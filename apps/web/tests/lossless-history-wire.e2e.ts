@@ -75,7 +75,6 @@ interface WirePageEvidence {
 interface StableUiEvidence {
   stats: string
   tool: string
-  settledFooter: string
   interruptedTextCount: number
   interruptedReasoningCount: number
   stoppedCount: number
@@ -450,9 +449,15 @@ function observeHistoryPages(page: Page, reads: Array<Promise<WirePageEvidence>>
   })
 }
 
+/** Marker reads scope to the transcript: the session title is the first
+ * prompt's text and legitimately shows USER_MARKERS[0] in header and sidebar. */
+function transcript(page: Page) {
+  return page.locator('[data-conversation-scroll]:visible').first()
+}
+
 async function markerCount(page: Page): Promise<number> {
   const counts = await Promise.all(MESSAGE_MARKERS.map(marker =>
-    page.getByText(marker, { exact: true }).count()))
+    transcript(page).getByText(marker, { exact: true }).count()))
   return counts.reduce((total, count) => total + count, 0)
 }
 
@@ -491,14 +496,12 @@ async function firstBrowserHistoryPage(
 }
 
 async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<StableUiEvidence> {
-  const stats = page.getByText(FULL_COUNTS, { exact: false }).locator('..')
+  const stats = page.locator('[data-composer-stats]').first()
   const tails = page.locator('[data-chat-flow-kind="turn-tail"]')
-  const tailCount = await tails.count()
-  if (tailCount < 2) throw new Error('expected settled and interrupted turn tails')
+  if (await tails.count() < 2) throw new Error('expected settled and interrupted turn tails')
   return {
     stats: (await stats.textContent()) ?? '',
     tool: await captureStableAria(page, '[data-sample="bash"]', scaffold.workspaceCwd),
-    settledFooter: (await tails.nth(tailCount - 2).textContent()) ?? '',
     interruptedTextCount: await page.getByText(INTERRUPTED_TEXT, { exact: true }).count(),
     interruptedReasoningCount: await page.getByRole('button', {
       name: new RegExp(`^Think ${INTERRUPTED_REASONING}`),
@@ -620,7 +623,7 @@ describe('web e2e: lossless history wire pagination', () => {
       timeout: 15_000,
     }).toBe(1)
 
-    expect(await page.getByText(USER_MARKERS[0] as string, { exact: true }).count()).toBe(0)
+    expect(await transcript(page).getByText(USER_MARKERS[0] as string, { exact: true }).count()).toBe(0)
     await expect.poll(() => page.getByRole('button', { name: 'Load earlier' }).count(), {
       timeout: 10_000,
     }).toBe(1)
@@ -652,10 +655,26 @@ describe('web e2e: lossless history wire pagination', () => {
     initialUi = await stableUiEvidence(page, scaffold)
     expect(initialUi.stats).toContain(FULL_COUNTS)
     expect(initialUi.stats).toContain('Cache hit 75%')
-    expect(initialUi.stats).toContain('Input 3.2K tok · Output 400 tok')
-    expect(initialUi.stats).toContain('Tool call')
-    expect(initialUi.settledFooter).not.toContain('TTFT')
-    expect(initialUi.settledFooter).not.toContain('tok/s')
+    expect(initialUi.stats).toContain('tok')
+    const usageButton = page.locator('[data-composer-stats]').first()
+      .getByRole('button', { name: /Cache hit 75%/u })
+    await usageButton.click()
+    const usageDetails = page.locator('[data-session-stats-usage]')
+    await usageDetails.waitFor({ timeout: 10_000 })
+    expect((await usageDetails.textContent()) ?? '').toMatch(/input/i)
+    expect((await usageDetails.textContent()) ?? '').toContain('Output')
+    await usageButton.press('Escape')
+    // Per-turn TTFT and throughput live in the turn-time dialog; with the
+    // chunk runs still omitted the settled tail's dialog carries neither row.
+    const initialTails = page.locator('[data-chat-flow-kind="turn-tail"]')
+    const initialTimeButton = initialTails.nth((await initialTails.count()) - 2)
+      .getByRole('button', { name: /Ran for/u })
+    await initialTimeButton.click()
+    const initialTimeDetails = page.locator('[data-turn-time-details]')
+    await initialTimeDetails.waitFor({ timeout: 10_000 })
+    expect((await initialTimeDetails.textContent()) ?? '').not.toContain('TTFT')
+    expect((await initialTimeDetails.textContent()) ?? '').not.toContain('tok/s')
+    await initialTimeButton.press('Escape')
     expect(initialUi.interruptedTextCount).toBe(1)
     expect(initialUi.interruptedReasoningCount).toBe(1)
     expect(initialUi.stoppedCount).toBe(1)
@@ -666,7 +685,7 @@ describe('web e2e: lossless history wire pagination', () => {
 
   it('fills Trajectory detail and restores Chat goldens', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lossless-history-expanded'))
-    while (await page.getByText(USER_MARKERS[0] as string, { exact: true }).count() === 0) {
+    while (await transcript(page).getByText(USER_MARKERS[0] as string, { exact: true }).count() === 0) {
       expect(loadOlderOperations).toBeLessThan(10)
       const beforeReadCount = historyReads.length
       const beforeMarkerCount = await markerCount(page)
@@ -694,7 +713,7 @@ describe('web e2e: lossless history wire pagination', () => {
       timeout: 10_000,
     }).toBe(0)
     for (const marker of MESSAGE_MARKERS) {
-      expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
+      expect(await transcript(page).getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
     const olderConversationPages = (await Promise.all(historyReads))
       .filter(current => current.detail === 'conversation' && current.beforeSeq !== undefined)
@@ -717,7 +736,7 @@ describe('web e2e: lossless history wire pagination', () => {
     // Every loaded turn is settled and folds its intermediate rows.
     await expandTurnProcesses(page)
     for (const marker of MESSAGE_MARKERS) {
-      expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
+      expect(await transcript(page).getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
     for (const marker of REASONING_MARKERS) {
       expect(await page.getByRole('button', { name: new RegExp(`^Think ${marker}`) }).count(), marker)
@@ -725,10 +744,24 @@ describe('web e2e: lossless history wire pagination', () => {
     }
 
     const expandedUi = await stableUiEvidence(page, scaffold)
-    expect(expandedUi.stats).toContain('TTFT avg')
     expect(expandedUi.stats).toContain('tok/s')
-    expect(expandedUi.settledFooter).toContain('TTFT')
-    expect(expandedUi.settledFooter).toContain('tok/s')
+    const timeButton = page.getByRole('button', { name: /TTFT|turns.*steps/u }).first()
+    await timeButton.click()
+    const timeDetails = page.locator('[data-session-stats-details]')
+    await timeDetails.waitFor({ timeout: 10_000 })
+    expect((await timeDetails.textContent()) ?? '').toContain('TTFT')
+    await timeButton.press('Escape')
+    // The filled chunk runs land TTFT and decode throughput on the settled
+    // tail's turn-time dialog rather than inline footer text.
+    const expandedTails = page.locator('[data-chat-flow-kind="turn-tail"]')
+    const expandedTimeButton = expandedTails.nth((await expandedTails.count()) - 2)
+      .getByRole('button', { name: /Ran for/u })
+    await expandedTimeButton.click()
+    const turnTimeDetails = page.locator('[data-turn-time-details]')
+    await turnTimeDetails.waitFor({ timeout: 10_000 })
+    expect((await turnTimeDetails.textContent()) ?? '').toContain('TTFT')
+    expect((await turnTimeDetails.textContent()) ?? '').toContain('tok/s')
+    await expandedTimeButton.press('Escape')
     expect(expandedUi.interruptedTextCount).toBe(1)
 
     const pages = await Promise.all(historyReads)

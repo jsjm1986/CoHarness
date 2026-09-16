@@ -396,18 +396,18 @@ function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
 }
 
 const ARCHIVE_COLUMNS = `a.root_session_id,
-  COALESCE(a.title,r.title) title,
+  harness.human_session_title(COALESCE(a.title,r.title)) title,
   COALESCE(
     (SELECT regexp_replace(left(cs.content,160), E'[\\r\\n]+', ' ', 'g')
       FROM harness.conversation_search cs
       JOIN harness.conversation_sessions csi ON csi.id=cs.session_id
       WHERE csi.organization_id=a.organization_id AND csi.root_session_id=a.root_session_id
-        AND cs.role='user'
+        AND cs.role='user' AND harness.human_session_title(cs.content) IS NOT NULL
       ORDER BY cs.occurred_at,cs.event_seq LIMIT 1),
     (SELECT regexp_replace(left(cas.content,160), E'[\\r\\n]+', ' ', 'g')
       FROM harness.conversation_archive_search cas
       WHERE cas.organization_id=a.organization_id AND cas.root_session_id=a.root_session_id
-        AND cas.role='user'
+        AND cas.role='user' AND harness.human_session_title(cas.content) IS NOT NULL
       ORDER BY cas.occurred_at,cas.event_seq LIMIT 1)
   ) content_preview,
   creator.public_id::text creator_public_id,creator.display_name creator_display_name,
@@ -579,7 +579,7 @@ export class ConversationArchiveService {
       const needle = `%${filter.query.trim()}%`
       values.push(needle)
       const arg = `$${String(values.length)}`
-      clauses.push(`(a.root_session_id ILIKE ${arg} OR COALESCE(a.title,r.title,'') ILIKE ${arg}
+      clauses.push(`(a.root_session_id ILIKE ${arg} OR COALESCE(harness.human_session_title(COALESCE(a.title,r.title)),'') ILIKE ${arg}
         OR EXISTS (SELECT 1 FROM harness.conversation_search cs
           JOIN harness.conversation_sessions csi ON csi.id=cs.session_id
           WHERE csi.organization_id=a.organization_id AND csi.root_session_id=a.root_session_id AND cs.content ILIKE ${arg})
@@ -748,7 +748,7 @@ export class ConversationArchiveService {
     const bounded = boundedLimit(limit, maximum)
     const descendants = await this.context.pool.query<{
       id: string; parent_session_id: string | null; title: string | null
-    }>(`SELECT id,parent_session_id,title FROM harness.conversation_sessions
+    }>(`SELECT id,parent_session_id,harness.human_session_title(title) title FROM harness.conversation_sessions
       WHERE organization_id=$1 AND root_session_id=$2 AND status<>'deleted'
       ORDER BY created_at,id LIMIT $3`, [this.context.organizationId, rootSessionId, MAX_ARCHIVE_DETAIL_DESCENDANTS + 1])
     if (descendants.rows.length > MAX_ARCHIVE_DETAIL_DESCENDANTS) {
@@ -1142,22 +1142,25 @@ export class ConversationArchiveService {
       ? await this.internalProjectId(this.context.pool, runtime.id)
       : await this.internalUserId(this.context.pool, runtime.id)
     if (owner === null) throw new Error('archive runtime owner is unavailable')
-    const result = await this.context.pool.query<{ id: string; root_session_id: string }>(`SELECT s.id,s.root_session_id
+    // Runtime-local sessions have no conversation_sessions row until the gateway
+    // materializes one, so ownership is enforced only against existing rows.
+    const result = await this.context.pool.query<{ id: string; root_session_id: string; owned: boolean }>(`SELECT s.id,s.root_session_id,
+        (($3::text='project' AND s.project_id=$4::uuid)
+          OR ($3::text='user' AND s.project_id IS NULL AND s.creator_user_id=$4::uuid)) AS owned
       FROM harness.conversation_sessions s
-      WHERE s.organization_id=$1 AND s.id=ANY($2::text[])
-        AND (($3::text='project' AND s.project_id=$4::uuid)
-          OR ($3::text='user' AND s.project_id IS NULL AND s.creator_user_id=$4::uuid))`, [
+      WHERE s.organization_id=$1 AND s.id=ANY($2::text[])`, [
       this.context.organizationId,
       unique,
       runtime.kind,
       owner,
     ])
-    if (result.rows.length !== unique.length) {
+    if (result.rows.some(row => !row.owned)) {
       throw new Error('archive snapshot contains a session outside the authenticated runtime')
     }
     const roots = new Map(result.rows.map(row => [row.id, row.root_session_id]))
     for (const pair of rootPairs) {
-      if (roots.get(pair.sessionId) !== pair.rootSessionId) {
+      const stored = roots.get(pair.sessionId)
+      if (stored !== undefined && stored !== pair.rootSessionId) {
         throw new Error('archive snapshot contains a session with an incorrect lineage root')
       }
     }

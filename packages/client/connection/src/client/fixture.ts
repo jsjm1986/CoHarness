@@ -29,7 +29,7 @@ import type {
 } from '@deepseek-ai/dsh-session/types'
 // Type-only: the brand constructor is host-side; the fixture casts at its
 // wire-fabrication boundary (the schema layer's one-cast-point posture).
-import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
+import type { CommandDefinitionId, CommandId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandDescriptor, CommandExecution, CommandResult } from '@deepseek-ai/dsh-commands/types'
 import { deriveEventMessage, foldSurface } from '@deepseek-ai/dsh-session/surface'
 import type {
@@ -41,6 +41,9 @@ import type { RequestPayload, ResponseValue, RpcMethodMap } from '@deepseek-ai/d
 import { AbstractApiClient, RpcId, SESSION_SEARCH_RESULT_LIMIT } from './api.ts'
 import { randomUuid } from './random-uuid.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
+
+/** Brand fixture-only command metadata without a runtime edge to Host commands. */
+const commandDefinitionId = (id: string): CommandDefinitionId => id as CommandDefinitionId
 
 /** The fake carrier mints like a real one (business code never mints). */
 function rpcRequest<P>(payload: P): RpcRequest<P> {
@@ -472,8 +475,8 @@ function buildAlphaLog(): SessionEvent[] {
   // header, the first hunk, a `⋯` gap, then the second (the same-file
   // second-hunk arm turns 62/63 cannot reach).
   toolTurn(64, 'edit', '{"file_path":"src/config.ts","old_string":"const timeout = 30","new_string":"const timeout = 60"}', '已编辑')
-  // Turn 65: one run_code turn with three logged sub-dispatches — the Code
-  // Mode acceptance surface (parent code row + nested native-identical rows,
+  // Turn 65: one run_code turn with three logged sub-dispatches — the PTC
+  // acceptance surface (parent code row + nested native-identical rows,
   // including an isError sub-call and a bash sub-call that must hit the same
   // keyed registration a top-level bash row uses).
   {
@@ -494,13 +497,13 @@ function buildAlphaLog(): SessionEvent[] {
     push({ type: 'tool/call', data: { turn, step: 0, callId, name: 'run_code', arguments: args } })
     const dispatchPair = (n: number, name: string, dispatchArgs: Record<string, unknown>, resultText: string, isError = false): void => {
       push({
-        type: 'tool/code-dispatch-start',
-        data: { rootCallId: callId, parentCallId: callId, subCallId: `${callId}:code:${n}`, name, arguments: dispatchArgs },
+        type: 'tool/ptc-dispatch-start',
+        data: { rootCallId: callId, parentCallId: callId, subCallId: `${callId}:ptc:${n}`, name, arguments: dispatchArgs },
       })
       push({
-        type: 'tool/code-dispatch',
+        type: 'tool/ptc-dispatch',
         data: {
-          rootCallId: callId, parentCallId: callId, subCallId: `${callId}:code:${n}`, name,
+          rootCallId: callId, parentCallId: callId, subCallId: `${callId}:ptc:${n}`, name,
           arguments: dispatchArgs, isError, content: [{ type: 'text', text: resultText }],
         },
       })
@@ -1021,23 +1024,43 @@ function estimateFixtureContent(blocks: readonly ContentBlock[]): number {
   }, 0)
 }
 
+/* jscpd:ignore-start -- deliberate self-contained parallel of token-meter's
+ * heuristic: the fixture stays dependency-free rather than pulling
+ * dsh-token-meter into the client fixture module. */
+/** Price a system-role message with token-meter's estimateSystemMessage heuristic. */
+function estimateFixtureSystemMessage(message: { content: readonly ContentBlock[] }): number {
+  if (message.content.length === 0) return 0
+  let characters = 0
+  for (const block of message.content) {
+    characters += block.type === 'text' ? block.text.length : JSON.stringify(block).length
+  }
+  return Math.ceil(characters / CHARS_PER_TOKEN) + ROLE_OVERHEAD
+}
+/* jscpd:ignore-end */
+
 /** Fixture parallel of token-meter's heuristic context-composition projection. */
 function contextBreakdownOf(log: readonly SessionEvent[]): FixtureContextBreakdownProjection {
   const headerEvent = log.findLast(event => event.type === 'request/header')
   const header = headerEvent === undefined
     ? undefined
     : headerEvent.data.header
+  let systemTokens = 0
   let messageTokens = 0
   for (const seq of foldSurface(log).nodes) {
     const event = log[seq]
     if (event === undefined) continue
     const message = deriveEventMessage(event)
-    if (message !== null) messageTokens += estimateFixtureContent(message.content) + ROLE_OVERHEAD
+    if (message === null) continue
+    if (event.type === 'system/message') {
+      // The newest system node is the effective prompt, priced like
+      // token-meter's estimateSystemMessage: text density plus role framing.
+      systemTokens = estimateFixtureSystemMessage(message)
+      continue
+    }
+    messageTokens += estimateFixtureContent(message.content) + ROLE_OVERHEAD
   }
   return {
-    systemTokens: header?.system === undefined
-      ? 0
-      : Math.ceil(header.system.length / CHARS_PER_TOKEN) + ROLE_OVERHEAD,
+    systemTokens,
     toolsTokens: header?.tools === undefined || header.tools.length === 0
       ? 0
       : Math.ceil(JSON.stringify(header.tools).length / CHARS_PER_TOKEN) + BLOCK_OVERHEAD,
@@ -1104,6 +1127,8 @@ function projectionValuesOf(log: readonly SessionEvent[]): Record<string, unknow
   values['contextBreakdown'] = contextBreakdownOf(log)
   // Always present (session-stats unit composed): whole-log turn/step counts.
   values['sessionStats'] = sessionStatsOf(log)
+  // Always present (apiproxy unit composed): durable model-selection fold.
+  values['modelSelection'] = modelSelectionProjectionOf(log)
   // Always present (attachment service composed): the deployment image
   // limits, constant per boot (mirrors the attachment-local defaults).
   // Deliberate host divergence: the real gateway never pushes an imageLimits
@@ -1121,9 +1146,51 @@ function projectionValuesOf(log: readonly SessionEvent[]): Record<string, unknow
 }
 
 /** Host push-frame parallel: emit one session/projection frame per key the given event advanced. */
+/** Fold the durable model-selection pair the host's modelSelection unit serves. */
+function modelSelectionProjectionOf(log: readonly SessionEvent[]): {
+  lastUsed: ModelSelection | null
+  next: ModelSelection | null
+} {
+  let lastUsed: ModelSelection | null = null
+  let pending: ModelSelection | null = null
+  for (const event of log) {
+    if ((event as { type: string }).type === 'model/selection') {
+      pending = (event as unknown as { data: ModelSelection }).data
+      continue
+    }
+    if (event.type !== 'request/header') continue
+    lastUsed = {
+      provider: event.data.header.config.provider,
+      model: event.data.header.config.model,
+      ...(event.data.header.config.reasoningEffort === undefined
+        ? {}
+        : { reasoningEffort: event.data.header.config.reasoningEffort }),
+    }
+    if (sameModelSelection(pending, lastUsed)) pending = null
+  }
+  return { lastUsed, next: pending ?? lastUsed }
+}
+
+function sameModelSelection(left: ModelSelection | null, right: ModelSelection | null): boolean {
+  return left === right || (left !== null && right !== null
+    && left.provider === right.provider
+    && left.model === right.model
+    && left.reasoningEffort === right.reasoningEffort)
+}
+
 function projectionFramesOf(id: SessionId, log: readonly SessionEvent[], event: SessionEvent): Extract<MuxFrame, { type: 'session/projection' }>[] {
   const type = (event as { type: string }).type
   const frames: Extract<MuxFrame, { type: 'session/projection' }>[] = []
+  // Host parallel: emit one Session control projection frame per key advanced by the event.
+  if (type === 'model/selection' || type === 'request/header') {
+    frames.push({
+      type: 'session/projection',
+      sessionId: id,
+      key: 'modelSelection',
+      value: modelSelectionProjectionOf(log),
+      seq: event.seq,
+    })
+  }
   // One usage sample advances both token-meter units.
   if (usageSampleOf(event) !== undefined) {
     frames.push(
@@ -1821,11 +1888,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       return {
         ok: true,
         value: [
-          { name: 'compact', description: 'fixture：压缩当前会话上下文' },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-compact'), name: 'compact', description: 'fixture：压缩当前会话上下文' },
           { name: 'echo', description: 'fixture：回显参数', input: { hint: 'text to echo' } },
-          { name: 'goal', description: 'set or view the goal for a long-running task', input: { hint: '<objective>', images: true } },
-          { name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
-          { name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', images: true } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'set or view the goal for a long-running task', input: { hint: '<objective>', images: true } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-permission-presets'), name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-plan-mode'), name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', images: true } },
         ],
       }
     },
@@ -2076,18 +2143,6 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     })
     return { ok: true, value: goalView(projection) }
   }
-
-  const mapGoalResult = <T, U>(result: RpcResult<T>, map: (value: T) => U): RpcResult<U> => (
-    result.ok ? { ok: true, value: map(result.value) } : result
-  )
-
-  const goalRefResult = (result: RpcResult<FxGoalView>): RpcResult<{ ref: { id: never; revision: number } }> => (
-    mapGoalResult(result, view => ({ ref: { id: view.id as never, revision: view.revision } }))
-  )
-
-  const legacyGoalResponse = <P, T>(request: RpcRequest<P>, result: RpcResult<T>): Promise<RpcResponse<T>> => (
-    Promise.resolve({ rpcId: request.rpcId, result })
-  )
 
   /** At most one in-flight replay per session; cancel clears it. */
   const replays = new Map<SessionId, { timer: ReturnType<typeof setTimeout>; finish(aborted: boolean): void }>()
@@ -2558,6 +2613,8 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
             : { reasoningEffort: request.payload.reasoningEffort },
         }
         modelSelections.set(request.payload.sessionId, selected)
+        // Host parallel: the validated selection is a durable Session event.
+        append(request.payload.sessionId, { type: 'model/selection', data: selected })
         return ok(request, { selected })
       },
       prompt: (request) => {
@@ -2683,7 +2740,6 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       },
     },
     subagents: {
-      list: request => ok(request, { entries: [], parentAvailable: true }),
       history: (request, signal) => {
         signal?.throwIfAborted()
         const log = logs.get(request.payload.childSessionId) ?? []
@@ -2692,10 +2748,6 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           pageOf(log, request.payload.beforeSeq, request.payload.maxMessages ?? 50),
         ))
       },
-      prompt: request => Promise.resolve(ok(request, {
-        messageId: `fixture-message-${request.payload.childSessionId}` as never,
-      })),
-      interrupt: request => Promise.resolve(ok(request, { accepted: true as const })),
     },
     host: {
       describe: request => ok(request, {
@@ -2871,58 +2923,18 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         return ok(request, { archivedSessionIds: [...archivedSessionIds] })
       },
     },
-    agentPresets: {
-      // Both trusts appear, because a surface must present a locally authored
-      // preset differently from one the deployment vetted.
-      list: request => ok(request, {
-        presets: [...fixturePresets].map(([id, preset]) => ({
-          id,
-          trust: preset.trust,
-          isDefault: id === fixtureDefaultPreset,
-        })),
-        authorable: true,
-        hasDocument: true,
+    workspaceFiles: {
+      list: request => ok(request, { path: request.payload.path ?? '', entries: [], truncated: false }),
+      stat: request => ok(request, { path: request.payload.path, type: 'file', bytes: 0, version: 'fixture' }),
+      read: request => ok(request, {
+        path: request.payload.path, offset: request.payload.offset ?? 1, limit: request.payload.limit ?? 1,
+        text: '', eof: true, version: 'fixture',
       }),
-      select: (request) => {
-        fixtureDefaultPreset = request.payload.agentPreset
-        return ok(request, { agentPreset: request.payload.agentPreset })
-      },
-      read: (request) => {
-        const { agentPreset } = request.payload
-        const preset = fixturePresets.get(agentPreset)
-        if (preset === undefined) {
-          return err(request, {
-            code: 'agent-preset-not-found',
-            message: `unknown agent preset "${agentPreset}"`,
-            details: { agentPreset, available: [...fixturePresets.keys()] },
-          })
-        }
-        return ok(request, {
-          agentPreset,
-          trust: preset.trust,
-          content: preset.content,
-        })
-      },
-      copy: (request) => {
-        const { from, agentPreset } = request.payload
-        const source = fixturePresets.get(from)
-        if (source === undefined) {
-          return err(request, {
-            code: 'agent-preset-not-found',
-            message: `unknown agent preset "${from}"`,
-            details: { agentPreset: from, available: [...fixturePresets.keys()] },
-          })
-        }
-        if (fixturePresets.has(agentPreset)) {
-          return err(request, {
-            code: 'agent-preset-invalid',
-            message: `agent preset "${agentPreset}" already exists`,
-            details: { agentPreset, reason: 'already exists' },
-          })
-        }
-        fixturePresets.set(agentPreset, { trust: 'user', content: source.content })
-        return ok(request, { agentPreset })
-      },
+      readBytes: request => ok(request, {
+        path: request.payload.path, offset: request.payload.offset ?? 0, bytes: '', eof: true, version: 'fixture',
+      }),
+    },
+    agentPresets: {
       // Native opens are deterministic no-op successes in this fixture, so the
       // open-directory affordance renders and the path-text fallback stays a
       // component-test concern.
@@ -2938,19 +2950,6 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         }
         return ok(request, { opened: true as const })
       },
-      remove: (request) => {
-        const { agentPreset } = request.payload
-        const existing = fixturePresets.get(agentPreset)
-        if (existing?.trust === 'system') {
-          return err(request, {
-            code: 'agent-preset-read-only',
-            message: `agent preset "${agentPreset}" ships with the deployment`,
-            details: { agentPreset, reason: 'it ships with the deployment' },
-          })
-        }
-        fixturePresets.delete(agentPreset)
-        return ok(request, {})
-      },
     },
 
     skills: {
@@ -2964,46 +2963,6 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           ],
         })
       },
-    },
-    goals: {
-      // Compatibility face only: old API Proxy payloads and acknowledgements
-      // adapt to the canonical fixture Remote implementation above.
-      create: request => legacyGoalResponse(
-        request,
-        mapGoalResult(
-          goalRemotes.create(request.payload.sessionId, {
-            objective: request.payload.objective,
-            ...request.payload.maxGoalRounds === undefined ? {} : { maxGoalRounds: request.payload.maxGoalRounds },
-          }),
-          value => ({ ref: { id: value.ref.id as never, revision: value.ref.revision } }),
-        ),
-      ),
-      edit: request => legacyGoalResponse(
-        request,
-        goalRefResult(goalRemotes.edit(request.payload.sessionId, request.payload.ref, {
-          ...request.payload.objective === undefined ? {} : { objective: request.payload.objective },
-          ...request.payload.maxGoalRounds === undefined ? {} : { maxGoalRounds: request.payload.maxGoalRounds },
-        })),
-      ),
-      pause: request => legacyGoalResponse(
-        request,
-        goalRefResult(goalRemotes.pause(request.payload.sessionId, request.payload.ref)),
-      ),
-      resume: request => legacyGoalResponse(
-        request,
-        goalRefResult(goalRemotes.resume(request.payload.sessionId, request.payload.ref)),
-      ),
-      complete: request => legacyGoalResponse(
-        request,
-        goalRefResult(goalRemotes.complete(request.payload.sessionId, request.payload.ref)),
-      ),
-      clear: request => legacyGoalResponse(
-        request,
-        mapGoalResult(
-          goalRemotes.clear(request.payload.sessionId, request.payload.ref),
-          () => ({ cleared: true as const }),
-        ),
-      ),
     },
     events: {
       async *mux(_request, signal) {
@@ -3183,7 +3142,10 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           query?: string
           images?: readonly unknown[]
           ref?: { id: string; revision: number }
-          request?: { objective?: string; maxGoalRounds?: number }
+          request?: { objective?: string; maxGoalRounds?: number; childSessionId?: string }
+          agentPreset?: string
+          from?: string
+          id?: string
         }
       }).args
       const sessionId = args.agentId
@@ -3205,6 +3167,57 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         case 'goals/resume': return Promise.resolve(goalRemotes.resume(sessionId, args.ref as FxGoalRef))
         case 'goals/complete': return Promise.resolve(goalRemotes.complete(sessionId, args.ref as FxGoalRef))
         case 'goals/clear': return Promise.resolve(goalRemotes.clear(sessionId, args.ref as FxGoalRef))
+        case 'agentPresets/list': return Promise.resolve({
+          ok: true,
+          value: {
+            presets: [...fixturePresets].map(([id, preset]) => ({ id, trust: preset.trust, isDefault: id === fixtureDefaultPreset })),
+            authorable: true,
+          },
+        })
+        case 'agentPresets/read': {
+          const agentPreset = args.agentPreset ?? ''
+          const preset = fixturePresets.get(agentPreset)
+          return Promise.resolve(preset === undefined
+            ? { ok: false, error: { code: 'agent-preset/not-found', message: `unknown agent preset "${agentPreset}"`, details: { agentPreset, available: [...fixturePresets.keys()] } } }
+            : { ok: true, value: { agentPreset, trust: preset.trust, content: preset.content } })
+        }
+        case 'agentPresets/copy': {
+          const from = args.from ?? ''
+          const id = args.id ?? ''
+          const source = fixturePresets.get(from)
+          if (source === undefined) {
+            return Promise.resolve({ ok: false, error: { code: 'agent-preset/not-found', message: `unknown agent preset "${from}"`, details: { agentPreset: from, available: [...fixturePresets.keys()] } } })
+          }
+          if (fixturePresets.has(id)) {
+            return Promise.resolve({ ok: false, error: { code: 'agent-preset/invalid', message: `agent preset "${id}" already exists`, details: { agentPreset: id, reason: 'already exists' } } })
+          }
+          fixturePresets.set(id, { trust: 'user', content: source.content })
+          return Promise.resolve({ ok: true, value: undefined })
+        }
+        case 'agentPresets/deletePreset': {
+          const id = args.id ?? ''
+          const existing = fixturePresets.get(id)
+          if (existing?.trust === 'system') {
+            return Promise.resolve({ ok: false, error: { code: 'agent-preset/read-only', message: `agent preset "${id}" ships with the deployment`, details: { agentPreset: id, reason: 'it ships with the deployment' } } })
+          }
+          fixturePresets.delete(id)
+          return Promise.resolve({ ok: true, value: undefined })
+        }
+        case 'agentPresets/select': {
+          const selected = args.agentPreset ?? ''
+          fixtureDefaultPreset = selected
+          return Promise.resolve({ ok: true, value: selected })
+        }
+        case 'subagents/list': return Promise.resolve({ ok: true, value: { entries: [], parentAvailable: true } })
+        case 'subagents/prompt': return Promise.resolve({
+          ok: true,
+          value: { messageId: `fixture-message-${args.request?.childSessionId ?? ''}` },
+        })
+        case 'subagents/interruptByParent': return Promise.resolve({ ok: true, value: { accepted: true } })
+        case 'llm/discoverModels': return Promise.resolve({
+          ok: true,
+          value: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
+        })
         default:
           return Promise.reject(new Error(`fixture connection RPC endpoint ${JSON.stringify(endpoint)} is unavailable`))
       }
@@ -3274,10 +3287,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.attachment': return this.api.sessions.attachment(request)
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)
       case 'session.cancel': return this.api.sessions.cancel(request)
-      case 'subagent.list': return this.api.subagents.list(request)
       case 'subagent.history': return this.api.subagents.history(request, signal)
-      case 'subagent.prompt': return this.api.subagents.prompt(request, signal)
-      case 'subagent.interrupt': return this.api.subagents.interrupt(request)
       case 'host.describe': return this.api.host.describe(request)
       case 'host.pickDirectory': return this.api.host.pickDirectory(request, new AbortController().signal)
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)
@@ -3290,19 +3300,12 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'workspace.insertBefore': return this.api.workspace.insertBefore(request)
       case 'workspace.insertSessionBefore': return this.api.workspace.insertSessionBefore(request)
       case 'workspace.archiveSession': return this.api.workspace.archiveSession(request)
+      case 'workspaceFiles.list': return this.api.workspaceFiles.list(request)
+      case 'workspaceFiles.stat': return this.api.workspaceFiles.stat(request)
+      case 'workspaceFiles.read': return this.api.workspaceFiles.read(request, signal)
+      case 'workspaceFiles.readBytes': return this.api.workspaceFiles.readBytes(request, signal)
       case 'skill.list': return this.api.skills.list(request)
-      case 'agentPreset.list': return this.api.agentPresets.list(request)
-      case 'agentPreset.select': return this.api.agentPresets.select(request)
-      case 'agentPreset.read': return this.api.agentPresets.read(request)
-      case 'agentPreset.copy': return this.api.agentPresets.copy(request)
       case 'agentPreset.openDocument': return this.api.agentPresets.openDocument(request, new AbortController().signal)
-      case 'agentPreset.remove': return this.api.agentPresets.remove(request)
-      case 'goal.create': return this.api.goals.create(request)
-      case 'goal.edit': return this.api.goals.edit(request)
-      case 'goal.pause': return this.api.goals.pause(request)
-      case 'goal.resume': return this.api.goals.resume(request)
-      case 'goal.complete': return this.api.goals.complete(request)
-      case 'goal.clear': return this.api.goals.clear(request)
       case 'settings.describe': return this.api.settings.describe(request)
       case 'settings.openDocument': return this.api.settings.openDocument(request, signal)
       case 'settings.update': return this.api.settings.update(request)

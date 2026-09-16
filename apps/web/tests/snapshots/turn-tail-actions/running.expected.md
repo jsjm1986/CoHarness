@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 tool call · 1 intermediate message" [expanded]:
   - text: 1 tool call · 1 intermediate message
   - img
@@ -49,4 +48,10 @@
   - img
 - button "6% of context used"
 - button "Stop generating"
-- text: 1 turns · 1 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 0% Input 7.8K tok · Output 109 tok
+- button "1 turns · 1 steps · {{throughput}} tok/s":
+  - img
+  - text: 1 turns · 1 steps{{throughput}} tok/s
+- button "7.9K tok · Cache hit 0%":
+  - img
+  - text: 7.9K tokCache hit 0%
+- separator "Adjust transcript content width"

@@ -30,14 +30,10 @@ import {
   workspaceRenameRequestSchema, workspaceRenameValueSchema, workspaceViewSchema,
 } from '../src/api/workspace.schema.ts'
 import { skillEntrySchema, skillListRequestSchema, skillListValueSchema } from '../src/api/skills.schema.ts'
-import {
-  agentPresetEntrySchema, agentPresetListValueSchema, agentPresetOpenDocumentValueSchema,
-} from '../src/api/agent-presets.schema.ts'
+import { agentPresetOpenDocumentValueSchema } from '../src/api/agent-presets.schema.ts'
 import { hostFrameSchema, muxFrameSchema, askUserQuestionItemSchema } from '../src/api/events.schema.ts'
 import { approvalRequestIdSchema, approvalResponsePayloadSchema } from '../src/api/approvals.schema.ts'
 import { askUserQuestionAnswerSchema, questionResponsePayloadSchema } from '../src/api/questions.schema.ts'
-import { goalEditRequestSchema } from '../src/api/goals.schema.ts'
-import { subagentPromptRequestSchema } from '../src/api/subagents.schema.ts'
 
 describe('RpcId', () => {
   it('brands a raw string at zero runtime cost', () => {
@@ -109,7 +105,21 @@ describe('rpcErrorSchema', () => {
     expect(() => rpcErrorSchema.parse({ code: 'agent-busy', message: 'm', details: {} })).toThrow()
     expect(() => rpcErrorSchema.parse({ code: 'title-invalid', message: 'm', details: {} })).toThrow()
     expect(() => rpcErrorSchema.parse({ code: 'command-error', message: 'm' })).toThrow()
-    expect(() => rpcErrorSchema.parse({ code: 'nope', message: 'm', details: {} })).toThrow()
+  })
+
+  it('carries codes outside the domain catalog on the generic branch', () => {
+    expect(rpcErrorSchema.parse({ code: 'gateway/internal', message: 'm', details: {} }).code).toBe('gateway/internal')
+    expect(rpcErrorSchema.parse({ code: 'llm/model-discovery-rejected', message: 'm', details: { settingsNs: 'x' } }).code)
+      .toBe('llm/model-discovery-rejected')
+    expect(rpcErrorSchema.parse({ code: 'nope', message: 'm', details: {} }).code).toBe('nope')
+    expect(() => rpcErrorSchema.parse({ code: 'nope', message: 'm' })).toThrow()
+    expect(rpcErrorSchema.parse({
+      code: 'collaboration-forbidden',
+      message: 'm',
+      details: { action: 'read', reason: 'not-member' },
+    }).code).toBe('collaboration-forbidden')
+    expect(() => rpcErrorSchema.parse({ code: 'collaboration-forbidden', message: 'm', details: { action: 'read' } }))
+      .toThrow()
   })
 })
 
@@ -351,24 +361,6 @@ describe('history wire schema', () => {
   })
 })
 
-describe('subagent domain schemas', () => {
-  it('carries optional request-local browser-zone provenance on prompts', () => {
-    expect(subagentPromptRequestSchema.parse({
-      parentSessionId: 'parent',
-      childSessionId: 'child',
-      mode: 'continuable',
-      content: [{ type: 'text', text: 'continue' }],
-      clientTimeZone: 'Asia/Shanghai',
-    }).clientTimeZone).toBe('Asia/Shanghai')
-    expect(subagentPromptRequestSchema.parse({
-      parentSessionId: 'parent',
-      childSessionId: 'child',
-      mode: 'continuable',
-      content: [],
-    }).clientTimeZone).toBeUndefined()
-  })
-})
-
 describe('host domain schemas', () => {
   it('validates describe request/value', () => {
     expect(hostDescribeRequestSchema.parse({})).toEqual({})
@@ -491,15 +483,6 @@ describe('skills domain schemas', () => {
   })
 })
 
-describe('goals domain schemas', () => {
-  it('requires at least one replacement field for goal.edit', () => {
-    const ref = { id: 'g1', revision: 1 }
-    expect(goalEditRequestSchema.parse({ sessionId: 's1', ref, objective: 'updated' }).objective).toBe('updated')
-    expect(goalEditRequestSchema.parse({ sessionId: 's1', ref, maxGoalRounds: 3 }).maxGoalRounds).toBe(3)
-    expect(() => goalEditRequestSchema.parse({ sessionId: 's1', ref })).toThrow()
-  })
-})
-
 describe('events frame schemas', () => {
   it('accepts every mux frame branch', () => {
     const frames = [
@@ -616,20 +599,6 @@ describe('respond payload schemas', () => {
 })
 
 describe('agent-preset schemas', () => {
-  it('accepts a roster row and rejects an unknown trust', () => {
-    expect(agentPresetEntrySchema.parse({ id: 'standard', trust: 'system', isDefault: true }))
-      .toEqual({ id: 'standard', trust: 'system', isDefault: true })
-    expect(() => agentPresetEntrySchema.parse({ id: 'x', trust: 'root', isDefault: false })).toThrow()
-    expect(() => agentPresetEntrySchema.parse({ id: '', trust: 'user', isDefault: false })).toThrow()
-  })
-
-  it('accepts an empty roster', () => {
-    // A deployment composing no presets still reports its authoring and
-    // native-open capabilities, so a surface knows what to offer.
-    expect(agentPresetListValueSchema.parse({ presets: [], authorable: false, hasDocument: false }))
-      .toEqual({ presets: [], authorable: false, hasDocument: false })
-  })
-
   it('answers the open-document union by its discriminant', () => {
     expect(agentPresetOpenDocumentValueSchema.parse({ opened: true })).toEqual({ opened: true })
     expect(agentPresetOpenDocumentValueSchema.parse({ opened: false, path: '/presets/mine' }))

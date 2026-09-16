@@ -43,9 +43,9 @@
     - button "Refresh":
       - img
     - button "History"
+  - checkbox "Select this page"
   - text: Visible only to you 21 documents
   - list "Document Manager":
-    - checkbox "Select this page"
     - group "Upload date 2026-08-01":
       - text: 2026-08-01
       - listitem:

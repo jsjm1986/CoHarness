@@ -4,7 +4,6 @@
     - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
-    - text: /
     - button "3 subagents":
       - text: 3 subagents
       - img
@@ -18,7 +17,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -41,7 +39,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -61,7 +62,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -72,4 +76,10 @@
 - 'button "Access mode, current: Custom"': Custom
 - button "6% of context used"
 - button "Send message" [disabled]
-- text: 2 turns · 2 steps LLM {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 99% Input 15.6K tok · Output 158 tok
+- button "2 turns · 2 steps · {{throughput}} tok/s":
+  - img
+  - text: 2 turns · 2 steps{{throughput}} tok/s
+- button "15.7K tok · Cache hit 99%":
+  - img
+  - text: 15.7K tokCache hit 99%
+- separator "Adjust transcript content width"

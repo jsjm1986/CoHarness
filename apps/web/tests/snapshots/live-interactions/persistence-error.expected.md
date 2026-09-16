@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "Process details":
   - text: Process details
   - img
@@ -37,4 +36,6 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
+- img
 - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"

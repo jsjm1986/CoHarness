@@ -103,9 +103,12 @@ describe('web e2e: whole-session stats survive history paging', () => {
     // Settled barrier: the newest recorded reply renders from the tail page.
     await expect.poll(() => page.getByText(`r${TURNS}`, { exact: true }).count(), { timeout: 15_000 }).toBe(1)
     // The tail page is partial (56 messages > one 50-message page): the first
-    // turns are NOT loaded, yet the strip already reports the whole log —
-    // the sessionStats projection, not the window fold.
-    expect(await page.getByText('m1', { exact: true }).count()).toBe(0)
+    // turns are NOT loaded in the transcript, yet the strip already reports
+    // the whole log — the sessionStats projection, not the window fold.
+    // (The marker reads scope to the transcript: the session title is the
+    // first prompt's text and legitimately shows 'm1' in header and sidebar.)
+    const transcript = page.locator('[data-conversation-scroll]:visible').first()
+    expect(await transcript.getByText('m1', { exact: true }).count()).toBe(0)
     await expect.poll(() => page.getByText(FULL_COUNTS, { exact: false }).count(), { timeout: 10_000 }).toBe(1)
     const strip = page.getByText(FULL_COUNTS, { exact: false }).locator('..')
     const stripBeforePaging = await strip.textContent()
@@ -115,13 +118,13 @@ describe('web e2e: whole-session stats survive history paging', () => {
     const loadEarlier = page.getByRole('button', { name: 'Load earlier' })
     const loadingEarlier = page.getByRole('button', { name: /Loading earlier history/ })
     await expect.poll(async () => {
-      if (await page.getByText('m1', { exact: true }).count() > 0) return true
+      if (await transcript.getByText('m1', { exact: true }).count() > 0) return true
       if (await loadingEarlier.count() > 0) return false
       if (await loadEarlier.count() === 0) return false
       try { await loadEarlier.click({ timeout: 1_000 }) } catch { /* retry after the DOM settles */ }
-      return await page.getByText('m1', { exact: true }).count() > 0
+      return await transcript.getByText('m1', { exact: true }).count() > 0
     }, { timeout: 30_000 }).toBe(true)
-    await expect.poll(() => page.getByText('m1', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    await expect.poll(() => transcript.getByText('m1', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     expect(await strip.textContent()).toBe(stripBeforePaging)
     // With the whole log loaded, the window mounts one turn-tail footer per
     // settled turn — the loaded-window probe the scroll/perf lanes count now

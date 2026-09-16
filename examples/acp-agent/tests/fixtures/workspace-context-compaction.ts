@@ -28,7 +28,7 @@ export function apply(ctx: Context): void {
       content: [{ type: 'text', text: 'Earlier context was compacted for this snapshot.' }],
       source: compactCheckpointSource(CompactionId('workspace-context-fixture')),
     }), {
-      surfaceOp: { op: 'replace', start: baseline.seq, end: baseline.seq },
+      surfaceOp: { op: 'replace', startSeq: baseline.seq, endSeq: baseline.seq },
       sourceEventSeqs: [baseline.seq],
     })
     return downstream

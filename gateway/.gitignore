@@ -4,3 +4,4 @@ data/
 public/admin
 deploy/postgres/secrets/*
 !deploy/postgres/secrets/.gitkeep
+lib-ci/

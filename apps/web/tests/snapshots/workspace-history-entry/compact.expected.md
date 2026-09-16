@@ -17,7 +17,9 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button:
+  - img
+- text: 7/25 {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -30,4 +32,9 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "Session statistics": 1 turns · 2 steps · Session statistics
+- button "1 turns · 2 steps · {{throughput}} tok/s":
+  - img
+  - text: 1 turns · 2 steps{{throughput}} tok/s
+- button "16K tok · Cache hit 98%":
+  - img
+  - text: 16K tokCache hit 98%

@@ -28,7 +28,7 @@ async function mintAgentScope(ctx: Context, name: string): Promise<{ scope: Scop
   // The scoped context resolves services through the MINTING plugin's
   // dependency chain — the minter must inject what scope holders will reach
   // (in production the agent loop's inject list plays this role).
-  await ctx.plugin(Object.assign((inner: Context) => { scope = createScope(inner, key) },
+  await ctx.plugin(Object.assign(async (inner: Context) => { scope = createScope(inner, key) },
     { inject: ['tools', 'systemPrompt'] }))
   return { scope, key }
 }
@@ -207,7 +207,7 @@ describe('restrict() over an inherited scope layer', () => {
     const key = { id: name as SessionId } as Agent
     bindScopeParent(key, parentKey)
     let scope!: Scope
-    await ctx.plugin(Object.assign((inner: Context) => { scope = createScope(inner, key) },
+    await ctx.plugin(Object.assign(async (inner: Context) => { scope = createScope(inner, key) },
       { inject: ['tools', 'systemPrompt'] }))
     return { scope, key }
   }

@@ -14,6 +14,10 @@ After `command.execute` returns a matched command result, this browser emits loc
 
 Menu queries fuzzy-match ordered, case-insensitive subsequences of command names. Prefixes rank first; separator boundaries, adjacent characters, and shorter gaps rank the remaining matches, with directory and contribution order breaking ties. This affects discovery only: space and Enter still require an exact command name. Rationale: [Web slash-command fuzzy discovery](../../../.agents/notes/implemented/feature/2026-08-04-web-slash-command-fuzzy-discovery.md).
 
+First-party command descriptors with a stable `definitionId` receive localized labels, descriptions, and glyphs in the empty-query menu; rows are grouped into Add and Commands sections. Client contributions may provide a label, description, and shared icon component without changing dispatch identity. Labels participate in fuzzy discovery while the canonical command name remains the pick key.
+
+The localized first-party token is only a draft spelling: the claim keeps it visible in the composer, while `command.execute` receives the canonical descriptor name. Exact canonical names still win when a deployment defines a same-text scoped command.
+
 `PopupSelectController` (`src/client/popup.ts`) is the headless shell state: `PopupSelectView` self-registers into `conversation.input.overlay` (the SlotMap key is ui-conversation's; this package pulls the declaration in with a type-only import — no runtime edge). The shell is a transient layer holding focus while open; token-segment consumption after onSelect runs both branches through `consumeTokenSegment` (menu-path span CAS, enter-path bare-token equality) against the draft face the wiring layer binds via `bindDraft`.
 
 The `/client` entrypoint exports the plugin body (`apply`/`inject`), `CommandUiRuntime`, the directory and popup classes with their state types, and the fixed contract types; the shell component itself is internal to the overlay registration.

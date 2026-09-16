@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import AgentRegistry, { agentEvents, Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
 import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
 import type { GoalRef } from '@deepseek-ai/dsh-goal'
@@ -17,12 +17,15 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
+import type { ReactLoopInbox } from '../../../core/agent-loop/src/inbox.ts'
 
 const testToolSignal = new AbortController().signal
 
 interface StubAgent {
   readonly agent: Agent
   readonly session: Session
+  readonly inbox: ReactLoopInbox
   setStatus(status: AgentStatus): void
 }
 
@@ -34,7 +37,7 @@ function stubAgent(rawId: string, supplied?: Session): StubAgent {
     id: session.id,
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     get status() { return status },
     ctx: new Context(),
     send: () => {},
@@ -47,7 +50,8 @@ function stubAgent(rawId: string, supplied?: Session): StubAgent {
     runMaintenance: task => task(new AbortController().signal),
     whenIdle() { return Promise.resolve() },
   }
-  return { agent, session, setStatus(value) { status = value } }
+  const inbox = sessionBackedInbox(agent)
+  return { agent, session, inbox, setStatus(value) { status = value } }
 }
 
 /** Open one message-triggered turn with its accepted model-visible input. */
@@ -60,7 +64,7 @@ function openTurn(stub: StubAgent, source: MessageSource, text = 'prompt'): numb
     source,
   })
   stub.agent.inbox.append('next-turn', message)
-  const claimed = stub.agent.inbox.claim('next-turn', turn)
+  const claimed = stub.inbox.claim('next-turn', turn)
   if (claimed.length === 0) throw new Error('expected queued turn input')
   stub.session.append('turn/start', { turn })
   for (const admitted of claimed) {

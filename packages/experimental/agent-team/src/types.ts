@@ -200,6 +200,23 @@ export interface TeamWaitResult {
   readonly timedOut: boolean
 }
 
+/** Point-in-time roster and task-board projection returned to browser clients. */
+export interface TeamView {
+  readonly members: TeamMemberView[]
+  readonly tasks: TeamTaskView[]
+}
+
+/** Browser task mutation result with stale revisions kept distinct from other Team rejections. */
+export type TeamTaskMutationResult =
+  | { readonly ok: true; readonly value: TeamTaskView }
+  | {
+    readonly ok: false
+    readonly error: {
+      readonly code: 'team-task-conflict' | 'team-rejected'
+      readonly message: string
+    }
+  }
+
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /** Whole teammate lifecycle value, stored only in the Team Lead Session. */

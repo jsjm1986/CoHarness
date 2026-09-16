@@ -30,6 +30,7 @@ import {
 import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
+import type { ModelDiscoveryProbe } from './ModelListEditor.tsx'
 import { deriveKeyRef, messageOf, protocolChoices } from './store.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import type { en } from './locales.ts'
@@ -63,8 +64,10 @@ export interface ProviderEditorProps {
   schema: SettingsSchemaOperations
   /** Path from the section root to this provider's profile. */
   settingsPath: readonly string[]
-  /** Wire faces for writes and for interrogating a provider endpoint. */
-  api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
+  /** Wire faces for writes. */
+  api: Pick<IApiClient, 'settings' | 'credentials'>
+  /** Discovery probe for interrogating a provider endpoint. */
+  discoverModels: ModelDiscoveryProbe
   /** Section copy. */
   t: (key: keyof typeof en) => string
   /** Disable writes (read-only settings provider). */
@@ -158,7 +161,7 @@ function refFor(
  * @returns the editor card.
  */
 export function ProviderEditor(props: ProviderEditorProps): ReactNode {
-  const { namespace, schema, settingsPath, api, t } = props
+  const { namespace, schema, settingsPath, api, discoverModels, t } = props
   const [draft, setDraft] = useState<Record<string, unknown>>(() => draftAt(schema, namespace, settingsPath))
   const [keyDraft, setKeyDraft] = useState('')
   const [keyState, setKeyState] = useState<CredentialView | undefined>(undefined)
@@ -492,7 +495,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                   defaultMaxTokens={typeof defaultMaxTokens === 'number' ? defaultMaxTokens : undefined}
                 />
               )
-              : <ModelListEditor {...catalogProps} probe={probe} probeBlocked={keyFailure} api={api} />}
+              : <ModelListEditor {...catalogProps} probe={probe} probeBlocked={keyFailure} discoverModels={discoverModels} />}
           </div>
         </details>}
       </>

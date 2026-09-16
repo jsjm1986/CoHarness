@@ -4,6 +4,7 @@ import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import type { BasicCompactionConfig } from '@deepseek-ai/dsh-compaction-basic'
 import { selectCompactableRange } from '@deepseek-ai/dsh-compaction-basic/src/region.ts'
+import { frameSummary } from '@deepseek-ai/dsh-compaction-basic/src/summarizer.ts'
 import type { SummarizationInput, SummaryResult } from '@deepseek-ai/dsh-compaction-basic/src/summarizer.ts'
 import { CompactionId, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@deepseek-ai/dsh-compaction'
 import {
@@ -23,6 +24,7 @@ import type {
   TokenUsage,
 } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { agentEvents, type Agent, type RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import ToolResultPruner from '@deepseek-ai/dsh-compaction-tool-result-pruner'
@@ -103,10 +105,20 @@ function promptInput(text: string): SummarizationInput {
 }
 
 /** Closed two-message turns followed by one open turn for durable compaction events. */
-function conversation(turns = 4, text = 'fixture '.repeat(40).trim()): Session {
+function conversation(turns = 4, text = 'fixture '.repeat(40).trim(), system?: string): Session {
   const session = Session.create(SessionId(`conversation-${turns}`))
   for (let turn = 1; turn <= turns; turn += 1) {
     session.append('turn/start', { turn })
+    if (turn === 1 && system !== undefined) {
+      session.append('system/message', {
+        turn, step: 1,
+        message: createMessage({
+          role: 'system',
+          content: [{ type: 'text', text: system }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+      }, { surfaceOp: 'append' })
+    }
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: `${text} user ${turn}` }],
       source: { kind: 'user' },
@@ -628,7 +640,7 @@ describe('pressure measurement and retention', () => {
     session.append('request/header', {
       header: {
         config: { provider: MODEL, model: MODEL },
-        system: 's'.repeat(2_000),
+        tools: [{ name: 'x'.repeat(2_000), description: 'd', parameters: { type: 'object' } }],
       },
       reason: 'resume',
     })
@@ -661,14 +673,20 @@ describe('pressure measurement and retention', () => {
     const empty = Session.create(SessionId('empty'))
     empty.append('turn/start', { turn: 1 })
     empty.append('request/header', {
-      header: { config: { provider: MODEL, model: MODEL }, system: 'x'.repeat(100_000) },
+      header: {
+        config: { provider: MODEL, model: MODEL },
+        tools: [{ name: 'x'.repeat(100_000), description: 'd', parameters: { type: 'object' } }],
+      },
       reason: 'initial',
     })
     expect(await compactIfNeeded(compact, empty)).toBeNull()
 
     const retained = conversation(1)
     retained.append('request/header', {
-      header: { config: { provider: MODEL, model: MODEL }, system: 'x'.repeat(100_000) },
+      header: {
+        config: { provider: MODEL, model: MODEL },
+        tools: [{ name: 'x'.repeat(100_000), description: 'd', parameters: { type: 'object' } }],
+      },
       reason: 'resume',
     })
     expect(await compactIfNeeded(compact, retained)).toBeNull()
@@ -879,19 +897,22 @@ describe('compaction region transaction', () => {
     expect(replay.deriveMessages()).toEqual(session.deriveMessages())
   })
 
-  it('replays the latest routed header so the summarizer reuses the cache', async () => {
+  it('replays the system head and latest routed header so the summarizer reuses the cache', async () => {
     const compact = service()
-    const session = conversation(3)
+    const session = conversation(3, 'fixture '.repeat(40).trim(), 'CONVERSATION SYSTEM')
     const tools = [{ name: 'do_thing', description: 'd', parameters: { type: 'object' } }]
     session.append('request/header', {
-      header: { config: { provider: MODEL, model: MODEL }, system: 'CONVERSATION SYSTEM', tools },
+      header: { config: { provider: MODEL, model: MODEL }, tools },
       reason: 'resume',
     })
     const nodes = session.surface.nodes
-    await compact.compactRegion(nodes[0]!, nodes[1]!, agent(session, MODEL), SIGNAL)
+    await compact.compactRegion(nodes[1]!, nodes[2]!, agent(session, MODEL), SIGNAL)
 
     const { input } = compact.calls[0]!
-    expect(input.system).toBe('CONVERSATION SYSTEM')
+    expect(input.messages[0]).toMatchObject({
+      role: 'system',
+      content: [{ type: 'text', text: 'CONVERSATION SYSTEM' }],
+    })
     expect(input.tools).toEqual(tools)
     expect(summarizedText(input)).toContain('fixture user 1')
   })
@@ -1238,16 +1259,21 @@ describe('default one-shot summarizer', () => {
       ],
       source: { kind: 'plugin', plugin: 'test' },
     })
+    const system = createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: 'REPLAYED SYSTEM' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    })
     await compact.runSummarize({
-      system: 'REPLAYED SYSTEM',
       tools,
-      messages: [prefix],
+      messages: [system, prefix],
     }, agent(conversation(1), MODEL))
 
-    expect(adapter.lastOptions?.system).toBe('REPLAYED SYSTEM')
+    expect(adapter.lastOptions?.system).toBeUndefined()
     expect(adapter.lastOptions?.tools).toEqual(tools)
     const messages = adapter.lastOptions?.messages ?? []
-    expect(messages[0]).toEqual(prefix)
+    expect(messages[0]).toEqual(system)
+    expect(messages[1]).toEqual(prefix)
     const last = messages.at(-1)?.content[0]
     const lastText = last?.type === 'text' ? last.text : ''
     expect(lastText).toContain('Write concise English engineering prose.')
@@ -1279,9 +1305,13 @@ describe('default one-shot summarizer', () => {
       source: { kind: 'plugin', plugin: 'test' },
     })
 
+    const system = createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: 'WARM SYSTEM' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    })
     const output = await compact.runSummarize({
-      system: 'WARM SYSTEM',
-      messages: [prefix],
+      messages: [system, prefix],
     }, agent(conversation(1), 'fallback'))
 
     expect(output).toMatchObject({
@@ -1293,9 +1323,10 @@ describe('default one-shot summarizer', () => {
       provider: 'policy-summary',
       model: 'policy-summary',
       maxTokens: 222,
-      system: 'WARM SYSTEM',
     })
-    expect(policyAdapter.lastOptions?.messages[0]).toEqual(prefix)
+    expect(policyAdapter.lastOptions?.system).toBeUndefined()
+    expect(policyAdapter.lastOptions?.messages[0]).toEqual(system)
+    expect(policyAdapter.lastOptions?.messages[1]).toEqual(prefix)
   })
 
   it('resolves the latest routed provider/model before the AgentOptions pair', async () => {
@@ -1876,5 +1907,150 @@ describe('automatic listener and loader composition', () => {
     await preStep(ctx, agent(session, MODEL))
     expect(session.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
+  })
+})
+
+describe('route-priced image pressure', () => {
+  const IMAGE_VISUAL_TOKENS = 300
+  const IMAGE_HANDLE_TEXT = 'request preview'
+
+  class PricedContextAdapter extends ContextAdapter {
+    override imageRequestPricing(): { priceImages: (images: readonly unknown[]) => Array<{ visualTokens: number; text: string }> } {
+      return {
+        priceImages: images => images.map(() => ({
+          visualTokens: IMAGE_VISUAL_TOKENS,
+          text: IMAGE_HANDLE_TEXT,
+        })),
+      }
+    }
+  }
+
+  function pricedContext(contextWindow = 1_000): Context {
+    const ctx = new Context()
+    void new LlmRuntime(ctx)
+    new SessionProjectionRegistry(ctx)
+    void new TokenMeter(ctx)
+    ctx.llm.registerAdapter([MODEL], new PricedContextAdapter(contextWindow))
+    return ctx
+  }
+
+  /** Closed short-text turns whose user messages each carry one image. */
+  function imageConversation(turns = 4): Session {
+    const session = Session.create(SessionId(`image-dense-${turns}`))
+    for (let turn = 1; turn <= turns; turn += 1) {
+      session.append('turn/start', { turn })
+      session.append('user/message', createUserMessage({
+        content: [
+          { type: 'text', text: `image turn ${turn}` },
+          {
+            type: 'image',
+            attachment: {
+              attachmentId: AttachmentId(`sha256:${String(turn).repeat(8)}`),
+              mediaType: 'image/png',
+              bytes: 2048,
+              width: 800,
+              height: 800,
+              name: `shot-${turn}`,
+            },
+          },
+        ],
+        source: { kind: 'user' },
+      }), { surfaceOp: 'append' })
+      session.append('step/start', { turn, step: 1 })
+      if (turn === 1) {
+        session.append('request/header', {
+          header: { config: { provider: MODEL, model: MODEL } },
+          reason: 'initial',
+        })
+      }
+      session.append('assistant/message', {
+        stream: [],
+        turn,
+        step: 1,
+        message: createMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text: `ok ${turn}` }],
+          source: {
+            kind: 'model',
+            ...{ provider: MODEL, model: MODEL },
+          },
+        }),
+      }, { surfaceOp: 'append' })
+      session.append('step/end', { turn, step: 1 })
+      session.append('turn/end', { turn, reason: { kind: 'completed' } })
+    }
+    session.append('turn/start', { turn: turns + 1 })
+    return session
+  }
+
+  it('selects an image-dense range only when the routed price counts visual tokens', () => {
+    const session = imageConversation()
+    const routed = pricedContext().tokenMeter.measure(session)
+    const neutral = createContext().tokenMeter.measure(session)
+
+    expect(routed.surfaceTokens).toBeGreaterThan(neutral.surfaceTokens + 4 * IMAGE_VISUAL_TOKENS - 200)
+    expect(routed.nodes.map(node => node.seq)).toEqual(neutral.nodes.map(node => node.seq))
+    expect(routed.nodes.map(node => node.heuristicTokens)).toEqual(neutral.nodes.map(node => node.tokens))
+
+    // The same verbatim tail budget retains almost everything under the
+    // neutral heuristic but forces a cut once visual tokens are counted.
+    expect(selectCompactableRange(session, neutral, 350)).toBeNull()
+    const range = selectCompactableRange(session, routed, 350)
+    expect(range).not.toBeNull()
+  })
+
+  it('accepts a summary larger than the span heuristic when the route price shrinks', async () => {
+    // A single short image message prices below a framed summary under the
+    // fixed heuristic but far above it under the route: the shrink comparison
+    // must ask whether the replacement lowers route pressure.
+    const ctx = pricedContext(1_000)
+    const session = imageConversation(1)
+    const before = ctx.tokenMeter.measure(session)
+    const imageNode = before.nodes[0]!
+    const compact = new TestCompactionEngine(ctx, { auto: false })
+    compact.summary = [{
+      type: 'text',
+      text: 'summary text sized between the heuristic and route prices of the shadowed image message, '
+        + 'long enough that the fixed heuristic alone would reject it as not smaller '
+        + 'while the route-priced comparison accepts the pressure reduction.',
+    }]
+    const framed = ctx.tokenMeter.estimateMessage(createUserMessage({
+      content: frameSummary(compact.summary),
+      source: { kind: 'plugin', plugin: 'test' },
+    }))
+    expect(framed).toBeGreaterThan(imageNode.heuristicTokens)
+    expect(framed).toBeLessThan(imageNode.tokens)
+
+    const result = await compact.compactRegion(imageNode.seq, imageNode.seq, agent(session), SIGNAL)
+    expect(result.shadowedSeqs).toEqual([imageNode.seq])
+    expect(result.shadowedTokenCount).toBe(imageNode.heuristicTokens)
+  })
+
+  it('triggers pressure compaction from routed visual tokens and logs heuristic shadow prices', async () => {
+    const ctx = pricedContext(1_000)
+    const session = imageConversation()
+    const before = ctx.tokenMeter.measure(session)
+    const compact = new TestCompactionEngine(ctx, {
+      auto: false,
+      thresholdRatio: 0.8,
+      retainTokens: 350,
+    })
+
+    // The same history stays below the 800-token threshold without pricing.
+    const neutralResult = await compactIfNeeded(service({
+      auto: false,
+      thresholdRatio: 0.8,
+      retainTokens: 350,
+    }), session)
+    expect(neutralResult).toBeNull()
+
+    const result = await compact.compactIfNeeded(agent(session), 'pressure', SIGNAL)
+    expect(result).not.toBeNull()
+    const summaryEvent = session.snapshotEvents().find(event => event.type === 'compaction/summary')
+    expect(summaryEvent).toBeDefined()
+    const shadowedHeuristic = before.nodes
+      .filter(node => result?.shadowedSeqs.includes(node.seq))
+      .reduce((total, node) => total + node.heuristicTokens, 0)
+    expect(summaryEvent?.data.shadowedTokenCount).toBe(shadowedHeuristic)
   })
 })

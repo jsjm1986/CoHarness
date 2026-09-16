@@ -3,7 +3,7 @@
 {"type":"user/message","data":{"content":[{"type":"text","text":"Run a PowerShell command that fails, then stop."}],"source":{"kind":"user","rpcId":"{{rpcId}}"}},"surfaceOp":"append"}
 {"type":"session/title","data":{"title":"Run a PowerShell command","messageSeqs":[1],"source":{"kind":"fallback"}}}
 {"type":"step/start","data":{"turn":1,"step":1}}
-{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"system":"{{system}}","tools":"{{tools}}","messagePrefix":["{{messagePrefix}}"]},"reason":"initial"}}
+{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"tools":"{{tools}}","messagePrefix":["{{messagePrefix}}"]},"reason":"initial"}}
 {"type":"assistant/chunk","data":{"turn":1,"step":1,"chunk":{"type":"block-start","index":0,"blockType":"reasoning"}}}
 {"type":"assistant/chunk","data":{"turn":1,"step":1,"chunk":{"type":"reasoning-delta","index":0,"text":"Run the failing pwsh command."}}}
 {"type":"assistant/chunk","data":{"turn":1,"step":1,"chunk":{"type":"block-end","index":0,"block":{"type":"reasoning","text":"Run the failing pwsh command."}}}}

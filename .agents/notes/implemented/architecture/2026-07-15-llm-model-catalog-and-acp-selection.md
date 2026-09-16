@@ -36,7 +36,7 @@ The ACP automation transport is not a catalog consumer. Its deployment config su
 
 `installModelSelection` (in `dsh-agent`) installs scoped `system-prompt/assemble` and `agent/request` listeners for a front-end-owned selection. Prompt assembly snapshots the selected pair once per step, overwrites the assembled `provider` and `model` variables after downstream prompt listeners, and the request listener applies that same snapshot after downstream request listeners. A selection during asynchronous assembly therefore starts on the next step rather than splitting prompt text from routing. Other call-config fields remain untouched.
 
-The request header remains the durable source of truth. When a selection is actually used, the existing full `request/header` snapshot records it, and a front end initializes its selection from the folded last request header before falling back to creation options. A selection that is never used by a request is intentionally in-memory only because it never became model-visible state.
+The request header and the `model/selection` event share durability: a selection accepted for the next request is appended as durable intent, and the `request/header` snapshot that consumes it retires the pending value. The front end's in-memory selection is seeded from the projection's pending value, then the folded last request header, then creation options — see [durable model selection](2026-09-13-durable-model-selection.md).
 
 ## Alternatives considered
 
@@ -46,7 +46,7 @@ The request header remains the durable source of truth. When a selection is actu
 
 **Store selection in `AgentOptions` or `LlmRuntime`.** Those are creation-wide or deployment-wide objects. Mutating them would couple concurrent sessions and bypass the logged `agent/request` replacement path.
 
-**Persist a new model-selection session event immediately.** An unused UI selection has not affected a model request. Recording the existing request header when the target is consumed preserves the model-visible-if-and-only-if-logged rule without adding a second source of truth.
+**Persist a new model-selection session event immediately.** Originally rejected because an unused UI selection had not affected a model request; the stance changed once cold resume made the pending intent reconstruction-relevant — [durable model selection](2026-09-13-durable-model-selection.md) adopted exactly this event.
 
 ## Consequences
 
@@ -54,7 +54,7 @@ The request header remains the durable source of truth. When a selection is actu
 - Catalog consumers must treat absence as “not advertised,” never “invalid request.”
 - pi-ai adapters expose their installed provider catalogs; hand-written DeepSeek deployments list known choices explicitly and retain arbitrary model support.
 - Human-facing catalog consumers own their selection interaction. ACP uses its fixed deployment target and does not widen the protocol with model discovery.
-- Request headers remain compatible with the provider-routed session shape; no new JSONL event or format version is required.
+- Request headers remain compatible with the provider-routed session shape; the selection intent event added later is covered by [durable model selection](2026-09-13-durable-model-selection.md).
 - A catalog read can be asynchronous, and every caller receives detached values.
 
 ## Testing

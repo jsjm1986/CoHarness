@@ -7,8 +7,9 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import SessionStore, { encodeSeqRanges, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { SessionAlreadyOwnedError, SessionFormatUnsupportedError } from '@deepseek-ai/dsh-session-persistence'
 import {
-  encodeSegment, eventLines, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
+  encodeSegment, eventLines, generationLogPath, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
   toHeaderLine,
 } from '../src/format.ts'
 import { runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
@@ -165,6 +166,24 @@ describe('JsonlSessionPersistence: format helpers', () => {
     expect(`${JSON.stringify(toHeaderLine(scanned.meta, scanned.inheritedEventCount))}\n`).toBe(bytes)
   })
 
+  it('refuses a foreign seeded header that lacks the seedLength cut', () => {
+    const foreign = {
+      type: 'session',
+      version: 3,
+      id: SessionId('foreign-seeded'),
+      createdAt: 1000,
+      isSeeded: true,
+      delegationDepth: 0,
+    }
+    expect(() => scanLog(Buffer.from(`${JSON.stringify(foreign)}\n`)))
+      .toThrow(SessionFormatUnsupportedError)
+    expect(() => scanLog(Buffer.from(`${JSON.stringify(foreign)}\n`)))
+      .toThrow(/seeded lineage.*different harness build/)
+    // A foreign unseeded marker carries no lineage to lose; it decodes normally.
+    const unseeded = scanLog(Buffer.from(`${JSON.stringify({ ...foreign, isSeeded: false })}\n`))
+    expect(unseeded.meta.isSeeded).toBe(false)
+  })
+
   it('requires logical lineage and the physical inherited cut to agree', () => {
     const unseeded = meta('lineage-cut')
     expect(() => toHeaderLine({ ...unseeded, isSeeded: true }))
@@ -291,6 +310,32 @@ describe('JsonlSessionPersistence: format helpers', () => {
       .toThrow(expect.objectContaining({ name: 'SessionFormatUnsupportedError' }))
   })
 
+  it('accepts the previous v2 header so the coordinator can migrate it to v3', () => {
+    const parsed = parseHeader(JSON.stringify({
+      type: 'session', version: 2, id: 'legacy-v2', createdAt: 1, delegationDepth: 0,
+    }))
+    expect(parsed?.meta.version).toBe(2)
+    expect(parsed?.meta.id).toBe(SessionId('legacy-v2'))
+  })
+
+  it('lists and opens a v2 artifact through the complete v2-to-v3 chain', async () => {
+    const absoluteRoot = await freshRoot()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(JsonlSessionPersistence, { root: absoluteRoot, compression: 'none' })
+    const id = SessionId('legacy-v2-load')
+    const path = rawLogPath(resolve(absoluteRoot), '/work', id)
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, `${JSON.stringify({ type: 'session', version: 2, id, createdAt: 1, cwd: '/work', delegationDepth: 0 })}\n${JSON.stringify({ type: 'turn/start', seq: 0, time: 2, data: { turn: 1 } })}\n`)
+
+    await expect(ctx.sessionPersistence.list()).resolves.toEqual([
+      expect.objectContaining({ id, version: 2 }),
+    ])
+    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 3 } })
+    await expect(stat(generationLogPath(resolve(absoluteRoot), '/work', id, 'none', 3))).resolves.toBeDefined()
+    await fiber.dispose()
+  })
+
   it('points a format refusal at the raw log path', async () => {
     const absoluteRoot = await freshRoot()
     const ctx = new Context()
@@ -325,7 +370,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     const secondFiber = await secondCtx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
     const id = SessionId('cross-process-lock')
     const first = await ctx.sessionPersistence.createHandle({ version: 0, id, createdAt: 1, isSeeded: false })
-    await expect(secondCtx.sessionPersistence.openHandleAsync(id, 'write')).rejects.toThrow(/already locked by another process/)
+    await expect(secondCtx.sessionPersistence.openHandleAsync(id, 'write')).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
     await first.close()
     const second = await secondCtx.sessionPersistence.openHandleAsync(id, 'write')
     await second.close()
@@ -1554,7 +1599,7 @@ describe('JsonlSessionPersistence: edge cases', () => {
     expect(ids).toContain('big')
   })
 
-  it('rejects a header that exceeds the metadata reader budget', async () => {
+  it('omits a header that exceeds the metadata reader budget', async () => {
     const absoluteRoot = await freshRoot()
     const localCtx = new Context()
     await localCtx.plugin(SessionStore)
@@ -1568,7 +1613,12 @@ describe('JsonlSessionPersistence: edge cases', () => {
     const header = JSON.stringify({ type: 'session', version: 0, id, createdAt: 1, delegationDepth: 0, pad: 'x'.repeat(200) })
     await writeFile(rawLogPath(absoluteRoot, undefined, id), header + '\n')
 
-    await expect(localCtx.sessionPersistence.list()).rejects.toThrow(/session header exceeds 128 bytes/)
+    // Listing omits the unreadable artifact; a targeted read still reports the
+    // oversize header.
+    const warn = vi.spyOn(localCtx.logger, 'warn').mockImplementation(() => undefined)
+    await expect(localCtx.sessionPersistence.list()).resolves.toEqual([])
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('session header exceeds 128 bytes'))
+    await expect(localCtx.sessionPersistence.load(id)).rejects.toThrow(/session header exceeds 128 bytes/)
     await fiber.dispose()
   })
 

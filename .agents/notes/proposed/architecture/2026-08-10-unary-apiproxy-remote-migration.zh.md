@@ -27,14 +27,25 @@ API Proxy 还包含一些不以业务方法为约定的 BFF 操作：Session 生
 | 旧 RPC | Remote 目标 | Host 方法 | 适配 |
 |---|---|---|---|
 | `session.rename` | `ctx.remote.sessionTitle`，位于 `@deepseek-ai/dsh-session-title` | `SessionTitleService.rename(Session, title)` | 直接使用 `@Remote`；Client 将 `eventSeq` 映射到自身的标题投影序列。 |
-| `command.list`、`command.execute` | `ctx.remote.commands`，位于 `@deepseek-ai/dsh-commands` | `CommandRuntime.list(Agent)`、`execute(Agent, line, signal)` | 直接使用 `@Remote`；Client 将 `undefined` 映射为未匹配结果，并保留调用方的取消行为。 |
 | `llm.providers` | `ctx.remote.llm`，位于 `@deepseek-ai/dsh-llm` | `LlmRuntime.listProviders()`、`listConfigurableProviders()` | 两项读取都直接使用 `@Remote`；Client 关联注册行与配置目录行。 |
 | `credentials.describe`、`credentials.set`、`credentials.unset` | `ctx.remote.credentials`，位于 `@deepseek-ai/dsh-credentials-local` | `LocalCredentialProvider.describe(ref)`、`set(ref, value)`、`unset(ref)` | 直接使用 `@Remote`；当 UI 请求多个 ref 时，Client 批量发起 `describe` 调用。 |
-| `agentPreset.read`、`agentPreset.copy`、`agentPreset.remove` | `ctx.remote.agentPresets`，位于 `@deepseek-ai/dsh-agent-presets` | `readDocument(id)`、`copy(from, id, name?)`、`remove(id)` | `copy` 和 `remove` 直接暴露现有方法；`readDocument` 将存储的内容与一次实时发现取得的元数据组合。 |
-| `subagent.interrupt` | `ctx.remote.subagents`，位于 `@deepseek-ai/dsh-subagent` | `interruptByParent(targetSessionId, parentSessionId)` | 适配器构造内部的用户权限变体，不解析也不恢复任一 Agent。 |
 | `workspace.list`、`workspace.insertSessionBefore`、`workspace.archiveSession` | `ctx.remote.workspace`，位于 `@deepseek-ai/dsh-workspace` | `snapshot()`、`insertSessionBefore(workspaceId, sessionId, before?)`、`archiveSession(sessionId)` | 注册表适配器分离可变实体，并返回已完成更新的 workspace 或归档快照。 |
 
 Remote API 有意采用服务名称，而不保留旧 RPC 的点分名称。例如，Session 重命名将变为 `ctx.remote.sessionTitle.rename(...)`。
+
+## 已落地的迁移
+
+以下行已先于或随同本表落地，不再有旧版路由、schema、映射条目、客户端存根或 fixture 实现：
+
+| 旧 RPC | Remote 目标 | 落地形态 |
+|---|---|---|
+| `command.list`、`command.execute` | `ctx.remote.commands`，位于 `@deepseek-ai/dsh-commands` | 直接使用 `@Remote`；Client 将 `undefined` 映射为未匹配结果，并保留调用方的取消行为。 |
+| `agentPreset.read`、`agentPreset.copy`、`agentPreset.remove` | `ctx.remote.agentPresets`，位于 `@deepseek-ai/dsh-agent-presets` | `read`、`copy`、`deletePreset`；`remove` 以 rc.2 的协议名 `deletePreset` 落地。 |
+| `agentPreset.list`、`agentPreset.select` | `ctx.remote.agentPresets` | 在会话作用域授权覆盖之后，名单读取与选择走同一 Remote 命名空间；暂缓理由不复存在。 |
+| `subagent.list`、`subagent.prompt`、`subagent.interrupt` | `ctx.remote.subagents`，位于 `@deepseek-ai/dsh-subagent` | `list`、`prompt`、`interruptByParent`；图片准入移到 `subagent/prompt-admission` 串行 waterfall，使 Remote 方法保持上游形态，API Proxy 以监听器身份负责持久化准入。`subagent.history` 留在 API Proxy——cold 日志投影属于 BFF 工作。 |
+| `goals.*`（create/edit/pause/resume/complete/clear） | `ctx.remote.goals`，位于 `@deepseek-ai/dsh-goal` | rc.2 面；Remote 方法直接返回领域值（`GoalView`、`CreateGoalResult`、`GoalRef`）。 |
+| `llm.discoverModels`（ambient 路径） | `ctx.remote.llm`，位于 `@deepseek-ai/dsh-llm` | 设置组件接收 `discoverModels` 回调；ambient 组合绑定 `ctx.remote.llm`，而项目作用域的模型桥仍走 `llm.discoverModels`，因为 Remote 没有项目目标路由。 |
+| `command-feedback.record`、`goal.get`、`agent-team` 控制 | `ctx.remote.sessionFeedback`、`ctx.remote.goals`、`ctx.remote.agentTeam` | 从未有过旧版路由的 rc.2 面。 |
 
 ## 暂缓迁移的 API Proxy 领域
 
@@ -48,7 +59,7 @@ Remote API 有意采用服务名称，而不保留旧 RPC 的点分名称。例�
 | Session skill 目录 | `skill.list` | 不得恢复冷 Session；preset 的常驻 scope 和呈现器过滤属于 BFF 关联操作。 |
 | Host 运行时信息 | `host.describe` | 版本、cwd、默认模型和当前已附加的 Session 数量来自多个 Host 所有者。 |
 | Host 路径打开 | `host.openPath`、`agentPreset.openDocument` | 原生桌面权限和取消属于 Host 组合。 |
-| 其余 preset、subagent 和 workspace 调用 | `agentPreset.list`、`select`；`subagent.list`、`history`、`prompt`；`workspace.create`、`rename`、`delete` | 这些调用包含名单策略、live／cold 关联、授权或多项操作的串行执行顺序。 |
+| 其余 subagent 和 workspace 调用 | `subagent.history`；`workspace.create`、`rename`、`delete` | 这些调用包含名单策略、live／cold 关联、授权或多项操作的串行执行顺序。 |
 | 有状态协议和流式协议 | 审批、问题、响应、mux 和 Host 流 | 它们不是一次请求／一次结果的业务调用。 |
 
 `workspace.delete` 与 `create` 和 `rename` 保持在一起，因为三者都参与同一条串行的创建／命名／删除操作链。单独迁出一个方法会使服务与 API Proxy 观察到不同的操作顺序。
@@ -78,10 +89,11 @@ Resolver 拥有的 `session-not-found` 和 `agent-busy` 错误保持稳定，因
 
 ## 特权调用权限
 
-Connection 必须在选择 Typert interceptor 或 API Proxy 回退路径之前检查调用方是否有权访问特权端点。该检查必须同时识别旧式点分名称和 Remote 斜杠端点，并保持以下已迁移操作仅限环回地址：
+Connection 必须在选择 Typert interceptor 或 API Proxy 回退路径之前检查调用方是否有权访问特权端点。共享 fetch handler 在端点选择时执行该检查，使两条分发路径一致，并保持以下已迁移操作仅限环回地址：
 
-- `agentPresets/readDocument`、`agentPresets/copy` 和 `agentPresets/remove`；
-- `credentials/describe`、`credentials/set` 和 `credentials/unset`。
+- `agentPresets/read`、`agentPresets/copy`、`agentPresets/deletePreset`，以及仅存的 `agentPreset.openDocument` RPC；
+- Remote 载体上的 `llm/discoverModels`，与其点分同名方法并列；
+- `credentials/describe`、`credentials/set` 和 `credentials/unset`（待这些行落地时）。
 
 贯穿整个载体的 trusted-host 和 origin 检查保持不变。这是一项非升权要求：端点所有权可以变化，但获准调用该操作的调用方集合不得扩大。
 

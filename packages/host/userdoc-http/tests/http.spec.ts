@@ -107,6 +107,7 @@ describe('user-document HTTP consumer', () => {
     expect(downloaded.headers.get('content-type')).toBe('text/plain')
     expect(downloaded.headers.get('x-content-type-options')).toBe('nosniff')
     expect(downloaded.headers.get('content-disposition')).toContain("filename*=UTF-8''")
+    expect(downloaded.headers.get('cache-control')).toContain('no-transform')
     expect(await downloaded.text()).toBe('hello')
 
     const head = await fetch(url, { method: 'HEAD' })

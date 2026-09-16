@@ -32,16 +32,21 @@ export type SurfaceEventType =
  *
  * - `'append'`: added to the tail — normal path for user/assistant/tool
  *   messages.
- * - `{ op: 'replace', start, end }`: replaces surface nodes from `start`
- *   (inclusive) through `end` (inclusive) with this node. Both must exist as
- *   surface nodes in the current surface. `start === end` replaces a single
+ * - `{ op: 'replace', startSeq, endSeq }`: replaces surface nodes from `startSeq`
+ *   (inclusive) through `endSeq` (inclusive) with this node. Both must exist as
+ *   surface nodes in the current surface. `startSeq === endSeq` replaces a single
  *   node. The node's {@link SessionEvent.sourceEventSeqs} must include every
  *   shadowed surface node. Used by compaction; any surface-replacing producer
- *   may use it.
+ *   may use it. When node 0 holds a `system/message`, a range covering it must
+ *   be a `system/message` over exactly that node.
+ *
+ * Readers also accept the pre-rename `start`/`end` keys on committed log
+ * entries and normalize them to `startSeq`/`endSeq`; writers always emit the
+ * canonical keys.
  */
 export type SurfaceOp =
   | 'append'
-  | { op: 'replace'; start: SessionSeq; end: SessionSeq }
+  | { op: 'replace'; startSeq: SessionSeq; endSeq: SessionSeq }
 
 /**
  * One immutable entry in the session log.
@@ -91,7 +96,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 }[T]
 ```
 
-Sources: [`packages/core/session/src/types.ts:407`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:414`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:444`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:476`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:406`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:413`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:448`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:480`](../packages/core/session/src/types.ts)
 
 ## Events
 
@@ -116,7 +121,7 @@ Sources: [`packages/core/session/src/types.ts:407`](../packages/core/session/src
 }
 ```
 
-Source: [`packages/core/agent/src/types.ts:38`](../packages/core/agent/src/types.ts)
+Source: [`packages/core/agent/src/types.ts:55`](../packages/core/agent/src/types.ts)
 
 ### `agent-preset/*`
 
@@ -134,7 +139,7 @@ Source: [`packages/core/agent/src/types.ts:38`](../packages/core/agent/src/types
 'agent-preset/selected': { agentPreset: string }
 ```
 
-Source: [`packages/preset/agent-presets/src/session.ts:26`](../packages/preset/agent-presets/src/session.ts)
+Source: [`packages/preset/agent-presets/src/session.ts:28`](../packages/preset/agent-presets/src/session.ts)
 
 ### `approval/*`
 
@@ -214,7 +219,7 @@ Source: [`packages/interaction/user-approval/src/index.ts:68`](../packages/inter
 'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[] }
 ```
 
-Source: [`packages/core/session/src/types.ts:344`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:343`](../packages/core/session/src/types.ts)
 
 <a id="assistantchunk--log-only"></a>
 
@@ -227,7 +232,7 @@ Source: [`packages/core/session/src/types.ts:344`](../packages/core/session/src/
 
 Types: [StreamChunk](subsystems/llm-streaming.md)
 
-Source: [`packages/core/session/src/types.ts:331`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:330`](../packages/core/session/src/types.ts)
 
 <a id="assistantmessage--surface"></a>
 
@@ -249,7 +254,7 @@ Source: [`packages/core/session/src/types.ts:331`](../packages/core/session/src/
 
 Types: [TokenUsage](subsystems/llm-streaming.md)
 
-Source: [`packages/core/session/src/types.ts:342`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:341`](../packages/core/session/src/types.ts)
 
 ### `command/*`
 
@@ -272,7 +277,7 @@ Source: [`packages/core/session/src/types.ts:342`](../packages/core/session/src/
 }
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:104`](../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:106`](../packages/interaction/commands/src/types.ts)
 
 <a id="commandrun--log-only"></a>
 
@@ -292,7 +297,7 @@ Source: [`packages/interaction/commands/src/types.ts:104`](../packages/interacti
 'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource }
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:97`](../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:99`](../packages/interaction/commands/src/types.ts)
 
 ### `compaction/*`
 
@@ -438,10 +443,10 @@ Source: [`packages/feedback/message-feedback/src/index.ts:59`](../packages/feedb
  * One recorded human remark about this session. Log-only and independent
  * of its trigger; it never enters model context or derived history.
  */
-'feedback/record': { text: string }
+'feedback/record': FeedbackRecord
 ```
 
-Source: [`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedback/command-feedback/src/index.ts)
+Source: [`packages/feedback/command-feedback/src/types.ts:40`](../packages/feedback/command-feedback/src/types.ts)
 
 ### `goal/*`
 
@@ -532,6 +537,22 @@ Source: [`packages/llm/llm-retry/src/types.ts:9`](../packages/llm/llm-retry/src/
 
 Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src/types.ts)
 
+### `model/*`
+
+<a id="modelselection--log-only"></a>
+
+#### `model/selection` — log-only
+
+```ts persistence-catalog
+/**
+ * Complete validated model selection requested for subsequent prompt
+ * assembly. Log-only: it never enters derived model history.
+ */
+'model/selection': ModelSelection
+```
+
+Source: [`packages/host/apiproxy/src/api/sessions.ts:73`](../packages/host/apiproxy/src/api/sessions.ts)
+
 ### `permission/*`
 
 <a id="permissionpreset--log-only"></a>
@@ -551,7 +572,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'permission/preset': { preset: string; origin?: 'default' | 'selection' | 'inferred' }
 ```
 
-Source: [`packages/interaction/permission-presets/src/index.ts:55`](../packages/interaction/permission-presets/src/index.ts)
+Source: [`packages/interaction/permission-presets/src/index.ts:56`](../packages/interaction/permission-presets/src/index.ts)
 
 ### `plan/*`
 
@@ -568,7 +589,7 @@ Source: [`packages/interaction/permission-presets/src/index.ts:55`](../packages/
 'plan/mode': { active: boolean }
 ```
 
-Source: [`packages/plan/plan-mode/src/index.ts:53`](../packages/plan/plan-mode/src/index.ts)
+Source: [`packages/plan/plan-mode/src/index.ts:56`](../packages/plan/plan-mode/src/index.ts)
 
 ### `request/*`
 
@@ -584,7 +605,7 @@ Source: [`packages/plan/plan-mode/src/index.ts:53`](../packages/plan/plan-mode/s
 'request/context': RequestContext
 ```
 
-Source: [`packages/core/session/src/types.ts:380`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:379`](../packages/core/session/src/types.ts)
 
 <a id="requestheader--log-only"></a>
 
@@ -598,7 +619,7 @@ Source: [`packages/core/session/src/types.ts:380`](../packages/core/session/src/
 'request/header': { header: EpochHeader; reason: RequestHeaderReason }
 ```
 
-Source: [`packages/core/session/src/types.ts:375`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:374`](../packages/core/session/src/types.ts)
 
 ### `sandbox/*`
 
@@ -673,7 +694,7 @@ Source: [`packages/schedule/schedule/src/types.ts:219`](../packages/schedule/sch
 'session/end-seed': Record<string, never>
 ```
 
-Source: [`packages/core/session/src/types.ts:403`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:402`](../packages/core/session/src/types.ts)
 
 <a id="sessiontitle--log-only"></a>
 
@@ -715,6 +736,8 @@ Source: [`packages/session/session-title-llm/src/index.ts:44`](../packages/sessi
 'session-log-deepseek/delivery-accepted': {
   /** Session identity the accepted delivery carried; inherited fork markers retain the parent's id. */
   sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+  /** Accepted Session format generation; absence identifies version 0. */
+  sessionFormatVersion?: number
   /** Last canonical event included in the accepted request. */
   throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq
 }
@@ -733,7 +756,7 @@ Source: [`packages/session/session-log-deepseek/src/types.ts:56`](../packages/se
 'step/end': { turn: number; step: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:319`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:318`](../packages/core/session/src/types.ts)
 
 <a id="stepstart--log-only"></a>
 
@@ -744,9 +767,23 @@ Source: [`packages/core/session/src/types.ts:319`](../packages/core/session/src/
 'step/start': { turn: number; step: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:317`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:316`](../packages/core/session/src/types.ts)
 
 ### `subagent/*`
+
+<a id="subagentcatalog--log-only"></a>
+
+#### `subagent/catalog` — log-only
+
+```ts persistence-catalog
+/**
+ * A direct child's complete discovery fact.
+ * @param data - versioned parent-owned catalog entry.
+ */
+'subagent/catalog': SubagentCatalogEvent
+```
+
+Source: [`packages/subagent/subagent/src/catalog.ts:40`](../packages/subagent/subagent/src/catalog.ts)
 
 <a id="subagentdescriptor--log-only"></a>
 
@@ -782,7 +819,7 @@ Source: [`packages/subagent/subagent/src/descriptor.ts:38`](../packages/subagent
 }
 ```
 
-Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:14`](../packages/subagent/tool-subagent/src/model-selection-state.ts)
+Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:17`](../packages/subagent/tool-subagent/src/model-selection-state.ts)
 
 ### `system/*`
 
@@ -795,7 +832,7 @@ Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:14`](../p
 'system/message': { turn: number; step: number; message: SystemMessage }
 ```
 
-Source: [`packages/core/session/src/types.ts:329`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:328`](../packages/core/session/src/types.ts)
 
 ### `team/*`
 
@@ -810,7 +847,7 @@ Source: [`packages/core/session/src/types.ts:329`](../packages/core/session/src/
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMemberSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:206`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:223`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -828,7 +865,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:206`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageId](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:212`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:229`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -841,7 +878,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:212`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:210`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -854,7 +891,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:210`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamTaskSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:208`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:225`](../packages/experimental/agent-team/src/types.ts)
 
 ### `todo/*`
 
@@ -869,7 +906,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:208`](../packages/experi
 
 Types: [TodoItem](subsystems/session.md)
 
-Source: [`packages/core/session/src/types.ts:370`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:369`](../packages/core/session/src/types.ts)
 
 ### `tool/*`
 
@@ -888,7 +925,7 @@ Source: [`packages/core/session/src/types.ts:370`](../packages/core/session/src/
 
 Types: [CallId](subsystems/core.md)
 
-Source: [`packages/core/session/src/types.ts:350`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:349`](../packages/core/session/src/types.ts)
 
 <a id="toolcode-dispatch--log-only"></a>
 
@@ -896,8 +933,42 @@ Source: [`packages/core/session/src/types.ts:350`](../packages/core/session/src/
 
 ```ts persistence-catalog
 /**
+ * The pre-rename spelling of `tool/ptc-dispatch`, recorded by builds
+ * before the PTC rename. Persistence accepts it on read and normalizes
+ * the type to `tool/ptc-dispatch` before projection, so released logs
+ * keep one downstream vocabulary.
+ * @deprecated Write `tool/ptc-dispatch`.
+ */
+'tool/code-dispatch': PtcDispatchEventData
+```
+
+Source: [`packages/core/tools/src/types.ts:72`](../packages/core/tools/src/types.ts)
+
+<a id="toolcode-dispatch-start--log-only"></a>
+
+#### `tool/code-dispatch-start` — log-only
+
+```ts persistence-catalog
+/**
+ * The pre-rename spelling of `tool/ptc-dispatch-start`, recorded by builds
+ * before the PTC rename. Persistence accepts it on read and normalizes
+ * the type to `tool/ptc-dispatch-start` before projection, so released
+ * logs keep one downstream vocabulary.
+ * @deprecated Write `tool/ptc-dispatch-start`.
+ */
+'tool/code-dispatch-start': PtcDispatchStartEventData
+```
+
+Source: [`packages/core/tools/src/types.ts:64`](../packages/core/tools/src/types.ts)
+
+<a id="toolptc-dispatch--log-only"></a>
+
+#### `tool/ptc-dispatch` — log-only
+
+```ts persistence-catalog
+/**
  * One bridged sub-dispatch SETTLING: the pairing ids (matching the
- * `tool/code-dispatch-start` with the same `subCallId`), the tool `name`
+ * `tool/ptc-dispatch-start` with the same `subCallId`), the tool `name`
  * with the same JSON-normalized `arguments`, and the sub-call's complete
  * model-facing outcome in `tool/result`'s own vocabulary
  * (`content` + `isError`), so UIs render a sub-call through the exact
@@ -910,19 +981,19 @@ Source: [`packages/core/session/src/types.ts:350`](../packages/core/session/src/
  * before returning), so its execution-enclosure relation holds by
  * construction.
  */
-'tool/code-dispatch': CodeDispatchEventData
+'tool/ptc-dispatch': PtcDispatchEventData
 ```
 
 Source: [`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types.ts)
 
-<a id="toolcode-dispatch-start--log-only"></a>
+<a id="toolptc-dispatch-start--log-only"></a>
 
-#### `tool/code-dispatch-start` — log-only
+#### `tool/ptc-dispatch-start` — log-only
 
 ```ts persistence-catalog
 /**
  * One sub-dispatch STARTING inside a `run_code` program: the parent
- * `run_code` call id, the deterministic sub-call id (`<parent>:code:<n>`,
+ * `run_code` call id, the deterministic sub-call id (`<parent>:ptc:<n>`,
  * numbered in submission order), and the tool `name` with its
  * JSON-normalized `arguments` — the exact value dispatched, normalized
  * BEFORE dispatch, so this append can never fail on payload shape.
@@ -930,10 +1001,10 @@ Source: [`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types
  * submission), so a start means the tool body pipeline was entered; a
  * call abandoned in the queue logs nothing. Log-only: `deriveMessages()`
  * ignores it; UIs use it for live per-sub-call running state and pair it
- * with `tool/code-dispatch` by `subCallId` (timing = the two events'
+ * with `tool/ptc-dispatch` by `subCallId` (timing = the two events'
  * `time` fields).
  */
-'tool/code-dispatch-start': CodeDispatchStartEventData
+'tool/ptc-dispatch-start': PtcDispatchStartEventData
 ```
 
 Source: [`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types.ts)
@@ -963,7 +1034,7 @@ Source: [`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types
 }
 ```
 
-Source: [`packages/core/session/src/types.ts:362`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:361`](../packages/core/session/src/types.ts)
 
 ### `tool-workflow/*`
 
@@ -1043,7 +1114,7 @@ Source: [`packages/workflow/tool-workflow/src/types.ts:47`](../packages/workflow
 
 Types: [TurnEndReason](subsystems/session.md)
 
-Source: [`packages/core/session/src/types.ts:315`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:314`](../packages/core/session/src/types.ts)
 
 <a id="turnstart--log-only"></a>
 
@@ -1059,7 +1130,7 @@ Source: [`packages/core/session/src/types.ts:315`](../packages/core/session/src/
 'turn/start': { turn: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:306`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:305`](../packages/core/session/src/types.ts)
 
 ### `user/*`
 
@@ -1078,7 +1149,7 @@ Source: [`packages/core/session/src/types.ts:306`](../packages/core/session/src/
 'user/message': UserMessage
 ```
 
-Source: [`packages/core/session/src/types.ts:327`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:326`](../packages/core/session/src/types.ts)
 
 ### `userdoc/*`
 

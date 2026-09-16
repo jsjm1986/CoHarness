@@ -7,10 +7,29 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import type { SessionTelemetryBackend, SessionTelemetrySharingStatus } from '@deepseek-ai/dsh-session-telemetry'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { getOrCreateAnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
+import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import type { FeedbackCategory, FeedbackRecord, SessionFeedbackRecordRequest, SessionFeedbackRecordResult } from './types.ts'
+
+export type * from './types.ts'
+
+/**
+ * Every feedback category in the order product surfaces present them; each
+ * surface owns its localized labels.
+ */
+export const FEEDBACK_CATEGORIES = [
+  'task-result',
+  'instruction-following',
+  'product-interaction',
+  'service-stability',
+  'resource-cost',
+  'security-privacy-permission',
+  'other',
+] as const satisfies readonly FeedbackCategory[]
 
 export const name = 'command-feedback'
 export const inject = ['commands']
@@ -53,26 +72,19 @@ function sharingDisclosure(telemetry: SessionTelemetryBackend | undefined): stri
   return sharingSentence(telemetry.sharing)
 }
 
-declare module '@deepseek-ai/dsh-session/types' {
-  interface SessionEventMap {
-    /**
-     * One recorded human remark about this session. Log-only and independent
-     * of its trigger; it never enters model context or derived history.
-     */
-    'feedback/record': { text: string }
-  }
-}
-
 /**
- * Record feedback independently of any UI trigger.
+ * Record feedback independently of any UI trigger. Surrounding whitespace is
+ * discarded and a blank text is recorded as absent; an entry with neither
+ * text nor category is still recorded.
  * @param session - session the feedback describes.
- * @param text - human-authored feedback; surrounding whitespace is discarded.
- * @throws {TypeError} when the normalized text is empty.
+ * @param entry - human-authored remark and its category.
  */
-export function recordFeedback(session: Session, text: string): void {
-  const normalized = text.trim()
-  if (normalized.length === 0) throw new TypeError('feedback text must not be empty')
-  session.append('feedback/record', { text: normalized })
+export function recordFeedback(session: Session, entry: FeedbackRecord): void {
+  const text = entry.text?.trim() ?? ''
+  session.append('feedback/record', {
+    ...(text.length === 0 ? {} : { text }),
+    ...(entry.category === undefined ? {} : { category: entry.category }),
+  })
 }
 
 /**
@@ -88,7 +100,7 @@ function executeFeedbackCommand(invocation: CommandInvocation, ctx: Context): Co
   if (invocation.rawInput.trim().length === 0) {
     return { kind: 'error', text: `Feedback text is required. ${USAGE}` }
   }
-  recordFeedback(invocation.agent.session, invocation.rawInput)
+  recordFeedback(invocation.agent.session, { text: invocation.rawInput })
   const telemetry = ctx.get('sessionTelemetry')
   return {
     kind: 'success',
@@ -96,9 +108,39 @@ function executeFeedbackCommand(invocation: CommandInvocation, ctx: Context): Co
   }
 }
 
+/** Host Remote through which a product surface records a Session-level remark. */
+export class SessionFeedbackService extends TypertRemoteService {
+  static inject = ['sessions']
+
+  /**
+   * @param ctx - Host context carrying the live Session store.
+   */
+  constructor(ctx: Context) {
+    super(ctx, 'sessionFeedback')
+  }
+
+  /**
+   * Record one remark on a live Session.
+   * @param request - target Session plus the optional text and category.
+   * @returns the recorded postcondition, or `session-not-found` when no live
+   * Session carries the id.
+   */
+  @Remote('record')
+  record(request: SessionFeedbackRecordRequest): Promise<SessionFeedbackRecordResult> {
+    const session = this.ctx.sessions.get(request.sessionId)
+    if (session === undefined) {
+      return Promise.resolve({ ok: false, error: { code: 'session-not-found', sessionId: request.sessionId } })
+    }
+    recordFeedback(session, request)
+    return Promise.resolve({ ok: true, value: { recorded: true } })
+  }
+}
+
 /** Register the global `/feedback` command for every composed command adapter. */
 export function apply(ctx: Context): void {
+  ctx.plugin(SessionFeedbackService)
   ctx.commands.register({
+    definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-feedback'),
     name: 'feedback',
     description: 'record feedback about this session',
     input: { hint: '<text>' },

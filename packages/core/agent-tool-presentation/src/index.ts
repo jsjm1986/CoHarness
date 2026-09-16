@@ -7,20 +7,20 @@
  * consumers, so it cannot move into a preset. What a preset CAN own is the
  * presentation: `ctx.tools.presentAs()` declares it for the mounting SCOPE,
  * which is the preset's standing mount, so the declaration covers every agent
- * joined to that preset and a Code Mode preset runs beside native ones in one
+ * joined to that preset and a PTC preset runs beside native ones in one
  * process. One row per composition, not one per session.
  *
- * A code mode needs a TypeScript code runtime, which is a host-plane service
+ * A PTC mode needs a TypeScript code runtime, which is a host-plane service
  * ([`dsh-code-runtime-worker-thread`](../../code-runtime/code-runtime-worker/README.md)).
  * This row therefore waits for it rather than assuming it: a preset selecting
- * Code Mode against a deployment that composes no runtime fails at mount, named
+ * PTC against a deployment that composes no runtime fails at mount, named
  * in the preset's own activation audit, instead of at the first prompt.
  * @module @deepseek-ai/dsh-agent-tool-presentation
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { ToolPresentationMode } from '@deepseek-ai/dsh-tools'
+import type { ToolPresentationModeInput } from '@deepseek-ai/dsh-tools'
 // Type-only: brings the `ctx.tools` Context merge into this program.
 import type {} from '@deepseek-ai/dsh-tools'
 
@@ -44,7 +44,7 @@ export interface Config {
    * without this row already gets, so an omitted value would mean the row was
    * composed for nothing.
    */
-  mode: ToolPresentationMode
+  mode: ToolPresentationModeInput
 }
 
 /** Runtime schema. */

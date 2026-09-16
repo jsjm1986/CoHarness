@@ -33,7 +33,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 // Type-only edge: resolves `ctx.commands` for the optional command child.
-import type { CommandId } from '@deepseek-ai/dsh-commands'
+import type { CommandDefinitionId, CommandId } from '@deepseek-ai/dsh-commands'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type { PlanProjection } from './types.ts'
@@ -42,6 +42,9 @@ import type { PlanProjection } from './types.ts'
 // module edge in the emitted index.d.ts, so aggregate programs consuming the
 // declarations still receive the SessionProjectionMap merge.
 export type * from './types.ts'
+
+/** Stable command identity without loading the optional command runtime. */
+const PLAN_COMMAND_DEFINITION_ID = '@deepseek-ai/dsh-plan-mode' as CommandDefinitionId
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -294,6 +297,7 @@ export class PlanModeController extends Service {
     // The command child activates only when a command registry is composed.
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
+        definitionId: PLAN_COMMAND_DEFINITION_ID,
         name: 'plan',
         description: 'Enter or leave plan mode',
         input: { hint: '[off|message]', images: true },

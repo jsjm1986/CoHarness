@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-13",
+  "target": "dsh-v0.1.5-rc.2",
+  "status": "measurements-pending",
+  "measurements": [
+    {
+      "name": "local-readByteRange",
+      "status": "pending-measurement",
+      "evidence": "No RSS, transfer-byte, latency, or React-commit benchmark has been completed for this worktree."
+    },
+    {
+      "name": "e2b-readByteRange",
+      "status": "pending-measurement",
+      "evidence": "No RSS, transfer-byte, latency, or React-commit benchmark has been completed for this worktree."
+    },
+    {
+      "name": "workspace-resource-records",
+      "status": "pending-measurement",
+      "evidence": "No RSS, transfer-byte, latency, or React-commit benchmark has been completed for this worktree; bounded registry behavior is covered by runtime tests."
+    },
+    {
+      "name": "workspace-change-stream",
+      "status": "pending-measurement",
+      "evidence": "No RSS, transfer-byte, latency, or React-commit benchmark has been completed for this worktree."
+    },
+    {
+      "name": "large-session-migration",
+      "status": "pending-measurement",
+      "evidence": "No new benchmark was run here; existing compact Assistant stream readers are now used by token-meter/session-stats without full expansion."
+    },
+    {
+      "name": "multi-runtime-workbench",
+      "status": "pending-measurement",
+      "evidence": "No RSS, transfer-byte, latency, or React-commit benchmark has been completed for this worktree."
+    },
+    {
+      "name": "compact-assistant-stream-readers",
+      "status": "functional-verified-benchmark-pending",
+      "evidence": "Record-level usage and first-token readers are covered by llm/token-meter/session-stats tests; RSS and latency comparison remains unmeasured."
+    },
+    {
+      "name": "v41-image-token-estimator",
+      "status": "functional-verified-not-performance",
+      "evidence": "Provider reference geometry and request-pricing cases pass; this is a bounded correctness change, not a claimed throughput optimization."
+    },
+    {
+      "name": "request-image-cache-isolation",
+      "status": "retained-policy",
+      "evidence": "Upstream d911a7b422 shared cache is intentionally not adopted: CoHarness keeps request-image derivatives below each runtime attachment root so multi-tenant Gateway instances cannot share mutable cache state. Cache hit/miss microbenchmarks remain unmeasured."
+    },
+    {
+      "name": "composer-menu-label-ranking",
+      "status": "functional-verified-benchmark-not-needed",
+      "evidence": "Label and canonical-name fuzzy ranking is bounded by the small command catalog; service and MenuView tests pass. No separate timing benchmark is claimed."
+    }
+  ]
+}

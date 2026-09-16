@@ -12,7 +12,7 @@ Status: implemented
 
 ## 决策
 
-**列表读路径已被取代。**[subagent 列表经投影单元读取身份](../architecture/2026-08-06-subagent-list-identity-projection.zh.md)取代了本记录的枚举与逐 child 读取设计:`listChildren` 现在直接合并存活会话存储与可选的会话持久化,并从注册的 `subagent` projection unit 读取每个 child 的 mode/label——不依赖会话查询,也不在列表时扫描描述符;当前的列表语义(含 diagnostic 映射)以该记录为准。本记录仍是描述符持久化、以 mode 判别的描述符作为持久身份、直接 parent 鉴权与面向模型的 `list_agents` 投影的权威;下文基于追踪的读取机制是决策背景,不再是当前行为。
+**列表读路径已被取代。**[subagent 列表经投影单元读取身份](../architecture/2026-08-06-subagent-list-identity-projection.zh.md)取代了本记录的枚举与逐 child 读取设计:`listChildren` 现在直接合并存活会话存储与可选的会话持久化,并从注册的 `subagent` projection unit 读取每个 child 的 mode/label——不依赖会话查询,也不在列表时扫描描述符;当前的列表语义(含 diagnostic 映射)以该记录为准。本记录仍是描述符持久化、以 mode 判别的描述符作为持久身份、直接 parent 鉴权与面向模型的 `list_agents` 投影的权威;下文基于追踪的读取机制是决策背景,不再是当前行为。parent 持有的 [subagent catalog 事件](../architecture/2026-09-01-parent-owned-subagent-catalog.zh.md)记录持有 parent Session 上独立的 `subagent/catalog` 持久事实及其 `subagentCatalog` 投影。
 
 parent 到 child 的枚举是一项带消费方专用投影的服务功能。`SubagentRuntime.listChildren(parentSessionId: SessionId)`（[subagent/src/index.ts](../../../../packages/subagent/subagent/src/index.ts)）执行以下操作：
 

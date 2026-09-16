@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
@@ -19,6 +19,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import GoalService, { GoalId, applyGoalProjection, foldGoal, goalProjectionDefinition } from '@deepseek-ai/dsh-goal'
 import type { GoalProjection, GoalProjectionState, GoalRef } from '@deepseek-ai/dsh-goal'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 interface Bench {
   ctx: Context
@@ -31,24 +32,24 @@ interface Bench {
 /** Register a minimal registry-compatible live agent over a store session. */
 function liveAgent(ctx: Context, session: Session): Agent {
   const status: AgentStatus = 'idle'
-  const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
   const agent: Agent = {
     id: session.id,
     options: {},
     session,
-    inbox,
+    inbox: unsupportedInbox(),
     ctx,
     get status() { return status },
     send: () => {},
     followup: () => {},
     steer: () => ({ outcome: Promise.resolve({ status: 'rejected' as const }) }),
     inject(input: UserMessage) {
-      inbox.append('next-step', input)
+      this.inbox.append('next-step', input)
     },
     cancel() {},
     runMaintenance: task => task(new AbortController().signal),
     whenIdle() { return Promise.resolve() },
   }
+  sessionBackedInbox(agent)
   ctx.agents.register(agent)
   return agent
 }

@@ -115,6 +115,8 @@ seam 正是替换一个提供方就能改变整个产品的原因。文件系统
 
 [客户端运行时](../packages/client/runtime/README.zh.md)保留当前 Session 和显式 staged 集合，共用一条连接及有界历史窗口。[对话插件](../packages/client/ui-conversation/README.zh.md)拥有 Session 渲染权并提供根作用域 viewport 能力；可选的 [Workspace 工作台](../packages/client/ui-workbench/README.zh.md)通过其 slots 组合最多四个面板。账户目录遵循 ACL 过滤，并通过 SessionRuntimePool 按需启动目标运行时，因此每个面板拥有独立 principal、事件流和 scope 资源。面板选择只改变浏览器视图状态，Session 日志、模型请求、sandbox 策略和 Collaboration 授权仍由原有模块负责。
 
+远程 Workspace 文件预览是独立的只读能力：Host ApiProxy 在 Gateway 授权后，经 `ctx.fs` 解析 Session 相对路径；Client runtime 将元数据保存在 `WorkspaceResourceRegistry` 中，并经所属 runtime target 路由每次读取。它不会替代 User Documents，不增加第二套写入协议，也不会在云端 Web 调用 `host.openPath`。
+
 
 ## 新行为的归属位置
 

@@ -17,8 +17,11 @@ import {
   GatewaySessionCreationAuthorization,
   type GatewaySessionCreationAuthorization as SessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
+import { isSessionSurfaceOp } from '@deepseek-ai/dsh-session-format/surface'
 import {
   isSurfaceEligibleType,
+  KNOWN_SESSION_EVENT_TYPES,
+  SESSION_FORMAT_VERSION,
   SessionId,
   SessionLogOffset,
   type Session,
@@ -113,16 +116,6 @@ function safeInteger(value: unknown): value is number {
 
 function optionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string'
-}
-
-function surfaceOp(value: unknown): boolean {
-  if (value === 'append') return true
-  const operation = record(value)
-  return operation !== undefined
-    && Object.keys(operation).length === 3
-    && operation.op === 'replace'
-    && nonNegativeInteger(operation.start)
-    && nonNegativeInteger(operation.end)
 }
 
 function jsonSerializable(value: unknown): boolean {
@@ -270,7 +263,13 @@ function contentMetadataFrom(value: unknown): SessionContentMetadata | undefined
   }
 }
 
-function eventsFrom(value: unknown): SessionEvent[] {
+/**
+ * Validate one wire event list. Legacy-generation events predate the surface
+ * protocol, so `legacy` relaxes only the `surfaceOp`/`sourceEventSeqs`
+ * consistency rule; the coordinator's migration stamps the markers before
+ * strict current-generation adoption sees the events.
+ */
+function eventsFrom(value: unknown, legacy = false): SessionEvent[] {
   if (!Array.isArray(value)) throw new Error('Gateway returned an invalid session event list')
   return value.map((candidate) => {
     const event = record(candidate)
@@ -287,8 +286,11 @@ function eventsFrom(value: unknown): SessionEvent[] {
     const isSurfaceEvent = isSurfaceEligibleType(event.type) || event.type === 'steering/message'
     const hasSurfaceOp = Object.hasOwn(event, 'surfaceOp')
     const hasSourceEventSeqs = Object.hasOwn(event, 'sourceEventSeqs')
-    if ((isSurfaceEvent && (!hasSurfaceOp || !surfaceOp(event.surfaceOp)))
-      || (!isSurfaceEvent && (hasSurfaceOp || hasSourceEventSeqs))) {
+    // An unknown ignorable record keeps opaque surface metadata, matching the
+    // runtime's adoption rule.
+    const opaqueMetadata = !KNOWN_SESSION_EVENT_TYPES.has(event.type) && event.ignorable === true
+    if (!legacy && ((isSurfaceEvent && (!hasSurfaceOp || !isSessionSurfaceOp(event.surfaceOp)))
+      || (!isSurfaceEvent && !opaqueMetadata && (hasSurfaceOp || hasSourceEventSeqs)))) {
       throw new Error('Gateway returned an invalid session event list')
     }
     return candidate as SessionEvent
@@ -354,6 +356,8 @@ function deterministicBatchId(kind: 'append' | 'repair' | 'migrate', sessionId: 
 export class GatewaySessionPersistence extends SessionPersistence implements PersistenceBackend<never> {
   override readonly supportsRawArtifacts = false
   override readonly name = 'session-persistence-gateway'
+  /** The Gateway recomputes and commits body migrations server-side. */
+  readonly supportsBodyMigration = true
 
   static inject = ['sessions', 'gatewayRuntime']
   static Config: z<Config> = z.object({
@@ -574,9 +578,15 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (typeof value.revision !== 'string' || value.revision === '') {
       throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session page revision')
     }
+    let header: SessionHeader
+    try {
+      header = headerFrom(value.header)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session header')
+    }
     let events: SessionEvent[]
     try {
-      events = eventsFrom(value.events)
+      events = eventsFrom(value.events, header.version !== SESSION_FORMAT_VERSION)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
@@ -594,12 +604,6 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     }
     if ((value.hasMore && cursor === undefined) || (!value.hasMore && cursor !== undefined)) {
       throw new SessionPersistenceReadError('protocol', 'Gateway returned an inconsistent session page continuation')
-    }
-    let header: SessionHeader
-    try {
-      header = headerFrom(value.header)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session header')
     }
     if (header.id !== id) {
       throw new SessionPersistenceReadError('protocol', 'Gateway returned a page for another session')
@@ -784,7 +788,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
     let events: SessionEvent[]
     try {
-      events = eventsFrom(value.events)
+      events = eventsFrom(value.events, storage.meta.version !== SESSION_FORMAT_VERSION)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
@@ -796,36 +800,54 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   }
 
   /**
-   * Ask the remote store to publish a v2 metadata successor when supported.
-   * A missing route is a compatibility no-op; the coordinator still exposes
-   * the normalized in-memory view for older Gateway deployments.
+   * Ask the Gateway to migrate the stored body to the current format. The wire
+   * carries only identity, the source revision, and the target header: the
+   * server recomputes the successor body through its own format catalog inside
+   * one transaction, so a content-changing migration publishes durably and a
+   * response `nextSeq`/`seedLength` that diverges from the local computation
+   * surfaces as a protocol error instead of a split cursor. A missing route is
+   * a compatibility no-op for older Gateway deployments; the coordinator still
+   * exposes the normalized in-memory view, and a later append fails loudly on
+   * the stale stored cursor rather than corrupting the log.
    * @param sourceStorage - legacy storage metadata.
    * @param currentStorage - normalized current storage metadata.
-   * @param _events - validated logical events, not sent over the wire.
+   * @param events - migrated logical events; used to verify the committed cursor.
    * @param sourceRevision - revision that the remote transaction must match.
    * @param signal - optional cancellation of the migration request.
-   * @returns after the optional remote migration request settles.
+   * @returns after the remote migration request settles.
    */
   async migrateStored(
     sourceStorage: SessionStorageMetadata,
     currentStorage: SessionStorageMetadata,
-    _events: readonly SessionEvent[],
+    events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
     signal?: AbortSignal,
   ): Promise<void> {
-    await this.optional('/internal/runtime/session/migrate', signal, {
+    const targetHeader = wireHeader(currentStorage)
+    const value = record(await this.optional('/internal/runtime/session/migrate', signal, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         sessionId: sourceStorage.meta.id,
         sourceRevision: String(sourceRevision),
-        targetHeader: wireHeader(currentStorage),
+        targetHeader,
         migrationId: deterministicBatchId('migrate', sourceStorage.meta.id, {
           sourceRevision: String(sourceRevision),
-          targetHeader: wireHeader(currentStorage),
+          targetHeader,
         }),
       }),
-    })
+    }))
+    if (value === undefined) return
+    if ((value.result !== 'committed' && value.result !== 'current')
+      || !nonNegativeInteger(value.nextSeq)
+      || (value.seedLength !== null && !nonNegativeInteger(value.seedLength))) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session migration result')
+    }
+    const lastMigrated = events.at(-1)
+    const expectedNextSeq = lastMigrated === undefined ? 0 : lastMigrated.seq + 1
+    if (value.nextSeq !== expectedNextSeq || (value.seedLength ?? null) !== (targetHeader.seedLength ?? null)) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway committed a divergent session migration')
+    }
   }
 
   async readStoredRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
@@ -856,7 +878,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
     let events: SessionEvent[]
     try {
-      events = eventsFrom(value.events)
+      events = eventsFrom(value.events, storage.meta.version !== SESSION_FORMAT_VERSION)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }

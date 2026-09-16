@@ -7,7 +7,9 @@ import SessionStore, {
   SessionSeq,
 } from '@deepseek-ai/dsh-session'
 import { isJsonValue, SessionDraftId } from '@deepseek-ai/dsh-session'
+import { SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
 import { createUserMessage, freezeMessage, MessageId } from '@deepseek-ai/dsh-llm'
+import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type {
   SessionEvent,
   SessionHeader,
@@ -697,6 +699,203 @@ describe('PersistenceCoordinator session preparations', () => {
     }
   })
 
+  it('normalizes pre-PTC dispatch events, preset ids, and plugin attributions on read without rewriting storage', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-ptc-read')
+    const legacyMessage: UserMessage = {
+      id: MessageId('legacy-ptc-message'),
+      role: 'user',
+      content: [{ type: 'text', text: 'hi' }],
+      source: { kind: 'plugin', plugin: 'tools-code-mode' },
+    }
+    backend.store.set(id, {
+      meta: { ...meta(id), agentPreset: 'code' },
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        { type: 'agent-preset/selected', seq: SessionSeq(1), time: 2, data: { agentPreset: 'code' } } as unknown as SessionEvent,
+        {
+          type: 'tool/code-dispatch-start', seq: SessionSeq(2), time: 3,
+          data: { rootCallId: 'call-1', parentCallId: 'call-1', subCallId: 'call-1:code:1', name: 'bash', arguments: { command: 'ls' } },
+        } as unknown as SessionEvent,
+        {
+          type: 'tool/code-dispatch', seq: SessionSeq(3), time: 4,
+          data: { rootCallId: 'call-1', parentCallId: 'call-1', subCallId: 'call-1:code:1', name: 'bash', arguments: { command: 'ls' }, isError: false, content: [{ type: 'text', text: 'ok' }] },
+        } as unknown as SessionEvent,
+        { type: 'user/message', seq: SessionSeq(4), time: 5, data: freezeMessage(legacyMessage), surfaceOp: 'append' },
+        {
+          type: 'agent/inbox/spliced', seq: SessionSeq(5), time: 6,
+          data: { target: 'next-step', start: 0, inserted: [structuredClone(legacyMessage)] },
+        } as unknown as SessionEvent,
+        {
+          type: 'session/title-llm-request', seq: SessionSeq(6), time: 7,
+          data: { titleProvider: 'test', messageSeqs: [4], route: { provider: 'p', model: 'm' }, system: 's', messages: [structuredClone(legacyMessage)], maxTokens: 8 },
+        } as unknown as SessionEvent,
+      ],
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      expect(loaded.meta.agentPreset).toBe('ptc')
+      expect(loaded.events.map(event => event.type)).toEqual([
+        'turn/start',
+        'agent-preset/selected',
+        'tool/ptc-dispatch-start',
+        'tool/ptc-dispatch',
+        'user/message',
+        'agent/inbox/spliced',
+        'session/title-llm-request',
+        // The open turn is torn-tail repaired during preparation.
+        'turn/end',
+      ])
+      expect(loaded.events.at(1)?.data).toEqual({ agentPreset: 'ptc' })
+      // Opaque call ids keep their recorded segment; only the vocabulary moves.
+      expect((loaded.events.at(2)?.data as { subCallId: string }).subCallId).toBe('call-1:code:1')
+      const pluginOf = (message: unknown) => (message as { source: { plugin?: string } }).source.plugin
+      expect(pluginOf(loaded.events.at(4)?.data)).toBe('tools-ptc')
+      const spliced = loaded.events.at(5)?.data as { inserted: unknown[] }
+      expect(pluginOf(spliced.inserted[0])).toBe('tools-ptc')
+      const titleRequest = loaded.events.at(6)?.data as { messages: unknown[] }
+      expect(pluginOf(titleRequest.messages[0])).toBe('tools-ptc')
+      // Reads adopt; they never rewrite the committed bytes.
+      const stored = backend.store.get(id)!
+      expect(stored.meta.agentPreset).toBe('code')
+      expect(stored.events.map(event => event.type)).toContain('tool/code-dispatch')
+      expect((stored.events.at(1)?.data as { agentPreset: string }).agentPreset).toBe('code')
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('passes non-legacy and malformed normalization candidates through unchanged', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-ptc-passthrough')
+    backend.store.set(id, {
+      meta: meta(id),
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        { type: 'agent-preset/selected', seq: SessionSeq(1), time: 2, data: { agentPreset: 'standard' } } as unknown as SessionEvent,
+        {
+          type: 'agent/inbox/spliced', seq: SessionSeq(2), time: 3,
+          data: { target: 'next-step', start: 0, inserted: 'opaque' },
+        } as unknown as SessionEvent,
+        {
+          type: 'agent/inbox/spliced', seq: SessionSeq(3), time: 4,
+          data: { target: 'next-step', start: 0, inserted: [null] },
+        } as unknown as SessionEvent,
+        {
+          type: 'session/title-llm-request', seq: SessionSeq(4), time: 5,
+          data: { messages: 'opaque' },
+        } as unknown as SessionEvent,
+        {
+          type: 'session/title-llm-request', seq: SessionSeq(5), time: 6,
+          data: { messages: [null] },
+        } as unknown as SessionEvent,
+      ],
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      expect(loaded.events.at(1)?.data).toEqual({ agentPreset: 'standard' })
+      expect((loaded.events.at(2)?.data as { inserted: unknown }).inserted).toBe('opaque')
+      expect((loaded.events.at(3)?.data as { inserted: unknown[] }).inserted).toEqual([null])
+      expect((loaded.events.at(4)?.data as { messages: unknown }).messages).toBe('opaque')
+      expect((loaded.events.at(5)?.data as { messages: unknown[] }).messages).toEqual([null])
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('adopts legacy start-keyed replace surfaceOps during whole-prefix reads', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-replace-read')
+    backend.store.set(id, {
+      meta: meta(id),
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        {
+          type: 'tool/result', seq: SessionSeq(1), time: 2,
+          data: { turn: 1, step: 1, callId: 'call-0', content: [{ type: 'text', text: 'ok' }], isError: false },
+          surfaceOp: 'append',
+        } as unknown as SessionEvent,
+        {
+          type: 'tool/result', seq: SessionSeq(2), time: 3,
+          data: { turn: 1, step: 1, callId: 'call-0', content: [{ type: 'text', text: 'replaced' }], isError: false },
+          surfaceOp: { op: 'replace', start: 1, end: 1 },
+          sourceEventSeqs: [1],
+        } as unknown as SessionEvent,
+      ],
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      const messageIdOf = (event: SessionEvent | undefined) =>
+        ((event?.data as { message?: { id?: unknown } }).message?.id)
+      // A `start`-keyed replace op inherits the migrated message at that seq.
+      expect(messageIdOf(loaded.events.at(2))).toBe(`legacy-message:${id}:1`)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('leaves malformed replace surfaceOps to the session validator', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-replace-malformed')
+    backend.store.set(id, {
+      meta: meta(id),
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        {
+          type: 'user/message', seq: SessionSeq(1), time: 2,
+          data: {
+            id: MessageId('replace-target-message'), role: 'user',
+            content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
+          },
+          surfaceOp: 'append',
+        },
+        {
+          type: 'tool/result', seq: SessionSeq(2), time: 3,
+          data: { turn: 1, step: 1, callId: 'call-1', content: [{ type: 'text', text: 'ok' }], isError: false },
+          surfaceOp: { op: 'replace' },
+        } as unknown as SessionEvent,
+        {
+          type: 'tool/result', seq: SessionSeq(3), time: 4,
+          data: { turn: 1, step: 1, callId: 'call-2', content: [{ type: 'text', text: 'ok' }], isError: false },
+          surfaceOp: { op: 'replace', start: -1 },
+        } as unknown as SessionEvent,
+      ],
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      await expect(coordinator.load(id)).rejects.toThrow(/invalid replace surfaceOp/)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it.each([true, false])('reads an old whole prefix with migration hook enabled=%s', async (withMigration) => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
@@ -726,7 +925,7 @@ describe('PersistenceCoordinator session preparations', () => {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
       expect(suffix.meta.version).toBe(3)
       expect(suffix.events.map(event => event.type)).toEqual([
-        'user/message', 'step/start', 'system/message', 'assistant/message', 'step/end', 'turn/end',
+        'step/start', 'system/message', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
       expect(stored.meta.version).toBe(0)
       // V2→V3 inserts a durable system node, so a metadata-only backend hook
@@ -798,6 +997,36 @@ describe('PersistenceCoordinator session preparations', () => {
       // Re-running a load over the already-published log is a no-op.
       await coordinator.load(readId)
       expect(migrateStored).toHaveBeenCalledTimes(2)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('claims an ownerless legacy load through the migrated prefix view', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-claim')
+    // Without a migrateStored hook the committed v0 body stays in place and the
+    // coordinator migrates only its in-memory view — including the ownerless
+    // claim's seed-vs-stored comparison.
+    backend.store.set(id, {
+      meta: { ...meta(id), version: 0 },
+      events: oneTurnLog(),
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      expect(loaded.meta.version).toBe(3)
+      expect(backend.store.get(id)?.meta.version).toBe(0)
+
+      const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })
+      await expect(ctx.sessions.flush(resumed)).resolves.toBe(true)
+      expect(backend.store.get(id)?.meta.version).toBe(0)
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()
@@ -2306,6 +2535,21 @@ describe('SessionPersistence service registration', () => {
 
     await expect(ctx.sessionPersistence.load(id))
       .rejects.toThrow('unsupported legacy mode/set event at seq 0')
+    await fiber.dispose()
+  })
+
+  it('surfaces a migration refusal unwrapped instead of as stored corruption', async () => {
+    const id = SessionId('legacy-mode-migration')
+    const m = { ...meta(id, '/legacy'), version: 0 }
+    const store: MemoryStore = new Map([[id, { meta: m, events: [legacyModeSet()] }]])
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence, { store })
+
+    // The format catalog refuses the log; it is an intact artifact this build
+    // declines to migrate, not damaged storage.
+    await expect(ctx.sessionPersistence.load(id))
+      .rejects.toBeInstanceOf(SessionFormatUnsupportedMigrationError)
     await fiber.dispose()
   })
 

@@ -3,7 +3,13 @@
 import { Buffer } from 'node:buffer'
 import { AttachmentError } from './error.ts'
 import type { AttachmentStore } from './index.ts'
-import type { EncodedImageAttachment, ImageAttachmentRef, SaveImageAttachment } from './types.ts'
+import type {
+  AdmittedPromptContentPart,
+  AttachmentAdmissionPart,
+  EncodedImageAttachment,
+  ImageAttachmentRef,
+  SaveImageAttachment,
+} from './types.ts'
 
 /** Decode one upload payload while rejecting non-canonical base64 forms. */
 function decodeBase64(data: string): Uint8Array {
@@ -38,4 +44,26 @@ export async function admitEncodedImages(
   images: readonly EncodedImageAttachment[],
 ): Promise<readonly ImageAttachmentRef[]> {
   return attachments.saveImages(images.map(saveInput))
+}
+
+/**
+ * Admit one Host prompt and replace each uploaded image with its durable
+ * reference. Text parts pass through unchanged; a prompt without image parts
+ * performs no storage operation.
+ * @param attachments - the deployment attachment store owning batch policy.
+ * @param content - prompt parts in message order.
+ * @returns admitted prompt parts in the same order as `content`.
+ * @throws AttachmentError when the image batch is refused.
+ */
+export async function admitPromptContent(
+  attachments: AttachmentStore,
+  content: readonly AttachmentAdmissionPart[],
+): Promise<AdmittedPromptContentPart[]> {
+  const images = content.filter((part): part is Extract<AttachmentAdmissionPart, { type: 'image' }> =>
+    part.type === 'image')
+  const refs = images.length === 0 ? [] : await admitEncodedImages(attachments, images)
+  let next = 0
+  return content.map((part): AdmittedPromptContentPart => part.type === 'text'
+    ? { type: 'text', text: part.text }
+    : { type: 'image', attachment: refs[next++] as ImageAttachmentRef })
 }

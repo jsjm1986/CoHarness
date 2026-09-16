@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-31-claimed-pre-step-inbox-lifecycle.md
-2026-07-31-claimed-pre-step-inbox-lifecycle.md: a3589ee13070d8e0a9d668a63efb20dc356e3e95
-2026-07-31-claimed-pre-step-inbox-lifecycle.zh.md: ef6d271811eae2b84a5b5953779ba6c6ae827704
+2026-07-31-claimed-pre-step-inbox-lifecycle.md: 9057518f840f838079075851ae8a473a97be8805
+2026-07-31-claimed-pre-step-inbox-lifecycle.zh.md: c06455a47eacf38392395e71b11d85856b685693

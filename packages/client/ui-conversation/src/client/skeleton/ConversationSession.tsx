@@ -108,11 +108,7 @@ export function ConversationSessionHeader({
                   const title = (
                     <button
                       type="button"
-                      className={clsx(
-                        css.crumb,
-                        summary.subagent && css.crumbSubagent,
-                        last && css.crumbCurrent,
-                      )}
+                      className={clsx(css.crumb, last && css.crumbCurrent)}
                       disabled={last}
                       onClick={() => { open(summary.id) }}
                     >

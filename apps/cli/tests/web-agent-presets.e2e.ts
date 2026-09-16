@@ -34,8 +34,7 @@ const INSTALL_ANCHOR = join(REPO_ROOT, 'apps/cli/package.json')
 const MINIMAL_PROMPT = 'You are a helpful software engineer assistant.'
 const MINIMAL_BASH_DESCRIPTION = `Run commands in a bash shell
 * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
-* You don't have access to the internet via this tool.
-* You do have access to a mirror of common linux and python packages via apt and pip.
+* Network access depends on the task environment. Prefer configured mirrors/proxies when they are available.
 * State is persistent across command calls and discussions with the user.
 * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
 * Please avoid commands that may produce a very large amount of output.
@@ -243,7 +242,7 @@ describe('the shipped Web composition', () => {
   it('supplies both shipped presets, and only those, from the system root', async () => {
     const listed = await ctx.agentPresets.list()
 
-    expect(listed.map(preset => preset.id).sort()).toEqual(['code', 'cordis', 'minimal', 'standard'])
+    expect(listed.map(preset => preset.id).sort()).toEqual(['cordis', 'minimal', 'ptc', 'standard'])
     expect(listed.every(preset => preset.trust === 'system')).toBe(true)
     expect(ctx.agentPresets.defaultId).toBe('standard')
   })
@@ -372,18 +371,18 @@ describe('the shipped Web composition', () => {
     }
   })
 
-  it('presents `code` as Code Mode without disturbing a native session beside it', async () => {
+  it('presents `ptc` as PTC without disturbing a native session beside it', async () => {
     const coded = await ctx.agents.create({
-      sessionId: SessionId('preset-code'),
-      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'code').then(() => undefined),
+      sessionId: SessionId('preset-ptc'),
+      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'ptc').then(() => undefined),
     })
     const native = await ctx.agents.create({
-      sessionId: SessionId('preset-code-native'),
+      sessionId: SessionId('preset-ptc-native'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     try {
       // One tool reaches the MODEL: the transport. The registry's catalog for
-      // this agent is unchanged — a code mode collapses the presentation, not
+      // this agent is unchanged — PTC collapses the presentation, not
       // the capabilities — so the assembly is what carries the claim.
       const assembly = await ctx.systemPrompt.assemble({ scope: coded.agent })
       expect(assembly.tools.map(tool => tool.name)).toEqual(['run_code'])

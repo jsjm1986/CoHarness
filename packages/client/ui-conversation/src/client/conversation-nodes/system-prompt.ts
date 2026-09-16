@@ -6,7 +6,7 @@ import { chatNode } from './common.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap {
-    /** Complete model-visible system prompt carried by a surface system/message or request header. */
+    /** Complete model-visible system prompt carried by a surface `system/message`. */
     'system-prompt': SystemPromptChatData
   }
 }
@@ -24,40 +24,28 @@ function systemPromptText(content: readonly ContentBlock[]): string {
     .join('\n')
 }
 
-/** One surface system/message or request/header prompt rendered as a collapsed Chat row. */
+/** One surface `system/message` prompt rendered as a collapsed Chat row. */
 export const systemPromptDefinition: ConversationNodeDefinition<SystemPromptState> = {
   kind: 'system-prompt',
   target: 'chat',
   match: (event) => {
-    if (event.type === 'system/message') {
-      const text = systemPromptText(event.data.message.content)
-      return text.trim() !== '' ? { id: String(event.seq), role: 'start' } : null
-    }
-    if (event.type !== 'request/header') return null
-    const system = event.data.header.system
-    return typeof system === 'string' && system.trim() !== ''
-      ? { id: String(event.seq), role: 'start' }
-      : null
+    // Empty prompts still start a Context: they clear the effective prompt,
+    // so backward lookups must see them instead of a stale predecessor.
+    if (event.type !== 'system/message') return null
+    return { id: String(event.seq), role: 'start' }
   },
   start: (_context, match) => {
-    if (match.event.type === 'system/message') {
-      return {
-        seq: match.event.seq,
-        time: match.event.time,
-        text: systemPromptText(match.event.data.message.content),
-      }
-    }
-    if (match.event.type !== 'request/header') throw new Error('system-prompt start requires request/header or system/message')
+    if (match.event.type !== 'system/message') throw new Error('system-prompt start requires system/message')
     return {
       seq: match.event.seq,
       time: match.event.time,
-      text: match.event.data.header.system ?? '',
+      text: systemPromptText(match.event.data.message.content),
     }
   },
   update: context => context.state,
   publication: () => 'immediate',
   buildViewNode: (context) => {
-    if (context.state === undefined) return null
+    if (context.state === undefined || context.state.text.trim() === '') return null
     return chatNode(context, 'system-prompt', context.state.seq, { text: context.state.text })
   },
 }

@@ -57,7 +57,7 @@ describe('Session format catalog', () => {
       inheritedEventCount: 2,
       events: [
         event('step/start', 0, { turn: 1, step: 1 }),
-        event('user/message', 1, { role: 'user', id: 'u-1', content: [], source: { kind: 'plugin', plugin: 'tools-code-mode' } }),
+        event('user/message', 1, { role: 'user', id: 'u-1', content: [], source: { kind: 'plugin', plugin: 'tools-ptc' } }),
         event('request/header', 2, { header: { config: {}, system: '' }, reason: 'initial' }, { surfaceOp: 'append' }),
         event('request/header', 3, { header: { config: {}, system: 'next' }, reason: 'change' }, {
           surfaceOp: { op: 'replace', start: 1, end: 1 }, sourceEventSeqs: [1],
@@ -137,6 +137,61 @@ describe('Session format catalog', () => {
       header: { version: 2, id: 'bad-data', createdAt: 1 }, inheritedEventCount: 0,
       events: [{ type: 'assistant/message', seq: 0, time: 1, data: [] }],
     })).toThrow('v2 assistant/message has invalid data')
+  })
+
+  it('passes bare mid-log end-seed lifecycle markers through an unseeded v0 log', () => {
+    const migrated = sessionFormatCatalog.migrate({
+      header: { version: 0, id: 'resume-marks', createdAt: 1 },
+      inheritedEventCount: 0,
+      events: [
+        event('turn/start', 0, { turn: 1 }),
+        event('session/end-seed', 1, {}),
+        event('turn/start', 2, { turn: 2 }),
+        event('session/end-seed', 3, {}),
+      ],
+    })
+    expect(migrated.header.version).toBe(3)
+    expect(migrated.inheritedEventCount).toBe(0)
+    expect(migrated.events.filter(item => item.type === 'session/end-seed')).toHaveLength(2)
+  })
+
+  it('accepts a seeded v0 log whose bare end-seed marker sits at the inherited cut', () => {
+    const migrated = sessionFormatCatalog.migrate({
+      header: { version: 0, id: 'seeded', createdAt: 1, isSeeded: true },
+      inheritedEventCount: 2,
+      events: [
+        event('turn/start', 0, { turn: 1 }),
+        event('turn/end', 1, { turn: 1, reason: { kind: 'completed' } }),
+        event('session/end-seed', 2, {}),
+        event('turn/start', 3, { turn: 2 }),
+      ],
+    })
+    expect(migrated.header.version).toBe(3)
+    expect(migrated.inheritedEventCount).toBe(2)
+  })
+
+  it('still rejects a flagged inherited end-seed marker in an unseeded log', () => {
+    expect(() => sessionFormatCatalog.migrate({
+      header: { version: 2, id: 'unseeded-flag', createdAt: 1 },
+      inheritedEventCount: 0,
+      events: [
+        event('step/start', 0, { turn: 1, step: 1 }),
+        event('session/end-seed', 1, { inherited: true }),
+      ],
+    })).toThrow('unseeded Session contains an inherited end-seed marker')
+  })
+
+  it('still rejects a flagged inherited end-seed marker off the inherited cut', () => {
+    expect(() => sessionFormatCatalog.migrate({
+      header: { version: 2, id: 'off-cut-flag', createdAt: 1, isSeeded: true },
+      inheritedEventCount: 3,
+      events: [
+        event('step/start', 0, { turn: 1, step: 1 }),
+        event('session/end-seed', 1, { inherited: true }),
+        event('step/end', 2, { turn: 1, step: 1 }),
+        event('turn/start', 3, { turn: 1 }),
+      ],
+    })).toThrow('inherited end-seed marker')
   })
 
 })

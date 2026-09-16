@@ -1438,7 +1438,7 @@ describe('dsh-workflow-worker-thread', () => {
     it('keeps a holder-owned run usable when the engine unloads before its child starts', async () => {
       const { ctx, parent, provider, engineFiber } = await setup({ reply: () => text('survived reload') })
       let handle!: ReturnType<typeof ctx.workflowEngine.start>
-      const holder = await ctx.plugin(Object.assign((inner: Context) => {
+      const holder = await ctx.plugin(Object.assign(async (inner: Context) => {
         handle = inner.workflowEngine.start({ ...scripted("return await agent('after reload')"), parent })
       }, { inject: ['workflowEngine'] }))
 

@@ -7,7 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import CommandRuntime from '@deepseek-ai/dsh-commands'
+import CommandRuntime, { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import {
   CompactionId,
   CompactionEngine,
@@ -122,6 +122,7 @@ describe('command-compact real Loader composition', () => {
     expect(context.commands.list(agent)).toContainEqual({
       name: 'compact',
       description: 'Compact older conversation history',
+      definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-compact'),
     })
     const execution = await context.commands.execute(agent, '/compact', [], new AbortController().signal)
     if (execution === undefined) throw new Error('Loader composition did not resolve /compact')

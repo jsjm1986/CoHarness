@@ -10,7 +10,7 @@
 
 import { join } from 'node:path'
 import {
-  decodeSeqRanges, decodeStorageRecord, encodeSeqRanges, packChunkRuns, SESSION_FORMAT_VERSION,
+  decodeSeqRanges, decodeStorageRecord, encodeSeqRanges, packChunkRuns,
   SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
 import type {
@@ -25,6 +25,7 @@ import {
   sessionFormatVersionRefusal,
   type SessionStorageMetadata,
 } from '@deepseek-ai/dsh-session-persistence'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
 
 /** Physical encoding selected for JSONL session artifacts. */
 export type JsonlCompression = 'zstd' | 'none'
@@ -98,6 +99,15 @@ export function toHeaderLine(
 function fromHeaderLine(line: HeaderLine): SessionStorageMetadata {
   if (Object.hasOwn(line, 'sandboxMode') || Object.hasOwn(line, 'approvalPolicy')) {
     throw new Error('session header uses retired policy baseline fields')
+  }
+  // Upstream marks seeded lineage with a required boolean `isSeeded` header key
+  // while this build carries the cut as `seedLength`. Reading that artifact
+  // silently would drop its fork lineage, so refuse it outright; `isSeeded:
+  // false` is structurally identical to an unseeded header here and passes.
+  if ((line as { isSeeded?: unknown }).isSeeded === true && line.seedLength === undefined) {
+    throw new SessionFormatUnsupportedError(
+      `session "${line.id}" marks seeded lineage without a seedLength; the artifact was written by a different harness build`,
+    )
   }
   return {
     meta: {
@@ -317,7 +327,14 @@ interface SessionLogScan {
 function refuseForeignFormatVersion(parsed: unknown): void {
   if (typeof parsed !== 'object' || parsed === null) return
   const { version, id } = parsed as { version?: unknown; id?: unknown }
-  if (typeof version !== 'number' || version === SESSION_FORMAT_VERSION || version === 0 || version === 1) return
+  // Every older integer is a valid migration source. In particular v2 is the
+  // format emitted by the previous CoHarness release and must reach the
+  // coordinator's v2-to-v3 migration instead of being rejected at the header
+  // scanner. Future versions still fail before their structure is decoded.
+  // The format catalog owns the reader's current version. Profile bundles can
+  // resolve peer packages through different symlink paths; using the catalog
+  // here keeps header admission and the migration chain on one authority.
+  if (typeof version !== 'number' || Number.isInteger(version) && version >= 0 && version <= sessionFormatCatalog.currentVersion) return
   throw new SessionFormatUnsupportedError(
     sessionFormatVersionRefusal(typeof id === 'string' ? id : String(id), version),
   )

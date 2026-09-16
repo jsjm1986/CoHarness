@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, WorkspaceResourceRegistry, workspaceResourceAddress, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
@@ -135,7 +135,7 @@ describe('workbench components', () => {
   it('requires an explicit replacement when full, but allows focusing a duplicate', () => {
     const choose = vi.fn(async () => ({ ok: true as const }))
     const p = props()
-    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [SID_A, 'c' as SessionId, 'd' as SessionId, 'e' as SessionId], activePaneId: SID_A, paneRatios: [1, 1, 1, 1] }} tabbed={false} chooseSession={choose} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [SID_A, 'c' as SessionId, 'd' as SessionId, 'e' as SessionId], paneRatios: [1, 1, 1, 1], activePaneId: SID_A }} tabbed={false} chooseSession={choose} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     expect(screen.getByRole('status').textContent).toContain('最多同时打开 4 个')
     expect(screen.getByRole('button', { name: 'Beta /work/beta' }).hasAttribute('disabled')).toBe(true)
@@ -162,7 +162,7 @@ describe('workbench components', () => {
     const focus = vi.fn()
     const changeMode = vi.fn()
     const p = props()
-    const view = render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [SID_A, SID_B], activePaneId: SID_A, paneRatios: [1, 1] }} tabbed chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={changeMode} t={t} />)
+    const view = render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [SID_A, SID_B], paneRatios: [1, 1], activePaneId: SID_A }} tabbed chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={changeMode} t={t} />)
     const tabs = screen.getAllByRole('tab')
     expect(tabs[1]!.textContent).toContain('运行中')
     fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' })
@@ -247,9 +247,30 @@ describe('workbench account targets and asynchronous chooser', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Team/ }))
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => { expect(screen.getByRole('alert').textContent).toBe('无法创建对话，请重试') })
-    expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7 }, false)
+    expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7, projectName: 'Team' }, false)
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+  })
+
+  it('creates without a name when the project left the reloaded catalog', async () => {
+    serve()
+    const createSession = vi.fn(async () => ({ ok: true as const }))
+    toolbar({ createSession })
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: 'Workspace' })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Team/ }))
+    fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
+
+    // Reopening the picker refetches the catalog; project 7 vanished, so the
+    // stale workspace id no longer resolves a name to stamp.
+    serve({ ...directory, projects: [], items: [] })
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: '新建对话' })
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    await waitFor(() => {
+      expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7 }, false)
+    })
   })
 
   it('ignores catalog completion after unmount and marks a failed catalog ready', async () => {
@@ -309,6 +330,51 @@ describe('pane header controls', () => {
     expect(screen.getByText('Workspace A')).toBeTruthy()
     expect(screen.getByText('就绪')).toBeTruthy()
   })
+  it('routes the pane files action to its own Workspace browser entry only when the runtime provides one', () => {
+    const p = props()
+    const openFiles = vi.fn()
+    const onFocus = vi.fn()
+    const hooks = {
+      useSession: (() => undefined) as never, useProjection: () => undefined,
+      useInput: (() => undefined) as never, inputActions: {} as never,
+    }
+    const view = render(<WorkbenchPaneHeader {...p} {...hooks} sessionId={SID_B} active={false} maximized={false}
+      onFocus={onFocus} onClose={vi.fn()} onMaximize={vi.fn()} replacePane={vi.fn()} movePane={vi.fn()}
+      filesAvailable={() => true} openFiles={openFiles} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace 文件' }))
+    expect(openFiles).toHaveBeenCalledOnce()
+    expect(onFocus).not.toHaveBeenCalled()
+    view.rerender(<WorkbenchPaneHeader {...p} {...hooks} sessionId={SID_B} active={false} maximized={false}
+      onFocus={onFocus} onClose={vi.fn()} onMaximize={vi.fn()} replacePane={vi.fn()} movePane={vi.fn()}
+      filesAvailable={() => false} openFiles={openFiles} t={t} />)
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+  })
+})
+
+describe('toolbar files entry', () => {
+  function renderToolbar(overrides: Partial<ComponentProps<typeof WorkbenchToolbar>> = {}) {
+    const p = props()
+    return render(<WorkbenchToolbar {...p} viewport={{ mode: 'single' as const, paneIds: [], paneRatios: [] }} tabbed={false}
+      chooseSession={vi.fn(async () => ({ ok: true as const }))} focusSession={vi.fn()}
+      createSession={vi.fn(async () => ({ ok: true as const }))} setMode={vi.fn()}
+      filesAvailable={() => true} openFiles={vi.fn()} t={t} {...overrides} />)
+  }
+  it('advertises the Workspace browser for a hosted single conversation', () => {
+    const openFiles = vi.fn()
+    renderToolbar({ openFiles })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace 文件' }))
+    expect(openFiles).toHaveBeenCalledOnce()
+  })
+  it('stays hidden without a files provider or opener', () => {
+    renderToolbar({ filesAvailable: () => false })
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+    cleanup()
+    renderToolbar({ filesAvailable: undefined })
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+    cleanup()
+    renderToolbar({ openFiles: undefined })
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+  })
 })
 
 describe('workbench toolbar edge paths', () => {
@@ -318,6 +384,84 @@ describe('workbench toolbar edge paths', () => {
       createSession={vi.fn(async () => ({ ok: true as const }))} setMode={vi.fn()} t={t} {...overrides} />)
     return view
   }
+  function fileProps() {
+    const list = vi.fn(async () => ({ entries: [], truncated: false }))
+    return {
+      list,
+      overrides: {
+        resources: { hasProvider: () => true } as never,
+        listWorkspaceDirectory: list as never,
+        openWorkspaceResource: vi.fn(),
+      },
+    }
+  }
+
+  it('binds a pane-opened Workspace browser to its own session and project target', async () => {
+    const p = props()
+    const { list, overrides } = fileProps()
+    renderToolbar(p, overrides)
+    const owner = { sessionId: SID_B, runtimeTarget: { kind: 'project' as const, projectId: 7, projectName: '发布' } }
+    act(() => { p.actions.openBrowser(owner) })
+    await waitFor(() => { expect(list).toHaveBeenCalledWith(owner, '.', expect.any(AbortSignal)) })
+    expect(screen.getByRole('button', { name: '发布' })).toBeTruthy()
+  })
+
+  it('falls back through workspaceName, cwd, and the generic root for the browser scope', async () => {
+    const p = props()
+    const { overrides } = fileProps()
+    renderToolbar(p, overrides)
+    const setSummary = (patch: object | undefined) => {
+      const s = p.sessionsStore.getSnapshot()
+      const { [SID_B]: existing, ...rest } = s.byId
+      const byId = patch === undefined ? rest : { ...rest, [SID_B]: { ...existing!, ...patch } }
+      p.sessionsStore.set({ ...s, byId })
+    }
+    // SID_B is in no Workspace item: the summary's workspaceName names the scope.
+    setSummary({ workspaceName: 'Beta WS' })
+    act(() => { p.actions.openBrowser({ sessionId: SID_B, runtimeTarget: { kind: 'base' } }) })
+    expect(await screen.findByRole('button', { name: 'Beta WS' })).toBeTruthy()
+    // Without it the project runtime target name applies when present, else cwd.
+    act(() => { p.actions.openBrowser({ sessionId: SID_B, runtimeTarget: { kind: 'project', projectId: 9 } }) })
+    expect(await screen.findByRole('button', { name: 'Beta WS' })).toBeTruthy()
+    setSummary({ workspaceName: undefined })
+    act(() => { p.actions.openBrowser({ sessionId: SID_B, runtimeTarget: { kind: 'project', projectId: 9 } }) })
+    expect(await screen.findByRole('button', { name: 'beta' })).toBeTruthy()
+    // A segment-less cwd falls back to the raw path, a missing summary to the generic root.
+    setSummary({ cwd: '/' })
+    act(() => { p.actions.openBrowser({ sessionId: SID_B, runtimeTarget: { kind: 'base' } }) })
+    expect(await screen.findByRole('button', { name: '/' })).toBeTruthy()
+    setSummary(undefined)
+    act(() => { p.actions.openBrowser({ sessionId: SID_B, runtimeTarget: { kind: 'base' } }) })
+    expect(await screen.findByRole('button', { name: 'Workspace 根目录' })).toBeTruthy()
+  })
+
+  it('renders the open preview only when its readers and resource registry exist', async () => {
+    const p = props()
+    const { overrides } = fileProps()
+    const resources = new WorkspaceResourceRegistry()
+    resources.register({ kind: 'base' }, {
+      stat: vi.fn(async () => ({ sessionId: SID_A, path: 'a.txt', type: 'file' as const, version: 'v1', changed: false })),
+    }, 5)
+    const view = renderToolbar(p, overrides)
+    const request = { runtimeTarget: { kind: 'base' as const }, sessionId: SID_A, path: 'a.txt', address: workspaceResourceAddress(SID_A, 'a.txt') }
+    // No preview readers on the inject face: an open request stays inert.
+    act(() => { p.actions.openPreview(request) })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const toolbarProps = { ...p, viewport: { mode: 'workbench' as const, paneIds: [], paneRatios: [] }, tabbed: false,
+      chooseSession: vi.fn(async () => ({ ok: true as const })), focusSession: vi.fn(),
+      createSession: vi.fn(async () => ({ ok: true as const })), setMode: vi.fn(), t }
+    // Readers without the resource registry keep the preview unmounted.
+    const read = vi.fn(() => new Promise(() => {}))
+    const readBytes = vi.fn(() => new Promise(() => {}))
+    view.rerender(<WorkbenchToolbar {...toolbarProps} {...overrides} resources={undefined}
+      readPreview={read as never} readBytesPreview={readBytes as never} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    view.rerender(<WorkbenchToolbar {...toolbarProps} {...overrides} resources={resources}
+      readPreview={read as never} readBytesPreview={readBytes as never} />)
+    await waitFor(() => { expect(screen.getByRole('dialog')).toBeTruthy() })
+    act(() => { p.actions.closePreview() })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
 
   it('filters fallback candidates by origin, blank non-current, project identity, and archive state', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
@@ -399,7 +543,7 @@ describe('workbench toolbar edge paths', () => {
   it('navigates tabs with Home, End, and ArrowLeft', () => {
     const focus = vi.fn()
     const p = props()
-    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: [SID_A, SID_B], activePaneId: SID_A, paneRatios: [1, 1] }} tabbed
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: [SID_A, SID_B], paneRatios: [1, 1], activePaneId: SID_A }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     const tabs = screen.getAllByRole('tab')
     fireEvent.keyDown(tabs[1]!, { key: 'Home' })
@@ -435,7 +579,7 @@ describe('workbench toolbar edge paths', () => {
     p.sessionsStore.set({ ...list, ids: ['t' as SessionId], byId: {
       ['t' as SessionId]: { id: 't' as SessionId, displayTitle: 'Project conv', running: false, blank: false, updatedAt: 0, projectId: 7 },
     } })
-    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: ['t' as SessionId], activePaneId: 't' as SessionId, paneRatios: [1] }} tabbed
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: ['t' as SessionId], paneRatios: [1], activePaneId: 't' as SessionId }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     const tab = screen.getByRole('tab')
     fireEvent.keyDown(tab, { key: 'ArrowUp' })
@@ -519,7 +663,7 @@ describe('workbench toolbar edge paths', () => {
       [SID_B]: { id: SID_B, displayTitle: 'Beta', cwd: '/work/beta', running: true, blank: false, updatedAt: 0, pendingInteraction: 'approval' },
     } })
     const focus = vi.fn()
-    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: [SID_B, 'missing' as SessionId], activePaneId: SID_B, paneRatios: [1, 1] }} tabbed
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: [SID_B, 'missing' as SessionId], paneRatios: [1, 1], activePaneId: SID_B }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     const tabs = screen.getAllByRole('tab')
     expect(screen.getByText('等待处理')).toBeTruthy()

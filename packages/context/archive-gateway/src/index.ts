@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-gateway-runtime'
 import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 import type { ArchivedSessionEntry, WorkspaceArchiveSnapshot, WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 
 export const name = 'archive-gateway'
@@ -122,7 +123,7 @@ class ArchiveProjectionCache {
     this.dropValue(sessionId)
     this.values.set(sessionId, {
       title,
-      messageCount: prior.messageCount + (event.type === 'user/message' || event.type === 'assistant/message' ? 1 : 0),
+      messageCount: prior.messageCount + (event.type === 'assistant/message' || isHumanUserMessage(event) ? 1 : 0),
       search: prior.search,
       lastSeq: event.seq,
       bytes,
@@ -181,8 +182,16 @@ function truncateUtf8(value: string, maximumBytes: number): string {
   return encoded.subarray(0, end).toString('utf8')
 }
 
+/** A `user/message` event only counts as a user turn when a human authored it. */
+function isHumanUserMessage(event: SessionEvent): boolean {
+  if (event.type !== 'user/message') return false
+  const data = event.data as { source?: { kind?: unknown } }
+  return data.source?.kind === 'user'
+}
+
 function searchRow(sessionId: string, event: SessionEvent): ArchiveSearchRow | undefined {
   if (event.type !== 'user/message' && event.type !== 'assistant/message') return undefined
+  if (event.type === 'user/message' && !isHumanUserMessage(event)) return undefined
   const data = event.data as { content?: unknown; message?: { content?: unknown } }
   const raw = textFromContent(event.type === 'user/message' ? data.content : data.message?.content)
   if (raw === '') return undefined
@@ -196,13 +205,8 @@ function searchRow(sessionId: string, event: SessionEvent): ArchiveSearchRow | u
 }
 
 function explicitTitleFromEvents(events: readonly SessionEvent[]): string | undefined {
-  for (let index = events.length - 1; index >= 0; index--) {
-    const event = events[index] as { type: string; data?: unknown } | undefined
-    if (event?.type !== 'session/title' || typeof event.data !== 'object' || event.data === null) continue
-    const title = (event.data as { title?: unknown }).title
-    if (typeof title === 'string' && title.trim() !== '') return title.trim()
-  }
-  return undefined
+  const title = foldSessionTitle(events)?.title.trim()
+  return title === undefined || title === '' ? undefined : title
 }
 
 function titleFromEvents(events: readonly SessionEvent[]): string | undefined {
@@ -273,7 +277,7 @@ async function loadArchiveProjection(
     return row === undefined ? [] : [row]
   })
   const messageCount = stored.events.reduce((count, event) => (
-    event.type === 'user/message' || event.type === 'assistant/message' ? count + 1 : count
+    event.type === 'assistant/message' || isHumanUserMessage(event) ? count + 1 : count
   ), 0)
   const lastSeq = stored.events.reduce((last, event) => Math.max(last, event.seq), -1)
   const bytes = Buffer.byteLength(JSON.stringify({ title, messageCount, search }), 'utf8')
@@ -327,7 +331,24 @@ async function* archiveSyncBatches(
     const generation = projectionCache.generation(id)
     const cached = projectionCache.get(id)
     const projection = cached ?? await loadArchiveProjection(ctx, entry)
-    if (cached === undefined) projectionCache.set(id, projection, generation)
+      .catch((error: unknown) => {
+        // An unreadable artifact still belongs in the archive set; its stored
+        // record persists while this pass contributes no payload fields.
+        ctx.logger.warn(`archive sync skipped unreadable session '${id}': ${String(error)}`)
+        return undefined
+      })
+    if (cached === undefined && projection !== undefined) projectionCache.set(id, projection, generation)
+    if (projection === undefined) {
+      titleCache.delete(id)
+      if (batch.archivedSessionIds.length >= ARCHIVE_SYNC_SESSION_BATCH_SIZE) {
+        emitted = true
+        yield takeSyncBatch(batch)
+        batch = emptySyncBatch()
+        batchNumber++
+      }
+      batch.archivedSessionIds.push(id)
+      continue
+    }
     const title = projection.title
     if (title === undefined) titleCache.delete(id)
     else rememberTitle(titleCache, id, title)

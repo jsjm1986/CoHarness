@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "outDir": "./lib-ci",
+    "rootDir": "..",
+    "rewriteRelativeImportExtensions": true,
+    "tsBuildInfoFile": "./lib-ci/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests", "scripts"]
+}

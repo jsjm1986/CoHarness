@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Synchronizes the durable Workspace archive state of a Gateway-launched runtime with the Gateway archive index. The provider sends revision-stamped, idempotent batches containing archived IDs, root lineage, session headers, retained Workspace placement, message counts, and title/body search projections; Gateway commands are applied after every batch for that revision succeeds.
+Synchronizes the durable Workspace archive state of a Gateway-launched runtime with the Gateway archive index. The provider sends revision-stamped, idempotent batches containing archived IDs, root lineage, session headers, retained Workspace placement, message counts, and title/body search projections; Gateway commands are applied after every batch for that revision succeeds. Projections treat only `user`-sourced `user/message` events as human turns: injected context, attribution notices, and goal wrap-ups contribute neither titles, message counts, nor search rows.
 
 One synchronization request carries at most 1,000 session IDs, 5,000 search rows, and 4 MiB of search text. Search content is capped at 64 KiB per row for the index; the transcript remains unchanged. A root split across requests receives a final aggregate message count, repeated triggers while a synchronization is running collapse into one follow-up pass, and disposal aborts and joins the active request. A response carries at most 1,000 pending commands; applying a non-empty command page schedules another pass until the queue is empty.
 

@@ -2,6 +2,7 @@
   - group "DeepSeek":
     - text: DeepSeek
     - menuitemradio "DeepSeek-V4-Flash"
+    - menuitemradio "DeepSeek-V4-Flash-Vision-Exp"
   - group "Acme Gateway":
     - text: Acme Gateway
     - menuitemradio "Acme Think 支持图片" [checked]:

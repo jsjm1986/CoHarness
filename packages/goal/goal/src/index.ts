@@ -292,6 +292,7 @@ export class GoalService extends TypertRemoteService {
    * @returns a fresh view or `undefined` when no goal is current.
    * @throws {@link GoalError} when the agent is not the registry's live instance.
    */
+  @Remote('get')
   get(agent: Agent): GoalView | undefined {
     this.assertLive(agent)
     const projected = this.projected(agent.session)

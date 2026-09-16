@@ -19,6 +19,11 @@
     "lightningcss"
   ],
   "workspaces": {
+    "packages/util/package-manifest": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
     ".": {
       "entry": [
         "scripts/**/*.mjs",
@@ -99,6 +104,15 @@
       ]
     },
     "packages/extensions/cordis-host-runner": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/feedback/command-feedback": {
       "entry": [
         "tests/**/*.spec.ts"
       ],
@@ -659,6 +673,15 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/llm/llm": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/examples/jsonrpc-demo": {
       "project": [
         "src/**/*.ts"
@@ -982,6 +1005,16 @@
       ],
       "ignoreDependencies": [
         "@deepseek-ai/.+"
+      ]
+    },
+    "packages/session/session-persistence-jsonl": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     }
   }

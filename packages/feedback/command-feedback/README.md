@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Trigger-independent session feedback plus human-facing `/feedback` capture. The package exports `recordFeedback(session, text)`, which appends one log-only `feedback/record` event. Its plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers it; the shipped Web client executes it without a model turn.
+Trigger-independent session feedback plus human-facing `/feedback` capture. The package exports `recordFeedback(session, record)`, which appends one log-only `feedback/record` event from a `FeedbackRecord` with optional `text` and `category` fields. Its plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers it; the shipped Web client executes it without a model turn.
 
 ## Command contract
 
@@ -28,7 +28,7 @@ The disclosure states the deployment's current sharing policy only; it never pro
 
 ## What this plugin does and does not do
 
-`recordFeedback(session, text)` is the command-independent write path. It rejects empty normalized text and appends `feedback/record { text }`; a different UI, hook, or host integration can call it without constructing a slash command. The `/feedback` handler uses that producer and starts no model work. The optional [`dsh-session-telemetry-otel`](../../session/session-telemetry-otel) consumer observes the event without changing its capture contract.
+`recordFeedback(session, record)` is the command-independent write path. It appends `feedback/record` with the record's optional `text` (blank text normalizes to absent) and `category`; an entirely empty record still marks that feedback was filed. A different UI, hook, or host integration can call it without constructing a slash command. The `/feedback` handler uses that producer and starts no model work. The optional [`dsh-session-telemetry-otel`](../../session/session-telemetry-otel) consumer observes the event without changing its capture contract.
 
 The feedback text appears in exactly one durable payload: `feedback/record`. [`dsh-commands`](../../interaction/commands/README.md) still appends its generic `command/run` / `command/done` pairing, but this definition sets `recordInput: false`, so `command/run` omits `args`; the paired `command/done` carries only the outcome. All three events are log-only and absent from the ordered surface, `deriveMessages()`, and model requests. These appends start persistence's ordinary eager drain, but neither producer forces `session/flush`, so acknowledgement means the feedback is in the log, not that it has reached disk. The acknowledgement identifies both the receiving session and the [shared anonymous user](../../identity/anonymous-user-id/); the first accepted feedback for a harness home can create `$DSH_HOME/.anonymous-user-id`. Rejected empty input leaves only the command pairing settled as `kind: 'error'`, with no `feedback/record` and no user-id lookup.
 
@@ -66,8 +66,9 @@ Independent of the model request path. Recording appends to the session log only
 ## Known Limitations and Deferred Work
 
 - **No feedback retrieval or management surface** — the optional OTel plugin uses the event only as a sharing trigger. There is no retrieval, aggregation, categorization, or model-facing tool for `feedback/record`.
-- **No structured fields** — an entry is one free-text string with no category, severity, or referenced-event link, so feedback cannot be filtered by subject without re-reading its text.
+- **No severity or event links** — a record may carry a category from the fixed `FeedbackCategory` taxonomy, but no severity or referenced-event link, so filtering stops at the category.
 - **No amend or withdraw** — the session log is append-only and this package adds no tombstone, so a mistaken entry stays recorded and can only be superseded by a later one.
 - **No explicit durability barrier** — the acknowledgement follows the append, not a flush, so an entry recorded immediately before a crash can be lost with any other unflushed tail. Feedback is not worth forcing a synchronous disk write for; a consumer that needs one awaits `ctx.sessions.flush(session)`.
 - **No visible acknowledgement on a fresh session** — the web transcript renders command rows only once a session is active, so `/feedback` on a still-blank session records the event but shows no acknowledgement row. Recording feedback after the first message renders normally.
 - **Web only among the shipped entry points** — headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so `/feedback` is unavailable there.
+- **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.

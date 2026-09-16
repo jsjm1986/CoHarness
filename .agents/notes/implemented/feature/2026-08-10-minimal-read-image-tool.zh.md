@@ -15,7 +15,7 @@ Status: implemented
 - **`read_image` 放在 `dsh-tool-fs`**，与 `read`/`write`/`edit` 并列。扩展名选择声明的 PNG/JPEG/WebP/GIF 媒体类型；附件存储的魔数与像素校验保持权威。字节沿 `ctx.fs.stat` → 有界 `ctx.fs.readBytes` → `ctx.attachments.saveImage` → `fs/observed` 流动，工具结果是元数据信封加真正的 `ImageBlock`——`ToolResultBlock.content` 本就允许图像块，pi-ai 适配器本就会渲染它们，Web 宿主的模型切换防护本就会扫描工具结果，下游无需任何改动。
 - **`FileSystem.readBytes(target, signal, maxBytes)`** 是新的必备提供方原语：字节上限放在 seam 上，任何后端都无法无界缓冲文件；stat 大小先短路，随后的流最多多读一个字节以防 stat 之后的增长（`FS_TOO_LARGE`）。
 - **注册随组合条件挂载，执行按路由门禁。** 工具只在 `ctx.inject(['attachments'], …)` 作用域内注册——没有存储就没有工具。执行时在任何 I/O 之前，严格门禁通过 `ctx.llm.resolveModelInfo` 解析调用路由（最新 `request/header` 配置，缺失时回退到 agent 选项），要求 `inputModalities` 包含 `image`；能力未知即拒绝。拒绝是普通的 `isError` 结果，因此文本路由的持久历史绝不会出现图像块，会话不会毁掉自己的路由。
-- **Code Mode 以带外方式转发图像**：嵌套分派返回规范值（仅限本次执行，不含图像块），并延迟提交一条携带信封和图像的 `user` 角色上下文消息，图片仍会到达下一次请求。
+- **PTC mode 以带外方式转发图像**：嵌套分派返回规范值（仅限本次执行，不含图像块），并延迟提交一条携带信封和图像的 `user` 角色上下文消息，图片仍会到达下一次请求。
 - **llm-replay 模型可以声明 `inputModalities`**，这正是两个 keyless ACP 快照能钉住门禁两侧的原因：图像路由上以 sha256 引用的成功结果，和纯文本路由上逐字的拒绝。
 
 ## 考虑过的替代方案

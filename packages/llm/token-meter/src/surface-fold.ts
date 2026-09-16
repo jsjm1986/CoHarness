@@ -11,7 +11,7 @@
  * @module @deepseek-ai/dsh-token-meter/surface-fold
  */
 
-import { deriveEventMessage } from '@deepseek-ai/dsh-session'
+import { deriveEventMessage, validateSurfaceMetadata } from '@deepseek-ai/dsh-session'
 import type { SessionSeq, SurfaceEvent } from '@deepseek-ai/dsh-session'
 import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -49,7 +49,7 @@ function collectImageFacts(blocks: readonly ContentBlock[], images: ImageAttachm
 }
 
 function makeNode(seq: SessionSeq, message: Message | null, tokens: number): TokenSurfaceNode {
-  const node: TokenSurfaceNode = { seq, tokens }
+  const node: TokenSurfaceNode = { seq, tokens, heuristicTokens: tokens }
   if (message !== null) {
     const images: ImageAttachmentRef[] = []
     const imageStructural = collectImageFacts(message.content, images)
@@ -92,15 +92,20 @@ export function foldSurfaceTokens(
 ): SurfaceTokenFold {
   const message = messageOverride === undefined ? deriveEventMessage(event) : messageOverride
   const tokens = message === null ? 0 : estimateMessage(message)
-  const op = event.surfaceOp
+  // Committed pre-rename logs still carry `start`/`end`; validateSurfaceMetadata
+  // normalizes both spellings into the canonical op.
+  const op = validateSurfaceMetadata(event)
   if (op === 'append') {
     return { tokens, nodes: [...nodes, makeNode(event.seq, message, tokens)], deltaTokens: tokens }
   }
-  const startIdx = nodes.findIndex(node => node.seq === op.start)
-  const endIdx = nodes.findIndex(node => node.seq === op.end)
+  if (op === undefined) {
+    throw new Error(`token surface: event at seq ${event.seq} carries no surface operation`)
+  }
+  const startIdx = nodes.findIndex(node => node.seq === op.startSeq)
+  const endIdx = nodes.findIndex(node => node.seq === op.endSeq)
   if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
     throw new Error(
-      `token surface: replace at seq ${event.seq} has invalid current range ${op.start}-${op.end}`,
+      `token surface: replace at seq ${event.seq} has invalid current range ${op.startSeq}-${op.endSeq}`,
     )
   }
   const removed = nodes

@@ -8,34 +8,43 @@
 
 .switcherRoot {
   min-width: 0;
-  margin-left: 6px;
 }
 
-.trigger,
-.switcherTrigger {
+/* Quiet header trigger: shared geometry for the session-header auxiliary
+   controls (28px row, 12px tertiary label, hairline-free ghost chrome). */
+.trigger {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   min-height: 28px;
-  padding: 3px 2px;
+  padding: 3px var(--dsw-space-2);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 20px;
   cursor: pointer;
 }
 
-.trigger {
-  gap: 4px;
-}
-
+/* The sibling switcher stands in for a crumb segment, so it borrows the
+   crumb geometry (14px/20px, radius-lg) instead of the quiet-trigger spec. */
 .switcherTrigger {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: 244px;
+  max-width: 220px;
+  min-height: 28px;
+  padding: var(--dsw-space-1) var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-lg);
+  background: transparent;
   color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 500;
+  cursor: pointer;
 }
 
 .ancestorSwitcherTrigger {
@@ -55,12 +64,6 @@
   flex: none;
 }
 
-.separator {
-  color: var(--dsw-alias-label-caption);
-  font-size: 14px;
-  line-height: 20px;
-}
-
 .activitySlot {
   display: inline-flex;
   flex: none;
@@ -70,11 +73,13 @@
 
 .trigger:hover,
 .trigger:focus-visible {
-  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .switcherTrigger:hover,
 .switcherTrigger:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }
 

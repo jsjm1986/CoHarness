@@ -14,7 +14,7 @@ Status: implemented
 
 `@deepseek-ai/dsh-tool-userdoc` 是现有 `ctx.userDocs` Service Definition 的模型侧 Consumer。它注册 `userdoc_list` 以发现有界元数据，并注册 `userdoc_read` 以读取有界的带行号 UTF-8 文本。存储、命名、文件系统包含性、HTTP 传输和浏览器管理仍分别由 `dsh-userdoc`、`dsh-userdoc-local`、`dsh-host-userdoc-http` 与 `dsh-client-ui-documents` 负责；Agent Consumer 不重复这些职责。
 
-该 Consumer 作为插件行挂载在随附的 `standard`、`code` 和 `cordis` Agent preset 中。它注入 `tools`、`systemPrompt` 与 `userDocs`，增加一条稳定指引，告诉模型在要求上传前先列举文档，并且不会把完整目录放入系统提示词。这样 `code` preset 通过生成的 SDK 获得相同能力，不需要修改 agent loop。
+该 Consumer 作为插件行挂载在随附的 `standard`、`ptc` 和 `cordis` Agent preset 中。它注入 `tools`、`systemPrompt` 与 `userDocs`，增加一条稳定指引，告诉模型在要求上传前先列举文档，并且不会把完整目录放入系统提示词。这样 `ptc` preset 通过生成的 SDK 获得相同能力，不需要修改 agent loop。
 
 `userdoc_list` 对名称和根相对 id 做筛选，支持文件夹和 offset 分页，使用确定性顺序，并省略所有主机绝对路径。`userdoc_read` 通过 `stat` 与 `openRead` 重新解析返回的 id，执行部署级字节和行数限制，在边界处保持 UTF-8 完整性，对格式错误的文本返回 `USERDOC_NOT_TEXT`；只有字节上限落在行与行之间时才报告继续读取的 offset，若落在行内则要求提高字节上限。两个结果在格式化后仍受字节上限约束，文档字节被视为不可信数据而不是指令。
 

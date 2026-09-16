@@ -14,6 +14,7 @@ import type { TodoItem } from '@deepseek-ai/dsh-session/types'
 import type {
   RpcError, RpcId, SessionId, SubagentAddress, ToolCallView, ToolResultView,
 } from '@deepseek-ai/dsh-api-remotes/client'
+import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type { PendingInteraction } from './pending.ts'
 import type { ContextProvenanceView, KnownContextForm } from './context-provenance.ts'
 import type {
@@ -470,7 +471,8 @@ export type ComposerPhase = 'blank' | 'engaging' | 'active'
 /** Send/stop failure surfaced in the input error strip; op picks the user-facing copy (发送失败 vs 停止失败). */
 export interface PromptError {
   op: 'send' | 'stop'
-  error: RpcError
+  /** Domain `RpcError` while a verb still rides the hand-written catalog; `RemoteFailure` once its path moved to a generated Remote. */
+  error: RpcError | RemoteFailure
 }
 
 /**

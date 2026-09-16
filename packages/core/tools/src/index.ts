@@ -21,8 +21,8 @@ import type {} from '@deepseek-ai/dsh-user-approval'
 import type { ToolCallView, ToolResultView } from './presentation.ts'
 import { assertSupportedJsonSchema, validateJsonSchemaValue } from './json-schema.ts'
 import type { JsonSchemaNode } from './json-schema.ts'
-import { createRunCodeTool, RUN_CODE_NAME, SDK_SECTION_ORDER } from './code-mode.ts'
-import type { CodeSdkLanguage } from './code-mode.ts'
+import { createRunCodeTool, RUN_CODE_NAME, SDK_SECTION_ORDER } from './ptc.ts'
+import type { CodeSdkLanguage } from './ptc.ts'
 import { renderToolsSdk } from './ts-types.ts'
 import type { ToolSdkSchema } from './ts-types.ts'
 import { renderToolsSdkPy } from './py-types.ts'
@@ -33,7 +33,7 @@ import { renderToolsSdkPy } from './py-types.ts'
  * section under a non-native mode; a runtime whose language is not a key
  * fails the assembly loudly (same idiom as `toolOrder` violations). Adding a
  * new backend language is three parallel edits — a {@link CodeSdkLanguage}
- * member, an entry here, and a `RUN_CODE_FLAVORS` entry in `code-mode.ts` for
+ * member, an entry here, and a `RUN_CODE_FLAVORS` entry in `ptc.ts` for
  * its `run_code` schema strings — plus the renderer function this table points
  * at. The `satisfies` clause pins this table's key set to that union, which
  * the flavor table is checked against too, so any of the three left out is a
@@ -55,7 +55,7 @@ const COLLAPSE_SECTION_ORDER = 99
  * (the call fails) and the route (inside the program), because a rule the
  * model can only discover by being denied is one it corrects too late.
  */
-const CODE_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`
+const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call directly — a tool call naming any other tool fails. Reach every tool the SDK declares below from inside the program.`
 
 const SDK_RENDERERS: Record<string, (schemas: ToolSdkSchema[]) => string> = {
   typescript: renderToolsSdk,
@@ -99,9 +99,9 @@ export {
 } from './json-schema.ts'
 
 export type { JsonValue } from '@deepseek-ai/dsh-session'
-export type { CodeDispatchEventData, CodeDispatchStartEventData } from './types.ts'
+export type { PtcDispatchEventData, PtcDispatchStartEventData } from './types.ts'
 
-export { CodeRunFailedError, RUN_CODE_NAME } from './code-mode.ts'
+export { CodeRunFailedError, RUN_CODE_NAME } from './ptc.ts'
 export { jsonSchemaToTs, renderToolsSdk } from './ts-types.ts'
 export { jsonSchemaToPy, renderToolsSdkPy } from './py-types.ts'
 export { defineContentToolFixture, type ContentToolFixtureOptions } from './testing.ts'
@@ -176,7 +176,7 @@ declare module '@deepseek-ai/cordis' {
     /**
      * Allow a listener to replace content in the DURABLE LOG COPY of one
      * `run_code` sub-dispatch outcome before the bridge appends its
-     * `tool/code-dispatch` event. `next()` keeps the
+     * `tool/ptc-dispatch` event. `next()` keeps the
      * content unchanged; a listener may return replacement blocks (e.g. the
      * spill policy's preview + locator for an oversized text result). Only the
      * logged copy is affected — the program already received the complete
@@ -186,7 +186,7 @@ declare module '@deepseek-ai/cordis' {
      * @param dispatch - the parent execution, sub-call identity, and the settled content to log.
      * @mode waterfall
      */
-    'tools/code-dispatch-log'(this: Scoped<ToolRuntime>, dispatch: CodeDispatchLog, next: () => Promise<ContentBlock[]>): Promise<ContentBlock[]>
+    'tools/ptc-dispatch-log'(this: Scoped<ToolRuntime>, dispatch: PtcDispatchLog, next: () => Promise<ContentBlock[]>): Promise<ContentBlock[]>
     /**
      * Observe the frozen, lossless-JSON final outcome. Listener failures are contained.
      * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): keyed by `exec.agent`.
@@ -324,11 +324,11 @@ export interface ToolExecutionInput {
   /** The agent on whose behalf the call runs (set by the agent loop). */
   readonly agent?: Agent
   /**
-   * Opaque token of the enclosing transport execution, when one exists. Code
-   * Mode sets this on SDK sub-dispatches so commit-style observers can wait for
+   * Opaque token of the enclosing transport execution, when one exists. PTC
+   * mode sets this on SDK sub-dispatches so commit-style observers can wait for
    * the outer `run_code` outcome without receiving its live mutable execution.
    * The token also marks the call as a transport sub-dispatch rather than a
-   * model-direct call: under `mode: 'code'`, only calls WITH a parent may
+   * model-direct call: under `mode: 'ptc'`, only calls WITH a parent may
    * execute a native tool name — a model-direct call (no parent) is denied as
    * `UNKNOWN_TOOL` before the policy pipeline. See {@link ToolRuntime.execute}.
    */
@@ -347,19 +347,19 @@ export type ToolExecutionMode =
 
 /**
  * One settled `run_code` sub-dispatch about to be logged, as seen by the
- * `tools/code-dispatch-log` waterfall: the parent execution (session owner,
+ * `tools/ptc-dispatch-log` waterfall: the parent execution (session owner,
  * outer call identity), the sub-call identity, and the outcome whose durable
  * copy a listener may reshape. `content` is the RENDERED result projection
  * (what a native `tool/result` would carry) — the program itself received
  * the structured `value` (or just the error message on failure); only the
- * `tool/code-dispatch` event's copy changes.
+ * `tool/ptc-dispatch` event's copy changes.
  */
-export interface CodeDispatchLog {
+export interface PtcDispatchLog {
   /** The outer `run_code` execution. */
   readonly exec: ToolExecution
   /** The calling agent (the scope routing key and the spill owner), when the outer call has one. */
   readonly agent?: Agent
-  /** Deterministic sub-call id (`<parent>:code:<n>`). */
+  /** Deterministic sub-call id (`<parent>:ptc:<n>`). */
   readonly subCallId: CallId
   /** The dispatched sub-tool name. */
   readonly name: string
@@ -648,11 +648,14 @@ function errorInfo(error: unknown): ToolErrorInfo | undefined {
 }
 
 /** How the registry presents its tools to the model (see {@link Config.mode}). */
-export type ToolPresentationMode = 'native' | 'code' | 'ptc' | 'both'
+export type ToolPresentationMode = 'native' | 'ptc' | 'both'
+
+/** Accepted spelling for presentation declarations: `code` resolves to `ptc`. */
+export type ToolPresentationModeInput = ToolPresentationMode | 'code'
 
 /** Normalize the canonical PTC spelling while retaining the historical alias. */
-function resolveToolPresentationMode(mode: ToolPresentationMode): Exclude<ToolPresentationMode, 'ptc'> {
-  return mode === 'ptc' ? 'code' : mode
+function resolveToolPresentationMode(mode: ToolPresentationModeInput): ToolPresentationMode {
+  return mode === 'code' ? 'ptc' : mode
 }
 
 /** Plugin config: how the registered tools are presented to the model. */
@@ -662,13 +665,13 @@ export interface Config {
    * sends only `run_code` plus a generated SDK prompt and collapses the
    * executor to the same surface (a model-direct call may only name
    * `run_code`; `run_code` SDK sub-dispatches keep every visible tool); `both`
-   * sends both forms; legacy `code` input is accepted as an alias. Code modes
+   * sends both forms; legacy `code` input is accepted as an alias. PTC modes
    * require a `ctx.codeRuntime` whose `language`
    * has a registered SDK renderer (TypeScript or Python) and fail prompt
    * assembly when it is absent or has no renderer. Under `ptc` (or `code`),
    * native names in `toolOrder` are invalid.
    */
-  mode?: ToolPresentationMode
+  mode?: ToolPresentationModeInput
   /**
    * Concurrency cap for a `run_code` program's overlapping sub-calls
    * (default 10, the loop scheduler's own default). Sub-calls follow the
@@ -688,7 +691,7 @@ export interface Config {
 
 /**
  * Per-scope filter over global tools. Restrictions intersect and do not affect
- * scoped registrations or the reserved Code Mode transport.
+ * scoped registrations or the reserved PTC mode transport.
  */
 export interface ToolRestriction {
   /** Global tool names that stay visible; everything else is removed. */
@@ -733,7 +736,7 @@ class ToolLayer implements ScopeLayer {
    * deployment default. One cell rather than an entry table: two answers to
    * "which form does the model see" is a contradiction, not a merge.
    */
-  mode: Exclude<ToolPresentationMode, 'ptc'> | undefined
+  mode: ToolPresentationMode | undefined
 
   constructor(scope: ScopeKey | undefined) {
     this.tools = new NamedEntries(name => new Error(scope === undefined
@@ -839,16 +842,16 @@ export class ToolRuntime extends Service {
     () => { this.ctx.emit('tools/change') },
   )
   /** Presentation for scopes that declare none; {@link presentAs} shadows it per scope. */
-  private readonly defaultMode: Exclude<ToolPresentationMode, 'ptc'>
+  private readonly defaultMode: ToolPresentationMode
   private readonly maxParallelSubCalls: number
   private readonly maxPendingSubCalls: number
   /**
    * Reserved presentation transport, kept outside the filterable registration
    * layers. Built on first need rather than at construction: which agents run
-   * a code mode is no longer known when the service is constructed, and the
+   * a PTC presentation is not known when the service is constructed, and the
    * transport is stateless beyond its closures over `this`.
    */
-  private codeTransport: ToolDefinition | undefined
+  private ptcTransport: ToolDefinition | undefined
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'tools')
@@ -882,20 +885,20 @@ export class ToolRuntime extends Service {
    */
   private collapseSection(): { name: string; order: number; text: (context: { scope?: ScopeKey }) => string } {
     return {
-      name: 'tools:code-only',
+      name: 'tools:ptc-only',
       order: COLLAPSE_SECTION_ORDER,
       // The SAME predicate the executor denies by, so the prompt cannot state
       // a rule the registry does not enforce (see `collapses`).
-      text: context => this.modeFor(context.scope) === 'code' ? CODE_ONLY_INSTRUCTION : '',
+      text: context => this.modeFor(context.scope) === 'ptc' ? PTC_ONLY_INSTRUCTION : '',
     }
   }
 
   /**
-   * The generated-SDK prompt section, registered globally by a code-mode
+   * The generated-SDK prompt section, registered globally by a PTC
    * deployment and per scope by {@link presentAs}.
    *
    * The body regenerates from the CALLING scope, and renders empty for an
-   * agent presenting natively — an agent that opted out under a code-mode
+   * agent presenting natively — an agent that opted out under a PTC
    * deployment still sees the global registration, and an empty section is
    * dropped from the rendered prompt.
    * @returns the section registration.
@@ -925,7 +928,7 @@ export class ToolRuntime extends Service {
    * @param scope - the calling agent, or undefined for the global view.
    * @returns the resolved presentation mode.
    */
-  private modeFor(scope?: ScopeKey): Exclude<ToolPresentationMode, 'ptc'> {
+  private modeFor(scope?: ScopeKey): ToolPresentationMode {
     // Nearest scope wins along the chain: a preset's standing declaration
     // covers every agent parented under it, and an agent's own (were one ever
     // declared) would override its preset's. The mode decides what the model
@@ -948,17 +951,17 @@ export class ToolRuntime extends Service {
    * @returns the shared transport definition.
    */
   private requireCodeTransport(): ToolDefinition {
-    this.codeTransport ??= createRunCodeTool(this, {
+    this.ptcTransport ??= createRunCodeTool(this, {
       requireRuntime: () => this.requireCodeRuntime(this.defaultMode),
       // The language-aware description/parameters getters read the runtime
       // without demanding one, so a native-default process can still project
-      // the transport for an agent that chose code.
+      // the transport for an agent that chose PTC.
       peekRuntime: () => this.ctx.get('codeRuntime'),
       maxParallel: this.maxParallelSubCalls,
       maxPending: this.maxPendingSubCalls,
       shapeDispatchLog: dispatch => this.shapeDispatchLog(dispatch),
     })
-    return this.codeTransport
+    return this.ptcTransport
   }
 
   /**
@@ -967,12 +970,12 @@ export class ToolRuntime extends Service {
    * declaration covers every agent joined under it.
    *
    * Scoped only, and one declaration per scope: this is how an agent preset
-   * composes Code Mode agents beside native ones in the same process, and a
+   * composes PTC agents beside native ones in the same process, and a
    * process-global override would be the `mode` config field instead.
    * @param mode - the presentation the covered agents' models see.
    * @returns the exact disposer that restores the deployment default.
    */
-  presentAs(mode: ToolPresentationMode): () => void {
+  presentAs(mode: ToolPresentationModeInput): () => void {
     const ctx = this.ctx
     if (scopeOf(ctx) === undefined) {
       throw new Error('tools.presentAs() requires a scoped context (agent.ctx): a context-global presentation is the `mode` config field on the tools row')
@@ -991,7 +994,7 @@ export class ToolRuntime extends Service {
         { label: 'tools.presentAs()' },
       )
       // The SDK and collapse sections are per scope for the same reason the
-      // mode is. Under a deployment that already defaults to a code mode this
+      // mode is. Under a deployment that already defaults to PTC this
       // shadows the global registration with an identical body, which costs
       // nothing and keeps one rule instead of a case analysis.
       if (resolvedMode !== 'native') {
@@ -1021,7 +1024,7 @@ export class ToolRuntime extends Service {
     // language with no SDK renderer.
     this.requireCodeRuntime(mode)
     const schemas = [...view.visible.values()].map(definition => this.schemaOf(definition, false))
-    if (mode === 'code') {
+    if (mode === 'ptc') {
       return {
         schemas: schemas.filter(schema => schema.name === RUN_CODE_NAME),
         knownNames: [RUN_CODE_NAME],
@@ -1044,7 +1047,7 @@ export class ToolRuntime extends Service {
    * language between them would hand a program written against one SDK to the
    * other. Binding it is deferred until a second backend ships (the first
    * point it is testable); rationale in the
-   * [language-dispatch note](../../../../.agents/notes/implemented/feature/2026-07-31-code-mode-language-dispatch.md).
+   * [language-dispatch note](../../../../.agents/notes/implemented/feature/2026-07-31-ptc-language-dispatch.md).
    */
   private requireCodeRuntime(mode: ToolPresentationMode): CodeRuntime {
     const runtime = this.ctx.get('codeRuntime')
@@ -1078,11 +1081,11 @@ export class ToolRuntime extends Service {
       && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
       throw new TypeError(`tool "${name}" timeoutMs must be a positive finite number`)
     }
-    // Reserved unconditionally: any agent may select a code mode for itself,
+    // Reserved unconditionally: any agent may select PTC for itself,
     // so a name free to take under the deployment default would become a
     // collision the moment a preset mounted.
     if (name === RUN_CODE_NAME) {
-      throw new Error(`tool name "${RUN_CODE_NAME}" is reserved for the Code Mode presentation transport and cannot be registered or shadowed`)
+      throw new Error(`tool name "${RUN_CODE_NAME}" is reserved for the PTC mode presentation transport and cannot be registered or shadowed`)
     }
     return this.layers.effect(
       this.ctx,
@@ -1113,7 +1116,7 @@ export class ToolRuntime extends Service {
       ...deny !== undefined ? { deny: new Set(deny) } : {},
     }
     if ([...allow ?? [], ...deny ?? []].includes(RUN_CODE_NAME)) {
-      throw new Error(`tools.restrict() cannot name reserved Code Mode presentation transport "${RUN_CODE_NAME}"; restrict end-capability tools instead`)
+      throw new Error(`tools.restrict() cannot name reserved PTC mode presentation transport "${RUN_CODE_NAME}"; restrict end-capability tools instead`)
     }
     const known = this.view(scope).restrictableNames
     const unknown = [...allow ?? [], ...deny ?? []].filter(name => !known.has(name))
@@ -1265,7 +1268,7 @@ export class ToolRuntime extends Service {
     return [...this.view(scope).visible.values()].map(definition => this.schemaOf(definition, true))
   }
 
-  /** Project visible callable tools onto the generated Code Mode SDK contract. */
+  /** Project visible callable tools onto the generated PTC SDK contract. */
   private sdkSchemas(scope?: ScopeKey): ToolSdkSchema[] {
     return [...this.view(scope).visible.values()]
       .filter(definition => definition.name !== RUN_CODE_NAME)
@@ -1315,22 +1318,22 @@ export class ToolRuntime extends Service {
   }
 
   /**
-   * Run the `tools/code-dispatch-log` waterfall over one settled sub-dispatch
-   * and return the content the bridge should log on `tool/code-dispatch`.
+   * Run the `tools/ptc-dispatch-log` waterfall over one settled sub-dispatch
+   * and return the content the bridge should log on `tool/ptc-dispatch`.
    * Contained: when a listener throws, the method logs the original settled
    * content; that failure must not fail the dispatch or omit the settle event. Private:
    * the ONE consumer is the `run_code` bridge this registry constructs, which
    * receives it as a capability parameter (the `requireRuntime` idiom) — the
    * waterfall, not this invoker, is the public extension point.
    */
-  private async shapeDispatchLog(dispatch: CodeDispatchLog): Promise<ContentBlock[]> {
+  private async shapeDispatchLog(dispatch: PtcDispatchLog): Promise<ContentBlock[]> {
     try {
       return await this.ctx.waterfall(
-        scopeTarget(this, dispatch.agent), 'tools/code-dispatch-log', dispatch,
+        scopeTarget(this, dispatch.agent), 'tools/ptc-dispatch-log', dispatch,
         () => Promise.resolve(dispatch.content),
       )
     } catch (error: unknown) {
-      this.ctx.logger.warn(`tools: code-dispatch-log listener failed for ${dispatch.name}: ${errorMessage(error)}; logging the original settled content`)
+      this.ctx.logger.warn(`tools: ptc-dispatch-log listener failed for ${dispatch.name}: ${errorMessage(error)}; logging the original settled content`)
       return dispatch.content
     }
   }
@@ -1352,7 +1355,7 @@ export class ToolRuntime extends Service {
    * @param nested - whether the call is a transport sub-dispatch, not a model-direct call.
    */
   private collapses(name: string, scope: ScopeKey | undefined, nested: boolean): boolean {
-    return !nested && this.modeFor(scope) === 'code' && name !== RUN_CODE_NAME
+    return !nested && this.modeFor(scope) === 'ptc' && name !== RUN_CODE_NAME
   }
 
   /**

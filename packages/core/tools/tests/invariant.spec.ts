@@ -89,7 +89,7 @@ describe('tool-pipeline invariants', () => {
     expect(() => { emitResult(ctx, anonymous, outcome()) }).toThrow(/non-empty name and callId/)
   })
 
-  it('requires code-dispatch records to be turn-enclosed', async () => {
+  it('requires ptc-dispatch records to be turn-enclosed', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create()
     const data = {
@@ -99,16 +99,16 @@ describe('tool-pipeline invariants', () => {
       name: 'echo',
       arguments: {},
     }
-    expect(() => session.append('tool/code-dispatch-start', data)).toThrow(/outside any open turn/)
+    expect(() => session.append('tool/ptc-dispatch-start', data)).toThrow(/outside any open turn/)
     session.append('turn/start', { turn: 1 })
-    expect(() => session.append('tool/code-dispatch-start', data)).not.toThrow()
+    expect(() => session.append('tool/ptc-dispatch-start', data)).not.toThrow()
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   })
 
   it('does not commit a rejected dispatch edge into the root index', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create()
-    expect(() => session.append('tool/code-dispatch-start', {
+    expect(() => session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('rejected-root'),
       parentCallId: CallId('rejected-root'),
       subCallId: CallId('reused-child'),
@@ -117,7 +117,7 @@ describe('tool-pipeline invariants', () => {
     })).toThrow(/outside any open turn/)
 
     session.append('turn/start', { turn: 1 })
-    expect(() => session.append('tool/code-dispatch-start', {
+    expect(() => session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('accepted-root'),
       parentCallId: CallId('accepted-root'),
       subCallId: CallId('reused-child'),
@@ -126,18 +126,18 @@ describe('tool-pipeline invariants', () => {
     })).not.toThrow()
   })
 
-  it('rejects a nested code dispatch that changes its parent chain root before append', async () => {
+  it('rejects a nested ptc dispatch that changes its parent chain root before append', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create()
     session.append('turn/start', { turn: 1 })
-    session.append('tool/code-dispatch-start', {
+    session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('root'),
       parentCallId: CallId('root'),
       subCallId: CallId('child'),
       name: 'run_code',
       arguments: {},
     })
-    session.append('tool/code-dispatch-start', {
+    session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('root'),
       parentCallId: CallId('child'),
       subCallId: CallId('grandchild'),
@@ -145,14 +145,14 @@ describe('tool-pipeline invariants', () => {
       arguments: {},
     })
 
-    expect(() => session.append('tool/code-dispatch-start', {
+    expect(() => session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('another-root'),
       parentCallId: CallId('child'),
       subCallId: CallId('invalid-grandchild'),
       name: 'echo',
       arguments: {},
     })).toThrow(/parentCallId child does not belong to rootCallId another-root/)
-    expect(session.snapshotEvents().some(event => event.type === 'tool/code-dispatch-start'
+    expect(session.snapshotEvents().some(event => event.type === 'tool/ptc-dispatch-start'
       && String(event.data.subCallId) === 'invalid-grandchild')).toBe(false)
   })
 
@@ -160,7 +160,7 @@ describe('tool-pipeline invariants', () => {
     const ctx = await setup()
     const session = ctx.sessions.create()
     session.append('turn/start', { turn: 1 })
-    expect(() => session.append('tool/code-dispatch-start', {
+    expect(() => session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId(''),
       parentCallId: CallId('root'),
       subCallId: CallId('child'),
@@ -168,14 +168,14 @@ describe('tool-pipeline invariants', () => {
       arguments: {},
     })).toThrow(/must carry non-empty rootCallId/)
 
-    session.append('tool/code-dispatch-start', {
+    session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('root'),
       parentCallId: CallId('root'),
       subCallId: CallId('child'),
       name: 'echo',
       arguments: {},
     })
-    expect(() => session.append('tool/code-dispatch-start', {
+    expect(() => session.append('tool/ptc-dispatch-start', {
       rootCallId: CallId('other-root'),
       parentCallId: CallId('other-root'),
       subCallId: CallId('child'),
@@ -190,7 +190,7 @@ describe('tool-pipeline invariants', () => {
     session.append('turn/start', { turn: 1 })
     expect(() => {
       ctx.emit('session/event', session as never, {
-        type: 'tool/code-dispatch-start',
+        type: 'tool/ptc-dispatch-start',
         seq: 1,
         time: 1,
         data: {
@@ -204,12 +204,12 @@ describe('tool-pipeline invariants', () => {
     }).not.toThrow()
   })
 
-  it('replays enclosed code-dispatch records on late registration', async () => {
+  it('replays enclosed ptc-dispatch records on late registration', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const session = ctx.sessions.create()
     session.append('turn/start', { turn: 1 })
-    session.append('tool/code-dispatch', {
+    session.append('tool/ptc-dispatch', {
       rootCallId: CallId('parent'),
       parentCallId: CallId('parent'),
       subCallId: CallId('child'),
@@ -223,10 +223,10 @@ describe('tool-pipeline invariants', () => {
     await expect(ctx.plugin(ToolsInvariant).then(() => undefined)).resolves.toBeUndefined()
   })
 
-  it('rejects an unenclosed code-dispatch record on late registration', async () => {
+  it('rejects an unenclosed ptc-dispatch record on late registration', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
-    ctx.sessions.create().append('tool/code-dispatch-start', {
+    ctx.sessions.create().append('tool/ptc-dispatch-start', {
       rootCallId: CallId('parent'),
       parentCallId: CallId('parent'),
       subCallId: CallId('child'),

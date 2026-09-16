@@ -254,7 +254,7 @@ describe('WorkspaceRuntime', () => {
   it('feeds readiness and recent-Workspace targeting without changing Host order', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [
@@ -282,7 +282,7 @@ describe('WorkspaceRuntime', () => {
   it('connectWorkspace reuses the workspace-member blank session and creates otherwise', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [workspace('alpha', [sid('s-blank')]), workspace('beta'), workspace('gamma')] as never[],
@@ -357,7 +357,7 @@ describe('WorkspaceRuntime', () => {
   it('openWorkspace selects the newest visible history and ignores blank, archived, and subagent rows', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [workspace('alpha', [
@@ -386,7 +386,7 @@ describe('WorkspaceRuntime', () => {
   it('prepares create options before reusing blanks and skips plugin-incompatible candidates', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [
@@ -440,7 +440,7 @@ describe('WorkspaceRuntime', () => {
   it('runs create rejection before returning an otherwise reusable blank', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [workspace('alpha', [sid('s-blank')])] as never[],
@@ -464,7 +464,7 @@ describe('WorkspaceRuntime', () => {
   it('a rejected first prompt keeps the blank session eligible for connectWorkspace reuse', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha', [sid('s-blank')])] as never[] }))
     api.onList = () => Promise.resolve(ok({
@@ -489,7 +489,7 @@ describe('WorkspaceRuntime', () => {
   it('returns created Workspaces and preserves Host business errors', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceCreate = () => Promise.resolve(ok({
       workspace: { ...workspace('picked'), path: '/w/alpha', title: 'alpha' }, created: true,
@@ -508,7 +508,7 @@ describe('WorkspaceRuntime', () => {
   it('passes native directory selection and cancellation through without local state', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onPickDirectory = () => Promise.resolve(ok({ path: '/w/alpha' }))
     await expect(workspaces.pickDirectory()).resolves.toBe('/w/alpha')
@@ -522,7 +522,7 @@ describe('WorkspaceRuntime', () => {
   it('passes listings and creation through the browse wire, wrapping business failures', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote()))
+    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote(api)))
     const listing = { path: '/home/u', home: '/home/u', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [{ name: 'p', path: '/home/u/p', hidden: false }], truncated: false }
     api.onListDirectory = () => Promise.resolve(ok(listing))
     await expect(workspaces.listDirectory()).resolves.toEqual(listing)
@@ -543,7 +543,7 @@ describe('WorkspaceRuntime', () => {
   it('opens a filesystem path through the host without local state', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     await expect(workspaces.openPath('/w/alpha/a.ts')).resolves.toBeUndefined()
     expect(api.callsOf('host.openPath')).toEqual([{ path: '/w/alpha/a.ts' }])
@@ -554,7 +554,7 @@ describe('WorkspaceRuntime', () => {
   it('deletes a Workspace or preserves it when the Host rejects deletion', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('alpha')] as never[] }))
     await workspaces.refresh()
@@ -570,7 +570,7 @@ describe('WorkspaceRuntime', () => {
   it('moves a Workspace through the durable order RPC and surfaces Host rejection', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote()))
+    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote(api)))
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [workspace('one'), workspace('two')] as never[],
     }))
@@ -593,7 +593,7 @@ describe('WorkspaceRuntime', () => {
   it('targets New Session at explicit, current-session, then recent Workspaces and clears with none', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [
@@ -636,7 +636,7 @@ describe('WorkspaceRuntime', () => {
   it('uses a blank draft Workspace hint when Host membership is still pending', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onWorkspaceList = () => Promise.resolve(ok({
       items: [workspace('hinted', []), workspace('recent', [], '2026-02-01T00:00:00.000Z')] as never[],
@@ -664,7 +664,7 @@ describe('WorkspaceRuntime', () => {
   it('archives a session, projects the set from the response, list, and frame, and clears only the current one', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onList = () => Promise.resolve(ok({
       items: [
@@ -711,7 +711,7 @@ describe('WorkspaceRuntime', () => {
   it('clears a current archived by a remote frame and shields the set from a stale in-flight baseline', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     api.onList = () => Promise.resolve(ok({
       items: [{ sessionId: sid('s-open'), updatedAt: 1, running: false, blank: false }],
@@ -745,7 +745,7 @@ describe('startInitialSelection', () => {
   function bench() {
     const ctx = new Context()
     const api = new FakeApiClient()
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     const workspaces = new WorkspaceRuntime(ctx, api, sessions)
     return { api, sessions, workspaces }
   }

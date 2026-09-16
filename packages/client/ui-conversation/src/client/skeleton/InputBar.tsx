@@ -11,7 +11,7 @@ import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   IconBrowseOutline16, IconChevronDownOutline14, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
-  IconSettingsOutline16, IconWarningOutline16, Toast, Tooltip, useMediaQuery,
+  IconSettingsOutline16, IconWarningOutline16, ReferenceIcon, Toast, Tooltip, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -27,7 +27,6 @@ import type { DraftDocumentId, EditRange } from '../input/contract.ts'
 import { deriveDecorations } from '../contract/decorations.ts'
 import type { DraftDecorations } from '../contract/decorations.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
-import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import { SessionSettingsSheet, type SessionSettingsSection, type SessionSettingsSectionId } from './SessionSettingsSheet.tsx'

@@ -96,6 +96,10 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 
 受继续执行管理的父级 Activation 会在子 agent 能够运行之前，把每个子 agent 的会话 id 记录到 `ownedChildren` 集合中，并且只有在每个所拥有的子 agent Activation 完成 `AgentHandle` dispose 之后才会 dispose（子先于父）。拆卸会先自顶向下传播 Agent 取消，再等待缓慢的后代，而 handle 释放仍保持 child-first。顶层及其他非继续执行的 Agent 没有 Activation，处于该等待图之外。最终结算会在 dispose handle 前等待 best-effort 的 `ctx.sessions.flush(child.session)`。监听器拒绝会被记录，但不会使 Activation 失败，因为监听器参与本身不能标识持久化后端；因此恢复时的持久化状态仍可能缺失或陈旧。
 
+## 父级持有的目录
+
+本地子 agent 创建成功后，会把一条 `subagent/catalog` 事实追加到父级 Session。一次性创建在提供方返回后记录；可继续创建在初始消息完成 inbox 准入后、返回子级 id 前记录。失败会释放子级而不发布补偿性 catalog 事件。一次性 catalog 追加失败会使该 run 被拒绝并保留 catalog 错误；dispose 失败只记录日志。`subagentCatalog` 投影排除 fork 继承的事实，并通过 Session 观察与客户端快照中的 `projections.values.subagentCatalog` 暴露直接子级列表。无效的自有 catalog 负载（包括不支持的版本）会拒绝投影恢复。其不可变存储与检查点校验使用 [`dsh-chunked-list`](../../util/chunked-list/README.zh.md)。视图按父级 catalog 事件顺序输出，D 条事实耗时 O(D)。排序、持久化成本与备选方案由[父级目录决策](../../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.zh.md)记录。
+
 ## 生命周期事件
 
 服务会为每次一次性运行以及每个已驻留的可继续 Activation 时段发出一对 `subagent/start`/`subagent/end`，因此可继续子 agent 可用与一次性运行相同的词汇观察，且不会暴露管理器是物化、唤醒还是冷恢复了它们。对于一次性启动，它会在同步的 `subagent/start` 之前附加结果观察器，因此即使子 agent 已经结算，也仍会先产生 `subagent/start`，再产生 `subagent/end`；在驻留前失败的可继续时段不会发出这对生命周期事件中的任何一个。这对事件共享由服务生成的 `runId`；`local` 标志根据提供方返回的确切 `localAgent` 是否存在取得快照（可继续子级恒为 true），因此观察器不会根据可复用的提供方名称或会话名称推断运行身份或本地性。`provider` 字段包含子 agent 初次创建时记录的提供方名称，不表示该提供方当前仍在注册：已接受的一次性 run 可在提供方移除后才结算；冷恢复时段会从描述符读取初始提供方名称，不会调用或注册该提供方。

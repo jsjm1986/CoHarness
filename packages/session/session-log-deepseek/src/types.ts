@@ -56,6 +56,8 @@ declare module '@deepseek-ai/dsh-session/types' {
     'session-log-deepseek/delivery-accepted': {
       /** Session identity the accepted delivery carried; inherited fork markers retain the parent's id. */
       sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+      /** Accepted Session format generation; absence identifies version 0. */
+      sessionFormatVersion?: number
       /** Last canonical event included in the accepted request. */
       throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq
     }

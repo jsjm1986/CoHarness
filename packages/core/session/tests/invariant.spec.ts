@@ -280,7 +280,7 @@ describe('session-log invariants', () => {
         }] satisfies typeof original.data.message.content,
       }),
     }, {
-      surfaceOp: { op: 'replace', start: original.seq, end: original.seq },
+      surfaceOp: { op: 'replace', startSeq: original.seq, endSeq: original.seq },
       sourceEventSeqs: [original.seq],
     })).not.toThrow()
   })
@@ -319,7 +319,7 @@ describe('session-log invariants', () => {
         }] satisfies typeof original.data.message.content,
       }),
     }, {
-      surfaceOp: { op: 'replace', start: original.seq, end: original.seq },
+      surfaceOp: { op: 'replace', startSeq: original.seq, endSeq: original.seq },
       sourceEventSeqs: [original.seq],
     })).toThrow(/outside any open turn/)
   })

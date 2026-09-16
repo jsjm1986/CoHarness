@@ -7,19 +7,20 @@
   align-items: center;
   gap: 3px;
   min-height: 28px;
-  padding: 3px 2px;
+  padding: 3px var(--dsw-space-2);
   border: 0;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 20px;
   cursor: pointer;
 }
 
 .trigger:hover,
 .trigger:focus-visible {
-  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .trigger svg {

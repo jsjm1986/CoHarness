@@ -1,10 +1,11 @@
-// Web e2e scenario (browserless): the subagent.interrupt RPC against the real
-// composition. A live continuable child holds its model turn open through a
-// replay hang entry; plain HTTP queues a follow-up, interrupts the turn, and
-// proves from the real session state that the turn aborted, the follow-up
-// parked without auto-starting a new turn, and a later waking send resumed the
-// preserved FIFO order. No browser: the RPC surface is the product surface
-// under test, and subagent-interrupt-ui.e2e.ts owns the composer interaction.
+// Web e2e scenario (browserless): the subagents Remote control surface against
+// the real composition. A live continuable child holds its model turn open
+// through a replay hang entry; plain HTTP queues a follow-up, interrupts the
+// turn, and proves from the real session state that the turn aborted, the
+// follow-up parked without auto-starting a new turn, and a later waking send
+// resumed the preserved FIFO order. No browser: the Remote surface is the
+// product surface under test, and subagent-interrupt-ui.e2e.ts owns the
+// composer interaction.
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -60,7 +61,7 @@ function textCompletion(text: string): object {
   }
 }
 
-describe.skipIf(MODE === 'record')('web e2e: subagent.interrupt over the real composition', () => {
+describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over the real composition', () => {
   let scaffold: WebScaffold
   let sidecarRoot: string
   let readyFile: string
@@ -120,19 +121,27 @@ describe.skipIf(MODE === 'record')('web e2e: subagent.interrupt over the real co
 
   it('parks a queued follow-up on interrupt and resumes it FIFO on a waking send', async () => {
     // Queue the follow-up while the turn is still open, then interrupt.
-    const queued = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagent.prompt', {
-      parentSessionId: parentId,
-      childSessionId: childId,
-      mode: 'continuable',
-      content: [{ type: 'text', text: FOLLOWUP }],
+    const queued = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagents/prompt', {
+      args: {
+        request: {
+          requestId: crypto.randomUUID(),
+          parentSessionId: parentId,
+          childSessionId: childId,
+          mode: 'continuable',
+          delivery: 'queue',
+          content: [{ type: 'text', text: FOLLOWUP }],
+        },
+      },
     })
     expect(queued).toMatchObject({ ok: true })
 
     const settled = scaffold.whenTurnSettled()
-    const interrupted = await rpc<{ accepted: true }>(scaffold.baseUrl, 'subagent.interrupt', {
-      parentSessionId: parentId,
-      childSessionId: childId,
-      mode: 'continuable',
+    const interrupted = await rpc<{ accepted: true }>(scaffold.baseUrl, 'subagents/interruptByParent', {
+      args: {
+        parentSessionId: parentId,
+        childSessionId: childId,
+        mode: 'continuable',
+      },
     })
     expect(interrupted).toMatchObject({ ok: true, value: { accepted: true } })
     // accepted acknowledges the admitted cancel, not quiescence: wait for the
@@ -151,11 +160,17 @@ describe.skipIf(MODE === 'record')('web e2e: subagent.interrupt over the real co
 
     // Only an explicit waking send resumes the parked queue, FIFO, then the
     // child runs both turns to completion and settles.
-    const waking = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagent.prompt', {
-      parentSessionId: parentId,
-      childSessionId: childId,
-      mode: 'continuable',
-      content: [{ type: 'text', text: WAKING }],
+    const waking = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagents/prompt', {
+      args: {
+        request: {
+          requestId: crypto.randomUUID(),
+          parentSessionId: parentId,
+          childSessionId: childId,
+          mode: 'continuable',
+          delivery: 'queue',
+          content: [{ type: 'text', text: WAKING }],
+        },
+      },
     })
     expect(waking).toMatchObject({ ok: true })
     await expect.poll(() => scaffold.ctx.agents.get(childId), { timeout: 60_000 }).toBeUndefined()

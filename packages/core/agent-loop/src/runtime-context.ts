@@ -64,7 +64,7 @@ export class SystemPromptProjection {
   private replace(seq: SessionSeq, text: string): SystemPromptCommit {
     return {
       message: createSystemMessage(text, SOURCE),
-      intent: { surfaceOp: { op: 'replace', start: seq, end: seq }, sourceEventSeqs: [seq] },
+      intent: { surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq }, sourceEventSeqs: [seq] },
     }
   }
 }

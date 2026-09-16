@@ -46,7 +46,7 @@ async function setupWalled(script: Script): Promise<{ ctx: Context; parent: Agen
   await ctx.plugin(ApprovalService)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
-  const parent = ctx.agentLoop.create(
+  const parent = await ctx.agentLoop.create(
     SessionId('parent'),
     { provider: 'mock', model: 'mock' },
     { cwd: workspace },
@@ -159,7 +159,7 @@ describe('in-process policy inheritance', () => {
       expect(contextText).toContain('Approval prompts are disabled')
       // The statement rides runtime context; the system prompt stays uniform.
       expect(contextText).toContain('You are a delegated subagent')
-      expect(request.data.header.system).toBeUndefined()
+      expect(request.data.header).not.toHaveProperty('system')
       expect(parent.session.snapshotEvents()).toHaveLength(parentLogLength)
     } finally {
       await run.dispose()

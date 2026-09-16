@@ -7,7 +7,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -31,7 +30,11 @@
   - img
 - button "Branch into a new conversation" [disabled]:
   - img
-- text: Available only on the last message of a completed turn 7/25 {{clock}} Ran for {{duration}}
+- text: Available only on the last message of a completed turn
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "Read a.txt":
   - img
   - img
@@ -62,7 +65,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -75,4 +81,10 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 2 turns · 3 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 98% Input 7.8K tok · Output 103 tok
+- button "2 turns · 3 steps · {{throughput}} tok/s":
+  - img
+  - text: 2 turns · 3 steps{{throughput}} tok/s
+- button "7.9K tok · Cache hit 98%":
+  - img
+  - text: 7.9K tokCache hit 98%
+- separator "Adjust transcript content width"

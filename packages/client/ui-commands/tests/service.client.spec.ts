@@ -10,6 +10,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import type { CommandResult } from '@deepseek-ai/dsh-commands/types'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import { createScope, scopeOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, InputTriggerSource, SubmitImageAttachment } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
@@ -210,6 +211,29 @@ describe('registration', () => {
 })
 
 describe('candidates', () => {
+  it('localizes first-party rows and groups an empty menu without changing command identity', async () => {
+    const b = await bench({ commands: () => Promise.resolve({ commands: [
+      { definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'host copy' },
+      { definitionId: CommandDefinitionId('@deepseek-ai/dsh-plan-mode'), name: 'plan', description: 'host copy' },
+      { name: 'custom', description: 'extension copy' },
+    ] }) })
+    const rows = await b.source.candidates(proj('s1'), req(''))
+    expect(rows.map(row => ({ name: row.name, label: row.label, section: row.section }))).toEqual([
+      { name: 'goal', label: 'command:label.goal', section: 'command:section.add' },
+      { name: 'plan', label: 'command:label.plan', section: 'command:section.add' },
+      { name: 'custom', label: undefined, section: 'command:section.commands' },
+    ])
+  })
+
+  it('fuzzy-searches localized labels while preserving the canonical command name', async () => {
+    const b = await bench({ commands: () => Promise.resolve({ commands: [
+      { definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'host copy' },
+    ] }) })
+    const rows = await b.source.candidates(proj('s1'), req('command:label.goal'))
+    expect(rows.map(row => row.name)).toEqual(['goal'])
+    expect(rows[0]?.label).toBe('command:label.goal')
+  })
+
   it('does not fetch Agent-bound commands for an addressed child', async () => {
     const b = await bench({ addressed: sid('child') })
     await expect(b.warm(proj('child'))).resolves.toBeUndefined()
@@ -247,7 +271,7 @@ describe('candidates', () => {
     const { source, listCalls } = await bench()
     const names = (await source.candidates(proj('s2'), req(''))).map(c => c.name)
     expect(listCalls).toEqual([{ sessionId: sid('s2') }])
-    expect(names).toEqual(['plan', 'goal', 'attach'])
+    expect(names).toEqual(['goal', 'plan', 'attach'])
   })
 
   it('hides leadingInput commands at inline position', async () => {
@@ -261,7 +285,7 @@ describe('candidates', () => {
     const available = vi.fn((session: ClientSessionContext) => session.sessionId === sid('s1'))
     command.register(themeContribution({ available }))
     const s1Names = (await source.candidates(proj('s1'), req(''))).map(c => c.name)
-    expect(s1Names).toEqual(['plan', 'goal', 'theme'])
+    expect(s1Names).toEqual(['goal', 'plan', 'theme'])
     expect(available).toHaveBeenLastCalledWith(proj('s1'))
     const s2Names = (await source.candidates(proj('s2'), req(''))).map(c => c.name)
     expect(s2Names).not.toContain('theme')
@@ -294,7 +318,7 @@ describe('decorations (bare-invocation UI on host commands)', () => {
     const { command, source } = await bench()
     command.decorate(goalDecoration())
     const names = (await source.candidates(proj('s1'), req(''))).map(c => c.name)
-    expect(names).toEqual(['plan', 'goal'])
+    expect(names).toEqual(['goal', 'plan'])
   })
 
   it('bare enter opens the popup; an argued line never consults the decoration (host claim)', async () => {

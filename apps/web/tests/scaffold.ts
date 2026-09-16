@@ -93,7 +93,18 @@ const SHIPPED_PRESET_DIR = join(REPO_ROOT, 'apps/cli/config/agent-presets')
 const REPLAY_PROVIDERS = [{
   id: 'deepseek-official',
   name: 'DeepSeek',
-  models: [{ id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', contextWindow: 128_000 }],
+  models: [
+    { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', contextWindow: 128_000 },
+    {
+      id: 'deepseek-v4-flash-vision-exp',
+      name: 'DeepSeek-V4-Flash-Vision-Exp',
+      contextWindow: 1_000_000,
+      inputModalities: ['text', 'image'] as const,
+      defaultMaxTokens: 256_000,
+      reasoningEfforts: ['off', 'low', 'high', 'max'],
+      defaultReasoningEffort: 'high',
+    },
+  ],
 }]
 
 /**
@@ -220,7 +231,7 @@ export interface LaunchOptions {
    * yml default. The code runtime row is always in the tree, so no extra
    * insertion is needed.
    */
-  toolsMode?: 'native' | 'code' | 'both'
+  toolsMode?: 'native' | 'ptc' | 'both'
   /**
    * Insert the opt-in model-facing Cordis tool provider into the shipped tree.
    * Record and replay use the same tool surface, so captured request headers
@@ -259,12 +270,14 @@ export interface LaunchOptions {
     default: string
   }
   /**
-   * Mount the shipped telemetry row in FULL mode against this exporter URL
-   * instead of disabling it. Used to pin a real backend disclosure in
-   * assembled coverage; point the URL at a local dead endpoint so no record
-   * leaves the process.
+   * Patch the telemetry exporter URL while preserving the shipped enabled
+   * setting. A scenario-owned loopback collector contains all fixture uploads.
    */
   telemetryUrl?: string
+  /** Mode when telemetryUrl is supplied; defaults to FEEDBACK_ONLY without enabling a disabled row. */
+  telemetryMode?: 'FEEDBACK_ONLY'
+  /** SDK batch cadence for a scenario-owned collector; omitted to retain the SDK default. */
+  telemetryScheduledDelayMillis?: number
   /**
    * Browse through a trusted non-loopback hostname that the browser resolves
    * to loopback (for example `*.localhost`). The test server stays bound to
@@ -377,6 +390,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const patches: PatchOptions[] = [
     ...basePatches,
     ...surfacePatches,
+    // Keyless scenarios retain the recorded default; explicit scenario overlays win.
+    ...mode === 'record' || options.deepSeekMissingCredential === true
+      ? []
+      : [{ id: 'agent-default-model', config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }],
     ...extraOverlayPatches,
     // The roster's `roots` is an assembly fact AppCLIEntry resolves and patches
     // in, exactly like `distIndex` on the webserver row — the shipped preset
@@ -432,8 +449,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       : {
         id: 'session-telemetry-otel',
         config: {
-          mode: 'FULL',
+          mode: options.telemetryMode ?? 'FEEDBACK_ONLY',
           exporter: { url: options.telemetryUrl },
+          ...(options.telemetryScheduledDelayMillis === undefined ? {} : {
+            processor: { scheduledDelayMillis: options.telemetryScheduledDelayMillis },
+          }),
           shutdownTimeoutMillis: 1_000,
         },
       },

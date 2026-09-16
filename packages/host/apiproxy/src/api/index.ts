@@ -7,11 +7,11 @@
 import type { SessionsApi } from './sessions.ts'
 import type { HostApi } from './host.ts'
 import type { WorkspaceApi } from './workspace.ts'
+import type { WorkspaceFilesApi } from './workspace-files.ts'
 import type { AgentPresetsApi } from './agent-presets.ts'
 import type { SkillsApi } from './skills.ts'
 import type { SubagentsApi } from './subagents.ts'
 import type { EventsApi } from './events.ts'
-import type { GoalsApi } from './goals.ts'
 import type { SettingsApi } from './settings.ts'
 import type { CredentialsApi } from './credentials.ts'
 import type { LlmApi } from './llm.ts'
@@ -24,10 +24,10 @@ export interface ApiProxy {
   subagents: SubagentsApi
   host: HostApi
   workspace: WorkspaceApi
+  workspaceFiles: WorkspaceFilesApi
   skills: SkillsApi
   agentPresets: AgentPresetsApi
   events: EventsApi
-  goals: GoalsApi
   settings: SettingsApi
   credentials: CredentialsApi
   llm: LlmApi
@@ -51,14 +51,22 @@ export type {
 export type { DirectoryEntry, DirectoryListing, HostApi } from './host.ts'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,
-  SubagentPromptContentPart, SubagentPromptReceipt, SubagentsApi,
-} from './subagents.ts'
+  SubagentPromptContentPart, SubagentPromptReceipt,
+} from '@deepseek-ai/dsh-subagent/client'
+export type { SubagentsApi } from './subagents.ts'
 export type { JobView } from './jobs.ts'
 export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'
+export type {
+  WorkspaceFileByteWindow,
+  WorkspaceFileEntry,
+  WorkspaceFileStat,
+  WorkspaceFileTextPage,
+  WorkspaceFilesApi,
+} from './workspace-files.ts'
 export type { SkillsApi, SkillEntry } from './skills.ts'
-export type { AgentPresetsApi, AgentPresetEntry } from './agent-presets.ts'
+export type { AgentPresetsApi } from './agent-presets.ts'
 export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, ToolCallView, ToolEventView, ToolResultView } from './events.ts'
-export type { GoalsApi, GoalId, GoalRef } from './goals.ts'
+export type { GoalId, GoalRef } from '@deepseek-ai/dsh-goal/client'
 export type {
   SettingsApi, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsSecretView, SettingsWritableReason,
 } from './settings.ts'

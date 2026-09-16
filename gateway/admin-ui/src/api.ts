@@ -618,8 +618,6 @@ export type UsageSummary = UsageMeasure & {
   alerts: Array<{ metric: 'tokens' | 'company-cost'; threshold: 80 | 100; createdAt: number }>
 }
 
-export type AdminUsageSummary = UsageSummary & { userId: number; username: string }
-
 export type UsageContributorRow = UsageMeasure & {
   userId: number
   username: string
@@ -760,10 +758,6 @@ export function setQuota(body: {
   companyCostMicrosLimit: number | null | 'inherit'
 }): Promise<void> {
   return request('/admin/api/quotas', { method: 'PUT', body: JSON.stringify(body) })
-}
-
-export function listUsage(month?: string): Promise<AdminUsageSummary[]> {
-  return request(`/admin/api/usage${month === undefined || month === '' ? '' : `?month=${encodeURIComponent(month)}`}`)
 }
 
 export function listUsageOverview(month?: string): Promise<UsageOverview> {

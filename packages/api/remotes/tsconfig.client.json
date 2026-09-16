@@ -22,7 +22,6 @@
     },
     {
       "path": "../../credentials/credentials"
-
     },
     {
       "path": "../../context/file-reference"
@@ -56,6 +55,15 @@
     },
     {
       "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
+      "path": "../../feedback/command-feedback"
+    },
+    {
+      "path": "../../context/collaboration"
     }
   ]
 }

@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -29,11 +28,14 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
-- 'button "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is enabled."':
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
+- 'button "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."':
   - img
   - img
-  - text: "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is enabled."
+  - text: "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -47,4 +49,10 @@
   - img
 - button "6% of context used"
 - button "Send message" [disabled]
-- text: 1 turns · 1 steps LLM {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 99% Input 7.8K tok · Output 21 tok
+- button "1 turns · 1 steps · {{throughput}} tok/s":
+  - img
+  - text: 1 turns · 1 steps{{throughput}} tok/s
+- button "7.8K tok · Cache hit 99%":
+  - img
+  - text: 7.8K tokCache hit 99%
+- separator "Adjust transcript content width"

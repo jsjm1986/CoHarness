@@ -687,8 +687,8 @@ describe('session-query exact reads', () => {
       events: eventLog(`queued-${index}`),
     }))
     TestPersistence.reset(entries)
-    const persistedInspectConcurrency = 2
-    const ctx = await liveContext({ persistedInspectConcurrency })
+    const persistedReadConcurrency = 2
+    const ctx = await liveContext({ persistedReadConcurrency })
     await ctx.plugin(TestPersistence)
     const controller = new AbortController()
     const reason = new Error('cancel queued title batch')
@@ -713,20 +713,20 @@ describe('session-query exact reads', () => {
       () => { batchSettled = true },
     )
     await vi.waitFor(() => {
-      expect(TestPersistence.inspectCalls).toHaveLength(persistedInspectConcurrency)
+      expect(TestPersistence.inspectCalls).toHaveLength(persistedReadConcurrency)
     })
     controller.abort(reason)
-    await vi.waitFor(() => { expect(abortsObserved).toBe(persistedInspectConcurrency) })
+    await vi.waitFor(() => { expect(abortsObserved).toBe(persistedReadConcurrency) })
 
     expect(batchSettled).toBe(false)
     expect(TestPersistence.inspectCalls)
-      .toEqual(entries.slice(0, persistedInspectConcurrency).map(entry => entry.meta.id))
+      .toEqual(entries.slice(0, persistedReadConcurrency).map(entry => entry.meta.id))
     for (const release of releases) release()
 
     await expect(pending).rejects.toBe(reason)
-    expect(inspectionsSettled).toBe(persistedInspectConcurrency)
+    expect(inspectionsSettled).toBe(persistedReadConcurrency)
     expect(TestPersistence.inspectCalls)
-      .toEqual(entries.slice(0, persistedInspectConcurrency).map(entry => entry.meta.id))
+      .toEqual(entries.slice(0, persistedReadConcurrency).map(entry => entry.meta.id))
   })
 
   it('passes cancellation into a stalled persisted title listing and rejects with its reason', async () => {
@@ -946,7 +946,7 @@ describe('session-query exact reads', () => {
           },
         }),
       },
-      { surfaceOp: { op: 'replace', start: first.seq, end: first.seq }, sourceEventSeqs: [first.seq] },
+      { surfaceOp: { op: 'replace', startSeq: first.seq, endSeq: first.seq }, sourceEventSeqs: [first.seq] },
     )
 
     expect((await ctx.sessionQuery.listEvents(session.id)).slice(2).map(record => record.surface))
@@ -973,7 +973,7 @@ describe('session-query exact reads', () => {
       createUserMessage({
         content: [{ type: 'text', text: 'checkpoint' }], source: { kind: 'plugin', plugin: 'compact' },
       }),
-      { surfaceOp: { op: 'replace', start: first.seq, end: first.seq }, sourceEventSeqs: [first.seq] },
+      { surfaceOp: { op: 'replace', startSeq: first.seq, endSeq: first.seq }, sourceEventSeqs: [first.seq] },
     )
     const retained = session.append(
       'user/message',
@@ -988,7 +988,7 @@ describe('session-query exact reads', () => {
         content: [{ type: 'text', text: 'latest checkpoint' }], source: { kind: 'plugin', plugin: 'compact' },
       }),
       {
-        surfaceOp: { op: 'replace', start: SessionSeq(2), end: retained.seq },
+        surfaceOp: { op: 'replace', startSeq: SessionSeq(2), endSeq: retained.seq },
         sourceEventSeqs: [SessionSeq(2), retained.seq],
       },
     )
@@ -1216,8 +1216,8 @@ describe('session-query exact reads', () => {
     expect(new TestSessionQueryEngine(direct)).toBeInstanceOf(SessionQueryEngine)
     for (const config of [
       { readWindowMax: -1 },
-      { persistedInspectConcurrency: 0 },
-      { persistedInspectConcurrency: Number.MAX_SAFE_INTEGER + 1 },
+      { persistedReadConcurrency: 0 },
+      { persistedReadConcurrency: Number.MAX_SAFE_INTEGER + 1 },
     ]) {
       const invalid = new Context()
       await invalid.plugin(SessionStore)

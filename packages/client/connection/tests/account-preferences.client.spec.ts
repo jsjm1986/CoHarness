@@ -11,12 +11,12 @@ function view(overrides: Partial<Record<string, unknown>> = {}): Record<string, 
     values: {
       locale: { preference: 'zh' },
       'ui-theme': { preference: 'dark' },
-      'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
+      'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15 },
     },
     overrides: {
       locale: { preference: 'zh' },
       'ui-theme': { preference: 'dark' },
-      'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
+      'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15 },
     },
     ...overrides,
   }
@@ -84,19 +84,20 @@ describe('account preference browser transport', () => {
     const legacyValues = legacy.values as Record<string, unknown>
     const legacyConversation = legacyValues['ui-conversation'] as Record<string, unknown>
     delete legacyConversation.chatContentWidth
+    delete legacyConversation.chatFullWidth
     delete legacyConversation.chatFontSize
     const legacyFetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(legacy), {
       status: 200, headers: { 'content-type': 'application/json' },
     }))
     await expect(createBrowserAccountPreferencesTransport(legacyFetcher).describe()).resolves.toMatchObject({
-      values: { 'ui-conversation': { chatContentWidth: 748, chatFontSize: 14 } },
+      values: { 'ui-conversation': { chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 } },
     })
     const invalidBase = view()
     const invalidValues = invalidBase.values as Record<string, unknown>
     const invalid = view({
       values: {
         ...invalidValues,
-        'ui-conversation': { busyEnter: 'queue', chatContentWidth: 99, chatFontSize: 14 },
+        'ui-conversation': { busyEnter: 'queue', chatContentWidth: 99, chatFullWidth: 'yes', chatFontSize: 14 },
       },
     })
     const invalidFetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(invalid), {

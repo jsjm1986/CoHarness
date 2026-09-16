@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -43,7 +42,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "5 tool calls · 6 intermediate messages":
   - text: 5 tool calls · 6 intermediate messages
   - img
@@ -104,7 +106,10 @@
 - button "Branch into a new conversation":
   - img
 - tooltip "Branch into a new conversation"
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -118,4 +123,10 @@
   - img
 - button "9% of context used"
 - button "Send message" [disabled]
-- text: 2 turns · 12 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 91% Input 113K tok · Output 2.4K tok
+- button "2 turns · 12 steps · {{throughput}} tok/s":
+  - img
+  - text: 2 turns · 12 steps{{throughput}} tok/s
+- button "115K tok · Cache hit 91%":
+  - img
+  - text: 115K tokCache hit 91%
+- separator "Adjust transcript content width"

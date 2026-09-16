@@ -7,9 +7,9 @@
 import type { SessionsApi } from './sessions.ts'
 import type { HostApi } from './host.ts'
 import type { WorkspaceApi } from './workspace.ts'
+import type { WorkspaceFilesApi } from './workspace-files.ts'
 import type { AgentPresetsApi } from './agent-presets.ts'
 import type { SkillsApi } from './skills.ts'
-import type { GoalsApi } from './goals.ts'
 import type { SettingsApi } from './settings.ts'
 import type { CredentialsApi } from './credentials.ts'
 import type { LlmApi } from './llm.ts'
@@ -35,10 +35,7 @@ export interface RpcMethodMap {
   'session.attachment': SessionsApi['attachment']
   'session.updateQueue': SessionsApi['updateQueue']
   'session.cancel': SessionsApi['cancel']
-  'subagent.list': SubagentsApi['list']
   'subagent.history': SubagentsApi['history']
-  'subagent.prompt': SubagentsApi['prompt']
-  'subagent.interrupt': SubagentsApi['interrupt']
   'host.describe': HostApi['describe']
   'host.pickDirectory': HostApi['pickDirectory']
   'host.listDirectory': HostApi['listDirectory']
@@ -51,19 +48,12 @@ export interface RpcMethodMap {
   'workspace.insertBefore': WorkspaceApi['insertBefore']
   'workspace.insertSessionBefore': WorkspaceApi['insertSessionBefore']
   'workspace.archiveSession': WorkspaceApi['archiveSession']
+  'workspaceFiles.list': WorkspaceFilesApi['list']
+  'workspaceFiles.stat': WorkspaceFilesApi['stat']
+  'workspaceFiles.read': WorkspaceFilesApi['read']
+  'workspaceFiles.readBytes': WorkspaceFilesApi['readBytes']
   'skill.list': SkillsApi['list']
-  'agentPreset.list': AgentPresetsApi['list']
-  'agentPreset.select': AgentPresetsApi['select']
-  'agentPreset.read': AgentPresetsApi['read']
-  'agentPreset.copy': AgentPresetsApi['copy']
   'agentPreset.openDocument': AgentPresetsApi['openDocument']
-  'agentPreset.remove': AgentPresetsApi['remove']
-  'goal.create': GoalsApi['create']
-  'goal.edit': GoalsApi['edit']
-  'goal.pause': GoalsApi['pause']
-  'goal.resume': GoalsApi['resume']
-  'goal.complete': GoalsApi['complete']
-  'goal.clear': GoalsApi['clear']
   'settings.describe': SettingsApi['describe']
   'settings.openDocument': SettingsApi['openDocument']
   'settings.update': SettingsApi['update']

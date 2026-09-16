@@ -27,14 +27,25 @@ Large BFF methods remain in `dsh-host-apiproxy`. A method leaves this migration 
 | Legacy RPC | Remote destination | Host method | Adaptation |
 |---|---|---|---|
 | `session.rename` | `ctx.remote.sessionTitle` in `@deepseek-ai/dsh-session-title` | `SessionTitleService.rename(Session, title)` | Direct `@Remote`; Client maps `eventSeq` to its title projection sequence. |
-| `command.list`, `command.execute` | `ctx.remote.commands` in `@deepseek-ai/dsh-commands` | `CommandRuntime.list(Agent)`, `execute(Agent, line, signal)` | Direct `@Remote`; Client maps `undefined` to unmatched and preserves caller cancellation. |
 | `llm.providers` | `ctx.remote.llm` in `@deepseek-ai/dsh-llm` | `LlmRuntime.listProviders()`, `listConfigurableProviders()` | Direct `@Remote` on both reads; the Client joins registration and configuration-directory rows. |
 | `credentials.describe`, `credentials.set`, `credentials.unset` | `ctx.remote.credentials` in `@deepseek-ai/dsh-credentials-local` | `LocalCredentialProvider.describe(ref)`, `set(ref, value)`, `unset(ref)` | Direct `@Remote`; Client batches `describe` calls when its UI requests several refs. |
-| `agentPreset.read`, `agentPreset.copy`, `agentPreset.remove` | `ctx.remote.agentPresets` in `@deepseek-ai/dsh-agent-presets` | `readDocument(id)`, `copy(from, id, name?)`, `remove(id)` | `copy` and `remove` are direct; `readDocument` combines stored content with metadata from one live discovery. |
-| `subagent.interrupt` | `ctx.remote.subagents` in `@deepseek-ai/dsh-subagent` | `interruptByParent(targetSessionId, parentSessionId)` | Adapter constructs the internal user-authority variant without resolving or resuming either Agent. |
 | `workspace.list`, `workspace.insertSessionBefore`, `workspace.archiveSession` | `ctx.remote.workspace` in `@deepseek-ai/dsh-workspace` | `snapshot()`, `insertSessionBefore(workspaceId, sessionId, before?)`, `archiveSession(sessionId)` | Registry adapters detach mutable entities and return the settled workspace or archive snapshot. |
 
 The Remote API deliberately follows Service names rather than preserving dotted legacy names. For example, Session rename becomes `ctx.remote.sessionTitle.rename(...)`.
+
+## Landed migrations
+
+These rows shipped ahead of or beside this table and no longer have a legacy route, schema, map entry, client stub, or fixture implementation:
+
+| Legacy RPC | Remote destination | Landed shape |
+|---|---|---|
+| `command.list`, `command.execute` | `ctx.remote.commands` in `@deepseek-ai/dsh-commands` | Direct `@Remote`; the Client maps `undefined` to unmatched and preserves caller cancellation. |
+| `agentPreset.read`, `agentPreset.copy`, `agentPreset.remove` | `ctx.remote.agentPresets` in `@deepseek-ai/dsh-agent-presets` | `read`, `copy`, `deletePreset`; `remove` shipped under the rc.2 wire name `deletePreset`. |
+| `agentPreset.list`, `agentPreset.select` | `ctx.remote.agentPresets` | Roster reads and selection rides the same Remote namespace once session-scoped authorization covered them; no deferred reason remained. |
+| `subagent.list`, `subagent.prompt`, `subagent.interrupt` | `ctx.remote.subagents` in `@deepseek-ai/dsh-subagent` | `list`, `prompt`, `interruptByParent`; image admission moved to the `subagent/prompt-admission` serial waterfall so the Remote method keeps the upstream shape and the API Proxy owns durable admission as a listener. `subagent.history` stays on the API Proxy — cold-log projection is BFF work. |
+| `goals.*` (create/edit/pause/resume/complete/clear) | `ctx.remote.goals` in `@deepseek-ai/dsh-goal` | rc.2 surface; Remote methods return domain values (`GoalView`, `CreateGoalResult`, `GoalRef`) directly. |
+| `llm.discoverModels` (ambient path) | `ctx.remote.llm` in `@deepseek-ai/dsh-llm` | The settings component takes a `discoverModels` callback; ambient composition binds `ctx.remote.llm`, while the project-scoped model bridge still rides `llm.discoverModels` because Remote has no project-target routing. |
+| `command-feedback.record`, `goal.get`, `agent-team` control | `ctx.remote.sessionFeedback`, `ctx.remote.goals`, `ctx.remote.agentTeam` | rc.2 surfaces that never had a legacy route. |
 
 ## Deferred API Proxy domains
 
@@ -48,7 +59,7 @@ The Remote API deliberately follows Service names rather than preserving dotted 
 | Session skill catalog | `skill.list` | Cold Sessions must not resume; preset standing scope and presenter filtering are BFF joins. |
 | Host runtime information | `host.describe` | Version, cwd, default model, and attached count combine several Host owners. |
 | Host path opening | `host.openPath`, `agentPreset.openDocument` | Native desktop authority and cancellation belong to the Host composition. |
-| Remaining preset, subagent, and workspace calls | `agentPreset.list`, `select`; `subagent.list`, `history`, `prompt`; `workspace.create`, `rename`, `delete` | These calls contain roster policy, live/cold joins, authorization, or serialized multi-operation ordering. |
+| Remaining subagent and workspace calls | `subagent.history`; `workspace.create`, `rename`, `delete` | These calls contain roster policy, live/cold joins, authorization, or serialized multi-operation ordering. |
 | Stateful and streaming protocol | approvals, questions, responses, mux and Host streams | They are not one-request/one-result business calls. |
 
 `workspace.delete` stays with `create` and `rename` because all three participate in the same serialized creation/name/delete chain. Splitting one method out would make the Service and API Proxy observe different operation orders.
@@ -78,10 +89,11 @@ Resolver-owned `session-not-found` and `agent-busy` errors remain stable because
 
 ## Privileged authority
 
-Connection must enforce privileged endpoint authority before choosing the Typert interceptor or API Proxy fallback. The check must recognize both legacy dotted names and Remote slash endpoints and keep these migrated operations loopback-only:
+Connection must enforce privileged endpoint authority before choosing the Typert interceptor or API Proxy fallback. The shared fetch handler applies the check at endpoint selection so both dispatch paths agree, and keeps these migrated operations loopback-only:
 
-- `agentPresets/readDocument`, `agentPresets/copy`, and `agentPresets/remove`;
-- `credentials/describe`, `credentials/set`, and `credentials/unset`.
+- `agentPresets/read`, `agentPresets/copy`, `agentPresets/deletePreset`, and the surviving `agentPreset.openDocument` RPC;
+- `llm/discoverModels` on the Remote carrier beside its dotted twin;
+- `credentials/describe`, `credentials/set`, and `credentials/unset`, when those rows land.
 
 The carrier-wide trusted-host and origin checks remain unchanged. This is a non-escalation requirement: endpoint ownership may change, but the set of callers authorized to invoke the operation may not widen.
 

@@ -36,44 +36,54 @@
           - button "恢复默认模型"
           - textbox "模型 ID 1":
             - /placeholder: 模型 ID
-            - text: deepseek-v4-pro
+            - text: deepseek-v4-flash
           - textbox "显示名称 1":
             - /placeholder: 显示名称
-            - text: DeepSeek-V4-Pro
+            - text: DeepSeek-V4-Flash
           - button "容量 1":
             - img
           - button "删除模型 1":
             - img
           - textbox "模型 ID 2":
             - /placeholder: 模型 ID
-            - text: deepseek-v4-flash-vision-exp
+            - text: deepseek-v4-pro
           - textbox "显示名称 2":
             - /placeholder: 显示名称
-            - text: DeepSeek-V4-Flash-Vision-Exp
+            - text: DeepSeek-V4-Pro
           - button "容量 2":
             - img
           - button "删除模型 2":
             - img
           - textbox "模型 ID 3":
             - /placeholder: 模型 ID
-            - text: private-preview
+            - text: deepseek-v4-flash-vision-exp
           - textbox "显示名称 3":
             - /placeholder: 显示名称
-            - text: Private Preview
-          - button "容量 3" [expanded]:
+            - text: DeepSeek-V4-Flash-Vision-Exp
+          - button "容量 3":
             - img
           - button "删除模型 3":
             - img
+          - textbox "模型 ID 4":
+            - /placeholder: 模型 ID
+            - text: private-preview
+          - textbox "显示名称 4":
+            - /placeholder: 显示名称
+            - text: Private Preview
+          - button "容量 4" [expanded]:
+            - img
+          - button "删除模型 4":
+            - img
           - paragraph: 单位是 token。可填 393216、256K 或 1M；K=1,000，M=1,000,000。留空继承提供方默认值。上下文窗口是请求总容量，最大输出是生成上限。
           - text: 上下文窗口（token）
-          - textbox "上下文窗口（token） 3":
+          - textbox "上下文窗口（token） 4":
             - /placeholder: 1M
             - text: "131072"
           - text: 最大输出（token）
-          - textbox "最大输出（token） 3":
+          - textbox "最大输出（token） 4":
             - /placeholder: 256K
             - text: 64K
-          - checkbox "接受图片输入 3"
+          - checkbox "接受图片输入 4"
           - text: 接受图片输入
           - button "添加模型":
             - img

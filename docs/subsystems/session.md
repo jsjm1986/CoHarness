@@ -161,12 +161,13 @@ interface TodoItem {
 
 ### The request header event: `request/header`
 
-The request envelope — the `EpochHeader` (call config + markers for adapter-supplied defaults + rendered system prompt + assembled tool schemas) — is logged session state, so every conversation request is a pure function of the log (the reconstructability Agent Note). A full `request/header` snapshot with reason `'initial'` or `'resume'` records each loop-instance boundary; a later changed request records another full snapshot with reason `'change'`. `foldRequestHeader(events)` reconstructs the header by selecting the latest snapshot. The event is not a `SurfaceEventType`: it produces no LLM message.
+The request envelope — the `EpochHeader` (call config + markers for adapter-supplied defaults + assembled tool schemas) — is logged session state, so every conversation request is a pure function of the log (the reconstructability Agent Note). The rendered system prompt is derived history instead: a `system/message` surface event, priced and replayed like any other surface node. A full `request/header` snapshot with reason `'initial'` or `'resume'` records each loop-instance boundary; a later changed request records another full snapshot with reason `'change'`. `foldRequestHeader(events)` reconstructs the header by selecting the latest snapshot. The event is not a `SurfaceEventType`: it produces no LLM message.
 
 ```ts type-equiv
 /**
- * Logged request state outside derived history: call config, system prompt, and
- * tools. The latest full `request/header` snapshot reconstructs it; canonical
+ * Logged request state outside derived history: call config and tools. The
+ * system prompt is derived history — a `system/message` surface event. The
+ * latest full `request/header` snapshot reconstructs the header; canonical
  * empty optional fields are absent.
  */
 interface EpochHeader {
@@ -174,14 +175,12 @@ interface EpochHeader {
   config: LlmCallConfig
   /** Effective config fields materialized from the exact adapter rather than proposed by a caller. */
   adapterDefaults?: LlmCallConfigAdapterDefaults
-  /** Rendered system prompt text; absent for a system-less request. */
-  system?: string
   /** Assembled tool schemas; absent for a tool-less request. */
   tools?: ToolSchema[]
 }
 ```
 
-Canonical form represents an empty system prompt or tool list as an absent field, matching how requests are built. Legacy v0 logs containing the legacy `request/header-delta` event or its full-snapshot `fallback` reason are rejected at seed, append, and persistence-load boundaries rather than replayed incompletely.
+Canonical form represents an empty tool list as an absent field, matching how requests are built. Legacy v0 logs containing the legacy `request/header-delta` event or its full-snapshot `fallback` reason are rejected at seed, append, and persistence-load boundaries rather than replayed incompletely.
 
 ### The route capacity event: `request/context`
 
@@ -308,19 +307,24 @@ type SurfaceEventType =
  *
  * - `'append'`: added to the tail — normal path for user/assistant/tool
  *   messages.
- * - `{ op: 'replace', start, end }`: replaces surface nodes from `start`
- *   (inclusive) through `end` (inclusive) with this node. Both must exist as
- *   surface nodes in the current surface. `start === end` replaces a single
+ * - `{ op: 'replace', startSeq, endSeq }`: replaces surface nodes from `startSeq`
+ *   (inclusive) through `endSeq` (inclusive) with this node. Both must exist as
+ *   surface nodes in the current surface. `startSeq === endSeq` replaces a single
  *   node. The node's {@link SessionEvent.sourceEventSeqs} must include every
  *   shadowed surface node. Used by compaction; any surface-replacing producer
- *   may use it.
+ *   may use it. When node 0 holds a `system/message`, a range covering it must
+ *   be a `system/message` over exactly that node.
+ *
+ * Readers also accept the pre-rename `start`/`end` keys on committed log
+ * entries and normalize them to `startSeq`/`endSeq`; writers always emit the
+ * canonical keys.
  */
 type SurfaceOp =
   | 'append'
-  | { op: 'replace'; start: SessionSeq; end: SessionSeq }
+  | { op: 'replace'; startSeq: SessionSeq; endSeq: SessionSeq }
 ```
 
-`'append'` is the normal tail-append path. `replace` shadows surface entries from `start` through `end` inclusive (both must be valid surface seqs; `start === end` replaces a single entry) and inserts the new event in their place.
+`'append'` is the normal tail-append path. `replace` shadows surface entries from `startSeq` through `endSeq` inclusive (both must be valid surface seqs; `startSeq === endSeq` replaces a single entry) and inserts the new event in their place.
 
 ### `SurfaceIntent` — the parameter to `session.append()`
 
@@ -691,7 +695,7 @@ The backends that consume this contract are on [persistence.md](persistence.md).
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxsessions--sessionstore"></a>
 
@@ -827,7 +831,7 @@ fork(source: SessionForkSource, boundary?: SessionSeq, childSessionId?: SessionI
 
 Types: [CreateSessionOptions](persistence.md) · [PrepareSessionOptions](persistence.md) · [SessionId](core.md)
 
-Source: [`packages/core/session/src/index.ts:930`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="session-events"></a>
 
@@ -856,7 +860,7 @@ Creation announcement during session publication. A synchronous throw vetoes and
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/core/session/src/index.ts:66`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="sessiondisposed--emit"></a>
 
@@ -879,7 +883,7 @@ Emitted once when an announced session leaves the store, including publication r
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/core/session/src/index.ts:76`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="sessionevent--emit"></a>
 
@@ -904,7 +908,7 @@ Post-commit, fire-and-forget append feed. The listener snapshot resolves before 
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/core/session/src/index.ts:88`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="sessionflush--parallel"></a>
 
@@ -926,5 +930,5 @@ Awaited parallel durability checkpoint: every listener runs and the caller await
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/core/session/src/index.ts:97`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -3,7 +3,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentFactory } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -18,6 +18,7 @@ import type { RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy/api
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 let nextRpc = 1
 
@@ -40,11 +41,11 @@ async function nextHostFrame(
 }
 
 function stubAgent(session: Session): Agent {
-  return {
+  const agent: Agent = {
     id: session.id,
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'idle',
     ctx: new Context(),
     send: () => {},
@@ -55,6 +56,8 @@ function stubAgent(session: Session): Agent {
     runMaintenance: job => job(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
   }
+  sessionBackedInbox(agent)
+  return agent
 }
 
 /** Compose the API over real Session, Agent, Storage, Domain, and Workspace services. */

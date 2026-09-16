@@ -37,6 +37,8 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
       inheritedEventCount: number
       items: QueuedInboxItem[]
     }
+    /** Durable model selection already used by a request and still pending for a later request. */
+    modelSelection: ModelSelectionProjectionState
   }
 
   interface SessionProjectionMap {
@@ -57,6 +59,18 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
      * composed — clients skip the pre-check and let the host answer.
      */
     imageLimits: ImageAttachmentLimits
+    /** Durable model selection already used and selected for the next request. */
+    modelSelection: ModelSelectionProjection
+  }
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /**
+     * Complete validated model selection requested for subsequent prompt
+     * assembly. Log-only: it never enters derived model history.
+     */
+    'model/selection': ModelSelection
   }
 }
 
@@ -168,6 +182,22 @@ export interface ModelSelection {
   model: string
   /** Adapter-owned reasoning effort; absence preserves adapter/provider default behavior. */
   reasoningEffort?: string
+}
+
+/** Host fold state for durable model selection. */
+export interface ModelSelectionProjectionState {
+  /** Selection consumed by the latest recorded model request. */
+  readonly lastUsed: ModelSelection | null
+  /** Later user selection not yet consumed by a matching model request. */
+  readonly pending: ModelSelection | null
+}
+
+/** Client view of the durable model-selection fold. */
+export interface ModelSelectionProjection {
+  /** Selection consumed by the latest recorded model request. */
+  readonly lastUsed: ModelSelection | null
+  /** Selection the next request should use, falling back to {@link lastUsed}. */
+  readonly next: ModelSelection | null
 }
 
 /** One adapter-owned reasoning effort displayed for an exact model route. */
@@ -469,7 +499,7 @@ export interface SessionsApi {
    * Browser callers attach their current IANA zone;
    * the Host validates, canonicalizes, and records it on that exact user message. Omission remains
    * valid for non-browser callers. Session-backed subagents reject with `agent-busy` and use
-   * `subagent.prompt`.
+   * the `subagents/prompt` Remote.
    */
   prompt(request: RpcRequest<{
     sessionId: SessionId

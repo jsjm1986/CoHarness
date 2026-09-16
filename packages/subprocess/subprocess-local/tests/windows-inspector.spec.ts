@@ -16,9 +16,11 @@ function fakeInternals() {
   const entries: ProcessEntry[] = []
   const states = new Map<number, WindowsProcessState>()
   const kills: Array<[number, boolean]> = []
+  const counts = { enumerations: 0 }
   return {
+    counts,
     internals: {
-      snapshot: () => [...entries],
+      snapshot: () => { counts.enumerations += 1; return [...entries] },
       processState: pid => states.get(pid),
       taskkill: (pid: number, force: boolean) => { kills.push([pid, force]) },
     } satisfies WindowsProcessInspectorInternals,
@@ -29,6 +31,29 @@ function fakeInternals() {
     kills,
   }
 }
+
+describe('WindowsProcessInspector table enumeration', () => {
+  it('enumerates the process table only for questions that need it', () => {
+    const fake = fakeInternals()
+    fake.add({ pid: 10, parentPid: 0 }, 't10')
+    fake.add({ pid: 11, parentPid: 10 }, 't11')
+    const inspector = new WindowsProcessInspector(fake.internals)
+
+    // Liveness is a per-handle question on Windows, so a snapshot asked only
+    // for liveness must not pay a Toolhelp32 walk. The terminal's Windows
+    // teardown polls exactly this way, every 25 ms.
+    const observed = inspector.snapshot()
+    expect(observed.alive({ pid: 11, started: 't11' })).toBe(true)
+    expect(fake.counts.enumerations).toBe(0)
+
+    expect(observed.tree(10)).toHaveLength(2)
+    expect(fake.counts.enumerations).toBe(1)
+
+    // A second tree question reuses the same observation.
+    observed.tree(10)
+    expect(fake.counts.enumerations).toBe(1)
+  })
+})
 
 describe('windowsProcessTree', () => {
   it('walks a table children-first with readable identities only', () => {

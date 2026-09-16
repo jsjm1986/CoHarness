@@ -67,7 +67,7 @@ interface RowAnchor {
   readonly top: number
 }
 
-async function openSeed(page: Page): Promise<void> {
+async function openSeed(page: Page, tailMarker: string | RegExp = FIXTURE.markers.assistant(FIXTURE.turns)): Promise<void> {
   const sidebarToggle = page.getByRole('button', { name: /Open sidebar|打开侧边栏/ })
   if (await sidebarToggle.count() > 0 && await sidebarToggle.getAttribute('aria-expanded') !== 'true') {
     await sidebarToggle.click()
@@ -85,7 +85,10 @@ async function openSeed(page: Page): Promise<void> {
     await closeSidebar.click()
   }
   await page.getByRole('tab', { name: 'Trajectory', exact: true }).waitFor({ timeout: 30_000 })
-  await page.getByText(FIXTURE.markers.assistant(FIXTURE.turns), { exact: false })
+  // Tail barrier: prove the conversation mounted its last page. The live
+  // stream turn the first test appends displaces the seeded tail marker, so
+  // callers on a smaller mounted window pass the streamed tail instead.
+  await page.getByText(tailMarker, typeof tailMarker === 'string' ? { exact: false } : {})
     .last()
     .waitFor({ timeout: 30_000 })
 }
@@ -339,7 +342,11 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
     try {
       await mobilePage.goto(scaffold.baseUrl, { waitUntil: 'load' })
       await mobilePage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-      await openSeed(mobilePage)
+      // The desktop test leaves a streamed turn appended to the seed, so the
+      // phone window mounts the stream tail rather than the seeded marker.
+      await openSeed(mobilePage, new RegExp(
+        `${FIXTURE.markers.assistant(FIXTURE.turns)}|${STREAM_MARKER}`,
+      ))
       await openTrajectory(mobilePage)
       await expect.poll(() => mobilePage.locator('[data-trajectory-feed]').count(), { timeout: 30_000 }).toBe(1)
       expect(await mobilePage.locator('[data-trajectory-scroll] table').count()).toBe(0)

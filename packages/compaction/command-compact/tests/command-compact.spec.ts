@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import CommandRuntime, { type CommandResult } from '@deepseek-ai/dsh-commands'
+import CommandRuntime, { CommandDefinitionId, type CommandResult } from '@deepseek-ai/dsh-commands'
 import {
   CompactionId,
   CompactionEngine,
@@ -164,6 +164,7 @@ describe('@deepseek-ai/dsh-command-compact registration', () => {
     expect(test.ctx.commands.list(test.agent)).toContainEqual({
       name: 'compact',
       description: 'Compact older conversation history',
+      definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-compact'),
     })
 
     await test.plugin.dispose()

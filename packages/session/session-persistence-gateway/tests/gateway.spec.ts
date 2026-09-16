@@ -6,7 +6,9 @@ import type {
   GatewayRuntimeRequestInit,
   GatewaySessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
-import SessionStore, { SessionDraftId, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionDraftId, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
+import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import { describe, expect, it, vi } from 'vitest'
 import {
   decodeSessionPersistenceCursor,
@@ -128,9 +130,25 @@ class GatewayTransport {
       if (String(body.sourceRevision) !== `revision-${String(stored.revision)}`) {
         return json(409, { error: 'revision-conflict' })
       }
-      stored.header = structuredClone(body.targetHeader)
+      // Mirror the Gateway transaction: recompute the successor body through
+      // the Session format catalog and commit it under the bumped revision.
+      const source = stored.header as SessionFormatHeader & { seedLength?: number }
+      const emitted: SessionFormatEvent[] = []
+      const stream = sessionFormatCatalog.createStream(source, source.seedLength ?? 0, {
+        emitEvent: (event) => { emitted.push(event) },
+      })
+      for (const event of stored.events) stream.emitEvent(event as SessionFormatEvent)
+      const inheritedEventCount = stream.finish()
+      stored.events = emitted
+      const seedLength = typeof stream.header.seedLength === 'number' ? inheritedEventCount : null
+      stored.header = { ...stream.header, ...(seedLength === null ? {} : { seedLength }) }
       stored.revision += 1
-      return json(200, { migrated: true, revision: `revision-${String(stored.revision)}` })
+      return json(200, {
+        result: 'committed',
+        revision: `revision-${String(stored.revision)}`,
+        nextSeq: emitted.length,
+        seedLength,
+      })
     }
 
     if (url.pathname === '/internal/runtime/session/meta') {
@@ -363,7 +381,7 @@ const PRINCIPAL: GatewayRequestPrincipal = {
 }
 
 describe('GatewaySessionPersistence collaboration creation', () => {
-  it('keeps a body-changing v2 migration local when Gateway exposes metadata-only migration', async () => {
+  it('migrates a stored legacy body through the Gateway endpoint', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const transport = new GatewayTransport()
@@ -373,7 +391,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
 
     const loaded = await ctx.sessionPersistence.load(id)
     expect(loaded.meta.version).toBe(3)
-    expect(transport.migrations).toHaveLength(0)
+    expect(transport.migrations).toHaveLength(1)
     await fiber.dispose()
   })
 
@@ -389,9 +407,9 @@ describe('GatewaySessionPersistence collaboration creation', () => {
       const loaded = await ctx.sessionPersistence.load(id)
       expect(loaded.meta).toMatchObject({ version: 3, isSeeded: true, parentSession: 'parent' })
       expect(loaded.inheritedEventCount).toBe(events.length + 1)
-      expect(transport.migrations).toHaveLength(0)
+      expect(transport.migrations).toHaveLength(1)
       const reloaded = await (ctx.sessionPersistence as GatewaySessionPersistence).loadStored(id)
-      expect(reloaded?.inheritedEventCount).toBe(events.length)
+      expect(reloaded?.inheritedEventCount).toBe(events.length + 1)
       expect(reloaded?.meta.isSeeded).toBe(true)
     } finally { await fiber.dispose(); await ctx.fiber.dispose() }
   })
@@ -473,7 +491,7 @@ describe('GatewaySessionPersistence response validation', () => {
       seq: 0,
       time: 1,
       data: {},
-      surfaceOp: { op: 'replace', start: 0, end: 0, extra: true },
+      surfaceOp: { op: 'replace', startSeq: 0, endSeq: 0, extra: true },
     }],
     ['surface metadata on a log event', {
       type: 'turn/start',
@@ -501,7 +519,9 @@ describe('GatewaySessionPersistence response validation', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const transport = new GatewayTransport()
-    transport.seed('invalid-event', [invalidEvent])
+    // The strict envelope gate applies to current-generation logs; legacy
+    // generations predate the surface protocol and are relaxed for migration.
+    transport.seed('invalid-event', [invalidEvent], { version: SESSION_FORMAT_VERSION })
     const fiber = await mountBackend(ctx, transport)
 
     await expect((ctx.sessionPersistence as GatewaySessionPersistence).loadStored(

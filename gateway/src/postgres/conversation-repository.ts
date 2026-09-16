@@ -159,6 +159,11 @@ function eventPromptTime(event: ConversationEvent): number | undefined {
 }
 
 function serialized(value: unknown): string {
+  // Event strings may legitimately contain U+0000 (instruction scope-key
+  // separators). JSON.stringify emits them as \u0000 escapes, which json
+  // columns preserve verbatim and decode back to the real character; jsonb
+  // columns reject the escape outright, so event payloads must only ever be
+  // written to json columns.
   const encoded = JSON.stringify(value)
   if (encoded === undefined) throw new TypeError('conversation value is not JSON serializable')
   return encoded
@@ -166,7 +171,8 @@ function serialized(value: unknown): string {
 
 function eventText(event: ConversationEvent): { role: 'user' | 'assistant' | 'tool'; content: string } | undefined {
   if (event.type === 'user/message') {
-    const data = event.data as { content?: unknown }
+    const data = event.data as { content?: unknown; source?: { kind?: unknown } }
+    if (data.source?.kind !== 'user') return undefined
     return { role: 'user', content: messageText(data) }
   }
   if (event.type === 'assistant/message') {
@@ -1162,6 +1168,139 @@ export class ConversationRepository {
       await client.query(`INSERT INTO harness.conversation_append_batches(batch_id,session_id,first_seq,event_count,checksum)
         VALUES($1,$2,$3,$4,$5)`, [batchId, sessionId, events[0]!.seq, events.length, batchChecksum])
       return 'inserted'
+    })
+  }
+
+  /**
+   * Atomically replace one session's committed event body with a migrated
+   * successor generation. The transform runs under the session row lock — in
+   * the same root-then-session order as appends — so a concurrent append either
+   * lands before the migration (and invalidates the caller's source revision)
+   * or after it (onto the migrated cursor). The committed predecessor body is
+   * preserved in `conversation_migrated_events` before the rewrite, matching
+   * the file backend's retained-generation rule. Contribution rows are
+   * write-time attribution, not a derived projection, so they are not rebuilt.
+   * @param sessionId - materialized session to migrate.
+   * @param migrationId - caller-determined idempotency key for the attempt.
+   * @param sourceRevision - `version:next_seq` revision the caller migrated from.
+   * @param targetFormatVersion - format version the migrated body must carry.
+   * @param migrate - pure transform from the stored header and events.
+   * @returns the post-commit revision, or the current one when the target is already stored.
+   */
+  async migrate(
+    sessionId: string,
+    migrationId: string,
+    sourceRevision: string,
+    targetFormatVersion: number,
+    migrate: (header: ConversationHeader, events: ConversationEvent[]) => {
+      sessionFormatVersion: number
+      seedLength: number | null
+      events: ConversationEvent[]
+    },
+  ): Promise<{ status: 'committed' | 'current'; revision: string; nextSeq: number; seedLength: number | null }> {
+    return await transaction(this.pool, async (client) => {
+      const lineage = await client.query<{ organization_id: string; root_session_id: string }>(`SELECT
+        c.organization_id,c.root_session_id FROM harness.conversation_sessions c
+        JOIN harness.conversation_sessions r ON r.id=c.root_session_id AND r.organization_id=c.organization_id
+        WHERE c.id=$1 AND c.status<>'deleted' AND r.status<>'deleted'`, [sessionId])
+      const scope = lineage.rows[0]
+      if (scope === undefined) throw new Error(`unknown conversation session ${sessionId}`)
+      await client.query(`SELECT id FROM harness.conversation_sessions
+        WHERE id=$1 AND organization_id=$2 AND status<>'deleted' FOR UPDATE`,
+      [scope.root_session_id, scope.organization_id])
+      const sessionRow = (await client.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
+        FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted' FOR UPDATE`, [sessionId])).rows[0]
+      if (sessionRow === undefined) throw new Error(`unknown conversation session ${sessionId}`)
+      const revision = `${sessionRow.version}:${sessionRow.next_seq}`
+      const storedSeedLength = sessionRow.seed_length === null ? null : Number(sessionRow.seed_length)
+      if (sessionRow.session_format_version === targetFormatVersion) {
+        return {
+          status: 'current' as const,
+          revision,
+          nextSeq: Number(sessionRow.next_seq),
+          seedLength: storedSeedLength,
+        }
+      }
+      if (sessionRow.session_format_version > targetFormatVersion) {
+        throw new Error(`conversation session ${sessionId} already uses a newer format`)
+      }
+      if (revision !== sourceRevision) {
+        throw new ConversationReadError('dependency', 'conversation changed while its format migration was preparing')
+      }
+      const events = await this.readFromWith(client, sessionId, 0)
+      const migrated = migrate(headerFromRow(sessionRow), events)
+      if (migrated.sessionFormatVersion !== targetFormatVersion
+        || migrated.events.some((event, index) => event.seq !== index || typeof event.type !== 'string' || event.type === '')) {
+        throw new Error(`conversation session ${sessionId} migration returned an invalid successor body`)
+      }
+      const receipt = await client.query<{ id: string }>(`INSERT INTO harness.conversation_migrations(
+        session_id,migration_id,from_format_version,to_format_version,source_revision,event_count
+      ) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (session_id,migration_id) DO NOTHING RETURNING id`,
+      [sessionId, migrationId, sessionRow.session_format_version, targetFormatVersion,
+        sourceRevision, events.length])
+      const receiptRow = receipt.rows[0]
+      if (receiptRow === undefined) {
+        return {
+          status: 'current' as const,
+          revision,
+          nextSeq: Number(sessionRow.next_seq),
+          seedLength: storedSeedLength,
+        }
+      }
+      await client.query(`INSERT INTO harness.conversation_migrated_events(
+        migration_id,session_id,seq,event_type,occurred_at,event,payload_bytes
+      ) SELECT $1,session_id,seq,event_type,occurred_at,event,payload_bytes
+        FROM harness.conversation_events WHERE session_id=$2`, [receiptRow.id, sessionId])
+      const encodedEvents = migrated.events.map((event) => {
+        const json = serialized(event)
+        return { event, json, payloadBytes: Buffer.byteLength(json, 'utf8') }
+      })
+      let bytes = 0
+      let hasVisibleContent = false
+      let visibleContentSeq: number | null = null
+      let lastPromptAt: number | null = null
+      const searchRows: ConversationSearchInsertRow[] = []
+      for (const { event, payloadBytes } of encodedEvents) {
+        bytes += payloadBytes
+        const search = eventText(event)
+        if (search !== undefined && search.content !== '') {
+          searchRows.push({ role: search.role, content: search.content, seq: event.seq, time: event.time })
+        }
+        if (eventHasVisibleContent(event)) {
+          hasVisibleContent = true
+          visibleContentSeq = Math.max(visibleContentSeq ?? -1, event.seq)
+        }
+        const promptTime = eventPromptTime(event)
+        if (promptTime !== undefined) lastPromptAt = Math.max(lastPromptAt ?? 0, promptTime)
+      }
+      await client.query('DELETE FROM harness.conversation_events WHERE session_id=$1', [sessionId])
+      await client.query('DELETE FROM harness.conversation_search WHERE session_id=$1', [sessionId])
+      await insertConversationEvents(client, sessionId, encodedEvents)
+      await insertConversationSearch(client, sessionId, searchRows)
+      const nextSeq = migrated.events.length === 0 ? 0 : migrated.events.at(-1)!.seq + 1
+      await client.query(`UPDATE harness.conversation_sessions SET
+        session_format_version=$2,seed_length=$3,next_seq=$4,event_count=$5,total_payload_bytes=$6,
+        has_visible_content=$7,visible_content_seq=$8,
+        last_prompt_at=CASE WHEN $9::bigint IS NULL THEN NULL ELSE to_timestamp($9/1000.0) END,
+        updated_at=now(),version=version+1 WHERE id=$1`,
+      [sessionId, migrated.sessionFormatVersion, migrated.seedLength, nextSeq, migrated.events.length,
+        bytes, hasVisibleContent, visibleContentSeq, lastPromptAt])
+      if (sessionRow.root_session_id !== sessionId) {
+        await client.query(`UPDATE harness.conversation_sessions SET
+          has_visible_content=tree.has_visible_content,visible_content_seq=tree.visible_content_seq,
+          last_prompt_at=tree.last_prompt_at,updated_at=now()
+          FROM (SELECT bool_or(has_visible_content) has_visible_content,
+              max(visible_content_seq) visible_content_seq,max(last_prompt_at) last_prompt_at
+            FROM harness.conversation_sessions
+            WHERE root_session_id=$1 AND status<>'deleted') tree
+          WHERE id=$1`, [sessionRow.root_session_id])
+      }
+      return {
+        status: 'committed' as const,
+        revision: `${String(Number(sessionRow.version) + 1)}:${String(nextSeq)}`,
+        nextSeq,
+        seedLength: migrated.seedLength,
+      }
     })
   }
 

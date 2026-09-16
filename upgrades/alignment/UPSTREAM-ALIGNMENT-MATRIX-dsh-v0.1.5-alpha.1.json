@@ -27,7 +27,23 @@
       "permission": "none",
       "testEvidence": "session-format catalog + persistence suites (711/649 focused tests)",
       "externalValidation": "external migration RSS/Gateway revision pending",
-      "upstreamCommit": "v2-to-v3; system prompt surface; PTC migration"
+      "upstreamCommit": "v2-to-v3; system prompt surface; PTC migration",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ],
+      "corrections": [
+        {
+          "date": "2026-09-13",
+          "note": "The v2→v3 successor publication claim covered only metadata-only migrations; content-changing migrations (v0/v2 inventory) did not publish a successor, and the v0→v1/v1→v2 stages were pass-through shells. Corrected under the rc.2 Session-correctness work."
+        }
+      ]
     },
     {
       "area": "agent-api",
@@ -38,7 +54,17 @@
       "permission": "parent attribution",
       "testEvidence": "AgentLoop, ACP, ApiProxy, subagent and Headless suites",
       "externalValidation": "Windows/native external pending",
-      "upstreamCommit": "remove ctx.agent; explicit Agent setup"
+      "upstreamCommit": "remove ctx.agent; explicit Agent setup",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "inbox",
@@ -49,7 +75,17 @@
       "permission": "none",
       "testEvidence": "cold inbox projection and queue tests",
       "externalValidation": "external multi-user queue pending",
-      "upstreamCommit": "type-only Inbox; loop-owned implementation"
+      "upstreamCommit": "type-only Inbox; loop-owned implementation",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "system-prompt",
@@ -60,7 +96,17 @@
       "permission": "model governance",
       "testEvidence": "LLM + AgentLoop reconstruction and replay tests",
       "externalValidation": "real model KV-cache behavior pending",
-      "upstreamCommit": "dynamic in-history prompt only for declared capability"
+      "upstreamCommit": "dynamic in-history prompt only for declared capability",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "subagent-runtimes",
@@ -71,7 +117,17 @@
       "permission": "credential scrubbing retained",
       "testEvidence": "Codex/Claude provider protocol suites",
       "externalValidation": "real binary smoke external pending",
-      "upstreamCommit": "Codex 0.153.4; Claude Agent SDK 0.3.263"
+      "upstreamCommit": "Codex 0.153.4; Claude Agent SDK 0.3.263",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "input-admission",
@@ -82,7 +138,17 @@
       "permission": "none",
       "testEvidence": "Host, ACP, subagent and UI focused suites",
       "externalValidation": "SDK/Headless snapshot rerun pending",
-      "upstreamCommit": "reject empty message and blank queue edit"
+      "upstreamCommit": "reject empty message and blank queue edit",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "goal",
@@ -93,7 +159,17 @@
       "permission": "user authority",
       "testEvidence": "goal-round-driver and Goal tool suites",
       "externalValidation": "Gateway external pending",
-      "upstreamCommit": "manual pause authoritative"
+      "upstreamCommit": "manual pause authoritative",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "agent-instructions",
@@ -104,7 +180,17 @@
       "permission": "workspace scope",
       "testEvidence": "agent-instructions suite 152 passed",
       "externalValidation": "remote provider pending",
-      "upstreamCommit": "surface root marker I/O and permission errors"
+      "upstreamCommit": "surface root marker I/O and permission errors",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "file-media-api",
@@ -115,7 +201,17 @@
       "permission": "ACL/path",
       "testEvidence": "attachment, API and remote path suites",
       "externalValidation": "Windows/E2B external pending",
-      "upstreamCommit": "bounded file route and POSIX media display"
+      "upstreamCommit": "bounded file route and POSIX media display",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "workbench-sidebar",
@@ -137,7 +233,17 @@
       "permission": "plugin resolution",
       "testEvidence": "Typert generator 172 passed; protocol/registry 30 passed",
       "externalValidation": "built Loader graph pending",
-      "upstreamCommit": "forwarding identity and edge priority"
+      "upstreamCommit": "forwarding identity and edge priority",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     },
     {
       "area": "native",
@@ -148,7 +254,29 @@
       "permission": "process lock",
       "testEvidence": "existing native manifest/CI checks",
       "externalValidation": "macOS x64/Windows external pending",
-      "upstreamCommit": "node-addon-system and flock"
+      "upstreamCommit": "node-addon-system and flock",
+      "evidence": [
+        {
+          "name": "verified — Sandbox Linux Landlock x64",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558965850/job/103137548726"
+        },
+        {
+          "name": "verified — Sandbox Linux Landlock arm64",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558965850/job/103137548880"
+        },
+        {
+          "name": "verified — Sandbox bubblewrap (ubuntu-latest)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558965850/job/103137548884"
+        },
+        {
+          "name": "failed — Sandbox seatbelt darwin (macos HMR unit flake; replace URL after a green retry)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558965850/job/103137548932"
+        },
+        {
+          "name": "verified — Release (dsh) master push",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558965907"
+        }
+      ]
     },
     {
       "area": "cordis-build",
@@ -159,7 +287,17 @@
       "permission": "lifecycle/ACL",
       "testEvidence": "typecheck, lint, catalog checks passed",
       "externalValidation": "full CI/release pending",
-      "upstreamCommit": "new packages and generated client/host faces"
+      "upstreamCommit": "new packages and generated client/host faces",
+      "evidence": [
+        {
+          "name": "verified — PR CI full lane green (node 24 static/coverage/snapshots + node 22/26 + wine + tarballs)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34557138475"
+        },
+        {
+          "name": "failed — master push CI (coverage/Knip spec + browser sweep + windows native)",
+          "url": "https://github.com/jsjm1986/CoHarness/actions/runs/34558966069"
+        }
+      ]
     }
   ],
   "status": "implemented-local-external-validation-pending",

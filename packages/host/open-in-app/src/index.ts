@@ -21,6 +21,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
 import { stat } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
+import { launchedThroughSsh, launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import z from '@deepseek-ai/schemastery'
@@ -133,8 +134,10 @@ function parseOpenBody(text: string): { app: string; path: string } | null {
 
 /** Register the apps, icon, and open routes behind the connection trust fence. */
 export function apply(ctx: Context, config: Config): void {
+  const ssh = launchedThroughSsh(launchEnvironmentOf(ctx))
   /** Test-seam facts completed with the composition's PATH resolver. */
   const catalogInternals = (): OpenInAppInternals => ({
+    ssh,
     resolveExecutable: async (name) => {
       try {
         return await ctx.subprocess.resolveExecutable(name)

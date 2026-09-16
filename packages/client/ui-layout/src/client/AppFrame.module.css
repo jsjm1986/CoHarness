@@ -12,6 +12,18 @@
   transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
+/* Dragging writes widths at pointer cadence; easing them would detach the
+   column from the handle. */
+.frame[data-dragging] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    transition: none;
+  }
+}
+
 /* Compact template is CSS-owned: shell topbar row over one content column.
    The frame height follows the visual viewport (ui-layout writes the
    variable) so the composer rides above the on-screen keyboard where the
@@ -189,7 +201,6 @@
   visibility: hidden;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
-  border-left: 0.5px solid var(--dsw-alias-border-l2);
   transition:
     transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
     visibility var(--ds-transition-duration-slow) step-end;
@@ -216,15 +227,11 @@
 @media (prefers-reduced-motion: reduce) {
   .scrim,
   .drawer,
-  .detailsOverlay {
+  .detailsOverlay,
+  .detailsPanel,
+  .detailsPanel[data-open] {
     transition: none;
   }
-}
-
-/* Dragging writes widths at pointer cadence; easing them would detach the
-   column from the handle. */
-.frame[data-dragging] {
-  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -252,16 +259,47 @@
   padding-bottom: var(--dsw-safe-bottom);
 }
 
+/*
+ * The details column never clips: its occupant panel anchors a fixed width to
+ * the column's right edge (the frame's edge, which never moves) and lets the
+ * track decide whether the center makes room. With no track the panel hangs
+ * over the center from a zero-width column; while the track animates the panel
+ * stays put. The occupant draws its own left border.
+ */
 .detailsCol {
+  position: relative;
   min-width: 0;
-  overflow: hidden;
-  border-left: 0.5px solid var(--dsw-alias-border-l3);
+  overflow: visible;
 }
 
-/* The details subtree stays mounted at zero width, so its border must not paint
-   a 1px seam. The collapsed sidebar instead retains a bordered compact rail. */
-.frame[data-details-collapsed] .detailsCol {
-  border-left: none;
+/*
+ * The details panel shell: the fixed-width surface that slides on and off the
+ * frame's right edge rather than unmounting or shrinking under the track.
+ * Hidden is translated fully off-edge — the frame's overflow clip finishes
+ * it — and visibility flips after the slide so the box is out of reach once
+ * off-edge; both directions ride the frame's track transition variables so
+ * the panel's left edge and the conversation's right edge travel together.
+ * Below the frame overlay layer (20).
+ */
+.detailsPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    visibility 0s linear var(--ds-transition-duration-slow);
+}
+
+.detailsPanel[data-open] {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
 /* Drag handles are frame children (columns clip overflow): an 8px hit strip

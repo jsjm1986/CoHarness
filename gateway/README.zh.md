@@ -87,11 +87,13 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 ## 项目协作对话
 
 账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。长时间 HTTP/WebSocket 工作会持有串行 runtime lease；idle 回收会重新检查 lease 准入，若停止操作赢得竞态则使用新 generation 重试，而不会转发过期端口。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
-账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
+账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。个人 runtime 暂时不可用时，Gateway 仍会返回已有的 ACL 过滤账户记录，个人启动失败不会隐藏项目对话。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
 
 Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scope 的 Host 操作最多在 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 内使用已签名模式（默认 30 秒），长连接 stream 会在 principal 过期时断开。删除项目时，Gateway 会在该运行时的串行操作槽内停止共享运行时，再由 PostgreSQL 级联删除项目所属的运行时与协作记录；项目目录仍保留在磁盘上。
+
+注销、密码或账户权限、项目成员关系、会话可见性或项目删除提交后，处理该变更的 Gateway 会关闭匹配的在途通用代理响应与 WebSocket，其他目标保持连接。该 registry 属于单个 Gateway 进程；其他 Gateway 进程或直接数据库写入产生的变化，通过操作授权与 principal 续期重新检查，不由此 registry 广播。
 
 文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把源溯源写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，代理操作和文档元数据／生命周期请求受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。文档请求停滞时会返回 HTTP 504 和 `DOCUMENT_SCOPE_TIMEOUT`，并释放 runtime lease；成功的内容流会持有 lease 直到 EOF 或取消，不受元数据截止时间截断。仅元数据的 transfer plan 五分钟后过期，并受进程（10,000 个计划／128 MiB）、企业（2,000 个计划／32 MiB）和操作者（100 个计划／8 MiB）三层的数量及序列化字节额度限制；计划被消费或过期时会释放全部三层计数。
 

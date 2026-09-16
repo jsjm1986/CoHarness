@@ -10,7 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { constants as bufferConstants } from 'node:buffer'
 import { readdirSync } from 'node:fs'
-import { open, mkdir, readdir, realpath, link, rm, stat, truncate, unlink, readFile } from 'node:fs/promises'
+import { open, mkdir, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
@@ -37,6 +37,7 @@ import {
 } from './zstd.ts'
 import { ZstdOutputLimitError } from './zstd-errors.ts'
 import { ensureDurableDirectoryWin32, publishNewFileWin32 } from './win32.ts'
+import { SessionWriteLease } from './lease.ts'
 
 export type { JsonlCompression } from './format.ts'
 
@@ -163,6 +164,7 @@ function isENOENT(error: unknown): boolean {
  */
 export class JsonlSessionPersistence extends SessionPersistence implements PersistenceBackend<JsonlTornMarker> {
   override readonly supportsRawArtifacts = true
+  readonly supportsBodyMigration = true
 
   static inject = ['sessions']
 
@@ -190,44 +192,20 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
    */
   override readonly name = 'session-persistence-jsonl'
 
-  /** Acquire one root-scoped atomic lock so separate processes cannot write one Session id. */
+  /**
+   * Hold one kernel write lock per Session id under the root's `.locks/`
+   * directory for the handle's whole life: POSIX `flock` or a Win32 named
+   * semaphore arbitrates cross-process exclusion and releases on any holder
+   * death. The file's legacy `{pid}` record keeps mutual exclusion with a
+   * create-and-probe writer from the previous mechanism until it exits.
+   */
   protected override async acquireWriteLock(id: SessionId): Promise<() => Promise<void>> {
-    await mkdir(join(this.root, '.locks'), { recursive: true })
-    const path = join(this.root, '.locks', `${encodeSegment(id)}.lock`)
-    let lock: Awaited<ReturnType<typeof open>>
-    try {
-      lock = await open(path, 'wx')
-      await lock.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }))
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException | null)?.code === 'EEXIST') {
-        try {
-          const record = JSON.parse(await readFile(path, 'utf8')) as { pid?: unknown }
-          if (typeof record.pid === 'number' && Number.isSafeInteger(record.pid) && record.pid > 0) {
-            try {
-              process.kill(record.pid, 0)
-            } catch (probeError: unknown) {
-              if ((probeError as NodeJS.ErrnoException | null)?.code === 'ESRCH') {
-                await unlink(path)
-                return await this.acquireWriteLock(id)
-              }
-            }
-          }
-        } catch {
-          // An unreadable lock is treated as live; deleting it could race its owner.
-        }
-        throw new Error(`session "${id}" is already locked by another process`)
-      }
-      throw error
-    }
-    return async () => {
-      try {
-        await lock.close()
-      } finally {
-        await unlink(path).catch((error: unknown) => {
-          if ((error as NodeJS.ErrnoException | null)?.code !== 'ENOENT') throw error
-        })
-      }
-    }
+    const lease = await SessionWriteLease.acquire(
+      join(this.root, '.locks'),
+      id,
+      `${encodeSegment(id)}.lock`,
+    )
+    return async () => { await lease.release() }
   }
 
   private root: string
@@ -742,7 +720,20 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       signal?.throwIfAborted()
       try {
         if (artifact.header.draft === true) {
-          const stored = await this.readPrefix(artifact.path, artifact.header.id, signal)
+          let stored: StoredPrefix<JsonlTornMarker>
+          try {
+            stored = await this.readPrefix(artifact.path, artifact.header.id, signal)
+          } catch (error: unknown) {
+            signal?.throwIfAborted()
+            if (isENOENT(error)) throw error
+            // A draft earns its row only by proving it carries content, so one
+            // unreadable draft must not take every other session down with it;
+            // the artifact stays on disk for inspection or recovery.
+            this.ctx.logger.warn(
+              `${this.name}: draft session "${artifact.header.id}" is unreadable and is omitted from the snapshot list: ${String(error)}`,
+            )
+            continue
+          }
           snapshots.push({
             header: stored.meta,
             revision: stored.revision,
@@ -784,9 +775,21 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
         signal?.throwIfAborted()
         if (!pathExists) continue
         // Read only headers so listing scales with session count, not log size.
-        const first = this.compression === 'zstd'
-          ? await this.readFirstZstdLine(path, signal)
-          : await this.readFirstLine(path, signal)
+        let first: string | undefined
+        try {
+          first = this.compression === 'zstd'
+            ? await this.readFirstZstdLine(path, signal)
+            : await this.readFirstLine(path, signal)
+        } catch (error: unknown) {
+          signal?.throwIfAborted()
+          if (isENOENT(error)) continue
+          // A header frame that cannot decode identifies nothing listable; skip
+          // it rather than fail every readable session in the same root.
+          this.ctx.logger.warn(
+            `${this.name}: session log at ${path} has an unreadable header and is omitted from the listing: ${String(error)}`,
+          )
+          continue
+        }
         signal?.throwIfAborted()
         if (first === undefined) continue // empty/half-written file
         const meta = parseHeaderMeta(first)

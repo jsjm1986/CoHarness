@@ -21,6 +21,7 @@ import FileSettingsProvider from '@deepseek-ai/dsh-settings-file'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { describe, expect, it } from 'vitest'
 import AgentPresets, { COMPOSITION_FILE, SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-agent-presets'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const ROOTS = [{ path: join(FIXTURES, 'system'), trust: 'system' as const }]
@@ -46,6 +47,7 @@ async function harness(
   await ctx.plugin(SystemPrompt, { persona: '' })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   const settingsFiber = ctx.plugin(FileSettingsProvider, { path: settingsFile, watch: false })
   await settingsFiber

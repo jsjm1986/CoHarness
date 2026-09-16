@@ -241,7 +241,7 @@ describe('web e2e: agent-preset selection', () => {
     await composer.fill('/')
     await expect.poll(() => menuOptions(page), { timeout: 15_000 })
       .not.toEqual(expect.arrayContaining([expect.stringContaining(SKILL_NAME)]))
-    const onMinimal = await menuOptions(page)
+    const onMinimal = await menuOptions(page).then(options => options.map(option => option.toLowerCase()))
     expect(onMinimal.some(option => option.startsWith('compact'))).toBe(false)
     expect(onMinimal.some(option => option.startsWith('plan'))).toBe(false)
     // The host-plane commands and the client's own contribution are the
@@ -261,7 +261,7 @@ describe('web e2e: agent-preset selection', () => {
     await composer.fill('/')
     await expect.poll(() => menuOptions(page), { timeout: 15_000 })
       .toEqual(expect.arrayContaining([expect.stringContaining(SKILL_NAME)]))
-    const onStandard = await menuOptions(page)
+    const onStandard = await menuOptions(page).then(options => options.map(option => option.toLowerCase()))
     expect(onStandard.some(option => option.startsWith('compact'))).toBe(true)
     expect(onStandard.some(option => option.startsWith('plan'))).toBe(true)
     await composer.fill('')

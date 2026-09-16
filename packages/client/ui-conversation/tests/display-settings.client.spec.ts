@@ -37,6 +37,30 @@ describe('ConversationDisplaySettings', () => {
     expect(stub.set).toHaveBeenCalledWith('chatContentWidth', 840)
   })
 
+  it('persists the fill preference and clears it on an explicit width', () => {
+    const stub = stubSettingsScope<ConversationSettings>()
+    const settings = new ConversationDisplaySettings(stub.scope)
+    stub.publish({
+      status: 'ready',
+      writable: true,
+      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13 },
+      write: { status: 'idle' },
+    })
+    settings.setFullWidth(true)
+    expect(settings.getSnapshot().chatFullWidth).toBe(true)
+    expect(stub.set).toHaveBeenCalledWith('chatFullWidth', true)
+
+    settings.setWidth(900)
+    expect(settings.getSnapshot()).toMatchObject({ chatContentWidth: 900, chatFullWidth: false })
+    expect(stub.set).toHaveBeenCalledWith('chatFullWidth', false)
+
+    stub.publish({
+      value: { busyEnter: 'queue', chatContentWidth: 900, chatFontSize: 13, chatFullWidth: false },
+      write: { status: 'idle' },
+    })
+    expect(settings.getSnapshot().chatFullWidth).toBe(false)
+  })
+
   it('drops optimistic values when the host rejects a write', () => {
     const stub = stubSettingsScope<ConversationSettings>()
     const settings = new ConversationDisplaySettings(stub.scope)

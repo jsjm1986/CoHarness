@@ -36,14 +36,21 @@ function CenterColumn(props: { children?: ReactNode }) {
   return <div className={css.centerCol}>{props.children}</div>
 }
 
-/** Details column grid item; width 0 keeps the subtree mounted (never unmount on close). */
+/**
+ * Details column grid item: a track, not a box. The column never clips — the
+ * panel shell anchors a fixed-width surface to the column's right edge (the
+ * frame's edge, which never moves) and slides it off-edge while closed, so a
+ * conceding track never crops the panel into a strip. The track only decides
+ * whether the center makes room.
+ */
 function DetailsColumn(props: { children?: ReactNode }) {
   return <div className={css.detailsCol}>{props.children}</div>
 }
 
 /**
- * One drag handle: pointer capture, rAF-throttled dx reports against the drag-start origin.
- * `side` keys the hover-reveal CSS to the owning column.
+ * One 8px resize strip centered on a column border. Pointer capture keeps the
+ * gesture on the strip; moves are rAF-batched into a single width write per
+ * frame; `side` keys the hover-reveal CSS to the owning column.
  */
 function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
   const [dragging, setDragging] = useState(false)
@@ -262,9 +269,9 @@ export function AppFrame({
         }}
       data-viewport={mode}
       data-viewport-short={shortCompact || undefined}
+      data-dragging={dragging || undefined}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={(overlayPanels ? !detailsOpen : cols.details === 0) || undefined}
-      data-dragging={dragging || undefined}
     >
       {mode === 'compact' && (
         <div className={css.topbar}>
@@ -337,9 +344,22 @@ export function AppFrame({
             </div>
           </>
         )
-        : <DetailsColumn>{panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
-          <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
-        )}</DetailsColumn>}
+        : (
+          <DetailsColumn>
+            <div
+              className={css.detailsPanel}
+              // The surface follows a widened drag track but never clips
+              // under the contract default: a released or squeezed track
+              // leaves it hanging over the center rather than cropping it.
+              style={{ width: Math.max(cols.details, DETAILS_DEFAULT) }}
+              data-open={cols.details > 0 || undefined}
+            >
+              {panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
+                <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
+              )}
+            </div>
+          </DetailsColumn>
+        )}
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>

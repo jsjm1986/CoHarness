@@ -59,14 +59,15 @@
       "evidence": [
         "resume acquires write handle before read/repair",
         "Agent teardown closes handle before registry detach",
-        "JSONL root lock"
+        "SessionWriteLease holds a kernel lock on <root>/.locks/<id>.lock for the write handle life: non-blocking flock via @deepseek-ai/node-addon-system/flock on POSIX, named kernel semaphore via win32.ts on Windows; contention maps to SessionAlreadyOwnedError",
+        "locked-inode verification retries a replaced/unlinked lock path; release never removes the lock file",
+        "legacy {pid} lock records keep mutual exclusion with a create-and-probe holder: live pid refused, dead/residue records proceed to flock, a held lock republishes its own live pid",
+        "lease.spec.ts covers contention, inode-replacement races, legacy live/dead pid, residue, and idempotent release; lease.two-process.e2e.ts proves live exclusion and immediate SIGKILL takeover on the built package"
       ],
-      "verification": "AgentLoop resume/config tests, JSONL lock tests, typecheck, build, and hygiene pass",
-      "next": [
-        "run two-process lock and process-restart evidence on supported platforms"
-      ],
-      "historicalAuditStatus": "implemented-verified-locally",
-      "status": "retain"
+      "verification": "AgentLoop resume/config tests, JSONL lock tests (lease.spec.ts 14 + two-process e2e), session-persistence suite (673), typecheck, build, and hygiene pass; Windows semaphore path is native-covered by CI",
+      "next": [],
+      "historicalAuditStatus": "adapted-verified-locally",
+      "status": "adapt"
     },
     {
       "id": "agent-loop-lifecycle",
@@ -107,12 +108,13 @@
       "evidence": [
         "send_message and continuable subagent exist in CoHarness",
         "parent Activation hold covers establishment and delivery awaits",
-        "durable inherited event count is passed into child creation"
+        "durable inherited event count is passed into child creation",
+        "parent-owned subagentCatalog projection, descriptor v3, and continuation-activation split ported; CoHarness activation quotas and persistence-driven listChildren retained"
       ],
       "next": [
         "run process-restart and external provider evidence"
       ],
-      "verification": "28 Subagent files/657 tests plus continuation and tool-control regressions pass; keyless snapshots pass",
+      "verification": "subagent package suite: 715 tests pass including catalog, continuation, control, and child-agent specs; tool-subagent 128 tests pass",
       "historicalAuditStatus": "adapted-verified-locally",
       "status": "adapt"
     },
@@ -136,14 +138,17 @@
       "area": "util/http-proxy, SDK, adapters, subprocess paths",
       "priority": "P1",
       "evidence": [
-        "CoHarness http-proxy package and policy are present"
+        "CoHarness http-proxy package and policy are present; the dsh launcher installs it before the first plugin mounts",
+        "verify-no-bare-dispatcher AST gate ported and wired into both static gate lists in scripts/run-gates.ts",
+        "web-fetch-http resolves proxyRouteFor(url) before pinning: proxied hops tunnel via route.dispatcher, non-public literals still take the validated path",
+        "upstream egress.spec.ts suite ported to all nine outbound call sites plus telemetry exclusion and web-fetch proxy.spec.ts",
+        "scripts/test-proxy-environment.ts clears all eight proxy names in both casings; wired as first setupFiles entry in vitest, e2e, and snapshot configs",
+        "docs/user/guide/network-proxy.md triplet published through website/docs.ts as guide/network-proxy.md"
       ],
-      "next": [
-        "enumerate production outbound routes and test HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY corpus"
-      ],
-      "verification": "Web and LLM suites pass; browser/headless snapshots pass with proxy variables unset",
-      "historicalAuditStatus": "implemented-verified-locally",
-      "status": "retain"
+      "next": [],
+      "verification": "30 egress tests, 26 gate/environment spec tests, 7 web-fetch proxy.spec tests, and 54 http-proxy package tests pass; verify-no-bare-dispatcher and docs:check pass",
+      "historicalAuditStatus": "adapted-verified-locally",
+      "status": "adapt"
     },
     {
       "id": "api-sdk-acp-wire",

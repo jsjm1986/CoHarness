@@ -17,7 +17,7 @@
 
 - id: tools
   config:
-    # Keep the same temporary process-wide Code Mode opt-in as the Web surface.
+    # Keep the same temporary process-wide PTC opt-in as the Web surface.
     mode: !!js process.env.DSH_TOOLS_MODE
 
 # Headless uses the structured read/write/edit file tools. The legacy editor
@@ -26,7 +26,7 @@
   disabled: true
 
 - insert:
-    # Code Mode is a core execution capability, not a Web component.
+    # PTC is a core execution capability, not a Web component.
     - id: code-runtime
       name: '@deepseek-ai/dsh-code-runtime-worker-thread'
 

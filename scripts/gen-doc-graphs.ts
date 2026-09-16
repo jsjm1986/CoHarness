@@ -335,7 +335,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Tool registry and guarded execution pipeline',
     mode: 'core',
     consumers: ['agent-loop', 'tool-ask-user', 'tool-bash', 'tool-cordis', 'tool-fs', 'tool-terminal', 'tool-skill', 'tool-subagent', 'tool-todo', 'tool-web'],
-    note: 'Registers capabilities, owns Code Mode transport, and routes calls through pre-policy, monotonic guards, around dispatch, post-policy, and final-result observation.',
+    note: 'Registers capabilities, owns the PTC transport, and routes calls through pre-policy, monotonic guards, around dispatch, post-policy, and final-result observation.',
   },
   {
     key: 'userQuestions',
@@ -516,7 +516,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['code-runtime-worker-thread', 'experimental-code-runtime-python'],
     consumers: ['tools'],
-    note: 'Runs one model-written program against host-provided async bindings; backends differ by substrate and language (the tool registry consumes it for Code Mode).',
+    note: 'Runs one model-written program against host-provided async bindings; backends differ by substrate and language (the tool registry consumes it for PTC).',
   },
   {
     key: 'fs',
@@ -1458,7 +1458,7 @@ function renderToolPipeline(): string {
     `  around["${mermaidCode('tools/execute')} waterfall<br/>timeout, retry, metrics (around dispatch)"]`,
     '  toolBody["Registered tool execute() body"]',
     `  fsGate["${mermaidCode('fs/write-intent')} or ${mermaidCode('fs/edit-intent')}<br/>tool-fs mutations only"]`,
-    `  owned["Tool-owned session events<br/>${mermaidCode('todo/write')}, ${mermaidCode('fs/observed')}, ${mermaidCode('hook/invoked')}, ${mermaidCode('hook/result')}, ${mermaidCode('tool/code-dispatch')}"]`,
+    `  owned["Tool-owned session events<br/>${mermaidCode('todo/write')}, ${mermaidCode('fs/observed')}, ${mermaidCode('hook/invoked')}, ${mermaidCode('hook/result')}, ${mermaidCode('tool/ptc-dispatch')}"]`,
     `  post["${mermaidCode('tools/post-execute')} waterfall<br/>accept, block, replace, add context"]`,
     '  normalized["Registry outer normalization<br/>pipeline/result snapshot throws become isError"]',
     '  finalize["ToolDefinition.finalizeContent<br/>last content-only invariant"]',
@@ -1498,7 +1498,7 @@ function renderToolPipeline(): string {
     '  allResults --> context',
     '```',
     '',
-    'Filesystem read-before-edit checks stay below `tool-fs` on `fs/*` events. Generic pre/post waterfalls host hooks and approval policy; `ctx.approval` resolves asks before monotonic guards, and owner policy that must not be reordered remains a registered guard. Around-dispatch concerns such as timeouts wrap `tools/execute`. The registry losslessly snapshots the candidate result and normalizes a snapshot failure before the visible definition\'s snapshotted `finalizeContent` callback enforces its synchronous content-only invariant. `tools/result` then observes the immutable, lossless-JSON outcome. This lets hooks span tool families without coupling the tools to one policy service. Code Mode sends both the reserved `run_code` transport and its serialized sub-calls through the pipeline; sub-calls carry the parent token, log `tool/code-dispatch`, return denials as binding rejections, and omit `additionalContexts` to preserve call/result adjacency.',
+    'Filesystem read-before-edit checks stay below `tool-fs` on `fs/*` events. Generic pre/post waterfalls host hooks and approval policy; `ctx.approval` resolves asks before monotonic guards, and owner policy that must not be reordered remains a registered guard. Around-dispatch concerns such as timeouts wrap `tools/execute`. The registry losslessly snapshots the candidate result and normalizes a snapshot failure before the visible definition\'s snapshotted `finalizeContent` callback enforces its synchronous content-only invariant. `tools/result` then observes the immutable, lossless-JSON outcome. This lets hooks span tool families without coupling the tools to one policy service. PTC sends both the reserved `run_code` transport and its serialized sub-calls through the pipeline; sub-calls carry the parent token, log `tool/ptc-dispatch`, return denials as binding rejections, and omit `additionalContexts` to preserve call/result adjacency.',
     '',
     ...maintenanceFooter(maintenance),
   ].join('\n')

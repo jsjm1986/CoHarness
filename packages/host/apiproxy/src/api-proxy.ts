@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { createWorkspaceFilesApi, subscribeWorkspaceFileChanges, DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 import { mkdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
@@ -12,7 +13,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
-import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, admitEncodedImages, admitPromptContent } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   DOCUMENT_STORE_UNAVAILABLE_CODE,
@@ -31,7 +32,6 @@ import type {
   JsonValue,
   Session,
   SessionEvent,
-  SessionEventMap,
   SessionHeader,
   SessionId,
   SessionLogOffset as SessionLogOffsetType,
@@ -56,9 +56,9 @@ import type {
 import type {} from '@deepseek-ai/dsh-permission-presets'
 import { SessionQueryError, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
-import { queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import type { SubagentListEntry as CatalogSubagentListEntry } from '@deepseek-ai/dsh-subagent'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
+import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 import type { Workspace, WorkspaceRecord } from '@deepseek-ai/dsh-workspace'
 import {
   workspaceDomainState, workspaceRecord, WorkspaceId as brandWorkspaceId,
@@ -73,12 +73,12 @@ import {
 import type { PresetBearingSession } from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {
-  ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, GoalRef, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
+  ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionHistoryIndex, SessionListMetadata,
   SessionProjectionsBlock, SessionSearchItem,
-  QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, SubagentPromptContentPart, JobView, ToolEventView,
+  QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
   WorkspaceId, WorkspaceView,
 } from './api/index.ts'
 import {
@@ -105,9 +105,6 @@ import type {} from '@deepseek-ai/dsh-jobs'
 import type { JobSnapshot } from '@deepseek-ai/dsh-jobs'
 // Type-only: resolves `ctx.get('sessionProjectionCache')` (the cold listing column).
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
-// GoalError narrows domain rejections to their stable codes at the wire boundary.
-import { GoalError } from '@deepseek-ai/dsh-goal'
-import type { GoalRef as CoreGoalRef } from '@deepseek-ai/dsh-goal'
 // Type-only edges: resolve the command-change stream and `ctx.get('skills')`.
 import type {} from '@deepseek-ai/dsh-commands'
 import {
@@ -145,6 +142,7 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 import type {} from '@deepseek-ai/dsh-user-approval'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
+import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
 import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
@@ -213,6 +211,16 @@ const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessio
   'dynamicCordisRunner/undefineFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
   'dynamicCordisRunner/reportRenderFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
   'dynamicCordisRunner/reportClientGuardFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/resolveInspectQuery': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'goals/get': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
+  'subagents/list': { action: 'read', sessionId: args => typertSessionId(args.parentSessionId) },
+  'subagents/prompt': { action: 'write', sessionId: args => typertRequestFieldSessionId(args.request, 'parentSessionId') },
+  'subagents/interruptByParent': { action: 'write', sessionId: args => typertSessionId(args.parentSessionId) },
+  'agentPresets/select': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'agentTeams/view': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
+  'agentTeams/createTask': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'agentTeams/updateTask': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'sessionFeedback/record': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
 })
 
 /**
@@ -224,6 +232,8 @@ const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessio
 const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   'pluginInventory/list',
   'dynamicCordisRunner/inventory',
+  'llm/listProviders',
+  'llm/listConfigurableProviders',
 ])
 
 /**
@@ -235,6 +245,27 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
 const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',
+  'dynamicCordisRunner/syncInspectManifest',
+  'agentPresets/list',
+])
+
+/**
+ * Project-scope Remote methods that write personal configuration but remain
+ * available to project managers, matching the RPC personal-configuration path.
+ * A non-manager project member is refused before lookup.
+ */
+const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set([
+  'agentPresets/read',
+  'agentPresets/copy',
+  'agentPresets/deletePreset',
+])
+
+/**
+ * Project-scope Remote methods reserved for personal configuration: every
+ * project member (ro, rw, or manager) is refused before lookup.
+ */
+const PROJECT_TYPERT_PERSONAL_CONFIGURATION: ReadonlySet<string> = new Set([
+  'llm/discoverModels',
 ])
 
 /** Brand one validated non-empty wire string as a Session identity. */
@@ -244,8 +275,13 @@ function typertSessionId(value: unknown): SessionId | undefined {
 
 /** Read a Session identity from a decoded request object. */
 function typertRequestSessionId(value: unknown): SessionId | undefined {
+  return typertRequestFieldSessionId(value, 'sessionId')
+}
+
+/** Read a Session identity from one named field of a decoded request object. */
+function typertRequestFieldSessionId(value: unknown, field: string): SessionId | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  return typertSessionId(Reflect.get(value, 'sessionId'))
+  return typertSessionId(Reflect.get(value, field))
 }
 
 /** Reject a Typert call through the carrier's existing collaboration error branch. */
@@ -277,6 +313,13 @@ export async function authorizeTypertRemote(
   if (authority.participant.scope.kind === 'personal') return
   if (PROJECT_TYPERT_PROCESS_WIDE_READS.has(payload.endpoint)) return
   if (PROJECT_TYPERT_REGISTRY_AUTHORIZED.has(payload.endpoint)) return
+  if (PROJECT_TYPERT_MANAGER_CONFIGURATION.has(payload.endpoint)) {
+    if (authority.participant.scope.canManage === true) return
+    rejectTypertCollaboration(new CollaborationError('forbidden'), 'write')
+  }
+  if (PROJECT_TYPERT_PERSONAL_CONFIGURATION.has(payload.endpoint)) {
+    rejectTypertCollaboration(new CollaborationError('forbidden'), 'write')
+  }
   if (policy === undefined) {
     rejectTypertCollaboration(new CollaborationError('forbidden'), action)
   }
@@ -337,19 +380,6 @@ async function durablePromptContent(
     }),
     documents,
   }
-}
-
-/** Admit image uploads in a continuable subagent prompt before inbox delivery. */
-async function durableSubagentPromptContent(
-  ctx: Context,
-  content: readonly SubagentPromptContentPart[],
-): Promise<ContentBlock[]> {
-  const images = content.filter((part): part is Extract<SubagentPromptContentPart, { type: 'image' }> => part.type === 'image')
-  const refs = images.length === 0 ? [] : await admitEncodedImages(ctx.attachments, images)
-  let imageIndex = 0
-  return content.map((part): ContentBlock => part.type === 'text'
-    ? { type: 'text', text: part.text }
-    : { type: 'image', attachment: refs[imageIndex++] as ImageAttachmentRef })
 }
 
 /** Search durable content for an image reference, including nested tool results. */
@@ -413,25 +443,6 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
     if (found !== undefined) return found
   }
   return undefined
-}
-
-/** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
-const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
-
-/** Validate and canonicalize one browser-supplied IANA zone at the wire boundary. */
-function canonicalClientTimeZone(value: string): string | undefined {
-  if (value.length === 0 || value.trim() !== value
-    || (value !== 'UTC' && !IANA_TIME_ZONE.test(value))) return undefined
-  try {
-    const canonical = new Intl.DateTimeFormat('en-US', { timeZone: value })
-      .resolvedOptions().timeZone
-    /* v8 ignore next -- Intl returns UTC or a canonical IANA Area/Location for accepted input. */
-    if (canonical !== 'UTC' && !IANA_TIME_ZONE.test(canonical)) return undefined
-    return canonical
-  } catch {
-    // Intl rejects unsupported zone names; the RPC maps that parser rejection below.
-    return undefined
-  }
 }
 
 /** Read live abort state across awaits without treating it as synchronously immutable. */
@@ -1061,6 +1072,14 @@ export interface ApiProxyDefaults {
    * falls back to platform detection ({@link canOpenNativePath}).
    */
   canOpenPath?: () => boolean
+  /** Maximum UTF-8 bytes returned by one Workspace page or byte window. */
+  workspaceFileMaxBytes?: number
+  /** Maximum lines in a Workspace text page. */
+  workspaceFileMaxLines?: number
+  /** Maximum direct directory entries processed in a Workspace listing. */
+  workspaceFileMaxEntries?: number
+  /** Maximum Client metadata records retained per runtime. */
+  workspaceFileMaxResources?: number
 }
 
 /** The tool/call payload fields the presenter path reads. */
@@ -1428,59 +1447,6 @@ function subagentHistoryProjections(
   }
 }
 
-/** Map continuation admission failures without exposing provider details. */
-function subagentPromptError(
-  request: RpcRequest<{ childSessionId: SessionId }>,
-  error: unknown,
-  signal: AbortSignal,
-): RpcResponse<never> {
-  const childSessionId = request.payload.childSessionId
-  if (signal.aborted) {
-    return err(request, { code: 'cancelled', message: 'subagent prompt was cancelled', details: {} })
-  }
-  if (error instanceof AttachmentError) {
-    return err(request, {
-      code: 'attachment-error',
-      message: error.message,
-      details: { reason: error.code },
-    })
-  }
-  if (error instanceof SubagentError) {
-    switch (error.code) {
-      case 'MODEL_DOES_NOT_SUPPORT_IMAGES':
-        return err(request, {
-          code: 'attachment-error',
-          message: error.message,
-          details: { reason: error.code },
-        })
-      case 'NOT_RESUMABLE':
-        return err(request, {
-          code: 'subagent-not-resumable',
-          message: 'subagent cannot be resumed',
-          details: { childSessionId },
-        })
-      case 'UNAUTHORIZED':
-        return err(request, {
-          code: 'subagent-unauthorized',
-          message: 'subagent does not belong to this parent',
-          details: { childSessionId },
-        })
-      case 'DRAINING':
-      case 'ACTIVATION_CLOSING':
-      case 'CONTINUATION_UNAVAILABLE':
-      case 'PERSISTENCE_UNAVAILABLE':
-        return err(request, {
-          code: 'subagent-delivery-unavailable',
-          message: 'subagent follow-up is temporarily unavailable',
-          details: { childSessionId },
-        })
-      default:
-        break
-    }
-  }
-  return err(request, { code: 'internal', message: 'subagent prompt failed', details: {} })
-}
-
 /** Stable RPC face of the missing projections capability, shared by every catalog read path. */
 function projectionsUnavailableError(): RpcError {
   return {
@@ -1656,16 +1622,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const { provider, model } = defaults.defaultModelSelection()
     return { provider, model }
   }
-  type WebModelSelectionRef = ModelSelectionRef & { current: ModelSelection }
+  type WebModelSelectionRef = ModelSelectionRef & {
+    current: ModelSelection
+    consume(provider: string, model: string, reasoningEffort: string | undefined): boolean
+  }
   const selections = new WeakMap<Agent, WebModelSelectionRef>()
-  /**
-   * Serializes `agentPreset.select` per session. Two concurrent selects both
-   * pass the blank check, and the second `unmountPresetFor` then finds nothing
-   * to unmount because the first already removed the record — leaving two
-   * compositions registered into one agent layer. The client's `busy` flag is
-   * not enforcement: the wire is reachable directly.
-   */
-  const presetSwitches = new Map<SessionId, Promise<unknown>>()
   /** Client-chosen identity creation/resume, deduplicated across concurrent retries. */
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
   /** Draft workspace attachments are published only after durable content lands. */
@@ -2039,33 +2000,60 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return result
   }
 
+  // Subagent prompts admit uploads through the same per-agent serialization as
+  // direct session prompts; deployments without an attachment store defer to
+  // the Remote service's own admission error.
+  ctx.on('subagent/prompt-admission', (agent, content) => {
+    const attachments = ctx.get('attachments')
+    if (attachments === undefined) return undefined
+    return serializeImageAdmission(agent, () => admitPromptContent(attachments, content))
+  })
+
   /**
    * Install or return the session-local model selection that prompt assembly snapshots.
    *
    * Precedence, resolved on EVERY read rather than seeded once: a selection
-   * made in this process, else the session's own latest logged request/header,
-   * else the live Agent default. Re-reading keeps the two tiers exact in both
-   * directions: a session with a recorded request derives its selection from
-   * its log, while a blank session (New Session reuses one rather than minting
-   * another) reads any default saved after it was created. There is no create-time
-   * per-session override tier on this wire — if one returns (a create-options
+   * made in this process or restored from the durable `model/selection`
+   * projection, else the session's own latest logged request/header, else the
+   * live Agent default. Re-reading keeps the tiers exact in both directions: a
+   * session with a recorded request derives its selection from its log, while a
+   * blank session (New Session reuses one rather than minting another) reads any
+   * default saved after it was created. There is no create-time per-session
+   * override tier on this wire — if one returns (a create-options
    * contribution), it must fold in between the selection and the log.
    */
   function selectionFor(agent: Agent): WebModelSelectionRef {
     const installed = selections.get(agent)
     if (installed !== undefined) return installed
-    let picked: ModelSelection | undefined
+    // A pending durable selection outranks the last request header: it was
+    // logged after that header and is consumed by the next matching one.
+    const pending = ctx.get('sessionProjections')
+      ?.stateOf(agent.session, 'modelSelection')?.pending ?? null
+    let picked: ModelSelection | undefined = pending === null
+      ? undefined
+      : {
+        provider: pending.provider,
+        model: pending.model,
+        ...pending.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: ReasoningEffortId(pending.reasoningEffort) },
+      }
     const selection: WebModelSelectionRef = {
       get current(): ModelSelection {
         if (picked !== undefined) return picked
         // Incrementally folded by the session, so a per-step read costs
         // O(new events) rather than a rescan.
-        const logged = agent.session.requestHeader()?.config
-        if (logged === undefined) return defaults.defaultModelSelection()
+        const loggedHeader = agent.session.requestHeader()
+        if (loggedHeader === undefined) return defaults.defaultModelSelection()
+        const logged = loggedHeader.config
         return {
           provider: logged.provider,
           model: logged.model,
+          // An effort the adapter defaulted is not a conversation choice:
+          // restoring it as one would make an unchanged default read as a
+          // request change.
           ...logged.reasoningEffort === undefined
+            || loggedHeader.adapterDefaults?.reasoningEffort === true
             ? {}
             : { reasoningEffort: logged.reasoningEffort },
         }
@@ -2073,11 +2061,45 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       set current(next: ModelSelection) {
         picked = next
       },
+      consume(provider: string, model: string, reasoningEffort: string | undefined): boolean {
+        if (picked?.provider !== provider
+          || picked.model !== model
+          || picked.reasoningEffort !== reasoningEffort) return false
+        picked = undefined
+        return true
+      },
       assembled: undefined,
     }
     installModelSelection(agent.ctx, selection)
     selections.set(agent, selection)
     return selection
+  }
+
+  /**
+   * Record one validated selection durably and apply it to prompt assembly.
+   * @param agent - live Agent that owns the selection.
+   * @param selection - validated selection to log and apply.
+   */
+  function selectForNextRequest(agent: Agent, selection: ModelSelection): void {
+    agent.session.append('model/selection', selection)
+    selectionFor(agent).current = selection
+  }
+
+  /**
+   * Let a matching durable request header retire a pending selection.
+   * @param agent - live Agent whose request was recorded.
+   * @param provider - provider route used by the request.
+   * @param model - provider-owned model used by the request.
+   * @param reasoningEffort - adapter-owned effort used by the request.
+   * @returns whether the pending selection was consumed.
+   */
+  function consumeSelection(
+    agent: Agent,
+    provider: string,
+    model: string,
+    reasoningEffort: string | undefined,
+  ): boolean {
+    return selections.get(agent)?.consume(provider, model, reasoningEffort) ?? false
   }
 
   /** Pre-publication setup used by both fresh and resumed Web agents. */
@@ -2236,17 +2258,30 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     projectionCtx.effect(() => projectionCtx.sessionProjections.register(inboxProjectionDefinition), 'apiproxy.inboxProjection()')
   })
 
-  /** Project both durable inbox lists, optionally including the splice currently being emitted. */
-  const queueItems = (
-    agent: Agent,
-    splice?: SessionEventMap['agent/inbox/spliced'],
-  ): QueuedInboxItem[] => {
-    const project = (target: 'next-turn' | 'next-step'): readonly UserMessage[] => {
-      const messages = target === 'next-turn' ? agent.inbox.nextTurn : agent.inbox.nextStep
-      return splice?.target === target
-        ? messages.toSpliced(splice.start, splice.removedCount ?? 0, ...splice.inserted)
-        : messages
-    }
+  ctx.inject(['sessionProjections'], (projectionCtx) => {
+    projectionCtx.effect(
+      () => projectionCtx.sessionProjections.register(modelSelectionProjectionDefinition),
+      'apiproxy.modelSelectionProjection()',
+    )
+  })
+
+  // A recorded request header retires the pending durable selection it used.
+  ctx.on('session/event', (session, event) => {
+    if (event.type !== 'request/header') return
+    const agent = ctx.agents.get(session.id)
+    if (agent?.session !== session) return
+    consumeSelection(
+      agent,
+      event.data.header.config.provider,
+      event.data.header.config.model,
+      event.data.header.config.reasoningEffort,
+    )
+  })
+
+  /** Project both durable inbox lists. Reads land after the owning event's fold, so no splice is applied here. */
+  const queueItems = (agent: Agent): QueuedInboxItem[] => {
+    const project = (target: 'next-turn' | 'next-step'): readonly UserMessage[] =>
+      target === 'next-turn' ? agent.inbox.nextTurn : agent.inbox.nextStep
     return [
       ...project('next-turn').map(message => ({
         id: message.id,
@@ -2274,7 +2309,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (event.type !== 'agent/inbox/spliced') return
     const agent = ctx.agents.get(session.id)
     if (agent?.session !== session) return
-    broadcast({ type: 'session/queue', sessionId: session.id, items: queueItems(agent, event.data) })
+    broadcast({ type: 'session/queue', sessionId: session.id, items: queueItems(agent) })
   })
 
   /** Remove a wait before settling it: synchronous deletion makes the first claimant win. */
@@ -3054,49 +3089,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /**
-   * Resolve the goal service THIS agent runs.
-   *
-   * The service is per session: an agent preset mounts it behind an `isolate`
-   * realm, which no host context resolves. Reading it from the root would
-   * answer "absent" for a session whose composition mounts it — so the lookup
-   * is keyed by the agent, and only a deployment composing it nowhere is
-   * genuinely absent.
-   */
-  function goalServiceFor(agent: Agent): NonNullable<ReturnType<typeof ctx.get<'goals'>>> | { error: RpcError } {
-    const presets = ctx.get('agentPresets')
-    const goals = presets?.serviceFor(agent, 'goals') ?? ctx.get('goals')
-    if (goals === undefined) {
-      return { error: { code: 'internal', message: 'goal service is absent: neither this session\'s agent preset nor the host composition mounts @deepseek-ai/dsh-goal', details: {} } }
-    }
-    return goals
-  }
-
-  /** Map one goal-domain rejection to the wire error (stable GoalError codes ride in details). */
-  function goalError(request: RpcRequest<unknown>, error: unknown): RpcResponse<never> {
-    const details = error instanceof GoalError ? { goalCode: error.code } : {}
-    return err(request, { code: 'internal', message: String(error), details })
-  }
-
-  /** Resolve a session's agent, apply one goal mutation, and acknowledge with the new CAS ref. */
-  async function mutateGoal(
-    request: RpcRequest<{ sessionId: SessionId }>,
-    mutation: (goals: NonNullable<ReturnType<typeof ctx.get<'goals'>>>, agent: Agent) => CoreGoalRef,
-  ): Promise<RpcResponse<{ ref: GoalRef }>> {
-    const authorized = await authorizeSession(request.payload.sessionId, 'write')
-    if ('error' in authorized) return err(request, authorized.error)
-    const found = await agentFor(request.payload.sessionId)
-    if ('error' in found) return err(request, found.error)
-    const goals = goalServiceFor(found.agent)
-    if ('error' in goals) return err(request, goals.error)
-    try {
-      const ref = mutation(goals, found.agent)
-      return ok(request, { ref: { id: ref.id, revision: ref.revision } })
-    } catch (error: unknown) {
-      return goalError(request, error)
-    }
-  }
-
-  /**
    * Whether an adapter currently serves this provider, and therefore whether
    * a session selecting it can start a turn. Catalog membership cannot answer
    * it: an adapter may serve a model its own catalog stopped advertising, so
@@ -3462,7 +3454,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return ok(request, namespaceView(descriptor))
   }
 
+  if (defaults.workspaceFileMaxResources !== undefined
+    && (!Number.isSafeInteger(defaults.workspaceFileMaxResources) || defaults.workspaceFileMaxResources < 1)) {
+    throw new RangeError('workspaceFileMaxResources must be a positive safe integer')
+  }
+  const workspaceFiles = createWorkspaceFilesApi(ctx, {
+    maxBytes: defaults.workspaceFileMaxBytes,
+    maxLines: defaults.workspaceFileMaxLines,
+    maxEntries: defaults.workspaceFileMaxEntries,
+    authorize: sessionId => authorizeSession(sessionId, 'read'),
+    validateRoot: resolveProjectPath,
+    principalSignal,
+  })
+
   return {
+    workspaceFiles,
     sessions: {
       // Attached sessions summarize from memory; persisted-but-unattached (cold)
       // sessions merge in from the persistence store so history survives restarts.
@@ -4027,7 +4033,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 ? {}
                 : { reasoningEffort: resolved.reasoningEffort },
             }
-            selectionFor(found.agent).current = selected
+            selectForNextRequest(found.agent, selected)
             if (authorized.authority?.participant.scope.kind !== 'project') {
               try {
                 await defaults.saveDefaultModelSelection?.(selected)
@@ -4394,39 +4400,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     },
 
     subagents: {
-      async list(request, signal) {
-        const authorized = await authorizeSession(request.payload.parentSessionId, 'read')
-        if ('error' in authorized) return err(request, authorized.error)
-        try {
-          const entries = await ctx.subagents.listChildren(request.payload.parentSessionId, signal)
-          return ok(request, {
-            entries: entries.map(entry => entry.kind === 'child'
-              ? {
-                ...entry,
-                activity: ctx.agents.get(entry.id)?.status === 'running' ? 'running' : 'inactive',
-              }
-              : entry),
-            parentAvailable: ctx.agents.get(request.payload.parentSessionId) !== undefined,
-          })
-        } catch (error: unknown) {
-          if (signal?.aborted || (error instanceof SubagentError && error.code === 'CANCELLED')) {
-            return err(request, {
-              code: 'cancelled',
-              message: 'subagent catalog read was cancelled',
-              details: {},
-            })
-          }
-          if (error instanceof SubagentError && error.code === 'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE') {
-            return err(request, projectionsUnavailableError())
-          }
-          return err(request, {
-            code: 'internal',
-            message: 'subagent catalog read failed',
-            details: {},
-          })
-        }
-      },
-
       async history(request, signal) {
         const {
           parentSessionId, childSessionId, mode, beforeSeq, maxMessages, detail,
@@ -4531,79 +4504,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }, detail, projections))
       },
 
-      async prompt(request, signal) {
-        const { parentSessionId, childSessionId, content, clientTimeZone, requestId } = request.payload
-        const parentAccess = await authorizeSession(parentSessionId, 'write')
-        if ('error' in parentAccess) return err(request, parentAccess.error)
-        const childAccess = await authorizeSession(childSessionId, 'write', parentAccess.authority)
-        if ('error' in childAccess) return err(request, childAccess.error)
-        const canonicalTimeZone = clientTimeZone === undefined
-          ? undefined
-          : canonicalClientTimeZone(clientTimeZone)
-        if (clientTimeZone !== undefined && canonicalTimeZone === undefined) {
-          return err(request, {
-            code: 'invalid-time-zone',
-            message: 'clientTimeZone must be UTC or a valid IANA Area/Location name',
-            details: { value: clientTimeZone },
-          })
-        }
-        const parent = ctx.agents.get(parentSessionId)
-        if (parent === undefined) {
-          return err(request, {
-            code: 'subagent-parent-unavailable',
-            message: `parent session "${parentSessionId}" is not live`,
-            details: { parentSessionId },
-          })
-        }
-        const verified = await catalogChild(ctx, {
-          parentSessionId, childSessionId, mode: 'continuable',
-        }, signal)
-        if (verified.error !== undefined) return err(request, verified.error)
-        const participant = projectParticipant(parentAccess.authority)
-        try {
-          const admitted = await durableSubagentPromptContent(ctx, content)
-          // Host-protocol delivery keeps its own provenance through the
-          // symbol-keyed queue adapter instead of impersonating an Agent sender.
-          const messageId = await queueHostSubagentPrompt(ctx.subagents, parent, childSessionId, admitted, {
-            kind: 'user',
-            rpcId: requestId ?? request.rpcId,
-            ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
-            ...(participant === undefined ? {} : { participant }),
-          }, signal)
-          return ok(request, { messageId })
-        } catch (error: unknown) {
-          return subagentPromptError(request, error, signal)
-        }
-      },
-
-      // Deliberately no catalog, history, persistence, or parent Agent lookup:
-      // the core primitive alone authorizes the durable address against the
-      // live Activation, which is what keeps a live child interruptible while
-      // its parent Agent is offline. Absent targets are accepted no-ops there.
-      async interrupt(request) {
-        const { parentSessionId, childSessionId } = request.payload
-        const parentAccess = await authorizeSession(parentSessionId, 'write')
-        if ('error' in parentAccess) return err(request, parentAccess.error)
-        const childAccess = await authorizeSession(childSessionId, 'write', parentAccess.authority)
-        if ('error' in childAccess) return err(request, childAccess.error)
-        try {
-          ctx.subagents.interrupt(childSessionId, { kind: 'user', parentSessionId })
-        } catch (error: unknown) {
-          if (error instanceof SubagentError && error.code === 'UNAUTHORIZED') {
-            return err(request, {
-              code: 'subagent-unauthorized',
-              message: 'subagent does not belong to this parent',
-              details: { childSessionId },
-            })
-          }
-          return err(request, {
-            code: 'internal',
-            message: 'subagent interrupt failed',
-            details: {},
-          })
-        }
-        return ok(request, { accepted: true as const })
-      },
     },
 
     workspace: {
@@ -4849,6 +4749,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           attachedSessions,
           home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
+          ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
+            maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
+            maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,
+            maxEntries: defaults.workspaceFileMaxEntries ?? DEFAULT_WORKSPACE_FILE_MAX_ENTRIES,
+            maxResources: defaults.workspaceFileMaxResources ?? DEFAULT_WORKSPACE_FILE_MAX_RESOURCES,
+          } }),
         })
       },
 
@@ -4947,178 +4853,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
     },
 
-    goals: {
-      // Mutations only — the read side is the 'goal' session projection.
-      // Every verb resolves the session's agent (agentFor: implicit cold
-      // resume, the command.* precedent) and acknowledges with the new CAS
-      // ref; the committed goal/change event carries the whole value to every
-      // client through the projection frames.
-      async create(request) {
-        const { objective, maxGoalRounds } = request.payload
-        return mutateGoal(request, (goals, agent) => goals.create(agent, {
-          objective,
-          ...(maxGoalRounds !== undefined ? { maxGoalRounds } : {}),
-        }))
-      },
-
-      async edit(request) {
-        const { ref, objective, maxGoalRounds } = request.payload
-        return mutateGoal(request, (goals, agent) => goals.edit(agent, ref, {
-          ...(objective !== undefined ? { objective } : {}),
-          ...(maxGoalRounds !== undefined ? { maxGoalRounds } : {}),
-        }))
-      },
-
-      async pause(request) {
-        return mutateGoal(request, (goals, agent) => goals.pause(agent, request.payload.ref))
-      },
-
-      async resume(request) {
-        return mutateGoal(request, (goals, agent) => goals.resume(agent, request.payload.ref))
-      },
-
-      async complete(request) {
-        return mutateGoal(request, (goals, agent) => goals.complete(agent, request.payload.ref))
-      },
-
-      async clear(request) {
-        /* jscpd:ignore-start -- goal mutations share the same authorization/error ladder. */
-        const authorized = await authorizeSession(request.payload.sessionId, 'write')
-        if ('error' in authorized) return err(request, authorized.error)
-        const found = await agentFor(request.payload.sessionId)
-        if ('error' in found) return err(request, found.error)
-        const goals = goalServiceFor(found.agent)
-        if ('error' in goals) return err(request, goals.error)
-        try {
-          goals.clear(found.agent, request.payload.ref)
-          return ok(request, { cleared: true as const })
-        } catch (error: unknown) {
-          return goalError(request, error)
-        }
-        /* jscpd:ignore-end */
-      },
-    },
-
     agentPresets: {
-      // A deployment with no roster answers with an empty list rather than an
-      // error: composing no presets is a valid deployment, and the browser
-      // simply offers no choice.
-      async list(request) {
-        const captured = captureCollaboration('read')
-        if ('error' in captured) return err(request, captured.error)
-        const projectScope = captured.authority?.participant.scope.kind === 'project'
-        const projectManager = captured.authority?.participant.scope.kind === 'project'
-          && captured.authority.participant.scope.canManage === true
-        const presets = ctx.get('agentPresets')
-        if (presets === undefined) return ok(request, { presets: [], authorable: false, hasDocument: false })
-        const defaultId = presets.defaultId
-        return ok(request, {
-          presets: (await presets.list()).map(preset => ({
-            id: preset.id,
-            trust: preset.trust,
-            isDefault: preset.id === defaultId,
-            ...preset.name === undefined ? {} : { name: preset.name },
-            ...preset.description === undefined ? {} : { description: preset.description },
-            ...preset.broken === undefined ? {} : { broken: preset.broken },
-          })),
-          authorable: (!projectScope || projectManager) && presets.authorable,
-          hasDocument: !projectScope && canOpenPaths(),
-        })
-      },
-
-      // Recomposing is limited to a session with no visible conversation
-      // content because its history is produced under its preset's tools; the
-      // agent and the session survive, only the composition is swapped.
-      async select(request) {
-        const { sessionId, agentPreset } = request.payload
-        const authorized = await authorizeSession(sessionId, 'write')
-        if ('error' in authorized) return err(request, authorized.error)
-        const presets = ctx.get('agentPresets')
-        if (presets === undefined) {
-          return err(request, {
-            code: 'agent-preset-not-found',
-            message: 'this deployment composes no agent presets',
-            details: { agentPreset, available: [] },
-          })
-        }
-        const found = await agentFor(sessionId)
-        if ('error' in found) return err(request, found.error)
-        const { agent } = found
-        const swap = async (): Promise<RpcResponse<{ agentPreset: string }>> => {
-          // Re-read inside the queue: an earlier switch may have run, and a
-          // visible content may have arrived, since this request arrived.
-          if (!sessionBlank(agent.session)) {
-            return err(request, {
-              code: 'agent-preset-locked',
-              message: `session "${sessionId}" already has visible conversation content; its agent preset is fixed`,
-              details: { sessionId, agentPreset },
-            })
-          }
-          try {
-            const preset = await presets.recompose(agent.ctx, agentPreset)
-            // Recorded only after the swap committed: the log states what the
-            // agent runs, and a rejected mount leaves the previous composition.
-            agent.session.append('agent-preset/selected', { agentPreset: preset.id })
-            return ok(request, { agentPreset: preset.id })
-          } catch (error: unknown) {
-            const refused = presetFailure(request, error)
-            if (refused !== undefined) return refused
-            return err(request, {
-              code: 'internal',
-              message: `failed to select agent preset "${agentPreset}": ${String(error)}`,
-              details: {},
-            })
-          }
-        }
-        const queued = presetSwitches.get(sessionId) ?? Promise.resolve()
-        const turn = queued.then(swap)
-        presetSwitches.set(sessionId, turn.catch(() => undefined))
-        try {
-          return await turn
-        } finally {
-          if (presetSwitches.get(sessionId) === turn) presetSwitches.delete(sessionId)
-        }
-      },
-
       // Authoring is privileged (see PRIVILEGED_METHODS in dsh-client-connection):
-      // a composition names the plugins a session runs, so reading one is
-      // reconnaissance, and copy/remove/openDocument manage the roster and
-      // drive the host desktop.
-      /* jscpd:ignore-start -- preset authoring methods intentionally share one refusal ladder. */
-      async read(request) {
-        const authorized = authorizePersonalConfiguration(true)
-        if (authorized.error !== undefined) return err(request, authorized.error)
-        const { agentPreset } = request.payload
-        const presets = ctx.get('agentPresets')
-        if (presets === undefined) return err(request, noRoster(agentPreset))
-        try {
-          const preset = await presets.resolve(agentPreset)
-          return ok(request, {
-            agentPreset: preset.id,
-            trust: preset.trust,
-            content: await presets.read(preset.id),
-            ...preset.name === undefined ? {} : { name: preset.name },
-            ...preset.description === undefined ? {} : { description: preset.description },
-          })
-        } catch (error: unknown) {
-          return err(request, presetError(agentPreset, error))
-        }
-      },
-
-      async copy(request) {
-        const authorized = authorizePersonalConfiguration(true)
-        if (authorized.error !== undefined) return err(request, authorized.error)
-        const { from, agentPreset, name } = request.payload
-        const presets = ctx.get('agentPresets')
-        if (presets === undefined) return err(request, noRoster(agentPreset))
-        try {
-          await presets.copy(from, agentPreset, name)
-          return ok(request, { agentPreset })
-        } catch (error: unknown) {
-          return err(request, presetError(agentPreset, error))
-        }
-      },
-
+      // a composition names the plugins a session runs, and openDocument manages
+      // the roster and drives the host desktop.
       async openDocument(request, signal) {
         const authorized = authorizePersonalConfiguration()
         if (authorized.error !== undefined) return err(request, authorized.error)
@@ -5143,22 +4881,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, presetError(agentPreset, error))
         }
       },
-
-      async remove(request) {
-        const authorized = authorizePersonalConfiguration(true)
-        if (authorized.error !== undefined) return err(request, authorized.error)
-        const { agentPreset } = request.payload
-        const presets = ctx.get('agentPresets')
-        if (presets === undefined) return err(request, noRoster(agentPreset))
-        try {
-          await presets.remove(agentPreset)
-          return ok(request, {})
-        } catch (error: unknown) {
-          return err(request, presetError(agentPreset, error))
-        }
-      },
-      /* jscpd:ignore-end */
     },
+
 
     skills: {
       // Skill lookup never creates or resumes an agent: the session address
@@ -5415,8 +5139,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...baseURL === undefined ? {} : { baseURL },
             ...api === undefined ? {} : { api },
             ...apiKey === undefined ? {} : { apiKey },
-            ...signal === undefined ? {} : { signal },
-          })
+          }, signal)
           const views: DiscoveredModelView[] = models.map(model => ({
             id: model.id,
             ...model.name === undefined ? {} : { name: model.name },
@@ -5604,7 +5327,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             for (const session of sessions) {
               if (!readable.has(session.id)) continue
               const agent = ctx.agents.get(session.id)
-              if (agent?.session === session && agent.inbox.hasPending) {
+              if (agent?.session === session
+                && (agent.inbox.nextTurn.length !== 0 || agent.inbox.nextStep.length !== 0)) {
                 queue.push(frame({ type: 'session/queue', sessionId: session.id, items: queueItems(agent) }))
               }
             }
@@ -5703,6 +5427,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
 
           const disposers = [
+            subscribeWorkspaceFileChanges(ctx, {
+              authority, signal: streamSignal,
+              publish: (change) => { queue.push(frame(change)) },
+              fail,
+              validateRoot: resolveProjectPath,
+            }),
             ctx.on('session/created', (session: Session) => {
               publish(() => {
                 void ensureReadable(session.id).then((allowed) => {

@@ -184,7 +184,7 @@ interface GoalChanged {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxgoals--goalservice"></a>
 
@@ -199,7 +199,7 @@ Goal service (`ctx.goals`) backed exclusively by the owning session log.
  * @returns a fresh view or `undefined` when no goal is current.
  * @throws {@link GoalError} when the agent is not the registry's live instance.
  */
-get(agent: Agent): GoalView | undefined
+@Remote('get') get(agent: Agent): GoalView | undefined
 
 /**
  * Remove process-local continuation authority without changing durable goal
@@ -281,7 +281,7 @@ block(agent: Agent, ref: GoalRef, reason: GoalBlockReason): GoalView
 
 Types: [Agent](core.zh.md)
 
-Source: [`packages/goal/goal/src/index.ts:250`](../../packages/goal/goal/src/index.ts)
+Source: [`packages/goal/goal/src/index.ts`](../../packages/goal/goal/src/index.ts)
 
 <a id="goal-events"></a>
 
@@ -307,5 +307,5 @@ Goal mutation accepted by one live agent. The matching `goal/change` session eve
 
 Types: [Agent](core.zh.md) · [Scoped](scope.zh.md)
 
-Source: [`packages/goal/goal/src/domain.ts:114`](../../packages/goal/goal/src/domain.ts)
+Source: [`packages/goal/goal/src/domain.ts`](../../packages/goal/goal/src/domain.ts)
 <!-- END GENERATED cordis-surface -->

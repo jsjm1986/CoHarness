@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -33,7 +32,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -46,7 +48,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -62,7 +67,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -76,4 +84,10 @@
   - img
 - button "0% of context used"
 - button "Send message" [disabled]
-- text: 3 turns · 7 steps LLM {{duration}} · Tool call {{duration}} Cache hit 77% Input 66.5K tok · Output 321 tok
+- button "3 turns · 7 steps":
+  - img
+  - text: 3 turns · 7 steps
+- button "66.8K tok · Cache hit 77%":
+  - img
+  - text: 66.8K tokCache hit 77%
+- separator "Adjust transcript content width"

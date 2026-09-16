@@ -69,6 +69,9 @@ describe('web e2e: durable per-message feedback', () => {
     await like.scrollIntoViewIfNeeded()
     await like.hover()
     await like.click()
+    // Rating submits behind a confirmation dialog.
+    await page.getByRole('dialog', { name: 'Submit feedback' })
+      .getByRole('button', { name: 'Submit', exact: true }).click()
     // A recorded rating relabels the button to what the next click would do,
     // so the pressed control is addressed by the retract label from here on.
     const rated = page.getByRole('button', { name: 'Remove rating' }).first()

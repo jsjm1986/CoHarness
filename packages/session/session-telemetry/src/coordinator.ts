@@ -23,6 +23,14 @@ import type { SessionTelemetrySink, SessionTelemetryRecord, SessionTelemetrySeve
 /** Whether capture follows live events or reads the canonical log only when requested. */
 export type SessionTelemetryCapture = 'live' | 'on-demand'
 
+/** Backend-selected capture mode and history policy. */
+export interface SessionTelemetryCaptureOptions {
+  /** Follow live events, or wait for explicit capture; defaults to live. */
+  capture?: SessionTelemetryCapture
+  /** Include stored history before this lifecycle; defaults to false. */
+  includeHistory?: boolean
+}
+
 /** One projected record ready for backend handoff. */
 interface ProjectedRecord {
   readonly record: SessionTelemetryRecord
@@ -70,14 +78,14 @@ export class SessionTelemetryCoordinator {
   /**
    * @param ctx - the composing backend's context; listeners bind to its fiber.
    * @param backend - the backend receiving records; owned elsewhere, never disposed here beyond `shutdown()` forwarding.
-   * @param capture - follow live events, or wait for explicit canonical-log capture.
+   * @param options - capture mode and history policy.
    */
   constructor(
     private readonly ctx: Context,
     private readonly backend: SessionTelemetrySink,
-    capture: SessionTelemetryCapture = 'live',
+    private readonly options: SessionTelemetryCaptureOptions = {},
   ) {
-    if (capture === 'live') {
+    if ((options.capture ?? 'live') === 'live') {
       ctx.on('session/created', (session) => {
         this.adopt(session)
       })
@@ -138,7 +146,7 @@ export class SessionTelemetryCoordinator {
    */
   captureSession(session: Session, throughSeq?: SessionSeqType): void {
     const cursor = handoffCursor.get(session)
-      ?? (session.firstLiveSeq === 0 ? -1 : SessionSeq(session.firstLiveSeq - 1))
+      ?? (this.options.includeHistory === true || session.firstLiveSeq === 0 ? -1 : SessionSeq(session.firstLiveSeq - 1))
     // Containment is PER EVENT: one rejected record is withheld fail-closed
     // while the rest of the historical replay proceeds.
     for (const event of session.snapshotEvents()) {
@@ -308,6 +316,7 @@ function errorDetail(error: unknown): { name: string; message: string } {
 function identityOf(session: Session, event: SessionEvent): Record<string, string | number> {
   const attributes: Record<string, string | number> = {
     'session.id': String(session.id),
+    'session.format_version': session.header.version,
     'event.type': event.type,
     'event.seq': event.seq,
   }

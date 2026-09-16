@@ -136,6 +136,16 @@
   white-space: nowrap;
 }
 
+.itemAlias {
+  flex: none;
+  max-width: 28%;
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .itemDescription {
   flex: 1;
   min-width: 0;

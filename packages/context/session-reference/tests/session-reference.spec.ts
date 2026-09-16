@@ -94,7 +94,7 @@ function appendConversation(session: Session): void {
       source: checkpointSource('conversation'),
     }),
     {
-      surfaceOp: { op: 'replace', start: oldUser.seq, end: oldAssistant.seq },
+      surfaceOp: { op: 'replace', startSeq: oldUser.seq, endSeq: oldAssistant.seq },
       sourceEventSeqs: [oldUser.seq, oldAssistant.seq],
     },
   )
@@ -787,7 +787,7 @@ describe('session reference discovery and preparation', () => {
         source: checkpointSource('later-source-mutation'),
       }),
       {
-        surfaceOp: { op: 'replace', start: original.seq, end: later.seq },
+        surfaceOp: { op: 'replace', startSeq: original.seq, endSeq: later.seq },
         sourceEventSeqs: [original.seq, later.seq],
       },
     )

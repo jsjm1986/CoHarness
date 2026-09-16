@@ -14,7 +14,7 @@ The earlier shipped composition avoided this mismatch by keeping forked children
 
 The model-facing `send_message` tool is registered globally for every Agent in a composition. A continuable forked child therefore receives the same tool name, description, schema, and ordering as its parent. Its initial task is appended after the inherited Session seed, and the task includes the direct parent id plus guidance to return results with `send_message({ agent_id, message })` when that tool is visible to the child.
 
-The base and headless compositions retain one-shot fork as their conservative lifecycle policy. The `code`, `cordis`, and `standard` Web app agent presets may bind fork to the continuable lifecycle because that binding no longer inserts child-only request-head fields. `ForkInProcessProvider.prepareContinuable()` and `ctx.subagents.startContinuable()` remain the implementation seam for those presets.
+The base and headless compositions retain one-shot fork as their conservative lifecycle policy. The `ptc`, `cordis`, and `standard` Web app agent presets may bind fork to the continuable lifecycle because that binding no longer inserts child-only request-head fields. `ForkInProcessProvider.prepareContinuable()` and `ctx.subagents.startContinuable()` remain the implementation seam for those presets.
 
 Byte-identical prefix reuse is qualified by explicit deployment choices. A fork delegation that applies a child persona or `toolFilter` may still change the request head. In particular, filtering out `send_message` removes both the schema and the return guidance from the child; the runtime does not bypass an explicit allow-list.
 

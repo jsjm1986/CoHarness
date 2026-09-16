@@ -108,6 +108,9 @@
       "path": "../../workspace/workspace"
     },
     {
+      "path": "../../fs/fs"
+    },
+    {
       "path": "../directory-picker"
     },
     {
@@ -121,6 +124,9 @@
     },
     {
       "path": "../../util/crypto"
+    },
+    {
+      "path": "../../util/time"
     }
   ]
 }

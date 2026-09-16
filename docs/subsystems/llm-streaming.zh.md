@@ -734,8 +734,6 @@ interface LlmModelDiscoveryRequest {
   api?: string
   /** Credential for this interrogation alone; the harness never stores it. */
   apiKey?: string
-  /** Caller cancellation; implementations must settle promptly after it aborts. */
-  signal?: AbortSignal
 }
 ```
 
@@ -766,11 +764,11 @@ interface LlmDiscoveredModel {
 
 ### 请求信封：`LlmCallConfig` 与记录的 header
 
-循环从已记录状态构建每个请求。`EpochHeader` 记录调用配置，标记由适配器默认值提供的字段，并通过完整的 `request/header` 快照记录渲染后的提示词以及权威返回工具顺序（由 `toolOrder` 配置；未配置时按字典序）。结合派生历史，请求便可由会话日志重建。见 [session.md](session.zh.md#the-request-header-event-requestheader) 与[可重建性 Agent Note](../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.zh.md)。
+循环从已记录状态构建每个请求。`EpochHeader` 记录调用配置，标记由适配器默认值提供的字段，并通过完整的 `request/header` 快照记录权威返回工具顺序（由 `toolOrder` 配置；未配置时按字典序）；渲染后的系统提示词是派生历史中的 `system/message` surface 事件。结合派生历史，请求便可由会话日志重建。见 [session.md](session.zh.md#the-request-header-event-requestheader) 与[可重建性 Agent Note](../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.zh.md)。
 
 `agent/request` 接收冻结的调用配置种子，并可返回替代值以切换提供方、模型、推理强度或采样参数。waterfall（瀑布式事件）开始前，循环会移除标记为适配器默认值的值，使确切模型准备过程填入所选路由的当前值；未带标记的显式设置仍保留在提议中。waterfall 结束后，准备过程会在轮次信号控制下拒绝显式指定但不受支持的推理强度 ID（不自动调整），并记录生效配置以及由适配器默认值提供的字段。准备完成的调用直至分派完成始终持有同一项适配器注册。到达 `llm/stream` 的请求会被深度冻结，因此变更会抛异常；请求还携带进程本地循环标识，使观察者不会把单独记录的冻结辅助调用误认成对话请求。
 
-在协议中，循环构建的请求先读取 `system` slot（渲染后的提示词组装），再读取派生历史。已记录的请求快照会以最新的 `user/message`（轮次首步）或上一步的工具结果（后续步骤）结尾。开发不变式针对每个循环构建的请求精确重算此等式。
+在协议中，循环构建的请求将渲染后的提示词组装作为首条 system 角色消息，随后是其余派生历史。已记录的请求快照会以最新的 `user/message`（轮次首步）或上一步的工具结果（后续步骤）结尾。开发不变式针对每个循环构建的请求精确重算此等式。
 
 FIXME(call-config-shape)：重新审视其余哪些字段出于缓存目的确实属于 epoch 层级（`model` 和模型持有的推理强度已明确属于；采样标量目前出于谨慎保留在此）。
 
@@ -909,7 +907,7 @@ declare abstract class LlmAdapter {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxdeepseekllmapiextensions--deepseekllmapiextensionregistry"></a>
 
@@ -936,7 +934,7 @@ register<K extends keyof DeepSeekLlmApiExtensionMap>( field: K, provider: DeepSe
 async prepare(request: DeepSeekLlmApiExtensionRequest): Promise<PreparedDeepSeekLlmApiExtensions>
 ```
 
-Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts:66`](../../packages/llm/deepseek-llm-api-extensions/src/index.ts)
+Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../../packages/llm/deepseek-llm-api-extensions/src/index.ts)
 
 <a id="ctxllm--llmruntime"></a>
 
@@ -959,7 +957,7 @@ registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHa
  * Describe provider routes with a registered adapter.
  * @returns detached provider metadata in registration order.
  */
-listProviders(): LlmProviderInfo[]
+@Remote listProviders(): LlmProviderInfo[]
 
 /**
  * Declare provider routes an adapter plugin can activate through
@@ -975,7 +973,7 @@ registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): Dire
  * List every declared configurable provider, registered or dormant.
  * @returns detached directory entries in declaration order.
  */
-listConfigurableProviders(): LlmConfigurableProvider[]
+@Remote listConfigurableProviders(): LlmConfigurableProvider[]
 
 /**
  * Offer to interrogate provider endpoints on behalf of the settings
@@ -984,10 +982,10 @@ listConfigurableProviders(): LlmConfigurableProvider[]
  * directory, and because a provider being *added* has no route to name yet.
  * Disposed with the fiber.
  * @param settingsNs - the namespace whose profiles this discovery serves.
- * @param discover - interrogates one endpoint; must honor `request.signal`.
+ * @param discover - interrogates one endpoint; must honor `signal`.
  * @returns the disposer that withdraws the offer.
  */
-registerModelDiscovery( settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>, ): () => void
+registerModelDiscovery( settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>, ): () => void
 
 /**
  * Interrogate one provider endpoint for the models it advertises. The
@@ -996,9 +994,20 @@ registerModelDiscovery( settingsNs: string, discover: (request: LlmModelDiscover
  * candidate metadata a surface may offer for adoption.
  * @param settingsNs - namespace whose registered discovery serves this draft.
  * @param request - the endpoint, protocol, and one-shot credential to use.
+ * @param signal - caller cancellation.
  * @returns the advertised models, deduplicated in endpoint order.
  */
-async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, ): Promise<LlmDiscoveredModel[]>
+async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal, ): Promise<LlmDiscoveredModel[]>
+
+/**
+ * Remote adapter for one draft provider interrogation.
+ * @param settingsNs - namespace whose registered discovery serves this draft.
+ * @param request - endpoint, protocol, and one-shot credential to use.
+ * @param signal - caller cancellation supplied by the Remote carrier.
+ * @returns advertised models in endpoint order.
+ * @throws RemoteError with `llm/model-discovery-rejected` when discovery refuses or fails.
+ */
+@Remote('discoverModels') async remoteDiscoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal, ): Promise<LlmDiscoveredModel[]>
 
 /**
  * Resolve the retry policy captured when one provider route was registered.
@@ -1072,7 +1081,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:284`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
 
 <a id="ctxmodelaccess--modelaccessservice"></a>
 
@@ -1089,7 +1098,7 @@ Runtime face published as `ctx.modelAccess`. Implementations may be plain object
 decide(target: ModelAccessTarget): ModelAccessDecision
 ```
 
-Source: [`packages/llm/model-access/src/index.ts:22`](../../packages/llm/model-access/src/index.ts)
+Source: [`packages/llm/model-access/src/index.ts`](../../packages/llm/model-access/src/index.ts)
 
 <a id="ctxmodelproviderconfig--modelproviderconfig-abstract-seam"></a>
 
@@ -1105,7 +1114,7 @@ Managed Provider configuration published as `ctx.modelProviderConfig`.
 abstract snapshot(): ModelProviderConfigSnapshot
 ```
 
-Source: [`packages/llm/model-provider-config/src/index.ts:120`](../../packages/llm/model-provider-config/src/index.ts)
+Source: [`packages/llm/model-provider-config/src/index.ts`](../../packages/llm/model-provider-config/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -1130,7 +1139,7 @@ The provider topology changed: an adapter registered or unregistered routes, or 
 'llm/adapters-updated'(): void
 ```
 
-Source: [`packages/llm/llm/src/types.ts:23`](../../packages/llm/llm/src/types.ts)
+Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)
 
 <a id="llmstream--waterfall"></a>
 
@@ -1154,7 +1163,7 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:69`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
 
 <a id="model-provider-config-events"></a>
 
@@ -1175,5 +1184,5 @@ Committed replacement of the organization Provider snapshot.
 'model-provider-config/updated'(revision: number): void
 ```
 
-Source: [`packages/llm/model-provider-config/src/index.ts:115`](../../packages/llm/model-provider-config/src/index.ts)
+Source: [`packages/llm/model-provider-config/src/index.ts`](../../packages/llm/model-provider-config/src/index.ts)
 <!-- END GENERATED cordis-surface -->

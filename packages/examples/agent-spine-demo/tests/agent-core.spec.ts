@@ -39,7 +39,7 @@ declare module '@deepseek-ai/dsh-jobs' {
 }
 
 async function composePrefix(ctx: Context, cwd: string): Promise<Message[]> {
-  const agent = ctx.agentLoop.create(SessionId('agent-spine-prefix'), {}, { cwd })
+  const agent = await ctx.agentLoop.create(SessionId('agent-spine-prefix'), {}, { cwd })
   const signal = new AbortController().signal
   const decision = await agentEvents(ctx, agent).waterfall(
     'agent/pre-step', { messages: [], turn: 1, step: 1, signal },

@@ -28,6 +28,8 @@ import {
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
+const OVERLAY = fileURLToPath(new URL('./seeded-history.overlay.yml', import.meta.url))
+
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/seeded-history', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expected.md', import.meta.url))
@@ -180,7 +182,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({})
+    scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
     // The workspace-aware flow runs sessions in <workspaceCwd>/workspace
     // (the composer's default draft name); the read-tool targets must live in
     // that session cwd. Pre-creating the directory is safe because the picker
@@ -334,7 +336,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // This scenario issues zero model calls — the scaffold's route-only
     // adapter serves the catalog and refuses to stream — so history restores
     // the routed id and the seat resolves it against an advertised row.
-    await page.getByRole('button', { name: /^Select model, current/ })
+    await page.getByRole('button', { name: /^Select model/ })
       .waitFor({ timeout: 10_000 })
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
@@ -413,6 +415,10 @@ describe('web e2e: seeded history renders through cold resume', () => {
       }))
     try {
       await fileLink.click()
+      // The RPC lands on the in-process host asynchronously: restoring the
+      // spy before arrival lets the real host opener run (on Linux a missing
+      // xdg-open pops the refusal dialog, whose mask then blocks later cases).
+      await expect.poll(() => openPath.mock.calls.length, { timeout: 5_000 }).toBe(1)
       await expect.poll(() => frame.getAttribute('data-details-collapsed'), { timeout: 5_000 }).toBe('true')
     } finally {
       openPath.mockRestore()

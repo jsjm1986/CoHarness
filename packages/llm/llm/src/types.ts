@@ -234,8 +234,22 @@ export interface LlmModelDiscoveryRequest {
   api?: string
   /** Credential for this interrogation alone; the harness never stores it. */
   apiKey?: string
+}
+
+/** Provider-side discovery request with operation-local cancellation attached. */
+export interface LlmModelDiscoveryOperation extends LlmModelDiscoveryRequest {
   /** Caller cancellation; implementations must settle promptly after it aborts. */
   signal?: AbortSignal
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    /** A draft provider interrogation refused or failed. */
+    'llm/model-discovery-rejected': {
+      readonly settingsNs: string
+      readonly baseURL?: string
+    }
+  }
 }
 
 /**

@@ -47,6 +47,15 @@ export interface RpcErrorDetailsMap {
   'workspace-invalid-path': { path: string }
   'workspace-name-conflict': { name: string }
   'workspace-move-invalid': { workspaceId: string; sessionId: SessionId; beforeSessionId?: SessionId }
+  'workspace-file/not-found': { sessionId: SessionId; path: string }
+  'workspace-file/outside-workspace': { sessionId: SessionId; path: string }
+  'workspace-file/not-directory': { sessionId: SessionId; path: string }
+  'workspace-file/not-regular-file': { sessionId: SessionId; path: string }
+  'workspace-file/not-text': { sessionId: SessionId; path: string }
+  'workspace-file/too-large': { sessionId: SessionId; path: string; limit: number }
+  'workspace-file/unsupported-address': { sessionId: SessionId }
+  'workspace-file/stale-version': { sessionId: SessionId; path: string }
+  'workspace-file/unknown-session': { sessionId: SessionId }
   'directory-unreadable': { path: string }
   'directory-exists': { path: string }
   'directory-create-failed': { path: string }
@@ -117,6 +126,19 @@ export type RpcError = {
 export type RpcResult<T> = { ok: true; value: T } | { ok: false; error: RpcError }
 
 /**
+ * Failure the wire may carry: the closed /api domain union, or any declared
+ * Remote code the Typert Gateway forwards through the same channel.
+ */
+export interface RpcWireFailure {
+  readonly code: string
+  readonly message: string
+  readonly details: object
+}
+
+/** Wire-carried result: producers narrow to RpcResult; envelopes accept the open failure space. */
+export type RpcWireResult<T> = { ok: true; value: T } | { ok: false; error: RpcWireFailure }
+
+/**
  * Fold a transport exception into the RpcResult error branch (unified error
  * API; 'internal' as the catch-all code). Lives with RpcResult so every
  * carrier consumer folds the same way.
@@ -160,7 +182,7 @@ export interface ClientRequest {
 export interface ServerResponse {
   type: 'server-response'
   rpcId: RpcId
-  result: RpcResult<unknown>
+  result: RpcWireResult<unknown>
 }
 
 /**
@@ -205,7 +227,7 @@ export function serverRequestJson(frame: RpcRequest<{ type: string }>): string {
 export interface ClientResponse {
   type: 'client-response'
   rpcId: RpcId
-  result: RpcResult<unknown>
+  result: RpcWireResult<unknown>
 }
 
 /** Authoritative wire full-form union; narrow via `switch (message.type)`. */

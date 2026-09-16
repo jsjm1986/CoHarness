@@ -17,6 +17,8 @@ export interface DisplaySettingsRowInjected {
   }
   /** Persist a transcript width. */
   setWidth: (value: number) => void
+  /** Persist the fill-width preference. */
+  setFullWidth: (value: boolean) => void
   /** Persist a transcript font size. */
   setFontSize: (value: number) => void
 }
@@ -54,7 +56,7 @@ function noticeOf(
  * @param props - composed settings-row props.
  * @returns the display preference row.
  */
-export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFontSize, t }: DisplaySettingsRowProps) {
+export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth, setFontSize, t }: DisplaySettingsRowProps) {
   const snapshot = useDisplaySettings(value => value)
   const disabled = snapshot.settings.status !== 'ready'
     || !snapshot.settings.writable
@@ -82,11 +84,23 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFontSize, 
             max={CHAT_CONTENT_WIDTH_RANGE.max}
             step="1"
             value={snapshot.chatContentWidth}
-            disabled={disabled}
+            disabled={disabled || snapshot.chatFullWidth}
             aria-label={t(widthLabel)}
             onChange={(event) => { setWidth(inputValue(event)) }}
           />
-          <output>{t('settings.display.widthValue', { value: snapshot.chatContentWidth })}</output>
+          <span className={css.widthOutput}>
+            <output>{snapshot.chatFullWidth ? t('settings.display.fill') : t('settings.display.widthValue', { value: snapshot.chatContentWidth })}</output>
+            <label className={css.fillToggle}>
+              <input
+                type="checkbox"
+                checked={snapshot.chatFullWidth}
+                disabled={disabled}
+                aria-label={t('settings.display.fill')}
+                onChange={(event) => { setFullWidth(event.currentTarget.checked) }}
+              />
+              {t('settings.display.fill')}
+            </label>
+          </span>
         </label>
         <label className={css.control}>
           <span className={css.controlLabel}>{t(fontLabel)}</span>

@@ -11,7 +11,7 @@
  * The policy only decides WHEN to spill and composes the notice.
  *
  * A second arm applies the SAME cap to the durable log: the
- * `tools/code-dispatch-log` waterfall bounds the `tool/code-dispatch` event's
+ * `tools/ptc-dispatch-log` waterfall bounds the `tool/ptc-dispatch` event's
  * copy of an oversized `run_code` sub-call result (the program's value is
  * untouched; UIs and replay read the full text through the spill artifact).
  *
@@ -208,13 +208,13 @@ export function apply(ctx: Context, config: Config): void {
     return { kind: 'accept', content: replaced, ...decision.additionalContexts ? { additionalContexts: decision.additionalContexts } : {} }
   }, { prepend: true })
 
-  // The durable-log arm: bound the `tool/code-dispatch` event's copy of an
+  // The durable-log arm: bound the `tool/ptc-dispatch` event's copy of an
   // oversized sub-call result the same way the model-facing arm bounds an
   // outer result. The program's returned value is untouched (it already
   // crossed the worker boundary whole); only the session log's copy shrinks
   // to preview + locator, so replay and UIs read the full text through the
   // spill artifact exactly as they do for spilled native results.
-  ctx.on('tools/code-dispatch-log', async (dispatch, next): Promise<ContentBlock[]> => {
+  ctx.on('tools/ptc-dispatch-log', async (dispatch, next): Promise<ContentBlock[]> => {
     const content = await next()
     // `read` sub-calls spill too: the log copy is not model context, so the
     // read → spill → read-again loop the post-execute arm avoids cannot

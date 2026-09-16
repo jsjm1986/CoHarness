@@ -47,7 +47,7 @@
 
 崩溃修复只适用于冷状态。对于已有活动会话的 id，`load(id)` 为权威内存日志制作快照，等待该快照持久，并只在平衡时返回；活动会话中开放的轮次会被拒绝，而不会收到合成中断 closer。对于冷 id，检查只读取、验证、冻结并构造一次未发布 Session；只有来源修订值仍然是当前值时，重复检查才会复用该对象图。`prepare(id)` 在修复前执行相同校验，预留该 Session 本身，提交任何待处理的撕裂尾部或中断轮次修复，并将其返回用于发布。HMR（热模块替换）接管通过 `loadStored` 读取，应用协调器 cwd 检查，并绝不关闭活动轮次。
 
-后端读取会通过相邻的 v0/v1 → v2 format catalog 转换受支持的历史记录，再校验当前记录。缺少 identity 的消息会获得确定性的 id `legacy-message:<session-id>:<event-seq>`；工具结果的内容替换会继承其目标导入后的 id。react-loop 引入前的 `turn/start` 会移除过时的 trigger，已移除的 steering（中途引导）事件 `steering/message` 会转换为同一条带标识的 `user/message`；旧版 `turn/end` 会映射终止原因，但不会虚构旧记录中没有记载的调用方。协调器对 `load`、`inspect`、`readFrom`、无所有者状态的认领和 HMR 前缀接管使用转换视图。存储仍然仅追加：源 generation 会保留，后续写入指向当前 generation。
+后端读取会通过相邻的 v0/v1/v2 → v3 format catalog 转换受支持的历史记录，再校验当前记录。缺少 identity 的消息会获得确定性的 id `legacy-message:<session-id>:<event-seq>`；工具结果的内容替换会继承其目标导入后的 id。react-loop 引入前的 `turn/start` 会移除过时的 trigger，已移除的 steering（中途引导）事件 `steering/message` 会转换为同一条带标识的 `user/message`；旧版 `turn/end` 会映射终止原因，但不会虚构旧记录中没有记载的调用方。协调器对 `load`、`inspect`、`readFrom`、无所有者状态的认领和 HMR 前缀接管使用转换视图。存储仍然仅追加：源 generation 会保留，后续写入指向当前 generation。
 
 活动会话发出 `session/disposed` 时，协调器等待其 controller，以串行方式执行最终 drain，然后释放该精确 `Session` 对象拥有的状态。失败退役会将 controller 保留在活动会话 map 中，使后端拆卸可重试。后端拆卸先停止事件接纳，flush 每个剩余 controller，等待每 id 操作，最后才关闭存储句柄。
 

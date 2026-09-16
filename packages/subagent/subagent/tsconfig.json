@@ -55,6 +55,24 @@
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../context/collaboration"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/time"
+    },
+    {
+      "path": "../../util/chunked-list"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../attachment/attachment"
     }
   ]
 }

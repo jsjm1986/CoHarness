@@ -31,7 +31,7 @@ fork 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: 
 
 #### 模型看到的内容
 
-子 agent 先接收由父 agent 已配平的已完成轮次构成的表层前缀，再逐字接收新的任务内容。配置的 persona 会在子 agent 的全新作用域中遮蔽提示词文本；工具限制会过滤其全局协议 schema、可执行工具查找和 Code Mode SDK 绑定，但不影响独立的指导内容。父 agent 的工具视图与权限不会被继承。可选的结构化输出请求会添加仅属于子 agent 的约定。父 agent 当前进行中的轮次会被排除。
+子 agent 先接收由父 agent 已配平的已完成轮次构成的表层前缀，再逐字接收新的任务内容。配置的 persona 会在子 agent 的全新作用域中遮蔽提示词文本；工具限制会过滤其全局协议 schema、可执行工具查找和 PTC mode SDK 绑定，但不影响独立的指导内容。父 agent 的工具视图与权限不会被继承。可选的结构化输出请求会添加仅属于子 agent 的约定。父 agent 当前进行中的轮次会被排除。
 
 #### Token 影响
 
@@ -58,4 +58,4 @@ fork 会把保留的已完成历史复制到独立的子 agent 请求中；随�
 ## 已知限制与暂缓事项
 
 - **初始内容是一次性快照**：子 agent 只能看到 fork 时父 agent 已完成的轮次，看不到父 agent 此后记录的任何内容；不会实时共享上下文。
-- **fork 生命周期策略因组合而异**：基础组合包与 ACP/headless 示例把 fork 委派工具绑定为 `backgroundMode: one-shot`，而 Web 应用的 agent preset（`code`、`cordis`、`standard`）选择 `continuable`。两者都让继承前缀保持可复用，因为父子双方的消息工具定义逐字节一致；显式的 persona、工具过滤、生成 SDK 或路由变化仍可能破坏这种一致性。理由见 [缓存保持型 fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)。
+- **fork 生命周期策略因组合而异**：基础组合包与 ACP/headless 示例把 fork 委派工具绑定为 `backgroundMode: one-shot`，而 Web 应用的 agent preset（`ptc`、`cordis`、`standard`）选择 `continuable`。两者都让继承前缀保持可复用，因为父子双方的消息工具定义逐字节一致；显式的 persona、工具过滤、生成 SDK 或路由变化仍可能破坏这种一致性。理由见 [缓存保持型 fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)。

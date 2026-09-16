@@ -1,5 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
+import {
+  SESSION_SURFACE_EVENT_TYPES,
+  isSessionSurfaceOp,
+} from '@deepseek-ai/dsh-session-format/surface'
 import { CollaborationDeniedError } from './collaboration.ts'
 import type { RuntimeTarget } from './instances.ts'
 import {
@@ -73,18 +78,13 @@ const EVENT_ENVELOPE_KEYS = new Set([
   'sourceEventSeqs',
   'ignorable',
 ])
-const SURFACE_EVENT_TYPES = new Set([
-  'user/message',
-  'assistant/message',
-  'tool/result',
-])
 
 interface RuntimeApiDependencies {
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
     & Partial<Pick<ConversationRepository,
-      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision'
+      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
       | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
   collaboration: Pick<
     PostgresCollaborationService,
@@ -139,16 +139,6 @@ function boundedOptionalString(value: unknown, maximum: number): value is string
   return optionalString(value) && (value === undefined || Buffer.byteLength(value, 'utf8') <= maximum)
 }
 
-function surfaceOp(value: unknown): boolean {
-  if (value === 'append') return true
-  const operation = record(value)
-  return operation !== undefined
-    && Object.keys(operation).length === 3
-    && operation.op === 'replace'
-    && safeInteger(operation.start)
-    && safeInteger(operation.end)
-}
-
 function jsonSerializable(value: unknown): boolean {
   try {
     return JSON.stringify(value) !== undefined
@@ -186,11 +176,13 @@ function conversationEvents(value: unknown): ConversationEvent[] {
       || (Object.hasOwn(event, 'ignorable') && event.ignorable !== true)) {
       throw new Error('invalid conversation event batch')
     }
-    const isSurfaceEvent = SURFACE_EVENT_TYPES.has(event.type)
+    const isSurfaceEvent = SESSION_SURFACE_EVENT_TYPES.has(event.type)
     const hasSurfaceOp = Object.hasOwn(event, 'surfaceOp')
     const hasSourceEventSeqs = Object.hasOwn(event, 'sourceEventSeqs')
-    if ((isSurfaceEvent && (!hasSurfaceOp || !surfaceOp(event.surfaceOp)))
-      || (!isSurfaceEvent && (hasSurfaceOp || hasSourceEventSeqs))) {
+    // An ignorable record keeps opaque surface metadata for forward
+    // compatibility, matching the runtime's adoption rule.
+    if ((isSurfaceEvent && (!hasSurfaceOp || !isSessionSurfaceOp(event.surfaceOp)))
+      || (!isSurfaceEvent && event.ignorable !== true && (hasSurfaceOp || hasSourceEventSeqs))) {
       throw new Error('invalid conversation event batch')
     }
     return candidate as ConversationEvent
@@ -260,6 +252,46 @@ function runtimeHeader(header: ConversationHeader): RuntimeSessionHeader {
     ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
     ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
     ...(header.draft === undefined ? {} : { draft: header.draft }),
+  }
+}
+
+/**
+ * Recompute one session's event body through the Session format catalog. The
+ * stream is the same code path the persistence coordinator uses for detached
+ * reads, so the committed successor equals what readers already saw lazily.
+ */
+function migrateSessionBody(header: ConversationHeader, events: readonly ConversationEvent[]): {
+  sessionFormatVersion: number
+  seedLength: number | null
+  events: ConversationEvent[]
+} {
+  const emitted: ConversationEvent[] = []
+  const stream = sessionFormatCatalog.createStream(
+    runtimeHeader(header) as unknown as Parameters<typeof sessionFormatCatalog.createStream>[0],
+    header.seedLength ?? 0,
+    { emitEvent: event => { emitted.push(event as unknown as ConversationEvent) } },
+  )
+  for (const event of events) {
+    stream.emitEvent(
+      event as unknown as Parameters<ReturnType<typeof sessionFormatCatalog.createStream>['emitEvent']>[0],
+    )
+  }
+  const inheritedEventCount = stream.finish()
+  const migrated = stream.header
+  if (migrated.id !== header.id || migrated.createdAt !== header.createdAt) {
+    throw new Error('conversation migration changed the session identity')
+  }
+  /* A seeded source header keeps its pre-migration `seedLength`; the stream's
+   * finish() reports the target-generation cut, which generated events inside
+   * the inherited region may have extended. */
+  const seedLength = typeof migrated.seedLength === 'number' ? inheritedEventCount : null
+  if (inheritedEventCount > emitted.length) {
+    throw new Error('conversation migration disagreed on the inherited event count')
+  }
+  return {
+    sessionFormatVersion: migrated.version,
+    seedLength,
+    events: emitted,
   }
 }
 
@@ -1069,6 +1101,44 @@ export function createRuntimeApiHandler(
           }
         }
         send(res, 200, { result })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/migrate' && req.method === 'POST') {
+        // Repositories without body migration keep the compatibility no-op:
+        // the Host treats a missing route as "metadata cannot be republished".
+        if (deps.conversations.migrate === undefined) return false
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.sessionId !== 'string' || payload.sessionId === ''
+          || typeof payload.sourceRevision !== 'string' || payload.sourceRevision === ''
+          || typeof payload.migrationId !== 'string' || payload.migrationId === '') {
+          throw new Error('invalid migrate request')
+        }
+        const target = sessionHeader(payload.targetHeader)
+        if (target.id !== payload.sessionId) throw new Error('invalid migrate request')
+        if (target.version !== sessionFormatCatalog.currentVersion) {
+          throw new ConversationReadError('protocol', 'conversation migration target is not this Gateway\'s current format')
+        }
+        const signal = requestSignal(req, res)
+        const header = await storedHeader(payload.sessionId, subject, signal)
+        if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        const revisionPrefix = revisionFor(subject, '')
+        if (!payload.sourceRevision.startsWith(revisionPrefix)) {
+          throw new ConversationReadError('protocol', 'conversation migration source revision is not scoped to this runtime')
+        }
+        const migrated = await deps.conversations.migrate(
+          payload.sessionId,
+          payload.migrationId,
+          payload.sourceRevision.slice(revisionPrefix.length),
+          target.version,
+          migrateSessionBody,
+        )
+        send(res, 200, {
+          result: migrated.status,
+          revision: revisionFor(subject, migrated.revision),
+          nextSeq: migrated.nextSeq,
+          seedLength: migrated.seedLength,
+        })
         return true
       }
 

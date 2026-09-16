@@ -52,6 +52,7 @@
     "@deepseek-ai/dsh-attachment": "workspace:^",
     "@deepseek-ai/dsh-authorization": "workspace:^",
     "@deepseek-ai/dsh-credentials": "workspace:^",
+    "@deepseek-ai/dsh-http-proxy": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-launch-environment": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",

@@ -70,7 +70,7 @@ async function setup(
     name: 'fake-telemetry',
     inject: ['sessions'],
     apply: (inner: Context) => {
-      coordinator = new SessionTelemetryCoordinator(inner, backend, capture)
+      coordinator = new SessionTelemetryCoordinator(inner, backend, { capture })
     },
   })
   return { ctx, backend, coordinator, fiber }
@@ -249,7 +249,7 @@ describe('SessionTelemetryCoordinator on-demand capture', () => {
       name: 'fake-telemetry-after-on-demand-reload',
       inject: ['sessions'],
       apply: (inner: Context) => {
-        coordinator = new SessionTelemetryCoordinator(inner, second, 'on-demand')
+        coordinator = new SessionTelemetryCoordinator(inner, second, { capture: 'on-demand' })
       },
     })
     coordinator.captureSession(session)

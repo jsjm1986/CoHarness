@@ -4,7 +4,9 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
       "path": "../../../vendor/cosmokit"
@@ -40,7 +42,16 @@
       "path": "../../util/home-paths"
     },
     {
+      "path": "../../context/collaboration"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../session/session-projection"
     }
   ]
 }

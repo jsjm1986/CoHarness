@@ -3,11 +3,10 @@
     - tab "Chat" [selected]
     - tab "Trajectory"
   - navigation "Session hierarchy":
-    - button "{{workspace}}" [disabled]
+    - button "m1" [disabled]
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -52,7 +51,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -68,7 +70,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -84,7 +89,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -100,7 +108,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -116,7 +127,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -132,7 +146,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -148,7 +165,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -164,7 +184,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -180,7 +203,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -196,7 +222,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -212,7 +241,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -228,7 +260,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -244,7 +279,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -260,7 +298,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -276,7 +317,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -292,7 +336,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -308,7 +355,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -324,7 +374,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -340,7 +393,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -356,7 +412,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -372,7 +431,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -388,7 +450,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -404,7 +469,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -420,7 +488,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -436,7 +507,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -452,7 +526,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -468,7 +545,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -484,7 +564,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -499,4 +582,7 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 28 turns · 28 steps LLM {{duration}}
+- button "28 turns · 28 steps":
+  - img
+  - text: 28 turns · 28 steps
+- separator "Adjust transcript content width"

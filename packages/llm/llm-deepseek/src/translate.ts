@@ -19,9 +19,9 @@ interface OpenBlock {
   kind: 'text' | 'reasoning' | 'tool-call'
   /** Incremental fragments; joined once at block close to avoid O(n²) concatenation. */
   parts: string[]
-  /** tool-call only */
-  callId?: string
-  name?: string
+  /** tool-call only, absent until a delta carries a non-empty value. */
+  callId?: string | undefined
+  name?: string | undefined
 }
 
 /** Response accumulation limits enforced while translating one stream. */
@@ -130,6 +130,17 @@ function malformed(message: string): LlmError {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Accept a streamed tool-call identity field only when the delta carries a
+ * non-empty string. Gateways observed in the wild repeat the first delta's
+ * value as `''` or `null`; both mean "unchanged" and leave any already
+ * established value alone rather than overwriting it.
+ * @returns the identity in force after this delta.
+ */
+function acceptIdentity(current: string | undefined, incoming: unknown): string | undefined {
+  return typeof incoming === 'string' && incoming.length > 0 ? incoming : current
 }
 
 function hasUsageFields(value: Record<string, unknown>): value is Record<string, unknown> & WireUsage {
@@ -310,7 +321,7 @@ export async function* translate(
         if (!Number.isSafeInteger(call.index) || call.index < 0) {
           throw new LlmError('malformed SSE payload: tool-call index is invalid', 'MALFORMED_RESPONSE')
         }
-        if (call.function?.arguments !== undefined && typeof call.function.arguments !== 'string') {
+        if (call.function?.arguments != null && typeof call.function.arguments !== 'string') {
           throw new LlmError('malformed SSE payload: tool-call arguments must be a string', 'MALFORMED_RESPONSE')
         }
         let block = toolBlocks.get(call.index)
@@ -322,8 +333,8 @@ export async function* translate(
           toolBlocks.set(call.index, block)
           yield { type: 'block-start', index: block.index, blockType: 'tool-call' }
         }
-        if (call.id !== undefined) block.callId = call.id
-        if (call.function?.name !== undefined) block.name = call.function.name
+        block.callId = acceptIdentity(block.callId, call.id)
+        block.name = acceptIdentity(block.name, call.function?.name)
         const fragment = call.function?.arguments ?? ''
         const bytes = (toolArgumentBytes.get(call.index) ?? 0) + utf8Bytes(fragment)
         if (bytes > maxToolArgumentBytes) {

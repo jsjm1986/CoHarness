@@ -1,13 +1,23 @@
 {
-  "version": 1,
-  "syncedTag": "dsh-v0.1.3-alpha.2",
-  "syncedCommit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+  "version": 2,
+  "syncedTag": "dsh-v0.1.5-rc.2",
+  "syncedCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
     },
     "api/gateway": {
-      "sovereignty": "adapted"
+      "sovereignty": "replaced",
+      "note": ".agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md",
+      "removedUpstreamPaths": [
+        "packages/api/gateway/src/client/journal-stream.ts",
+        "packages/api/gateway/src/client/remote-events.ts",
+        "packages/api/gateway/src/client/remote-stream.ts",
+        "packages/api/gateway/src/client/snapshot-stream.ts",
+        "packages/api/gateway/src/client/stream-client.ts",
+        "packages/api/gateway/src/stream-protocol.ts",
+        "packages/api/gateway/src/stream-server.ts"
+      ]
     },
     "api/remotes": {
       "sovereignty": "adapted"
@@ -43,7 +53,12 @@
       "sovereignty": "adapted"
     },
     "client/connection": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "removedUpstreamPaths": [
+        "packages/client/connection/src/browser-auth.ts",
+        "packages/client/connection/src/recovery-config.ts",
+        "packages/client/connection/src/rpc-schema.ts"
+      ]
     },
     "client/hmr": {
       "sovereignty": "adapted"
@@ -289,7 +304,11 @@
       "sovereignty": "owned"
     },
     "experimental/agent-team": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "removedUpstreamPaths": [
+        "packages/experimental/agent-team/src/persisted.ts",
+        "packages/experimental/agent-team/src/projection.ts"
+      ]
     },
     "experimental/code-runtime-python": {
       "sovereignty": "adapted"
@@ -517,7 +536,13 @@
       "sovereignty": "adapted"
     },
     "session/session-persistence": {
-      "sovereignty": "adapted"
+      "sovereignty": "replaced",
+      "note": ".agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md",
+      "removedUpstreamPaths": [
+        "packages/session/session-persistence/src/errors.ts",
+        "packages/session/session-persistence/src/handle.ts",
+        "packages/session/session-persistence/src/storage-contract.ts"
+      ]
     },
     "session/session-persistence-gateway": {
       "sovereignty": "owned"
@@ -708,6 +733,9 @@
     "util/brand": {
       "sovereignty": "adapted"
     },
+    "util/chunked-list": {
+      "sovereignty": "adapted"
+    },
     "util/crypto": {
       "sovereignty": "adapted"
     },
@@ -724,6 +752,13 @@
       "sovereignty": "adapted"
     },
     "util/output-retention": {
+      "sovereignty": "adapted"
+    },
+    "util/package-manifest": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
+    },
+    "util/time": {
       "sovereignty": "adapted"
     },
     "util/timeout": {
@@ -767,34 +802,157 @@
     }
   },
   "upstreamOnly": [
-    "api/session-controller",
-    "api/settings-controller",
-    "api/workspace-controller",
-    "bundle/acp-app",
-    "bundle/sdk-app",
-    "bundle/sdk-minimal",
-    "client/file-upload",
-    "client/store",
-    "client/ui-approval",
-    "client/ui-chat",
-    "client/ui-session",
-    "experimental/agent-team-profile",
-    "experimental/agent-team-web-profile",
-    "experimental/client-ui-agent-team",
-    "experimental/inspector",
-    "experimental/webworker-packer",
-    "experimental/webworker-runtime",
-    "session/session-format-catalog",
-    "session/session-format-v0-to-v1",
-    "session/session-format-v1-to-v2",
-    "session/session-turn-outline",
-    "subprocess/win32-process",
-    "test-support/session-snapshot",
-    "util/deque",
-    "util/package-manifest",
-    "util/time",
-    "util/workspace-path",
-    "webhook/webhook",
-    "webhook/webhook-github"
+    {
+      "package": "api/session-controller",
+      "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the desktop session controller is not carried",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "api/settings-controller",
+      "reason": "settings flow through host/apiproxy under the same principal/ACL dispatch",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "api/workspace-controller",
+      "reason": "workspace operations are served by host/apiproxy and the Workbench runtime targets",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "api/workspace-files",
+      "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "bundle/acp-app",
+      "reason": "CoHarness ships its own installable bundle profiles; the upstream ACP bundle is not carried"
+    },
+    {
+      "package": "bundle/sdk-app",
+      "reason": "CoHarness ships its own installable bundle profiles; the upstream SDK bundle is not carried"
+    },
+    {
+      "package": "bundle/sdk-minimal",
+      "reason": "CoHarness ships its own installable bundle profiles; the upstream minimal SDK bundle is not carried"
+    },
+    {
+      "package": "client/file-upload",
+      "reason": "attachment/userdoc-local plus host/userdoc-http provide resumable chunked upload with SHA-256 resume; the upstream transient file-upload receipt surface is deferred"
+    },
+    {
+      "package": "client/resources",
+      "reason": "cloud runtime resources live in client/runtime WorkspaceResourceRegistry bound to bootstrap/project runtimes; the upstream single-session registry is not carried",
+      "replacedBy": "client/runtime"
+    },
+    {
+      "package": "client/store",
+      "reason": "Workbench multi-runtime client state replaces the single-session upstream store",
+      "replacedBy": "client/runtime"
+    },
+    {
+      "package": "client/ui-approval",
+      "reason": "approval surfaces live inside the CoHarness Workbench conversation UI"
+    },
+    {
+      "package": "client/ui-chat",
+      "reason": "client/ui-conversation owns the chat surface for the cloud product",
+      "replacedBy": "client/ui-conversation"
+    },
+    {
+      "package": "client/ui-dockkit",
+      "reason": "the desktop docking layout belongs to the rejected upstream ui-package tree; the Workbench owns the cloud layout"
+    },
+    {
+      "package": "client/ui-session",
+      "reason": "client/ui-conversation and ui-workbench own the session surface",
+      "replacedBy": "client/ui-conversation"
+    },
+    {
+      "package": "client/ui-sidebar-documentpreview",
+      "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews"
+    },
+    {
+      "package": "client/ui-sidebar-files",
+      "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
+    },
+    {
+      "package": "client/ui-sidebar-right",
+      "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
+    },
+    {
+      "package": "experimental/agent-team-profile",
+      "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+    },
+    {
+      "package": "experimental/agent-team-web-profile",
+      "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+    },
+    {
+      "package": "experimental/client-ui-agent-team",
+      "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+    },
+    {
+      "package": "experimental/inspector",
+      "reason": "experimental prototype with no cloud consumer"
+    },
+    {
+      "package": "experimental/webworker-packer",
+      "reason": "experimental prototype with no cloud consumer"
+    },
+    {
+      "package": "experimental/webworker-runtime",
+      "reason": "experimental prototype with no cloud consumer"
+    },
+    {
+      "package": "fs/tool-present",
+      "reason": "the present-file tool adds a model-visible deliverable declaration surface; adoption is deferred pending a product decision on the cloud produced-files flow"
+    },
+    {
+      "package": "session/session-format-catalog",
+      "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
+      "replacedBy": "session/session-format"
+    },
+    {
+      "package": "session/session-format-v0-to-v1",
+      "reason": "real v0 normalization inlines into session/session-format; empty bump() shells are replaced under the rc.2 Session-correctness work",
+      "replacedBy": "session/session-format"
+    },
+    {
+      "package": "session/session-format-v1-to-v2",
+      "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
+      "replacedBy": "session/session-format"
+    },
+    {
+      "package": "session/session-format-v2-to-v3",
+      "reason": "v2\u2192v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
+      "replacedBy": "session/session-format"
+    },
+    {
+      "package": "session/session-turn-outline",
+      "reason": "readHistoryIndex covers the lookup surface but only the gateway provider produces indexes; the exclusion is under review"
+    },
+    {
+      "package": "subprocess/win32-process",
+      "reason": "shared Windows process helper library; adopted or rejected with the PR-11 subprocess runner rebuild"
+    },
+    {
+      "package": "test-support/session-snapshot",
+      "reason": "snapshot coverage runs through test:snapshot and apps/web fixtures; the helper package is not carried"
+    },
+    {
+      "package": "util/deque",
+      "reason": "no current consumer requires it"
+    },
+    {
+      "package": "util/workspace-path",
+      "reason": "workspace path policy is owned by host/apiproxy containment plus the fs seam; the upstream helper is not carried"
+    },
+    {
+      "package": "webhook/webhook",
+      "reason": "a cloud HTTP entry that creates Sessions needs a separate security review; deferred"
+    },
+    {
+      "package": "webhook/webhook-github",
+      "reason": "a cloud HTTP entry that creates Sessions needs a separate security review; deferred"
+    }
   ]
 }

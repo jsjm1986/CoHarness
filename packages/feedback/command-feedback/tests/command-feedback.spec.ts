@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
-import CommandRuntime from '@deepseek-ai/dsh-commands'
+import CommandRuntime, { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import SessionStore, { foldSurface, Session, SessionId } from '@deepseek-ai/dsh-session'
 import { SessionTelemetryBackend, type SessionTelemetrySharingStatus } from '@deepseek-ai/dsh-session-telemetry'
 import * as commandFeedback from '@deepseek-ai/dsh-command-feedback'
+import type { FeedbackRecord } from '@deepseek-ai/dsh-command-feedback/types'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const { USER_ID, getOrCreateAnonymousUserId } = vi.hoisted(() => {
   const USER_ID = '01234567-89ab-4cde-8f01-23456789abcd'
@@ -43,7 +45,7 @@ class FakeTelemetry extends SessionTelemetryBackend {
 /** Build a live idle agent over a store-owned session, as an app's spine does. */
 function stubAgent(ctx: Context, id: string): { agent: Agent; session: Session } {
   const session = ctx.sessions.create(SessionId(id))
-  const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
+  const inbox = unsupportedInbox()
   let status: AgentStatus = 'idle'
   const agent: Agent = {
     id: session.id,
@@ -93,11 +95,29 @@ async function run(test: Harness, suffix = ''): Promise<{ kind: string; text?: s
 }
 
 /** Authoritative feedback payloads in log order. */
-function feedbackTexts(session: Session): string[] {
+function feedbackRecords(session: Session): FeedbackRecord[] {
   return session.snapshotEvents()
     .filter(event => event.type === 'feedback/record')
-    .map(event => event.data.text)
+    .map(event => event.data)
 }
+
+/** The text of each authoritative feedback payload in log order. */
+function feedbackTexts(session: Session): (string | undefined)[] {
+  return feedbackRecords(session).map(record => record.text)
+}
+
+describe('sessionFeedback Remote', () => {
+  it('records on a live session and reports session-not-found', async () => {
+    const test = await harness()
+    const remote = test.ctx.get('sessionFeedback') as commandFeedback.SessionFeedbackService
+    await expect(remote.record({ sessionId: test.session.id, text: ' remote remark ', category: 'other' }))
+      .resolves.toEqual({ ok: true, value: { recorded: true } })
+    expect(feedbackRecords(test.session)).toEqual([{ text: 'remote remark', category: 'other' }])
+    const missing = SessionId('command-feedback-missing')
+    await expect(remote.record({ sessionId: missing, text: 'x' }))
+      .resolves.toEqual({ ok: false, error: { code: 'session-not-found', sessionId: missing } })
+  })
+})
 
 describe('@deepseek-ai/dsh-command-feedback registration', () => {
   it('registers one global command with Loader-safe exports and disposes it', async () => {
@@ -112,6 +132,7 @@ describe('@deepseek-ai/dsh-command-feedback registration', () => {
       name: 'feedback',
       description: 'record feedback about this session',
       input: { hint: '<text>' },
+      definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-feedback'),
     })
     expect(test.ctx.commands.find(test.agent, 'feedback')).toMatchObject({ recordInput: false })
 
@@ -135,12 +156,24 @@ describe('/feedback human command', () => {
 
   it('exports a command-independent feedback producer', async () => {
     const test = await harness()
-    commandFeedback.recordFeedback(test.session, '  recorded outside a command  ')
-    expect(test.session.snapshotEvents().map(event => event.type)).toEqual(['feedback/record'])
-    expect(feedbackTexts(test.session)).toEqual(['recorded outside a command'])
-    expect(() => { commandFeedback.recordFeedback(test.session, ' \n\t ') })
-      .toThrow('feedback text must not be empty')
-    expect(feedbackTexts(test.session)).toEqual(['recorded outside a command'])
+    commandFeedback.recordFeedback(test.session, { text: '  recorded outside a command  ' })
+    commandFeedback.recordFeedback(test.session, { text: ' \n\t ', category: 'service-stability' })
+    commandFeedback.recordFeedback(test.session, {})
+    expect(test.session.snapshotEvents().map(event => event.type))
+      .toEqual(['feedback/record', 'feedback/record', 'feedback/record'])
+    // Blank text is recorded as absent; an entry with neither member still records.
+    expect(feedbackRecords(test.session)).toEqual([
+      { text: 'recorded outside a command' },
+      { category: 'service-stability' },
+      {},
+    ])
+  })
+
+  it('publishes the fixed category taxonomy in presentation order', () => {
+    expect(commandFeedback.FEEDBACK_CATEGORIES).toEqual([
+      'task-result', 'instruction-following', 'product-interaction', 'service-stability',
+      'resource-cost', 'security-privacy-permission', 'other',
+    ])
   })
 
   it('keeps command bookkeeping around the authoritative feedback event', async () => {

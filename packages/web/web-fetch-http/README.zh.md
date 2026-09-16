@@ -23,6 +23,7 @@
 - 发送显式的产品 `User-Agent`，绝不伪装成浏览器。
 - 不受支持的内容类型（例如二进制）以 `WEB_UNSUPPORTED_CONTENT_TYPE` 拒绝。
 - 每次连接前解析主机名，拒绝 loopback、私有、链路本地、多播和其他非公网地址（`WEB_BLOCKED_URL`）。请求会固定经过校验的地址集合，避免 DNS rebinding 将连接切换到私有目标。
+- 遵循集中式出站代理策略（[`dsh-http-proxy`](../../util/http-proxy/README.zh.md)）：`proxyRouteFor(url)` 先于解析执行；被策略代理的路由经由策略调度器建立隧道，源站 DNS 在代理侧解析，因此跳过本地解析与地址固定。非公网 IP 字面量仍走已校验路径并被拒绝，而不是交给代理。
 
 ## 配置
 

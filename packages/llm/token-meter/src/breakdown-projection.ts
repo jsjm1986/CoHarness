@@ -6,9 +6,9 @@
  */
 
 import { z } from 'zod'
-import { canonicalHeader, SessionSeq } from '@deepseek-ai/dsh-session'
+import { canonicalHeader, isReplacementSurfaceEvent, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { estimateSystemTokens, estimateToolsTokens } from './estimate.ts'
+import { estimateSystemMessage, estimateToolsTokens } from './estimate.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
 // Import for the `contextBreakdown` SessionProjectionStateMap key merge.
 import type {} from './projection.ts'
@@ -25,9 +25,12 @@ const sessionSeq = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).t
 
 /** The context-breakdown state schema and source of its inferred type. */
 const contextBreakdownStateSchema = z.object({
-  systemTokens: tokenCount,
-  toolsTokens: tokenCount,
   messageTokens: tokenCount,
+  toolsTokens: tokenCount,
+  systems: z.array(z.object({
+    seq: sessionSeq,
+    tokens: tokenCount,
+  }).strict()),
   claim: z.object({
     start: sessionSeq,
     end: sessionSeq,
@@ -45,42 +48,82 @@ const breakdownSchema = z.object({
 /**
  * Token-meter's context-composition projection unit.
  *
- * Envelope figures are last-wins per `request/header`; the message figure
- * rides {@link foldSurfaceProjection} — the same O(1) fold the occupancy
- * projection uses — so fully metered logs equal `measure().surfaceTokens` at
- * every event boundary and compaction shrinks the figure by its logged shadow
- * price. A replacement without a claim preserves the previous total. The
- * state is a fixed handful of numbers, so the persisted checkpoint stays
- * O(1) over the session's life.
+ * Envelope figures are last-wins per `request/header`; the non-system message
+ * figure rides {@link foldSurfaceProjection} — the same O(1) fold the
+ * occupancy projection uses — so compaction shrinks it by its logged shadow
+ * price and a replacement without a claim preserves the previous total.
+ *
+ * System nodes are priced exactly by a small ordered list of live node
+ * estimates (`sourceEventSeqs` covers every shadowed node, so any replace —
+ * prompt maintenance or a compaction — retires the entries it shadows). The
+ * newest nonempty surviving node is the effective prompt and supplies
+ * `systemTokens`; superseded in-history nodes stay model-visible and add to
+ * the message figure. The list stays bounded by the active system nodes, so
+ * the persisted checkpoint stays near-O(1) over the session's life.
  */
 export const contextBreakdownProjectionDefinition = {
   key: 'contextBreakdown',
-  stateVersion: 2,
+  stateVersion: 3,
   stateSchema: contextBreakdownStateSchema,
-  init: () => ({ systemTokens: 0, toolsTokens: 0, messageTokens: 0 }),
+  init: (): ContextBreakdownState => ({ messageTokens: 0, toolsTokens: 0, systems: [] }),
   apply: (state, event) => {
     const fold = foldSurfaceProjection(state.claim, event)
-    let systemTokens = state.systemTokens
     let toolsTokens = state.toolsTokens
     if (event.type === 'request/header') {
-      const header = canonicalHeader(event.data.header)
-      systemTokens = estimateSystemTokens(header)
-      toolsTokens = estimateToolsTokens(header)
+      toolsTokens = estimateToolsTokens(canonicalHeader(event.data.header))
     }
-    if (systemTokens === state.systemTokens
+    let systems = state.systems
+    let messageDelta = event.type === 'system/message' ? 0 : fold.deltaTokens
+    const systemWrite = event.type === 'system/message' && event.surfaceOp !== undefined
+    if (isReplacementSurfaceEvent(event) || systemWrite) {
+      const covered = new Set<SessionSeq>(
+        isReplacementSurfaceEvent(event) ? event.sourceEventSeqs ?? [] : [],
+      )
+      const firstCovered = systems.findIndex(entry => covered.has(entry.seq))
+      if (firstCovered !== -1) {
+        let retired = 0
+        systems = systems.filter((entry) => {
+          if (!covered.has(entry.seq)) return true
+          retired += entry.tokens
+          return false
+        })
+        // A non-system replacement conserves the shadowed estimate inside its
+        // total (claim-priced or unclaimed-preserved); a system write settles
+        // the node exactly instead.
+        if (!systemWrite) messageDelta += retired
+      }
+      if (systemWrite) {
+        const tokens = estimateSystemMessage(event.data.message)
+        if (tokens > 0) {
+          systems = [...systems]
+          systems.splice(firstCovered === -1 ? systems.length : firstCovered, 0, { seq: event.seq, tokens })
+        }
+      }
+    }
+    if (messageDelta === 0
       && toolsTokens === state.toolsTokens
-      && fold.deltaTokens === 0
+      && systems === state.systems
       && fold.claim === undefined
       && state.claim === undefined) return state
     return {
-      systemTokens,
+      messageTokens: state.messageTokens + messageDelta,
       toolsTokens,
-      messageTokens: state.messageTokens + fold.deltaTokens,
+      systems,
       ...fold.claim === undefined ? {} : { claim: fold.claim },
     }
   },
   wire: {
     viewSchema: breakdownSchema,
-    view: ({ systemTokens, toolsTokens, messageTokens }) => ({ systemTokens, toolsTokens, messageTokens }),
+    view: ({ messageTokens, toolsTokens, systems }) => {
+      const last = systems.at(-1)
+      const systemTokens = last?.tokens ?? 0
+      let superseded = 0
+      for (const entry of systems) superseded += entry.tokens
+      return {
+        systemTokens,
+        toolsTokens,
+        messageTokens: messageTokens + superseded - systemTokens,
+      }
+    },
   },
 } satisfies ProjectionDefinition<'contextBreakdown', ContextBreakdownState>

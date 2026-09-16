@@ -185,6 +185,7 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
   try {
     expect(scaffold.ctx.commands.list(commandHandle.agent)).toContainEqual({
       name: 'feedback',
+      definitionId: '@deepseek-ai/dsh-command-feedback',
       description: 'record feedback about this session',
       input: { hint: '<text>' },
     })
@@ -198,7 +199,7 @@ it('ships PTC with run_code but without the general workflow SDK binding', async
   const ctx = scaffold.ctx
   const handle = await ctx.agents.create({
     sessionId: SessionId('shipped-ptc-composition'),
-    setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'code').then(() => undefined),
+    setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'ptc').then(() => undefined),
   })
   try {
     const assembly = await ctx.systemPrompt.assemble({ scope: handle.agent })

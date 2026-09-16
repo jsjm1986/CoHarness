@@ -160,7 +160,7 @@ describe('session-query document and filter helpers', () => {
           ...{ provider: 'mock', model: 'mock' },
         },
       }),
-    }, surfaceOp: { op: 'replace', start: SessionSeq(0), end: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
+    }, surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
     { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'interrupted' } } },
   ]
 
@@ -242,7 +242,7 @@ describe('session-query document and filter helpers', () => {
           },
         }),
       },
-      surfaceOp: { op: 'replace', start: SessionSeq(9), end: SessionSeq(9) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(9), endSeq: SessionSeq(9) },
     }]
     expect(() => buildSessionEventRecords(id, malformed)).toThrow(expectCode('SESSION_QUERY_INVALID_SURFACE'))
   })

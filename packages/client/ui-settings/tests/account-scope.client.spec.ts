@@ -22,7 +22,7 @@ const initial: AccountPreferencesView = {
   values: {
     locale: {},
     'ui-theme': { preference: 'system' },
-    'ui-conversation': { busyEnter: 'queue', chatContentWidth: 748, chatFontSize: 14 },
+    'ui-conversation': { busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
   },
   overrides: { locale: {}, 'ui-theme': {}, 'ui-conversation': {} },
 }
@@ -50,7 +50,9 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
                   ? { busyEnter: mutation.operation === 'unset' ? 'queue' : mutation.value as 'queue' | 'steer' }
                   : mutation.field === 'chatContentWidth'
                     ? { chatContentWidth: mutation.operation === 'unset' ? 748 : mutation.value as number }
-                    : { chatFontSize: mutation.operation === 'unset' ? 14 : mutation.value as number }),
+                    : mutation.field === 'chatFullWidth'
+                      ? { chatFullWidth: mutation.operation === 'unset' ? false : mutation.value as boolean }
+                      : { chatFontSize: mutation.operation === 'unset' ? 14 : mutation.value as number }),
               },
         },
         overrides: {
@@ -64,6 +66,7 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
                 : {
                   ...(mutation.field === 'busyEnter' ? { busyEnter: mutation.value as 'queue' | 'steer' } : {}),
                   ...(mutation.field === 'chatContentWidth' ? { chatContentWidth: mutation.value as number } : {}),
+                  ...(mutation.field === 'chatFullWidth' ? { chatFullWidth: mutation.value as boolean } : {}),
                   ...(mutation.field === 'chatFontSize' ? { chatFontSize: mutation.value as number } : {}),
                 },
         },
@@ -107,7 +110,7 @@ describe('account settings scope', () => {
     expect(mirror.namespace('locale')).toMatchObject({ ns: 'locale', base: {}, user: {} })
     expect(mirror.namespace('ui-theme')).toMatchObject({ ns: 'ui-theme', base: { preference: 'system' } })
     expect(mirror.namespace('ui-conversation')).toMatchObject({
-      ns: 'ui-conversation', base: { busyEnter: 'queue', chatContentWidth: 748, chatFontSize: 14 },
+      ns: 'ui-conversation', base: { busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
     })
     expect(mirror.namespace('other')).toBeUndefined()
 
@@ -252,18 +255,20 @@ describe('account settings scope', () => {
     await scope.dispose()
   })
 
-  it('keeps numeric conversation display writes numeric on the account transport', async () => {
+  it('keeps conversation display write types intact on the account transport', async () => {
     const api = transport()
     const mirror = new AccountPreferencesMirror(api)
     const scope = new AccountSettingsScopeController(api, { namespace: 'ui-conversation' }, mirror)
     await mirror.ensure()
     await scope.set('chatContentWidth', 920)
+    await scope.set('chatFullWidth', true)
     await scope.set('chatFontSize', 16)
     expect(api.calls).toEqual([
       expect.objectContaining({ field: 'chatContentWidth', value: 920 }),
+      expect.objectContaining({ field: 'chatFullWidth', value: true }),
       expect.objectContaining({ field: 'chatFontSize', value: 16 }),
     ])
-    expect(scope.getSnapshot().value).toMatchObject({ chatContentWidth: 920, chatFontSize: 16 })
+    expect(scope.getSnapshot().value).toMatchObject({ chatContentWidth: 920, chatFullWidth: true, chatFontSize: 16 })
     await scope.dispose()
   })
 

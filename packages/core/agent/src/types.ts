@@ -10,6 +10,23 @@ import type { OptionalSessionSeq, SessionSeq } from '@deepseek-ai/dsh-session/ty
 /** One of the two ordered pending-message lists owned by an agent. */
 export type InboxTarget = 'next-turn' | 'next-step'
 
+/** Complete pending Inbox value reconstructed from durable splices. */
+export interface InboxState {
+  readonly 'next-turn': readonly UserMessage[]
+  readonly 'next-step': readonly UserMessage[]
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    /**
+     * Pending agent input reconstructed from durable inbox splices. The
+     * driver-owned fold stays host-only: the client-visible `inbox`
+     * projection carries its own attributed queue shape.
+     */
+    agentInbox: InboxState
+  }
+}
+
 /**
  * Turn and step boundaries folded from one agent session log.
  *

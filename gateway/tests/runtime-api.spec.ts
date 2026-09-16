@@ -7,6 +7,7 @@ import { CollaborationDeniedError } from '../src/collaboration.ts'
 import {
   type ConversationEvent,
   type ConversationHeader,
+  ConversationReadError,
   encodePageCursor,
   type StoredConversation,
 } from '../src/postgres/conversation-repository.ts'
@@ -826,5 +827,222 @@ describe('runtime session event validation', () => {
       body: { error: 'invalid conversation event batch' },
     })
     expect(runtime.append).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a system message carrying its required surface marker', {
+      type: 'system/message',
+      seq: 0,
+      time: CREATED_AT,
+      data: {
+        message: {
+          id: 'message-1',
+          role: 'system',
+          content: [{ type: 'text', text: 'system prompt' }],
+        },
+        source: { kind: 'plugin', plugin: 'dsh-system-prompt' },
+      },
+      surfaceOp: 'append',
+    }],
+    ['a canonical positional replacement', {
+      type: 'assistant/message',
+      seq: 3,
+      time: CREATED_AT,
+      data: {},
+      surfaceOp: { op: 'replace', startSeq: 1, endSeq: 2 },
+      sourceEventSeqs: [1, 2],
+    }],
+    ['a pre-rename positional replacement', {
+      type: 'assistant/message',
+      seq: 3,
+      time: CREATED_AT,
+      data: {},
+      surfaceOp: { op: 'replace', start: 1, end: 2 },
+      sourceEventSeqs: [1, 2],
+    }],
+    ['an ignorable record keeping opaque surface metadata', {
+      type: 'future/event',
+      seq: 0,
+      time: CREATED_AT,
+      data: {},
+      surfaceOp: 'append',
+      sourceEventSeqs: [0],
+      ignorable: true,
+    }],
+  ])('accepts %s', async (_label, validEvent) => {
+    const runtime = fixture()
+    const sessionId = `valid-${_label.replaceAll(' ', '-')}`
+    const authorization = await prepare(runtime, sessionId, 'project')
+
+    const response = await request(runtime.handler, '/internal/runtime/session/append', {
+      body: {
+        sessionId,
+        batchId: `batch-${sessionId}`,
+        creationAuthorization: authorization,
+        events: [validEvent],
+      },
+    })
+
+    expect(response).toMatchObject({ handled: true, status: 200, body: { result: 'inserted' } })
+    expect(runtime.append).toHaveBeenCalledWith(sessionId, `batch-${sessionId}`, [validEvent], expect.anything())
+  })
+})
+
+describe('runtime session body migration', () => {
+  const legacyHeader: ConversationHeader = {
+    id: 'session-legacy',
+    organizationId: ORGANIZATION_ID,
+    creatorUserId: CREATOR_INTERNAL_ID,
+    projectId: PROJECT_INTERNAL_ID,
+    rootSessionId: 'session-legacy',
+    visibility: 'project',
+    sessionFormatVersion: 0,
+    createdAt: CREATED_AT,
+    cwd: '/tmp/shared',
+  }
+  const wireRevision = `postgres:${ORGANIZATION_ID}:project:${PROJECT_ID}:7:40`
+
+  type MigrateCall = {
+    readHeader?: (sessionId: string) => Promise<ConversationHeader | undefined>
+    migrate?: (
+      sessionId: string,
+      migrationId: string,
+      sourceRevision: string,
+      targetFormatVersion: number,
+      migrate: (header: ConversationHeader, events: ConversationEvent[]) => {
+        sessionFormatVersion: number
+        seedLength: number | null
+        events: ConversationEvent[]
+      },
+    ) => Promise<{ status: 'committed' | 'current'; revision: string; nextSeq: number; seedLength: number | null }>
+  }
+
+  function migrateBody(runtime: ReturnType<typeof fixture>, migrate?: MigrateCall['migrate']) {
+    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & MigrateCall
+    conversations.readHeader = vi.fn(async () => legacyHeader)
+    conversations.migrate = migrate ?? vi.fn(async () => ({
+      status: 'committed' as const,
+      revision: '8:42',
+      nextSeq: 42,
+      seedLength: null,
+    }))
+    return conversations
+  }
+
+  function migrateRequest(runtime: ReturnType<typeof fixture>, overrides: Record<string, unknown> = {}) {
+    return request(runtime.handler, '/internal/runtime/session/migrate', {
+      body: {
+        sessionId: 'session-legacy',
+        sourceRevision: wireRevision,
+        migrationId: 'migration-1',
+        targetHeader: { id: 'session-legacy', version: 3, createdAt: CREATED_AT },
+        ...overrides,
+      },
+    })
+  }
+
+  it('is absent when the repository cannot migrate bodies', async () => {
+    const runtime = fixture()
+    const response = await migrateRequest(runtime)
+    expect(response).toMatchObject({ handled: false })
+  })
+
+  it('migrates under the caller-scoped source revision', async () => {
+    const runtime = fixture()
+    const conversations = migrateBody(runtime)
+    const response = await migrateRequest(runtime)
+    expect(response).toMatchObject({
+      handled: true,
+      status: 200,
+      body: {
+        result: 'committed',
+        revision: `postgres:${ORGANIZATION_ID}:project:${PROJECT_ID}:8:42`,
+        nextSeq: 42,
+        seedLength: null,
+      },
+    })
+    expect(conversations.migrate).toHaveBeenCalledWith(
+      'session-legacy', 'migration-1', '7:40', 3, expect.any(Function),
+    )
+  })
+
+  it('recomputes a v0 body through the Session format catalog', async () => {
+    const runtime = fixture()
+    let transform: Parameters<NonNullable<MigrateCall['migrate']>>[4] | undefined
+    migrateBody(runtime, vi.fn(async (_id, _mid, _rev, _target, migrate) => {
+      transform = migrate
+      const migrated = migrate(legacyHeader, [
+        { type: 'permission/preset', seq: 0, time: CREATED_AT, data: { preset: 'workspace-write' } },
+        { type: 'turn/start', seq: 1, time: CREATED_AT + 1, data: { turn: 1 } },
+        { type: 'step/start', seq: 2, time: CREATED_AT + 2, data: { turn: 1, step: 1 } },
+        { type: 'user/message', seq: 3, time: CREATED_AT + 3, data: {
+          content: [{ type: 'text', text: 'legacy prompt' }],
+          source: { kind: 'user' },
+        } },
+        { type: 'assistant/message', seq: 4, time: CREATED_AT + 4, data: {
+          message: { content: [{ type: 'text', text: 'legacy answer' }] },
+        } },
+        { type: 'step/end', seq: 5, time: CREATED_AT + 5, data: { turn: 1, step: 1 } },
+        { type: 'turn/end', seq: 6, time: CREATED_AT + 6, data: { reason: { kind: 'completed' } } },
+        { type: 'session/end-seed', seq: 7, time: CREATED_AT + 7, data: {} },
+      ])
+      expect(migrated.sessionFormatVersion).toBe(3)
+      expect(migrated.events.map((event: ConversationEvent) => event.seq)).toEqual(
+        migrated.events.map((_event: ConversationEvent, index: number) => index),
+      )
+      for (const event of migrated.events as ConversationEvent[]) {
+        if (event.type === 'system/message') {
+          expect(event.surfaceOp).toBe('append')
+        }
+      }
+      expect(migrated.events.filter((event: ConversationEvent) => event.type === 'session/end-seed')).toHaveLength(1)
+      return {
+        status: 'committed' as const,
+        revision: '8:9',
+        nextSeq: migrated.events.length,
+        seedLength: migrated.seedLength,
+      }
+    }))
+    const response = await migrateRequest(runtime)
+    expect(response).toMatchObject({ handled: true, status: 200, body: { result: 'committed' } })
+    expect(transform).toBeDefined()
+  })
+
+  it.each([
+    ['a missing source revision', { sourceRevision: undefined }],
+    ['another runtime\'s revision', {
+      sourceRevision: `postgres:${ORGANIZATION_ID}:user:77:7:40`,
+    }],
+    ['a mismatched target id', {
+      targetHeader: { id: 'session-other', version: 3, createdAt: CREATED_AT },
+    }],
+    ['a non-current target version', {
+      targetHeader: { id: 'session-legacy', version: 2, createdAt: CREATED_AT },
+    }],
+  ])('rejects %s', async (_label, overrides) => {
+    const runtime = fixture()
+    const conversations = migrateBody(runtime)
+    const response = await migrateRequest(runtime, overrides)
+    expect(response.handled).toBe(true)
+    expect(response.status).toBe(400)
+    expect(conversations.migrate).not.toHaveBeenCalled()
+  })
+
+  it('hides sessions outside the caller scope', async () => {
+    const runtime = fixture()
+    const conversations = migrateBody(runtime)
+    conversations.readHeader = vi.fn(async () => ({ ...legacyHeader, projectId: 'other-project' }))
+    const response = await migrateRequest(runtime)
+    expect(response).toMatchObject({ handled: true, status: 404, body: { error: 'conversation-not-found' } })
+    expect(conversations.migrate).not.toHaveBeenCalled()
+  })
+
+  it('reports a revision conflict as a retryable dependency failure', async () => {
+    const runtime = fixture()
+    migrateBody(runtime, vi.fn(async () => {
+      throw new ConversationReadError('dependency', 'conversation changed while its format migration was preparing')
+    }))
+    const response = await migrateRequest(runtime)
+    expect(response).toMatchObject({ handled: true, status: 503, body: { code: 'dependency' } })
   })
 })

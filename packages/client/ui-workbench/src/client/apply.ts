@@ -1,13 +1,17 @@
 /** Contributes workbench controls without importing the conversation renderer. */
+import { WorkspaceResourceError } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, ConversationViewport, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkbenchCatalog } from './catalog.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
 import { WorkbenchToolbar } from './components/WorkbenchToolbar.tsx'
-import { createWorkbenchStore } from './stores.ts'
+import { createWorkbenchStore, type WorkspaceBrowserOwner } from './stores.ts'
 import { en, NS, zh } from './locales.ts'
 
 /** Required Cordis capabilities; slot declarations may arrive in either order. */
@@ -35,11 +39,17 @@ type WorkbenchViewport = ConversationViewport & {
  */
 export function apply(ctx: ClientContext): void {
   const viewport = controller(ctx)
+  const connection = ctx.get('connection') as ConnectionHandle | undefined
   const chooser = createWorkbenchStore()
   let disposed = false
   const isDisposed = (): boolean => disposed
   ctx.effect(() => () => { disposed = true }, 'ui-workbench: pending navigation lifetime')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workbench: dictionaries')
+  ctx.on('workspace/resource-open', (request) => {
+    if (ctx.get('workspaceResources')?.hasProvider(request.runtimeTarget) !== true || connection === undefined) return
+    ctx.slots.bindStore(chooser).actions.openPreview(request)
+    return true
+  })
   const chooseSession = async (item: import('./catalog.ts').WorkbenchConversation, replace: boolean) => {
     const current = viewport.snapshot.getSnapshot()
     if (!replace && current.paneIds.length >= 4 && !current.paneIds.includes(item.sessionId)) {
@@ -48,6 +58,26 @@ export function apply(ctx: ClientContext): void {
     const available = await ctx.sessions.ensureSession?.(item.runtime, item.sessionId)
     if (disposed || available !== true) return { ok: false as const, reason: 'unknown' as const }
     return replace ? viewport.replaceActive(item.sessionId) : viewport.add(item.sessionId)
+  }
+  // The files entry appears wherever the toolbar hosts a Session: the toolbar
+  // row above the workbench grid and the Session header's leading seat in the
+  // single-conversation view. Provider availability follows runtime connection
+  // state, so evaluate it at render time instead of freezing it into the
+  // inject face.
+  const filesAvailable = (sessionId: SessionId) => () =>
+    connection?.isLoopback === false
+    && ctx.get('workspaceResources')?.hasProvider(ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }) === true
+  const openFiles = (sessionId: SessionId) => () => {
+    ctx.slots.bindStore(chooser).actions.openBrowser({
+      sessionId,
+      runtimeTarget: ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const },
+    })
+  }
+  const activeSessionId = (): SessionId | undefined => {
+    const snap = viewport.snapshot.getSnapshot()
+    return snap.mode === 'workbench'
+      ? (snap.activePaneId ?? snap.paneIds[0])
+      : ctx.sessions.list.getSnapshot().current
   }
   ctx.slots.inject('conversation.workbench.toolbar', () => ctx.slots.register({
     name: 'conversation.workbench.toolbar',
@@ -95,6 +125,58 @@ export function apply(ctx: ClientContext): void {
         },
         markCatalogReady: () => { if (!disposed) viewport.markCatalogReady() },
         setMode: (mode: 'single' | 'workbench') => { viewport.setMode(mode) },
+        resources: ctx.get('workspaceResources'),
+        filesAvailable: () => {
+          const sessionId = activeSessionId()
+          return sessionId !== undefined && filesAvailable(sessionId)()
+        },
+        openFiles: () => {
+          const sessionId = activeSessionId()
+          if (sessionId !== undefined) openFiles(sessionId)()
+        },
+        openWorkspaceResource: (request: WorkspaceResourceOpenRequest) => {
+          ctx.slots.bindStore(chooser).actions.openPreview(request)
+        },
+        listWorkspaceDirectory: async (owner: WorkspaceBrowserOwner, path: string, signal: AbortSignal) => {
+          if (connection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace connection is unavailable')
+          const targetConnection = owner.runtimeTarget.kind === 'base'
+            ? connection
+            : connection.forTarget?.(owner.runtimeTarget)
+          if (targetConnection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace runtime is unavailable')
+          const response = await targetConnection.api.workspaceFiles.list({ sessionId: owner.sessionId, path }, signal)
+          if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
+          return response.result.value
+        },
+        readPreview: async (
+          request: { resource: WorkspaceResourceOpenRequest; offset: number; version: string }, signal: AbortSignal,
+        ) => {
+          if (connection === undefined) throw new Error('Workspace file preview requires a connection')
+          const { runtimeTarget, sessionId, path } = request.resource
+          const targetConnection = runtimeTarget.kind === 'base'
+            ? connection
+            : connection.forTarget?.(runtimeTarget)
+          if (targetConnection === undefined) {
+            throw new WorkspaceResourceError('access-revoked', 'Workspace runtime is unavailable')
+          }
+          const response = await targetConnection.api.workspaceFiles.read(
+            { sessionId, path, offset: request.offset, version: request.version }, signal,
+          )
+          if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
+          return response.result.value
+        },
+        readBytesPreview: async (
+          request: { resource: WorkspaceResourceOpenRequest; offset: number; length: number; version: string }, signal: AbortSignal,
+        ) => {
+          if (connection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace connection requires a live runtime')
+          const { runtimeTarget, sessionId, path } = request.resource
+          const targetConnection = runtimeTarget.kind === 'base' ? connection : connection.forTarget?.(runtimeTarget)
+          if (targetConnection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace runtime is unavailable')
+          const response = await targetConnection.api.workspaceFiles.readBytes(
+            { sessionId, path, offset: request.offset, length: request.length, version: request.version }, signal,
+          )
+          if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
+          return response.result.value
+        },
       }
     },
   }, WorkbenchToolbar))
@@ -111,6 +193,8 @@ export function apply(ctx: ClientContext): void {
         ctx.slots.bindStore(chooser).actions.openPicker(true)
       },
       movePane: (direction: 'previous' | 'next') => { viewport.move(sessionId, direction) },
+      filesAvailable: filesAvailable(sessionId),
+      openFiles: openFiles(sessionId),
     }),
   }, WorkbenchPaneHeader))
 }

@@ -194,6 +194,7 @@ describe('project collaboration Typert Remote ACL', () => {
         action: 'write' as const,
         args: { agentId: sessionId },
       })),
+      { endpoint: 'agentPresets/select', action: 'write', args: { agentId: sessionId } },
       { endpoint: 'messageFeedback/list', action: 'read', args: { request: { sessionId } } },
       { endpoint: 'messageFeedback/put', action: 'write', args: { request: { sessionId } } },
       { endpoint: 'messageFeedback/delete', action: 'write', args: { request: { sessionId } } },
@@ -317,6 +318,33 @@ describe('project collaboration Typert Remote ACL', () => {
       ctx,
       typertRequest('dynamicCordisRunner/invoke', { pluginId: 'test', pluginRunId: 'r', method: 'x', args: null }),
     )).resolves.toBeUndefined()
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('agentPresets/list', {}),
+    )).resolves.toBeUndefined()
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('dynamicCordisRunner/syncInspectManifest', { providers: [] }),
+    )).resolves.toBeUndefined()
+  })
+
+  it('applies Session write ACL to inspect-query resolution', async () => {
+    const sessionId = SessionId('inspect-query-session')
+    const { ctx } = await harness(controlledAuthority().authority)
+
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('dynamicCordisRunner/resolveInspectQuery', { agentId: sessionId, requestId: 'inspect-1', resolution: { ok: true, data: null } }),
+    )).resolves.toBeUndefined()
+
+    const denied = await expectTypertCollaborationFailure(authorizeTypertRemote(
+      (await harness(readOnlyAuthority())).ctx,
+      typertRequest('dynamicCordisRunner/resolveInspectQuery', { agentId: sessionId, requestId: 'inspect-1', resolution: { ok: true, data: null } }),
+    ))
+    expect(denied.failure).toMatchObject({
+      code: 'collaboration-forbidden',
+      details: { action: 'write', sessionId },
+    })
   })
 
   it('does not apply project policy to a personal principal', async () => {
@@ -860,41 +888,48 @@ describe('read-write project scope containment', () => {
     expect(openPath).not.toHaveBeenCalled()
   })
 
-  it('allows preset discovery and selection but denies host-owned preset configuration', async () => {
-    const recompose = vi.fn(async () => ({ id: 'standard' }))
-    const presets = {
-      defaultId: 'standard',
-      authorable: true,
-      list: async () => [{ id: 'standard', trust: 'system' }],
-      recompose,
-    }
-    const { ctx, api } = await harness(controlledAuthority().authority, undefined, {
-      agentPresets: presets,
-      canOpenPath: () => true,
-    })
-    const session = ctx.sessions.create(SessionId('preset-session'), { meta: { cwd: PROJECT_ROOT } })
-    ctx.agents.register(stubAgent(ctx, session))
+  it('admits preset discovery to project members and pins preset configuration to managers', async () => {
+    const base = controlledAuthority().authority
+    const { ctx, api } = await harness(base, undefined, { canOpenPath: () => true })
     const signal = new AbortController().signal
 
-    expect(expectOk(await api.agentPresets.list(request({})))).toMatchObject({
-      presets: [{ id: 'standard', isDefault: true }],
-      authorable: false,
-      hasDocument: false,
-    })
-    expect(expectOk(await api.agentPresets.select(request({
-      sessionId: session.id,
-      agentPreset: 'standard',
-    })))).toEqual({ agentPreset: 'standard' })
-    expect(recompose).toHaveBeenCalledTimes(1)
+    // The roster is registry-authorized: every project member reads it.
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('agentPresets/list', {}),
+    )).resolves.toBeUndefined()
 
-    const denied: Array<Promise<RpcResponse<unknown>>> = [
-      api.agentPresets.read(request({ agentPreset: 'standard' })),
-      api.agentPresets.copy(request({ from: 'standard', agentPreset: 'copy' })),
-      api.agentPresets.openDocument(request({ agentPreset: 'standard' }), signal),
-      api.agentPresets.remove(request({ agentPreset: 'standard' })),
-    ]
-    for (const response of await Promise.all(denied)) {
-      expect(response.result).toMatchObject(collaborationForbidden('write'))
+    // Authoring writes personal configuration, so a member without canManage
+    // is refused before lookup — on the Remote surface and on the surviving
+    // native-open RPC alike.
+    for (const endpoint of ['agentPresets/read', 'agentPresets/copy', 'agentPresets/deletePreset']) {
+      const failure = await expectTypertCollaborationFailure(authorizeTypertRemote(
+        ctx,
+        typertRequest(endpoint, { agentPreset: 'standard' }),
+      ))
+      expect(failure.failure).toMatchObject({
+        code: 'collaboration-forbidden',
+        details: { action: 'write', reason: 'forbidden' },
+      })
+    }
+    expect((await api.agentPresets.openDocument(
+      request({ agentPreset: 'standard' }),
+      signal,
+    )).result).toMatchObject(collaborationForbidden('write'))
+
+    const manager: CollaborationAuthority = {
+      ...base,
+      participant: {
+        ...base.participant,
+        scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw', canManage: true },
+      },
+    }
+    const managerHarness = await harness(manager, undefined, {})
+    for (const endpoint of ['agentPresets/read', 'agentPresets/copy', 'agentPresets/deletePreset']) {
+      await expect(authorizeTypertRemote(
+        managerHarness.ctx,
+        typertRequest(endpoint, { agentPreset: 'standard' }),
+      )).resolves.toBeUndefined()
     }
   })
 
@@ -958,10 +993,7 @@ describe('read-only project scope', () => {
       ['settings.update', () => api.settings.update(request({ ns: 'ui-onboarding', patch: {} }))],
       ['settings.replace', () => api.settings.replace(request({ ns: 'ui-onboarding', section: {} }))],
       ['settings.mutate', () => api.settings.mutate(request({ ns: 'ui-onboarding', ops: [] }))],
-      ['agentPreset.copy', () => api.agentPresets.copy(request({ from: 'base', agentPreset: 'copy' }))],
-      ['agentPreset.read', () => api.agentPresets.read(request({ agentPreset: 'base' }))],
       ['agentPreset.openDocument', () => api.agentPresets.openDocument(request({ agentPreset: 'base' }), signal)],
-      ['agentPreset.remove', () => api.agentPresets.remove(request({ agentPreset: 'base' }))],
     ]
 
     for (const [name, call] of calls) {
@@ -979,9 +1011,6 @@ describe('read-only project scope', () => {
   it('rejects every session mutation through root-inherited authorization', async () => {
     const { api } = await harness(readOnlyAuthority())
     const sessionId = SessionId('shared')
-    const childSessionId = SessionId('child')
-    const signal = new AbortController().signal
-    const goal = { id: 'goal' as never, revision: 0 }
     const calls: Array<[string, () => Promise<RpcResponse<unknown>>]> = [
       ['session.selectModel', () => api.sessions.selectModel(request({ sessionId, provider: 'p', model: 'm' }))],
       ['session.rename', () => api.sessions.rename(request({ sessionId, title: 'Renamed' }))],
@@ -989,15 +1018,6 @@ describe('read-only project scope', () => {
       ['session.prompt', () => api.sessions.prompt(request({ sessionId, mode: 'queue', content: [{ type: 'text', text: 'hello' }] }))],
       ['session.updateQueue', () => api.sessions.updateQueue(request({ sessionId, itemId: 'message' as never, action: { kind: 'remove' } }))],
       ['session.cancel', () => api.sessions.cancel(request({ sessionId }))],
-      ['subagent.prompt', () => api.subagents.prompt(request({ parentSessionId: sessionId, childSessionId, mode: 'continuable', content: [{ type: 'text', text: 'hello' }] }), signal)],
-      ['subagent.interrupt', () => api.subagents.interrupt(request({ parentSessionId: sessionId, childSessionId, mode: 'continuable' }))],
-      ['goal.create', () => api.goals.create(request({ sessionId, objective: 'Ship' }))],
-      ['goal.edit', () => api.goals.edit(request({ sessionId, ref: goal, objective: 'Ship safely' }))],
-      ['goal.pause', () => api.goals.pause(request({ sessionId, ref: goal }))],
-      ['goal.resume', () => api.goals.resume(request({ sessionId, ref: goal }))],
-      ['goal.complete', () => api.goals.complete(request({ sessionId, ref: goal }))],
-      ['goal.clear', () => api.goals.clear(request({ sessionId, ref: goal }))],
-      ['agentPreset.select', () => api.agentPresets.select(request({ sessionId, agentPreset: 'base' }))],
       ['workspace.insertSessionBefore', () => api.workspace.insertSessionBefore(request({ workspaceId: 'workspace' as never, sessionId }))],
       ['workspace.archiveSession', () => api.workspace.archiveSession(request({ sessionId }))],
     ]

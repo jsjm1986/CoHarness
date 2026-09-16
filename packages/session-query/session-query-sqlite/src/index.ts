@@ -116,8 +116,8 @@ export interface Config extends SessionQueryConfig {
   maxLimit?: number
   /** Maximum snippet length in Unicode code points. Defaults to 240. */
   snippetChars?: number
-  /** Maximum concurrent persisted-log inspections in one inherited batch read. Defaults to 4. */
-  persistedInspectConcurrency?: number
+  /** Maximum concurrent persisted-log reads in one inherited batch read. Defaults to 4. */
+  persistedReadConcurrency?: number
 }
 
 interface ResolvedConfig {
@@ -128,7 +128,7 @@ interface ResolvedConfig {
   maxLimit: number
   snippetChars: number
   readWindowMax: number
-  persistedInspectConcurrency: number
+  persistedReadConcurrency: number
 }
 
 interface ObservedSession {
@@ -212,7 +212,7 @@ export class SqliteSessionQueryEngine extends SessionQueryEngine {
     maxLimit: z.number().step(1).min(1).max(SQLITE_MAX_PAGE_LIMIT).default(SESSION_QUERY_SQLITE_MAX_LIMIT),
     snippetChars: z.number().step(1).min(1).default(SESSION_QUERY_SQLITE_SNIPPET_CHARS),
     readWindowMax: z.number().step(1).min(0).default(SESSION_QUERY_READ_WINDOW_MAX),
-    persistedInspectConcurrency: z.number()
+    persistedReadConcurrency: z.number()
       .step(1)
       .min(1)
       .max(Number.MAX_SAFE_INTEGER)
@@ -1026,7 +1026,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxLimit: config.maxLimit ?? SESSION_QUERY_SQLITE_MAX_LIMIT,
     snippetChars: config.snippetChars ?? SESSION_QUERY_SQLITE_SNIPPET_CHARS,
     readWindowMax: config.readWindowMax ?? SESSION_QUERY_READ_WINDOW_MAX,
-    persistedInspectConcurrency: config.persistedInspectConcurrency
+    persistedReadConcurrency: config.persistedReadConcurrency
       ?? SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
   }
   if (typeof resolved.path !== 'string' || resolved.path.trim().length === 0) {
@@ -1041,10 +1041,10 @@ function resolveConfig(config: Config): ResolvedConfig {
     throw invalidConfig('readWindowMax must be a non-negative integer')
   }
   if (
-    !Number.isSafeInteger(resolved.persistedInspectConcurrency)
-    || resolved.persistedInspectConcurrency < 1
+    !Number.isSafeInteger(resolved.persistedReadConcurrency)
+    || resolved.persistedReadConcurrency < 1
   ) {
-    throw invalidConfig('persistedInspectConcurrency must be a positive safe integer')
+    throw invalidConfig('persistedReadConcurrency must be a positive safe integer')
   }
   if (resolved.defaultLimit > resolved.maxLimit) {
     throw invalidConfig('defaultLimit must be less than or equal to maxLimit')

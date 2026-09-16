@@ -17,6 +17,7 @@ import { candidateScopeKey } from '../src/render.ts'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 const PROBE = 'banana-271828'
 const NESTED_PROBE = 'papaya-314159'
@@ -45,6 +46,7 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
   await ctx.plugin(LocalFileSystem, { cwd: '/' })
   await ctx.plugin(ToolFs)
   await ctx.plugin(WorkspaceContext, { maxBytes: 65536 })
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })
   const handle = await ctx.agents.create({

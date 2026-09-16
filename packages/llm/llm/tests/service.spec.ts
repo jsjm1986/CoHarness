@@ -1585,3 +1585,38 @@ describe('LlmRuntime', () => {
     expect(ctx.llm.listProviders()).toEqual([])
   })
 })
+
+describe('remoteDiscoverModels', () => {
+  it('serves the registered interrogation and wraps refusals in RemoteError', async () => {
+    const runtime = new SourceLlmRuntime(new Context())
+    runtime.registerModelDiscovery('remote-ns', () => Promise.resolve([
+      { id: 'a', name: 'A' },
+      { id: 'b' },
+    ] as never))
+
+    const discovered = await runtime.remoteDiscoverModels(
+      'remote-ns', { baseURL: 'https://models.example' }, new AbortController().signal)
+    expect(discovered).toEqual([{ id: 'a', name: 'A' }, { id: 'b' }])
+
+    const refused = await runtime.remoteDiscoverModels(
+      'remote-ns', { baseURL: '' }, new AbortController().signal).catch((error: unknown) => error)
+    expect(refused).toMatchObject({
+      code: 'llm/model-discovery-rejected',
+      details: { settingsNs: 'remote-ns', baseURL: '' },
+    })
+
+    const missing = await runtime.remoteDiscoverModels(
+      'no-such-ns', { provider: 'route' }, new AbortController().signal).catch((error: unknown) => error)
+    expect(missing).toMatchObject({
+      code: 'llm/model-discovery-rejected',
+      details: { settingsNs: 'no-such-ns' },
+    })
+
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors
+    runtime.registerModelDiscovery('odd-refusal', () => Promise.reject('flat refusal'))
+    const odd = await runtime.remoteDiscoverModels(
+      'odd-refusal', { baseURL: 'https://models.example' }, new AbortController().signal).catch((error: unknown) => error)
+    // The provider threw a non-Error: the wrapper strings it into the message.
+    expect(odd).toMatchObject({ code: 'llm/model-discovery-rejected', message: 'flat refusal' })
+  })
+})

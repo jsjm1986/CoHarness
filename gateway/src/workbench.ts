@@ -29,14 +29,26 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
 }): GatewayWorkbenchCatalogHandler {
   return async (user, signal) => {
     const projectRows = await deps.collaboration.listAccountConversations?.(user.id) ?? []
-    const running = await deps.instances.ensureRunning(user)
     const target = { kind: 'user' as const, id: user.id }
-    let leased = false
-    if (deps.instances.operationRef !== undefined) {
-      await deps.instances.operationRef(target, 1, running.generation)
-      leased = true
-    }
+    // The account catalog is also the user's only cross-runtime directory.
+    // A single unreadable legacy personal artifact must not hide project
+    // conversations that PostgreSQL has already authorized.  Return the
+    // authoritative project rows while the personal runtime can be repaired;
+    // cancellation still propagates so a closed browser request is not turned
+    // into a successful partial response.
+    let running: Awaited<ReturnType<GatewayInstanceService['ensureRunning']>>
     try {
+      running = await deps.instances.ensureRunning(user)
+    } catch (error: unknown) {
+      if (signal.aborted) throw error
+      return projectRows
+    }
+    let leased = false
+    try {
+      if (deps.instances.operationRef !== undefined) {
+        await deps.instances.operationRef(target, 1, running.generation)
+        leased = true
+      }
       const authority = `127.0.0.1:${String(running.port)}`
       const principal = deps.principals.issue({
         user,
@@ -103,6 +115,9 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
       const personalIds = new Set(personalRows.map(row => row.sessionId))
       return [...personalRows.filter(row => !archivedIds.has(row.sessionId)), ...projectRows.filter(row => row.runtime.kind !== 'personal' || !personalIds.has(row.sessionId))]
         .sort((left, right) => right.updatedAt - left.updatedAt || left.sessionId.localeCompare(right.sessionId))
+    } catch (error: unknown) {
+      if (signal.aborted) throw error
+      return projectRows
     } finally {
       if (leased) await deps.instances.operationRef?.(target, -1, running.generation)
     }

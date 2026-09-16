@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ConversationEventRegistry, ConversationNodeAssembler, SlotRegistry,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type {
   ConversationEventInput, ConversationLocationDataStore, ConversationMatch, ConversationNodeDefinition,
   ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewDefinition,
@@ -211,7 +212,7 @@ describe('produced-file Turn data', () => {
         ...replacement,
         event: {
           ...replacement.event,
-          surfaceOp: { op: 'replace', start: 1, end: 1 },
+          surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(1) },
         } as ConversationEventInput['event'],
       },
       at(9, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),

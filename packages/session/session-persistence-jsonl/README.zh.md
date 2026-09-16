@@ -14,7 +14,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
       session.jsonl              # only with compression: 'none'
 ```
 
-- 第一个逻辑行是私有的 v0 物理 header，标记为 `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset?, draft? }`。其可选的数字 `seedLength` 保持字节兼容：缺失解码为 `SessionHeader.isSeeded: false`，零或正值解码为 `isSeeded: true` 加精确的 `inheritedEventCount`，因此逻辑 header 从不携带位置整数。`delegationDepth` 在磁盘上必需，顶层会话为 `0`；缺失或无效值会拒绝日志。`agentPreset` 必须持久化，因为它决定了被恢复会话的工具与提示词——恢复成另一套组装，就会回放模型已无法据以行动的历史。后续每个逻辑行是一条存储记录；`assistant/chunk` 事件绝不丢弃，且 `seq` 在解码日志中保持连续（`events[i].seq === i`）。
+- 第一个逻辑行是私有的 v0 物理 header，标记为 `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset?, draft? }`。其可选的数字 `seedLength` 保持字节兼容：缺失解码为 `SessionHeader.isSeeded: false`，零或正值解码为 `isSeeded: true` 加精确的 `inheritedEventCount`，因此逻辑 header 从不携带位置整数。用布尔 `isSeeded: true` 而非 `seedLength` 标记 fork 血统的外来 header 会被拒绝为不同 harness 构建，而不是被静默当作未植入。`delegationDepth` 在磁盘上必需，顶层会话为 `0`；缺失或无效值会拒绝日志。`agentPreset` 必须持久化，因为它决定了被恢复会话的工具与提示词——恢复成另一套组装，就会回放模型已无法据以行动的历史。后续每个逻辑行是一条存储记录；`assistant/chunk` 事件绝不丢弃，且 `seq` 在解码日志中保持连续（`events[i].seq === i`）。
 - 存储记录可以是原样的 `SessionEvent` JSON，也可以在启用 `packChunks` 且连续段符合条件时写为**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`），未识别形态原样存储；读取与布局无关，打包、非打包和混合文件加载结果一致。
 - surface 的 `sourceEventSeqs` 数组在连续段有收益时使用无损闭区间范围；读取方同时接受范围形式和旧的数字数组形式。
 - 项目目录保留规范化 cwd 的可读形式，便于导航，并限制在文件系统组件上限内。分隔符替换和截断刻意有损，因此规范化相同的 cwd 字符串共享项目目录；会话 id 仍选择不同会话目录。在不区分大小写的文件系统上，只有文件系统规范化将两种写法解析到同一 transcript（文本记录）时，身份验证才接受备选路径写法。配置根仍由部署控制：可以是项目本地、共享、临时或集中式。[项目会话目录决策](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.zh.md) 记录这项取舍。
@@ -80,9 +80,9 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 
 ## 已知限制与暂缓事项
 
-- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1 artifact 迁移到当前 v2，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
+- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1/v2 artifact 迁移到当前 v3，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
 - **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。
-- **每会话一个活动 writer**：append 和修复只在所属后端实例内协调。在所有者完成完全停稳的 dispose 前，其他后端实例或进程不得写入同一会话；初始同 id 发布仍通过 POSIX 无覆盖硬链接或 Windows 无替换 write-through rename 保持冲突安全。
+- **每会话一个活动 writer**：写句柄在整个生命期持有 `<root>/.locks/<id>.lock` 上的内核租约（POSIX 非阻塞 `flock`；Windows 命名内核信号量），因此第二个后端实例或进程写打开同一会话时以 `SessionAlreadyOwnedError` 失败，直到所有者释放或其进程退出。活着但卡死的持有者会一直阻塞到进程退出——删除锁文件是 POSIX 上的显式放弃手段——且咨询式 `flock` 在 NFSv3 上不可靠，此类根目录上的排他会退化为仅进程内。初始同 id 发布仍通过 POSIX 无覆盖硬链接或 Windows 无替换 write-through rename 保持冲突安全。
 - **POSIX 实体化需要硬链接支持**：第一次 append 使用 `link()`，使同 id 竞态失败，而不覆盖已提交日志；Windows 使用无替换 write-through rename。

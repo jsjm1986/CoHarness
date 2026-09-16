@@ -437,8 +437,6 @@ function CatalogRows({
 interface CatalogDropdownSharedProps extends SubagentCatalogInjected {
   /** Session whose direct catalog roots the tree. */
   rootSessionId: SessionId
-  /** Whether an ordinary title needs a breadcrumb separator before its count. */
-  separator?: boolean
   useSessions: SubagentHeaderLineageProps['useSessions']
   t: TranslateNS<typeof NS>
 }
@@ -480,7 +478,7 @@ function catalogMenuPosition(trigger: HTMLButtonElement): CSSProperties {
 
 /** One trigger-plus-tree dropdown over the catalog rooted at `rootSessionId`. */
 function CatalogDropdown({
-  rootSessionId, currentSessionId, displayTitle, openTitle, variant, separator = false,
+  rootSessionId, currentSessionId, displayTitle, openTitle, variant,
   useSessions, openChild, refresh, setCatalogOpen, t,
 }: CatalogDropdownProps) {
   const ancestorSwitcher = variant === 'switcher' && openTitle !== undefined
@@ -729,7 +727,6 @@ function CatalogDropdown({
       onMouseEnter={scheduleHoverOpen}
       onMouseLeave={scheduleHoverClose}
     >
-      {separator && <span className={css.separator}>/</span>}
       <button
         ref={triggerRef}
         type="button"
@@ -767,7 +764,7 @@ function CatalogDropdown({
                   <StateDot state="ongoing" />
                 </span>
               )}
-              <span className={css.count}>{t(totalCountKey, { count: descendantCount })}</span>
+              <span>{t(totalCountKey, { count: descendantCount })}</span>
             </>
           )}
         {variant === 'switcher'
@@ -828,7 +825,6 @@ export function SubagentHeaderLineage({
         key={lineageSessionId}
         rootSessionId={lineageSessionId}
         variant="count"
-        separator
         {...shared}
       />
     )

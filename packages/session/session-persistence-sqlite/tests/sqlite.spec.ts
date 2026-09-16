@@ -681,7 +681,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 })
 
 describe('SessionPersistenceSqlite edge behavior', () => {
-  it('keeps a migrated legacy row immutable when event content changes', async () => {
+  it('publishes a body-migrated generation transactionally when event content changes', async () => {
     const path = await freshDbPath('dsh-sqlite-format-migration-')
     const id = SessionId('sqlite-legacy-format')
     const first = new Context()
@@ -701,8 +701,16 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const loaded = await second.sessionPersistence.load(id)
     expect(loaded.meta.version).toBe(3)
     const migrated = new DatabaseSync(path)
-    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 0 })
+    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 3 })
     migrated.close()
+    // The stored body was rewritten in place: a fresh store decodes the same
+    // migrated event list (v2→v3 inserts the system head into the open step).
+    const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
+    const reread = await store.loadStored(id)
+    expect(reread?.meta.version).toBe(3)
+    expect(reread?.events.map(event => event.type)).toEqual(loaded.events.map(event => event.type))
+    expect(reread?.events.map(event => event.type)).toContain('system/message')
+    await store.close()
     await second.fiber.dispose()
   })
 

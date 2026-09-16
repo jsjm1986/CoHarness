@@ -128,7 +128,7 @@ Pi-AI and the direct DeepSeek adapter resolve `ctx.attachments` at request time,
 
 Core supports structured assistant image blocks, but no current production provider route is certified for image output. Any future output-capable adapter must retrieve provider bytes under bounded size and time policy, validate them through the same attachment service, persist them, and only then publish the atomic `ImageBlock`. A URL in assistant Markdown remains text and is never downloaded automatically.
 
-Provider-neutral token estimation does not guess visual pricing from image dimensions; provider-reported usage remains authoritative. ACP advertises image prompts only when its configured exact route and attachment deployment can accept them, persists inline input before publishing the user event, and re-reads committed assistant image references for native ACP image updates. MCP keeps canonical raw blocks for programmatic callers while projecting admitted images to durable core blocks; Code Mode carries any settled image-bearing sub-result through the outer result as logged source-attributed context.
+Provider-neutral token estimation does not guess visual pricing from image dimensions; provider-reported usage remains authoritative. ACP advertises image prompts only when its configured exact route and attachment deployment can accept them, persists inline input before publishing the user event, and re-reads committed assistant image references for native ACP image updates. MCP keeps canonical raw blocks for programmatic callers while projecting admitted images to durable core blocks; PTC mode carries any settled image-bearing sub-result through the outer result as logged source-attributed context.
 
 Compaction replays the selected conversation prefix, including image references, into the configured summarization route. A visual-capable route resolves those references through its adapter; a text-only route fails explicitly instead of silently dropping the visual context. The synthesized checkpoint remains text-only, and `compaction-basic` rejects image summary output with `UNSUPPORTED_CONTENT`.
 
@@ -159,13 +159,13 @@ Malformed base64, unsupported or mismatched media, truncated image payloads, exc
 | `packages/client/ui-conversation` | Per-session draft images, attachment rail, user and assistant image controls, and original preview. |
 | `packages/acp/acp` | Conditional native image capability, atomic inline-image admission, and verified assistant-image delivery. |
 | `packages/mcp/mcp-client` | Lossless canonical MCP results plus capability-gated durable image projection and explicit diagnostics for unsupported rich blocks. |
-| `packages/core/tools` | Generic Code Mode forwarding of settled image-bearing sub-results after the outer result. |
+| `packages/core/tools` | Generic PTC mode forwarding of settled image-bearing sub-results after the outer result. |
 
 The attachment packages form the interface/implementation side of one capability seam. Composer behavior stays in the conversation object layer, provider conversion stays in adapters, and no change is required in `agent-loop`.
 
 ### Implementation
 
-The implemented slice includes the attachment seam and shared batch admission, role-neutral image block, Pi-AI and direct DeepSeek input conversion, durable Web/ACP/MCP ordering, Web upload/read protocol, conditional ACP image wire support, lossless MCP canonical results with durable image projection, generic Code Mode rich-result forwarding, current image-limit enforcement, bounded Web request bodies, in-memory draft images, paste/drop rail, user and assistant history rendering, single-click preview, compaction handling, and keyless assembled Web and ACP coverage.
+The implemented slice includes the attachment seam and shared batch admission, role-neutral image block, Pi-AI and direct DeepSeek input conversion, durable Web/ACP/MCP ordering, Web upload/read protocol, conditional ACP image wire support, lossless MCP canonical results with durable image projection, generic PTC mode rich-result forwarding, current image-limit enforcement, bounded Web request bodies, in-memory draft images, paste/drop rail, user and assistant history rendering, single-click preview, compaction handling, and keyless assembled Web and ACP coverage.
 
 No compatibility shim is required for the pre-release prompt wire; all call sites and fixtures change with the introducing slice.
 
@@ -201,11 +201,11 @@ Rejected because the core already has the role-neutral `ContentBlock` vocabulary
 
 ### Normalize MCP results into core content as the canonical tool value
 
-Rejected because Code Mode and programmatic callers need the complete MCP JSON blocks and optional `structuredContent`; replacing that value with a Native projection would make the bridge lossy. MCP retains the protocol value and prepares a separate model projection, with final post-execute policy remaining authoritative.
+Rejected because PTC mode and programmatic callers need the complete MCP JSON blocks and optional `structuredContent`; replacing that value with a Native projection would make the bridge lossy. MCP retains the protocol value and prepares a separate model projection, with final post-execute policy remaining authoritative.
 
 ### Perform attachment reads and writes inside synchronous output renderers
 
-Rejected because tool renderers are pure, synchronous, and replayable. MCP prepares image projection during async execution and installs it only at the registry's finalization boundary; ACP performs async admission and output conversion in its transport lifecycle. Code Mode forwarding observes the already settled final content instead of giving individual image tools private parent-token behavior.
+Rejected because tool renderers are pure, synchronous, and replayable. MCP prepares image projection during async execution and installs it only at the registry's finalization boundary; ACP performs async admission and output conversion in its transport lifecycle. PTC mode forwarding observes the already settled final content instead of giving individual image tools private parent-token behavior.
 
 ## Testing
 
@@ -213,7 +213,7 @@ Rejected because tool renderers are pure, synchronous, and replayable. MCP prepa
 - Host and protocol tests cover persist-before-event ordering, absence of base64 in logs, session-scoped authorization, capability rejection, upload limits, bounded HTTP request bodies, image-admission/model-selection races (queued and steering placements), pending publication, idle release without publication, text-only queue edits, and selection against current derived history after compaction.
 - Client unit tests cover paste and drop, mixed clipboard text, image-only send, draft restoration, ordering, draft/session-scope/application object-URL cleanup, and a deferred historical read that completes after disposal; the keyless assembled built-client lane (`apps/web/tests/image-display.snapshot.ts`, `DSH_EXAMPLE_MODE=lib pnpm run test:snapshot`) covers the historical user and assistant galleries over the authorized attachment route, the original-size lightbox, and the composer paste rail.
 - Adapter and compaction tests cover native Pi-AI image conversion, late attachment-service composition, text-only rejection, recursively nested tool-result images, preserved summary input, and explicit image-output rejection.
-- Attachment, MCP, ACP, and Code Mode tests cover all-member validation before writes, mixed text/image ordering, no inline base64 in durable events, exact route-capability gates, explicit unsupported-content diagnostics, post-execute replacement/block precedence, cancellation during admission, verified assistant-image delivery, and generic nested-image forwarding. A keyless assembled ACP snapshot sends a real inline PNG and pins only its durable reference in the session log.
+- Attachment, MCP, ACP, and PTC mode tests cover all-member validation before writes, mixed text/image ordering, no inline base64 in durable events, exact route-capability gates, explicit unsupported-content diagnostics, post-execute replacement/block precedence, cancellation during admission, verified assistant-image delivery, and generic nested-image forwarding. A keyless assembled ACP snapshot sends a real inline PNG and pins only its durable reference in the session log.
 - A credentialed real-API test sends a PNG through the Anthropic `claude-opus-4-8` route and requires the model to identify its QR code.
 - The current production adapter set has no certified image-output route; output-provider certification remains outside version one.
 

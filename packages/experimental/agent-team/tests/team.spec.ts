@@ -10,7 +10,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentService from '@deepseek-ai/dsh-subagent'
-import { queueSubagentPrompt, type HostPromptQueue } from '@deepseek-ai/dsh-subagent/internal'
+import { deliverSubagentPrompt, type HostPromptDeliverer } from '@deepseek-ai/dsh-subagent/internal'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
@@ -59,7 +59,7 @@ async function setup(
   const teamFiber = await ctx.plugin(TeamService, config)
   const adapter = new MockAdapter(script)
   ctx.llm.registerAdapter(['mock'], adapter)
-  const lead = ctx.agentLoop.create(SessionId('lead'), { provider: 'mock', model: 'mock' })
+  const lead = await ctx.agentLoop.create(SessionId('lead'), { provider: 'mock', model: 'mock' })
   return { ctx, lead, adapter, storageRoot, teamFiber }
 }
 
@@ -146,7 +146,7 @@ describe('Team identity and provisioning', () => {
     await ctx.plugin(JsonlSessionPersistence, { root: storageRoot })
     await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(SubagentService)
-    const lead = ctx.agentLoop.create(SessionId('preexisting-lead'), {})
+    const lead = await ctx.agentLoop.create(SessionId('preexisting-lead'), {})
     const service = new TeamService(ctx)
 
     expect(service.listMembers(lead)).toEqual([expect.objectContaining({
@@ -1029,7 +1029,8 @@ describe('Team mailbox and waiting', () => {
     const entered = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
     const admitted: string[] = []
-    vi.spyOn(ctx.subagents as unknown as HostPromptQueue, queueSubagentPrompt).mockImplementation(async (_parent, _childId, blocks) => {
+    const deliverer = ctx.subagents as unknown as HostPromptDeliverer
+    vi.spyOn(deliverer, deliverSubagentPrompt).mockImplementation(async (_parent, _childId, blocks) => {
       const last = blocks.at(-1)
       const text = last?.type === 'text' ? last.text : ''
       admitted.push(text)
@@ -1151,7 +1152,7 @@ describe('Team mailbox and waiting', () => {
     expect(uncertain.status).toBe('queued')
     inspect.mockRestore()
 
-    vi.spyOn(ctx.subagents as unknown as HostPromptQueue, queueSubagentPrompt).mockRejectedValueOnce(new Error('delivery unavailable'))
+    vi.spyOn(ctx.subagents as unknown as HostPromptDeliverer, deliverSubagentPrompt).mockRejectedValueOnce(new Error('delivery unavailable'))
     const failed = await ctx.agentTeams.sendMessage(lead, {
       target: 'inactive-target', content: content('delivery failure'), delivery: 'wakeup', signal: SIGNAL,
     })
@@ -1264,7 +1265,7 @@ describe('Team mailbox and waiting', () => {
     await ctx.plugin(SubagentService)
     const fiber = await ctx.plugin(TeamService)
     const service = ctx.agentTeams
-    const lead = ctx.agentLoop.create(SessionId('wait-lead'), {})
+    const lead = await ctx.agentLoop.create(SessionId('wait-lead'), {})
 
     await expect(service.waitForChange(lead, 9_999, SIGNAL))
       .rejects.toMatchObject({ code: 'TEAM_INVALID_TIMEOUT' })
@@ -1458,7 +1459,7 @@ describe('Team mailbox and waiting', () => {
     const entered = Promise.withResolvers<undefined>()
     const aborted = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
-    vi.spyOn(ctx.subagents as unknown as HostPromptQueue, queueSubagentPrompt)
+    vi.spyOn(ctx.subagents as unknown as HostPromptDeliverer, deliverSubagentPrompt)
       .mockImplementation(async (_parent, _childId, _content, _source, signal) => {
         entered.resolve(undefined)
         return await new Promise<never>((_resolve, reject) => {
@@ -1700,5 +1701,63 @@ describe('Team mailbox and waiting', () => {
     expect(durable(second.lead).members[0]).toMatchObject({
       phase: 'failed', error: 'settled elsewhere',
     })
+  })
+})
+
+describe('Team Remote surface', () => {
+  it('serves view and task mutations with typed rejections', async () => {
+    const { ctx, lead } = await setup([])
+    const empty = ctx.agentTeams.remoteView(lead)
+    expect(empty.members[0]).toMatchObject({ name: 'lead', role: 'lead' })
+    expect(empty.tasks).toEqual([])
+
+    const created = await ctx.agentTeams.remoteCreateTask(lead, { subject: 'remote task', description: 'd' })
+    expect(created).toMatchObject({ ok: true })
+    if (!created.ok) throw new Error('expected created task')
+    const task = created.value
+    expect(ctx.agentTeams.remoteView(lead).tasks.map(item => item.id)).toEqual([task.id])
+
+    const claimed = await ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: task.id,
+      expectedRevision: task.revision,
+      action: 'claim',
+      owner: 'lead',
+    })
+    expect(claimed).toMatchObject({ ok: true })
+
+    const stale = await ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: task.id,
+      expectedRevision: 999,
+      action: 'complete',
+    })
+    expect(stale).toMatchObject({ ok: false, error: { code: 'team-task-conflict' } })
+
+    const rejected = await ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: TeamTaskId('missing'),
+      expectedRevision: 1,
+      action: 'delete',
+    })
+    expect(rejected).toMatchObject({ ok: false, error: { code: 'team-rejected' } })
+  })
+
+  it('rejects the Remote call when a task mutation fails unexpectedly', async () => {
+    const { ctx, lead } = await setup([])
+    const tasks = (ctx.agentTeams as unknown as {
+      tasks: { update: () => Promise<never> }
+    }).tasks
+    tasks.update = () => Promise.reject(new TypeError('unexpected task failure'))
+    await expect(ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: TeamTaskId('task-1'),
+      expectedRevision: 1,
+      action: 'claim',
+      owner: 'lead',
+    })).rejects.toThrow('unexpected task failure')
+  })
+
+  it('resolves waitForChange on the next Team activity', async () => {
+    const { ctx, lead } = await setup([])
+    const waiting = ctx.agentTeams.waitForChange(lead, 60_000, new AbortController().signal)
+    await ctx.agentTeams.createTask(lead, { subject: 'wakes the waiter', description: 'd' })
+    await expect(waiting).resolves.toEqual({ timedOut: false })
   })
 })

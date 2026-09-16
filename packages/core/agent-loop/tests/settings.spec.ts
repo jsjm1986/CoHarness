@@ -11,6 +11,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import AgentLoop, { AGENT_LOOP_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-agent-loop'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {
@@ -39,6 +40,7 @@ async function boot(): Promise<{ ctx: Context; settingsFiber: Fiber; loopFiber: 
   await ctx.plugin(AgentRegistry)
   const settingsFiber = ctx.plugin(MemorySettings)
   await settingsFiber.await()
+  await ctx.plugin(SessionProjectionRegistry)
   const loopFiber = ctx.plugin(AgentLoop, { agents: [], maxParallelToolCalls: 4 })
   await loopFiber.await()
   return { ctx, settingsFiber, loopFiber }

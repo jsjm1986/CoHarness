@@ -21,7 +21,7 @@ export function priceSurface(
     let surfaceTokens = 0
     const detached = nodes.map((node) => {
       surfaceTokens += node.tokens
-      return { seq: node.seq, tokens: node.tokens }
+      return { seq: node.seq, tokens: node.tokens, heuristicTokens: node.tokens }
     })
     return { nodes: detached, surfaceTokens }
   }

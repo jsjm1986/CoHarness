@@ -222,6 +222,9 @@ jobs:
           # The scoped changed-source gate diffs against pr-scope's inferred
           # base commit; a depth-1 clone cannot resolve it.
           fetch-depth: 0
+          # The upstream-sovereignty gate diffs packages against the mirrored
+          # upstream release tag.
+          fetch-tags: true
 
       - uses: pnpm/action-setup@v6.0.10
         with:
@@ -563,10 +566,23 @@ jobs:
         run: npm ci --prefix gateway
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
+      # The production `npm run build` resolves workspace packages through their
+      # emitted lib/types, which a standalone npm-ci lane cannot produce; the
+      # check variant compiles and emits the same source graph through the
+      # tsconfig paths instead.
       - name: Build Gateway
-        run: npm run build --prefix gateway
+        run: npm run build:check --prefix gateway
+      # Gateway tests materialize the bundle into staged instance homes; the
+      # ci face emits transpile-only because this lane has no workspace lib/types.
       - name: Build the directory guard bundle used by Gateway tests
-        run: pnpm exec tsc -p plugins/dsh-directory-guard/tsconfig.build.json
+        run: gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json
+      # loadConfig's source-run default resolves tsx/esm to an absolute path
+      # under the repo root (instances spawn outside it); this lane has no root
+      # install, so provide the root devDependency for the resolution test.
+      - name: Install the repo-level tsx devDependency
+        run: |
+          npm install --prefix "$RUNNER_TEMP/harness-root-deps" --no-save --no-package-lock "tsx@$(node -p "require(process.cwd() + '/package.json').devDependencies.tsx")"
+          mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
       - name: Test Gateway
         run: npm test --prefix gateway
 
@@ -586,6 +602,21 @@ jobs:
           cache-dependency-path: gateway/admin-ui/package-lock.json
       - name: Install Gateway admin UI dependencies
         run: npm ci --prefix gateway/admin-ui
+      # The admin surface re-exports workspace component sources whose
+      # third-party imports resolve from the repo install a standalone
+      # checkout does not have; provision the ones the reached graph uses.
+      - name: Install repo-level dependencies of re-exported workspace sources
+        run: |
+          SPECS=$(node -e "
+            const deps = {}
+            for (const p of ['packages/client/runtime/package.json', 'packages/client/ui-primitives/package.json']) {
+              const manifest = require(process.cwd() + '/' + p)
+              Object.assign(deps, manifest.dependencies, manifest.devDependencies)
+            }
+            console.log(['anser', 'clsx', 'immer', 'zustand'].map(name => name + '@' + deps[name]).join(' '))
+          ")
+          npm install --prefix "$RUNNER_TEMP/harness-root-deps" --no-save --no-package-lock $SPECS
+          mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
       - name: Test Gateway admin UI
         run: npm test --prefix gateway/admin-ui
       - name: Build Gateway admin UI

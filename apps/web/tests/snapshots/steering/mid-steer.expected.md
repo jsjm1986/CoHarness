@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 tool call · 1 intermediate message" [expanded]:
   - text: 1 tool call · 1 intermediate message
   - img
@@ -56,3 +55,4 @@
   - status
   - button "Skip this question"
   - button "Submit" [disabled]
+- separator "Adjust transcript content width"

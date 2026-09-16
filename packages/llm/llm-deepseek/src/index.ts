@@ -102,8 +102,27 @@ const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 const PROVIDER = 'deepseek-official'
 
 const DEFAULT_MODELS: DeepSeekCatalogModel[] = [
-  { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', contextWindow: DEFAULT_CONTEXT_WINDOW },
-  { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', contextWindow: DEFAULT_CONTEXT_WINDOW },
+  {
+    id: 'deepseek-flash',
+    name: 'DeepSeek-V41-Flash',
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+    inputModalities: ['text', 'image'],
+    imagePixelBudget: DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
+    imageMaxBytes: DEFAULT_REQUEST_IMAGE_MAX_BYTES,
+    systemPromptUpdate: 'in-history',
+  },
+  {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek-V4-Flash',
+    description: 'Fast, efficient, and economical; suited to focused, routine, or parallel tasks.',
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+  },
+  {
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek-V4-Pro',
+    description: 'Stronger agentic coding, knowledge, and difficult reasoning; suited to complex or quality-critical tasks at higher cost.',
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+  },
   {
     id: 'deepseek-v4-flash-vision-exp',
     name: 'DeepSeek-V4-Flash-Vision-Exp',
@@ -137,7 +156,7 @@ export interface Config {
   maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value (default 1,000,000). */
   defaultContextWindow?: number
-  /** Advisory models shown by discovery consumers; defaults to V4 Flash, V4 Pro, and V4 Flash Vision Exp. */
+  /** Advisory models shown by discovery consumers; defaults to V41 Flash, V4 Flash, V4 Pro, and V4 Flash Vision Exp. */
   models?: DeepSeekCatalogModel[]
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs?: number
@@ -278,6 +297,11 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
     if (model.imageMaxBytes !== undefined
       && (!Number.isSafeInteger(model.imageMaxBytes) || model.imageMaxBytes <= 0)) {
       throw new Error(`llm-deepseek: catalog model "${model.id}" imageMaxBytes must be a positive safe integer`)
+    }
+    // Widened: a dynamic config update reaches this check without schema validation.
+    const systemPromptUpdate: string | undefined = model.systemPromptUpdate
+    if (systemPromptUpdate !== undefined && systemPromptUpdate !== 'in-history') {
+      throw new Error(`llm-deepseek: catalog model "${model.id}" systemPromptUpdate must be "in-history" when present`)
     }
     if (seen.has(model.id)) throw new Error(`llm-deepseek: duplicate catalog model "${model.id}"`)
     seen.add(model.id)

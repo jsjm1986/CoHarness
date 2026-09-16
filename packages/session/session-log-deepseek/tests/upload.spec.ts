@@ -287,7 +287,7 @@ describe('incremental DeepSeek session-log upload', () => {
         time: 2,
         data: replacementMessage,
         sourceEventSeqs: [SessionSeq(0)],
-        surfaceOp: { op: 'replace', start: SessionSeq(0), end: SessionSeq(0) },
+        surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) },
       },
     ] satisfies SessionEvent[]
     const { ctx, session } = await harness('wire-child', seed, {

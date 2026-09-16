@@ -145,7 +145,7 @@ function appendTraceEvents(session: Session): void {
       }),
     },
     {
-      surfaceOp: { op: 'replace', start: SessionSeq(3), end: SessionSeq(3) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(3), endSeq: SessionSeq(3) },
       sourceEventSeqs: [SessionSeq(3), SessionSeq(2)],
     },
   )
@@ -172,7 +172,7 @@ function appendTraceEvents(session: Session): void {
       }),
     },
     {
-      surfaceOp: { op: 'replace', start: SessionSeq(4), end: SessionSeq(4) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(4), endSeq: SessionSeq(4) },
       sourceEventSeqs: [SessionSeq(2), SessionSeq(4)],
     },
   )
@@ -414,7 +414,7 @@ describe('session event tracing', () => {
           },
         }),
       },
-      surfaceOp: { op: 'replace', start: SessionSeq(9), end: SessionSeq(9) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(9), endSeq: SessionSeq(9) },
       sourceEventSeqs: [],
     }]
     TracePersistence.reset([{ meta: bad, events: malformed }])
@@ -454,12 +454,12 @@ describe('session event tracing', () => {
     ]],
     ['replacement without sources', [
       appendEvent(SessionSeq(0)),
-      { ...appendEvent(SessionSeq(1)), surfaceOp: { op: 'replace', start: 0, end: 0 } },
+      { ...appendEvent(SessionSeq(1)), surfaceOp: { op: 'replace', startSeq: 0, endSeq: 0 } },
     ]],
     ['replacement missing a shadowed source', [
       { type: 'assistant/chunk', seq: 0, time: 1, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'draft' } } },
       appendEvent(SessionSeq(1)),
-      { ...appendEvent(SessionSeq(2), [0]), surfaceOp: { op: 'replace', start: 1, end: 1 } },
+      { ...appendEvent(SessionSeq(2), [0]), surfaceOp: { op: 'replace', startSeq: 1, endSeq: 1 } },
     ]],
   ] as const)('rejects an invalid surface log: %s', async (_name, rawEvents) => {
     const durable = header('invalid-provenance')

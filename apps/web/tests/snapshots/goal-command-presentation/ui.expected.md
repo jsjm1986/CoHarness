@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - group "Command input": /goal
 - 'button "goal No goal is currently set. Usage: /goal [<objective>|clear|edit <objective>|pause|resume]"':
   - img
@@ -27,3 +26,4 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
+- separator "Adjust transcript content width"

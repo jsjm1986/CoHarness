@@ -52,6 +52,8 @@ export interface HostApi {
     attachedSessions: number
     home: string
     canOpenPath: boolean
+    /** Present only when a filesystem provider serves read-only Workspace resources. */
+    workspaceFiles?: { maxBytes: number; maxLines: number; maxEntries: number; maxResources: number }
   }>>
 
   /**

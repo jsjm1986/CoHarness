@@ -116,8 +116,10 @@
     "verify-client-packages": "tsx scripts/verify-client-packages.ts",
     "verify-plugin-surfaces": "tsx scripts/verify-plugin-surfaces.ts",
     "verify-upstream-sovereignty": "tsx scripts/verify-upstream-sovereignty.ts",
+    "verify-upgrade-records": "tsx scripts/verify-upgrade-records.ts",
     "verify-vendored-links": "tsx scripts/verify-vendored-links.ts",
     "verify-cordis-config": "tsx scripts/verify-cordis-config.ts",
+    "verify-no-bare-dispatcher": "tsx scripts/verify-no-bare-dispatcher.ts",
     "rescope-vendor": "tsx scripts/rescope-vendor.ts",
     "rescope-vendor:check": "tsx scripts/rescope-vendor.ts --check",
     "upstream-sync:report": "tsx scripts/sync-upstream-report.ts",
@@ -155,12 +157,13 @@
     "release:verify-packed-install": "tsx scripts/release/verify-packed-install.ts",
     "release:publish": "tsx scripts/release/publish.ts",
     "dsh": "node --import tsx/esm apps/cli/src/bin.ts",
-    "demo:code-mode": "node scripts/demo-code-mode.mjs",
+    "demo:ptc": "node scripts/demo-ptc.mjs",
     "demo:cordis": "node scripts/demo-cordis.mjs",
     "demo:acp": "node --import tsx packages/examples/acp-demo/src/bin.ts --config examples/acp-agent/cordis.yml",
     "mock:llm": "node --import tsx packages/test-support/llm-mock-server/src/bin.ts",
     "dev:web": "tsx scripts/dev-web.ts --poll",
-    "postinstall": "node scripts/install-lefthook.mjs"
+    "postinstall": "node scripts/install-lefthook.mjs",
+    "gen-upstream-commit-inventory": "tsx scripts/gen-upstream-commit-inventory.ts"
   },
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.4.0",

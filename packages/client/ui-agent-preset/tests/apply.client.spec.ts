@@ -27,50 +27,38 @@ import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
 // FALLBACK_LOCALE (en); each bench stages zh explicitly on the locale instead.
 
 const ROSTER_ONE = {
-  rpcId: 'r',
-  result: {
-    ok: true as const,
-    value: {
-      presets: [{ id: 'standard', trust: 'system', isDefault: true }],
-      authorable: true,
-      hasDocument: true,
-    },
+  ok: true as const,
+  value: {
+    presets: [{ id: 'standard', trust: 'system', isDefault: true }],
+    authorable: true,
   },
 }
 
 /** The roster after this browser copied one preset of its own. */
 const ROSTER_AUTHORED = {
-  rpcId: 'r',
-  result: {
-    ok: true as const,
-    value: {
-      presets: [
-        { id: 'standard', trust: 'system', isDefault: true },
-        { id: 'mine', trust: 'user', isDefault: false },
-      ],
-      authorable: true,
-      hasDocument: true,
-    },
+  ok: true as const,
+  value: {
+    presets: [
+      { id: 'standard', trust: 'system', isDefault: true },
+      { id: 'mine', trust: 'user', isDefault: false },
+    ],
+    authorable: true,
   },
 }
 
 /** The same roster with a second preset carrying the default. */
 const ROSTER_MOVED = {
-  rpcId: 'r',
-  result: {
-    ok: true as const,
-    value: {
-      presets: [
-        { id: 'standard', trust: 'system', isDefault: false },
-        { id: 'minimal', trust: 'system', isDefault: true },
-      ],
-      authorable: true,
-      hasDocument: true,
-    },
+  ok: true as const,
+  value: {
+    presets: [
+      { id: 'standard', trust: 'system', isDefault: false },
+      { id: 'minimal', trust: 'system', isDefault: true },
+    ],
+    authorable: true,
   },
 }
 
-async function bench() {
+async function bench(hostSnapshot: unknown = { canOpenPath: true }) {
   const ctx = new Context()
   // The host's answer, mutable so a spec can move the default the way the
   // settings surface does and watch who re-reads it.
@@ -82,31 +70,40 @@ async function bench() {
   ctx.provide('locale', locale)
   // The plugins inject `remote`; forwarded events reach them through the
   // same `$dispatch` handoff the connection sink makes.
-  new TestRemote(ctx)
+  const remote = new TestRemote(ctx) as TestRemote & {
+    agentPresets: Record<string, (...args: never[]) => Promise<unknown>>
+  }
   const calls: string[] = []
+  // The generated agentPresets namespace, mounted the way the assembled Client
+  // Remote would expose it: one object under both ctx.remote.agentPresets and
+  // the remote.agentPresets service key the plugin injects.
+  const agentPresetsNs = {
+    list: () => { calls.push('list'); return Promise.resolve(ROSTER) },
+    read: () => Promise.resolve({
+      ok: true as const,
+      value: { agentPreset: 'standard', trust: 'system', content: '' },
+    }),
+    copy: (_from: string, id: string) => {
+      calls.push(`copy:${id}`)
+      // The host's roster now contains it, which is the whole point of the
+      // copy and what every surface must converge on.
+      ROSTER = ROSTER_AUTHORED
+      return Promise.resolve({ ok: true as const, value: undefined })
+    },
+    deletePreset: () => Promise.resolve({ ok: true as const, value: undefined }),
+    select: (_sessionId: string, agentPreset: string) => {
+      calls.push(`select:${agentPreset}`)
+      return Promise.resolve({ ok: true as const, value: agentPreset })
+    },
+  }
+  remote.agentPresets = agentPresetsNs
+  ctx.provide('remote.agentPresets', agentPresetsNs as never)
   ctx.provide('connection', {
     api: {
       agentPresets: {
-        list: () => { calls.push('list'); return Promise.resolve(ROSTER) },
-        read: () => Promise.resolve({
-          rpcId: 'r',
-          result: { ok: true as const, value: { agentPreset: 'standard', trust: 'system', content: '' } },
-        }),
-        copy: (payload: { from: string; agentPreset: string }) => {
-          calls.push(`copy:${payload.agentPreset}`)
-          // The host's roster now contains it, which is the whole point of the
-          // copy and what every surface must converge on.
-          ROSTER = ROSTER_AUTHORED
-          return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: { agentPreset: payload.agentPreset } } })
-        },
         openDocument: (payload: { agentPreset: string }) => {
           calls.push(`openDocument:${payload.agentPreset}`)
           return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: { opened: true as const } } })
-        },
-        remove: () => Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } }),
-        select: (payload: { agentPreset: string }) => {
-          calls.push(`select:${payload.agentPreset}`)
-          return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: { agentPreset: payload.agentPreset } } })
         },
       },
       settings: {
@@ -118,6 +115,7 @@ async function bench() {
         update: (payload: { patch: unknown }) => { calls.push(`settings:${JSON.stringify(payload.patch)}`); return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } }) },
       },
     },
+    hostDescription: { getSnapshot: () => hostSnapshot },
   } as never)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, calls, moveDefault }
@@ -182,7 +180,7 @@ function sessionsDouble(state: {
 
 describe('ui-agent-preset apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.agentPresets', 'settingsScope'])
   })
 
   it('registers the General row and the settings section', async () => {
@@ -586,29 +584,36 @@ describe('ui-agent-preset apply', () => {
   })
 })
 
-it.each([false, true])('reads the selected Session roster through its runtime connection when available (%s)', async (withTarget) => {
+it('hands the owning session to the Remote select the Gateway routes by', async () => {
   const { ctx, slots, calls } = await bench()
   declareRoot(slots)
   declareConversation(slots)
   const state = { current: 's1', byId: { s1: { id: 's1', blank: true, agentPreset: 'standard' } } }
-  const sessions = sessionsDouble(state)
-  Object.assign(sessions, { runtimeTargetFor: () => ({ kind: 'project', projectId: 7 }) })
-  ctx.provide('sessions', sessions as never)
+  ctx.provide('sessions', sessionsDouble(state) as never)
   ctx.provide('conversation', {} as never)
   ctx.provide('workspaces', workspacesDouble() as never)
-  const connection = ctx.get('connection') as {
-    api: { agentPresets: { list: typeof ROSTER_MOVED } }
-    forTarget?: () => { api: { agentPresets: { list: typeof ROSTER_MOVED } } }
-  }
-  const list = vi.fn(async () => ROSTER_MOVED)
-  if (withTarget) Object.assign(connection, {
-    forTarget: () => ({ api: { ...connection.api, agentPresets: { ...connection.api.agentPresets, list } } }),
-  })
+  const remote = ctx.get('remote') as unknown as { agentPresets: { select: (sessionId: string, preset: string) => Promise<unknown> } }
+  const select = vi.fn(remote.agentPresets.select)
+  remote.agentPresets.select = select
   try {
     await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
     const seat = (slots.entries('conversation.hero.agentPreset')[0]!.inject as unknown as () => AgentPresetSeatInjected)()
     await seat.load()
-    if (withTarget) expect(list).toHaveBeenCalled()
-    else expect(calls).toContain('list')
+    void seat.select('minimal')
+    await vi.waitFor(() => { expect(select).toHaveBeenCalled() })
+    // The session id is the routing token: the Gateway client's agent scope
+    // turns it into forSession(...) and lands the call on the owning runtime.
+    expect(select).toHaveBeenCalledWith('s1', 'minimal')
+    expect(calls).toContain('select:minimal')
   } finally { await ctx.fiber.dispose() }
+})
+
+it('treats a missing host description as no native-open support', async () => {
+  const { ctx, slots } = await bench(null)
+  declareRoot(slots)
+  await ctx.plugin({ inject: [...inject], apply }).await()
+  const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+  // The section loads its roster even when the host cannot open paths.
+  await section.load()
+  expect(section.hooks.agentPresetSection.getSnapshot().status).toBe('ready')
 })

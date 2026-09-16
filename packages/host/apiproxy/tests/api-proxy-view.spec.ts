@@ -262,7 +262,7 @@ describe('mux live view computation', () => {
       content: [{ type: 'text', text: '<context_checkpoint>summary</context_checkpoint>' }],
       source: { kind: 'plugin', plugin: 'compact' },
     }), {
-      surfaceOp: { op: 'replace', start: SessionSeq(shadowed[0] as number), end: SessionSeq(shadowed.at(-1) as number) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(shadowed[0] as number), endSeq: SessionSeq(shadowed.at(-1) as number) },
       sourceEventSeqs: [...shadowed, summary.seq],
     })
 

@@ -43,9 +43,9 @@
     - button "Refresh":
       - img
     - button "History"
+  - checkbox "Select this page"
   - text: Visible only to you 2 documents
   - list "Document Manager":
-    - checkbox "Select this page"
     - listitem:
       - button "Open folder reports": reports
       - button "Rename folder reports": Rename

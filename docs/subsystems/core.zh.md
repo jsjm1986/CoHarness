@@ -181,6 +181,63 @@ interface AgentOptions {
 inbox 即投递词汇——agent 以持久投影形式拥有的两条有序待处理消息列表：
 
 ```ts type-equiv
+/** Agent-owned access to pending work; concrete storage belongs to the driver. */
+interface Inbox {
+  /** Prompts awaiting individual turns. */
+  readonly nextTurn: readonly UserMessage[]
+  /** Input awaiting the next step boundary. */
+  readonly nextStep: readonly UserMessage[]
+
+  /** Durably cancel all pending input, clearing next-step before next-turn. */
+  clear(): void
+
+  /**
+   * Append one message to a pending list.
+   * @param target - pending list to extend.
+   * @param message - message to append.
+   */
+  append(target: InboxTarget, message: UserMessage): void
+
+  /**
+   * Prepend one message to a pending list.
+   * @param target - pending list to extend.
+   * @param message - message to prepend.
+   */
+  prepend(target: InboxTarget, message: UserMessage): void
+
+  /**
+   * Replace one pending message in place.
+   * @param messageId - identity of the pending message to replace.
+   * @param newMessage - replacement message.
+   * @returns whether the message was still pending.
+   */
+  replace(messageId: MessageId, newMessage: UserMessage): boolean
+
+  /**
+   * Remove one pending message.
+   * @param messageId - identity of the pending message to remove.
+   * @returns whether the message was still pending.
+   */
+  remove(messageId: MessageId): boolean
+
+  /**
+   * Apply standard splice semantics and durably record the normalized result.
+   * @param target - pending list to mutate.
+   * @param start - splice position.
+   * @param deleteCount - maximum number of messages to remove.
+   * @param inserted - messages to insert at the resolved position.
+   * @returns messages removed by the splice.
+   */
+  splice(
+    target: InboxTarget,
+    start: number,
+    deleteCount: number,
+    inserted: UserMessage[],
+  ): UserMessage[]
+}
+```
+
+```ts type-equiv
 /** One of the two ordered pending-message lists owned by an agent. */
 type InboxTarget = 'next-turn' | 'next-step'
 ```
@@ -207,7 +264,7 @@ interface TurnBoundaryProjection {
 }
 ```
 
-每个待处理入队项就是其 `UserMessage`；`MessageId` 是唯一标识。`Inbox.append`、`prepend`、`replace`、`remove`、`clear`、`splice` 与 `claim` 会记录规范化的持久 `agent/inbox/spliced` 变更，并拒绝重复的待处理 id。`replace(messageId, newMessage)` 与 `remove(messageId)` 通过 `MessageId` 跨两份列表定位待处理消息；替换可以改变标识，并先将旧消息作为 discarded 发布，再将新消息作为 inserted 发布。普通删除和 `clear()` 都表示取消。`claim(target)` 通过纯删除 splice 移除拟进入步骤的批次——全部 `next-step` 输入，外加轮次边界上的一条 `next-turn` 消息——且不发出 discarded 通知；循环另行逐条发出 claimed 通知。UI 投影等整体队列消费方通过持久 splice 重建 `nextTurn` 与 `nextStep`，而跟踪单条消息的消费方使用精确的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知。
+每个待处理入队项就是其 `UserMessage`；`MessageId` 是唯一标识。`Inbox` 结构方法会记录规范化的持久 `agent/inbox/spliced` 变更，并拒绝重复的待处理 id。`replace(messageId, newMessage)` 与 `remove(messageId)` 通过 `MessageId` 跨两份列表定位待处理消息；替换可以改变标识，并先将旧消息作为 discarded 发布，再将新消息作为 inserted 发布。普通删除和 `clear()` 都表示取消。在步骤边界，dsh-agent-loop 包内私有的 `ReactLoopInbox` 通过纯删除 splice 移除拟进入步骤的批次——全部 `next-step` 输入，外加轮次边界上的一条 `next-turn` 消息——不发出 discarded 通知，随后逐条发出 claimed 通知。仅循环内部使用的待处理检测与认领不属于 `Agent.inbox`。每个 `ReactLoopInbox` 构造器在其 agent 作用域内贡献 host-only 的 `agentInbox` 投影；注册表按引用计数在多个 agent 间共享同一 fold 定义，其 cell 是唯一的存活状态，同一 fold 同时服务冷读取方。该 fold 会拒绝越界或不安全的 splice 坐标与两份列表上的重复标识，并按事件 seq 定位畸形的持久历史。跟踪单条消息的消费方使用精确的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知。
 
 取消：
 
@@ -352,7 +409,7 @@ type Branded<B extends string> = string & { readonly [BRAND]: B }
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxagentdefaultmodel--agentdefaultmodelconfig"></a>
 
@@ -376,7 +433,7 @@ currentSelection(): ModelSelection
 async saveSelection(next: ModelSelection): Promise<void>
 ```
 
-Source: [`packages/core/agent-default-model/src/index.ts:64`](../../packages/core/agent-default-model/src/index.ts)
+Source: [`packages/core/agent-default-model/src/index.ts`](../../packages/core/agent-default-model/src/index.ts)
 
 <a id="ctxagentloop--agentloop"></a>
 
@@ -388,13 +445,16 @@ Concrete agent factory and driver service.
 /**
  * Create an agent and session under one caller-supplied identity, owned by
  * the accessing fiber. Constructor-driven config calls mint a fresh combined
- * id before entering this boundary.
+ * id before entering this boundary. When a persistence backend is mounted,
+ * the session's write handle is acquired before publication, so an already
+ * owned or already persisted id fails inside this call rather than racing
+ * the coordinator's write path later.
  * @param id - shared agent/session identity.
  * @param options - concrete loop options.
  * @param meta - optional fresh-session workspace metadata.
  * @returns the published running agent.
  */
-create(id: SessionId, options: AgentOptions = {}, meta: Pick<SessionHeader, 'cwd'> = {}): Agent
+async create(id: SessionId, options: AgentOptions = {}, meta: Pick<SessionHeader, 'cwd'> = {}): Promise<Agent>
 
 /**
  * Create an owned agent on a caller-supplied session id.
@@ -415,7 +475,7 @@ async resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandl
 
 Types: [SessionHeader](persistence.zh.md)
 
-Source: [`packages/core/agent-loop/src/index.ts:358`](../../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts`](../../packages/core/agent-loop/src/index.ts)
 
 <a id="ctxagentpresets--agentpresets"></a>
 
@@ -507,6 +567,63 @@ composeFrom(agentCtx: Context, parentCtx: Context): string | undefined
 composedPreset(agentCtx: Context): string | undefined
 
 /**
+ * The roster with the authoring capability this caller may use.
+ *
+ * Read addressing only: the roster itself is deployment-wide, while
+ * `authorable` reports what the CALLER may write — a project member without
+ * manage rights reads `false` even when a writable root exists, matching the
+ * enforcement the privileged authoring Remote methods apply. The authority
+ * is re-captured inside the call because the wire carrier, not this service,
+ * owns request scope.
+ * @returns the presets and the caller-scoped authoring hint.
+ */
+@Remote('list') async remoteExportList(): Promise<AgentPresetRoster>
+
+/**
+ * One preset's composition text with the roster row it belongs to.
+ * @param agentPreset - the preset id.
+ * @returns the composition beside its trust and published metadata.
+ * @throws {RemoteError} `gateway/bad-request` for an empty id, or
+ * `agent-preset/not-found` when no configured root supplies it.
+ */
+@Remote('read') async readDocument(agentPreset: string): Promise<AgentPresetDocument>
+
+/**
+ * Copy one preset through the Remote API.
+ * @param from - the source preset id.
+ * @param id - the new preset id.
+ * @param name - the copy's optional display name.
+ * @returns once the copy is stored.
+ * @throws {RemoteError} with the corresponding stable preset code and
+ * details when the copy is refused.
+ */
+@Remote('copy') async remoteExportCopy(from: string, id: string, name?: string): Promise<void>
+
+/**
+ * Delete one preset through the Remote API.
+ * @param id - the preset id.
+ * @returns once the preset is deleted.
+ * @throws {RemoteError} with the corresponding stable preset code and
+ * details when deletion is refused.
+ */
+@Remote('deletePreset') async remoteExportDelete(id: string): Promise<void>
+
+/**
+ * Switch one agent's preset through the Remote API.
+ *
+ * Recomposing is limited to a session with no visible conversation content
+ * because its history is produced under its preset's tools; the agent and
+ * the session survive, only the composition is swapped. Switches on one
+ * session queue so a stale blankness read cannot interleave two swaps.
+ * @param agent - exact live agent whose composition is swapped.
+ * @param agentPreset - the preset to compose instead.
+ * @returns the preset id that was recorded.
+ * @throws {RemoteError} with `gateway/bad-request`, `agent-preset/locked`,
+ * `agent-preset/not-found`, or `agent-preset/invalid` when refused.
+ */
+@Remote('select') async select(agent: Agent, agentPreset: string): Promise<string>
+
+/**
  * Read one preset's composition text.
  * @param id - the preset id.
  * @returns the composition exactly as stored.
@@ -594,7 +711,7 @@ async standingKeyFor(id?: string): Promise<ScopeKey>
 
 Types: [ScopeKey](scope.zh.md)
 
-Source: [`packages/preset/agent-presets/src/index.ts:92`](../../packages/preset/agent-presets/src/index.ts)
+Source: [`packages/preset/agent-presets/src/index.ts`](../../packages/preset/agent-presets/src/index.ts)
 
 <a id="ctxagents--agentregistry"></a>
 
@@ -767,7 +884,7 @@ list(): Agent[]
 roots(): Agent[]
 ```
 
-Source: [`packages/core/agent/src/index.ts:254`](../../packages/core/agent/src/index.ts)
+Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
 <a id="agent-events"></a>
 
@@ -795,7 +912,7 @@ A fully configured agent and live session were published. Setup is composition-o
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:166`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentdisposed--emit"></a>
 
@@ -817,7 +934,7 @@ An agent left the registry; AgentLoop emits this after driver quiescence and sco
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:175`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agenterror--emit"></a>
 
@@ -841,7 +958,7 @@ A step or turn errored. The machine reports a failure here even when the error h
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:311`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentinboxclaimed--emit"></a>
 
@@ -865,7 +982,7 @@ One message left the inbox inside its open turn. If the proposed step is rejecte
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:204`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentinboxdiscarded--emit"></a>
 
@@ -886,7 +1003,7 @@ One message was discarded from the live inbox.
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:212`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentinboxinserted--emit"></a>
 
@@ -907,7 +1024,7 @@ One message entered the live inbox.
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:193`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentmessage-entered--serial"></a>
 
@@ -934,7 +1051,7 @@ A final user message has committed to the durable surface and the model request 
 
 Types: [Scoped](scope.zh.md) · [SessionEvent](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:252`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentpre-step--waterfall"></a>
 
@@ -959,7 +1076,7 @@ Reject a proposed step or replace the messages that enter it. Calling `next()` p
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:238`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentrequest--waterfall"></a>
 
@@ -985,7 +1102,7 @@ Replace the frozen call configuration. `await next()` yields the config the mach
 
 Types: [LlmCallConfig](llm-streaming.zh.md) · [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:265`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentrequest-error--waterfall"></a>
 
@@ -1014,7 +1131,7 @@ Handle one failed model-request attempt before the loop retries or closes its st
 
 Types: [LlmFailure](llm-streaming.zh.md) · [ResolvedRetryPolicy](llm-streaming.zh.md) · [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:281`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentsession-start--emit"></a>
 
@@ -1038,7 +1155,7 @@ The session lifecycle began, once before the first turn. Use `agent.inject()` to
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:224`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentstatus--emit"></a>
 
@@ -1061,7 +1178,7 @@ Agent status changed (`idle` ⇄ `running`). A waking delivery enters `running` 
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:185`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentturn-stopping--serial"></a>
 
@@ -1092,7 +1209,7 @@ The turn is about to close: the model owes no response (no live tool calls, no f
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:299`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agent-loop-events"></a>
 
@@ -1117,7 +1234,7 @@ A declarative agent entry failed before it could publish a live agent. Consumers
 'agent-loop/config-start-failed'(payload: { sessionId: SessionId; error: unknown }): void
 ```
 
-Source: [`packages/core/agent-loop/src/index.ts:233`](../../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts`](../../packages/core/agent-loop/src/index.ts)
 
 <a id="agent-preset-events"></a>
 
@@ -1138,7 +1255,7 @@ A live Agent was re-linked to a different standing preset composition. Consumers
 'agent-preset/recomposed'(): void
 ```
 
-Source: [`packages/preset/agent-presets/src/types.ts:19`](../../packages/preset/agent-presets/src/types.ts)
+Source: [`packages/preset/agent-presets/src/types.ts`](../../packages/preset/agent-presets/src/types.ts)
 
 <a id="agent-presetselected--emit"></a>
 
@@ -1157,5 +1274,5 @@ One session committed a different agent preset to its durable log. Consumers inv
 'agent-preset/selected'(sessionId: SessionId, agentPreset: string): void
 ```
 
-Source: [`packages/preset/agent-presets/src/types.ts:13`](../../packages/preset/agent-presets/src/types.ts)
+Source: [`packages/preset/agent-presets/src/types.ts`](../../packages/preset/agent-presets/src/types.ts)
 <!-- END GENERATED cordis-surface -->

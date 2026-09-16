@@ -1,4 +1,3 @@
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -17,7 +16,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -33,7 +35,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: 7/25 {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -46,4 +51,6 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 2 turns · 2 steps LLM {{duration}}
+- button "2 turns · 2 steps":
+  - img
+  - text: 2 turns · 2 steps

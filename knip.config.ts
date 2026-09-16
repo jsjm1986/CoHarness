@@ -21,7 +21,9 @@ export const GENERATED_TYPERT_WORKSPACES = [
   'packages/context/file-reference',
   'packages/context/session-reference',
   'packages/extensions/cordis-host-runner',
+  'packages/feedback/command-feedback',
   'packages/interaction/commands',
+  'packages/llm/llm',
 ] as const
 
 /**

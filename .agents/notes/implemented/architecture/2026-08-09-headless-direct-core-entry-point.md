@@ -12,7 +12,7 @@ The direct entry point still needs the same deployment model state as Web-create
 
 ## Decision
 
-The shipped `headless` profile contains `dsh-base` and `dsh-headless`. The headless bundle supplies its persona and tool mode, disables HMR, mounts the Code Mode worker explicitly, and inserts `headless-runner`. Its tree contains no `@deepseek-ai/dsh-host-*` package, ApiProxy, HTTP server, Web runtime, or browser client. Code Mode and Session persistence are one-shot Agent capabilities independent of Web presentation.
+The shipped `headless` profile contains `dsh-base` and `dsh-headless`. The headless bundle supplies its persona and tool mode, disables HMR, mounts the PTC mode worker explicitly, and inserts `headless-runner`. Its tree contains no `@deepseek-ai/dsh-host-*` package, ApiProxy, HTTP server, Web runtime, or browser client. PTC mode and Session persistence are one-shot Agent capabilities independent of Web presentation.
 
 `headless-runner` is a direct core entry point. After Loader settlement, it reads `ctx.agentDefaultModel.currentSelection()`, creates a fresh persisted Agent through `ctx.agents.create`, installs that `ModelSelection` in the Agent scope, waits for startup quiescence, anchors the Session sequence, submits one ordinary user message, and waits for quiescence again. It awaits `ctx.sessions.flush`, folds its durable event interval for the last non-empty assistant text and final `turn/end` reason, writes the text plus one newline to stdout, and requests bounded launcher shutdown with exit 0 exactly when the reason is `completed`. A terminal `error` reason writes its durable code and message to stderr; unexpected driver failures also use stderr and exit 1. The runner's `progress` option defaults to `false`; when enabled, reasoning chunks from the owned Session are streamed to stderr without changing the durable result or stdout contract.
 
@@ -34,7 +34,7 @@ Package tests use the real Session store and Agent registry around a scripted Ag
 | Build a Host-only one-shot bundle around ApiProxy | ApiProxy is a client protocol gateway; a local one-shot entry point has no client boundary. |
 | Use `InProcessApiClient` for product-level protocol coverage | Product execution would depend on an unrelated protocol solely to exercise that protocol. |
 | Give headless a separate provider/model config | Direct and Web creation would have independent defaults and persistence. |
-| Omit Code Mode and Session persistence | Both capabilities belong to one-shot Agent execution rather than Web presentation. |
+| Omit PTC mode and Session persistence | Both capabilities belong to one-shot Agent execution rather than Web presentation. |
 | Normalize every tuple containing Web and headless bundles | Bundle lists are an extension surface; only the exact installation-owned tuple is safe to classify. |
 
 ## Consequences

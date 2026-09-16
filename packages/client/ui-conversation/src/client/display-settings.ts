@@ -11,6 +11,7 @@ import {
 export interface ConversationDisplaySettingsSnapshot {
   readonly chatContentWidth: number
   readonly chatFontSize: number
+  readonly chatFullWidth: boolean
   readonly settings: SettingsControlState
 }
 
@@ -20,6 +21,7 @@ export class ConversationDisplaySettings {
   private readonly unsubscribe: (() => void) | undefined
   private pendingWidth: number | undefined
   private pendingFontSize: number | undefined
+  private pendingFullWidth: boolean | undefined
   private disposed = false
 
   /** @param scope - settings scope for the conversation namespace. */
@@ -58,18 +60,39 @@ export class ConversationDisplaySettings {
 
   /**
    * Persist a transcript width after clamping it to the supported range.
+   * An explicit pixel choice also ends fill mode.
    * @param value - requested width in pixels.
    */
   setWidth(value: number): void {
     const width = clamp(value, CHAT_CONTENT_WIDTH_RANGE.min, CHAT_CONTENT_WIDTH_RANGE.max)
-    if (width === this.width()) return
+    const filling = this.getSnapshot().chatFullWidth
+    if (width === this.width() && !filling) return
     this.pendingWidth = width
-    this.store.set({ ...this.getSnapshot(), chatContentWidth: width })
+    if (filling) this.pendingFullWidth = false
+    this.store.set({ ...this.getSnapshot(), chatContentWidth: width, chatFullWidth: false })
     if (this.scope === undefined) {
       this.pendingWidth = undefined
+      this.pendingFullWidth = undefined
       return
     }
     void this.scope.set('chatContentWidth', width)
+    if (filling) void this.scope.set('chatFullWidth', false)
+  }
+
+  /**
+   * Persist the fill-width preference; the pixel width stays stored for when
+   * fill is turned off.
+   * @param value - whether the transcript fills the pane.
+   */
+  setFullWidth(value: boolean): void {
+    if (value === this.getSnapshot().chatFullWidth) return
+    this.pendingFullWidth = value
+    this.store.set({ ...this.getSnapshot(), chatFullWidth: value })
+    if (this.scope === undefined) {
+      this.pendingFullWidth = undefined
+      return
+    }
+    void this.scope.set('chatFullWidth', value)
   }
 
   /**
@@ -108,12 +131,15 @@ export class ConversationDisplaySettings {
       CHAT_FONT_SIZE_RANGE.min,
       CHAT_FONT_SIZE_RANGE.max,
     )
+    const remoteFullWidth = value?.chatFullWidth ?? false
     if (snapshot.write.status === 'idle') {
       if (this.pendingWidth === remoteWidth) this.pendingWidth = undefined
       if (this.pendingFontSize === remoteFontSize) this.pendingFontSize = undefined
+      if (this.pendingFullWidth === remoteFullWidth) this.pendingFullWidth = undefined
     } else if (snapshot.write.status === 'error' || snapshot.write.status === 'blocked') {
       this.pendingWidth = undefined
       this.pendingFontSize = undefined
+      this.pendingFullWidth = undefined
     }
     this.store.set({
       chatContentWidth: snapshot.write.status === 'saving' && this.pendingWidth !== undefined
@@ -122,6 +148,9 @@ export class ConversationDisplaySettings {
       chatFontSize: snapshot.write.status === 'saving' && this.pendingFontSize !== undefined
         ? this.pendingFontSize
         : remoteFontSize,
+      chatFullWidth: snapshot.write.status === 'saving' && this.pendingFullWidth !== undefined
+        ? this.pendingFullWidth
+        : remoteFullWidth,
       settings: settingsControlState(snapshot),
     })
   }
@@ -130,6 +159,7 @@ export class ConversationDisplaySettings {
     return {
       chatContentWidth: DEFAULT_CHAT_CONTENT_WIDTH,
       chatFontSize: DEFAULT_CHAT_FONT_SIZE,
+      chatFullWidth: false,
       settings: snapshot === undefined
         ? { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } }
         : settingsControlState(snapshot),

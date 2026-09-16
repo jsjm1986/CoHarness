@@ -270,6 +270,32 @@ describe('AppFrame', () => {
     expect(frame.hasAttribute('data-details-collapsed')).toBe(true)
   })
 
+  it('details panel is a self-anchored slide surface, not a clipped track child', () => {
+    // 1030 < 280+360+640: the concession chain auto-releases the details
+    // track rather than squeezing it, so opening here keeps the surface
+    // off-edge until the frame re-widens.
+    frameWidth = 1030
+    const { frame, instance } = mountFrame()
+    const panel = () => frame.querySelector<HTMLElement>('[class*="detailsPanel"]')!
+    // Never opened: mounted at the contract width, hidden off the frame edge.
+    expect(panel().hasAttribute('data-open')).toBe(false)
+    expect(panel().style.width).toBe('360px')
+    act(() => { instance.actions.openDetails() })
+    expect(panel().hasAttribute('data-open')).toBe(false)
+    expect(panel().style.width).toBe('360px') // contract floor — the track released, not the panel
+    // Re-widening restores the open preference at the contract width.
+    frameWidth = 1920
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(tracks(frame)).toEqual([280, 360])
+    expect(panel().hasAttribute('data-open')).toBe(true)
+    // Closing releases the track: the surface stays mounted and slides off.
+    act(() => { instance.actions.closeDetails() })
+    expect(tracks(frame)).toEqual([280, 0])
+    expect(panel().hasAttribute('data-open')).toBe(false)
+    expect(panel().querySelector('[data-testid="details-content"]')).toBeTruthy()
+    expect(panel().style.width).toBe('360px')
+  })
+
   it('closed sidebar keeps its compact rail with mounted slot content and collapsed owner props', () => {
     const { frame, instance, slotCalls, getByTestId } = mountFrame()
     act(() => { instance.actions.toggleSidebar() })
@@ -360,6 +386,29 @@ describe('AppFrame — medium-viewport auto-collapse', () => {
     act(() => { (scrims[0] as HTMLElement).click() })
     expect(overlay.hasAttribute('data-open')).toBe(false)
     expect(instance.getSnapshot().details).toBe(0)
+  })
+
+  it('opening details collapses the squeeze-open sidebar instead of crowding the center', () => {
+    frameWidth = 900
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() })
+    expect(tracks(frame)).toEqual([280, 0])
+    act(() => { instance.actions.openDetails() })
+    // One narrow surface at a time: the sidebar collapses rather than
+    // squeezing the conversation between rail and overlay.
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(frame.querySelector('[class*="detailsOverlay"]')!.hasAttribute('data-open')).toBe(true)
+  })
+
+  it('the rail toggle while the details overlay is open swaps surfaces', () => {
+    frameWidth = 900
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    expect(frame.querySelector('[class*="detailsOverlay"]')!.hasAttribute('data-open')).toBe(true)
+    act(() => { instance.actions.toggleSidebar() })
+    expect(instance.getSnapshot().details).toBe(0)
+    expect(frame.querySelector('[class*="detailsOverlay"]')!.hasAttribute('data-open')).toBe(false)
+    expect(tracks(frame)).toEqual([280, 0])
   })
 })
 

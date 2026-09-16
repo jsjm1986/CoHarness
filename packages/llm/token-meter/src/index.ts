@@ -26,25 +26,32 @@ import type {
 } from './types.ts'
 import { contextBreakdownProjectionDefinition } from './breakdown-projection.ts'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from './usage-projection.ts'
-import { estimateHeader, estimateMessage } from './estimate.ts'
+import { estimateMessage, estimateToolsTokens } from './estimate.ts'
 import { foldSurfaceTokens } from './surface-fold.ts'
 import { priceSurface } from './route-pricing.ts'
 
 export type * from './types.ts'
 
+/**
+ * Raw anchor facts captured at the latest successful call; the baseline is
+ * derived per measurement so the anchored surface reprices under the same
+ * route pricing as the current surface it is compared with.
+ */
 interface MeasurementAnchor {
   readonly header: EpochHeader | undefined
-  readonly surfaceTokens: number
-  readonly surfaceNodes: readonly TokenSurfaceNode[]
-  readonly baseline: Exclude<TokenMeasurementBaseline, { kind: 'none' }>
+  /** Priced surface immediately before the anchored assistant message commits. */
+  readonly nodes: readonly TokenSurfaceNode[]
+  /** Fixed-heuristic price of the call's provider output. */
+  readonly assistantTokens: number
+  /** Provider usage of the call, when it reported one under a known header. */
+  readonly usage: TokenUsage | undefined
 }
 
 interface ReplayState {
   consumedEvents: SessionLogOffsetType
   header: EpochHeader | undefined
   surface: TokenSurfaceNode[]
-  surfaceTokens: number
-  stepStart: { turn: number; step: number; surfaceTokens: number } | undefined
+  stepStart: { turn: number; step: number } | undefined
   anchor: MeasurementAnchor | undefined
 }
 
@@ -133,8 +140,18 @@ export class TokenMeter extends Service {
     let baseline: TokenMeasurementBaseline
     let surfaceDeltaTokens: number
     if (anchor !== undefined && optionalHeaderEquals(anchor.header, header)) {
-      baseline = anchor.baseline
-      const anchorSurfaceTokens = priceSurface(anchor.surfaceNodes, pricing).surfaceTokens
+      // Matching headers share one route, so the anchored snapshot reprices
+      // under the same pricing as the current surface and the signed delta
+      // compares like with like.
+      const anchorSurfaceTokens = priceSurface(anchor.nodes, pricing).surfaceTokens
+        + anchor.assistantTokens
+      const estimatedAnchorTokens = estimateToolsTokens(header) + anchorSurfaceTokens
+      const usage = anchor.usage
+      // Signed heuristic deltas remain conservative only from an anchor
+      // that is at least as large as the matching full heuristic price.
+      baseline = usage !== undefined && usageTokens(usage) >= estimatedAnchorTokens
+        ? { kind: 'usage', tokens: usageTokens(usage), usage }
+        : { kind: 'estimated', tokens: estimatedAnchorTokens }
       surfaceDeltaTokens = priced.surfaceTokens - anchorSurfaceTokens
     } else if (header === undefined && priced.surfaceTokens === 0) {
       baseline = { kind: 'none', tokens: 0 }
@@ -142,7 +159,7 @@ export class TokenMeter extends Service {
     } else {
       baseline = {
         kind: 'estimated',
-        tokens: estimateHeader(header) + priced.surfaceTokens,
+        tokens: estimateToolsTokens(header) + priced.surfaceTokens,
       }
       surfaceDeltaTokens = 0
     }
@@ -182,7 +199,6 @@ export class TokenMeter extends Service {
         consumedEvents: SessionLogOffset(0),
         header: undefined,
         surface: [],
-        surfaceTokens: 0,
         stepStart: undefined,
         anchor: undefined,
       }
@@ -218,7 +234,7 @@ export class TokenMeter extends Service {
             `token meter: step/start at seq ${event.seq} arrived before turn ${state.stepStart.turn}/step ${state.stepStart.step} ended`,
           )
         }
-        nextStepStart = { ...event.data, surfaceTokens: state.surfaceTokens }
+        nextStepStart = { ...event.data }
         break
       case 'step/end':
         if (state.stepStart === undefined
@@ -251,35 +267,26 @@ export class TokenMeter extends Service {
 
       // assistant/message is surface-mandatory at every append/seed boundary.
       const eventTokens = surface.tokens
+      // The loop admits prompts and user messages after step/start; retries may
+      // replace them before succeeding. Only the pre-assistant surface is priced
+      // by this call. Provider output stays separate from durable output rewrites.
       if (event.data.usage !== undefined && nextHeader !== undefined) {
         const providerAssistant = this._providerAssistantMessage(session, event)
         const providerAssistantTokens = providerAssistant.message === null
           ? 0
           : estimateMessage(providerAssistant.message)
-        const anchorSurfaceTokens = stepStart.surfaceTokens + providerAssistantTokens
-        const providerTokens = usageTokens(event.data.usage)
-        const estimatedAnchorTokens = estimateHeader(nextHeader) + anchorSurfaceTokens
-        const providerSurface = foldSurfaceTokens(state.surface, surfaceEvent, providerAssistant.message)
         nextAnchor = {
           header: nextHeader,
-          surfaceTokens: anchorSurfaceTokens,
-          surfaceNodes: providerSurface.nodes,
-          // Signed heuristic deltas remain conservative only from an anchor
-          // that is at least as large as the matching full heuristic price.
-          baseline: providerTokens >= estimatedAnchorTokens
-            ? { kind: 'usage', tokens: providerTokens, usage: event.data.usage }
-            : { kind: 'estimated', tokens: estimatedAnchorTokens },
+          nodes: [...state.surface],
+          assistantTokens: providerAssistantTokens,
+          usage: event.data.usage,
         }
       } else {
-        const anchorSurfaceTokens = stepStart.surfaceTokens + eventTokens
         nextAnchor = {
           header: nextHeader,
-          surfaceTokens: anchorSurfaceTokens,
-          surfaceNodes: surface.nodes,
-          baseline: {
-            kind: 'estimated',
-            tokens: estimateHeader(nextHeader) + anchorSurfaceTokens,
-          },
+          nodes: [...state.surface],
+          assistantTokens: eventTokens,
+          usage: undefined,
         }
       }
     }
@@ -288,7 +295,6 @@ export class TokenMeter extends Service {
     state.stepStart = nextStepStart
     if (surface !== undefined) {
       state.surface = surface.nodes
-      state.surfaceTokens += surface.deltaTokens
     }
     state.anchor = nextAnchor
   }
@@ -308,12 +314,14 @@ export class TokenMeter extends Service {
     const assembler = new BlockAssembler()
     const seen = new Set<SessionSeqType>()
     for (const seq of sourceSeqs) {
+      /* v8 ignore start -- provenance validation already guarantees earlier, unique cited seqs */
       if (seq >= event.seq) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} is not earlier`)
       }
       if (seen.has(seq)) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} repeats source seq ${seq}`)
       }
+      /* v8 ignore stop */
       seen.add(seq)
       // Session construction validates contiguous seqs, and the explicit
       // earlier-than-assistant check above therefore guarantees existence.

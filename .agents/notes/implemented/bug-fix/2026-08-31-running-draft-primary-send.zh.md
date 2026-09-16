@@ -20,7 +20,7 @@ Status: implemented
 
 ## 相关决策
 
-空草稿 Cmd/Ctrl+Enter 的整队列手势仍由[空输入时 Cmd/Ctrl+Enter 将 Web 排队消息全部插话](../feature/2026-08-06-web-queue-steer-all-gesture.zh.md)负责；本笔记定义可操作草稿的指针操作。
+空草稿 Cmd/Ctrl+Enter 的整队列手势仍由[空输入时 Cmd/Ctrl+Enter 将 Web 排队消息全部插话](../../archived/feature/2026-08-06-web-queue-steer-all-gesture.md)负责；本笔记定义可操作草稿的指针操作。
 
 ## 备选方案
 

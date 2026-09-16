@@ -85,7 +85,7 @@ export type OptionalSessionSeq = SessionSeq | null
  * The on-disk session format version, stamped into every newly-written {@link SessionHeader}
  * and enforced by every persistence backend on load. The single source of truth for the
  * version — write sites and the load-time check all read it.
- * The current build stamps `2`; supported historical generations are migrated
+ * The current build stamps `3`; supported historical generations are migrated
  * by the persistence format catalog before a provider exposes a Session.
  *
  * The version is a single monotonic integer with no major/minor split. Whether
@@ -255,8 +255,9 @@ export interface TodoItem {
 }
 
 /**
- * Logged request state outside derived history: call config, system prompt, and
- * tools. The latest full `request/header` snapshot reconstructs it; canonical
+ * Logged request state outside derived history: call config and tools. The
+ * system prompt is derived history — a `system/message` surface event. The
+ * latest full `request/header` snapshot reconstructs the header; canonical
  * empty optional fields are absent.
  */
 export interface EpochHeader {
@@ -264,8 +265,6 @@ export interface EpochHeader {
   config: LlmCallConfig
   /** Effective config fields materialized from the exact adapter rather than proposed by a caller. */
   adapterDefaults?: LlmCallConfigAdapterDefaults
-  /** Rendered system prompt text; absent for a system-less request. */
-  system?: string
   /** Assembled tool schemas; absent for a tool-less request. */
   tools?: ToolSchema[]
 }
@@ -434,16 +433,21 @@ export type SurfaceEvent = SessionEvent<SurfaceEventType> & { surfaceOp: Surface
  *
  * - `'append'`: added to the tail — normal path for user/assistant/tool
  *   messages.
- * - `{ op: 'replace', start, end }`: replaces surface nodes from `start`
- *   (inclusive) through `end` (inclusive) with this node. Both must exist as
- *   surface nodes in the current surface. `start === end` replaces a single
+ * - `{ op: 'replace', startSeq, endSeq }`: replaces surface nodes from `startSeq`
+ *   (inclusive) through `endSeq` (inclusive) with this node. Both must exist as
+ *   surface nodes in the current surface. `startSeq === endSeq` replaces a single
  *   node. The node's {@link SessionEvent.sourceEventSeqs} must include every
  *   shadowed surface node. Used by compaction; any surface-replacing producer
- *   may use it.
+ *   may use it. When node 0 holds a `system/message`, a range covering it must
+ *   be a `system/message` over exactly that node.
+ *
+ * Readers also accept the pre-rename `start`/`end` keys on committed log
+ * entries and normalize them to `startSeq`/`endSeq`; writers always emit the
+ * canonical keys.
  */
 export type SurfaceOp =
   | 'append'
-  | { op: 'replace'; start: SessionSeq; end: SessionSeq }
+  | { op: 'replace'; startSeq: SessionSeq; endSeq: SessionSeq }
 
 /**
  * Surface placement and cited source-event seqs for {@link Session.append}. Required on

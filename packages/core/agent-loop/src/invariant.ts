@@ -41,8 +41,9 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
       fail(`llm request for session "${String(session.id)}" diverges from the dispatch-time durable derivation (log-reconstruction desync)`)
     }
 
+    // The system prompt travels inside `messages` as surface nodes, never as `system`.
     const headerMatches = options.model === header.config.model
-      && options.system === header.system
+      && options.system === undefined
       && options.reasoningEffort === header.config.reasoningEffort
       && options.temperature === header.config.temperature
       && options.maxTokens === header.config.maxTokens

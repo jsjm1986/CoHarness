@@ -14,6 +14,10 @@
 
 菜单查询会按顺序且不区分大小写地模糊匹配命令名的子序列。前缀排名最高；其余匹配项按分隔符边界优先、相邻字符优先、间隔越短越优先的规则排序，若仍同分，则以目录顺序和贡献项顺序打破平局。此行为只影响命令发现：space 和 Enter 仍要求命令名精确匹配。原理：[Web 斜杠命令模糊发现](../../../.agents/notes/implemented/feature/2026-08-04-web-slash-command-fuzzy-discovery.zh.md)。
 
+带稳定 `definitionId` 的一方命令描述符会在空查询菜单中获得本地化标题、描述和图标，并按“添加”和“命令”分组。客户端 contribution 可以提供标题、描述和共享图标组件，但不会改变派发身份。模糊搜索同时检查标题与规范命令名，规范命令名仍是实际选取 key。
+
+本地化的一方命令 token 只是草稿中的显示写法：claim 会保留它供 composer 显示，而 `command.execute` 始终接收规范描述符名称。若部署定义了同名的 scope 命令，规范名称的精确匹配仍优先。
+
 `PopupSelectController`（`src/client/popup.ts`）是不含界面的外壳状态：`PopupSelectView` 自行注册进 `conversation.input.overlay`（SlotMap key 归 ui-conversation 所有；本包只以 type-only 导入引入该声明——没有运行时依赖边）。壳是打开期间持有焦点的瞬态层；onSelect 之后的 token 片段消费在两条分支上都经 `consumeTokenSegment` 执行（菜单路径做 span CAS，回车路径做裸 token 相等比较），作用于接线层经 `bindDraft` 绑定的草稿表层。
 
 `/client` 入口导出插件主体（`apply`／`inject`）、`CommandUiRuntime`、目录类和 popup 类及其状态类型，以及固定的约定类型；外层组件本身是 overlay 注册的内部实现。

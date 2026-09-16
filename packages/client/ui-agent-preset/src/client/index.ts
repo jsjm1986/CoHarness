@@ -11,7 +11,7 @@
  * before-the-fact, while the header only reports what a session already runs.
  */
 
-import type { ConnectionHandle, IApiClient, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
@@ -48,22 +48,30 @@ export { presetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
 export type { PresetDisplaySource, PresetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
+export const inject = [
+  'slots', 'locale', 'connection', 'remote', 'remote.agentPresets', 'settingsScope',
+]
 
 /**
  * Mount the General-settings row.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
-  const { api } = ctx.get('connection') as ConnectionHandle
-  const controller = new AgentPresetSettingsController(api, ctx.settingsScope.describe())
+  const connection = ctx.get('connection') as ConnectionHandle
+  const { api } = connection
+  const controller = new AgentPresetSettingsController(api, ctx.remote, ctx.settingsScope.describe())
   // One roster, four surfaces. The chip is registered in a later scope, so it
   // subscribes here rather than being reached from this one.
   const rosterReaders = new Set<() => void>()
-  const section = new AgentPresetSectionController(api, () => {
-    void controller.load()
-    for (const read of rosterReaders) read()
-  })
+  const section = new AgentPresetSectionController(
+    ctx.remote,
+    api,
+    () => connection.hostDescription.getSnapshot()?.canOpenPath ?? false,
+    () => {
+      void controller.load()
+      for (const read of rosterReaders) read()
+    },
+  )
 
   ctx.effect(() => ctx.locale.register('settings.agentPreset', { zh, en }), 'ui-agent-preset: settings row dictionaries')
 
@@ -102,19 +110,7 @@ export function apply(ctx: ClientContext): void {
   // The new-session chip and the header label: one controller, because the
   // staged choice belongs to the flow rather than to any one session.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
-    const connection = scope.get('connection') as ConnectionHandle
-    const apiForSession = (id: SessionId | undefined): IApiClient => {
-      const target = id === undefined ? undefined : scope.sessions.runtimeTargetFor?.(id)
-      return target === undefined || connection.forTarget === undefined ? connection.api : connection.forTarget(target).api
-    }
-    const api: Pick<IApiClient, 'agentPresets'> = {
-      agentPresets: {
-        ...connection.api.agentPresets,
-        list: (payload, signal) => apiForSession(scope.sessions.list.getSnapshot().current).agentPresets.list(payload, signal),
-        select: (payload, signal) => apiForSession(payload.sessionId).agentPresets.select(payload, signal),
-      },
-    }
-    const seat = new AgentPresetSeatController(api, (): SeatSessionSummary | undefined => {
+    const seat = new AgentPresetSeatController(scope.remote, (): SeatSessionSummary | undefined => {
       const state = scope.sessions.list.getSnapshot()
       const summary = state.current === undefined ? undefined : state.byId[state.current]
       return summary === undefined

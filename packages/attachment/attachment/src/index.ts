@@ -1,8 +1,11 @@
 /** Durable attachment storage seam (`ctx.attachments`). @module @deepseek-ai/dsh-attachment */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import { admitPromptContent as admitWirePromptContent } from './admission.ts'
 import { AttachmentError } from './error.ts'
 import type {
+  AdmittedPromptContentPart,
+  AttachmentAdmissionPart,
   ImageAttachmentLimits,
   ImageAttachmentRef,
   ImageRequestPolicy,
@@ -14,9 +17,11 @@ import type {
 export { AttachmentId, ImageVariantId } from './brand.ts'
 export { AttachmentError, isImageAdmissionError } from './error.ts'
 export type { AttachmentErrorCode, ImageAdmissionErrorCode } from './error.ts'
-export { admitEncodedImages } from './admission.ts'
+export { admitEncodedImages, admitPromptContent } from './admission.ts'
 export { requestImageDimensions } from './request-projection.ts'
 export type {
+  AdmittedPromptContentPart,
+  AttachmentAdmissionPart,
   AttachmentId as AttachmentIdType,
   EncodedImageAttachment,
   ImageAttachmentLimits,
@@ -89,6 +94,19 @@ export abstract class AttachmentStore extends Service {
     const refs: ImageAttachmentRef[] = []
     for (const input of inputs) refs.push(await this.saveImage(input))
     return refs
+  }
+
+  /**
+   * Admit one Host prompt and replace each uploaded image with its durable reference.
+   * Text parts pass through unchanged. A prompt without image parts performs no storage operation.
+   * @param content - prompt parts in message order.
+   * @returns admitted prompt parts in the same order as `content`.
+   * @throws AttachmentError when the image batch is refused.
+   */
+  async admitPromptContent(
+    content: readonly AttachmentAdmissionPart[],
+  ): Promise<AdmittedPromptContentPart[]> {
+    return admitWirePromptContent(this, content)
   }
 
   /**

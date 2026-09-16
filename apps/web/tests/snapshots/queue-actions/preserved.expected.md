@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -26,7 +25,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "2 queued messages" [expanded]
 - list:
   - listitem:
@@ -58,4 +60,7 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 1 turns · 1 steps LLM {{duration}} TTFT avg {{duration}}
+- button "1 turns · 1 steps":
+  - img
+  - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"

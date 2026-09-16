@@ -1,14 +1,20 @@
 /** Workbench controls, Workspace/session chooser, and compact pane tabs. */
 import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { Button, IconChevronDownOutline14, IconPlusOutline16, Menu, Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
+  IconPlusOutline16, IconTrashOutline16, Menu, Modal, StateDot,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { AddPaneResult, ConversationViewportMode, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkbenchStore } from '../stores.ts'
 import { NS } from '../locales.ts'
 import { loadWorkbenchCatalog, type WorkbenchCatalog, type WorkbenchConversation } from '../catalog.ts'
 import css from './Workbench.module.css'
+import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceResource } from './WorkspaceFileBrowser.tsx'
+import { WorkspaceFilePreview, type ReadWorkspacePreview } from './WorkspaceFilePreview.tsx'
 
 interface Actions {
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
@@ -20,10 +26,19 @@ interface Actions {
   switchWorkbench?: (id: string) => void
   chooseSession: (item: WorkbenchConversation, replace: boolean) => Promise<AddPaneResult>
   focusSession: (id: SessionId) => void
-  createSession: (target: { kind: 'personal' } | { kind: 'project'; projectId: number }, replace: boolean) => Promise<AddPaneResult>
+  createSession: (target: SessionRuntimeTarget, replace: boolean) => Promise<AddPaneResult>
   hydrateCatalog?: (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => Promise<void>
   markCatalogReady?: () => void
   setMode: (mode: ConversationViewportMode) => void
+  readPreview?: ReadWorkspacePreview
+  readBytesPreview?: import('./WorkspaceFilePreview.tsx').ReadWorkspaceBytesPreview
+  listWorkspaceDirectory?: ListWorkspaceDirectory
+  openWorkspaceResource?: OpenWorkspaceResource
+  resources?: WorkspaceResourceRegistry | undefined
+  /** Provider availability for the addressed Session's runtime, evaluated at render time. */
+  filesAvailable?: (() => boolean) | undefined
+  /** Open the Workspace file browser for the active Session and runtime target. */
+  openFiles?: (() => void) | undefined
 }
 type Props = PropsRuntime<'conversation.workbench.toolbar'> & PropsLocale<typeof NS>
   & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions
@@ -45,9 +60,10 @@ export function WorkbenchToolbar({
   viewport, tabbed, inline = false, useStore, actions, useSessions, useWorkspaces,
   chooseSession, focusSession, createSession, hydrateCatalog, markCatalogReady, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
-  duplicateWorkbench, deleteWorkbench, t,
+  duplicateWorkbench, deleteWorkbench, readPreview, readBytesPreview,
+  listWorkspaceDirectory, openWorkspaceResource, resources, filesAvailable, openFiles, t,
 }: Props) {
-  const { pickerOpen, replace } = useStore(state => state)
+  const { pickerOpen, replace, preview, browser } = useStore(state => state)
   const sessions = useSessions(s => s)
   const workspaces = useWorkspaces(s => s)
   const [query, setQuery] = useState('')
@@ -79,6 +95,19 @@ export function WorkbenchToolbar({
     return () => { abort.abort() }
   }, [pickerOpen])
   const full = viewport.paneIds.length >= 4 && !replace
+  // The root crumb names the owning pane's Workspace so cross-project browsing
+  // cannot be mistaken for the active pane's scope.
+  const browserSummary = browser === undefined ? undefined : sessions.byId[browser.sessionId]
+  const browserScope = browser === undefined ? undefined
+    : workspaces.items.find(item => item.sessionIds.includes(browser.sessionId))?.title
+      ?? browserSummary?.workspaceName
+      ?? (browser.runtimeTarget.kind === 'project' ? browser.runtimeTarget.projectName : undefined)
+      ?? (browserSummary?.cwd === undefined ? undefined : workspaceTitleOf(browserSummary.cwd) || browserSummary.cwd)
+  const browserLabels = {
+    close: t('previewClose'), title: t('files'), root: browserScope ?? t('filesRoot'), up: t('filesUp'),
+    loading: t('previewLoading'), empty: t('filesEmpty'), directory: t('filesDirectory'),
+    truncated: t('filesTruncated'), error: t('createError'), reload: t('previewReload'),
+  }
   const selectedProject = workspace === 'personal' || workspace === ''
     ? undefined
     : catalog?.projects.find(project => String(project.projectId) === workspace)
@@ -125,9 +154,14 @@ export function WorkbenchToolbar({
     }
     setPending(true)
     setError(undefined)
-    const target = workspace === 'personal'
+    const target: SessionRuntimeTarget = workspace === 'personal'
       ? { kind: 'personal' as const }
-      : { kind: 'project' as const, projectId: Number(workspace) }
+      : {
+        kind: 'project' as const, projectId: Number(workspace),
+        // The name rides the target so a runtime first opened by this create
+        // still stamps workspaceName on its summaries (pane scope label).
+        ...(selectedProject === undefined ? {} : { projectName: selectedProject.name }),
+      }
     void createSession(target, replace).then(finish, (cause: unknown) => {
       setError(cause instanceof Error ? cause.message : t('createError'))
     }).finally(() => { setPending(false) })
@@ -136,6 +170,7 @@ export function WorkbenchToolbar({
   const pickerClass = css.picker ?? ''
   return (
     <div className={css.toolbar} data-workbench-toolbar="" data-inline={inline || undefined} data-tabbed={tabbed || undefined}>
+      {preview !== undefined && readPreview !== undefined && resources !== undefined && <WorkspaceFilePreview key={JSON.stringify([preview.runtimeTarget, preview.address])} request={preview} read={readPreview} readBytes={readBytesPreview} resources={resources} close={actions.closePreview} labels={{ close: t('previewClose'), reload: t('previewReload'), previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), changed: t('previewChanged'), binary: t('previewBinary') }} />}
       <div className={css.toolbarTitle}>
         <Menu open={workbenchMenuOpen} onClose={() => { setWorkbenchMenuOpen(false) }} onSelect={(id) => {
           setWorkbenchMenuOpen(false)
@@ -148,22 +183,44 @@ export function WorkbenchToolbar({
         }} items={[
           ...(listWorkbenches?.() ?? [{ id: 'default', name: '我的工作台', paneIds: [], updatedAt: Date.now() }]).map(item => ({ id: item.id, label: `${item.name} · ${item.paneIds.length}/4` })),
           { type: 'separator' as const, id: 'workbench-actions-separator' },
-          { id: '__new', label: t('newWorkbench') },
-          { id: '__rename', label: t('renameWorkbench') },
-          { id: '__duplicate', label: t('duplicateWorkbench') },
-          { id: '__delete', label: t('deleteWorkbench'), danger: true },
+          { id: '__new', label: t('newWorkbench'), icon: <IconPlusOutline16 /> },
+          { id: '__rename', label: t('renameWorkbench'), icon: <IconEditOutline16 /> },
+          { id: '__duplicate', label: t('duplicateWorkbench'), icon: <IconCopyOutline16 /> },
+          { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true },
           { type: 'separator' as const, id: 'workbench-exit-separator' },
-          { id: '__exit', label: t('exitWorkbench') },
+          { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
         ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label="选择工作台" aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { setWorkbenchMenuOpen(value => !value) }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>
       <div className={css.toolbarActions}>
+        {filesAvailable?.() === true && openFiles !== undefined && (
+          <button
+            type="button"
+            className={css.iconAction}
+            aria-label={t('files')}
+            title={t('files')}
+            onClick={() => { openFiles() }}
+          >
+            <IconFolderOpenOutline16 />
+          </button>
+        )}
         {viewport.mode === 'workbench' && (
           <Button size="sm" variant="toolbar" icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
             {t('add')}
           </Button>
         )}
       </div>
+      {browser !== undefined && listWorkspaceDirectory !== undefined && openWorkspaceResource !== undefined && (
+        <WorkspaceFileBrowser
+          key={`${browser.runtimeTarget.kind}:${browser.runtimeTarget.kind === 'project' ? String(browser.runtimeTarget.projectId) : 'base'}:${browser.sessionId}`}
+          sessionId={browser.sessionId}
+          runtimeTarget={browser.runtimeTarget}
+          list={listWorkspaceDirectory}
+          open={openWorkspaceResource}
+          close={actions.closeBrowser}
+          labels={browserLabels}
+        />
+      )}
       {tabbed && viewport.mode === 'workbench' && (
         <div className={css.tabs} role="tablist" aria-label={t('mode')}>
           {viewport.paneIds.map((id, index) => {

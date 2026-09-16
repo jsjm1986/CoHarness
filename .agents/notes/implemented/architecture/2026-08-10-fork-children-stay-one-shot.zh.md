@@ -14,7 +14,7 @@ fork 与 spawn 的差异在于：fork 会用 parent 已完成轮次的前缀作�
 
 面向模型的 `send_message` 工具在组合中的每个 Agent 上全局注册。因此，可继续 fork child 获得与 parent 相同的工具名称、描述、schema 和顺序。其初始任务追加在继承的 Session 种子之后；当 child 可以看到该工具时，任务还会包含直接 parent id，以及使用 `send_message({ agent_id, message })` 返回结果的指引。
 
-base 与 headless 组合保留 one-shot fork 作为其保守生命周期策略。`code`、`cordis` 和 `standard` 三个 Web 应用 agent preset 可以把 fork 绑定为可继续生命周期，因为该绑定不再插入 child-only 请求头字段。`ForkInProcessProvider.prepareContinuable()` 与 `ctx.subagents.startContinuable()` 仍是这些 preset 使用的实现 seam。
+base 与 headless 组合保留 one-shot fork 作为其保守生命周期策略。`ptc`、`cordis` 和 `standard` 三个 Web 应用 agent preset 可以把 fork 绑定为可继续生命周期，因为该绑定不再插入 child-only 请求头字段。`ForkInProcessProvider.prepareContinuable()` 与 `ctx.subagents.startContinuable()` 仍是这些 preset 使用的实现 seam。
 
 逐字节相同的前缀复用受显式部署选择约束。配置 child persona 或 `toolFilter` 的 fork 委派仍可能改变请求头。尤其是过滤掉 `send_message` 时，child 会同时失去该 schema 与返回指引；运行时不会绕过显式 allow-list。
 

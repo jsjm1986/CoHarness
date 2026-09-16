@@ -8,10 +8,11 @@ import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import { Session, SessionId, type SessionEvent, type UserMessage } from '@deepseek-ai/dsh-session'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import AgentRegistry, { agentEvents, Inbox, type Agent, type PreStepDecision } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents, type Agent, type PreStepDecision } from '@deepseek-ai/dsh-agent'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import * as toolSkill from '@deepseek-ai/dsh-tool-skill'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -44,7 +45,7 @@ function agentForCwd(cwd: string): Agent {
     id,
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'idle',
     send: () => {},
     followup: () => {},
@@ -61,7 +62,7 @@ function sessionAgent(session: Session, id = 'tool-skill-agent'): Agent {
     id: SessionId(id),
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'running',
     ctx: new Context(),
     send: () => {},
@@ -150,7 +151,7 @@ async function composePrefixForAgent(ctx: Context, agent: Agent, signal = new Ab
 async function mintAgentScope(ctx: Context, subject: string | Agent): Promise<{ agent: Agent; scope: Scope }> {
   const agent = typeof subject === 'string' ? agentForCwd(subject) : subject
   let scope!: Scope
-  await ctx.plugin(Object.assign((inner: Context) => { scope = createScope(inner, agent) }, {
+  await ctx.plugin(Object.assign(async (inner: Context) => { scope = createScope(inner, agent) }, {
     inject: ['tools'],
   }))
   return { agent, scope }
@@ -616,7 +617,7 @@ describe('dsh-tool-skill', () => {
       content: [{ type: 'text', text: 'compacted history' }],
       source: { kind: 'plugin', plugin: 'compact' },
     }), {
-      surfaceOp: { op: 'replace', start: initial.seq, end: initial.seq },
+      surfaceOp: { op: 'replace', startSeq: initial.seq, endSeq: initial.seq },
       sourceEventSeqs: [initial.seq],
     })
 

@@ -7,7 +7,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -48,7 +47,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -61,4 +63,10 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 1 turns · 2 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 0% Input 280 tok · Output 30 tok
+- button "1 turns · 2 steps · {{throughput}} tok/s":
+  - img
+  - text: 1 turns · 2 steps{{throughput}} tok/s
+- button "310 tok · Cache hit 0%":
+  - img
+  - text: 310 tokCache hit 0%
+- separator "Adjust transcript content width"

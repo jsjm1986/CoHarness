@@ -33,8 +33,6 @@ describe('LayoutController', () => {
     expect(panels.toggleSidebar).toHaveBeenCalledTimes(1)
     expect(panels.openDetails).toHaveBeenCalledTimes(1)
     expect(panels.closeDetails).toHaveBeenCalledTimes(1)
-    expect(panels.setSidebar).not.toHaveBeenCalled()
-    expect(panels.setDetails).not.toHaveBeenCalled()
   })
 
   it('fails loud before the root entry wired its actions', () => {

@@ -11,6 +11,7 @@ import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as Spawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import WorkerThreadWorkflowEngine from '../src/index.ts'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 /**
  * With-key e2e: a REAL script in a REAL worker thread
@@ -35,6 +36,7 @@ async function harness(): Promise<Context> {
   await built.plugin(SystemPrompt)
   await built.plugin(ToolRuntime)
   await built.plugin(AgentRegistry)
+  await built.plugin(SessionProjectionRegistry)
   await built.plugin(AgentLoop, { agents: [] })
   await built.plugin(LlmDeepSeek)
   await built.plugin(SubagentRuntime)

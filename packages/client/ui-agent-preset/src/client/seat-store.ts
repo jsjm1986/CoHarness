@@ -10,7 +10,7 @@
  * deployment default again, matching the workspace picker beside it.
  */
 
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   createSnapshotStore, type SessionId, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -63,7 +63,7 @@ export class AgentPresetSeatController {
   private staged: string | undefined
 
   constructor(
-    private readonly api: Pick<IApiClient, 'agentPresets'>,
+    private readonly remote: Pick<ClientRemote, 'agentPresets'>,
     /** The session the hero is about to hand over to, when there is one. */
     private readonly currentSession: () => SeatSessionSummary | undefined,
     /**
@@ -84,12 +84,12 @@ export class AgentPresetSeatController {
    */
   async load(): Promise<void> {
     try {
-      const response = await this.api.agentPresets.list({})
-      if (!response.result.ok) {
-        this.set({ error: response.result.error.message })
+      const response = await this.remote.agentPresets.list()
+      if (!response.ok) {
+        this.set({ error: response.error.message })
         return
       }
-      const { presets } = response.result.value
+      const { presets } = response.value
       this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
       this.set({
         options: presetOptions(presets),
@@ -160,18 +160,25 @@ export class AgentPresetSeatController {
     }
     this.set({ busy: true, error: null })
     try {
-      const response = await this.api.agentPresets.select({ sessionId: session.id, agentPreset: staged })
+      const response = await this.remote.agentPresets.select(session.id, staged)
       this.staged = undefined
-      if (!response.result.ok) {
-        const { error } = response.result
+      if (!response.ok) {
+        const { error } = response
         const detail = error.details
-        const reason = 'reason' in detail ? detail.reason : undefined
+        // A refusal carries its cause twice: `message` wraps it in the
+        // roster's own frame, which names the preset the surface reporting
+        // this already names, and a `reason` detail holds the same cause
+        // without it. Read by the detail rather than by the code, because
+        // every refusal that has a cause to give names it the same way.
+        const reason = 'reason' in detail && typeof detail.reason === 'string'
+          ? detail.reason
+          : undefined
         this.set({ busy: false, error: reason ?? error.message, current: this.fallback })
         return
       }
       // Consumed: the next new session opens on the deployment default again.
-      this.set({ busy: false, current: response.result.value.agentPreset })
-      this.onApplied?.(session.id, response.result.value.agentPreset)
+      this.set({ busy: false, current: response.value })
+      this.onApplied?.(session.id, response.value)
     } catch (error) {
       this.staged = undefined
       this.set({ busy: false, error: messageOf(error), current: this.fallback })

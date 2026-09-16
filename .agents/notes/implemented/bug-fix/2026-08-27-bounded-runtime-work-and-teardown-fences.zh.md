@@ -10,7 +10,7 @@ Gateway 与 SDK 传输、提供方流、持久化写入器和文档 broker 可�
 
 ## Decision
 
-每个不受信任或节奏由外部控制的流，都在接纳点拥有一个正数上限。JSON-RPC 限制输入行字节数、待处理请求、并发入站处理器、输出缓冲、session 数量、提示词块数量和提示词字节数；TypeScript 与 Python reader 会保留分片行，避免反复复制前缀。DeepSeek 限制提供方错误体、未完成 SSE 帧、生成文本和流式工具参数。Code Mode、会话持久化与文档传输限制保留队列、计划和响应体。Gateway 代理操作拥有可配置的超时和响应字节上限。
+每个不受信任或节奏由外部控制的流，都在接纳点拥有一个正数上限。JSON-RPC 限制输入行字节数、待处理请求、并发入站处理器、输出缓冲、session 数量、提示词块数量和提示词字节数；TypeScript 与 Python reader 会保留分片行，避免反复复制前缀。DeepSeek 限制提供方错误体、未完成 SSE 帧、生成文本和流式工具参数。PTC mode、会话持久化与文档传输限制保留队列、计划和响应体。Gateway 代理操作拥有可配置的超时和响应字节上限。
 
 运行时工作从授权开始一直持有 operation reference，直到响应最后一个字节完成，因此 idle 回收不会在活动请求下停止进程。就绪检查使用绑定启动 token、nonce 和精确运行时身份的 HMAC challenge。Settings 注册、客户端会话 scope、动态 Host/Client runner 和子进程所有者会在拆卸前关闭接纳，并等待已启动的工作；迟到的 loader 条目和进程树会获得显式清理。带 revision 的模型 projection 会在使用前刷新并异步重试，因此数据库变更已经提交时，不会仅因文件 projection 暂时不可用就被报告为事务失败。
 
@@ -84,4 +84,4 @@ Gateway 推送发送方会在 Token 分类前把 FCM 和 JPush 错误 body 限�
 
 ## Verification
 
-聚焦测试覆盖 Code Mode 调度器故障与队列准入、settings watcher 停稳与机密脱敏、动态 runner 超时与迟到条目移除、本地进程树终止、Gateway readiness 与响应预算、串行实例 lease、文档传输 lease 与回收站保留、有界浏览器上传元数据、JSON-RPC 与 SDK 队列／超时上限、DeepSeek 流与 wire 结构预算、持久化写入上限和按 id revision、带 revision 的模型治理、有界客户端血缘遍历、分离历史缓存校验、安全整数归档 revision 耗尽、可继续 Activation 配额的准入与释放、分批归档同步与读取序号下限，以及可重复读会话加载。TypeScript typecheck、合同 lint 和对应包测试均针对最新源码树执行。
+聚焦测试覆盖 PTC mode 调度器故障与队列准入、settings watcher 停稳与机密脱敏、动态 runner 超时与迟到条目移除、本地进程树终止、Gateway readiness 与响应预算、串行实例 lease、文档传输 lease 与回收站保留、有界浏览器上传元数据、JSON-RPC 与 SDK 队列／超时上限、DeepSeek 流与 wire 结构预算、持久化写入上限和按 id revision、带 revision 的模型治理、有界客户端血缘遍历、分离历史缓存校验、安全整数归档 revision 耗尽、可继续 Activation 配额的准入与释放、分批归档同步与读取序号下限，以及可重复读会话加载。TypeScript typecheck、合同 lint 和对应包测试均针对最新源码树执行。

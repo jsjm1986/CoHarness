@@ -3,11 +3,10 @@
     - tab "Chat" [selected]
     - tab "Trajectory"
   - navigation "Session hierarchy":
-    - button "{{workspace}}" [disabled]
+    - button "WIRE_USER_01" [disabled]
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -37,7 +36,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -58,7 +63,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -79,7 +90,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -100,7 +117,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -121,7 +144,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -142,7 +171,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -171,7 +206,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Usage 900 tok · Cache hit 75%":
+  - img
+  - text: Usage 900 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "Process details" [expanded]:
   - text: Process details
   - img
@@ -188,7 +229,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -203,4 +247,10 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 8 turns · 9 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 75% Input 3.2K tok · Output 400 tok
+- button "8 turns · 9 steps · {{throughput}} tok/s":
+  - img
+  - text: 8 turns · 9 steps{{throughput}} tok/s
+- button "3.6K tok · Cache hit 75%":
+  - img
+  - text: 3.6K tokCache hit 75%
+- separator "Adjust transcript content width"

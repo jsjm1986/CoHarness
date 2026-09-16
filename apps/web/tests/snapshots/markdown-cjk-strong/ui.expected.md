@@ -7,7 +7,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -48,7 +47,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -61,4 +63,7 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 1 turns · 1 steps LLM {{duration}}
+- button "1 turns · 1 steps":
+  - img
+  - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"

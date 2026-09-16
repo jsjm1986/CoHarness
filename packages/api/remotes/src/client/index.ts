@@ -1,23 +1,32 @@
 /** Platform-neutral assembly of generated Host Remote contributions. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import agentPresetsRemote from '@deepseek-ai/dsh-agent-presets/remote'
 import commandsRemote from '@deepseek-ai/dsh-commands/remote'
 import goalsRemote from '@deepseek-ai/dsh-goal/remote'
+import llmRemote from '@deepseek-ai/dsh-llm/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
+import sessionFeedbackRemote from '@deepseek-ai/dsh-command-feedback/remote'
 import sessionReferencesRemote from '@deepseek-ai/dsh-session-reference/remote'
+import subagentsRemote from '@deepseek-ai/dsh-subagent/remote'
 import type { TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 
 export type { TypertClientRemote as ClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 export type { PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
+export type {} from '@deepseek-ai/dsh-agent-presets/remote'
 export type {} from '@deepseek-ai/dsh-commands/remote'
 export type {} from '@deepseek-ai/dsh-file-reference/remote'
 export type {} from '@deepseek-ai/dsh-goal/remote'
+export type {} from '@deepseek-ai/dsh-llm/remote'
 export type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 export type {} from '@deepseek-ai/dsh-message-feedback/remote'
+export type {} from '@deepseek-ai/dsh-command-feedback/remote'
 export type {} from '@deepseek-ai/dsh-session-reference/remote'
+export type {} from '@deepseek-ai/dsh-subagent/remote'
+export type * from '@deepseek-ai/dsh-subagent/client'
 // The forwarded-event allowlist's selection seat: without it in the consumer's
 // compilation face `TypertRemoteEvent` is `never` and every `$on` call fails.
 export type { ApiRemoteForwardedEvent } from '../types.ts'
@@ -29,6 +38,8 @@ export type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
 export type {} from '@deepseek-ai/dsh-credentials/types'
 export type {} from '@deepseek-ai/dsh-llm/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/types'
+export type {} from '@deepseek-ai/dsh-command-feedback/types'
+export type {} from '@deepseek-ai/dsh-collaboration/types'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
 /**
@@ -44,7 +55,7 @@ export type {
   RpcRequest, RpcResponse, RpcResult, SessionDraftId, SessionId, SessionModels, SessionSearchItem,
   SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
   SubagentAddress, SubagentCatalog, SubagentPromptContentPart, JobView, ToolCallView, ToolEventView, ToolResultView,
-  WorkspaceId, WorkspaceView,
+  WorkspaceId, WorkspaceView, WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-client-connection/client'
 export type {} from '@deepseek-ai/dsh-api-gateway/client'
 export type {} from '@deepseek-ai/dsh-cordis-host-runner/remote'
@@ -95,6 +106,13 @@ export type { JsonValue } from '@deepseek-ai/dsh-session/types'
 export type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
 export type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-session-reference/types'
 
+// The Remote failure vocabulary, re-exported so business packages keep naming
+// this assembly alone. Types only: a value export would make spec imports load
+// this module's owner /remote artifacts.
+export type {
+  RemoteErrorCode, RemoteErrorDetailsMap, RemoteFailure, RemoteResult,
+} from '@deepseek-ai/dsh-typert-protocol'
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Generated Remote namespaces selected by this Client assembly. */
@@ -114,8 +132,9 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, goalsRemote, dynamicRemote, fileReferencesRemote,
-      pluginInventoryRemote, messageFeedbackRemote, sessionReferencesRemote,
+      agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
+      fileReferencesRemote, pluginInventoryRemote, messageFeedbackRemote, sessionFeedbackRemote,
+      sessionReferencesRemote, subagentsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

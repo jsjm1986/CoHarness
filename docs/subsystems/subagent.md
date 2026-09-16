@@ -8,6 +8,8 @@ Service Definition: [dsh-subagent](../../packages/subagent/subagent) (`ctx.subag
 
 Sources: [`packages/subagent/subagent/src/types.ts`](../../packages/subagent/subagent/src/types.ts), [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts), and [`packages/subagent/subagent/src/continuation.ts`](../../packages/subagent/subagent/src/continuation.ts)
 
+The `subagentCatalog` projection exposes `SubagentCatalogEntry[]` in parent event order through Session observations and client snapshots. Each entry contains the child id, creation time, mode, and mode-dependent label; fork-inherited catalog facts are excluded. [The subagent package](../../packages/subagent/subagent/README.md) owns catalog creation and persistence semantics.
+
 ## Two kinds of capability, discovered two ways
 
 A provider advertises its **start-time** features on a static descriptor the service checks BEFORE a one-shot run exists; a request that needs one the provider lacks is rejected loud (`SubagentError('UNSUPPORTED_CAPABILITY')`), never accepted-then-ignored. Those flags describe only the one-shot [`start()`](#the-provider-contract-subagentprovider) path, where the provider composes the child. **Continuable** children are composed by the continuation manager itself, so they are gated by one optional method whose presence IS the capability, with TS narrowing as the discovery mechanism: [`SubagentProvider.prepareContinuable`](#the-provider-contract-subagentprovider).
@@ -250,7 +252,7 @@ interface ContinuableCreateSpec {
 }
 ```
 
-The descriptor (`SubagentDescriptorData` in [descriptor.ts](../../packages/subagent/subagent/src/descriptor.ts)) is a mode-discriminated durable identity for every session-backed subagent. Both modes carry the provider name. A `one-shot` descriptor optionally carries a caller-owned display `label`; a `continuable` descriptor requires the delegation `description` as its durable creation label and additionally snapshots resolved child `agentOptions.provider`/`model` and optional `persona`/`toolFilter` for cold resume. It never snapshots the merge-extensible `AgentOptions` object, so an unrelated extension value cannot break continuation and a later composition input is a deliberate version change. It omits `subagentDepth` (cold resume trusts the persisted header's `delegationDepth` as the monotone floor) and `outputSchema` (one run or Activation's result contract, not durable identity).
+The descriptor (`SubagentDescriptorData` in [descriptor.ts](../../packages/subagent/subagent/src/descriptor.ts)) is a mode-discriminated durable identity for every session-backed subagent. Both modes carry the provider name. A `one-shot` descriptor optionally carries a caller-owned display `label`; a `continuable` descriptor requires the delegation `description` as its durable creation label and additionally snapshots resolved child `agentOptions.provider`/`model`/`reasoningEffort` and optional `persona`/`toolFilter` for cold resume. It never snapshots the merge-extensible `AgentOptions` object, so an unrelated extension value cannot break continuation and a later composition input is a deliberate version change. It omits `subagentDepth` (cold resume trusts the persisted header's `delegationDepth` as the monotone floor) and `outputSchema` (one run or Activation's result contract, not durable identity).
 
 A local one-shot provider appends the descriptor inside the child's initial turn before its first request. The continuation manager appends the descriptor after any provider-supplied lineage and before the initial prompt is admitted; `Session.inheritedEventCount` remains the fork-lineage boundary: resume-time descriptor authority reads the child's own suffix, while the list-serving identity projection folds `subagent/descriptor` last-wins so the child's own descriptor overrides a fork-seeded ancestor's. A seeded cold list skips a cache hint until an authoritative observation supplies that exact cut. The event is log-only: no `surfaceOp`, never in model history, and retained across compaction by the append-only log. Malformed current-version descriptors are corrupt; unsupported versions cannot be classified by this runtime.
 
@@ -452,7 +454,7 @@ The spawn and fork backends create an ordinary one-shot agent through `parent.ct
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxsubagentmodelselection--subagentmodelselectionconfig"></a>
 
@@ -468,7 +470,7 @@ Singleton settings owner read by delegation tools when an Agent is published.
 current(): SubagentModelSelectionSettings
 ```
 
-Source: [`packages/subagent/tool-subagent/src/model-selection-settings.ts:45`](../../packages/subagent/tool-subagent/src/model-selection-settings.ts)
+Source: [`packages/subagent/tool-subagent/src/model-selection-settings.ts`](../../packages/subagent/tool-subagent/src/model-selection-settings.ts)
 
 <a id="ctxsubagents--subagentruntime"></a>
 
@@ -593,6 +595,62 @@ listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<Subagent
 listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>
 
 /**
+ * Remote face of {@link listChildren} for one browser: the durable listing
+ * plus live Agent activity and the delivery-time parent availability hint.
+ * Parent availability is a hint; {@link prompt} performs the authoritative
+ * check. Named apart from the provider-name {@link list}, which owns the
+ * member.
+ * @param parentSessionId - parent session whose direct children are listed.
+ * @param signal - carrier cancellation forwarded to Session queries.
+ * @returns the catalog view for that parent.
+ * @throws {RemoteError} `gateway/bad-request` for an empty parent id,
+ *   `collaboration-forbidden` for a refused Session authorization,
+ *   `gateway/cancelled` for an aborted read,
+ *   `subagent/projections-unavailable` when the deployment has no projection
+ *   registry, otherwise `gateway/internal`.
+ */
+@Remote('list') async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog>
+
+/**
+ * Deliver one browser-authored message to a continuable child through the
+ * exact live direct parent, retaining the caller-minted request identity,
+ * validated browser zone, and authenticated project participant on the
+ * accepted message. Success identifies the message the child's inbox
+ * accepted; later execution is independent of this call. Queue delivery
+ * targets a later turn; steer delivery targets the nearest step and retains
+ * the Agent loop's best-effort fallback semantics. Image parts are admitted
+ * and persisted through the attachment store before delivery, and the
+ * child's model must accept image input.
+ * @param request - durable address, delivery, minted identity, content, and optional browser zone.
+ * @param signal - carrier cancellation, owning the call until inbox acceptance.
+ * @returns the accepted message's inbox identity.
+ * @throws {RemoteError} `gateway/bad-request`, `collaboration-forbidden`,
+ *   `subagent/attachment-invalid`, `subagent/invalid-time-zone`,
+ *   `subagent/parent-unavailable`, `subagent/not-resumable`,
+ *   `subagent/unauthorized`, `subagent/delivery-unavailable`,
+ *   `gateway/cancelled`, or `gateway/internal`.
+ */
+@Remote('prompt') async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt>
+
+/**
+ * Remote face of {@link interrupt} under one durable parent address. No
+ * catalog, history, persistence, or parent Agent lookup runs: the Session
+ * authorization tiers and the core primitive's lineage check together
+ * authorize the address, which is what keeps a live child interruptible
+ * while its parent Agent is offline. Absent, idle, and already-completed
+ * targets are accepted no-ops there.
+ * @param childSessionId - durable child session id to interrupt.
+ * @param parentSessionId - durable direct parent whose authority is claimed.
+ * @param mode - required continuable-address discriminator.
+ * @returns acknowledgement that the cancel signal was admitted, not that the target is quiescent.
+ * @throws {RemoteError} `gateway/bad-request` for an empty id,
+ *   `collaboration-forbidden` for a refused Session authorization,
+ *   `subagent/unauthorized` when the address does not own the live target,
+ *   otherwise `gateway/internal`.
+ */
+@Remote('interruptByParent') async interruptByParent( childSessionId: SessionId, parentSessionId: SessionId, mode: 'continuable', ): Promise<SubagentInterruptReceipt>
+
+/**
  * Register a provider under its name. Registration is effect-scoped and HMR
  * safe; removing a provider blocks new starts but does not revoke runs that
  * were already returned to their holders.
@@ -620,6 +678,8 @@ list(): string[]
  * fulfills; a rejection therefore has no run for the caller to dispose and
  * emits no run lifecycle events. Post-publication turn and infrastructure
  * failures settle through the returned run.
+ * A catalog append failure disposes the run and handles its result rejection;
+ * the caller receives the catalog error even if disposal also fails.
  * @param name - the provider to use.
  * @param request - child label, prompt, parent, signal, and optional capabilities.
  * @returns the published holder-owned run.
@@ -629,7 +689,7 @@ async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
 
 Types: [Agent](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:188`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagent-events"></a>
 
@@ -655,7 +715,29 @@ A published child settled. Scope-filtered dispatch uses the same delegating pare
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:162`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
+
+<a id="subagentprompt-admission--serial"></a>
+
+#### `subagent/prompt-admission` — serial
+
+Admit one continuable prompt's uploaded content before the child inbox accepts it. The first listener returning blocks owns admission; returning `undefined` defers to the next listener, then to the attachment store.
+
+```ts cordis-catalog
+/**
+ * Admit one continuable prompt's uploaded content before the child inbox
+ * accepts it. The first listener returning blocks owns admission; returning
+ * `undefined` defers to the next listener, then to the attachment store.
+ * @param parent - live Agent of the prompting parent Session.
+ * @param content - ordered wire prompt parts awaiting durable admission.
+ * @mode serial
+ */
+'subagent/prompt-admission'( parent: Agent, content: readonly SubagentPromptContentPart[], ): Promise<AdmittedPromptContentPart[] | undefined> | AdmittedPromptContentPart[] | undefined
+```
+
+Types: [AdmittedPromptContentPart](attachment.md) · [Agent](core.md)
+
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-added--emit"></a>
 
@@ -672,7 +754,7 @@ A provider became resolvable in the registry.
 'subagent/provider-added'(provider: SubagentProvider): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:136`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-removed--emit"></a>
 
@@ -689,7 +771,7 @@ A provider left the registry. Accepted runs remain holder-owned.
 'subagent/provider-removed'(name: string): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:142`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentstart--emit"></a>
 
@@ -713,5 +795,5 @@ A provider established a published child. For in-process providers, `ctx.agents.
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:153`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -14,7 +14,7 @@ import { waitingPage } from './html.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
-import type { GatewayDeps, GatewayRequestContext, ProxyHandler, UpgradeHandler } from './server.ts'
+import type { GatewayAccessInvalidation, GatewayDeps, GatewayRequestContext, ProxyHandler, UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
   return (req.headers.accept ?? '').includes('text/html')
@@ -64,13 +64,22 @@ function scrubRuntimeHeaders(req: IncomingMessage): void {
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
-): { proxy: ProxyHandler; upgrade: UpgradeHandler; close(): void } {
+): { proxy: ProxyHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; close(): void } {
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
     xfwd: true,
     proxyTimeout: cfg.upstreamTimeoutMs,
     timeout: cfg.upstreamTimeoutMs,
   })
+  const active = new Set<{ context: GatewayRequestContext; cancel(): void }>()
+  const invalidateAccess: GatewayAccessInvalidation = (subject) => {
+    for (const operation of [...active]) {
+      const { user, scope } = operation.context
+      if (subject.userId !== undefined && subject.userId !== user.id) continue
+      if (subject.projectId !== undefined && (scope.kind !== 'project' || scope.projectId !== subject.projectId)) continue
+      operation.cancel()
+    }
+  }
   server.on('proxyRes', (proxyResponse) => {
     const location = proxyResponse.headers.location
     if (typeof location === 'string') {
@@ -156,7 +165,7 @@ export function createProxyHandlers(
     }
   }
 
-  const proxy: ProxyHandler = async (req, res, context) => {
+  const proxyRequest: ProxyHandler = async (req, res, context) => {
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
     let ready = await ensureReady(req, res, context)
@@ -270,7 +279,7 @@ export function createProxyHandlers(
     }
   }
 
-  const upgrade: UpgradeHandler = async (req, socket, head, context) => {
+  const upgradeRequest: UpgradeHandler = async (req, socket, head, context) => {
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
     let ready: { port: number; generation: number; target: RuntimeTarget }
@@ -324,5 +333,26 @@ export function createProxyHandlers(
     }
   }
 
-  return { proxy, upgrade, close: () => server.close() }
+  const proxy: ProxyHandler = async (req, res, context) => {
+    const operation = { context, cancel: (): void => { res.destroy() } }
+    active.add(operation)
+    try { await proxyRequest(req, res, context) } finally { active.delete(operation) }
+  }
+  const upgrade: UpgradeHandler = async (req, socket, head, context) => {
+    const operation = { context, cancel: (): void => { socket.destroy() } }
+    active.add(operation)
+    const release = (): void => { active.delete(operation) }
+    socket.once('close', release)
+    try { await upgradeRequest(req, socket, head, context) } catch (error: unknown) {
+      release()
+      socket.destroy()
+      throw error
+    }
+    if (socket.destroyed) release()
+  }
+  return { proxy, upgrade, invalidateAccess, close: () => {
+    invalidateAccess({})
+    active.clear()
+    server.close()
+  } }
 }

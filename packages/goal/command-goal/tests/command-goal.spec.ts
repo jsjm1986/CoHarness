@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import GoalService from '@deepseek-ai/dsh-goal'
 import type { GoalRef } from '@deepseek-ai/dsh-goal'
 import SessionStore, { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import * as commandGoal from '@deepseek-ai/dsh-command-goal'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 interface Harness {
   readonly ctx: Context
@@ -20,23 +21,23 @@ interface Harness {
 function stubAgent(ctx: Context, id: string): { agent: Agent; session: Session } {
   // Store-created: the command executor durably logs lifecycle events on it.
   const session = ctx.sessions.create(SessionId(id))
-  const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
   let status: AgentStatus = 'idle'
   const agent: Agent = {
     id: session.id,
     options: {},
     session,
-    inbox,
+    inbox: unsupportedInbox(),
     ctx: new Context(),
     get status() { return status },
     send: () => {},
     followup: () => {},
     steer: () => {},
-    inject(input) { inbox.append('next-step', input) },
+    inject(input) { this.inbox.append('next-step', input) },
     cancel() { status = 'idle' },
     runMaintenance: task => task(new AbortController().signal),
     whenIdle() { return Promise.resolve() },
   }
+  sessionBackedInbox(agent)
   return { agent, session }
 }
 
@@ -95,6 +96,7 @@ describe('@deepseek-ai/dsh-command-goal registration', () => {
     expect(loader.unwrapExports(commandGoal)).toBe(commandGoal)
 
     expect(test.ctx.commands.list(test.agent)).toContainEqual({
+      definitionId: '@deepseek-ai/dsh-command-goal',
       name: 'goal',
       description: 'set or view the goal for a long-running task',
       input: { hint: '[<objective>|clear|edit <objective>|pause|resume]', images: true },

@@ -6,9 +6,10 @@
  * @module @deepseek-ai/dsh-llm
  */
 
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   GenerateOptions,
   LlmConfigurableProvider,
@@ -281,7 +282,7 @@ export interface LlmRuntimeConfig {
  * The abstract `llm` service: an adapter registry plus a streaming model-call
  * API, interceptable via the `llm/stream` waterfall.
  */
-export class LlmRuntime extends Service {
+export class LlmRuntime extends TypertRemoteService {
   static Config: z<LlmRuntimeConfig> = z.object({
     streamCloseTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(1_000),
   })
@@ -290,7 +291,7 @@ export class LlmRuntime extends Service {
   private directory = new Map<string, LlmConfigurableProvider>()
   private discoveries = new Map<
     string,
-    (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>
+    (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>
   >()
   private readonly streamCloseTimeoutMs: number
 
@@ -426,6 +427,7 @@ export class LlmRuntime extends Service {
    * Describe provider routes with a registered adapter.
    * @returns detached provider metadata in registration order.
    */
+  @Remote
   listProviders(): LlmProviderInfo[] {
     return [...this.adapters.values()].map(({ provider }) => ({ ...provider }))
   }
@@ -497,6 +499,7 @@ export class LlmRuntime extends Service {
    * List every declared configurable provider, registered or dormant.
    * @returns detached directory entries in declaration order.
    */
+  @Remote
   listConfigurableProviders(): LlmConfigurableProvider[] {
     return [...this.directory.values()].map(entry => ({ ...entry, settingsPath: [...entry.settingsPath] }))
   }
@@ -508,12 +511,12 @@ export class LlmRuntime extends Service {
    * directory, and because a provider being *added* has no route to name yet.
    * Disposed with the fiber.
    * @param settingsNs - the namespace whose profiles this discovery serves.
-   * @param discover - interrogates one endpoint; must honor `request.signal`.
+   * @param discover - interrogates one endpoint; must honor `signal`.
    * @returns the disposer that withdraws the offer.
    */
   registerModelDiscovery(
     settingsNs: string,
-    discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>,
+    discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>,
   ): () => void {
     const dispose = this.ctx.effect(function* (this: LlmRuntime) {
       if (settingsNs.length === 0) {
@@ -537,11 +540,13 @@ export class LlmRuntime extends Service {
    * candidate metadata a surface may offer for adoption.
    * @param settingsNs - namespace whose registered discovery serves this draft.
    * @param request - the endpoint, protocol, and one-shot credential to use.
+   * @param signal - caller cancellation.
    * @returns the advertised models, deduplicated in endpoint order.
    */
   async discoverModels(
     settingsNs: string,
     request: LlmModelDiscoveryRequest,
+    signal?: AbortSignal,
   ): Promise<LlmDiscoveredModel[]> {
     const discover = this.discoveries.get(settingsNs)
     if (discover === undefined) {
@@ -552,7 +557,9 @@ export class LlmRuntime extends Service {
     if ((request.provider ?? '').length === 0 && (request.baseURL ?? '').length === 0) {
       throw new LlmError('model discovery needs a provider route or a baseURL', 'INVALID_DISCOVERY')
     }
-    const discovered = await discover(request)
+    const discovered = signal === undefined
+      ? await discover(request)
+      : await discover(request, signal)
     const seen = new Set<string>()
     const models: LlmDiscoveredModel[] = []
     for (const model of discovered) {
@@ -569,6 +576,35 @@ export class LlmRuntime extends Service {
       })
     }
     return models
+  }
+
+  /**
+   * Remote adapter for one draft provider interrogation.
+   * @param settingsNs - namespace whose registered discovery serves this draft.
+   * @param request - endpoint, protocol, and one-shot credential to use.
+   * @param signal - caller cancellation supplied by the Remote carrier.
+   * @returns advertised models in endpoint order.
+   * @throws RemoteError with `llm/model-discovery-rejected` when discovery refuses or fails.
+   */
+  @Remote('discoverModels')
+  async remoteDiscoverModels(
+    settingsNs: string,
+    request: LlmModelDiscoveryRequest,
+    signal: AbortSignal,
+  ): Promise<LlmDiscoveredModel[]> {
+    try {
+      return await this.discoverModels(settingsNs, request, signal)
+    } catch (error: unknown) {
+      throw new RemoteError(
+        'llm/model-discovery-rejected',
+        error instanceof Error ? error.message : String(error),
+        {
+          settingsNs,
+          ...request.baseURL === undefined ? {} : { baseURL: request.baseURL },
+        },
+        { cause: error },
+      )
+    }
   }
 
   /**

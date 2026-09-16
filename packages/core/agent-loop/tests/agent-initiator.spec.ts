@@ -8,6 +8,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 const testToolSignal = new AbortController().signal
 
@@ -24,6 +25,7 @@ async function harness(adapter: LlmAdapter): Promise<Harness> {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   const agentsFiber = await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
   return { ctx, agentsFiber, loopFiber }
@@ -124,11 +126,12 @@ describe('AgentLoop initiator scope', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })
     ctx.llm.registerAdapter(['mock'], adapter)
 
-    const a = ctx.agentLoop.create(SessionId('a'), { provider: 'mock', model: 'mock' })
-    const b = ctx.agentLoop.create(SessionId('b'), { provider: 'mock', model: 'mock' })
+    const a = await ctx.agentLoop.create(SessionId('a'), { provider: 'mock', model: 'mock' })
+    const b = await ctx.agentLoop.create(SessionId('b'), { provider: 'mock', model: 'mock' })
     const idleA = waitForIdle(ctx, a)
     const idleB = waitForIdle(ctx, b)
     send(a, 'a')
@@ -151,7 +154,7 @@ describe('AgentLoop initiator scope', () => {
       textResponse('second done'),
     ])
     const { ctx } = await harness(adapter)
-    const agent = ctx.agentLoop.create(SessionId('signal-owner'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(SessionId('signal-owner'), { provider: 'mock', model: 'mock' })
     let signals: AbortSignal[] = []
     let preStepSignals: AbortSignal[] = []
     const capture = (signal: AbortSignal | undefined): void => {
@@ -383,6 +386,7 @@ describe('AgentLoop initiator scope', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })
     ctx.llm.registerAdapter(['mock'], adapter)
     const service = ctx.agents

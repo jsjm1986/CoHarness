@@ -24,12 +24,12 @@ const VIEW: AccountPreferencesView = {
   values: {
     locale: { preference: 'zh' },
     'ui-theme': { preference: 'dark' },
-    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
+    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15 },
   },
   overrides: {
     locale: { preference: 'zh' },
     'ui-theme': { preference: 'dark' },
-    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
+    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15 },
   },
 }
 
@@ -49,7 +49,7 @@ async function setup() {
         throw new Error('account preference revision conflict')
       }
       if (mutation.namespace === 'ui-conversation'
-        && (mutation.field === 'chatContentWidth' || mutation.field === 'chatFontSize')
+        && (mutation.field === 'chatContentWidth' || mutation.field === 'chatFullWidth' || mutation.field === 'chatFontSize')
         && mutation.operation === 'set') {
         current = {
           ...current,
@@ -153,6 +153,15 @@ describe('Gateway account preferences route', () => {
     })
     expect(write.status).toBe(200)
     expect((await write.json()).values['ui-conversation']).toMatchObject({ chatContentWidth: 920, chatFontSize: 15 })
+
+    const fill = await fetch(`${base}/account/api/preferences`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'chatFullWidth', operation: 'set', value: false, expectedRevision: 5,
+      }),
+    })
+    expect(fill.status).toBe(200)
+    expect((await fill.json()).values['ui-conversation']).toMatchObject({ chatFullWidth: false })
   })
 
   it('rejects out-of-range conversation display fields before the service runs', async () => {
@@ -165,6 +174,13 @@ describe('Gateway account preferences route', () => {
       }),
     })
     expect(write.status).toBe(400)
+    const mistyped = await fetch(`${base}/account/api/preferences`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'chatFullWidth', operation: 'set', value: 'yes', expectedRevision: 4,
+      }),
+    })
+    expect(mistyped.status).toBe(400)
     expect(mutate).not.toHaveBeenCalled()
   })
 

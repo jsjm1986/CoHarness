@@ -161,12 +161,13 @@ interface TodoItem {
 
 ### 请求头事件：`request/header`
 
-请求信封（即 `EpochHeader`：调用配置 + 适配器所提供默认值的标记 + 渲染后的系统提示词 + 已组装的工具 schema）会作为会话状态写入日志，因此每个对话请求都是日志的纯函数（见可重建性 Agent Note）。带有 reason `'initial'` 或 `'resume'` 的完整 `request/header` 快照记录每个 agent loop 实例的边界；之后请求发生变化时，系统会以 reason `'change'` 记录另一份完整快照。`foldRequestHeader(events)` 通过选择最新快照重建请求头。该事件不是 `SurfaceEventType`，不产生 LLM 消息。
+请求信封（即 `EpochHeader`：调用配置 + 适配器所提供默认值的标记 + 已组装的工具 schema）会作为会话状态写入日志，因此每个对话请求都是日志的纯函数（见可重建性 Agent Note）。渲染后的系统提示词则属于派生历史：一个 `system/message` surface 事件，与其他 surface 节点一样计价和回放。带有 reason `'initial'` 或 `'resume'` 的完整 `request/header` 快照记录每个 agent loop 实例的边界；之后请求发生变化时，系统会以 reason `'change'` 记录另一份完整快照。`foldRequestHeader(events)` 通过选择最新快照重建请求头。该事件不是 `SurfaceEventType`，不产生 LLM 消息。
 
 ```ts type-equiv
 /**
- * Logged request state outside derived history: call config, system prompt, and
- * tools. The latest full `request/header` snapshot reconstructs it; canonical
+ * Logged request state outside derived history: call config and tools. The
+ * system prompt is derived history — a `system/message` surface event. The
+ * latest full `request/header` snapshot reconstructs the header; canonical
  * empty optional fields are absent.
  */
 interface EpochHeader {
@@ -174,14 +175,12 @@ interface EpochHeader {
   config: LlmCallConfig
   /** Effective config fields materialized from the exact adapter rather than proposed by a caller. */
   adapterDefaults?: LlmCallConfigAdapterDefaults
-  /** Rendered system prompt text; absent for a system-less request. */
-  system?: string
   /** Assembled tool schemas; absent for a tool-less request. */
   tools?: ToolSchema[]
 }
 ```
 
-规范形式：空系统提示词和空工具列表都表示为字段缺失，与请求构建方式一致。包含旧版 `request/header-delta` 事件或完整快照原因为 `fallback` 的旧版 v0 日志，会在 seed、append 和持久化加载边界被拒绝，而不会以不完整方式回放。
+规范形式：空工具列表表示为字段缺失，与请求构建方式一致。包含旧版 `request/header-delta` 事件或完整快照原因为 `fallback` 的旧版 v0 日志，会在 seed、append 和持久化加载边界被拒绝，而不会以不完整方式回放。
 
 ### 路由容量事件：`request/context`
 
@@ -310,19 +309,24 @@ type SurfaceEventType =
  *
  * - `'append'`: added to the tail — normal path for user/assistant/tool
  *   messages.
- * - `{ op: 'replace', start, end }`: replaces surface nodes from `start`
- *   (inclusive) through `end` (inclusive) with this node. Both must exist as
- *   surface nodes in the current surface. `start === end` replaces a single
+ * - `{ op: 'replace', startSeq, endSeq }`: replaces surface nodes from `startSeq`
+ *   (inclusive) through `endSeq` (inclusive) with this node. Both must exist as
+ *   surface nodes in the current surface. `startSeq === endSeq` replaces a single
  *   node. The node's {@link SessionEvent.sourceEventSeqs} must include every
  *   shadowed surface node. Used by compaction; any surface-replacing producer
- *   may use it.
+ *   may use it. When node 0 holds a `system/message`, a range covering it must
+ *   be a `system/message` over exactly that node.
+ *
+ * Readers also accept the pre-rename `start`/`end` keys on committed log
+ * entries and normalize them to `startSeq`/`endSeq`; writers always emit the
+ * canonical keys.
  */
 type SurfaceOp =
   | 'append'
-  | { op: 'replace'; start: SessionSeq; end: SessionSeq }
+  | { op: 'replace'; startSeq: SessionSeq; endSeq: SessionSeq }
 ```
 
-`'append'` 是常规的尾部追加路径。`replace` 会遮蔽从 `start` 到 `end`（含两端）的 surface 条目（两者都必须是有效的 surface seq；`start === end` 时仅替换单个条目），并在原位置插入新事件。
+`'append'` 是常规的尾部追加路径。`replace` 会遮蔽从 `startSeq` 到 `endSeq`（含两端）的 surface 条目（两者都必须是有效的 surface seq；`startSeq === endSeq` 时仅替换单个条目），并在原位置插入新事件。当节点 0 持有 `system/message` 时，覆盖它的区间必须是一个恰好只替换该节点的 `system/message`。
 
 ### `SurfaceIntent`：`session.append()` 的参数
 
@@ -695,7 +699,7 @@ interface TurnEndReasonMap {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxsessions--sessionstore"></a>
 
@@ -831,7 +835,7 @@ fork(source: SessionForkSource, boundary?: SessionSeq, childSessionId?: SessionI
 
 Types: [CreateSessionOptions](persistence.zh.md) · [PrepareSessionOptions](persistence.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/core/session/src/index.ts:930`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="session-events"></a>
 
@@ -860,7 +864,7 @@ Creation announcement during session publication. A synchronous throw vetoes and
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/session/src/index.ts:66`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="sessiondisposed--emit"></a>
 
@@ -883,7 +887,7 @@ Emitted once when an announced session leaves the store, including publication r
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/session/src/index.ts:76`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="sessionevent--emit"></a>
 
@@ -908,7 +912,7 @@ Post-commit, fire-and-forget append feed. The listener snapshot resolves before 
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/session/src/index.ts:88`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
 <a id="sessionflush--parallel"></a>
 
@@ -930,5 +934,5 @@ Awaited parallel durability checkpoint: every listener runs and the caller await
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/session/src/index.ts:97`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 <!-- END GENERATED cordis-surface -->

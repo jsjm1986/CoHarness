@@ -29,5 +29,13 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    server: {
+      deps: {
+        // Workspace sources import zustand outside the vite root; externalized
+        // copies would resolve their react import against a second instance,
+        // so it stays in the vite pipeline where dedupe applies.
+        inline: [/zustand/],
+      },
+    },
   },
 })

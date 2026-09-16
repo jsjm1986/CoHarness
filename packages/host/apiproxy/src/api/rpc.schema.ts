@@ -8,7 +8,7 @@
 import { z } from 'zod'
 import type { z as zCore } from 'zod'
 type ZodIssue = zCore.core.$ZodIssue
-import type { ClientRequest, ClientResponse, RpcError, RpcId, RpcReceipt, ServerRequest, ServerResponse } from './rpc.ts'
+import type { ClientRequest, ClientResponse, RpcId, RpcReceipt, RpcWireFailure, ServerRequest, ServerResponse } from './rpc.ts'
 
 /**
  * Wire widening of a contract type: widens every property (deeply) to `original | undefined`.
@@ -30,8 +30,8 @@ export type Wire<T> = T extends readonly (infer E)[] ? Wire<E>[]
  */
 export const rpcIdSchema = z.string() as unknown as z.ZodType<RpcId>
 
-/** Error body: discriminated by code, per-branch details aligned to RpcErrorDetailsMap; details is required. */
-export const rpcErrorSchema: z.ZodType<RpcError> = z.discriminatedUnion('code', [
+/** Error body for the handwritten /api domain: discriminated by `code`, with per-branch details aligned to `RpcErrorDetailsMap`. */
+const rpcDomainErrorSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('bad-request'), message: z.string(), details: z.object({ issues: z.array(z.custom<ZodIssue>()) }) }),
   z.object({ code: z.literal('cancelled'), message: z.string(), details: z.object({}) }),
   z.object({
@@ -59,6 +59,15 @@ export const rpcErrorSchema: z.ZodType<RpcError> = z.discriminatedUnion('code', 
   z.object({ code: z.literal('workspace-invalid-path'), message: z.string(), details: z.object({ path: z.string() }) }),
   z.object({ code: z.literal('workspace-name-conflict'), message: z.string(), details: z.object({ name: z.string() }) }),
   z.object({ code: z.literal('workspace-move-invalid'), message: z.string(), details: z.object({ workspaceId: z.string(), sessionId: z.string(), beforeSessionId: z.string().optional() }) }),
+  z.object({ code: z.literal('workspace-file/not-found'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/outside-workspace'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/not-directory'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/not-regular-file'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/not-text'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/too-large'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string(), limit: z.number().int().positive() }) }),
+  z.object({ code: z.literal('workspace-file/unsupported-address'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/stale-version'), message: z.string(), details: z.object({ sessionId: z.string(), path: z.string() }) }),
+  z.object({ code: z.literal('workspace-file/unknown-session'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('directory-unreadable'), message: z.string(), details: z.object({ path: z.string() }) }),
   z.object({ code: z.literal('directory-exists'), message: z.string(), details: z.object({ path: z.string() }) }),
   z.object({ code: z.literal('directory-create-failed'), message: z.string(), details: z.object({ path: z.string() }) }),
@@ -100,7 +109,28 @@ export const rpcErrorSchema: z.ZodType<RpcError> = z.discriminatedUnion('code', 
   z.object({ code: z.literal('subagent-unauthorized'), message: z.string(), details: z.object({ childSessionId: z.string() }) }),
   z.object({ code: z.literal('subagent-delivery-unavailable'), message: z.string(), details: z.object({ childSessionId: z.string() }) }),
   z.object({ code: z.literal('internal'), message: z.string(), details: z.object({}) }),
-]) as unknown as z.ZodType<RpcError>
+])
+
+/** Every code the domain catalog declares, lifted from the union literals. */
+const DOMAIN_ERROR_CODES = new Set<string>(
+  rpcDomainErrorSchema.options.map(option => (option.shape.code as z.ZodLiteral<string>).value),
+)
+
+/**
+ * Wire-carried failure: declared domain codes keep the per-branch detail
+ * validation above; Remote codes the Typert Gateway forwards through the same
+ * channel take the generic carrier branch.
+ */
+export const rpcErrorSchema = z.union([
+  rpcDomainErrorSchema as unknown as z.ZodType<RpcWireFailure>,
+  z.object({
+    // Codes the domain catalog declares still owe their per-branch details;
+    // the carrier branch serves only codes the catalog does not know.
+    code: z.string().refine(code => !DOMAIN_ERROR_CODES.has(code)),
+    message: z.string(),
+    details: z.record(z.string(), z.unknown()),
+  }),
+]) as unknown as z.ZodType<RpcWireFailure>
 
 /**
  * Business success/failure result schema (generic, reusable).

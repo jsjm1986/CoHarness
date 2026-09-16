@@ -12,7 +12,6 @@ import {
   interruptedTurnClosers,
   KNOWN_SESSION_EVENT_TYPES,
   materializesSession,
-  SESSION_FORMAT_VERSION,
   SessionLogOffset,
   SessionPreparation,
   SessionSeq,
@@ -28,13 +27,14 @@ import type {
   SessionSeq as SessionSeqType,
 } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { sessionFormatCatalog, type SessionFormatEvent, type SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog, SessionFormatUnsupportedMigrationError, type SessionFormatEvent, type SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import type {
   SessionEventSuffix,
   SessionInspection,
   SessionLocation,
   SessionStorageMetadata,
 } from './index.ts'
+import { SessionPersistenceReadError } from './page.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import { observeQueuedAbort, SessionPreparations } from './preparations.ts'
 import type { SessionPreparationReservation } from './preparations.ts'
@@ -97,9 +97,9 @@ export class SessionFormatUnsupportedError extends Error {
  * @returns the stable refusal text, without a raw-log path suffix.
  */
 export function sessionFormatVersionRefusal(id: string, version: number): string {
-  return version > SESSION_FORMAT_VERSION
-    ? `session "${id}" uses log format v${version}, but this harness reads only v${SESSION_FORMAT_VERSION}: the log was written by a newer harness — upgrade the harness to open it`
-    : `session "${id}" uses log format v${version}, older than the supported v${SESSION_FORMAT_VERSION}, and this build ships no upgrade path for it`
+  return version > sessionFormatCatalog.currentVersion
+    ? `session "${id}" uses log format v${version}, but this harness reads only v${sessionFormatCatalog.currentVersion}: the log was written by a newer harness — upgrade the harness to open it`
+    : `session "${id}" uses log format v${version}, older than the supported v${sessionFormatCatalog.currentVersion}, and this build ships no upgrade path for it`
 }
 
 /** Transform a legacy event sequence through the format chain without intermediate artifacts. */
@@ -242,6 +242,9 @@ export interface PersistenceBackend<TornMarker = unknown> {
     signal?: AbortSignal,
   ): Promise<void>
 
+  /** Set when migrateStored persists transformed event bodies in a new generation. */
+  readonly supportsBodyMigration?: boolean
+
   /** Durably create an empty header-only session artifact. */
   materializeHeader?(storage: SessionStorageMetadata): Promise<void>
 
@@ -377,17 +380,23 @@ function assertSupportedEvents(events: readonly SessionEvent[], id: SessionId): 
   const legacyType: string = 'request/header-delta'
   const legacy = events.find(event => event.type === legacyType)
   if (legacy !== undefined) {
-    throw new Error(`session "${id}" contains unsupported legacy request/header-delta event at seq ${legacy.seq}`)
+    throw new SessionFormatUnsupportedMigrationError(
+      `session "${id}" contains unsupported legacy request/header-delta event at seq ${legacy.seq}`,
+    )
   }
   const legacyModeType: string = 'mode/set'
   const legacyMode = events.find(event => event.type === legacyModeType)
   if (legacyMode !== undefined) {
-    throw new Error(`session "${id}" contains unsupported legacy mode/set event at seq ${legacyMode.seq}`)
+    throw new SessionFormatUnsupportedMigrationError(
+      `session "${id}" contains unsupported legacy mode/set event at seq ${legacyMode.seq}`,
+    )
   }
   const fallback = events.find(event => event.type === 'request/header'
     && (event.data as { reason?: string }).reason === 'fallback')
   if (fallback !== undefined) {
-    throw new Error(`session "${id}" contains unsupported legacy request/header reason "fallback" at seq ${fallback.seq}`)
+    throw new SessionFormatUnsupportedMigrationError(
+      `session "${id}" contains unsupported legacy request/header reason "fallback" at seq ${fallback.seq}`,
+    )
   }
 }
 
@@ -419,9 +428,11 @@ function legacyMessageId(id: SessionId, seq: SessionSeqType): PersistedMessageId
 /** Read a replacement target while leaving malformed surface metadata to the session validator. */
 function replacementStart(event: SessionEvent): SessionSeqType | undefined {
   const op = asRecord((event as SessionEvent & { surfaceOp?: unknown }).surfaceOp)
-  if (op?.['op'] !== 'replace' || typeof op['start'] !== 'number') return undefined
+  if (op?.['op'] !== 'replace') return undefined
+  const start = typeof op['startSeq'] === 'number' ? op['startSeq'] : op['start']
+  if (typeof start !== 'number') return undefined
   try {
-    return SessionSeq(op['start'])
+    return SessionSeq(start)
   } catch {
     return undefined
   }
@@ -564,6 +575,9 @@ function migrateLegacyTurnEndEvent(event: SessionEvent, id: SessionId): SessionE
  * Current-looking malformed events remain untouched so validation rejects them
  * instead of disguising corruption as legacy data.
  */
+/* jscpd:ignore-start -- the same normalization applied to two event
+ * universes: SessionEvent here, SessionFormatEvent in session-format's
+ * normalizeLegacyMessage; the layers' types and id minting differ. */
 function migrateLegacyMessageEvent(
   event: SessionEvent,
   id: SessionId,
@@ -638,6 +652,89 @@ function migrateLegacyMessageEvent(
       return event
   }
 }
+/* jscpd:ignore-end */
+
+/** Rename the pre-PTC dispatch event types; their payloads are unchanged. */
+function migrateLegacyDispatchEvent(event: SessionEvent): SessionEvent {
+  const legacyStart: string = 'tool/code-dispatch-start'
+  const legacySettled: string = 'tool/code-dispatch'
+  if (event.type === legacyStart) return { ...event, type: 'tool/ptc-dispatch-start' } as SessionEvent
+  if (event.type === legacySettled) return { ...event, type: 'tool/ptc-dispatch' } as SessionEvent
+  return event
+}
+
+/** Rename the pre-PTC preset id inside `agent-preset/selected` data. */
+function migrateLegacyPresetEvent(event: SessionEvent): SessionEvent {
+  const selectedType: string = 'agent-preset/selected'
+  if (event.type !== selectedType) return event
+  const data = asRecord(event.data)
+  if (data?.['agentPreset'] !== 'code') return event
+  return { ...event, data: { ...data, agentPreset: 'ptc' } } as SessionEvent
+}
+
+/** Rewrite a pre-PTC `tools-code-mode` plugin attribution on one message record. */
+function migrateLegacyPtcSource(message: Record<string, unknown>): Record<string, unknown> {
+  const source = asRecord(message['source'])
+  if (source?.['kind'] !== 'plugin' || source['plugin'] !== 'tools-code-mode') return message
+  return { ...message, source: { ...source, plugin: 'tools-ptc' } }
+}
+
+/**
+ * Rename pre-PTC `tools-code-mode` source attributions inside the message
+ * carriers this build persists. Stored payloads stay byte-identical; reads
+ * adopt the current plugin name so projections see one vocabulary.
+ */
+function migrateLegacyPtcSources(event: SessionEvent): SessionEvent {
+  const data = asRecord(event.data)
+  if (data === undefined) return event
+  const splicedType: string = 'agent/inbox/spliced'
+  const titleRequestType: string = 'session/title-llm-request'
+  switch (event.type) {
+    case 'user/message':
+      return { ...event, data: migrateLegacyPtcSource(data) } as SessionEvent
+    case 'assistant/message':
+    case 'tool/result': {
+      const message = asRecord(data['message'])
+      if (message === undefined) return event
+      return { ...event, data: { ...data, message: migrateLegacyPtcSource(message) } } as SessionEvent
+    }
+    case splicedType: {
+      const inserted = data['inserted']
+      if (!Array.isArray(inserted)) return event
+      return {
+        ...event,
+        data: {
+          ...data,
+          inserted: inserted.map((item: unknown) => {
+            const message = asRecord(item)
+            return message === undefined ? item : migrateLegacyPtcSource(message)
+          }),
+        },
+      } as SessionEvent
+    }
+    case titleRequestType: {
+      const messages = data['messages']
+      if (!Array.isArray(messages)) return event
+      return {
+        ...event,
+        data: {
+          ...data,
+          messages: messages.map((item: unknown) => {
+            const message = asRecord(item)
+            return message === undefined ? item : migrateLegacyPtcSource(message)
+          }),
+        },
+      } as SessionEvent
+    }
+    default:
+      return event
+  }
+}
+
+/** Rename the pre-PTC preset id on one stored header. */
+function migrateLegacyPtcMeta(meta: SessionHeader): SessionHeader {
+  return meta.agentPreset === 'code' ? { ...meta, agentPreset: 'ptc' } : meta
+}
 
 /** Read the identified message carried by one validated current event. */
 function eventMessageId(event: SessionEvent): PersistedMessageId | undefined {
@@ -654,25 +751,51 @@ function snapshotStoredEvents(events: readonly SessionEvent[], id: SessionId): S
     const migratedStart = migrateLegacyTurnStartEvent(event, id)
     const migratedTurn = migrateLegacyTurnEndEvent(migratedStart, id)
     const migratedSteering = migrateLegacySteeringEvent(migratedTurn, id)
-    const snapshot = snapshotSessionEvent(migrateLegacyMessageEvent(migratedSteering, id, messageIds))
+    const migratedDispatch = migrateLegacyDispatchEvent(migratedSteering)
+    const migratedPreset = migrateLegacyPresetEvent(migratedDispatch)
+    const migratedSource = migrateLegacyPtcSources(migratedPreset)
+    const snapshot = snapshotSessionEvent(migrateLegacyMessageEvent(migratedSource, id, messageIds))
     const messageId = eventMessageId(snapshot)
     if (messageId !== undefined) messageIds.set(snapshot.seq, messageId)
     return snapshot
   })
 }
 
-/** Upgrade and validate an exclusively owned backend result without copying it. */
-function adoptStoredEvents(events: SessionEvent[], id: SessionId): SessionEvent[] {
+/**
+ * Normalize legacy payloads in an exclusively owned backend result without
+ * validating them. Runs before the format chain, which only accepts normalized
+ * legacy carriers; current-generation invariants apply to the migrated output
+ * through {@link adoptStoredEvents}.
+ */
+function normalizeStoredEvents(events: SessionEvent[], id: SessionId): SessionEvent[] {
   assertSupportedEvents(events, id)
   const messageIds = new Map<SessionSeqType, PersistedMessageId>()
   for (const [index, event] of events.entries()) {
     const migratedStart = migrateLegacyTurnStartEvent(event, id)
     const migratedTurn = migrateLegacyTurnEndEvent(migratedStart, id)
     const migratedSteering = migrateLegacySteeringEvent(migratedTurn, id)
-    const adopted = adoptSessionEvent(migrateLegacyMessageEvent(migratedSteering, id, messageIds))
-    events[index] = adopted
-    const messageId = eventMessageId(adopted)
-    if (messageId !== undefined) messageIds.set(adopted.seq, messageId)
+    const migratedDispatch = migrateLegacyDispatchEvent(migratedSteering)
+    const migratedPreset = migrateLegacyPresetEvent(migratedDispatch)
+    const migratedSource = migrateLegacyPtcSources(migratedPreset)
+    const normalized = migrateLegacyMessageEvent(migratedSource, id, messageIds)
+    events[index] = normalized
+    const messageId = eventMessageId(normalized)
+    if (messageId !== undefined) messageIds.set(normalized.seq, messageId)
+  }
+  return events
+}
+
+/** Validate and freeze an exclusively owned, already-normalized event sequence. */
+function adoptStoredEvents(events: SessionEvent[], id: SessionId): SessionEvent[] {
+  for (const [index, event] of events.entries()) {
+    try {
+      events[index] = adoptSessionEvent(event)
+    } catch (error: unknown) {
+      throw new SessionPersistenceCorruptionError(
+        `stored session "${id}" failed validation: ${String(error)}`,
+        { cause: error },
+      )
+    }
   }
   return events
 }
@@ -1093,11 +1216,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (stored === undefined) throw new Error(`session "${id}" not found`)
     this.assertStoredId(id, stored.meta)
     const currentMeta = this.assertVersion(stored.meta)
-    let events = adoptStoredEvents(stored.events, id)
+    let events = normalizeStoredEvents(stored.events, id)
     let inheritedEventCount = SessionLogOffset(stored.inheritedEventCount)
     if (stored.meta.version !== currentMeta.version) {
       const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
-      if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(events, migrated.events)) {
+      if (this.backend.migrateStored !== undefined
+        && (this.backend.supportsBodyMigration === true || canPublishMetadataOnlyMigration(events, migrated.events))) {
         await this.backend.migrateStored(
           stored,
           { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
@@ -1109,6 +1233,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       events = migrated.events
       inheritedEventCount = migrated.inheritedEventCount
     }
+    adoptStoredEvents(events, id)
     this.assertEventsSupported(currentMeta, events)
     return {
       meta: structuredClone(currentMeta),
@@ -1125,11 +1250,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const { meta, inheritedEventCount, events, revision, tornMarker } = stored
       this.assertStoredId(id, meta)
       const currentMeta = this.assertVersion(meta)
-      let storedEvents = adoptStoredEvents(events, id)
+      let storedEvents = normalizeStoredEvents(events, id)
       let currentInheritedEventCount = SessionLogOffset(inheritedEventCount)
       if (meta.version !== currentMeta.version) {
         const migrated = migrateFormatEvents(meta, inheritedEventCount, storedEvents)
-        if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(storedEvents, migrated.events)) {
+        if (this.backend.migrateStored !== undefined
+          && (this.backend.supportsBodyMigration === true || canPublishMetadataOnlyMigration(storedEvents, migrated.events))) {
           await this.backend.migrateStored(
             { meta, inheritedEventCount },
             { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
@@ -1140,6 +1266,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         storedEvents = migrated.events
         currentInheritedEventCount = migrated.inheritedEventCount
       }
+      adoptStoredEvents(storedEvents, id)
       this.assertEventsSupported(currentMeta, storedEvents)
       if (currentInheritedEventCount > storedEvents.length) {
         throw new Error(`session "${id}" inherited event count exceeds its stored event count`)
@@ -1169,8 +1296,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       }
     } catch (error: unknown) {
       // An unsupported format is a refusal over an intact log, not damage —
-      // surface it unwrapped so callers can point at the raw artifact.
-      if (error instanceof SessionFormatUnsupportedError) throw error
+      // surface it unwrapped so callers can point at the raw artifact. Read
+      // failures (migration conflicts, timeouts) are transient, never damage.
+      if (error instanceof SessionFormatUnsupportedError
+        || error instanceof SessionFormatUnsupportedMigrationError
+        || error instanceof SessionPersistenceReadError
+        || error instanceof SessionPersistenceCorruptionError) throw error
       throw new SessionPersistenceCorruptionError(
         `stored session "${id}" failed validation: ${String(error)}`,
         { cause: error },
@@ -1302,9 +1433,10 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   }
 
   private assertVersion(meta: SessionHeader): SessionHeader {
-    if (meta.version === SESSION_FORMAT_VERSION) return meta
+    if (meta.version === sessionFormatCatalog.currentVersion) return migrateLegacyPtcMeta(meta)
     if (meta.version === 0 || meta.version === 1 || meta.version === 2) {
-      return sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
+      const migrated = sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
+      return migrateLegacyPtcMeta(migrated)
     }
     throw this.unsupported(meta, sessionFormatVersionRefusal(meta.id, meta.version))
   }
@@ -1315,9 +1447,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
    * change how the rest of the log must be interpreted, so silently skipping
    * it would reconstruct a wrong session (the envelope contract on
    * `SessionEvent.ignorable`). Runs on NORMALIZED events — after
-   * `snapshotStoredEvents`/`adoptStoredEvents` has upgraded the legacy shapes
-   * this build still reads and rejected the ones it does not, so those keep
-   * their specific diagnostics.
+   * `snapshotStoredEvents`/`normalizeStoredEvents` has upgraded the legacy
+   * shapes this build still reads and rejected the ones it does not, so those
+   * keep their specific diagnostics.
    */
   private assertEventsSupported(meta: SessionHeader, events: readonly SessionEvent[]): void {
     for (const event of events) {
@@ -1483,6 +1615,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     /* v8 ignore next -- a cursor > 0 means the session was materialized, so it exists */
     if (stored === undefined) return false
     this.assertStoredId(id, stored.meta)
+    if (stored.meta.version !== sessionFormatCatalog.currentVersion) {
+      /* The cursor tracks the migrated prefix this session's preparation
+       * published, so the comparison needs the same migrated event view. */
+      const whole = await this.readStoredPrefix(id)
+      return seedCoversPrefix(seed, whole.events.slice(0, cursor))
+    }
     return seedCoversPrefix(seed, snapshotStoredEvents(stored.events, id).slice(0, cursor))
   }
 

@@ -82,7 +82,7 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     step: 1,
     message: replacement,
   }, {
-    surfaceOp: { op: 'replace', start: firstEvent.seq, end: firstEvent.seq },
+    surfaceOp: { op: 'replace', startSeq: firstEvent.seq, endSeq: firstEvent.seq },
     sourceEventSeqs: [firstEvent.seq],
   })
 

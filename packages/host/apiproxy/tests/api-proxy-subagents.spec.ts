@@ -3,7 +3,6 @@ import { Context } from '@deepseek-ai/cordis'
 import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
-import { queueSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { RpcId } from '../src/api/rpc.ts'
 import type { RpcRequest } from '../src/api/rpc.ts'
 import { createApiProxy } from '../src/api-proxy.ts'
@@ -17,11 +16,8 @@ function request<P>(payload: P): RpcRequest<P> {
 }
 
 function bench(options: {
-  parentLive?: boolean
   childStatus?: 'idle' | 'running'
   entries?: object[]
-  queuePromptError?: Error
-  interruptError?: Error
   listError?: Error
   /** Persistence forgets the child entirely (the vanished-mid-read race). */
   storedChild?: false
@@ -39,7 +35,7 @@ function bench(options: {
     ? undefined
     : { id: CHILD, status: options.childStatus }
   const getAgent = vi.fn((id: SessionId) => {
-    if (options.parentLive !== false && id === PARENT) return parent
+    if (id === PARENT) return parent
     if (id === CHILD) return child
     return undefined
   })
@@ -51,23 +47,6 @@ function bench(options: {
       },
     ])
     : Promise.reject(options.listError))
-  // The host-protocol prompt path enters the runtime through the symbol-keyed
-  // queue adapter (`queueHostSubagentPrompt`), never through an Agent sender.
-  const queuePrompt = vi.fn((
-    _parent: unknown,
-    _childId: SessionId,
-    _content: unknown,
-    _source: { kind: string; rpcId: RpcId; clientTimeZone?: string },
-    _signal: AbortSignal,
-  ) => options.queuePromptError === undefined
-    ? Promise.resolve('message-1')
-    : Promise.reject(options.queuePromptError))
-  const interrupt = vi.fn((
-    _targetSessionId: SessionId,
-    _authority: { kind: 'user'; parentSessionId: SessionId },
-  ) => {
-    if (options.interruptError !== undefined) throw options.interruptError
-  })
   const childHeader = {
     version: 0, id: CHILD, createdAt: 1, cwd: '/proj', isSeeded: false, parentSession: options.historyParent ?? PARENT,
     ...options.agentPreset === undefined ? {} : { agentPreset: options.agentPreset },
@@ -100,7 +79,7 @@ function bench(options: {
   })
   const ctx = new Context()
   ctx.provide('agents', { get: getAgent })
-  ctx.provide('subagents', { listChildren, [queueSubagentPrompt]: queuePrompt, interrupt })
+  ctx.provide('subagents', { listChildren })
   ctx.provide('sessions', {
     list: () => [],
     get: (id: SessionId) => options.liveChild === true && id === CHILD
@@ -132,51 +111,10 @@ function bench(options: {
   const api = createApiProxy(ctx, {
     defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp',
   })
-  return { api, ctx, getAgent, listChildren, inspect, snapshot, restore, queuePrompt, interrupt, standingKeyFor, parent }
+  return { api, ctx, getAgent, listChildren, inspect, snapshot, restore, standingKeyFor, parent }
 }
 
 describe('subagent gateway', () => {
-  it('lists the complete catalog and reports exact live-parent availability', async () => {
-    const { api, listChildren } = bench({ parentLive: false, entries: [
-      {
-        kind: 'child', id: CHILD, mode: 'continuable', label: 'worker',
-        activity: 'inactive', hasChildren: true,
-      },
-      {
-        kind: 'child', id: sid('one-shot'), mode: 'one-shot',
-        activity: 'inactive', hasChildren: false,
-      },
-      { kind: 'diagnostic', id: sid('bad'), reason: 'corrupt' },
-    ] })
-    const response = await api.subagents.list(request({ parentSessionId: PARENT }))
-    expect(response.rpcId).toBe('subagent-rpc')
-    expect(response.result).toMatchObject({
-      ok: true,
-      value: {
-        parentAvailable: false,
-        entries: [
-          { kind: 'child', mode: 'continuable' },
-          { kind: 'child', mode: 'one-shot' },
-          { kind: 'diagnostic' },
-        ],
-      },
-    })
-    expect(listChildren).toHaveBeenCalledWith(PARENT, undefined)
-  })
-
-  it('derives catalog activity from the live child Agent rather than Session residency', async () => {
-    const residentIdle = bench({ childStatus: 'idle', entries: [{
-      kind: 'child', id: CHILD, mode: 'continuable', label: 'worker',
-      activity: 'running', hasChildren: false,
-    }] })
-    expect((await residentIdle.api.subagents.list(request({ parentSessionId: PARENT }))).result)
-      .toMatchObject({ ok: true, value: { entries: [{ activity: 'inactive' }] } })
-
-    const running = bench({ childStatus: 'running' })
-    expect((await running.api.subagents.list(request({ parentSessionId: PARENT }))).result)
-      .toMatchObject({ ok: true, value: { entries: [{ activity: 'running' }] } })
-  })
-
   it('reads a healthy direct child without looking up or activating any Agent', async () => {
     const { api, getAgent, inspect, restore } = bench()
     const response = await api.subagents.history(request({
@@ -298,7 +236,7 @@ describe('subagent gateway', () => {
     expect(inspect).not.toHaveBeenCalled()
   })
 
-  it('maps the missing projections capability to one wire face on list, history, and prompt', async () => {
+  it('maps the missing projections capability to one wire face on history', async () => {
     const listError = () => new SubagentError(
       'listing subagents requires the sessionProjections registry (load @deepseek-ai/dsh-session-projection)',
       'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE',
@@ -308,128 +246,11 @@ describe('subagent gateway', () => {
       message: 'subagent catalog is unavailable: this deployment does not mount the sessionProjections registry (load @deepseek-ai/dsh-session-projection)',
     }
 
-    const list = bench({ listError: listError() })
-    expect((await list.api.subagents.list(request({ parentSessionId: PARENT }))).result)
-      .toMatchObject({ ok: false, error: expected })
-
     const history = bench({ listError: listError() })
     expect((await history.api.subagents.history(request({
       parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable',
     }))).result).toMatchObject({ ok: false, error: expected })
     expect(history.inspect).not.toHaveBeenCalled()
-
-    const prompt = bench({ listError: listError() })
-    expect((await prompt.api.subagents.prompt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
-    }), new AbortController().signal)).result).toMatchObject({ ok: false, error: expected })
-    expect(prompt.queuePrompt).not.toHaveBeenCalled()
-  })
-
-  it('routes human content through the exact live parent with rpc attribution', async () => {
-    const { api, parent, queuePrompt } = bench()
-    const content = [{ type: 'text' as const, text: '继续' }]
-    const signal = new AbortController().signal
-    const response = await api.subagents.prompt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content,
-    }), signal)
-    expect(response.result).toMatchObject({
-      ok: true, value: { messageId: 'message-1' },
-    })
-    expect(queuePrompt).toHaveBeenCalledWith(
-      parent,
-      CHILD,
-      content,
-      { kind: 'user', rpcId: RpcId('subagent-rpc') },
-      signal,
-    )
-  })
-
-  it('admits continuable image uploads before forwarding durable references', async () => {
-    const { api, ctx, parent, queuePrompt } = bench()
-    ctx.provide('attachments', {
-      saveImages: vi.fn(async (inputs: readonly { mediaType: string; data: Uint8Array }[]) => inputs.map((input, index) => ({
-        attachmentId: `image-${String(index)}`,
-        mediaType: input.mediaType,
-        bytes: input.data.byteLength,
-        width: 1,
-        height: 1,
-      }))),
-    } as never)
-    const content = [
-      { type: 'text' as const, text: 'see this' },
-      { type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==', name: 'shot.png' },
-    ]
-    const response = await api.subagents.prompt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content,
-    }), new AbortController().signal)
-    expect(response.result).toMatchObject({ ok: true })
-    expect(queuePrompt).toHaveBeenCalledWith(
-      parent,
-      CHILD,
-      [
-        { type: 'text', text: 'see this' },
-        { type: 'image', attachment: { attachmentId: 'image-0', mediaType: 'image/png', bytes: 1, width: 1, height: 1 } },
-      ],
-      { kind: 'user', rpcId: RpcId('subagent-rpc') },
-      expect.any(AbortSignal),
-    )
-  })
-
-  it('canonicalizes browser-zone provenance before delivering a child prompt', async () => {
-    const { api, parent, queuePrompt } = bench()
-    const alias = 'US/Pacific'
-    const canonical = new Intl.DateTimeFormat('en-US', { timeZone: alias })
-      .resolvedOptions().timeZone
-    const content = [{ type: 'text' as const, text: 'continue locally' }]
-    const signal = new AbortController().signal
-    await expect(api.subagents.prompt(request({
-      parentSessionId: PARENT,
-      childSessionId: CHILD,
-      mode: 'continuable',
-      content,
-      clientTimeZone: alias,
-    }), signal)).resolves.toMatchObject({ result: { ok: true } })
-    expect(queuePrompt).toHaveBeenCalledWith(
-      parent,
-      CHILD,
-      content,
-      { kind: 'user', rpcId: RpcId('subagent-rpc'), clientTimeZone: canonical },
-      signal,
-    )
-
-    const invalid = await api.subagents.prompt(request({
-      parentSessionId: PARENT,
-      childSessionId: CHILD,
-      mode: 'continuable',
-      content,
-      clientTimeZone: 'Not/A_Real_Zone',
-    }), signal)
-    expect(invalid.result).toEqual({
-      ok: false,
-      error: {
-        code: 'invalid-time-zone',
-        message: 'clientTimeZone must be UTC or a valid IANA Area/Location name',
-        details: { value: 'Not/A_Real_Zone' },
-      },
-    })
-    expect(queuePrompt).toHaveBeenCalledOnce()
-  })
-
-  it('fails before delivery when the parent is absent and maps continuation failures', async () => {
-    const absent = bench({ parentLive: false })
-    expect((await absent.api.subagents.prompt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
-    }), new AbortController().signal)).result).toMatchObject({
-      ok: false, error: { code: 'subagent-parent-unavailable' },
-    })
-    expect(absent.listChildren).not.toHaveBeenCalled()
-
-    const failed = bench({ queuePromptError: new SubagentError('draining', 'DRAINING') })
-    expect((await failed.api.subagents.prompt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
-    }), new AbortController().signal)).result).toMatchObject({
-      ok: false, error: { code: 'subagent-delivery-unavailable' },
-    })
   })
 
   it('maps history disappearance and hides unexpected backend details', async () => {
@@ -444,65 +265,61 @@ describe('subagent gateway', () => {
         details: { parentSessionId: PARENT, childSessionId: CHILD },
       },
     })
-
-    const catalog = bench({ listError: new Error('secret descriptor') })
-    expect((await catalog.api.subagents.list(request({
-      parentSessionId: PARENT,
-    }))).result).toMatchObject({
-      ok: false,
-      error: { code: 'internal', message: 'subagent catalog read failed' },
-    })
-
-    const prompt = bench({ queuePromptError: new Error('secret provider') })
-    expect((await prompt.api.subagents.prompt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
-    }), new AbortController().signal)).result).toMatchObject({
-      ok: false,
-      error: { code: 'internal', message: 'subagent prompt failed' },
-    })
   })
 
-  it('interrupts through the core primitive alone while the parent Agent is offline', async () => {
-    const { api, interrupt, getAgent, listChildren, inspect } = bench({ parentLive: false })
-    const response = await api.subagents.interrupt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable' as const,
-    }))
-    expect(response.rpcId).toBe('subagent-rpc')
-    expect(response.result).toEqual({ ok: true, value: { accepted: true } })
-    expect(interrupt).toHaveBeenCalledExactlyOnceWith(CHILD, { kind: 'user', parentSessionId: PARENT })
-    // No parent-registry, catalog, or history dependency: this is what keeps a
-    // live child interruptible after its parent Agent went offline.
-    expect(getAgent).not.toHaveBeenCalled()
-    expect(listChildren).not.toHaveBeenCalled()
-    expect(inspect).not.toHaveBeenCalled()
-  })
+  it('admits uploaded prompt content through the registered admission listener', async () => {
+    const { ctx, parent } = bench()
+    const saveImages = vi.fn(async (inputs: readonly { mediaType: string; data: Uint8Array }[]) =>
+      inputs.map((input, index) => ({
+        attachmentId: `image-${String(index)}`,
+        mediaType: input.mediaType,
+        bytes: input.data.byteLength,
+        width: 1,
+        height: 1,
+      })))
+    ctx.provide('attachments', { saveImages } as never)
+    const content = [
+      { type: 'text' as const, text: 'see this' },
+      { type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==', name: 'shot.png' },
+    ]
 
-  it('maps interrupt authorization rejection without touching other services', async () => {
-    const { api, listChildren } = bench({
-      interruptError: new SubagentError('secret lineage', 'UNAUTHORIZED'),
-    })
-    const response = await api.subagents.interrupt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable' as const,
-    }))
-    expect(response.result).toEqual({
-      ok: false,
-      error: {
-        code: 'subagent-unauthorized',
-        message: 'subagent does not belong to this parent',
-        details: { childSessionId: CHILD },
+    const admitted = await ctx.serial('subagent/prompt-admission', parent as never, content)
+    expect(admitted).toEqual([
+      { type: 'text', text: 'see this' },
+      {
+        type: 'image',
+        attachment: { attachmentId: 'image-0', mediaType: 'image/png', bytes: 1, width: 1, height: 1 },
       },
-    })
-    expect(listChildren).not.toHaveBeenCalled()
+    ])
+    expect(saveImages).toHaveBeenCalledOnce()
   })
 
-  it('hides unexpected interrupt failures behind the internal code', async () => {
-    const { api } = bench({ interruptError: new Error('secret activation state') })
-    const response = await api.subagents.interrupt(request({
-      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable' as const,
-    }))
-    expect(response.result).toEqual({
-      ok: false,
-      error: { code: 'internal', message: 'subagent interrupt failed', details: {} },
+  it('defers prompt admission to the service fallback when no attachment store is composed', async () => {
+    const { ctx, parent } = bench()
+    const admitted = await ctx.serial('subagent/prompt-admission', parent as never, [
+      { type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==' },
+    ])
+    expect(admitted).toBeUndefined()
+  })
+
+  it('serializes concurrent image admission behind the same parent Agent', async () => {
+    const { ctx, parent } = bench()
+    const gate = Promise.withResolvers<true>()
+    const saveImages = vi.fn(async () => {
+      await gate.promise
+      return []
     })
+    ctx.provide('attachments', { saveImages } as never)
+    const content = [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==' }]
+
+    const first = ctx.serial('subagent/prompt-admission', parent as never, content)
+    const second = ctx.serial('subagent/prompt-admission', parent as never, content)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(saveImages).toHaveBeenCalledOnce()
+    gate.resolve(true)
+    await first
+    await second
+    expect(saveImages).toHaveBeenCalledTimes(2)
   })
 })

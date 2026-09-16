@@ -87,7 +87,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     )).toBeLessThan(1)
     await input.fill('/cpt')
     await expect.poll(() => menu.getByRole('option').allTextContents()).toEqual([
-      'compactCompact older conversation history',
+      'CompactCompact older conversation history',
     ])
     const fuzzySnapshot = await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(FUZZY_COMMAND_MENU_EXPECTED, fuzzySnapshot, MODE)
@@ -107,7 +107,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
       await activePage.getByRole('button', { name: 'Commands' }).click()
       const menu = activePage.getByRole('listbox', { name: 'Trigger suggestions' })
       await menu.waitFor({ timeout: 10_000 })
-      await menu.getByRole('option', { name: 'plan Enter or leave plan mode' }).click()
+      await menu.getByRole('option', { name: 'Plan Enter or leave plan mode' }).click()
       await expect.poll(() => input.inputValue()).toBe('/plan ')
       await input.press('Enter')
       const planButton = activePage.getByRole('button', { name: 'Plan mode on, press to turn off' })

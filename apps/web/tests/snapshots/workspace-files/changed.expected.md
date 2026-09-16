@@ -1,0 +1,9 @@
+- dialog "notes.txt":
+  - heading "notes.txt" [level=2]
+  - button "Close preview":
+    - img
+  - status: This file changed. Reload to see its current content.
+  - text: alpha line
+  - button "Reload"
+  - button "Previous page" [disabled]
+  - button "Next page" [disabled]

@@ -15,6 +15,7 @@ import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 const dirs: string[] = []
 afterEach(async () => { for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true }) })
@@ -33,6 +34,7 @@ async function mountPersistentHarness(root: string, adapter: MockAdapter): Promi
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(JsonlSessionPersistence, { root })
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
   return ctx
@@ -271,6 +273,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const a2 = (await ctx2.agents.resume({ resumeSessionId: SessionId('nocwd-sess') })).agent
@@ -299,6 +302,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const sources2: string[] = []
@@ -457,7 +461,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     ctx.on('agent/created', () => void published.push('agent/created'))
 
     let resuming!: ReturnType<typeof ctx.agents.resume>
-    const owner = await ctx.plugin(Object.assign((inner: Context) => {
+    const owner = await ctx.plugin(Object.assign(async (inner: Context) => {
       resuming = inner.agents.resume({
         resumeSessionId: sessionId,
         agentOptions: { provider: 'mock', model: 'mock' },
@@ -546,6 +550,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
     const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(JsonlSessionPersistence, { root })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('next')]))
@@ -606,6 +611,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const a2 = (await ctx2.agents.resume({ resumeSessionId: SessionId('forked-sess') })).agent
@@ -643,6 +649,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const stored = await ctx2.sessionPersistence.readFrom(SessionId('inject-sess'), SessionLogOffset(0))
@@ -679,6 +686,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
 
@@ -711,6 +719,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentLoop, { agents: [] })
     ctx.llm.registerAdapter(['mock'], adapter)
     await expect(ctx.agents.resume({ resumeSessionId: SessionId('nope') }))
@@ -911,6 +920,7 @@ describe('configured-start failure edges', () => {
       if (typeof args[0] === 'string') configWarnings.push(args[0])
       return (configWarn as (...a: unknown[]) => unknown)(...args)
     }) as typeof configured.logger.warn
+    await configured.plugin(SessionProjectionRegistry)
     const loop = await configured.plugin(AgentLoop, {
       agents: [{ id: 'main', sessionId, provider: 'mock', model: 'mock' }],
     })
@@ -949,6 +959,7 @@ describe('configured-start failure edges', () => {
     configured.llm.registerAdapter(['mock'], new MockAdapter([]))
     configured.sessionPersistence.prepare = (id, signal) => ctx.sessionPersistence.prepare(id, signal)
     configured.on('agent-loop/config-start-failed', ({ error }) => { failures.push(error) })
+    await configured.plugin(SessionProjectionRegistry)
     const loop = await configured.plugin(AgentLoop, {
       agents: [{ id: 'main', resumeSessionId: sessionId, provider: 'mock', model: 'mock' }],
     })

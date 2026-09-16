@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -32,7 +31,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -46,4 +48,10 @@
   - img
 - button "6% of context used"
 - button "Send message" [disabled]
-- text: 1 turns · 2 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 98% Input 15.8K tok · Output 156 tok
+- button "1 turns · 2 steps · {{throughput}} tok/s":
+  - img
+  - text: 1 turns · 2 steps{{throughput}} tok/s
+- button "16K tok · Cache hit 98%":
+  - img
+  - text: 16K tokCache hit 98%
+- separator "Adjust transcript content width"

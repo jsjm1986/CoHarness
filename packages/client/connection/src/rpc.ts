@@ -1,6 +1,18 @@
 /** Generic unary RPC contracts shared by the Host and Client Connection halves. */
 
-import type { RpcResult } from '@deepseek-ai/dsh-host-apiproxy/api'
+/** Carrier-neutral failure returned by one logical RPC endpoint. The code space
+ * is open: Typert Remote failures carry their own declared vocabulary through
+ * this channel alongside the handwritten `/api` RpcError codes. */
+export interface ConnectionRpcFailure {
+  readonly code: string
+  readonly message: string
+  readonly details: object
+}
+
+/** Carrier-neutral result returned by one logical RPC endpoint. */
+export type ConnectionRpcResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: ConnectionRpcFailure }
 
 /** Trust fence applied before a Host RPC channel reaches its handler. */
 export type ConnectionRpcAuthority = 'trusted-host' | 'loopback'
@@ -16,7 +28,7 @@ export type ConnectionRpcHandler = (
   endpoint: string,
   payload: unknown,
   signal: AbortSignal,
-) => Promise<RpcResult<unknown>>
+) => Promise<ConnectionRpcResult<unknown>>
 
 /** Synchronous ownership test for one endpoint on a shared RPC channel. */
 export type ConnectionRpcEndpointMatcher = (endpoint: string) => boolean
@@ -67,5 +79,5 @@ export interface ClientConnectionRpc {
     endpoint: string,
     payload: unknown,
     signal?: AbortSignal,
-  ): Promise<RpcResult<unknown>>
+  ): Promise<ConnectionRpcResult<unknown>>
 }

@@ -25,6 +25,9 @@
       "path": "../../subprocess/subprocess"
     },
     {
+      "path": "../../util/launch-environment"
+    },
+    {
       "path": "../../util/native-command"
     }
   ]

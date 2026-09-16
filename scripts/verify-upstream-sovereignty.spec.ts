@@ -15,18 +15,18 @@ import {
 
 const root = resolve(import.meta.dirname, '..')
 
-const SYNCED_COMMIT = '82a5fd61a7cf5c293cec4bdff68f455398d685e9'
+const SYNCED_COMMIT = 'fb2c4b9e698e30edb738bca4cf0618587db7d203'
 
 function synthetic(overrides: Record<string, unknown> = {}): unknown {
   return {
-    version: 1,
+    version: 2,
     syncedTag: 'dsh-v0.0.0-test',
     syncedCommit: SYNCED_COMMIT,
     packages: {
       'core/session': { sovereignty: 'tracked' },
       'web/fetch': { sovereignty: 'adapted' },
     },
-    upstreamOnly: ['util/time'],
+    upstreamOnly: [{ package: 'util/time', reason: 'not needed by current consumers' }],
     ...overrides,
   }
 }
@@ -36,12 +36,13 @@ describe('manifest validation', () => {
     const manifest = validateUpstreamSyncManifest(synthetic(), root)
     expect(manifest.syncedTag).toBe('dsh-v0.0.0-test')
     expect(Object.keys(manifest.packages)).toEqual(['core/session', 'web/fetch'])
-    expect(manifest.upstreamOnly).toEqual(['util/time'])
+    expect(manifest.upstreamOnly).toEqual([{ package: 'util/time', reason: 'not needed by current consumers' }])
   })
 
   it.each([
-    ['a non-number version', { version: '1' }],
-    ['a newer schema version', { version: 2 }],
+    ['a non-number version', { version: '2' }],
+    ['the retired schema version', { version: 1 }],
+    ['a newer schema version', { version: 3 }],
     ['a missing version', { version: undefined }],
   ] as const)('rejects %s', (_label, patch) => {
     expect(() => validateUpstreamSyncManifest(synthetic(patch), root)).toThrow('upstream-sovereignty:')
@@ -56,8 +57,49 @@ describe('manifest validation', () => {
   it('rejects an owned package that is also listed upstreamOnly', () => {
     expect(() => validateUpstreamSyncManifest(synthetic({
       packages: { 'local/only': { sovereignty: 'owned' } },
-      upstreamOnly: ['local/only'],
+      upstreamOnly: [{ package: 'local/only', reason: 'test' }],
     }), root)).toThrow('in both packages and upstreamOnly')
+  })
+
+  it('rejects a replaced package without a note', () => {
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      packages: { 'core/session': { sovereignty: 'replaced' } },
+    }), root)).toThrow('must name a note file')
+  })
+
+  it('accepts a replaced package with a note', () => {
+    const manifest = validateUpstreamSyncManifest(synthetic({
+      packages: { 'core/session': { sovereignty: 'replaced', note: 'AGENTS.md' } },
+    }), root)
+    expect(manifest.packages['core/session']?.sovereignty).toBe('replaced')
+  })
+
+  it('rejects removedUpstreamPaths entries that exist on disk or escape the package', () => {
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      packages: { 'core/session': { sovereignty: 'adapted', removedUpstreamPaths: ['packages/core/session/src/index.ts'] } },
+    }), root)).toThrow('exists on disk')
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      packages: { 'web/fetch': { sovereignty: 'adapted', removedUpstreamPaths: ['packages/core/session/src/x.ts'] } },
+    }), root)).toThrow('must be a "packages/web/fetch/…" path')
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      packages: { 'web/fetch': { sovereignty: 'adapted', removedUpstreamPaths: ['packages/web/fetch/src/gone.ts'] } },
+    }), root)).not.toThrow()
+  })
+
+  it('rejects upstreamOnly entries without a reason or with a foreign replacedBy', () => {
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      upstreamOnly: [{ package: 'util/time' }],
+    }), root)).toThrow('non-empty reason')
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      upstreamOnly: [{ package: 'util/time', reason: 'x', replacedBy: 'ghost/pkg' }],
+    }), root)).toThrow('must name a packages key')
+  })
+
+  it('accepts an upstreamOnly entry whose replacedBy names a local package', () => {
+    const manifest = validateUpstreamSyncManifest(synthetic({
+      upstreamOnly: [{ package: 'util/time', reason: 'x', replacedBy: 'core/session' }],
+    }), root)
+    expect(manifest.upstreamOnly[0]?.replacedBy).toBe('core/session')
   })
 
   it('rejects a note that is not an existing repo-relative file', () => {
@@ -80,7 +122,7 @@ describe('manifest validation', () => {
     ['an unknown top-level key', { packages: {}, extra: true }],
     ['an unknown package field', { packages: { 'a/b': { sovereignty: 'tracked', owner: 'x' } } }],
     ['a non-"<group>/<pkg>" package key', { packages: { 'a/b/c': { sovereignty: 'tracked' } } }],
-    ['a duplicated upstreamOnly entry', { upstreamOnly: ['util/time', 'util/time'] }],
+    ['a duplicated upstreamOnly entry', { upstreamOnly: [{ package: 'util/time', reason: 'a' }, { package: 'util/time', reason: 'b' }] }],
     ['a non-hex syncedCommit', { syncedCommit: 'not-a-commit' }],
   ] as const)('rejects %s', (_label, patch) => {
     expect(() => validateUpstreamSyncManifest(synthetic(patch), root)).toThrow('upstream-sovereignty:')
@@ -91,8 +133,8 @@ describe('checked-in manifest', () => {
   const manifest: UpstreamSyncManifest = loadUpstreamSyncManifest(root)
 
   it('loads scripts/upstream-sync.json pinned at the mirrored release tag', () => {
-    expect(manifest.version).toBe(1)
-    expect(manifest.syncedTag).toBe('dsh-v0.1.3-alpha.2')
+    expect(manifest.version).toBe(2)
+    expect(manifest.syncedTag).toBe('dsh-v0.1.5-rc.2')
     expect(manifest.syncedCommit).toBe(SYNCED_COMMIT)
   })
 
@@ -101,8 +143,8 @@ describe('checked-in manifest', () => {
   })
 
   it('keeps every upstreamOnly package absent from disk', () => {
-    for (const key of manifest.upstreamOnly) {
-      expect(existsSync(resolve(root, 'packages', key)), `${key} must not exist on disk`).toBe(false)
+    for (const item of manifest.upstreamOnly) {
+      expect(existsSync(resolve(root, 'packages', item.package)), `${item.package} must not exist on disk`).toBe(false)
     }
   })
 
@@ -124,9 +166,9 @@ describe('checked-in manifest', () => {
     }
   })
 
-  it.runIf(tagPresent)('partitions upstream packages into tracked|adapted and upstreamOnly', () => {
+  it.runIf(tagPresent)('partitions upstream packages into tracked|adapted|replaced and upstreamOnly', () => {
     const upstream = packageKeysAtCommit(root, manifest.syncedCommit)
-    const upstreamOnly = new Set(manifest.upstreamOnly)
+    const upstreamOnly = new Set(manifest.upstreamOnly.map(item => item.package))
     for (const key of upstream) {
       const entry = manifest.packages[key]
       if (entry === undefined) {

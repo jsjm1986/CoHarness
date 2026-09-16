@@ -14,6 +14,12 @@ Settings owners share the React-free `SettingsScopeSpec`, `SettingsScope`, and s
 
 `SlotRegistry.bindStore(handle, sessionId?)` resolves the framework-owned instance of an already registered handle. Service consumers share that instance with renderer entries and write through its declared actions; an unregistered handle or missing session scope throws.
 
+## Workspace file resources
+
+`WorkspaceResourceRegistry` keeps metadata by explicit runtime target and Session-relative resource address. The bootstrap connection has a distinct `base` identity; each project connection registers `workspaceResourceProvider(api)` with its own API client after the Host handshake advertises file support. File requests never derive a target from the focused pane. The Host-configured `workspaceFileMaxResources` bounds retained records per runtime; idle records are evicted in usage order, while active resources refuse admission at the bound.
+
+Subscribers and pins share metadata loads. Releasing the last owner cancels pending reads. Existing Host streams deliver file observations, so opening more files creates no additional streams. Reconnect aborts old-generation requests and revalidates retained metadata; differing versions mark it changed until an explicit reload. Transient failures preserve metadata, while access denial, provider removal, or runtime removal discards it. Preview content stays in the view and is fetched through bounded, version-guarded RPCs.
+
 ## Slot declaration injection
 
 `ctx.slots.inject(name, callback)` makes a full `SlotMap` key the dependency for a contribution whose plugin can activate independently from the declaring entry. It runs `callback` synchronously when the declaration exists, otherwise waits; declaration collapse disposes the callback effect, and redeclaration reruns it. The controller belongs to the caller's plugin fiber, so unloading the contributor cancels either the wait or its active registrations. A direct `slots.register()` into an undeclared slot still throws.
@@ -74,7 +80,7 @@ The Chat builder keeps one mutable keyed store per Session. Content updates noti
 
 Trajectory Definitions assemble one chronological, purpose-discriminated provider-request stream. Assistant requests always carry their numeric `turn` and `step`; compaction requests carry `step: 0` and a `turn` owner that may be `null`. That null owner means a manual compaction ran standalone between turns, not that it belongs to either adjacent turn. A cancellation-finalized `assistant/message` retains its durable result seq and provider provenance but does not complete the request; `step/end` classifies that request as an error. A `session/end-seed` boundary closes an unmatched compaction request as an error at the boundary time with `Compaction was interrupted before completion.`; a later start projects as an independent request instead of overwriting the orphan.
 
-## Code Mode child-call tree
+## PTC mode child-call tree
 
 Every `ToolCallBlock` recursively owns its children through `subCalls`, in start order. Chat's Tool Definition correlates root calls and results by call id, folds Code Dispatch start/settlement records into that root Context, and projects one keyed recursive tree; child calls never become independent Chat roots. When a start falls outside the loaded window, its settlement remains renderable with `callTime: null`. A child update copies only its ancestor path, so unchanged siblings retain object identity. Edges that introduce a cycle or exceed the fixed 256-call depth limit are consumed without mutating the tree. Trajectory's Tool Definition independently assembles the same nested data contract for its target.
 

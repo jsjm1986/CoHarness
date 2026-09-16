@@ -8,33 +8,43 @@ import {
 import type { UpstreamSyncManifest } from './verify-upstream-sovereignty.ts'
 
 const manifest: UpstreamSyncManifest = {
-  version: 1,
+  version: 2,
   syncedTag: 'dsh-v0.0.0-test',
   syncedCommit: '82a5fd61a7cf5c293cec4bdff68f455398d685e9',
   packages: {
     'jobs/jobs': { sovereignty: 'tracked' },
     'core/session': { sovereignty: 'adapted' },
     'local/owned': { sovereignty: 'owned' },
+    'api/gateway': { sovereignty: 'replaced', note: 'AGENTS.md' },
   },
-  upstreamOnly: ['util/time'],
+  upstreamOnly: [{ package: 'util/time', reason: 'test fixture' }],
 }
 
 describe('parseReportArgs', () => {
-  it('requires --tag and accepts an optional --from', () => {
+  it('requires --tag and accepts optional --from and --residue', () => {
     expect(parseReportArgs(['--tag', 'dsh-v0.1.5-alpha.1'])).toEqual({
       tag: 'dsh-v0.1.5-alpha.1',
       from: undefined,
+      residue: undefined,
     })
     expect(parseReportArgs(['--', '--tag', 'dsh-v0.1.5-alpha.1'])).toEqual({
       tag: 'dsh-v0.1.5-alpha.1',
       from: undefined,
+      residue: undefined,
     })
     expect(parseReportArgs(['--from', 'dsh-v0.1.3-alpha.2', '--tag', 'dsh-v0.1.5-alpha.1'])).toEqual({
       tag: 'dsh-v0.1.5-alpha.1',
       from: 'dsh-v0.1.3-alpha.2',
+      residue: undefined,
+    })
+    expect(parseReportArgs(['--tag', 'dsh-v0.1.5-alpha.1', '--residue', 'dsh-v0.1.2-rc.1'])).toEqual({
+      tag: 'dsh-v0.1.5-alpha.1',
+      from: undefined,
+      residue: 'dsh-v0.1.2-rc.1',
     })
     expect(() => parseReportArgs([])).toThrow('missing required --tag')
     expect(() => parseReportArgs(['--tag'])).toThrow('--tag requires a tag value')
+    expect(() => parseReportArgs(['--residue'])).toThrow('--residue requires a tag value')
     expect(() => parseReportArgs(['--tag', 'x', '--bogus'])).toThrow('unknown argument')
   })
 })
@@ -62,6 +72,7 @@ describe('bucketPackageChanges', () => {
       'A\tpackages/core/session/src/new.ts',
       'D\tpackages/local/owned/src/gone.ts',
       'M\tpackages/util/time/src/tick.ts',
+      'M\tpackages/api/gateway/src/index.ts',
       'A\tpackages/brand/new/src/index.ts',
       'M\tdocs/architecture.md',
       'R100\tpackages/jobs/jobs/src/old.ts\tpackages/core/session/src/moved.ts',
@@ -73,6 +84,7 @@ describe('bucketPackageChanges', () => {
       'packages/core/session/src/moved.ts',
     ])
     expect(buckets.owned.map(e => e.key)).toEqual(['local/owned'])
+    expect(buckets.replaced.map(e => e.key)).toEqual(['api/gateway'])
     expect(buckets.upstreamOnly.map(e => e.key)).toEqual(['util/time'])
     expect(buckets.unmanifested.map(e => e.key)).toEqual(['brand/new'])
     for (const bucket of Object.values(buckets)) {

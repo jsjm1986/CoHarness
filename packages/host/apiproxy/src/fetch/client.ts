@@ -9,7 +9,7 @@ import type { z } from 'zod'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { ApiProxy, HostFrame, MuxFrame } from '../api/index.ts'
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '../api/rpc-map.ts'
-import type { ClientRequest, ClientResponse, RpcMessage, RpcReceipt, RpcRequest, RpcResponse, ServerRequest } from '../api/rpc.ts'
+import type { ClientRequest, ClientResponse, RpcError, RpcMessage, RpcReceipt, RpcRequest, RpcResponse, ServerRequest } from '../api/rpc.ts'
 import { RpcId } from '../api/rpc.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { rpcReceiptSchema, serverRequestSchema, serverResponseSchema } from '../api/rpc.schema.ts'
@@ -41,19 +41,14 @@ import {
   workspaceListValueSchema,
   workspaceRenameValueSchema,
 } from '../api/workspace.schema.ts'
+import {
+  workspaceFilesListValueSchema,
+  workspaceFilesReadBytesValueSchema,
+  workspaceFilesReadValueSchema,
+  workspaceFilesStatValueSchema,
+} from '../api/workspace-files.schema.ts'
 import { skillListValueSchema } from '../api/skills.schema.ts'
-import {
-  agentPresetCopyValueSchema, agentPresetListValueSchema, agentPresetOpenDocumentValueSchema,
-  agentPresetReadValueSchema, agentPresetRemoveValueSchema, agentPresetSelectValueSchema,
-} from '../api/agent-presets.schema.ts'
-import {
-  goalCreateValueSchema,
-  goalEditValueSchema,
-  goalPauseValueSchema,
-  goalResumeValueSchema,
-  goalCompleteValueSchema,
-  goalClearValueSchema,
-} from '../api/goals.schema.ts'
+import { agentPresetOpenDocumentValueSchema } from '../api/agent-presets.schema.ts'
 import {
   settingsDescribeValueSchema, settingsMutateValueSchema, settingsOpenDocumentValueSchema,
   settingsReplaceValueSchema, settingsUpdateValueSchema,
@@ -62,11 +57,6 @@ import {
   credentialsDescribeValueSchema, credentialsSetValueSchema, credentialsUnsetValueSchema,
 } from '../api/credentials.schema.ts'
 import { llmDiscoverModelsValueSchema, llmModelsValueSchema, llmProvidersValueSchema } from '../api/llm.schema.ts'
-import {
-  subagentInterruptValueSchema,
-  subagentListValueSchema,
-  subagentPromptValueSchema,
-} from '../api/subagents.schema.ts'
 import { historyWireValueSchema } from './history-wire.ts'
 
 /**
@@ -102,10 +92,7 @@ export interface IApiClient {
     cancel(payload: RequestPayload<'session.cancel'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.cancel'>>>
   }
   subagents: {
-    list(payload: RequestPayload<'subagent.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.list'>>>
     history(payload: RequestPayload<'subagent.history'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.history'>>>
-    prompt(payload: RequestPayload<'subagent.prompt'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.prompt'>>>
-    interrupt(payload: RequestPayload<'subagent.interrupt'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.interrupt'>>>
   }
   host: {
     describe(payload: RequestPayload<'host.describe'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.describe'>>>
@@ -123,29 +110,23 @@ export interface IApiClient {
     insertSessionBefore(payload: RequestPayload<'workspace.insertSessionBefore'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.insertSessionBefore'>>>
     archiveSession(payload: RequestPayload<'workspace.archiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.archiveSession'>>>
   }
+  workspaceFiles: {
+    list(payload: RequestPayload<'workspaceFiles.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.list'>>>
+    stat(payload: RequestPayload<'workspaceFiles.stat'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.stat'>>>
+    read(payload: RequestPayload<'workspaceFiles.read'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.read'>>>
+    readBytes(payload: RequestPayload<'workspaceFiles.readBytes'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.readBytes'>>>
+  }
   skills: {
     list(payload: RequestPayload<'skill.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'skill.list'>>>
   }
   agentPresets: {
-    list(payload: RequestPayload<'agentPreset.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.list'>>>
-    select(payload: RequestPayload<'agentPreset.select'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.select'>>>
-    read(payload: RequestPayload<'agentPreset.read'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.read'>>>
-    copy(payload: RequestPayload<'agentPreset.copy'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.copy'>>>
     openDocument(payload: RequestPayload<'agentPreset.openDocument'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.openDocument'>>>
-    remove(payload: RequestPayload<'agentPreset.remove'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.remove'>>>
   }
   events: {
     mux(payload: Parameters<ApiProxy['events']['mux']>[0]['payload'], signal: AbortSignal, onOpen?: () => void): AsyncIterable<RpcRequest<MuxFrame>>
     host(payload: Parameters<ApiProxy['events']['host']>[0]['payload'], signal: AbortSignal, onOpen?: () => void): AsyncIterable<RpcRequest<HostFrame>>
   }
-  goals: {
-    create(payload: RequestPayload<'goal.create'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'goal.create'>>>
-    edit(payload: RequestPayload<'goal.edit'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'goal.edit'>>>
-    pause(payload: RequestPayload<'goal.pause'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'goal.pause'>>>
-    resume(payload: RequestPayload<'goal.resume'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'goal.resume'>>>
-    complete(payload: RequestPayload<'goal.complete'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'goal.complete'>>>
-    clear(payload: RequestPayload<'goal.clear'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'goal.clear'>>>
-  }
+
   settings: {
     describe(payload: RequestPayload<'settings.describe'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'settings.describe'>>>
     openDocument(payload: RequestPayload<'settings.openDocument'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'settings.openDocument'>>>
@@ -185,10 +166,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.attachment': sessionAttachmentValueSchema,
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
-  'subagent.list': subagentListValueSchema,
   'subagent.history': historyWireValueSchema,
-  'subagent.prompt': subagentPromptValueSchema,
-  'subagent.interrupt': subagentInterruptValueSchema,
   'host.describe': hostDescribeValueSchema,
   'host.pickDirectory': hostPickDirectoryValueSchema,
   'host.listDirectory': hostListDirectoryValueSchema,
@@ -201,19 +179,12 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'workspace.insertBefore': workspaceInsertBeforeValueSchema,
   'workspace.insertSessionBefore': workspaceInsertSessionBeforeValueSchema,
   'workspace.archiveSession': workspaceArchiveSessionValueSchema,
+  'workspaceFiles.list': workspaceFilesListValueSchema,
+  'workspaceFiles.stat': workspaceFilesStatValueSchema,
+  'workspaceFiles.read': workspaceFilesReadValueSchema,
+  'workspaceFiles.readBytes': workspaceFilesReadBytesValueSchema,
   'skill.list': skillListValueSchema,
-  'agentPreset.list': agentPresetListValueSchema,
-  'agentPreset.select': agentPresetSelectValueSchema,
-  'agentPreset.read': agentPresetReadValueSchema,
-  'agentPreset.copy': agentPresetCopyValueSchema,
   'agentPreset.openDocument': agentPresetOpenDocumentValueSchema,
-  'agentPreset.remove': agentPresetRemoveValueSchema,
-  'goal.create': goalCreateValueSchema,
-  'goal.edit': goalEditValueSchema,
-  'goal.pause': goalPauseValueSchema,
-  'goal.resume': goalResumeValueSchema,
-  'goal.complete': goalCompleteValueSchema,
-  'goal.clear': goalClearValueSchema,
   'settings.describe': settingsDescribeValueSchema,
   'settings.openDocument': settingsOpenDocumentValueSchema,
   'settings.update': settingsUpdateValueSchema,
@@ -336,6 +307,14 @@ function requestSignalLease(
 }
 
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
+/** HTTP failure before an RPC envelope is received; response bodies remain unread. */
+export class ApiTransportError extends Error {
+  constructor(readonly status: number, path: string) {
+    super(`transport failure for ${path}: HTTP ${String(status)}`)
+    this.name = 'ApiTransportError'
+  }
+}
+
 const INTERNAL_BASE = 'http://dsh.internal'
 
 /** Read a unary response body with an explicit byte budget before JSON parsing. */
@@ -625,7 +604,7 @@ export abstract class AbstractApiClient implements IApiClient {
       if (!response.ok) {
         await response.body?.cancel().catch(() => {})
         lease.dispose()
-        throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+        throw new ApiTransportError(response.status, path)
       }
       return { response, signal: lease.signal, dispose: () => { lease.dispose() } }
     } catch (error: unknown) {
@@ -656,7 +635,9 @@ export abstract class AbstractApiClient implements IApiClient {
       ))
       this.onEnvelope(full)
       if (full.rpcId !== message.rpcId) throw new Error(`rpcId mismatch for ${method}: sent ${message.rpcId}, got ${full.rpcId}`)
-      if (!full.result.ok) return { rpcId: full.rpcId, result: full.result }
+      // Only handwritten RpcMethodMap endpoints reach callUnary (Remote calls use the
+      // generic Connection caller), so the failure carries a domain RpcError.
+      if (!full.result.ok) return { rpcId: full.rpcId, result: { ok: false, error: full.result.error as RpcError } }
       // Second-level S→C parse: the ok value must match the method's Value schema (mirror of the
       // handler's request-payload parse). The cast collapses the Wire<> widening, same as the handler side.
       const value = UNARY_VALUE_SCHEMAS[method].parse(full.result.value) as ResponseValue<K>
@@ -692,7 +673,7 @@ export abstract class AbstractApiClient implements IApiClient {
     const response = await this.doFetch(this.resolveUrl(path), { signal })
     if (!response.ok || response.body === null) {
       await response.body?.cancel().catch(() => {})
-      throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+      throw new ApiTransportError(response.status, path)
     }
     try {
       onOpen?.()
@@ -760,10 +741,7 @@ export abstract class AbstractApiClient implements IApiClient {
   }
 
   readonly subagents: IApiClient['subagents'] = {
-    list: (payload, signal) => this.callUnary('subagent.list', payload, signal),
     history: (payload, signal) => this.callUnary('subagent.history', payload, signal),
-    prompt: (payload, signal) => this.callUnary('subagent.prompt', payload, signal),
-    interrupt: (payload, signal) => this.callUnary('subagent.interrupt', payload, signal),
   }
 
   readonly host: IApiClient['host'] = {
@@ -788,6 +766,13 @@ export abstract class AbstractApiClient implements IApiClient {
     archiveSession: (payload, signal) => this.callUnary('workspace.archiveSession', payload, signal),
   }
 
+  readonly workspaceFiles: IApiClient['workspaceFiles'] = {
+    list: (payload, signal) => this.callUnary('workspaceFiles.list', payload, signal),
+    stat: (payload, signal) => this.callUnary('workspaceFiles.stat', payload, signal),
+    read: (payload, signal) => this.callUnary('workspaceFiles.read', payload, signal),
+    readBytes: (payload, signal) => this.callUnary('workspaceFiles.readBytes', payload, signal),
+  }
+
   readonly skills: IApiClient['skills'] = {
     list: (payload, signal) => this.callUnary('skill.list', payload, signal),
   }
@@ -798,21 +783,7 @@ export abstract class AbstractApiClient implements IApiClient {
   // the whole gateway, and with it the host `Context` merges, into every
   // Client program that imports this carrier.
   readonly agentPresets: IApiClient['agentPresets'] = {
-    list: (payload, signal) => this.callUnary('agentPreset.list', payload, signal),
-    select: (payload, signal) => this.callUnary('agentPreset.select', payload, signal),
-    read: (payload, signal) => this.callUnary('agentPreset.read', payload, signal),
-    copy: (payload, signal) => this.callUnary('agentPreset.copy', payload, signal),
     openDocument: (payload, signal) => this.callUnary('agentPreset.openDocument', payload, signal),
-    remove: (payload, signal) => this.callUnary('agentPreset.remove', payload, signal),
-  }
-
-  readonly goals: IApiClient['goals'] = {
-    create: (payload, signal) => this.callUnary('goal.create', payload, signal),
-    edit: (payload, signal) => this.callUnary('goal.edit', payload, signal),
-    pause: (payload, signal) => this.callUnary('goal.pause', payload, signal),
-    resume: (payload, signal) => this.callUnary('goal.resume', payload, signal),
-    complete: (payload, signal) => this.callUnary('goal.complete', payload, signal),
-    clear: (payload, signal) => this.callUnary('goal.clear', payload, signal),
   }
 
   readonly settings: IApiClient['settings'] = {

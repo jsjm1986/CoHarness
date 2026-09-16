@@ -22,9 +22,11 @@ Status: implemented
 
 每个会话都有一个隔离的增量折叠。活跃折叠通过 `session/event` 前进；每次读取都会追到持久日志尾部，因此监听器顺序、种子会话与服务重载不会改变答案。折叠跟踪规范的完整请求头快照、步骤边界、表层追加与替换、assistant usage，以及每条 assistant 消息引用的分片 seq。下一个畸形事件会以事务方式失败并保持未读，不会让状态只修改一半。
 
-`measure(session, requestHeader?)` 只同步一次折叠，并在返回标量压力的同时给出逐位置节点价格。`totalTokens` 仍表示请求与响应压力；`surfaceTokens` 是仅针对表层的启发式总量，并等于 `nodes[].tokens` 之和。`requestHeader` 覆盖只改变压力定价，表层字段始终描述当前会话。`estimateMessage(message)` 不依赖会话状态，直接应用固定启发式规则。每个结果都是一个分离且深度不可变的快照，只携带一个 `logRevision`。每次计量都会复制当前节点，因此成本为 O(surface)。
+`measure(session, requestHeader?)` 只同步一次折叠，并在返回标量压力的同时给出逐位置节点价格。`totalTokens` 仍表示请求与响应压力；`surfaceTokens` 是按被计量路由的请求计价得到的表层总量，并等于 `nodes[].tokens` 之和。`requestHeader` 覆盖只改变压力与节点计价，节点集合始终描述当前会话。`estimateMessage(message)` 不依赖会话状态，直接应用固定启发式规则。每个结果都是一个分离且深度不可变的快照，只携带一个 `logRevision`。每次计量都会复制当前节点，因此成本为 O(surface)。
 
-只有当待计量的规范请求信封等于最近一次成功调用的锚点时，服务才复用提供方 usage。提供方、模型、系统提示词、前缀、工具或调用配置任一变化都会触发完整的启发式重新定价。表层变化相对匹配锚点保留有符号增量，包括缩小替换后的负值。后续成功请求会替换先前锚点，提供方或模型切换时也一样。
+被路由适配器的可选同步钩子 `imageRequestPricing(provider, model)`——经 `ctx.llm.imageRequestPricing()` 解析——把每张保留图片按该路由声明的视觉价加上模型可见文本计价；未提供该钩子的路由保持固定启发式价。因此每个 `TokenSurfaceNode` 携带两个价格：`tokens` 是按路由计价的请求压力，由触发、保留、范围选择与摘要收缩比较读取；`heuristicTokens` 是固定启发式价，影子计价协议使用它，使 O(1) 投影折叠与自身追加保持一致。`compaction/summary` 与 `compaction/prune` 记录的 `shadowedTokenCount` 携带启发式总量，而压缩器的收缩比较读取按路由计价的 `shadowedRouteTokenCount`。
+
+只有当待计量的规范请求信封等于最近一次成功调用的锚点时，服务才复用提供方 usage。提供方、模型、系统提示词、前缀、工具或调用配置任一变化都会触发完整重新定价。锚点持有原始材料——assistant 消息前的表层节点、提供方输出的启发式价与上报 usage——因此匹配的请求头会在每次计量时推导基线，并按与当前表层相同的路由计价重定价锚定表层；usage 与估算的取舍在该按路由计价的锚点上逐次进行。表层变化相对匹配锚点保留有符号增量，包括缩小替换后的负值。后续成功请求会替换先前锚点，提供方或模型切换时也一样。
 
 Usage 会对互不重叠的输入、缓存读取、缓存写入与输出 bucket 求和，不会再次加入推理计数。每次成功模型调用都会记录 `assistant/message`，包括无内容调用与达到 token 上限的调用，并带上精确的更早分片 seq。显式的空 `sourceEventSeqs` 列表表示已知为空的提供方流；旧日志中缺失的列表则保守地把持久 assistant 输出视为提供方输出。
 
@@ -40,7 +42,7 @@ Usage 会对互不重叠的输入、缓存读取、缓存写入与输出 bucket 
 
 ## 测试
 
-单元测试覆盖固定估算、信封失效与锚点替换、回放边界、不可变快照、已路由压力、收敛、溢出 generation 证明与回滚。真实 Loader/Include fixture（测试前置数据）验证零配置 token-meter 与 compaction-basic 按依赖顺序加载的路径。
+单元测试覆盖固定估算、信封失效与锚点替换、回放边界、不可变快照、已路由压力、按路由计价的计量（计价器驱动的触发、无计价器回退与提供方 usage 增量）、启发式影子计价声明对路由价收缩比较、收敛、溢出 generation 证明与回滚。真实 Loader/Include fixture（测试前置数据）验证零配置 token-meter 与 compaction-basic 按依赖顺序加载的路径。
 
 ## 考虑过的替代方案
 

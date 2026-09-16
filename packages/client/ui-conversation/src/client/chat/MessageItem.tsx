@@ -9,9 +9,8 @@ import type {
   ModelRetryNode, PendingSubmission, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { isSessionPersistenceFailureMessage } from '@deepseek-ai/dsh-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import { JsonBlock, MessageText, ReferenceIcon, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageImageSource } from '../contract/slots.ts'
-import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
@@ -158,6 +157,9 @@ function TurnMaxTokensItem({ t }: {
  * scan as the composer, minus the lexicon: sent tokens were validated at
  * compose time, so shape alone decorates).
  */
+/* jscpd:ignore-start -- intentional lexicon-less variant of the primitives
+ * projectUserText: it decorates every token shape (compose-time validation
+ * already ran) and renders refChips over MessageText plain runs. */
 function projectUserText(text: string, sessionLabels: readonly string[]): ReactNode {
   const ranges: { start: number; end: number; label: string; kind: 'session' | 'plain' }[] = []
   for (const rawLabel of [...new Set(sessionLabels)].sort((a, b) => b.length - a.length)) {
@@ -216,6 +218,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
   if (cursor < text.length) parts.push(<MessageText key={cursor} text={text.slice(cursor)} />)
   return <>{parts}</>
 }
+/* jscpd:ignore-end */
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({

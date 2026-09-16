@@ -11,6 +11,7 @@
     { "path": "../../context/collaboration" },
     { "path": "../../context/gateway-runtime" },
     { "path": "../../core/session" },
+    { "path": "../session-format" },
     { "path": "../session-persistence" },
     { "path": "../../runtime-diagnostics/invariants" }
   ]

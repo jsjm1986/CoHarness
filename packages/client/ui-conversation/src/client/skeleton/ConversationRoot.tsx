@@ -226,7 +226,7 @@ export function ConversationPane({
     leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
     rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
     // Stats band under the card, inside the bar's width column so both
-    // share one constraint (composer.dock = stats-line family).
+    // share one constraint (composer.dock = session-stats pill family).
     footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
   })
 
@@ -258,22 +258,37 @@ export function ConversationPane({
   )
 
   const widthStyle = {
-    '--dsh-chat-content-width': `${displaySettings.chatContentWidth}px`,
+    '--dsh-chat-content-width': displaySettings.chatFullWidth
+      ? 'calc(100% - var(--dsh-composer-side-clearance) * 2)'
+      : `${displaySettings.chatContentWidth}px`,
     '--dsh-chat-font-size': `${displaySettings.chatFontSize}px`,
   } as CSSProperties
+  // In fill mode the rendered column is the pane minus the side clearance, so
+  // a width gesture starts from the measured width rather than the stored one.
+  const renderedWidth = (): number | undefined => {
+    const root = rootRef.current
+    if (root === null) return undefined
+    const clearance = Number.parseFloat(getComputedStyle(root).getPropertyValue('--dsh-composer-side-clearance'))
+    const gutter = Number.isFinite(clearance) ? clearance * 2 : 0
+    return root.getBoundingClientRect().width - gutter
+  }
+  const dragOrigin = (): number => displaySettings.chatFullWidth
+    ? renderedWidth() ?? displaySettings.chatContentWidth
+    : displaySettings.chatContentWidth
   const updateWidth = (clientX: number, startWidth?: number): void => {
     const root = rootRef.current
     if (root === null) return
     const rect = root.getBoundingClientRect()
     const center = rect.left + rect.width / 2
-    const origin = startWidth ?? displaySettings.chatContentWidth
+    const origin = startWidth ?? dragOrigin()
     setDisplayWidth(origin + (clientX - (center + origin / 2)) * 2)
   }
   const beginWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
     event.preventDefault()
     invokePointerCapture(event.currentTarget, 'setPointerCapture', event.pointerId)
-    widthPointer.current = { id: event.pointerId, width: displaySettings.chatContentWidth }
-    updateWidth(event.clientX, displaySettings.chatContentWidth)
+    const origin = dragOrigin()
+    widthPointer.current = { id: event.pointerId, width: origin }
+    updateWidth(event.clientX, origin)
   }
   const moveWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
     const active = widthPointer.current
@@ -287,7 +302,7 @@ export function ConversationPane({
   }
   const onWidthKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     const step = event.shiftKey ? 64 : 16
-    const current = displaySettings.chatContentWidth
+    const current = dragOrigin()
     const next = event.key === 'ArrowLeft' ? current - step
       : event.key === 'ArrowRight' ? current + step
         : event.key === 'Home' ? CHAT_CONTENT_WIDTH_RANGE.min
@@ -301,25 +316,30 @@ export function ConversationPane({
   return (
     <div ref={rootRef} className={clsx(css.root, workbench && css.workbenchPane)} data-phase={phase} style={widthStyle}>
       {renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
-      <div className={css.scrollBody} data-conversation-scroll="">
-        <div
-          className={css.widthHandle}
-          role="separator"
-          aria-orientation="vertical"
-          aria-valuemin={CHAT_CONTENT_WIDTH_RANGE.min}
-          aria-valuemax={CHAT_CONTENT_WIDTH_RANGE.max}
-          aria-valuenow={displaySettings.chatContentWidth}
-          aria-label={t('settings.display.widthHandle')}
-          tabIndex={0}
-          data-conversation-width-handle=""
-          onPointerDown={beginWidthResize}
-          onPointerMove={moveWidthResize}
-          onPointerUp={endWidthResize}
-          onPointerCancel={endWidthResize}
-          onKeyDown={onWidthKeyDown}
-        />
-        {renderSlot('conversation.session', { compact })}
-        {composerSeat}
+      <div className={css.scrollRegion}>
+        <div className={css.scrollBody} data-conversation-scroll="">
+          {renderSlot('conversation.session', { compact })}
+          {composerSeat}
+        </div>
+        {!workbench && (
+          <div
+            className={css.widthHandle}
+            role="separator"
+            aria-orientation="vertical"
+            aria-valuemin={CHAT_CONTENT_WIDTH_RANGE.min}
+            aria-valuemax={CHAT_CONTENT_WIDTH_RANGE.max}
+            aria-valuenow={displaySettings.chatContentWidth}
+            aria-valuetext={displaySettings.chatFullWidth ? t('settings.display.fill') : undefined}
+            aria-label={t('settings.display.widthHandle')}
+            tabIndex={0}
+            data-conversation-width-handle=""
+            onPointerDown={beginWidthResize}
+            onPointerMove={moveWidthResize}
+            onPointerUp={endWidthResize}
+            onPointerCancel={endWidthResize}
+            onKeyDown={onWidthKeyDown}
+          />
+        )}
       </div>
       <Modal
         open={discardWorkspaceId !== undefined}
@@ -469,7 +489,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                             invokePointerCapture(event.currentTarget, 'releasePointerCapture', event.pointerId)
                           }}
                           onPointerCancel={() => { drag.current = null }}
-                          onKeyDown={(event) => {
+                          onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
                             if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
                             event.preventDefault()
                             resize(index, viewport.paneRatios, (event.key === 'ArrowLeft' ? -0.025 : 0.025) * total, event.currentTarget.parentElement?.parentElement?.clientWidth ?? 1, total)

@@ -186,11 +186,19 @@ export function collectSessionTitleMessages(
 
 /**
  * Fold the latest logged title without consulting mutable metadata.
+ * A non-user-sourced title event derived from injected context — text that
+ * opens with a known injection envelope, or `messageSeqs` citing a non-human
+ * `user/message` — is skipped as legacy corruption: pre-enforcement builds
+ * could mint one, and last-wins replay must not resurrect it. A human rename
+ * (`source.kind === 'user'`) stays authoritative regardless of text.
  * @param events - live or persisted session log.
  * @returns the latest immutable title snapshot, or `undefined`.
  */
 export function foldSessionTitle(events: readonly SessionEvent[]): SessionTitleSnapshot | undefined {
-  const event = events.findLast(item => item.type === 'session/title')
+  const event = events.findLast(
+    (item): item is Extract<SessionEvent, { type: 'session/title' }> =>
+      item.type === 'session/title' && !isInjectedTitleEvent(item, events),
+  )
   if (event === undefined) return undefined
   return deepFreeze({
     title: event.data.title,
@@ -199,6 +207,60 @@ export function foldSessionTitle(events: readonly SessionEvent[]): SessionTitleS
     eventSeq: event.seq,
     updatedAt: event.time,
   })
+}
+
+/**
+ * Whether a logged title event was minted from injected context. Only
+ * non-user sources are inspected: an explicit rename stays authoritative
+ * even when a human picks text resembling an envelope.
+ */
+function isInjectedTitleEvent(
+  event: Extract<SessionEvent, { type: 'session/title' }>,
+  events: readonly SessionEvent[],
+): boolean {
+  if (event.data.source.kind === 'user') return false
+  if (isInjectedTitleText(event.data.title)) return true
+  return event.data.messageSeqs.some((seq) => {
+    const cited = events.find(item => item.seq === seq)
+    return cited?.type === 'user/message' && cited.data.source.kind !== 'user'
+  })
+}
+
+/**
+ * Durable context-injection envelopes that must never name a session.
+ * Older builds logged plugin/goal injections as `user`-sourced messages (or
+ * derived titles from them before source kinds were enforced), so legacy
+ * logs can carry injected text as the first human-looking message or as the
+ * persisted title itself. These prefixes are renderer-owned; a human prompt
+ * cannot begin with one.
+ */
+const INJECTED_TITLE_PREFIXES = [
+  '<goal_',
+  'Shared-project attribution for the next message',
+  'Current runtime context',
+  '[model changed:',
+] as const
+
+/** Whether one candidate title or message text is a known injected envelope. */
+function isInjectedTitleText(text: string): boolean {
+  const trimmed = text.trimStart()
+  return INJECTED_TITLE_PREFIXES.some(prefix => trimmed.startsWith(prefix))
+}
+
+/**
+ * Title-eligible messages with legacy injected envelopes removed. Current
+ * logs mark injections `plugin`/`goal`, but older builds recorded some under
+ * the `user` source, so source-kind eligibility alone cannot exclude them.
+ * @param events - session log or persisted replay.
+ * @param throughSeq - optional inclusive event boundary.
+ * @returns human-authored messages safe to name or summarize a session from.
+ */
+function eligibleTitleMessages(
+  events: readonly SessionEvent[],
+  throughSeq?: SessionSeq,
+): SessionTitleUserMessage[] {
+  return collectSessionTitleMessages(events, throughSeq)
+    .filter(message => !isInjectedTitleText(message.text))
 }
 
 /** Defensive copy of a logged title source (the snapshot must not alias log-owned objects). */
@@ -318,6 +380,22 @@ export class SessionTitleService extends Service {
       })
     })
 
+    // A session announced with events was restored or seeded; backfill its
+    // durable title once, up front — foldSessionTitle already hides injected
+    // corruption, so an untitled restored session simply gets the fallback a
+    // fresh session would have minted. Sessions entered empty are live
+    // creates; their first human message drives the ordinary path.
+    ctx.on('session/created', (session) => {
+      if (session.snapshotEvents().length === 0) return
+      this.defer(async () => {
+        try {
+          await this.ensureFallback(session)
+        } catch (error: unknown) {
+          if (!this.serviceActive()) return
+          this.ctx.logger.warn(`session "${session.id}": title repair failed: ${String(error)}`)
+        }
+      })
+    }, { global: true })
     ctx.on('session/event', (session, event) => {
       switch (event.type) {
         case 'user/message':
@@ -398,7 +476,7 @@ export class SessionTitleService extends Service {
       throw new Error(`session "${session.id}" is not live in this store`)
     }
     const registration = this.registration
-    const messages = collectSessionTitleMessages(session.snapshotEvents())
+    const messages = eligibleTitleMessages(session.snapshotEvents())
     const latest = messages.at(-1)
     if (registration === undefined || registration.closing || latest === undefined) {
       // Explicit refresh is the unpin even without a provider: a standing
@@ -463,12 +541,12 @@ export class SessionTitleService extends Service {
   /** Schedule fallback creation and any provider cadence for one eligible event. */
   private onUserMessage(session: Session, event: Extract<SessionEvent, { type: 'user/message' }>): void {
     if (!this.serviceActive()) return
-    if (event.data.source.kind !== 'user' || collectSessionTitleMessages([event]).length === 0) return
+    if (event.data.source.kind !== 'user' || eligibleTitleMessages([event]).length === 0) return
     // A user rename pins the title: no automatic revision may override it.
     if (this.get(session)?.source.kind === 'user') return
     const registration = this.registration
     if (registration !== undefined && !registration.closing) {
-      const messages = collectSessionTitleMessages(session.snapshotEvents(), event.seq)
+      const messages = eligibleTitleMessages(session.snapshotEvents(), event.seq)
       const shouldSchedule = registration.provider.automatic === 'all-prompts'
         || (session.header.parentSession === undefined && messages.length === 1 && this.get(session) === undefined)
       if (shouldSchedule) {
@@ -559,7 +637,7 @@ export class SessionTitleService extends Service {
       this.assertCurrent(session, work)
       await this.ensureFallback(session)
       this.assertCurrent(session, work)
-      const messages = collectSessionTitleMessages(session.snapshotEvents(), work.throughSeq)
+      const messages = eligibleTitleMessages(session.snapshotEvents(), work.throughSeq)
       const result = await work.registration.provider.generate({
         session,
         messages,
@@ -759,7 +837,7 @@ export class SessionTitleService extends Service {
     this.assertServiceActive()
     const current = this.get(session)
     if (current !== undefined) return current
-    const [first] = collectSessionTitleMessages(session.snapshotEvents())
+    const [first] = eligibleTitleMessages(session.snapshotEvents())
     if (first === undefined) return undefined
     const title = fallbackSessionTitle(
       first.text,

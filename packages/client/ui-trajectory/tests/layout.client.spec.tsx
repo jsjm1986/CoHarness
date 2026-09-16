@@ -493,7 +493,7 @@ describe('run_code sub-dispatch cells', () => {
 
   const settledSub = (n: number, name: string, start: number, end: number) => ({
     kind: 'tool-result' as const, seq: 100 + n, time: end,
-    callId: `p1:code:${n}`,
+    callId: `p1:ptc:${n}`,
     call: { name, argsRaw: '{"x":1}' }, callTime: start,
     content: [{ type: 'text' as const, text: 'ok' }], isError: false, callView: null, resultView: null,
     subCalls: [],
@@ -521,7 +521,7 @@ describe('run_code sub-dispatch cells', () => {
 
   it('a running (unsettled) sub-call renders a subtool cell with blank time', () => {
     const running = {
-      callId: 'p1:code:1', name: 'grep', argsRaw: '{"pattern":"x"}',
+      callId: 'p1:ptc:1', name: 'grep', argsRaw: '{"pattern":"x"}',
       turn: 0, step: 0, time: 6_400, callView: null, subCalls: [],
     }
     const turns = deriveTrajectoryLayout({ nodes: withSubCalls([running]), partial: null, runningCalls: [] })
@@ -534,7 +534,7 @@ describe('run_code sub-dispatch cells', () => {
   it('recursively flattens nested child calls immediately after their parent', () => {
     const leaf = {
       ...settledSub(2, 'read', 7_300, 7_800),
-      callId: 'p1:code:1:code:1',
+      callId: 'p1:ptc:1:ptc:1',
     }
     const child = {
       ...settledSub(1, 'run_code', 6_300, 8_000),
@@ -544,8 +544,8 @@ describe('run_code sub-dispatch cells', () => {
     const cells = turns[0]!.groups.flatMap(group => group.cells)
     expect(cells.map(cell => cell.kind)).toEqual(['message', 'tool', 'subtool', 'subtool'])
     expect(cells.slice(2).map(cell => cell.callId)).toEqual([
-      'p1:code:1',
-      'p1:code:1:code:1',
+      'p1:ptc:1',
+      'p1:ptc:1:ptc:1',
     ])
     expect(cells.map(cell => cell.index)).toEqual([1, 2, 3, 4])
   })

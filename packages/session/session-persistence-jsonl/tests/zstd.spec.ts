@@ -735,9 +735,44 @@ describe('JsonlSessionPersistence: default Zstandard encoding', () => {
       JSON.stringify({ type: 'turn/start' }),
       '',
     ].join('\n')))
-    await expect(ctx.sessionPersistence.list()).rejects.toThrow(/first frame is not exactly one header line/)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
+    // Listing omits an artifact whose header frame does not decode; a targeted
+    // read still reports the corruption.
+    expect(await ctx.sessionPersistence.list()).toEqual([])
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unreadable header'))
     await expect(ctx.sessionPersistence.load(SessionId('two-lines')))
       .rejects.toThrow(/first frame is not exactly one header line/)
+  })
+
+  it('omits a draft whose committed region is corrupt and keeps every readable session listable', async () => {
+    const root = await freshRoot()
+    const ctx = await mount(root)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
+
+    const good = meta('good-zstd', '/work')
+    await ctx.sessionPersistence.create(good)
+    await ctx.sessionPersistence.append(good.id, oneTurnLog())
+
+    // A draft whose last committed frame carries a seq far past the log's end —
+    // the residue a crashed writer or botched generation append can leave.
+    const draft = meta('corrupt-draft', '/work')
+    const draftPath = logPath(root, draft.cwd, draft.id, 'zstd')
+    await mkdir(sessionDir(root, draft.cwd, draft.id), { recursive: true })
+    await writeFile(draftPath, Buffer.concat([
+      await compressZstdFrame(`${JSON.stringify(toHeaderLine({ ...draft, draft: true }))}\n`),
+      await compressZstdFrame(oneTurnLog().map(e => `${JSON.stringify(e)}\n`).join('')),
+      await compressZstdFrame(`${JSON.stringify({ type: 'session/end-seed', seq: 9999, time: 9, data: {} })}\n`),
+    ]))
+    await expect(ctx.sessionPersistence.load(draft.id)).rejects.toThrow(/corrupt/)
+
+    // The corrupt draft cannot prove it carries content, so it stays hidden;
+    // every other session still lists.
+    const snapshots = await ctx.sessionPersistence.listSnapshots()
+    expect(snapshots.map(snapshot => snapshot.header.id)).toEqual([good.id])
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('draft session "corrupt-draft" is unreadable'))
+
+    // The header remains readable, so the cheap header listing still reports it.
+    expect((await ctx.sessionPersistence.list()).map(header => header.id)).toEqual([draft.id, good.id])
   })
 
   it('rejects missing, empty, and checksum-corrupt header frames on targeted reads', async () => {
@@ -756,7 +791,11 @@ describe('JsonlSessionPersistence: default Zstandard encoding', () => {
       .rejects.toThrow(/empty or header-less Zstandard session log/)
     await expect(ctx.sessionPersistence.load(SessionId('empty-header')))
       .rejects.toThrow(/first frame is not exactly one header line/)
-    await expect(ctx.sessionPersistence.list()).rejects.toThrow(/header frame failed validation/)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
+    // Listing omits artifacts whose header frames are missing, empty, or
+    // checksum-corrupt instead of rejecting the whole enumeration.
+    expect(await ctx.sessionPersistence.list()).toEqual([])
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unreadable header'))
   })
 })
 

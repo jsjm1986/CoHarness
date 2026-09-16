@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ClientRemote, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { AgentPresetSectionController, draftBlocker } from '../src/client/section-store.ts'
 import type { CopyDraft, PresetRow } from '../src/client/section-store.ts'
 
@@ -48,6 +48,9 @@ interface FakeOptions {
 const ok = (value: unknown) => Promise.resolve({ rpcId: 'r', result: { ok: true as const, value } })
 const fail = (message: string) =>
   Promise.resolve({ rpcId: 'r', result: { ok: false as const, error: { code: 'internal', message, details: {} } } })
+const remoteOk = (value: unknown) => Promise.resolve({ ok: true as const, value })
+const remoteFail = (message: string) =>
+  Promise.resolve({ ok: false as const, error: { code: 'internal', message, details: {} } })
 
 /**
  * A wire face over an in-memory preset store: copies land, so the roster the
@@ -57,55 +60,69 @@ const fail = (message: string) =>
  * @param options - failure injection and call recording.
  * @returns the fake client.
  */
-function fakeApi(
+function fakeRemote(
   presets: Map<string, FakePreset>,
   defaultId: { id: string },
   options: FakeOptions = {},
-): Pick<IApiClient, 'agentPresets' | 'settings'> {
+): Pick<ClientRemote, 'agentPresets'> {
   const record = (method: string, payload: unknown): void => { options.calls?.push({ method, payload }) }
   return {
     agentPresets: {
       list: () => {
         record('list', {})
         if (options.throwList === true) return Promise.reject(new Error('socket closed'))
-        if (options.failList !== undefined) return fail(options.failList)
-        return ok({
+        if (options.failList !== undefined) return remoteFail(options.failList)
+        return remoteOk({
           presets: [...presets].map(([id, preset]) => ({
             id, trust: preset.trust, isDefault: id === defaultId.id,
             ...preset.name === undefined ? {} : { name: preset.name },
           })),
           authorable: options.authorable ?? true,
-          hasDocument: options.hasDocument ?? true,
         })
       },
-      read: (payload: { agentPreset: string }) => {
-        record('read', payload)
+      read: (id: string) => {
+        record('read', { agentPreset: id })
         if (options.throwRead === true) return Promise.reject(new Error('socket closed'))
-        if (options.failRead !== undefined) return fail(options.failRead)
-        const preset = presets.get(payload.agentPreset)
+        if (options.failRead !== undefined) return remoteFail(options.failRead)
+        const preset = presets.get(id)
         /* v8 ignore next -- every test reads an id the fake store holds */
-        if (preset === undefined) return fail(`unknown preset ${payload.agentPreset}`)
-        return ok({
-          agentPreset: payload.agentPreset,
+        if (preset === undefined) return remoteFail(`unknown preset ${id}`)
+        return remoteOk({
+          agentPreset: id,
           trust: preset.trust,
           content: preset.content,
           ...preset.name === undefined ? {} : { name: preset.name },
         })
       },
-      copy: (payload: { from: string; agentPreset: string; name?: string }) => {
-        record('copy', payload)
+      copy: (from: string, id: string, name?: string) => {
+        record('copy', { from, agentPreset: id, ...name === undefined ? {} : { name } })
         if (options.throwCopy === true) return Promise.reject(new Error('socket closed'))
-        if (options.failCopy !== undefined) return fail(options.failCopy)
-        const source = presets.get(payload.from)
+        if (options.failCopy !== undefined) return remoteFail(options.failCopy)
+        const source = presets.get(from)
         /* v8 ignore next -- every test copies a source the fake store holds */
-        if (source === undefined) return fail(`unknown preset ${payload.from}`)
-        presets.set(payload.agentPreset, {
+        if (source === undefined) return remoteFail(`unknown preset ${from}`)
+        presets.set(id, {
           trust: 'user',
           content: source.content,
-          ...payload.name === undefined ? {} : { name: payload.name },
+          ...name === undefined ? {} : { name },
         })
-        return ok({ agentPreset: payload.agentPreset })
+        return remoteOk(undefined)
       },
+      deletePreset: async (id: string) => {
+        record('deletePreset', { agentPreset: id })
+        await options.holdRemove
+        if (options.failRemove !== undefined) return await remoteFail(options.failRemove)
+        presets.delete(id)
+        return await remoteOk(undefined)
+      },
+    },
+  } as unknown as Pick<ClientRemote, 'agentPresets'>
+}
+
+function fakeApi(defaultId: { id: string }, options: FakeOptions = {}): Pick<IApiClient, 'agentPresets' | 'settings'> {
+  const record = (method: string, payload: unknown): void => { options.calls?.push({ method, payload }) }
+  return {
+    agentPresets: {
       openDocument: (payload: { agentPreset: string }) => {
         record('openDocument', payload)
         if (options.throwOpen === true) return Promise.reject(new Error('socket closed'))
@@ -113,13 +130,6 @@ function fakeApi(
         return (options.hasDocument ?? true)
           ? ok({ opened: true })
           : ok({ opened: false, path: `/presets/${payload.agentPreset}` })
-      },
-      remove: async (payload: { agentPreset: string }) => {
-        record('remove', payload)
-        await options.holdRemove
-        if (options.failRemove !== undefined) return await fail(options.failRemove)
-        presets.delete(payload.agentPreset)
-        return await ok({})
       },
     },
     settings: {
@@ -146,8 +156,11 @@ function harness(options: FakeOptions = {}) {
   const defaultId = { id: 'standard' }
   const calls: Recorded[] = []
   let rosterChanges = 0
+  const shared = { ...options, calls: options.calls ?? calls }
   const controller = new AgentPresetSectionController(
-    fakeApi(presets, defaultId, { ...options, calls: options.calls ?? calls }),
+    fakeRemote(presets, defaultId, shared),
+    fakeApi(defaultId, shared),
+    () => options.hasDocument ?? true,
     () => { rosterChanges += 1 },
   )
   return { controller, presets, defaultId, calls, rosterChanges: () => rosterChanges }
@@ -492,7 +505,7 @@ describe('deleting', () => {
     await controller.remove()
 
     expect(controller.store.getSnapshot().rows.map(row => row.id)).toContain('mine')
-    expect(calls.some(call => call.method === 'remove')).toBe(false)
+    expect(calls.some(call => call.method === 'deletePreset')).toBe(false)
   })
 
   it('ignores a second confirmation while one delete is in flight', async () => {
@@ -508,7 +521,7 @@ describe('deleting', () => {
     release()
     await removal
 
-    expect(calls.filter(call => call.method === 'remove')).toHaveLength(1)
+    expect(calls.filter(call => call.method === 'deletePreset')).toHaveLength(1)
   })
 
   it('surfaces a refusal and clears the confirmation', async () => {
@@ -531,10 +544,10 @@ describe('deleting', () => {
     const broken = new AgentPresetSectionController({
       agentPresets: {
         list: () => Promise.reject(new Error('gone')),
-        remove: () => Promise.reject(new Error('socket closed')),
+        deletePreset: () => Promise.reject(new Error('socket closed')),
       },
-      settings: {},
-    } as unknown as Pick<IApiClient, 'agentPresets' | 'settings'>)
+    } as unknown as Pick<ClientRemote, 'agentPresets'>,
+    fakeApi({ id: 'standard' }), () => true)
     broken.store.set({ ...broken.store.getSnapshot(), authorable: true, rows: [{
       id: 'mine', trust: 'user', isDefault: false,
     }] })
@@ -551,7 +564,9 @@ describe('a controller with no roster listener', () => {
     // The rosterChanged callback is optional wiring, not a requirement: a
     // page composed without sibling surfaces still deletes cleanly.
     const presets = seed()
-    const alone = new AgentPresetSectionController(fakeApi(presets, { id: 'standard' }))
+    const alone = new AgentPresetSectionController(
+      fakeRemote(presets, { id: 'standard' }), fakeApi({ id: 'standard' }), () => true,
+    )
     await alone.load()
     alone.confirmDelete('mine')
 

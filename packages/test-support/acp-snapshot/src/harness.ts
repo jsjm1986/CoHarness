@@ -29,6 +29,7 @@ import {
   type RequestPermissionResponse,
   type SessionNotification,
 } from '@agentclientprotocol/sdk'
+import { clearedProxyEnv } from '@deepseek-ai/dsh-http-proxy'
 import {
   launchAcpTestAgent,
   type AcpTestClient,
@@ -194,7 +195,7 @@ export interface RunOptions {
   /**
    * Alternate LIVE config path for the boot (absolute), overriding
    * {@link AgentUnderTest.configPath} for this run. A scenario needing a
-   * differently-composed tree (the Code Mode scenarios) ships an overlay
+   * differently-composed tree (the PTC mode scenarios) ships an overlay
    * whose basename still ends in `cordis.yml`, so the bin's replay swap
    * resolves the sibling `*cordis.snapshot.yml` the same way it does for
    * the default.
@@ -252,6 +253,12 @@ export async function runScenario(input: InputScript, opts: RunOptions): Promise
     await opts.prepareWorkspace?.(cwd)
     const env: NodeJS.ProcessEnv = {
       ...opts.env,
+      // A replay must not depend on the machine's network policy, the same reason it pins its home
+      // and sessions root. The harness honors the proxy environment, so a runner that exports one
+      // would send a scenario's fixture-server request to a proxy that cannot resolve the fixture
+      // host and record that proxy's error page as the expected output. `undefined` removes the
+      // name from the child rather than setting it empty.
+      ...clearedProxyEnv(),
       DSH_SNAPSHOT: opts.mode,
       DSH_SNAPSHOT_FILE: opts.fixtureFile,
       DSH_SNAPSHOT_SESSIONS_ROOT: sessionsRoot,

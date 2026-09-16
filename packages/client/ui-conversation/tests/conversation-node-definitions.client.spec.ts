@@ -162,6 +162,33 @@ describe('built-in conversation node Definitions', () => {
     expect(assistantDefinition.publication?.(match(at(16, 'step/start', {})))).toBe('none')
   })
 
+  it('keeps compact Assistant attempts in the turn tail so exact usage remains visible after replay', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/attempt', {
+        turn: 1,
+        step: 1,
+        stream: [
+          { type: 'chunk', time: 3_000, chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 2, totalTokens: 17, cacheReadTokens: 5, cacheWriteTokens: 0 } } },
+        ],
+      }),
+      at(4, 'step/end', { turn: 1, step: 1 }),
+      at(5, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const tail = node(snapshot(value), 'turn-tail')
+    expect(tail?.data).toMatchObject({
+      turn: 1,
+      tokenUsage: {
+        uncachedInputTokens: 10,
+        cacheReadTokens: 5,
+        cacheWriteTokens: 0,
+        outputTokens: 2,
+        totalTokens: 17,
+      },
+    })
+  })
+
   it('projects turn process evidence, counts delegation tools precisely, and keeps answer anchors', () => {
     const empty = assembler([
       at(1, 'turn/start', { turn: 1 }),
@@ -212,16 +239,26 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
-  it('keeps system prompts empty-safe and recoverable across repeated headers and pagination', () => {
+  it('keeps system prompts empty-safe and recoverable across repeated messages and pagination', () => {
+    const prompt = (id: string, text: string) => ({
+      turn: 1,
+      step: 1,
+      message: {
+        role: 'system',
+        id,
+        content: [{ type: 'text', text }],
+        source: { kind: 'plugin', plugin: 'test' },
+      },
+    })
     const empty = assembler([
-      at(1, 'request/header', { header: { system: '' } }),
-      at(2, 'request/header', { header: { system: '   ' } }),
+      at(1, 'system/message', prompt('system-1', ''), { surfaceOp: 'append' }),
+      at(2, 'system/message', prompt('system-2', '   '), { surfaceOp: 'append' }),
     ])
     expect(snapshot(empty).nodes.values().filter(candidate => candidate.kind === 'system-prompt')).toHaveLength(0)
 
     const value = assembler([
-      at(10, 'request/header', { header: { system: 'current system' } }),
-      at(11, 'request/header', { header: { system: 'updated system' } }),
+      at(10, 'system/message', prompt('system-10', 'current system'), { surfaceOp: 'append' }),
+      at(11, 'system/message', prompt('system-11', 'updated system'), { surfaceOp: 'append' }),
     ], true)
     const before = snapshot(value).order
       .map(key => snapshot(value).nodes.get(key))
@@ -232,7 +269,7 @@ describe('built-in conversation node Definitions', () => {
     ])
 
     value.prepend([
-      at(1, 'request/header', { header: { system: 'cold-recovered system' } }),
+      at(1, 'system/message', prompt('system-1', 'cold-recovered system'), { surfaceOp: 'append' }),
     ], false)
     value.flush()
     const current = snapshot(value)
@@ -487,14 +524,14 @@ describe('built-in conversation node Definitions', () => {
     expect((settled?.data as ToolChatData).root).toMatchObject({ kind: 'tool-result', callId: 'root' })
 
     const history = assembler([
-      at(14, 'tool/code-dispatch-start', {
+      at(14, 'tool/ptc-dispatch-start', {
         rootCallId: 'history-root',
         parentCallId: 'history-root',
         subCallId: 'child',
         name: 'read',
         arguments: { path: 'README.md' },
       }),
-      at(15, 'tool/code-dispatch', {
+      at(15, 'tool/ptc-dispatch', {
         rootCallId: 'history-root',
         parentCallId: 'history-root',
         subCallId: 'child',
@@ -534,7 +571,7 @@ describe('built-in conversation node Definitions', () => {
     ])
 
     const firstChild = (after?.data as ToolChatData).root.subCalls[0]
-    history.append(at(17, 'tool/code-dispatch-start', {
+    history.append(at(17, 'tool/ptc-dispatch-start', {
       rootCallId: 'history-root',
       parentCallId: 'history-root',
       subCallId: 'second-child',
@@ -817,18 +854,18 @@ describe('built-in conversation node Definitions', () => {
       at(3, 'user/message', {
         ...textMessage('replacement-user', 'model-only context'),
         source: { kind: 'plugin', plugin: 'foreign' },
-      }, { surfaceOp: { op: 'replace', start: 1, end: 1 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 1 } }),
       at(4, 'assistant/message', {
         turn: 1,
         step: 1,
         message: assistantMessage('replacement-assistant', 'rewritten answer'),
-      }, { surfaceOp: { op: 'replace', start: 2, end: 2 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 2, endSeq: 2 } }),
       at(5, 'tool/call', { turn: 1, step: 1, callId: 'root', name: 'read', arguments: '{}' }),
       at(6, 'tool/result', {
         turn: 1,
         step: 1,
         message: toolResult('root', 'pruned result'),
-      }, { surfaceOp: { op: 'replace', start: 3, end: 3 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 3, endSeq: 3 } }),
     ])
 
     const current = snapshot(value)
@@ -909,7 +946,7 @@ describe('built-in conversation node Definitions', () => {
           compactionId: 'manual-1',
           sourceCommandId: 'command-1',
         },
-      }, { surfaceOp: { op: 'replace', start: 1, end: 2 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 2 } }),
       at(14, 'compaction/end', {
         compactionId: 'manual-1',
         sourceCommandId: 'command-1',
@@ -930,7 +967,7 @@ describe('built-in conversation node Definitions', () => {
       at(22, 'user/message', {
         ...textMessage('automatic-checkpoint', 'checkpoint'),
         source: { kind: 'plugin', plugin: 'compact', compactionId: 'automatic-1' },
-      }, { surfaceOp: { op: 'replace', start: 3, end: 4 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 3, endSeq: 4 } }),
       at(23, 'compaction/end', { compactionId: 'automatic-1', turn: null }),
     ])
 
@@ -949,7 +986,7 @@ describe('built-in conversation node Definitions', () => {
       at(13, 'user/message', {
         ...textMessage('checkpoint', 'checkpoint'),
         source: { kind: 'plugin', plugin: 'compact', compactionId: 'compact-1' },
-      }, { surfaceOp: { op: 'replace', start: 1, end: 8 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 8 } }),
     ], true)
     const before = node(snapshot(value), 'compaction')
     expect(before?.data).toMatchObject({ summary: null, summaryEventSeq: null })
@@ -990,7 +1027,7 @@ describe('built-in conversation node Definitions', () => {
       at(11, 'user/message', {
         ...textMessage('checkpoint-windowed', 'checkpoint'),
         source: { kind: 'plugin', plugin: 'compact', compactionId: 'compact-windowed' },
-      }, { surfaceOp: { op: 'replace', start: 1, end: 3 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 3 } }),
     ], true)
 
     expect(node(snapshot(value), 'compaction')?.data).toMatchObject({
@@ -1014,14 +1051,14 @@ describe('built-in conversation node Definitions', () => {
       at(22, 'user/message', {
         ...textMessage('legacy-checkpoint', 'checkpoint'),
         source: { kind: 'plugin', plugin: 'compact' },
-      }, { surfaceOp: { op: 'replace', start: 1, end: 3 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 3 } }),
       at(23, 'compaction/end', { turn: null }),
     ], true)
 
     expect(node(snapshot(value), 'compaction')).toBeUndefined()
   })
 
-  it('ignores legacy retry and code-dispatch events without correlation ids', () => {
+  it('ignores legacy retry and ptc-dispatch events without correlation ids', () => {
     const value = assembler([
       at(10, 'llm/retry', {
         turn: 1,
@@ -1046,13 +1083,13 @@ describe('built-in conversation node Definitions', () => {
         delayMs: 10,
         failure: { code: 'TRANSPORT', message: 'second legacy retry' },
       }),
-      at(30, 'tool/code-dispatch-start', {
+      at(30, 'tool/ptc-dispatch-start', {
         parentCallId: 'root',
         subCallId: 'child',
         name: 'legacy-subcall',
         arguments: {},
       }),
-      at(31, 'tool/code-dispatch', {
+      at(31, 'tool/ptc-dispatch', {
         parentCallId: 'root',
         subCallId: 'child',
         name: 'legacy-subcall',
@@ -1198,10 +1235,10 @@ describe('built-in conversation node Definitions', () => {
 
   it('preserves nested Tools and manual compaction evidence when their start events are outside the window', () => {
     const value = assembler([
-      at(12, 'tool/code-dispatch-start', {
+      at(12, 'tool/ptc-dispatch-start', {
         rootCallId: 'root', parentCallId: 'root', subCallId: 'child', name: 'read_file', arguments: { path: 'a' },
       }),
-      at(13, 'tool/code-dispatch', {
+      at(13, 'tool/ptc-dispatch', {
         rootCallId: 'root', parentCallId: 'root', subCallId: 'child', name: 'read_file', arguments: { path: 'a' },
         isError: false, content: [{ type: 'text', text: 'child result' }],
       }),
@@ -1225,7 +1262,7 @@ describe('built-in conversation node Definitions', () => {
           compactionId: 'manual-1',
           sourceCommandId: 'command-1',
         },
-      }, { surfaceOp: { op: 'replace', start: 1, end: 2 } }),
+      }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 2 } }),
       at(22, 'command/done', {
         commandId: 'command-1',
         kind: 'success',

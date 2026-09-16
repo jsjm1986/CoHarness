@@ -2,13 +2,14 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import AgentDefaultModelConfig from '@deepseek-ai/dsh-agent-default-model'
 import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session, UserMessage } from '@deepseek-ai/dsh-session'
 import { apply, Config, internals } from '../src/index.ts'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const originalInternals = { ...internals }
 afterEach(() => { Object.assign(internals, originalInternals) })
@@ -73,7 +74,7 @@ async function bench(script: Script): Promise<{
         id: session.id,
         options: options.agentOptions ?? {},
         session,
-        inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+        inbox: unsupportedInbox(),
         status: 'idle',
         ctx: agentCtx,
         cancel: () => {},
@@ -87,6 +88,7 @@ async function bench(script: Script): Promise<{
         inject: () => {},
         whenIdle: () => idle,
       } satisfies Partial<Agent>)
+      sessionBackedInbox(agent)
       await options.setup?.(agentCtx, agent)
       script.before?.(session)
       ctx.agents.register(agent)

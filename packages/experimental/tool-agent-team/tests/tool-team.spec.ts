@@ -35,14 +35,19 @@ const TOOL_NAMES = [
 ].sort()
 
 const roots: string[] = []
+const contexts: Context[] = []
 let callNumber = 0
 
-afterEach(() => {
+afterEach(async () => {
+  // Dispose live contexts before removing roots: agent write handles keep lock
+  // files open under their owning fibers until the fiber drains.
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 async function setup(script: ConstructorParameters<typeof MockAdapter>[0], legacyControl = false) {
   const ctx = new Context()
+  contexts.push(ctx)
   await mountAgentLoopTestDependencies(ctx)
   const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-tool-team-'))
   roots.push(storageRoot)
@@ -56,7 +61,7 @@ async function setup(script: ConstructorParameters<typeof MockAdapter>[0], legac
   const fiber = await ctx.plugin(toolTeam)
   const adapter = new MockAdapter(script)
   ctx.llm.registerAdapter(['mock'], adapter)
-  const lead = ctx.agentLoop.create(SessionId('tool-team-lead'), { provider: 'mock', model: 'mock' })
+  const lead = await ctx.agentLoop.create(SessionId('tool-team-lead'), { provider: 'mock', model: 'mock' })
   return { ctx, lead, fiber }
 }
 

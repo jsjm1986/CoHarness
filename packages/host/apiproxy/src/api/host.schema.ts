@@ -19,6 +19,12 @@ export const hostDescribeValueSchema = z.object({
   attachedSessions: z.number().int().nonnegative(),
   home: z.string(),
   canOpenPath: z.boolean(),
+  workspaceFiles: z.object({
+    maxBytes: z.number().int().positive(),
+    maxLines: z.number().int().positive(),
+    maxEntries: z.number().int().positive(),
+    maxResources: z.number().int().positive(),
+  }).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.describe'>>>
 
 /** host.pickDirectory request payload (empty object literal). */

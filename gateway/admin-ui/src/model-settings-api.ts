@@ -221,7 +221,7 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
         apiKey?: string
       }) {
         if (payload.settingsNs !== 'llm-pi-ai') {
-          return rejected(
+          return rejected<never>(
             'model-discovery-failed',
             `settings namespace ${payload.settingsNs} has no organization model discovery`,
             { settingsNs: payload.settingsNs, ...payload.baseURL === undefined ? {} : { baseURL: payload.baseURL } },
@@ -231,7 +231,7 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
           const { settingsNs: _settingsNs, ...request } = payload
           return accepted(await discoverOrganizationModels(request))
         } catch (error) {
-          return rejected(
+          return rejected<never>(
             'model-discovery-failed',
             messageOf(error),
             { settingsNs: payload.settingsNs, ...payload.baseURL === undefined ? {} : { baseURL: payload.baseURL } },

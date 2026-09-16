@@ -62,12 +62,7 @@ export type RemoteErrorCode = keyof RemoteErrorDetailsMap
  */
 export type RemoteFailure = {
   [Code in RemoteErrorCode]: import('./remote-error.ts').RemoteError<Code>
-}[RemoteErrorCode] | {
-  /** CoHarness Gateway domain code, extended by the host RPC catalog. */
-  readonly code: string
-  readonly message: string
-  readonly details: object
-}
+}[RemoteErrorCode]
 
 /**
  * What every generated Remote method resolves to. The Remote face itself folds

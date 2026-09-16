@@ -24,12 +24,12 @@ Status: implemented
 ```ts
 export type SurfaceOp =
   | 'append'                                    // normal tail append
-  | { op: 'replace'; start: number; end: number }  // shadow [start, end] inclusive
+  | { op: 'replace'; startSeq: number; endSeq: number }  // shadow [startSeq, endSeq] inclusive
 ```
 
 1. **Append**：在尾部追加新事件的 seq。`user/message`、`assistant/message`、`tool/result`、`context/message` 使用此操作。agent loop（智能体循环）在所有此类追加上传入 `surfaceOp: 'append'`，并在适用时记录 `sourceEventSeqs`：每个成功的 `assistant/message` 都记录完整的 `assistant/chunk` 来源集合（包括 `[]`），而 `tool/result` 记录其 `tool/call` 来源。
 
-2. **Replace**：移除从 `start` 到 `end`（两端包含）的条目，并在其位置插入新事件的 seq。`start` 和 `end` 都必须存在于当前 surface；`start === end` 表示替换单个条目。该事件的 `sourceEventSeqs` 必须包含所有被遮蔽的 surface seq。被遮蔽的事件仍留在日志中，但不再出现在 surface 上。
+2. **Replace**：移除从 `startSeq` 到 `endSeq`（两端包含）的条目，并在其位置插入新事件的 seq。两个端点都必须存在于当前 surface 且引用更早的事件；`startSeq === endSeq` 表示替换单个条目。该事件的 `sourceEventSeqs` 必须包含所有被遮蔽的 surface seq。被遮蔽的事件仍留在日志中，但不再出现在 surface 上。当节点 0 持有 `system/message` 时，覆盖它的区间必须是一个恰好只替换该节点的 `system/message`。字段改名前已提交的日志携带 `start`/`end` 键；读取方将它们归一化为 `startSeq`/`endSeq`，写入方始终输出规范键。
 
 ### SurfaceManager：基于增量，而非全量重建
 
@@ -56,7 +56,7 @@ export type SurfaceOp =
 ## 曾考虑的替代方案
 
 - **逐插件的 `agent/request` 包装**（surface 之前的历史操纵模式）：监听器排序脆弱、无法持久记录改动内容，且每种新操纵都迫使核心 `deriveMessages()` 再次修改。
-- **半开区间 `[start, endExclusive)` 的 replace 范围**：否决。端点由 surface 事件 seq 命名，单条目替换（`start === end`）在闭区间语义下读起来更自然。
+- **半开区间 `[start, endExclusive)` 的 replace 范围**：否决。端点由 surface 事件 seq 命名，单条目替换（`startSeq === endSeq`）在闭区间语义下读起来更自然。
 - **链接节点对象加 seq map**：否决。生产代码不读取前驱链接，唯一的后继用途就是数组中的下一个位置，而替换本来就需要线性 `indexOf` 查找。单个 seq 数组在保留相同渐进复杂度的同时，只留下一个需要校验的表示。
 - **脏标记后全量重建**替代增量处理：在会话生命周期内为 O(N²)，每次单事件追加都要重新扫描所有先前事件。
 
@@ -68,6 +68,6 @@ export type SurfaceOp =
 - **`packages/session/session-persistence-jsonl`**：无需改动。
 - **`packages/session/session-persistence`**：抽象接口不变。
 
-surface 是历史操纵赖以落地的基础——dsh-compaction 的压缩就搭载于其上。压缩或 tool-result-pruner 插件追加一个既有的消息产出事件类型（例如一条携带摘要的 `user/message`），附带 `surfaceOp: { op: 'replace', start, end }` 和覆盖被遮蔽条目的 `sourceEventSeqs`——新事件在 surface 上取代该范围的位置，而插件自身的 trace 事件（如 `compaction/start`、`compaction/end`）不进入 surface。回放以确定性方式保留该决策。
+surface 是历史操纵赖以落地的基础——dsh-compaction 的压缩就搭载于其上。压缩或 tool-result-pruner 插件追加一个既有的消息产出事件类型（例如一条携带摘要的 `user/message`），附带 `surfaceOp: { op: 'replace', startSeq, endSeq }` 和覆盖被遮蔽条目的 `sourceEventSeqs`——新事件在 surface 上取代该范围的位置，而插件自身的 trace 事件（如 `compaction/start`、`compaction/end`）不进入 surface。回放以确定性方式保留该决策。
 
 一次 `tool/result` 替换只能改写当前的一个 `tool/result`，并且必须保留除 `content` 以外的每个数据字段。Session 接纳会与位置范围和引用的源事件校验一起强制这条规则，不依赖可选的诊断插件。

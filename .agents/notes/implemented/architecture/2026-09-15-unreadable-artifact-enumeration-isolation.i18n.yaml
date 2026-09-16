@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-unreadable-artifact-enumeration-isolation.md
+2026-09-15-unreadable-artifact-enumeration-isolation.md: dacafdde5d4e7f278829f946e3aa69d3dedb742f
+2026-09-15-unreadable-artifact-enumeration-isolation.zh.md: 8b0f9452a400b6f69b18f88eb0fedf669e821fe0

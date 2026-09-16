@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentCancelCause, InboxTarget } from '@deepseek-ai/dsh-agent'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import * as cryptoUtility from '@deepseek-ai/dsh-util-crypto'
@@ -12,6 +12,7 @@ import {
   foldScheduleEvents,
 } from '../src/domain.ts'
 import { MAX_TIMER_DELAY_MS, ScheduleRuntime } from '../src/runtime.ts'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const contexts: Context[] = []
 const runtimes: ScheduleRuntime[] = []
@@ -58,7 +59,7 @@ async function harness(): Promise<RuntimeHarness> {
     onFollowup: undefined as (() => void) | undefined,
     idle: Promise.withResolvers<undefined>(),
   }
-  const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
+  const inbox = unsupportedInbox()
   const agent: Agent = {
     id: session.id,
     options: {},

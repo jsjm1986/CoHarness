@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-shared-session-surface-wire-vocabulary.md
+2026-09-15-shared-session-surface-wire-vocabulary.md: 80145ad9b1474ebc79f19ec0aeb006203c01ce39
+2026-09-15-shared-session-surface-wire-vocabulary.zh.md: a652cfe05ad0fcb2c891f01456978dfb9c1c094c

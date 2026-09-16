@@ -649,14 +649,11 @@
   cursor: pointer;
 }
 
-.listHeader {
-  display: flex;
-  flex: none;
+.captionLeading {
+  display: inline-flex;
   align-items: center;
   gap: var(--dsw-space-2);
   min-width: 0;
-  padding: 0 var(--dsw-space-1) var(--dsw-space-1);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .upload {
@@ -1578,11 +1575,6 @@
     overscroll-behavior: contain;
   }
 
-  .listHeader {
-    min-height: var(--dsw-touch-target);
-    padding: 0;
-  }
-
   .row {
     display: grid;
     grid-template-columns: var(--dsw-touch-target) 24px minmax(0, 1fr) auto var(--dsw-touch-target);
@@ -1945,14 +1937,6 @@
   scrollbar-gutter: stable both-edges;
 }
 
-.listHeader {
-  min-height: 36px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-2);
-}
-
 .row,
 .overviewRow,
 .trashRow {
@@ -2292,10 +2276,6 @@
 
   .groupDate {
     padding: 6px 8px 2px;
-  }
-
-  .listHeader {
-    min-height: 28px;
   }
 
   .emptyState {

@@ -25,6 +25,7 @@ interface PreferenceRow {
   theme_preference: 'light' | 'dark' | 'system' | null
   busy_enter: 'queue' | 'steer' | null
   chat_content_width: number | string | null
+  chat_full_width: boolean | null
   chat_font_size: number | string | null
   revision: string
   migrated_at: Date | null
@@ -35,6 +36,7 @@ interface LegacyPreferences {
   theme?: 'light' | 'dark' | 'system'
   busyEnter?: 'queue' | 'steer'
   chatContentWidth?: number
+  chatFullWidth?: boolean
   chatFontSize?: number
 }
 
@@ -76,6 +78,7 @@ function legacyPreferences(value: unknown): LegacyPreferences {
     ...(theme === 'light' || theme === 'dark' || theme === 'system' ? { theme } : {}),
     ...(busyEnter === 'queue' || busyEnter === 'steer' ? { busyEnter } : {}),
     ...(chatContentWidth === undefined ? {} : { chatContentWidth }),
+    ...(typeof conversation?.chatFullWidth === 'boolean' ? { chatFullWidth: conversation.chatFullWidth } : {}),
     ...(chatFontSize === undefined ? {} : { chatFontSize }),
   }
 }
@@ -129,6 +132,7 @@ function viewOf(row: PreferenceRow): AccountPreferencesView {
     'ui-conversation': {
       busyEnter: row.busy_enter ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-conversation'].busyEnter,
       chatContentWidth,
+      chatFullWidth: row.chat_full_width ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-conversation'].chatFullWidth,
       chatFontSize,
     },
   }
@@ -138,6 +142,7 @@ function viewOf(row: PreferenceRow): AccountPreferencesView {
     'ui-conversation': {
       ...(row.busy_enter === null ? {} : { busyEnter: row.busy_enter }),
       ...(row.chat_content_width === null ? {} : { chatContentWidth }),
+      ...(row.chat_full_width === null ? {} : { chatFullWidth: row.chat_full_width }),
       ...(row.chat_font_size === null ? {} : { chatFontSize }),
     },
   }
@@ -176,12 +181,14 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
             ? 'busy_enter'
             : mutation.field === 'chatContentWidth'
               ? 'chat_content_width'
-              : 'chat_font_size'
+              : mutation.field === 'chatFullWidth'
+                ? 'chat_full_width'
+                : 'chat_font_size'
       const value = mutation.operation === 'unset' ? null : mutation.value
       const result = await client.query<PreferenceRow>(`UPDATE harness.user_preferences
         SET ${column}=$3,revision=revision+1,updated_at=now()
         WHERE organization_id=$1 AND user_id=$2
-        RETURNING locale_preference,theme_preference,busy_enter,chat_content_width,chat_font_size,revision::text,migrated_at`, [
+        RETURNING locale_preference,theme_preference,busy_enter,chat_content_width,chat_full_width,chat_font_size,revision::text,migrated_at`, [
         this.context.organizationId,
         await internalUserId(client, this.context.organizationId, user.id),
         value,
@@ -196,7 +203,7 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
     const internal = await internalUserId(client, this.context.organizationId, user.id)
     if (internal === null) throw new AccountPreferencesInputError(`unknown user ${String(user.id)}`)
     const existing = await client.query<PreferenceRow>(`SELECT locale_preference,theme_preference,busy_enter,
-      chat_content_width,chat_font_size,
+      chat_content_width,chat_full_width,chat_font_size,
       revision::text,migrated_at
       FROM harness.user_preferences
       WHERE organization_id=$1 AND user_id=$2
@@ -206,12 +213,13 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
 
     const legacy = await readLegacyPreferences(this.config, user)
     const revision = legacy.locale !== undefined || legacy.theme !== undefined || legacy.busyEnter !== undefined
-      || legacy.chatContentWidth !== undefined || legacy.chatFontSize !== undefined ? 1 : 0
+      || legacy.chatContentWidth !== undefined || legacy.chatFullWidth !== undefined
+      || legacy.chatFontSize !== undefined ? 1 : 0
     const migratedAt = revision === 0 ? null : new Date()
     await client.query(`INSERT INTO harness.user_preferences(
       organization_id,user_id,locale_preference,theme_preference,busy_enter,
-      chat_content_width,chat_font_size,revision,migrated_at
-    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      chat_content_width,chat_full_width,chat_font_size,revision,migrated_at
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     ON CONFLICT (organization_id,user_id) DO NOTHING`, [
       this.context.organizationId,
       internal,
@@ -219,12 +227,13 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
       legacy.theme ?? null,
       legacy.busyEnter ?? null,
       legacy.chatContentWidth ?? null,
+      legacy.chatFullWidth ?? null,
       legacy.chatFontSize ?? null,
       revision,
       migratedAt,
     ])
     const inserted = await client.query<PreferenceRow>(`SELECT locale_preference,theme_preference,busy_enter,
-      chat_content_width,chat_font_size,
+      chat_content_width,chat_full_width,chat_font_size,
       revision::text,migrated_at
       FROM harness.user_preferences
       WHERE organization_id=$1 AND user_id=$2
