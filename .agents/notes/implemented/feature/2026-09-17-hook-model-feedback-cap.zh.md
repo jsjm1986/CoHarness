@@ -20,7 +20,7 @@ Status: implemented
 
 ## Consequences
 
-进入模型请求的 hook 文本逐段有界；hook 仍可表达被截断的 reason，完整 stderr 通过进程本身仍可观察，而非经事件或模型。需要不同上限的部署在 cordis.yml 里像其他数值旋钮一样设置。
+进入模型请求的 hook 文本逐段有界；hook 仍可表达被截断的 reason，完整 stderr 通过进程本身仍可观察，而非经事件或模型。需要不同上限的部署在 cordis.yml 里像其他数值旋钮一样设置。`hook-protocol` 现在携带自有改动（`capModelFeedback` helper），其 sovereignty 条目从 `tracked` 翻转为 `adapted`。
 
 ## Verification
 

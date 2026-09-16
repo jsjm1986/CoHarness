@@ -20,7 +20,7 @@ Each bridge accepts a `modelFeedbackMaxChars` config field (default `DEFAULT_MOD
 
 ## Consequences
 
-Hook text reaching a model request is bounded per piece; a hook can still express a truncated reason, and the full stderr remains observable through the process itself rather than the event or the model. Deployments needing a different bound set it in cordis.yml like every other numeric knob.
+Hook text reaching a model request is bounded per piece; a hook can still express a truncated reason, and the full stderr remains observable through the process itself rather than the event or the model. Deployments needing a different bound set it in cordis.yml like every other numeric knob. `hook-protocol` now carries an owned delta (the `capModelFeedback` helper), so its sovereignty entry flips from `tracked` to `adapted`.
 
 ## Verification
 
