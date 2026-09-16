@@ -42,6 +42,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
     'conversation.workbench.empty': { kind: 'single', scope: 'root' },
     'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
+    'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
   } } as never, () => null)
   const fiber = await ctx.plugin({ inject, apply }).await()
   const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
@@ -265,6 +266,16 @@ describe('workspace file serving', () => {
       expect(pane.filesAvailable()).toBe(true)
       expect(resources.hasProvider).toHaveBeenCalledWith({ kind: 'base' })
       pane.openFiles()
+      const utility = (h.slots.entries('conversation.session.header.utilities')[0]!.inject as unknown as (id: SessionId) => {
+        filesAvailable(): boolean
+        openFiles(): void
+        inWorkbench(): boolean
+      })(A)
+      expect(utility.inWorkbench()).toBe(true)
+      h.snapshot.set({ mode: 'single', paneIds: [], paneRatios: [] })
+      expect(utility.inWorkbench()).toBe(false)
+      expect(utility.filesAvailable()).toBe(true)
+      utility.openFiles()
     } finally { await h.ctx.fiber.dispose() }
   })
 

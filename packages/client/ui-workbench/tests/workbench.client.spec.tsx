@@ -8,6 +8,7 @@ import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
+import { WorkspaceFilesAction } from '../src/client/components/WorkspaceFilesAction.tsx'
 import { createWorkbenchStore } from '../src/client/stores.ts'
 import { zh } from '../src/client/locales.ts'
 
@@ -347,6 +348,36 @@ describe('pane header controls', () => {
     view.rerender(<WorkbenchPaneHeader {...p} {...hooks} sessionId={SID_B} active={false} maximized={false}
       onFocus={onFocus} onClose={vi.fn()} onMaximize={vi.fn()} replacePane={vi.fn()} movePane={vi.fn()}
       filesAvailable={() => false} openFiles={openFiles} t={t} />)
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+  })
+})
+
+describe('session header files entry', () => {
+  function action(overrides: Partial<ComponentProps<typeof WorkspaceFilesAction>> = {}) {
+    const p = props()
+    return render(<WorkspaceFilesAction {...p} sessionId={SID_A}
+      useSession={(() => undefined) as never} useProjection={() => undefined}
+      useInput={(() => undefined) as never} inputActions={{} as never}
+      filesAvailable={() => true} openFiles={vi.fn()} inWorkbench={() => false} t={t} {...overrides} />)
+  }
+  it('opens the Workspace browser for a hosted single conversation', () => {
+    const openFiles = vi.fn()
+    action({ openFiles, inWorkbench: undefined })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace 文件' }))
+    expect(openFiles).toHaveBeenCalledOnce()
+  })
+  it('yields to the pane header inside the workbench grid', () => {
+    action({ inWorkbench: () => true })
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+  })
+  it('stays hidden without a files provider or opener', () => {
+    action({ filesAvailable: () => false })
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+    cleanup()
+    action({ filesAvailable: undefined })
+    expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
+    cleanup()
+    action({ openFiles: undefined })
     expect(screen.queryByRole('button', { name: 'Workspace 文件' })).toBeNull()
   })
 })
