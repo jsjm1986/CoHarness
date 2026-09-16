@@ -43,20 +43,27 @@ export function NativeDirectoryFlow(props: DirectoryFlowOwnerProps & NativeFlowI
     alive.current = true
     return () => { alive.current = false }
   }, [])
+  // Each open edge launches one pick tagged with the current generation. The
+  // owner withdrawing `open` orphans the in-flight settlement (the retracted
+  // request takes no answer), so a chooser still on screen when the next
+  // request opens can never land its stale path on the new handlers.
+  const generation = useRef(0)
   useEffect(() => {
     if (!open) {
       armed.current = false
+      generation.current += 1
       return
     }
     if (armed.current) return
     armed.current = true
+    const launched = ++generation.current
     pick().then(
       (path) => {
-        if (!alive.current) return
+        if (!alive.current || generation.current !== launched) return
         if (path === null) outcome.current.onCancel(); else outcome.current.onPicked(path)
       },
       (reason: unknown) => {
-        if (!alive.current) return
+        if (!alive.current || generation.current !== launched) return
         outcome.current.onError(reason instanceof Error ? reason.message : String(reason))
       },
     )

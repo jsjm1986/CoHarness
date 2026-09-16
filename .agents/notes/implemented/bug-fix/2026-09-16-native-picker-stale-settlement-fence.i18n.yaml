@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-native-picker-stale-settlement-fence.md
+2026-09-16-native-picker-stale-settlement-fence.md: d02616dd7a43dbd0f21eb443fa6406c1b24673f5
+2026-09-16-native-picker-stale-settlement-fence.zh.md: c815f262aa145dda93e11e85b351c9f823990552

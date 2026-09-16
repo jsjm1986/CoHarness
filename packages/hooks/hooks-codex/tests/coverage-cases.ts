@@ -33,7 +33,7 @@ function hooks(d: string, h: unknown): string {
   writeFileSync(join(d, 'hooks.json'), JSON.stringify({ hooks: h })); return join(d, 'hooks.json')
 }
 
-type HarnessOpts = { stderrSummaryMaxChars?: number; sessionRoot?: string }
+type HarnessOpts = { stderrSummaryMaxChars?: number; defaultTimeoutMs?: number; sessionRoot?: string }
 async function harness(configPath: string, adapter: MockAdapter, opts: HarnessOpts = {}): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
@@ -295,6 +295,16 @@ export function defineCoverageCases(groups: CoverageGroup | readonly CoverageGro
         const adapter = new MockAdapter([])
         await expect(harness(join(d, 'hooks.json'), adapter, { stderrSummaryMaxChars: bad }))
           .rejects.toThrow(/hooks-codex: stderrSummaryMaxChars must be a positive integer/)
+      }
+    })
+
+    it('rejects a non-positive or fractional defaultTimeoutMs at load', async () => {
+      const d = dir()
+      hooks(d, {})
+      for (const bad of [0, -5, 1.5, Number.NaN]) {
+        const adapter = new MockAdapter([])
+        await expect(harness(join(d, 'hooks.json'), adapter, { defaultTimeoutMs: bad }))
+          .rejects.toThrow(/hooks-codex: defaultTimeoutMs must be a positive integer/)
       }
     })
 

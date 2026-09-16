@@ -1,13 +1,37 @@
+// A post-rename directory-fsync failure cannot be timed from outside. The
+// `fs/promises` API injects it once so the test can prove the committed file
+// is not rolled back.
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Storage, { storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { runKvBackendContract } from '../../storage/tests/contract.ts'
 import { Config, JsonStorageBackend, apply } from '../src/index.ts'
 import * as InvariantCompanion from '../src/invariant.ts'
+
+const state = vi.hoisted(() => ({
+  failDirectorySync: '',
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    open: (async (path: unknown, ...rest: never[]) => {
+      // `writeAtomic` opens the temp file with 'wx' and the parent directory
+      // with 'r'; failing only the exact directory path injects the
+      // post-commit fsync failure.
+      if (rest[0] === 'r' && String(path) === state.failDirectorySync) {
+        state.failDirectorySync = ''
+        throw Object.assign(new Error('EIO: injected directory fsync failure'), { code: 'EIO' })
+      }
+      return (actual.open as (path: unknown, ...args: never[]) => Promise<unknown>)(path, ...rest)
+    }) as typeof actual.open,
+  }
+})
 
 const roots: string[] = []
 
@@ -106,6 +130,21 @@ describe('json backend specifics', () => {
     await unit.putRecord('t', 'k3', { v: 'later' })
     const text = await readFile(path, 'utf8')
     expect(text).not.toContain('rejected')
+    await backend.close()
+  })
+
+  it('keeps the committed state when the post-rename fsync fails', async () => {
+    const root = await freshRoot()
+    const backend = new JsonStorageBackend(root)
+    const unit = await backend.kv.open(descriptor)
+    state.failDirectorySync = root
+    // The rename already committed the file, so the write resolves and both
+    // memory and media hold the new value.
+    await unit.putRecord('t', 'k', { v: 'committed' })
+    const text = await readFile(join(root, 'shape.json'), 'utf8')
+    expect(text).toContain('committed')
+    const snapshot = await unit.loadAll()
+    expect(snapshot.tables['t']).toEqual({ k: { v: 'committed' } })
     await backend.close()
   })
 

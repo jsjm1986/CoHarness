@@ -19,7 +19,9 @@ import { randomUUID } from 'node:crypto'
  * Durably replace `path` with `data`.
  * @param path - Absolute target file path.
  * @param data - Full new file content.
- * @returns resolution after the replacement is crash-durable.
+ * @returns resolution once the replacement is committed; the post-commit
+ *   directory fsync is best-effort, so a failure there weakens crash
+ *   durability without rejecting.
  */
 export async function writeAtomic(path: string, data: string): Promise<void> {
   const tmp = join(dirname(path), `.${randomUUID()}.tmp`)
@@ -32,10 +34,16 @@ export async function writeAtomic(path: string, data: string): Promise<void> {
       await handle.close()
     }
     await rename(tmp, path)
-    await fsyncDirectory(dirname(path))
   } catch (error) {
     await rm(tmp, { force: true })
     throw error
+  }
+  try {
+    await fsyncDirectory(dirname(path))
+  } catch {
+    // The rename already committed the new directory entry; rejecting now
+    // would fork memory from media, because the caller rolls its in-memory
+    // state back while the file on disk keeps the new value.
   }
 }
 

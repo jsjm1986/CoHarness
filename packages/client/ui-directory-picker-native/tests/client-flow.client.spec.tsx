@@ -207,6 +207,31 @@ describe('directory-picker-native client half', () => {
     expect(pick).toHaveBeenCalledTimes(2)
   })
 
+  it('discards a stale pick settlement that lands after close and reopen', async () => {
+    const pending: Array<(path: string | null) => void> = []
+    const pick = vi.fn(() => new Promise<string | null>((settle) => { pending.push(settle) }))
+    const first = owner()
+    const view = render(<NativeDirectoryFlow {...first} pick={pick} />)
+    expect(pick).toHaveBeenCalledOnce()
+
+    // The owner withdraws the request while the chooser is still on screen,
+    // then opens a fresh one — a second pick launches for the new request.
+    view.rerender(<NativeDirectoryFlow {...first} open={false} pick={pick} />)
+    const second = owner()
+    view.rerender(<NativeDirectoryFlow {...second} pick={pick} />)
+    expect(pick).toHaveBeenCalledTimes(2)
+
+    // The first chooser's late answer belongs to a retracted request: it must
+    // land nowhere rather than resolve the new request with a stale path.
+    await act(async () => { pending[0]!('/tmp/stale') })
+    expect(second.onPicked).not.toHaveBeenCalled()
+    expect(second.onCancel).not.toHaveBeenCalled()
+    expect(second.onError).not.toHaveBeenCalled()
+
+    await act(async () => { pending[1]!('/tmp/fresh') })
+    expect(second.onPicked).toHaveBeenCalledWith('/tmp/fresh')
+  })
+
   it('folds pick failures into onError messages', async () => {
     const props = owner()
     render(<NativeDirectoryFlow {...props} pick={vi.fn(async () => { throw new Error('no chooser installed') })} />)

@@ -12,38 +12,12 @@
 import { offloadedImageText, offloadedImagePrefixCount, requestImageHandleText, textOnlyImageText } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentAccessResolver, LlmImageRequestPrice, LlmImageRequestPricing } from '@deepseek-ai/dsh-llm'
 import { requestImageDimensions } from '@deepseek-ai/dsh-attachment'
-import type { ImageAttachmentRef, ImageRequestPolicy } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { deepSeekImageTokens } from './image-tokens.ts'
-import type { DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
+import { resolveRequestImagePolicy } from './request-image-policy.ts'
+import type { DeepSeekConnectionOptions } from './adapter.ts'
 
-/** Default bound on accumulated file-referenced image bytes per request. */
-export const DEFAULT_MAX_REQUEST_FILES_BYTES = 128 * 1024 * 1024
-/** Provider request image-count limit. */
-export const DEFAULT_MAX_IMAGES_PER_REQUEST = 600
-/** Total-pixel budget matching DeepSeek's normal vision projection. */
-export const DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET = 640_000
-/** Total-pixel budget matching provider low-detail image input. */
-export const DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET = 512 * 512
-/** Encoded-byte target for one deterministic model-request image; the smallest quality-ladder output is used when no quality fits. */
-export const DEFAULT_REQUEST_IMAGE_MAX_BYTES = 1024 * 1024
-
-/**
- * Resolve the request-image budgets owned by one DeepSeek model route.
- * @param model - Advertised model route and its optional image overrides.
- * @returns Complete pixel and encoded-byte budgets.
- * @internal
- */
-export function resolveRequestImagePolicy(model: DeepSeekCatalogModel): ImageRequestPolicy {
-  const maxPixels = model.imagePixelBudget === 'low' || model.imageDetail === 'low'
-    ? DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET
-    : model.imagePixelBudget ?? DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET
-  return {
-    maxPixels,
-    maxBytes: model.imageMaxBytes === undefined
-      ? DEFAULT_REQUEST_IMAGE_MAX_BYTES
-      : model.imageMaxBytes,
-  }
-}
+export { resolveRequestImagePolicy } from './request-image-policy.ts'
 
 /**
  * Price one occurrence a text-only route substitutes with deterministic text,

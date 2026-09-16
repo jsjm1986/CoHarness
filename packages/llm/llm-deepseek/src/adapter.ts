@@ -26,7 +26,6 @@ import type {
   AttachmentId,
   AttachmentStore,
   ImageAttachmentRef,
-  ImageRequestPolicy,
   RequestImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
@@ -40,6 +39,7 @@ import type {
 import { serializeRequest, serializeRequestWithImages } from './serialize.ts'
 import type { ImageWireLocation, RequestDefaults } from './serialize.ts'
 import { deepSeekImageRequestPricing } from './request-pricing.ts'
+import { resolveRequestImagePolicy } from './request-image-policy.ts'
 import { DeepSeekFileStore } from './file-store.ts'
 import type { DeepSeekFilePolicy } from './file-store.ts'
 import type { DeepSeekFileId } from './file-id.ts'
@@ -159,22 +159,20 @@ export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
 export const DEFAULT_CONTEXT_WINDOW = 1_000_000
 /** Default per-request output-token cap. */
 export const DEFAULT_MAX_TOKENS = 256_000
-/** Default bound on accumulated file-referenced image bytes per request. */
-export const DEFAULT_MAX_REQUEST_FILES_BYTES = 128 * 1024 * 1024
 /** Default bound on accumulated base64 image payload after Files API fallback. */
 export const DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
-/** Provider request image-count limit. */
-export const DEFAULT_MAX_IMAGES_PER_REQUEST = 600
 /** Default number of request-image projections prepared concurrently. */
 export const DEFAULT_IMAGE_PREPARATION_CONCURRENCY = 4
 /** Maximum configurable request-image preparation concurrency. */
 export const MAX_IMAGE_PREPARATION_CONCURRENCY = 32
-/** Total-pixel budget matching DeepSeek's normal vision projection. */
-export const DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET = 640_000
-/** Total-pixel budget matching provider low-detail image input. */
-export const DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET = 512 * 512
-/** Encoded-byte cap for one deterministic model-request image. */
-export const DEFAULT_REQUEST_IMAGE_MAX_BYTES = 1024 * 1024
+export {
+  DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET,
+  DEFAULT_MAX_IMAGES_PER_REQUEST,
+  DEFAULT_MAX_REQUEST_FILES_BYTES,
+  DEFAULT_REQUEST_IMAGE_MAX_BYTES,
+  DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
+  resolveRequestImagePolicy,
+} from './request-image-policy.ts'
 /** Deterministic raw-byte removal step. */
 export const DEFAULT_IMAGE_OFFLOAD_BYTE_QUANTUM = 64 * 1024 * 1024
 /** Deterministic base64-byte removal step after Files API fallback. */
@@ -261,25 +259,6 @@ function collectImageRefs(
       refs.set(block.attachment.attachmentId, block.attachment)
       occurrences.push(block.attachment.attachmentId)
     } else if (block.type === 'tool-result') collectImageRefs(block.content, refs, occurrences)
-  }
-}
-
-/**
- * Resolve the request-image budgets owned by one DeepSeek model route.
- * @param model - Advertised model route and its optional image overrides.
- * @returns Complete pixel and encoded-byte budgets.
- * @internal
- */
-export function resolveRequestImagePolicy(model: DeepSeekCatalogModel): ImageRequestPolicy {
-  let maxPixels: number
-  if (model.imagePixelBudget !== undefined && model.imagePixelBudget !== 'low') maxPixels = model.imagePixelBudget
-  else if (model.imagePixelBudget === 'low' || model.imageDetail === 'low') maxPixels = DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET
-  else maxPixels = DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET
-  return {
-    maxPixels,
-    maxBytes: model.imageMaxBytes === undefined
-      ? DEFAULT_REQUEST_IMAGE_MAX_BYTES
-      : model.imageMaxBytes,
   }
 }
 
