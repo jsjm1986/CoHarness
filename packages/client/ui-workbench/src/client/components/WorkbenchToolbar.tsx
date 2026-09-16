@@ -36,9 +36,9 @@ interface Actions {
   openWorkspaceResource?: OpenWorkspaceResource
   resources?: WorkspaceResourceRegistry | undefined
   /** Provider availability for the addressed Session's runtime, evaluated at render time. */
-  filesAvailable?: () => boolean
+  filesAvailable?: (() => boolean) | undefined
   /** Open the Workspace file browser for the active Session and runtime target. */
-  openFiles?: () => void
+  openFiles?: (() => void) | undefined
 }
 type Props = PropsRuntime<'conversation.workbench.toolbar'> & PropsLocale<typeof NS>
   & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions
