@@ -17,7 +17,8 @@ CoHarness 处于发布前阶段，尚未接受安全审计。不要把它视为�
 ## 负责运行
 
 - 启用前检查插件、Profile、patch、命令和模型路由。
-- 除非端点、脱敏、限流、审计和回滚策略获批，否则保持 WebFetch、插件 metadata 和 Session-log upload 关闭。
+- 除非端点、脱敏、限流、审计和回滚策略获批，否则保持插件 metadata 和 Session-log upload 关闭。
+- 出厂基础 Profile 默认启用 `web_fetch`，仅允许经验证的公开目的地且无需逐次批准；网络策略更严格的部署应覆盖 `tool-web` 行。
 - 在迁移或激活 release 前备份可访问的文件和数据库，并测试恢复。
 - Gateway 必须位于 TLS 之后并使用自身认证流程；不要暴露未认证的 runtime 端口。
 - 监控日志、进程树、出站请求、存储增长和失败的授权决策。

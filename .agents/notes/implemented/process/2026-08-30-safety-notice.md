@@ -10,7 +10,7 @@ CoHarness can execute model-generated code, load plugins, access exposed host re
 
 ## Decision
 
-The repository root publishes `SAFETY.md` and `SAFETY.zh.md` as the operator-facing safety authority. They state that the project is unaudited pre-release software, describe sandbox and authorization limits, require least privilege and tested backups, and keep WebFetch, plugin metadata, and Session-log upload opt-in until endpoint, redaction, rate, audit, and rollback controls are approved. The notice does not replace Gateway authentication, TLS, sandboxing, or deployment-specific review.
+The repository root publishes `SAFETY.md` and `SAFETY.zh.md` as the operator-facing safety authority. They state that the project is unaudited pre-release software, describe sandbox and authorization limits, require least privilege and tested backups, and keep plugin metadata and Session-log upload opt-in until endpoint, redaction, rate, audit, and rollback controls are approved. They also record that the shipped base profile enables `web_fetch` against validated public destinations without per-call approval, so deployments with a stricter network policy override the `tool-web` row ([default rationale](../feature/2026-09-01-shared-base-web-fetch-default.md)). The notice does not replace Gateway authentication, TLS, sandboxing, or deployment-specific review.
 
 ## Alternatives considered
 
