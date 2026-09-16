@@ -68,10 +68,8 @@ export {
   MAX_IMAGE_PREPARATION_CONCURRENCY,
 } from './adapter.ts'
 export type { DeepSeekAdapterOptions, DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
-export {
-  deepSeekImageRequestPricing,
-  resolveRequestImagePolicy,
-} from './request-pricing.ts'
+export { deepSeekImageRequestPricing } from './request-pricing.ts'
+export { resolveRequestImagePolicy } from './request-image-policy.ts'
 export { deepSeekImageTokens } from './image-tokens.ts'
 export { DeepSeekFileStore, MAX_CHAT_IMAGE_BYTES } from './file-store.ts'
 export type { DeepSeekFileConnection, DeepSeekFilePolicy, DeepSeekFileReference } from './file-store.ts'

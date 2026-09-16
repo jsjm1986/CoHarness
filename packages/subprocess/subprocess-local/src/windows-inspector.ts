@@ -287,15 +287,21 @@ function snapshotWindowsProcesses(bindings: Win32Bindings): ProcessEntry[] {
   const entries: ProcessEntry[] = []
   try {
     const entry = allocNative(PROCESSENTRY32W, 1)
-    koffi.encode(entry, 'uint32', PROCESSENTRY32W.size)
-    let ok = bindings.process32FirstW(snapshot, entry)
-    while (ok !== 0) {
-      const record = koffi.decode(entry, PROCESSENTRY32W) as {
-        th32ProcessID: number
-        th32ParentProcessID: number
+    try {
+      koffi.encode(entry, 'uint32', PROCESSENTRY32W.size)
+      let ok = bindings.process32FirstW(snapshot, entry)
+      while (ok !== 0) {
+        const record = koffi.decode(entry, PROCESSENTRY32W) as {
+          th32ProcessID: number
+          th32ParentProcessID: number
+        }
+        entries.push({ pid: record.th32ProcessID, parentPid: record.th32ParentProcessID })
+        ok = bindings.process32NextW(snapshot, entry)
       }
-      entries.push({ pid: record.th32ProcessID, parentPid: record.th32ParentProcessID })
-      ok = bindings.process32NextW(snapshot, entry)
+    } finally {
+      // koffi.alloc is unmanaged calloc; the returned bigint wrapper carries
+      // no finalizer, so every allocation needs an explicit free.
+      koffi.free(entry)
     }
   } finally {
     bindings.closeHandle(snapshot)
@@ -313,18 +319,22 @@ function windowsProcessState(bindings: Win32Bindings, pid: number): WindowsProce
     const exit = allocNative(FILETIME, 1)
     const kernel = allocNative(FILETIME, 1)
     const user = allocNative(FILETIME, 1)
-    /* v8 ignore next -- a GetProcessTimes failure after a successful open races process exit and
-       cannot be staged deterministically; the absent-process path is covered and the caller
-       treats undefined as a detector miss. */
-    if (bindings.getProcessTimes(handle, creation, exit, kernel, user) === 0) return undefined
-    const record = koffi.decode(creation, FILETIME) as { dwLowDateTime: number; dwHighDateTime: number }
-    const wait = bindings.waitForSingleObject(handle, 0)
-    /* v8 ignore next -- an opened process handle has exactly one of these two
-       zero-time wait states; an unexpected Win32 failure is an unreadable process. */
-    if (wait !== WAIT_OBJECT_0 && wait !== WAIT_TIMEOUT) return undefined
-    return {
-      started: `${record.dwHighDateTime}:${record.dwLowDateTime}`,
-      active: wait === WAIT_TIMEOUT,
+    try {
+      /* v8 ignore next -- a GetProcessTimes failure after a successful open races process exit and
+         cannot be staged deterministically; the absent-process path is covered and the caller
+         treats undefined as a detector miss. */
+      if (bindings.getProcessTimes(handle, creation, exit, kernel, user) === 0) return undefined
+      const record = koffi.decode(creation, FILETIME) as { dwLowDateTime: number; dwHighDateTime: number }
+      const wait = bindings.waitForSingleObject(handle, 0)
+      /* v8 ignore next -- an opened process handle has exactly one of these two
+         zero-time wait states; an unexpected Win32 failure is an unreadable process. */
+      if (wait !== WAIT_OBJECT_0 && wait !== WAIT_TIMEOUT) return undefined
+      return {
+        started: `${record.dwHighDateTime}:${record.dwLowDateTime}`,
+        active: wait === WAIT_TIMEOUT,
+      }
+    } finally {
+      for (const ptr of [creation, exit, kernel, user]) koffi.free(ptr)
     }
   } finally {
     bindings.closeHandle(handle)

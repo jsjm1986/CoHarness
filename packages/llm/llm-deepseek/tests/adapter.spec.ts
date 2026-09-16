@@ -145,6 +145,12 @@ describe('request image policy', () => {
       { id: 'custom', imagePixelBudget: 320_000, imageMaxBytes: 512_000 },
       { maxPixels: 320_000, maxBytes: 512_000 },
     ],
+    [
+      // An explicit numeric budget wins over the legacy low-detail alias so
+      // the pricing path reproduces the request projection exactly.
+      { id: 'numeric-over-alias', imagePixelBudget: 320_000, imageDetail: 'low' as const },
+      { maxPixels: 320_000, maxBytes: 1024 * 1024 },
+    ],
   ])('resolves route-owned defaults and overrides for %s', (model, expected) => {
     expect(resolveRequestImagePolicy(model)).toEqual(expected)
   })
