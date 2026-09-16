@@ -80,9 +80,9 @@ describe('web e2e: Workspace history-first entry', () => {
     await page.locator('textarea[placeholder="Describe what you want to build"]').waitFor({ timeout: 15_000 })
     expect((await scaffold.ctx.sessionPersistence.list()).filter(session =>
       session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
-    // Repeated explicit New conversation gestures reuse the same blank
+    // Repeated explicit New Session gestures reuse the same blank
     // reservation instead of minting another empty Session.
-    await page.getByRole('button', { name: 'New conversation', exact: true }).click()
+    await workspaceNew.click()
     await page.waitForTimeout(50)
     expect((await scaffold.ctx.sessionPersistence.list()).filter(session =>
       session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)

@@ -10,7 +10,7 @@ Selecting a Workspace intentionally opened its latest history, but the only visi
 
 ## Decision
 
-Keep Workspace selection history-first and expose New conversation as a separate action. Real Workspace rows keep their plus affordance visible, and the Hero exposes the same action beside the Workspace selector. Both actions call the existing `startSession` → `connectWorkspace` path, which reuses one compatible blank Session or creates one reservation.
+Keep Workspace selection history-first and expose New conversation as a separate action. Real Workspace rows keep their plus affordance visible, and the sidebar entry provides the same action; the Hero's own composer is the blank-draft surface, so its workspace row carries only the selector ([the Hero row simplification](2026-09-17-hero-workspace-row-simplification.md)). Both actions call the existing `startSession` → `connectWorkspace` path, which reuses one compatible blank Session or creates one reservation.
 
 The Session list keeps a client-local `workspaceId` hint for a newly reserved blank draft until the Host reports membership or the first visible event. The hint is used only for grouping and current-group expansion; it is removed on engagement or removal and is never serialized, searched, or persisted as Workspace membership. Repeated gestures remain coalesced by the existing Workspace single-flight and draft reservation.
 
@@ -30,7 +30,7 @@ Users can open existing history and start another conversation from the same Wor
 
 ## Verification
 
-Client runtime, Workspace tree, and ConversationRoot tests cover blank-draft retention, hinted grouping, explicit Hero activation, and first-message hint removal. The GUI suite and TypeScript typecheck pass. The assembled Web history-entry scenario remains history-first and exercises the explicit New Session path on desktop and compact layouts.
+Client runtime, Workspace tree, and ConversationRoot tests cover blank-draft retention, hinted grouping, Workspace-row activation, and first-message hint removal. The GUI suite and TypeScript typecheck pass. The assembled Web history-entry scenario remains history-first and exercises the explicit New Session path on desktop and compact layouts.
 
 ## Related
 

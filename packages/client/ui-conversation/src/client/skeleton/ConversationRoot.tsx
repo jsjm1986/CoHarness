@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import clsx from 'clsx'
-import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationPaneSlotProps, ConversationSlotProps, InputZone,
@@ -24,7 +24,7 @@ export type ConversationPaneProps = ConversationPaneSlotProps
 /** Render one Session's complete conversation surface. */
 export function ConversationPane({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace, newSession,
+  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
   t, compact = false, active = true, workbench = false, headerLeading,
 }: ConversationPaneProps) {
   const openState = useSession(s => s.openState)
@@ -158,11 +158,6 @@ export function ConversationPane({
           ? undefined
           : workspaceLabel(cwd)))
 
-  const newSessionWorkspaceId = pendingWorkspaceId
-    ?? activeWorkspace?.workspaceId
-    ?? hintedWorkspaceId
-    ?? workspaces.recentWorkspaceId
-
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
       {headerLeading}
@@ -173,17 +168,6 @@ export function ConversationPane({
         onClick={() => { setPickerOpen(open => !open) }}
         t={t}
       />
-      {newSessionWorkspaceId !== undefined && (
-        <button
-          type="button"
-          className={css.newSession}
-          aria-label={t('hero.newSession')}
-          onClick={() => { newSession(newSessionWorkspaceId) }}
-        >
-          <IconPlusOutline16 size={14} />
-          <span>{t('hero.newSession')}</span>
-        </button>
-      )}
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,

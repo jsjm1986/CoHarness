@@ -290,7 +290,6 @@ export function apply(ctx: Context): void {
           inputHub.discardDraft(sessionId)
         }
       },
-      newSession: (workspaceId) => { workspaces.startSession(workspaceId) },
       setDisplayWidth: (value) => { displaySettings.setWidth(value) },
     }),
   }, ConversationPane)

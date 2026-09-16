@@ -30,9 +30,6 @@
   - img
   - text: workspace
   - img
-- button "New conversation":
-  - img
-  - text: New conversation
 - button "Standard mode":
   - img
   - text: Standard mode
