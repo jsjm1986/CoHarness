@@ -4,8 +4,8 @@
  * store instance (createLayoutStore().create() — the test-sanctioned engine
  * path), a recording renderSlot stub, and a render-prop SessionProvider stub
  * (the real one is framework-wired to the renderer host; its own behavior is
- * ui-renderer's spec territory). Stepped panel transitions, concession
- * response to viewport change, and details staying mounted at
+ * ui-renderer's spec territory). Drag sequences (pointer capture + rAF flush),
+ * concession response to viewport change, and details staying mounted at
  * zero width are the preserved behavior assertions. jsdom has no layout
  * engine, so the frame width comes from a mocked getBoundingClientRect and
  * resizes are driven through the ResizeObserver stub.
@@ -109,6 +109,15 @@ function tracks(frame: HTMLElement): number[] {
   throw new Error(`unexpected template: ${frame.style.gridTemplateColumns}`)
 }
 
+function drag(handle: Element, fromX: number, toX: number): void {
+  const down = new PointerEvent('pointerdown', { pointerId: 1, clientX: fromX, bubbles: true })
+  const move = new PointerEvent('pointermove', { pointerId: 1, clientX: toX, bubbles: true })
+  const up = new PointerEvent('pointerup', { pointerId: 1, clientX: toX, bubbles: true })
+  act(() => { handle.dispatchEvent(down) })
+  act(() => { handle.dispatchEvent(move); vi.advanceTimersByTime(20) })
+  act(() => { handle.dispatchEvent(up) })
+}
+
 beforeEach(() => {
   frameWidth = 1920
   frameHeight = 1080
@@ -133,6 +142,11 @@ beforeEach(() => {
       toJSON: () => ({}),
     }
   }
+  // jsdom lacks pointer capture: emulate per-element so hasPointerCapture gates pass.
+  const captured = new WeakSet<Element>()
+  Element.prototype.setPointerCapture = function () { captured.add(this) }
+  Element.prototype.releasePointerCapture = function () { captured.delete(this) }
+  Element.prototype.hasPointerCapture = function () { return captured.has(this) }
 })
 
 afterEach(() => {
@@ -224,6 +238,31 @@ describe('AppFrame', () => {
     expect(slotCalls.find(c => c.key === 'sidebar')!.props).toEqual({ collapsed: false, width: 280 })
   })
 
+  it('sidebar drag widens through rAF-batched pointer moves', () => {
+    const { frame } = mountFrame()
+    const handles = frame.querySelectorAll('[class*="handle"]')
+    drag(handles[0]!, 280, 350)
+    expect(tracks(frame)[0]).toBe(350)
+  })
+
+  it('details drag widens leftward (negative dx grows the panel)', () => {
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    const handles = frame.querySelectorAll('[class*="handle"]')
+    drag(handles[1]!, 1560, 1500)
+    expect(tracks(frame)[1]).toBe(420)
+  })
+
+  it('drag base is the rendered (concession-clamped) width, not the preference', () => {
+    frameWidth = 1250 // step-2 squeeze: details renders 330 while preference is 360
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    expect(tracks(frame)).toEqual([280, 330])
+    const handles = frame.querySelectorAll('[class*="handle"]')
+    drag(handles[1]!, 920, 930) // shrink by 10 from the rendered width
+    expect(instance.getSnapshot().details).toBe(320)
+  })
+
   it('details column stays mounted at zero width', () => {
     const { frame, getByTestId } = mountFrame()
     expect(tracks(frame)).toEqual([280, 0])
@@ -232,7 +271,7 @@ describe('AppFrame', () => {
   })
 
   it('details panel is a self-anchored slide surface, not a clipped track child', () => {
-    // 1030 < 280+360+400: the concession chain auto-releases the details
+    // 1030 < 280+360+640: the concession chain auto-releases the details
     // track rather than squeezing it, so opening here keeps the surface
     // off-edge until the frame re-widens.
     frameWidth = 1030
@@ -243,7 +282,7 @@ describe('AppFrame', () => {
     expect(panel().style.width).toBe('360px')
     act(() => { instance.actions.openDetails() })
     expect(panel().hasAttribute('data-open')).toBe(false)
-    expect(panel().style.width).toBe('360px') // fixed contract width — the track released, not the panel
+    expect(panel().style.width).toBe('360px') // contract floor — the track released, not the panel
     // Re-widening restores the open preference at the contract width.
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
@@ -270,20 +309,21 @@ describe('AppFrame', () => {
   it('viewport shrink triggers the concession chain via ResizeObserver', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    frameWidth = 1030
+    frameWidth = 1250
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([280, 330])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([280, 360])
   })
 
-  it('renders no resize handles in any column state', () => {
+  it('drag handles disappear for collapsed columns', () => {
     const { frame, instance } = mountFrame()
-    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
     act(() => { instance.actions.openDetails() })
-    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(2)
     act(() => { instance.actions.closeDetails() })
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
     act(() => { instance.actions.toggleSidebar() })
     expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
   })
@@ -305,6 +345,7 @@ describe('AppFrame — medium-viewport auto-collapse', () => {
     act(() => { instance.actions.toggleSidebar() })
     expect(tracks(frame)).toEqual([280, 0])
     expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(false)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
     act(() => { instance.actions.toggleSidebar() })
     expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
   })
@@ -320,14 +361,15 @@ describe('AppFrame — medium-viewport auto-collapse', () => {
     expect(instance.getSnapshot().sidebar).toBe(0) // preference untouched
   })
 
-  it('shrinking across the breakpoint auto-collapses; re-widening restores the open preference', () => {
-    const { frame } = mountFrame()
+  it('shrinking across the breakpoint auto-collapses; re-widening restores the drag width', () => {
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.setSidebar(400) })
     frameWidth = 980
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0])
+    expect(tracks(frame)).toEqual([400, 0])
   })
 
   it('details opens as an overlay, not a grid track, and scrim-dismisses', () => {
@@ -489,6 +531,46 @@ describe('AppFrame — viewport class stamp', () => {
 })
 
 describe('AppFrame — guard branches', () => {
+  it('pointer moves without capture are ignored (no width write)', () => {
+    const { frame, instance } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    const before = instance.getSnapshot().sidebar
+    // Move + up without a preceding pointerdown: hasPointerCapture is false.
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 9, clientX: 500, bubbles: true }))
+      vi.advanceTimersByTime(20)
+      handle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, clientX: 500, bubbles: true }))
+    })
+    expect(instance.getSnapshot().sidebar).toBe(before)
+  })
+
+  it('two moves inside one frame coalesce through the pending rAF', () => {
+    const { frame, instance } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => {
+      // Two moves before the frame flushes: the second must ride the pending
+      // rAF (frame.current ??= guard), and the flush sees the latest x.
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 320, bubbles: true }))
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 340, bubbles: true }))
+      vi.advanceTimersByTime(20)
+    })
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 340, bubbles: true })) })
+    expect(instance.getSnapshot().sidebar).toBe(340)
+  })
+
+  it('pointerup with a pending rAF cancels it and commits the final position', () => {
+    const { frame, instance } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 360, bubbles: true }))
+      // No timer advance: the rAF is still pending when pointerup arrives.
+      handle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 360, bubbles: true }))
+    })
+    expect(instance.getSnapshot().sidebar).toBe(360)
+  })
+
   it('zero-width resize reports are ignored (display:none window)', () => {
     const { frame } = mountFrame()
     frameWidth = 0
@@ -511,8 +593,8 @@ describe('AppFrame — unmount with an in-flight resize frame', () => {
   it('double resize inside one frame rides the pending rAF (??= guard)', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    frameWidth = 1030
+    frameWidth = 1250
     act(() => { fireResize?.(); fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([280, 330])
   })
 })

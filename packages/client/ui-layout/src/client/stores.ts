@@ -1,6 +1,6 @@
 /**
- * The root entry's transient layout store: panel open state as the contract
- * width or 0 (closed). Module level exports the factory only — a module-level
+ * The root entry's transient layout store: panel geometry as plain widths in
+ * px (0 = closed). Module level exports the factory only — a module-level
  * handle would pin the store's identity in the module
  * cache (a de-facto singleton surviving plugin reloads). register() receives
  * the factory (exclusive use: the framework instantiates per entry), AppFrame
@@ -8,16 +8,19 @@
  * receives the bound actions through the registration's inject hook.
  */
 import { defineStore, type EngineStoreHandle, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import { DETAILS_DEFAULT, SIDEBAR_DEFAULT } from './columns.ts'
+import {
+  clampWidth, DETAILS_DEFAULT, DETAILS_MAX, DETAILS_MIN,
+  SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+} from './columns.ts'
 
 /**
- * Layout store state: panel open preferences (the contract default width, or
- * 0 = closed), plus the narrow-viewport pair — `narrow` mirrors AppFrame's
- * breakpoint reading (viewport < SIDEBAR_AUTO_COLLAPSE) so toggleSidebar can
- * pick semantics, and `narrowExpanded` is the manual override that opens the
- * auto-collapsed sidebar without rewriting the preference: the medium mode
- * renders it expanded over the squeezed center, the compact mode as the
- * overlay drawer (AppFrame owns that rendering split).
+ * Layout store state: panel width preferences in px (0 = closed), plus the
+ * narrow-viewport pair — `narrow` mirrors AppFrame's breakpoint reading
+ * (viewport < SIDEBAR_AUTO_COLLAPSE) so toggleSidebar can pick semantics, and
+ * `narrowExpanded` is the manual override that opens the auto-collapsed
+ * sidebar without rewriting the width preference: the medium mode renders it
+ * expanded over the squeezed center, the compact mode as the overlay drawer
+ * (AppFrame owns that rendering split).
  */
 type LayoutState = { sidebar: number; details: number; narrow: boolean; narrowExpanded: boolean; detailsSessionId?: SessionId }
 
@@ -26,6 +29,8 @@ type LayoutState = { sidebar: number; details: number; narrow: boolean; narrowEx
  * return type); drift fails assignability at the defineStore call.
  */
 type LayoutActions = {
+  setSidebar: (draft: LayoutState, px: number) => void
+  setDetails: (draft: LayoutState, px: number) => void
   toggleSidebar: (draft: LayoutState) => void
   setNarrow: (draft: LayoutState, narrow: boolean) => void
   collapseNarrow: (draft: LayoutState) => void
@@ -34,16 +39,21 @@ type LayoutActions = {
 }
 
 /**
- * Create the layout panel store handle. Panels are stepped — open means the
- * contract default width, closed means 0 — so reopening always restores the
- * default. Below the auto-collapse breakpoint (AppFrame feeds setNarrow) the
- * sidebar toggle flips the narrowExpanded override instead of the preference.
+ * Create the layout panel store handle. The preference IS the width, so
+ * closing a panel forgets its drag width — reopening restores the contract
+ * default. Actions are the complete write set: drag writes clamp
+ * into the panel's contract range and never cross the open/closed line;
+ * open/close transitions write 0 / the default explicitly. Below the
+ * auto-collapse breakpoint (AppFrame feeds setNarrow) the sidebar toggle
+ * flips the narrowExpanded override instead of the preference.
  * @returns the store handle (spec + type + identity + factory in one).
  */
 export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
   const handle = defineStore({
     init: (): LayoutState => ({ sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false }),
     actions: {
+      setSidebar: (d, px: number) => { d.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX) },
+      setDetails: (d, px: number) => { d.details = clampWidth(px, DETAILS_MIN, DETAILS_MAX) },
       // Narrow toggles flip only the override: the width preference survives
       // untouched, so re-widening restores the pre-squeeze layout. The narrow
       // surfaces are exclusive — re-expanding the sidebar while the details
