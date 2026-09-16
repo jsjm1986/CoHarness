@@ -3,7 +3,7 @@
 - 审查日期：2026-09-08
 - CoHarness 基线：`d5274caced` 加 `380c4d597b` 及当前未提交 Workbench 改动；审计分支：当前工作树审计
 - 上游 alpha.2：[dsh-v0.1.3-alpha.2](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.3-alpha.2)，提交 `82a5fd61a7cf5c293cec4bdff68f455398d685e9`；持续审查至 `master@c389f96bf3a9b6807cb71ed6bdad5849be0df6d8`
-- 上游范围：`dsh-v0.1.2-alpha.5..dsh-v0.1.3-alpha.2`，2,201 个文件，63,846 行新增，30,632 行删除，37 个 first-parent 提交，182 个非 merge 提交。
+- 上游范围：`dsh-v0.1.3-alpha.1..dsh-v0.1.3-alpha.2`，3,790 个文件，46,421 行新增，15,866 行删除，33 个 first-parent 提交，183 个非 merge 提交。
 - 同步方式：先建立共享核心的行为/API/协议矩阵，再按 seam 分阶段适配；不执行跨仓库 merge 或批量 cherry-pick。
 - 当前版本：`0.1.3-alpha.2.coharness.1`；下一版本仅在本轮必需适配和门禁完成后提升；Android、vendor、native 保留独立版本线。
 
