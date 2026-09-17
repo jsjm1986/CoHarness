@@ -34,6 +34,9 @@ class CliMockAdapter extends LlmAdapter {
       yield { type: 'finish', reason: { kind: 'error', failure: { code: 'SERVER', message: 'CLI mock provider failed' } } }
       return
     }
+    if (process.env.DSH_CLI_STARTUP_HOOK_CONFIG !== undefined && !JSON.stringify(options.messages).includes('STARTUP_HOOK_CONTEXT')) {
+      throw new Error('SessionStart context missing from model request')
+    }
     const toolResult = options.messages.at(-1)?.content.find(block => block.type === 'tool-result')
     if (toolResult === undefined) {
       const args = JSON.stringify({ command: 'printf CLI_TOOL_ROUND_TRIP', description: 'Prove the CLI tool round trip.' })

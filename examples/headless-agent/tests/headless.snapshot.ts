@@ -345,6 +345,38 @@ describe('headless stream-json snapshots', () => {
     expect(result.stderr).toBe('')
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
+  it('includes awaited Claude SessionStart context in the product headless first request', async () => {
+    const overlay = fileURLToPath(new URL('./fixtures/headless-startup-hooks.cordis.yml', import.meta.url))
+    const result = await runLoaderSmoke({
+      label: 'headless Claude startup hook snapshot',
+      tempDirPrefix: 'headless-snapshot-startup-hook-',
+      binScript: dshBinScript,
+      configPath: overlay,
+      binArgs: ['--profile', 'headless', '--patch', overlay, 'Use startup guidance.'],
+      tsconfigPath,
+      env: {
+        DSH_CLI_STARTUP_HOOK_CONFIG: './startup-hooks.json',
+        DSH_PERMISSION_MODE: 'danger-full-access',
+        DSH_TELEMETRY_DISABLED: '1',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: async (cwd) => {
+        await prepareCliMockFixture(cwd)
+        await writeFile(join(cwd, 'startup-hooks.json'), JSON.stringify({ hooks: {
+          SessionStart: [{ hooks: [{ type: 'command', command: 'sleep 0.05; printf \'%s\' \'{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"STARTUP_HOOK_CONTEXT"}}\'' }] }],
+        } }))
+      },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd, join(cwd, '.dsh', 'sessions'))
+        expect(logs).toHaveLength(1)
+        expect(logs[0]!.content).toContain('STARTUP_HOOK_CONTEXT')
+        expect(logs[0]!.content).toContain('hooks-claude-code')
+      },
+    })
+    expect(result.stderr).toBe('')
+    await expect(result.stdout).toMatchFileSnapshot(join(snapshotsDir, 'headless-profile', 'startup-hook.expected.txt'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('rejects publication without starting queued input through the product headless profile', async () => {
     const result = await runLoaderSmoke({
       label: 'product headless publication input snapshot',

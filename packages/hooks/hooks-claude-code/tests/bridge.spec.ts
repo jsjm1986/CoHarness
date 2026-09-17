@@ -88,6 +88,73 @@ async function waitFor(predicate: () => boolean, timeout = 5000, interval = 10):
   }
 }
 
+describe('hooks-claude-code bridge — initialization', () => {
+  it('awaits SessionStart context before creation returns and the first request', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-hooks-claude-'))
+    dirs.push(dir)
+    const hook = join(dir, 'startup.sh')
+    writeFileSync(hook, '#!/usr/bin/env bash\nsleep 0.05\necho \'{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"startup guidance"}}\'\n')
+    chmodSync(hook, 0o755)
+    writeFileSync(join(dir, 'hooks.json'), JSON.stringify({ hooks: {
+      SessionStart: [{ hooks: [{ type: 'command', command: hook }] }],
+    } }))
+    const adapter = new MockAdapter([textResponse('ready')])
+    const ctx = await harness(dir, adapter)
+    try {
+      const agent = await ctx.agentLoop.create(SessionId('startup-context'), { provider: 'mock', model: 'mock' })
+      expect(agent.inbox.nextStep.some(message => message.content.some(block =>
+        block.type === 'text' && block.text.includes('startup guidance')))).toBe(true)
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+      await agent.whenIdle()
+      expect(JSON.stringify(adapter.requests[0]!.messages)).toContain('startup guidance')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+  it.each(['creation cancellation', 'bridge unload'] as const)('drains SessionStart after %s without injecting late context', async (cause) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-hooks-claude-'))
+    dirs.push(dir)
+    const started = join(dir, 'started')
+    const hook = join(dir, 'startup.sh')
+    writeFileSync(hook, `#!/usr/bin/env bash\nprintf started > '${started}'\nsleep 30\necho '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"late context"}}'\n`)
+    chmodSync(hook, 0o755)
+    writeFileSync(join(dir, 'hooks.json'), JSON.stringify({ hooks: {
+      SessionStart: [{ hooks: [{ type: 'command', command: hook }] }],
+    } }))
+    const adapter = new MockAdapter([])
+    const { ctx, hooks } = await harnessWithFiber(dir, adapter)
+    const controller = new AbortController()
+    const injected = vi.fn()
+    const creating = ctx.agents.create({
+      sessionId: SessionId('cancel-startup'),
+      signal: controller.signal,
+      agentOptions: { provider: 'mock', model: 'mock' },
+      setup: (_agentCtx, agent) => { agent.inject = injected },
+    })
+    const outcome = creating.then(handle => ({ handle }), (error: unknown) => ({ error }))
+    try {
+      await waitFor(() => existsSync(started))
+      if (cause === 'creation cancellation') controller.abort(new Error('startup cancelled'))
+      else await hooks.dispose()
+      const result = await outcome
+      if (cause === 'creation cancellation') {
+        expect(result).toHaveProperty('error')
+        expect(ctx.agents.get(SessionId('cancel-startup'))).toBeUndefined()
+        expect(ctx.sessions.get(SessionId('cancel-startup'))).toBeUndefined()
+      } else {
+        expect(result).toHaveProperty('handle')
+        if ('handle' in result) await result.handle.dispose()
+      }
+      expect(injected).not.toHaveBeenCalled()
+      expect(adapter.requests).toHaveLength(0)
+    } finally {
+      controller.abort()
+      await outcome
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
 describe('hooks-claude-code bridge — UserPromptSubmit', () => {
   it('a UserPromptSubmit hook that exits 2 closes a blocked turn without a step', async () => {
     // UserPromptSubmit ignores its malformed matcher field, then exit 2 blocks

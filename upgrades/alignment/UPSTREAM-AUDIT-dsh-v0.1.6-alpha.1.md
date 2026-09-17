@@ -30,3 +30,11 @@ Lint（oxlint）0 告警 0 错误。
 - AgentLoop 单测 19 文件、359 项通过；聚焦 interception 32 项与 cancel 37 项通过；包级 TypeScript 编译和局部 oxlint 通过。审查补充两条回归，确认普通取消保留输入但清除旧唤醒，之后的新输入仍可唤醒。
 - Headless 产品与 TypeScript SDK 快照共 22 项通过；新增发布失败快照输出 `publication turn started: false`，其余已有预期输出不变。
 - 公开创建事件仍为同步事件；串行事件、消费者迁移、Python 打包运行时快照、真实 provider 和桌面能力验收未完成。本批未重复执行仓库全量单测。
+
+## Phase 2：串行创建与启动 hooks
+
+- `2d893a6eb9` 引入串行 `agent/created` 与 Codex 启动等待；Claude Code 的 SessionStart 同样在初始化中等待，创建取消与桥接卸载会中止并等待进程清理，不注入迟到上下文。Hook 失败保留记录但不否决创建。
+- `235cfdedc7` 修正测试消费者的异步 registry disposer 类型与等待；相关 5 文件 161 项测试通过，6 文件类型感知 lint 0 告警、0 错误。
+- Claude 桥接 6 文件 69 项测试、包级 TypeScript 编译、局部 lint 通过。Headless 与 TypeScript SDK 原集合 23 项通过，包括真实 Claude 启动 hook 的首请求上下文和持久来源检查；未放宽请求次数断言或改写已有预期。
+- 本批全量测试首次 1058 文件通过、9 文件失败，构建通过。在测试进程 PATH 指向宿主 Python 3.12 后，原 9 个失败文件集合最终复跑 516 项通过、2 项跳过。此前复跑出现过 Python 清理耗时 4074ms 超过 4000ms，快照出现过请求数 2 而非 1；隔离和原集合后续复跑通过，原因未确定，不据此宣称全量稳定性已解决。耗时和请求数断言均未修改。
+- 待完成：goal、goal-round-driver、agent-team 旧启动事件消费者迁移与旧事件移除；Python SDK、真实 provider、桌面与 LAN/公网验收。各阶段状态仍以升级计划为准。

@@ -1,0 +1,12 @@
+- id: agent-default-model
+  config:
+    provider: cli-mock
+    model: cli-mock
+
+- insert:
+    - id: cli-mock-llm
+      name: './snapshot-fixtures/cli-mock-llm.ts'
+    - id: startup-hooks
+      name: '@deepseek-ai/dsh-hooks-claude-code'
+      config:
+        configPath: !!js "process.env.DSH_CLI_STARTUP_HOOK_CONFIG"

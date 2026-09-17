@@ -214,18 +214,19 @@ export function apply(ctx: Context, config: Config): void {
     return [ours, ...theirs ?? []]
   }
 
-  // SessionStart injects context when its detached hook resolves; a slow hook
-  // may miss the first request.
-  // TODO(session-start-gating): add a startup gate before promising first-turn delivery.
-  ctx.on('agent/session-start', ({ agent, source }) => {
-    detached.track(runPoint('SessionStart', source, sessionStartPayload(ctx, agent, source), { agent, signal: detached.signal })
+  ctx.on('agent/created', async ({ agent, source, signal }) => {
+    const initializationSignal = signal === undefined ? detached.signal : AbortSignal.any([signal, detached.signal])
+    const run = runPoint('SessionStart', source, sessionStartPayload(ctx, agent, source), { agent, signal: initializationSignal })
       .then((merged) => {
+        if (initializationSignal.aborted) return
         const context = contextFrom(merged)
         if (context) agent.inject(context)
       })
       .catch((error: unknown) => {
         ctx.logger.warn(`hooks-claude-code: SessionStart hook failed: ${String(error)}`)
-      }))
+      })
+    detached.track(run)
+    await run
   })
 
   // --- UserPromptSubmit → PreStepDecision. The prompt text is the payload; no

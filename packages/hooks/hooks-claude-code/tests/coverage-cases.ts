@@ -693,14 +693,22 @@ export function defineCoverageCases(group: CoverageGroup): void {
       const path = hooks(d, { SessionStart: [{ hooks: [{ type: 'command', command: s }] }] })
       const adapter = new MockAdapter([textResponse('ok')])
       const ctx = await harness(path, adapter)
-      const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
-      // Make inject throw, forcing the SessionStart .catch path.
-      const original = agent.inject.bind(agent)
+      const warn = vi.fn(); ctx.logger.warn = warn as never
       let threw = false
-      agent.inject = (() => { threw = true; throw new Error('inject boom') })
-      await waitFor(() => threw)
+      const { agent } = await ctx.agents.create({
+        sessionId: SessionId('a1'),
+        agentOptions: { provider: 'mock', model: 'mock' },
+        setup: (_agentCtx, prepared) => {
+          const original = prepared.inject.bind(prepared)
+          prepared.inject = () => {
+            prepared.inject = original
+            threw = true
+            throw new Error('inject boom')
+          }
+        },
+      })
       expect(threw).toBe(true)
-      agent.inject = original
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('SessionStart hook failed'))
       agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
       await waitForIdle(ctx, agent)
       expect(adapter.requests).toHaveLength(1) // loop survived the thrown inject
