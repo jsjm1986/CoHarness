@@ -102,5 +102,10 @@ describe('conversation compact chrome', () => {
     expect(input).not.toContain('flex-basis: 100%')
     expect(input).not.toMatch(/\.row:has\(\[data-model-select\]\)/u)
     expect(input).not.toContain('sessionSummary')
+    // Both row groups shrink on a short line so the labels contract instead
+    // of pushing Send outside the card; a rigid group (flex: none) is the
+    // overflow regression this guards.
+    expect(input).toMatch(/\.tools\s*\{[^}]*flex:\s*0 1 auto/u)
+    expect(input).toMatch(/\.trailing\s*\{[^}]*flex:\s*0 1 auto/u)
   })
 })
