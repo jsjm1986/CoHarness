@@ -27,11 +27,13 @@ async function writePackage(
   base: string,
   pkgName: string,
   options: {
+    manifestName?: string
     typertExport?: boolean
     typertTarget?: unknown
     typertSource?: string
     pluginSource?: string
     omitExports?: boolean
+    pluginSubpath?: string
   } = {},
 ): Promise<void> {
   const dir = join(base, 'node_modules', ...pkgName.split('/'))
@@ -40,8 +42,9 @@ async function writePackage(
   if (options.typertExport !== false && options.typertSource !== undefined) {
     exportsField['./typert'] = options.typertTarget ?? './typert.host.js'
   }
+  if (options.pluginSubpath !== undefined) exportsField[options.pluginSubpath] = './index.js'
   await writeFile(join(dir, 'package.json'), JSON.stringify({
-    name: pkgName,
+    name: options.manifestName ?? pkgName,
     type: 'module',
     ...(options.omitExports ? { main: './index.js' } : { exports: exportsField }),
   }))
@@ -177,13 +180,16 @@ describe('typert loader', () => {
 
     let failure: unknown
     try {
-      await mountTypertLoader(ctx, { packages: ['@fixture/missing', '@fixture/plain'] })
+      await mountTypertLoader(ctx, {
+        packages: ['@fixture/missing', '@fixture/plain', '@fixture/subpath/plugin'],
+      })
     } catch (error) {
       failure = error
     }
     expect(failure).toBeInstanceOf(AggregateError)
     expect((failure as Error).message).toContain('configured package "@fixture/missing" cannot be resolved')
     expect((failure as Error).message).toContain('configured package "@fixture/plain" does not export "./typert"')
+    expect((failure as Error).message).toContain('configured package "@fixture/subpath/plugin" cannot be resolved')
   })
 
   it('auto-registers a mounted package exporting ./typert and withdraws it on unmount', LOADER_TEST_TIMEOUT, async () => {
@@ -212,12 +218,12 @@ describe('typert loader', () => {
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(ctx.typert.list()).toHaveLength(1)
 
-    await ctx.loader.remove(id)
+    ctx.loader.remove(id)
     await ctx.loader.await()
     // The unmount reconciliation rides a queued microtask flush.
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(ctx.typert.get('@fixture/with-typert#Thing')).toBeUndefined()
-    await ctx.loader.remove(plainId)
+    ctx.loader.remove(plainId)
     await ctx.loader.await()
     await new Promise(resolve => setTimeout(resolve, 20))
 
@@ -225,6 +231,28 @@ describe('typert loader', () => {
     await ctx.loader.await()
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(ctx.typert.get('@fixture/with-typert#Thing')).toBeDefined()
+  })
+
+  it('skips package-subpath rows and validates npm aliases against the manifest owner', LOADER_TEST_TIMEOUT, async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-typert-loader-'))
+    await linkZod(root)
+    await writePackage(root, '@fixture/subpath', {
+      pluginSubpath: './plugin',
+      typertSource: typertSource('@fixture/subpath', 'Subpath'),
+    })
+    await writePackage(root, 'fixture-alias', {
+      manifestName: '@fixture/actual',
+      typertSource: typertSource('@fixture/actual', 'Aliased'),
+    })
+    const ctx = await boot()
+    await ctx.loader.create({ name: '@fixture/subpath/plugin' })
+    await ctx.loader.create({ name: 'fixture-alias' })
+    await ctx.loader.await()
+
+    await mountTypertLoader(ctx)
+
+    expect(ctx.typert.getPackage('@fixture/subpath')).toBeUndefined()
+    expect(ctx.typert.get('@fixture/actual#Aliased')).toBeDefined()
   })
 
   it('follows entries mounted after activation', LOADER_TEST_TIMEOUT, async () => {

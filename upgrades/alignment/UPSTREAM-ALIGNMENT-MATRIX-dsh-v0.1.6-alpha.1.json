@@ -135,9 +135,10 @@
       "commitScope": [
         "packages/boot/app-boot/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/boot/cmdline",
@@ -806,9 +807,10 @@
       "commitScope": [
         "packages/client/web/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/code-runtime/code-runtime",
@@ -1315,9 +1317,10 @@
       "commitScope": [
         "packages/extensions/cordis-client-runner/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/extensions/cordis-host-runner",
@@ -1579,9 +1582,10 @@
       "commitScope": [
         "packages/host/directory-picker-auto/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/host/directory-picker-browse",
@@ -1810,9 +1814,10 @@
       "commitScope": [
         "packages/llm/plugin-package-inventory-deepseek/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/llm/token-meter",
@@ -2845,9 +2850,10 @@
       "commitScope": [
         "packages/todo/tool-todo/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/typert/generator",
@@ -2867,9 +2873,10 @@
       "commitScope": [
         "packages/typert/loader/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
       "area": "packages/typert/protocol",

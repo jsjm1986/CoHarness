@@ -722,7 +722,7 @@ describe('boot', () => {
     const dir = tmp()
     writeFileSync(join(dir, 'cordis.yml'), '- id: ghost\n  name: ./missing.mjs\n')
     await expect(boot(NAME, join(dir, 'cordis.yml'))).rejects.toThrow(
-      `${NAME}: plugin tree failed to load: failed to apply loader entry`,
+      `${NAME}: plugin tree failed to load: ${NAME}: plugin(s) failed to load: ./missing.mjs`,
     )
   })
 
@@ -740,7 +740,7 @@ describe('boot', () => {
     writeFileSync(configPath, config)
 
     await expect(boot(NAME, configPath)).rejects.toThrow(
-      'failed to apply loader entry invalid-config (./noop.mjs)',
+      new RegExp(String.raw`1 entry did not activate\n\./noop\.mjs: SyntaxError`),
     )
     expect(readFileSync(configPath, 'utf8')).toBe(config)
   })
@@ -757,8 +757,8 @@ describe('boot', () => {
     ].join('\n'))
     writeFileSync(join(dir, 'cordis.yml'), '- id: failing\n  name: ./failing.mjs\n')
     await expect(boot(NAME, join(dir, 'cordis.yml'))).rejects.toThrow(new RegExp([
-      String.raw`failed to apply loader entry failing \(\./failing\.mjs\): pinned activation failure\n`,
-      String.raw`Error: pinned activation failure\n {4}at failing-fixture$`,
+      String.raw`1 entry did not activate\n\./failing\.mjs: Error: pinned activation failure\n`,
+      String.raw` {4}at failing-fixture$`,
     ].join('')))
   })
 

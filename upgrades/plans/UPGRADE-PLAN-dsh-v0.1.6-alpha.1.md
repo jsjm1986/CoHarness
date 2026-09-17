@@ -61,7 +61,7 @@
 | 阶段 | 内容 | 放行证据 | 状态 |
 | --- | --- | --- | --- |
 | 0 | 固定引用、生成包级库存、记录决定及未验证项 | 升级记录校验、文档检查、文件差异检查 | 进行中 |
-| 1 | vendor、Typert、依赖及底座接口同步，按 vendoring 流程重放本地差量 | vendor manifest、要求的 test/build，相关类型检查 | 已完成：非事务 Loader 消费方适配、Typert 上游语义（别名/子路径）与 vendor 差量记录收口；Python 3.12 `pnpm run test` 退出码 0（18075 通过、116 跳过、0 失败），`pnpm run build` 与 `pnpm run typecheck` 退出码 0。 |
+| 1 | vendor、Typert、依赖及底座接口同步，按 vendoring 流程重放本地差量 | vendor manifest、要求的 test/build，相关类型检查 | 已完成：非事务 Loader 消费方适配、Typert 上游语义（别名/子路径）与 vendor 差量记录收口；Python 3.12 `pnpm run test` 退出码 0（18075 通过、116 跳过、0 失败），`pnpm run build` 与 `pnpm run typecheck` 退出码 0。底座提交 94ea1e1dd8（vendor/Typert 原生加载器）及后续底座提交（非事务 Loader、激活审计、锁文件） |
 | 2 | Agent 异步创建、首轮输入屏障、Session 与投影适配 | 创建/恢复/fork/失败/取消/父属测试，TS 与 Python SDK 输出、真实组装快照 | 已完成本地验收：投影回归 5/5、生成器 26/26、全量单测 18082 通过/116 跳过；Headless 与 TS SDK 快照 34/34，Python 真实 carrier SDK 快照通过。保留事件窗口、不可变日志及 Gateway 语义；生产与跨平台验收归后续阶段 |
 | 3 | Messages、Files、图片编码/计价/offload/冷恢复及模型治理 | 双协议真实 provider、凭据来源、用量、截图持久化与重放 | 待实施 |
 | 4 | PTC、workflow、Shell、sandbox、jobs 全部消费者迁移 | 原生/PTC 路径、目录拒绝、取消超时、子进程静止与资源回收 | 待实施 |

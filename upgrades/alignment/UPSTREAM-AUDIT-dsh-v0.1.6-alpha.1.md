@@ -56,7 +56,7 @@ Lint（oxlint）0 告警 0 错误。
 - 原 HMR 失败单项隔离通过，随后完整 app-boot 包为 108 通过、1 失败（同一用例的首次配置添加未生效）；再串行隔离 3 次均通过。未改超时、断言或 watch 实现，尚不能确定依赖变更与失败的因果关系。本批保留为待验收，不以隔离通过替代完整回归。
 - 第三次全量确认运行在 coverage partition 3/3 阶段被主动终止，未产生最终结果；提交时全量套件状态以第二次运行为准（18050 通过、2 失败），批次按待验收提交。
 
-## Phase 1：非事务 Loader 适配（工作树，待验收）
+## Phase 1：非事务 Loader 适配（过程批次，最终状态见下节收口）
 
 - app-boot 启动失败断言已对齐结算后审计；插入插件路径锚定、用户 patch 重载诊断和 webserver 激活失败的定向集合为 7 文件 95 项通过。app-boot 完整集合为 115 项通过、2 项失败；聚焦 `tsc -b packages/boot/app-boot` 退出码 0。
 - 两个原生监听用例仍失败：文件新增/变更/删除，以及注册时父目录不存在。单项原生错误捕获记录 `EMFILE: too many open files, watch`（errno -24），进程软／硬描述符限额均为 unlimited；不修改生产监听实现、不切换轮询、不放宽超时，原生监听验收继续作为环境阻塞保留。卸载期间打开 watcher 的定向生命周期用例通过，不据此推断所有资源泄漏均已排除。
@@ -66,6 +66,8 @@ Lint（oxlint）0 告警 0 错误。
 - 尚未完成本批组装快照、全量回归收口和 vendor 本地差量日志核验；profile-resolution 与 required-startup 策略继续推迟。此次记录不推进同步基线，不表示 Phase 1 或整次升级已完成。
 
 ## Phase 1：非事务 Loader 适配收口
+
+- Phase 1 底座（vendor、Typert、依赖与锁文件、app-boot 及其余 Loader 消费者）以独立 Phase 1 提交落库，不夹带第二阶段的 Agent/Session 源码；阶段范围及验证见[升级清单](../manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json)。
 
 - 收口范围：app-boot 与其余 Loader 消费方适配为激活后审计，vendor/Typert/依赖底座同步；第二阶段起的目标不进入本批。上游 `profile-resolution` 的 worker/runtime resolver 归属发布闭包，按计划保留推迟。
 - 上游 Typert-loader 语义补齐：包子路径条目退出自动发现、显式 `packages` 拒绝配置的子路径，npm 别名按 manifest 包名校验产物。本地保留 `createRequire` 原生解析（上游走 `pluginPackages` 解析服务，属发布闭包差异），`packages/typert/loader/tests/loader.spec.ts` 17 项通过，双语 README 记录该语义。

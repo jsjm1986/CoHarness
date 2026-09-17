@@ -6,6 +6,7 @@
  * @module session-format-guard-snapshot
  */
 
+import { writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
@@ -102,5 +103,35 @@ describe('session format guard through the assembled app', () => {
     // stable path suffix instead of the realpath-dependent prefix.
     expect(result.stderr).toContain('(raw log: ')
     expect(result.stderr).toContain(sessionPath.slice(sessionPath.indexOf('/.sessions/')))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+})
+
+describe('activation audit through the assembled app', () => {
+  it('rejects a settled tree whose enabled entry is waiting for a missing service', async () => {
+    const result = await runLoaderSmoke({
+      label: 'pending plugin activation refusal',
+      tempDirPrefix: 'dsh-activation-guard-',
+      binScript,
+      libBinScript: binScript,
+      configPath,
+      binArgs: ['./pending.cordis.yml', 'Must not start a turn.'],
+      tsconfigPath,
+      expectedExitCode: 1,
+      prepare: async (cwd) => {
+        await writeFile(join(cwd, 'pending.cordis.yml'), [
+          '- id: waiting',
+          '  name: cordis:group',
+          '  inject: [neverProvided]',
+          '  config: []',
+          '',
+        ].join('\n'))
+      },
+    })
+    expect(result.stdout).toBe('')
+    expect(result.stderr).toMatchInlineSnapshot(`
+      "headless-test-driver: plugin tree failed to load: headless-test-driver: 1 entry did not activate
+      cordis:group: pending (waiting for service: neverProvided)
+      "
+    `)
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })

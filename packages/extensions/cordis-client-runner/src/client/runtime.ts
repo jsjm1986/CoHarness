@@ -462,9 +462,11 @@ export class DynamicCordisPackageRunner {
       // cleanup here is safe to repeat and does not invalidate a newer load's
       // factory.
       const lateCleanup = pendingEntry.then(async (lateEntryId) => {
-        await this.env.loader.remove(lateEntryId).catch((removeError: unknown) => {
+        try {
+          await this.removeEntry(lateEntryId)
+        } catch (removeError: unknown) {
           console.error(`[cordis-client-runner] late entry cleanup for ${half.pluginId} failed:`, removeError)
-        })
+        }
         styles.dispose()
       }, () => { styles.dispose() })
       this.lateCleanups.add(lateCleanup)
@@ -550,6 +552,13 @@ export class DynamicCordisPackageRunner {
     }
   }
 
+  /** Remove the entry and join teardown even though Loader removal returns void. */
+  private async removeEntry(entryId: string): Promise<void> {
+    const fiber = this.env.loader.resolve(entryId).fiber
+    this.env.loader.remove(entryId)
+    while (fiber?.inertia) await fiber.inertia
+  }
+
   /**
    * Unload one package's contributions. Takes the pieces rather than the record
    * because a load can fail before any record is seated.
@@ -565,7 +574,7 @@ export class DynamicCordisPackageRunner {
     this.failures.delete(id)
     // Entry removal disposes the fiber (slot entries and facade effects
     // cascade); the factory invalidation makes a later re-load legal.
-    await this.env.loader.remove(entryId)
+    await this.removeEntry(entryId)
     this.env.modules.invalidate(moduleIdOf(id))
     styles.dispose()
   }

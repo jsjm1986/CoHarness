@@ -17,6 +17,7 @@ import Include, { applyEntryPatches, entryListSchema, type PatchOptions } from '
 import Group from '@deepseek-ai/cordis-plugin-group'
 import { dshHomePath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { createLaunchEnvironmentSnapshot, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
+import { watchConfig } from './watch-config.ts'
 import type {} from '@deepseek-ai/cordis-plugin-hmr'
 // Side-effect type import: resolves `ctx.get('systemPrompt')` to the service.
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -223,7 +224,7 @@ export interface UserPatchWatchOptions {
 }
 
 /**
- * Watch the user patch layer through Cordis HMR and transactionally reapply it to the boot include.
+ * Watch the user patch layer and reapply it to the boot Include without rollback.
  * @param ctx - settled app context containing the root Include and an active HMR service.
  * @param options - diagnostic, file, and patch-composition inputs.
  * @returns an asynchronous disposer after the exact-path watcher is ready.
@@ -238,7 +239,7 @@ export async function watchUserPatches(
   if (hmr === undefined) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`)
   const entry = bootstrapIncludes.get(ctx)
   if (entry === undefined) throw new Error(`${binName}: user patch-layer watching requires the root Include entry`)
-  const register = hmr.registerConfig(filename, async () => {
+  const register = watchConfig(ctx, filename, hmr.config, async () => {
     // Re-read the include's non-patch options per refresh: a writer that
     // updates the root Include's other options between refreshes (none exists
     // today) must not have them silently reverted by a user-layer reload.
@@ -251,6 +252,10 @@ export async function watchUserPatches(
         patches,
       },
     })
+    await ctx.loader.await()
+    await Promise.allSettled([...ctx.loader.entries()].map(entry => Promise.resolve(entry.fiber?.await())))
+    const failures = await inactiveEntries(ctx)
+    if (failures.length > 0) throw new Error(`${binName}: warning: ${failures.length} ${failures.length === 1 ? 'entry' : 'entries'} did not activate\n${failures.join('\n')}`)
   })
   try {
     return await register
@@ -336,7 +341,20 @@ function parsePatchList(
       throw new Error(`${binName}: ${label} entry ${index + 1} in ${file} must be a mapping (a loader patch entry)`)
     }
   })
-  return parsed as PatchOptions[]
+  return anchorInsertedPluginNames(parsed as PatchOptions[], file)
+}
+
+/** Resolve inserted plugin paths beside their patch file; assertion names remain literal. */
+function anchorInsertedPluginNames(patches: PatchOptions[], file: string): PatchOptions[] {
+  const base = dirname(resolve(file))
+  const visit = (entry: EntryOptions): void => {
+    if (typeof entry.name === 'string' && (isAbsolute(entry.name) || entry.name.startsWith('./') || entry.name.startsWith('../'))) {
+      entry.name = pathToFileURL(resolve(base, entry.name)).href
+    }
+    if (entry.group && Array.isArray(entry.config)) entry.config.forEach(visit)
+  }
+  for (const patch of patches) patch.insert?.forEach(visit)
+  return patches
 }
 
 /** One overlay patch list with the source label printed in dump comments. */
@@ -679,6 +697,45 @@ const FIBER_FAILED = 3 as FiberState.FAILED
 /** Render a thrown plugin value without discarding an Error's original stack. */
 function formatActivationError(error: unknown): string {
   return error instanceof Error ? error.stack ?? error.message : String(error)
+}
+
+/** Collect reload failures, including invalid disabled expressions, without changing startup policy. */
+async function inactiveEntries(ctx: Context): Promise<string[]> {
+  const failures: string[] = []
+  const rejectionReasons: unknown[] = []
+  for (const entry of ctx.loader.entries()) {
+    const subject = `${entry.options.id} (${entry.options.name})`
+    try {
+      if (entry.disabled) continue
+    } catch (error) {
+      failures.push(`${subject}: disabled expression failed: ${formatActivationError(error)}`)
+      continue
+    }
+    const fiber = entry.fiber
+    if (fiber === undefined) {
+      failures.push(`${subject}: failed to import`)
+      continue
+    }
+    const state = fiber.state
+    if (state === FIBER_ACTIVE) continue
+    if (state === FIBER_FAILED) {
+      try {
+        await fiber.await()
+      } catch (error) {
+        rejectionReasons.push(error)
+        failures.push(`${subject}: ${formatActivationError(error)}`)
+      }
+      continue
+    }
+    if (state === FIBER_PENDING) {
+      const missing = Object.keys(fiber.inject).filter(service => fiber.ctx.get(service) === undefined)
+      failures.push(`${subject}: pending (waiting for ${missing.length === 1 ? 'service' : 'services'}: ${missing.join(', ') || 'unknown'})`)
+    } else {
+      failures.push(`${subject}: fiber state ${String(state)}`)
+    }
+  }
+  if (rejectionReasons.length > 0) await observeLoaderRejectionCheckpoint(rejectionReasons)
+  return failures
 }
 
 /**

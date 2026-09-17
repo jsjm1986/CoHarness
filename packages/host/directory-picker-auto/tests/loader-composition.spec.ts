@@ -4,16 +4,20 @@
  * assertions observe the durable outcome — which backend and surface entries
  * the chooser mounted into the Loader store, the capability the seam then
  * serves, and that disposing the chooser removes both mounted entries again
- * (HMR safety), joining the backend's own teardown before the disposer settles.
+ * (HMR safety), joining each face's teardown past the entry's removal before
+ * the disposer settles. Import failures of the mounted faces surface on the
+ * chooser fiber (FAILED) rather than the loader promise, and the chooser's
+ * own cleanup still joins a slow face disposal in flight.
  */
 
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setImmediate } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
@@ -90,7 +94,10 @@ afterEach(async () => {
 /** Write a two-row cordis.yml (webserver + chooser), then boot it through the real Loader. */
 async function loadComposition(
   bindHost: '127.0.0.1' | '0.0.0.0',
-  options: { failSurface?: boolean } = {},
+  options: {
+    failImport?: { specifier: string; error: Error; once?: boolean }
+    observe?: (ctx: Context) => void
+  } = {},
 ): Promise<{ ctx: Context; configPath: string }> {
   root = await mkdtemp(join(tmpdir(), 'dsh-directory-picker-auto-'))
   const configPath = join(root, 'cordis.yml')
@@ -115,16 +122,19 @@ async function loadComposition(
     [NATIVE_SURFACE, surfaceModule(NATIVE_SURFACE)],
     [BROWSE_SURFACE, surfaceModule(BROWSE_SURFACE)],
   ])
+  let importFailed = false
   context.loader.internal = {
     version: 'v2',
     async import(specifier: string) {
-      if (options.failSurface === true && (specifier === NATIVE_SURFACE || specifier === BROWSE_SURFACE)) {
-        throw new Error(`surface import failed: ${specifier}`)
+      if (options.failImport?.specifier === specifier && (!options.failImport.once || !importFailed)) {
+        importFailed = true
+        throw options.failImport.error
       }
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
   } as unknown as NonNullable<typeof context.loader.internal>
+  options.observe?.(context)
   await context.loader.create({
     name: 'cordis:include',
     config: { path: pathToFileURL(configPath).href },
@@ -218,15 +228,112 @@ describe('real Loader composition', () => {
     expect(entryNames(ctx)).not.toContain(NATIVE_SURFACE)
   })
 
-  it('unmounts the backend when the surface entry fails to load', { timeout: 60_000 }, async () => {
-    stubAttendedHost()
-    await expect(loadComposition('127.0.0.1', { failSurface: true })).rejects.toThrow(/surface import failed/)
+  it.each([NATIVE, NATIVE_SURFACE, BROWSE, BROWSE_SURFACE])(
+    'fails the chooser and removes its entries when %s cannot import',
+    { timeout: 60_000 },
+    async (specifier) => {
+      stubAttendedHost()
+      const error = new Error(`interaction import failed: ${specifier}`)
+      const { ctx } = await loadComposition(specifier === BROWSE || specifier === BROWSE_SURFACE ? '0.0.0.0' : '127.0.0.1', {
+        failImport: { specifier, error },
+      })
+      const autoEntry = [...ctx.loader.entries()].find(entry => entry.options.name === AUTO)!
+      expect(autoEntry.fiber!.state).toBe(FiberState.FAILED)
+      await expect(autoEntry.fiber!.await()).rejects.toThrow(`entry did not start: ${specifier}`)
+      for (const name of [NATIVE, NATIVE_SURFACE, BROWSE, BROWSE_SURFACE]) {
+        expect(entryNames(ctx)).not.toContain(name)
+      }
+      expect(ctx.get('directoryPicker')).toBeUndefined()
+    },
+  )
 
-    // Setup owns both entries until it returns its disposer, so a failed surface
-    // must take the mounted backend with it: otherwise a retry collides with the
-    // directoryPicker registration this backend already made.
-    expect(entryNames(context!)).not.toContain(NATIVE)
-    expect(context!.get('directoryPicker')).toBeUndefined()
+  it('fails closed after a transient import failure without retrying activation', async () => {
+    stubAttendedHost()
+    const { ctx } = await loadComposition('127.0.0.1', {
+      failImport: { specifier: NATIVE_SURFACE, error: new Error('transient import failure'), once: true },
+    })
+    const autoEntry = [...ctx.loader.entries()].find(entry => entry.options.name === AUTO)!
+    expect(autoEntry.fiber!.state).toBe(FiberState.FAILED)
+    await expect(autoEntry.fiber!.await()).rejects.toThrow(`entry did not start: ${NATIVE_SURFACE}`)
+    expect(entryNames(ctx)).not.toContain(NATIVE)
+    expect(entryNames(ctx)).not.toContain(NATIVE_SURFACE)
+    expect(ctx.get('directoryPicker')).toBeUndefined()
+  })
+
+  it.each([
+    [NATIVE, false], [NATIVE_SURFACE, false], [NATIVE, true], [NATIVE_SURFACE, true],
+  ] as const)('joins delayed %s disposal (already removed: %s)', async (name, alreadyRemoved) => {
+    stubAttendedHost()
+    const { ctx } = await loadComposition('127.0.0.1')
+    const entry = [...ctx.loader.entries()].find(entry => entry.options.name === name)!
+    const fiber = entry.fiber!
+    const autoFiber = [...ctx.loader.entries()].find(entry => entry.options.name === AUTO)!.fiber!
+    const started = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    let finished = false
+    fiber.ctx.effect(() => async () => {
+      started.resolve(undefined)
+      await release.promise
+      finished = true
+    })
+    if (alreadyRemoved) ctx.loader.remove(entry.id)
+    let settled = false
+    const disposal = Promise.resolve(autoFiber.dispose()).then(() => { settled = true })
+    try {
+      await started.promise
+      await setImmediate()
+      expect(fiber.uid).toBeNull()
+      expect(fiber.inertia).toBeDefined()
+      expect(finished).toBe(false)
+      expect(settled).toBe(false)
+    } finally {
+      release.resolve(undefined)
+      await disposal
+    }
+    expect(finished).toBe(true)
+    expect(fiber.inertia).toBeUndefined()
+    expect(entryNames(ctx)).not.toContain(NATIVE)
+    expect(entryNames(ctx)).not.toContain(NATIVE_SURFACE)
+    expect(ctx.get('directoryPicker')).toBeUndefined()
+  })
+
+  it('joins delayed backend disposal before surface import failure settles the chooser', async () => {
+    stubAttendedHost()
+    const started = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const error = new Error('surface import failed')
+    let finished = false
+    let settled = false
+    const loading = loadComposition('127.0.0.1', {
+      failImport: { specifier: NATIVE_SURFACE, error },
+      observe(ctx) {
+        ctx.on('internal/plugin', (fiber) => {
+          if (!fiber.uid || fiber.entry?.options.name !== NATIVE) return
+          fiber.ctx.effect(() => async () => {
+            started.resolve(undefined)
+            await release.promise
+            finished = true
+          })
+        })
+      },
+    }).then((result) => { settled = true; return result })
+    try {
+      await started.promise
+      await setImmediate()
+      expect(finished).toBe(false)
+      expect(settled).toBe(false)
+    } finally {
+      release.resolve(undefined)
+      await loading
+    }
+    const { ctx } = await loading
+    const autoFiber = [...ctx.loader.entries()].find(entry => entry.options.name === AUTO)!.fiber!
+    expect(finished).toBe(true)
+    expect(autoFiber.state).toBe(FiberState.FAILED)
+    await expect(autoFiber.await()).rejects.toThrow(`entry did not start: ${NATIVE_SURFACE}`)
+    expect(entryNames(ctx)).not.toContain(NATIVE)
+    expect(entryNames(ctx)).not.toContain(NATIVE_SURFACE)
+    expect(ctx.get('directoryPicker')).toBeUndefined()
   })
 
   it('tolerates the mounted entry being removed by the tree before the chooser unloads', { timeout: 60_000 }, async () => {
@@ -234,7 +341,7 @@ describe('real Loader composition', () => {
     const { ctx, configPath } = await loadComposition('127.0.0.1')
 
     const backendEntry = [...ctx.loader.entries()].find(entry => entry.options.name === NATIVE)!
-    await ctx.loader.remove(backendEntry.id)
+    ctx.loader.remove(backendEntry.id)
     const autoEntry = [...ctx.loader.entries()].find(entry => entry.options.name === AUTO)!
     renameControl.remainingFailures = 1
     await expect(autoEntry.fiber!.dispose()).resolves.not.toThrow()

@@ -135,9 +135,6 @@ export namespace ModuleLoader {
 
     const raw = requireInternal('internal/modules/esm/loader')?.getOrInitializeCascadedLoader()
     if (!raw) return
-    // Node 24.0–24.11 still exposes the v1 module-job API even though its
-    // major version is 24. Detect the interface itself so those releases do
-    // not receive v2's reversed resolveSync arguments.
     const version = typeof raw.getOrCreateModuleJob === 'function'
       ? 'v2'
       : typeof raw.getModuleJobForImport === 'function' ? 'v1' : undefined

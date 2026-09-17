@@ -18,10 +18,30 @@
   },
   "targetVersion": "0.1.6-alpha.1.coharness.1",
   "versionStatus": "proposed-release-families-unverified",
-  "status": "implementation-in-progress-phase-2-complete-foundation-uncommitted",
+  "status": "implementation-in-progress-phase-2-complete-phase-1-committed",
   "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md",
   "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
   "verification": [
+    {
+      "phase": 1,
+      "command": "pnpm run test",
+      "exitCode": 0
+    },
+    {
+      "phase": 1,
+      "command": "pnpm run build && pnpm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "phase": 1,
+      "command": "pnpm run lint && pnpm run doc-sync",
+      "exitCode": 0
+    },
+    {
+      "phase": 1,
+      "command": "pnpm run test:snapshot apps/cli/tests/dsh-badge.snapshot.ts examples/headless-agent/tests/session-format-guard.snapshot.ts",
+      "exitCode": 0
+    },
     {
       "command": "pnpm run test",
       "exitCode": 0,
@@ -122,10 +142,19 @@
       "localOwner": "vendor, Typert and workspace build owners",
       "commitScope": [
         "vendor",
-        "packages/typert"
+        "packages/typert",
+        "packages/boot/app-boot",
+        "packages/client/web",
+        "packages/todo/tool-todo",
+        "packages/extensions/cordis-client-runner",
+        "packages/host/directory-picker-auto",
+        "packages/llm/plugin-package-inventory-deepseek",
+        "packages/typert/loader",
+        "pnpm-lock.yaml"
       ],
       "reviewState": "implemented-local-tests-passing",
-      "requiredVerification": "Vendor procedure, local modifications replay, test/build and compiler consumers; js-yaml dependency review."
+      "requiredVerification": "Vendor procedure, local modifications replay, test/build and compiler consumers; js-yaml dependency review.",
+      "evidence": "Phase 1 foundation committed separately from Phase 2 (94ea1e1dd8 and the non-transactional Loader consumer base commit); Phase 2 commit 49a968bc26 carries no foundation files."
     },
     {
       "id": "agent-session",

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import { CallId } from '@deepseek-ai/dsh-llm'
@@ -130,11 +130,14 @@ describe('tool-todo real Loader composition through cordis.yml', () => {
   }, 30_000)
 
   it.each([
-    { label: 'is omitted', configLines: [], failure: '$.allowParallelInProgress missing required value' },
-    { label: 'is not boolean', configLines: ['    allowParallelInProgress: "no"'], failure: '$.allowParallelInProgress expected boolean' },
-  ])('fails loading when allowParallelInProgress $label', async ({ configLines, failure }) => {
-    // The policy is self-contained, so misconfiguration fails at load: the
-    // entry's apply rejects and boot never reaches a running tool.
-    await expect(boot(configLines)).rejects.toThrow(failure)
+    { label: 'is omitted', configLines: [] as readonly string[] },
+    { label: 'is not boolean', configLines: ['    allowParallelInProgress: "no"'] as readonly string[] },
+  ])('fails activation when allowParallelInProgress $label', async ({ configLines }) => {
+    // Misconfiguration fails loud at the earliest resolvable point without a
+    // transactional rollback: the tool entry's apply rejects and its fiber
+    // fails while the rest of the tree activates, so todo_write never mounts.
+    const ctx = await boot(configLines)
+    const todo = [...ctx.loader.entries()].find(entry => entry.options.name === '@deepseek-ai/dsh-tool-todo')
+    expect(todo?.fiber?.state).toBe(FiberState.FAILED)
   }, 30_000)
 })

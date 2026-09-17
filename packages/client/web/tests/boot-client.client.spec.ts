@@ -83,9 +83,9 @@ describe('bootClient', () => {
     const sink = stateSink()
 
     await expect(bootClient({ ctx, modules, manifest, onEntryState: sink.onEntryState })).rejects.toThrow(
-      /failed to import loader entry \S+ \(ghost\): client-modules: cannot resolve/,
+      'web boot: 1 entry did not activate\nghost: import failed (see console for the import error)',
     )
-    expect(sink.states.get('ghost')).toEqual(['loading'])
+    expect(sink.states.get('ghost')).toEqual(['loading', 'failed'])
     await ctx.fiber.dispose()
   })
 })

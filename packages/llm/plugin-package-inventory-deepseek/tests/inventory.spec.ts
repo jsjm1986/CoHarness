@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
@@ -191,7 +191,11 @@ describe('DeepSeek plugin package inventory', () => {
     await writeFile(composition, '- id: nested\n  name: versioned-plugin/plugin.mjs\n')
 
     await ctx.loader.create({ name: 'versioned-plugin/plugin.mjs' })
-    await ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(composition).href } })
+    const includeId = await ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(composition).href } })
+    await ctx.loader.await()
+    const nested = ctx.loader.resolve(`${includeId}:nested`)
+    expect(nested.fiber?.state).toBe(FiberState.ACTIVE)
+    expect(nested.parent.tree.ctx.baseUrl).toBe(pathToFileURL(`${nestedRoot}/`).href)
 
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
     expect(prepared.fields.dsh_plugin_packages?.packages).toEqual([

@@ -1091,6 +1091,9 @@ importers:
       '@deepseek-ai/dsh-package-manifest':
         specifier: workspace:^
         version: link:../../util/package-manifest
+      chokidar:
+        specifier: 4.0.3
+        version: 4.0.3
       js-yaml:
         specifier: ^5.2.3
         version: 5.3.0

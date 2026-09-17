@@ -299,7 +299,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // Artifact paths by package name. Negative verdicts (unresolvable specifier —
   // loader builtins, subpath rows — or no typert export) are cached as null and
   // never expire: plugin-set changes take effect on restart.
-  const artifactPath = new Map<string, string | null>()
+  const artifactPath = new Map<string, { packageName: string; path: string } | null>()
   // Imported+validated manifests by package name (one import per package per process).
   const manifests = new Map<string, Promise<TypertContribution>>()
   const dirty = new Set<string>()
@@ -312,9 +312,17 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     }
   }, 'typert loader lifetime')
 
-  const resolveArtifact = (pkgName: string): string | null => {
+  const resolveArtifact = (pkgName: string): { packageName: string; path: string } | null => {
     const cached = artifactPath.get(pkgName)
     if (cached !== undefined) return cached
+    const firstSlash = pkgName.indexOf('/')
+    if (firstSlash >= 0 && (pkgName[0] !== '@' || pkgName.indexOf('/', firstSlash + 1) >= 0)) {
+      if (configured.has(pkgName)) {
+        throw new Error(`typert-loader: configured package "${pkgName}" cannot be resolved from the config tree — add it to the composition package dependencies or remove it from packages`)
+      }
+      artifactPath.set(pkgName, null)
+      return null
+    }
     let pkgPath: string
     try {
       pkgPath = require.resolve(`${pkgName}/package.json`)
@@ -331,11 +339,12 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       return null
     }
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>
-    const rel = typertExportOf(pkgName, pkg.exports)
+    const manifestName = typeof pkg.name === 'string' ? pkg.name : pkgName
+    const rel = typertExportOf(manifestName, pkg.exports)
     if (rel === undefined && configured.has(pkgName)) {
       throw new Error(`typert-loader: configured package "${pkgName}" does not export "${TYPERT_HOST_EXPORT}"`)
     }
-    const resolved = rel === undefined ? null : join(dirname(pkgPath), rel)
+    const resolved = rel === undefined ? null : { packageName: manifestName, path: join(dirname(pkgPath), rel) }
     artifactPath.set(pkgName, resolved)
     return resolved
   }
@@ -375,9 +384,9 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       return undefined
     }
     if (registered.has(entryName) || pending.has(entryName)) return undefined
-    const path = resolveArtifact(entryName)
-    if (path === null) return undefined
-    const task = loadManifest(entryName, path).then((manifest) => {
+    const artifact = resolveArtifact(entryName)
+    if (artifact === null) return undefined
+    const task = loadManifest(artifact.packageName, artifact.path).then((manifest) => {
       // The entry may have unmounted (or already re-registered) while the import was in flight.
       if (!active || !qualifies(entryName) || registered.has(entryName)) return
       registered.set(entryName, ctx.typert.register(manifest))

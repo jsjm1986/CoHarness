@@ -6,7 +6,7 @@ Node-only Loader integration for generated Typert artifacts. The plugin requires
 
 During activation it scans existing Loader entries. It then follows Cordis `internal/plugin` lifecycle notifications, resolves each entry package's `package.json`, imports `./typert` when exported, validates its `TYPERT` manifest, and registers the contribution until the entry or this plugin unmounts. An import that settles after either owner is gone is discarded.
 
-`packages` lists additional package artifacts to register for plugins nested behind another Loader entry. Cordis fibers do not retain those nested plugins' npm specifiers, so this boundary is explicit; every configured package must resolve from the config tree and export `./typert`.
+`packages` lists additional package artifacts to register for plugins nested behind another Loader entry. Cordis fibers do not retain those nested plugins' npm specifiers, so this boundary is explicit; every configured package must resolve from the config tree and export `./typert`. Package-subpath entries are excluded from automatic discovery and rejected in `packages`. npm aliases validate artifacts against the manifest's package name, not the installed alias. Resolution follows the config tree's native Node lookup and materialized profile links.
 
 Packages without the export are skipped. Package resolution and imported manifests are cached for the process lifetime, so adding an export requires a restart. A malformed artifact fails activation when already mounted; a later failure is logged without preventing unrelated packages from registering.
 

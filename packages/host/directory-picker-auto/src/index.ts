@@ -12,8 +12,8 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-// Empty type imports carry the `loader` and `webServer` Context merges for the reads below.
-import type {} from '@deepseek-ai/cordis-plugin-loader'
+import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
+// Empty type import carries the `webServer` Context merge for the read below.
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { canExecute, hasLinuxChooserBinary } from './probe.ts'
 import type { DirectoryPickerBackendKind } from './resolve.ts'
@@ -54,9 +54,11 @@ export const SURFACE_PACKAGES: Record<DirectoryPickerBackendKind, string> = {
 
 /**
  * Resolve the interaction from one boot-time sample and mount its backend and
- * surface as Loader entries; the effect's disposer removes both entries and
- * joins their fibers' teardown, so unloading this plugin returns only after
- * both faces of the mounted interaction (and their dependents) quiesced.
+ * surface as Loader entries. Import or activation failure fails the chooser
+ * and removes both entries. The Loader logs the original import error; the
+ * chooser reports the missing entry fiber without retrying the import.
+ * Its disposer waits for both fibers to finish teardown, including entries
+ * already removed from the Loader tree.
  * @param ctx - cordis context carrying the injected `webServer` and `loader`.
  */
 export async function apply(ctx: Context): Promise<void> {
@@ -71,20 +73,34 @@ export async function apply(ctx: Context): Promise<void> {
     // the mounted rows can never be persisted back into a config file. The
     // backend lands first: the surface's browser half drives the capability
     // the backend registers.
-    const ids: string[] = []
+    const loader = ctx.loader
+    const entries: { id: string; entry?: Entry }[] = []
     const unmount = async () => {
-      for (const id of [...ids].reverse()) {
-        // Tree teardown (group.stop) can have removed the entry already;
-        // nothing is left to unmount or await then.
-        if (ctx.loader.store[id] === undefined) continue
-        // remove() disposes the entry transactionally, so the chooser's unload
-        // signals completion only after that face quiesced.
-        await ctx.loader.remove(id)
+      for (const { id, entry } of [...entries].reverse()) {
+        const fiber = entry?.fiber
+        if (loader.store[id] === entry && entry) loader.remove(id)
+        // remove() only requests disposal. The retained entry also owns teardown
+        // after a tree stop has deleted its store row; repeated dispose() is not a join.
+        await fiber?.dispose()
+        while (fiber?.inertia) await fiber.inertia
       }
     }
     try {
       for (const name of [BACKEND_PACKAGES[backend], SURFACE_PACKAGES[backend]]) {
-        ids.push(await ctx.loader.create({ name }))
+        const options = { name }
+        const owned: { id: string; entry?: Entry } = { id: loader.ensureId(options) }
+        entries.push(owned)
+        try {
+          await loader.create(options)
+        } finally {
+          const entry = loader.store[owned.id]
+          if (entry) owned.entry = entry
+        }
+        if (!owned.entry?.fiber) {
+          throw new Error(`directory-picker-auto: entry did not start: ${name}`)
+        }
+        // Only join our own fiber: loader.await() would also wait for this apply().
+        await owned.entry.fiber.await()
       }
     } catch (cause) {
       // Setup owns the entries it created until it returns the disposer: leaving

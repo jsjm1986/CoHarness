@@ -287,41 +287,28 @@ describe('PythonCodeRuntime — seam descriptors and misuse', () => {
     }
   })
 
-  it('rejects a non-CPython, outdated, or probe-failing interpreter at load', async () => {
-    const nonPython = new Context()
-    await expect(nonPython.plugin(PythonCodeRuntime, { pythonBin: '/bin/echo' }))
-      .rejects.toThrow(/did not report a CPython version/)
-
-    const dir = await mkdtemp(join(tmpdir(), 'dsh-python-probe-'))
-    const oldMajor = join(dir, 'python-old-major')
-    const old = join(dir, 'python-old')
-    const future = join(dir, 'python-future')
-    const pypy = join(dir, 'pypy')
-    const failed = join(dir, 'python-failed')
-    await writeFile(oldMajor, '#!/bin/sh\nprintf \'cpython 2 99 0\\n\'\n', { mode: 0o755 })
-    await writeFile(old, '#!/bin/sh\nprintf \'cpython 3 9 6\\n\'\n', { mode: 0o755 })
-    await writeFile(future, '#!/bin/sh\nprintf \'cpython 4 0 0\\n\'\n', { mode: 0o755 })
-    await writeFile(pypy, '#!/bin/sh\nprintf \'pypy 3 10 0\\n\'\n', { mode: 0o755 })
-    await writeFile(failed, '#!/bin/sh\nexit 7\n', { mode: 0o755 })
+  it.each([
+    { label: 'non-Python output', output: 'not-python', error: /did not report a CPython version/ },
+    { label: 'obsolete major', output: 'cpython 2 99 0', error: /must be CPython 3\.10 or newer, got cpython 2\.99\.0/ },
+    { label: 'outdated minor', output: 'cpython 3 9 6', error: /must be CPython 3\.10 or newer, got cpython 3\.9\.6/ },
+    { label: 'future major', output: 'cpython 4 0 0', error: undefined },
+    { label: 'alternative implementation', output: 'pypy 3 10 0', error: /must be CPython, got pypy/ },
+    { label: 'probe failure', output: undefined, error: /failed the CPython version probe/ },
+  ])('validates the interpreter at load: $label', async ({ output, error }) => {
+    const dir = await makeTempDir('dsh-python-probe-')
+    const bin = join(dir, 'python-probe')
+    await writeFile(bin, output === undefined ? '#!/bin/sh\nexit 7\n' : `#!/bin/sh\nprintf '${output}\\n'\n`, { mode: 0o755 })
+    expect(resolvePythonBin(relative(process.cwd(), bin))).toBe(bin)
+    const ctx = new Context()
     try {
-      expect(resolvePythonBin(relative(process.cwd(), old))).toBe(old)
-      const obsolete = new Context()
-      await expect(obsolete.plugin(PythonCodeRuntime, { pythonBin: oldMajor }))
-        .rejects.toThrow(/must be CPython 3\.10 or newer, got cpython 2\.99\.0/)
-      const outdated = new Context()
-      await expect(outdated.plugin(PythonCodeRuntime, { pythonBin: old }))
-        .rejects.toThrow(/must be CPython 3\.10 or newer, got cpython 3\.9\.6/)
-      const forwardCompatible = new Context()
-      const fiber = await forwardCompatible.plugin(PythonCodeRuntime, { pythonBin: future })
-      await fiber.dispose()
-      const alternative = new Context()
-      await expect(alternative.plugin(PythonCodeRuntime, { pythonBin: pypy }))
-        .rejects.toThrow(/must be CPython, got pypy/)
-      const probeFailure = new Context()
-      await expect(probeFailure.plugin(PythonCodeRuntime, { pythonBin: failed }))
-        .rejects.toThrow(/failed the CPython version probe/)
+      if (error) {
+        await expect(ctx.plugin(PythonCodeRuntime, { pythonBin: bin })).rejects.toThrow(error)
+      } else {
+        const fiber = await ctx.plugin(PythonCodeRuntime, { pythonBin: bin })
+        await fiber.dispose()
+      }
     } finally {
-      rmSync(dir, { recursive: true, force: true })
+      await ctx.fiber.dispose()
     }
   })
 
