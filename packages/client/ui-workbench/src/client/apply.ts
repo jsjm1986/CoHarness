@@ -3,6 +3,7 @@ import { WorkspaceResourceError } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, ConversationViewport, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
@@ -10,6 +11,7 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import type { WorkbenchCatalog } from './catalog.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
+import { WorkbenchSidebar, type WorkbenchSidebarInjected } from './components/WorkbenchSidebar.tsx'
 import { WorkbenchToolbar } from './components/WorkbenchToolbar.tsx'
 import { createWorkbenchStore, type WorkspaceBrowserOwner } from './stores.ts'
 import { en, NS, zh } from './locales.ts'
@@ -183,6 +185,23 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.workbench.empty', () => ctx.slots.register({
     name: 'conversation.workbench.empty', locale: NS, store: chooser,
   }, WorkbenchEmpty))
+  // The sidebar panel shares the chooser store: its Add action opens the
+  // toolbar's picker dialog through the same bound handle.
+  ctx.slots.inject('sidebar.workspaces.workbench', () => ctx.slots.register({
+    name: 'sidebar.workspaces.workbench',
+    locale: NS,
+    store: chooser,
+    children: {
+      'conversation.workbench.display': { kind: 'single', scope: 'root' },
+    },
+    inject: (): WorkbenchSidebarInjected => ({
+      hooks: { viewport: viewport.snapshot },
+      focusPane: (sessionId) => { viewport.focus(sessionId) },
+      removePane: (sessionId) => { viewport.remove(sessionId) },
+      setPaneRatios: (ratios) => { viewport.setPaneRatios(ratios) },
+      exitWorkbench: () => { viewport.setMode('single') },
+    }),
+  }, WorkbenchSidebar))
   ctx.slots.inject('conversation.workbench.pane.header', () => ctx.slots.register({
     name: 'conversation.workbench.pane.header',
     id: 'workbench-pane-header',

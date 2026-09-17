@@ -19,13 +19,16 @@ describe('ModelSelect.module.css', () => {
   it('collapses the trigger to its glyph inside a narrow composer row', () => {
     expect(css).toMatch(/\.triggerGlyph\s*\{[^}]*display:\s*none/u)
     const tier = css.match(/@container\s*\(max-width:\s*480px\)\s*\{(?<body>[^@]*)\}/u)?.groups?.body ?? ''
-    expect(tier).toMatch(/\.triggerLabel,\s*\.triggerEffort\s*\{[^}]*display:\s*none/u)
-    expect(tier).toMatch(/\.triggerGlyph\s*\{[^}]*display:\s*inline-flex/u)
+    expect(tier).toMatch(/\.trigger\s*\{[^}]*width:\s*28px/u)
+    expect(tier).toMatch(/\.triggerLabel,[^}]*\.chevron\s*\{[^}]*display:\s*none/u)
+    expect(tier).toMatch(/\.triggerGlyph\s*\{[^}]*display:\s*grid/u)
+    expect(tier).toMatch(/\.triggerGlyph\s*\{[^}]*width:\s*24px/u)
+    expect(tier).toMatch(/\.trigger:hover:not\(:disabled\)\s*\.triggerGlyph\s*\{[^}]*--dsw-alias-interactive-bg-hover/u)
   })
 
-  it('keeps the model label visible in the compact phone layout', () => {
+  it('collapses the trigger to its glyph on the compact phone row', () => {
     const scope = String.raw`:global\(\[data-viewport='compact'\]\)\s*\.`
-    expect(css).toMatch(new RegExp(`${scope}triggerLabel,\\s*${scope}triggerEffort\\s*\\{[^}]*display:\\s*block`, 'u'))
-    expect(css).toMatch(new RegExp(`${scope}triggerGlyph\\s*\\{[^}]*display:\\s*none`, 'u'))
+    expect(css).toMatch(new RegExp(`${scope}triggerLabel,\\s*${scope}triggerEffort,\\s*${scope}chevron\\s*\\{[^}]*display:\\s*none`, 'u'))
+    expect(css).toMatch(new RegExp(`${scope}triggerGlyph\\s*\\{[^}]*display:\\s*inline-flex`, 'u'))
   })
 })

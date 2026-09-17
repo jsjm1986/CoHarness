@@ -50,50 +50,94 @@
   white-space: nowrap;
 }
 
+.chevron {
+  /* inline-flex, not inline: an inline seat reserves baseline descent under
+     the svg and floats the glyph off-center in the 28px trigger. */
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
 /* Composer-row collapse tier: below the width where the label can still
    render legibly, the permission glyph (which already varies by level)
-   plus the chevron carry the trigger. The nearest container ancestor is
-   InputBar's anonymous inline-size row; other mounts (session settings)
-   have no container and never match. 480 is the shared narrow-panel step. */
+   carries the trigger alone as a bare 28px icon seat; hover paints a 24px
+   disc around the glyph. The nearest container ancestor is InputBar's
+   anonymous inline-size row; other mounts (session settings) have no
+   container and never match. 480 is the shared narrow-panel step. */
 @container (max-width: 480px) {
   .trigger {
-    padding-inline: var(--dsw-space-2) var(--dsw-space-1);
+    justify-content: center;
+    width: 28px;
+    padding: 0;
   }
 
-  .triggerLabel {
+  .trigger:hover:not(:disabled) {
+    background: transparent;
+  }
+
+  .trigger:hover:not(:disabled) .triggerIcon {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  .triggerLabel,
+  .chevron {
     display: none;
   }
+
+  .triggerIcon {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    corner-shape: round;
+  }
 }
 
-/* The compact phone layout lays the tool row out on its own grid column
-   where the label still fits; the collapse above targets squeezed
-   non-compact columns only. */
-:global([data-viewport='compact']) .triggerLabel {
-  display: block;
+/* Compact phones carry the seat as an icon-only control on the single
+   toolbar line: the permission glyph alone (its mark already varies by
+   level); the aria-label still names the mode. */
+:global([data-viewport='compact']) .trigger {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
 }
 
-.summary {
+:global([data-viewport='compact']) .trigger:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+:global([data-viewport='compact']) .triggerLabel,
+:global([data-viewport='compact']) .chevron {
+  display: none;
+}
+
+:global([data-viewport='compact']) .triggerIcon {
   display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--dsw-space-1);
-  overflow: hidden;
-  color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-mobile-font-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: auto;
+  height: auto;
 }
 
-.summaryIcon {
-  display: inline-flex;
-  flex: none;
+:global([data-viewport='compact']) .trigger:hover:not(:disabled) .triggerIcon {
+  background: transparent;
+}
+
+:global([data-viewport='compact']) .triggerIcon svg {
   width: var(--dsw-mobile-icon-secondary);
   height: var(--dsw-mobile-icon-secondary);
 }
 
-.summaryIcon svg {
-  width: 16px;
-  height: 16px;
+@media (max-width: 359px) {
+  :global([data-viewport='compact']) .trigger {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 .sectionOptions {
@@ -152,21 +196,4 @@
   flex: none;
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-mobile-font-section);
-}
-
-.chevron {
-  /* inline-flex, not inline: an inline seat reserves baseline descent under
-     the svg and floats the glyph off-center in the 28px trigger. */
-  display: inline-flex;
-  flex: 0 0 auto;
-  color: var(--dsw-alias-label-caption);
-  transition: transform 120ms ease;
-}
-
-:global([data-viewport='compact']) .trigger {
-  height: var(--dsw-touch-target);
-}
-
-.chevronOpen {
-  transform: rotate(180deg);
 }

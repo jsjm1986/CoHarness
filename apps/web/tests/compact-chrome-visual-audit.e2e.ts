@@ -201,7 +201,8 @@ describe('visual audit: compact product chrome', () => {
         await dismissOnboarding(page)
         await shot(page, `${prefix}-00-landing`)
         if (phone.width <= 359) {
-          expect(await page.locator('[data-session-summary]').count()).toBe(0)
+          // No session yet: the icon-only model seat renders nothing.
+          expect(await page.locator('[data-model-trigger]').count()).toBe(0)
         }
         findings[`${prefix}.landing`] = await dumpOverflow(page)
 

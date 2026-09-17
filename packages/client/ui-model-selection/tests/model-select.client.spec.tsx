@@ -48,7 +48,7 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
 afterEach(cleanup)
 
 describe('ModelSelect reasoning effort', () => {
-  it('renders a readable compact summary and a section-level effort picker', async () => {
+  it('names the current selection on the trigger and a section-level effort picker', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
     const select = vi.fn(async (selection: ModelSelection) => {
       directory.set(state({ current: selection }))
@@ -61,9 +61,8 @@ describe('ModelSelect reasoning effort', () => {
       load={vi.fn()}
       select={select}
       t={t}
-      presentation="summary"
     />)
-    expect(screen.getByText('DeepSeek-V4-Flash · High')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High' })).toBeTruthy()
     rerender(<ModelSelect
       locked={false}
       available

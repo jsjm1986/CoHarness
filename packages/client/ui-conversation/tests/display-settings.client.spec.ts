@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ConversationSettings } from '../src/submission-settings.ts'
@@ -83,5 +85,19 @@ describe('ConversationDisplaySettings', () => {
     settings.dispose()
     expect(stub.listenerCount()).toBe(0)
     settings.dispose()
+  })
+})
+
+describe('display-settings stylesheet contract', () => {
+  const root = readFileSync(fileURLToPath(new URL('../src/client/skeleton/ConversationRoot.module.css', import.meta.url)), 'utf8')
+
+  it('re-points the body-size markdown tokens at the chat font-size preference', () => {
+    // The shared markdown sheet pins its type through these tokens; without the
+    // re-point the preference stops at the .markdown container and transcript
+    // text never changes size. The re-point scales around the 16px/28px design
+    // baseline (preference 14 ↔ design 16), keeping the 1.75 ratio.
+    expect(root).toContain('--dsw-font-markdown-base: calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family)')
+    expect(root).toContain('--dsw-font-markdown-base-strong: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family)')
+    expect(root).toContain('--dsw-font-markdown-h4: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family)')
   })
 })

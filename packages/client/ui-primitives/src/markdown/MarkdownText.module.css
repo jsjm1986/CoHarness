@@ -214,9 +214,21 @@
   overscroll-behavior-x: contain;
 }
 
+/* Inside a workbench pane the scroller becomes the cell-cap query container,
+   so `cqw` below resolves against the pane's text column, not the window. */
+:global([data-workbench]) .tableScroll {
+  container-type: inline-size;
+}
+
 .tableScroll:global(.md-table-wide) {
   overflow-x: hidden;
   padding-bottom: var(--dsh-scrollbar-width, 4px);
+}
+
+/* A pane too narrow for the hover-revealed bar must stay scrollable. */
+:global([data-workbench]) .tableScroll:global(.md-table-wide) {
+  overflow-x: auto;
+  padding-bottom: 0;
 }
 
 .tableScroll:global(.md-table-wide):hover,
@@ -248,7 +260,7 @@
   border-top: none;
   font: var(--dsw-font-markdown-table-head);
   max-width: 320px;
-  max-width: min(30vw, 320px);
+  max-width: min(30cqw, 320px);
   min-width: 100px;
 }
 
@@ -257,7 +269,7 @@
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   font: var(--dsw-font-markdown-table);
   max-width: 320px;
-  max-width: min(30vw, 320px);
+  max-width: min(30cqw, 320px);
   min-width: 100px;
 }
 

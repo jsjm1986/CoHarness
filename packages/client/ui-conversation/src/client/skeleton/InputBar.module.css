@@ -364,7 +364,10 @@
    (figma Input_Bottom chrome). */
 .row {
   display: flex;
-  flex-wrap: wrap;
+  /* The toolbar never takes a second line: controls degrade by the row's own
+     inline-size (icon tiers, then the context meter hides) and extension
+     items clip rather than wrap. */
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--dsw-space-3);
@@ -393,16 +396,21 @@
 .extensionItems {
   flex: 0 1 auto;
   gap: var(--dsw-space-1);
+  /* The row never wraps; contributed items are the first thing to clip when
+     the line runs out of width. */
+  overflow: hidden;
 }
 
 /* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
    Read-only; the chip gap widened to 12 so the pill chips read as separate
    controls. */
 .tools {
-  /* Keep the left touch targets together. The model seat is the flexible
-     region; shrinking this group lets its children paint outside their flex
-     item and cover the model label on narrow cards. */
-  flex: 0 0 auto;
+  /* Keep the left touch targets together. The group still shrinks before the
+     card overflows: its mode chips truncate and contributed items clip. No
+     overflow clip here — the permission and command menus render inside this
+     lane and must paint past it; the flex min-content floor already keeps
+     fixed seats from reaching the trailing controls. */
+  flex: 0 1 auto;
   gap: var(--dsw-space-4);
 }
 
@@ -411,35 +419,15 @@
 }
 
 .trailing {
-  flex: none;
-  /* Wrap keeps the left mode chips and the right controls apart when the card
-     runs out of row width: the trailing group (model + send) moves to its own
-     line instead of the left group shrinking until its chip overlaps the
-     model trigger (external:107). The auto margin re-anchors it right on the
-     wrapped line; on a single line space-between already pins it right. */
+  /* The group shrinks on a short line: the model seat is the flexible region
+     (its root contracts and truncates the name) while the context meter and
+     send stay fixed. Without this the whole group holds max-content width
+     and the overflowing edge pushes Send outside the card. */
+  flex: 0 1 auto;
+  /* The auto margin keeps the trailing group pinned right; space-between
+     already anchors it on the single line. */
   margin-left: auto;
   gap: 12px;
-}
-
-/* Extreme narrowness gives the model/meter/send group its own line inside
-   the card. By then the 480px tier has already collapsed the permission and
-   model chips to icons, so the remaining controls still fit one wrapped row.
-   This is the container version of the ≤359px compact rule further below. */
-@container (max-width: 300px) {
-  .trailing {
-    flex-basis: 100%;
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-end;
-  }
-}
-
-.sessionSummary {
-  display: none;
-}
-
-.sessionSettingsRow {
-  display: none;
 }
 
 /* Attach circle (figma + control): 28px, selector fill, primary glyph. */
@@ -464,6 +452,58 @@
 .add:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Narrow composer rows (a workbench pane under the 480px step): the tool
+   seats drop their filled disc and hover paints a 24px circle behind the
+   glyph instead, matching the collapsed model/permission triggers. The
+   compact phone row restores the filled seat below. */
+@container (max-width: 480px) {
+  .tools {
+    gap: var(--dsw-space-2);
+  }
+
+  .trailing {
+    gap: var(--dsw-space-1);
+  }
+
+  .add {
+    position: relative;
+    background: transparent;
+  }
+
+  .add::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: 999px;
+    corner-shape: round;
+    background: transparent;
+  }
+
+  .add > * {
+    position: relative;
+  }
+
+  .add:hover:not(:disabled) {
+    background: transparent;
+  }
+
+  .add:hover:not(:disabled)::before {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+:global([data-viewport='compact']) .add {
+  background: var(--dsw-specific-selector);
+}
+
+:global([data-viewport='compact']) .add:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+:global([data-viewport='compact']) .add::before {
+  content: none;
 }
 
 /* The visible paperclip button owns the accessible file-picker action; keep
@@ -614,8 +654,9 @@
 }
 
 :global([data-viewport='compact']) .row {
-  flex-wrap: wrap;
-  row-gap: var(--dsw-space-2);
+  /* The compact toolbar holds one icon line at every width; extension items
+     scroll inside their own lane instead of pushing the row taller. */
+  flex-wrap: nowrap;
 }
 
 :global([data-viewport='compact']) .tools {
@@ -634,25 +675,16 @@
 
 :global([data-viewport='compact']) .trailing {
   flex: 1 1 0;
+  justify-content: flex-end;
 }
 
-/* At the smallest phone width, give the model/send group its own row. Keeping
-   both controls inside the card is preferable to squeezing the model label to
-   zero and pushing Send past the rounded edge. */
-@media (max-width: 359px) {
-  :global([data-viewport='compact']) .trailing {
-    flex-basis: 100%;
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-end;
-  }
-}
-
+/* 40px targets, not the full 44px touch target: the single-row compact
+   toolbar seats seven controls and must still fit a 360px phone. */
 :global([data-viewport='compact']) .add,
 :global([data-viewport='compact']) .primary,
 :global([data-viewport='compact']) .documentAction {
-  width: var(--dsw-touch-target);
-  height: var(--dsw-touch-target);
+  width: 40px;
+  height: 40px;
 }
 
 :global([data-viewport='compact']) .primary {
@@ -688,9 +720,9 @@
 }
 
 /* Compact composer hierarchy: the left rail owns attach/command/accessory
-   actions, while the model and send controls form one readable trailing group.
-   Grid keeps the two groups aligned instead of letting flex-wrap create a
-   third accidental line when a provider name or extension is long. */
+   actions, while the model and send controls form one trailing icon group.
+   Grid keeps both groups on the single toolbar line; the tools column clips
+   before it ever yields a second row. */
 @media (max-width: 767px) {
   :global([data-viewport='compact']) .card {
     gap: var(--dsw-space-2);
@@ -726,148 +758,33 @@
   }
 
   :global([data-viewport='compact']) .trailing [data-model-select] {
-    min-width: 0;
-    flex: 1 1 auto;
-    max-width: none;
-  }
-
-  :global([data-viewport='compact']) .trailing [data-model-trigger] {
-    max-width: 100%;
-    padding-inline: var(--dsw-space-1);
-    font: var(--dsw-mobile-font-secondary);
-  }
-
-  :global([data-viewport='compact']) .trailing [data-model-trigger] svg {
-    width: var(--dsw-mobile-icon-secondary);
-    height: var(--dsw-mobile-icon-secondary);
+    flex: 0 0 auto;
   }
 
   :global([data-viewport='compact']) .add svg,
-  :global([data-viewport='compact']) .primary svg,
-  :global([data-viewport='compact']) .sessionSummary > svg {
+  :global([data-viewport='compact']) .primary svg {
     width: var(--dsw-mobile-icon-secondary);
     height: var(--dsw-mobile-icon-secondary);
   }
-
-  .sessionSummary {
-    display: flex;
-    align-items: center;
-    gap: var(--dsw-space-2);
-    width: 100%;
-    min-height: var(--dsw-mobile-summary-height);
-    padding: 0 var(--dsw-space-2);
-    border: 0;
-    border-radius: var(--dsw-mobile-control-radius);
-    background: var(--dsw-alias-bg-module-platform);
-    color: var(--dsw-alias-label-primary);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .sessionSummary:disabled {
-    color: var(--dsw-alias-label-dimmed);
-    cursor: default;
-  }
-
-  .sessionSummary:focus-visible {
-    outline: 2px solid var(--dsw-alias-border-l3);
-    outline-offset: -2px;
-  }
-
-  .sessionSummaryText {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .sessionSummaryModel,
-  .sessionSummaryMeta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sessionSummaryModel {
-    font: var(--dsw-mobile-font-secondary);
-    font-weight: 500;
-  }
-
-  .sessionSummaryMeta {
-    color: var(--dsw-alias-label-caption);
-    font: var(--dsw-mobile-font-caption);
-  }
-
-  .sessionSummaryChevron {
-    flex: none;
-    color: var(--dsw-alias-label-caption);
-  }
 }
 
-@media (max-width: 767px) {
-  /* A live model seat deserves its own readable line on every phone width;
-     keeping it beside the tool rail produces an overlap before truncation
-     can help. The blank hero has no model seat and remains one row. */
-  :global([data-viewport='compact']) .row:has([data-model-select]) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  :global([data-viewport='compact']) .row:has([data-model-select]) .trailing {
-    width: 100%;
-    flex: 1 1 auto;
-    justify-content: flex-end;
-  }
-}
-
+/* The narrowest phones keep the same single icon row; every control steps
+   down to 36px so attach, access, model, meter, and send still fit a 320px
+   card. The tools column may shrink but never yields a second row. */
 @media (max-width: 359px) {
   :global([data-viewport='compact']) .row {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 2px;
   }
 
-  :global([data-viewport='compact']) .row:has(.sessionSettingsRow) {
-    row-gap: var(--dsw-space-2);
-  }
-
-  :global([data-viewport='compact']) .sessionSettingsRow {
-    display: block;
-    grid-column: 1 / -1;
-    min-width: 0;
-    width: 100%;
-  }
-
-  :global([data-viewport='compact']) .sessionSettingsRow .sessionSummary {
-    min-height: var(--dsw-mobile-summary-height);
-  }
-
-  :global([data-viewport='compact']) .trailing {
-    width: auto;
-    justify-content: flex-end;
-  }
-
-  /* A live session carries a model seat and needs the second row; the blank
-     hero only has Send, so keeping it in the first row avoids an orphaned
-     arrow at the left edge. */
-  :global([data-viewport='compact']) .row:has([data-model-select]) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  :global([data-viewport='compact']) .row:has([data-model-select]) .trailing {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
   :global([data-viewport='compact']) .tools {
     min-width: 0;
   }
 
-  :global([data-viewport='compact']) .trailing [data-model-select] {
-    max-width: calc(100% - var(--dsw-touch-target) - var(--dsw-space-1));
-  }
-
-  :global([data-viewport='compact']) .trailing [data-model-trigger] {
-    justify-content: flex-start;
-    text-align: left;
+  :global([data-viewport='compact']) .add,
+  :global([data-viewport='compact']) .primary,
+  :global([data-viewport='compact']) .documentAction {
+    width: 36px;
+    height: 36px;
   }
 }

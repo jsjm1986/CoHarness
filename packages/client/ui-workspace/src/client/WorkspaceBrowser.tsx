@@ -811,7 +811,6 @@ export function WorkspaceBrowser({
   useHostDescription,
   useViewport,
   useCurrentSessions,
-  exitWorkbench,
   renderSlot,
   t,
   listDirectory,
@@ -1067,10 +1066,8 @@ export function WorkspaceBrowser({
   return (
     <div className={clsx(css.root, !wide && css.rail, workbenchMode && css.workbenchMode)}>
       {workbenchMode && wide && (
-        <div className={css.workbenchNotice} role="status">
-          <strong>工作台模式</strong>
-          <span>当前空间会话列表已暂时收起</span>
-          <button type="button" onClick={() => { exitWorkbench?.() }}>返回当前空间</button>
+        <div className={css.workbenchPanel}>
+          {renderSlot('sidebar.workspaces.workbench', {})}
         </div>
       )}
       <div className={css.sectionHeader}>
@@ -1185,8 +1182,9 @@ export function WorkspaceBrowser({
         />
       </div>
 
-      {/* The collapsed rail keeps search as its own 36px control. */}
-      {!wide && <div className={css.search}>
+      {/* The collapsed rail keeps search as its own 36px control; workbench
+          mode replaces the whole region, so the rail gesture stays hidden. */}
+      {!wide && !workbenchMode && <div className={css.search}>
         <Tooltip label={t('search')}>
           <button
             type="button"

@@ -20,6 +20,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     add: vi.fn(() => ({ ok: true })),
     replaceActive: vi.fn(() => ({ ok: true })),
     focus: vi.fn(), move: vi.fn(), setMode: vi.fn(), markCatalogReady: vi.fn(),
+    remove: vi.fn(), setPaneRatios: vi.fn(),
     listWorkbenches: vi.fn(() => []),
     currentWorkbench: vi.fn(() => ({ id: 'w1', name: 'Sessions', paneIds: [], updatedAt: 1 })),
     createWorkbench: vi.fn(() => 'w2'),
@@ -43,6 +44,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
     'conversation.workbench.empty': { kind: 'single', scope: 'root' },
     'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
+    'sidebar.workspaces.workbench': { kind: 'single', scope: 'root' },
   } } as never, () => null)
   const fiber = await ctx.plugin({ inject, apply }).await()
   const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
@@ -148,6 +150,33 @@ describe('workbench navigation lifecycle', () => {
     expect(h.viewport.markCatalogReady).not.toHaveBeenCalled()
     expect(h.slots.entries('conversation.workbench.toolbar')).toHaveLength(0)
     await h.ctx.fiber.dispose()
+  })
+
+  it('registers the sidebar panel with pane actions and a declared display hole', async () => {
+    const h = await harness()
+    try {
+      const entry = h.slots.entries('sidebar.workspaces.workbench')[0]
+      expect(entry).toBeDefined()
+      const face = (entry!.inject as unknown as () => {
+        focusPane(id: SessionId): void
+        removePane(id: SessionId): void
+        setPaneRatios(ratios: readonly number[]): void
+        exitWorkbench(): void
+      })()
+      face.focusPane(A)
+      face.removePane(A)
+      face.setPaneRatios([1, 1])
+      face.exitWorkbench()
+      expect(h.viewport.focus).toHaveBeenCalledWith(A)
+      expect(h.viewport.remove).toHaveBeenCalledWith(A)
+      expect(h.viewport.setPaneRatios).toHaveBeenCalledWith([1, 1])
+      expect(h.viewport.setMode).toHaveBeenCalledWith('single')
+      // Registering into the panel's display hole succeeds only because the
+      // panel's own registration declared it.
+      const release = h.slots.register({ name: 'conversation.workbench.display' } as never, () => null)
+      expect(h.slots.entries('conversation.workbench.display')).toHaveLength(1)
+      release()
+    } finally { await h.ctx.fiber.dispose() }
   })
 
   it('delegates workbench layout management to the viewport capability', async () => {

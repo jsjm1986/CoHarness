@@ -28,14 +28,14 @@ describe('conversation compact chrome', () => {
     expect(hero).toContain('min-height: var(--dsw-touch-target)')
   })
 
-  it('gives attach and send the touch target on compact viewports', () => {
+  it('gives attach and send the compact icon target on compact viewports', () => {
     expect(input).toContain("[data-viewport='compact']")
     expect(input).toContain('.add')
     expect(input).toContain('.primary')
     expect(input).toContain('.documentRail')
     expect(input).toContain('.documentStatus')
-    expect(input).toContain('var(--dsw-touch-target)')
-    expect(input).toContain('.sessionSummary > svg')
+    expect(input).toContain('width: 40px')
+    expect(input).toContain('width: 36px')
     expect(input).toContain('var(--dsw-mobile-icon-secondary)')
     expect(input).toContain('flex-wrap: wrap')
     expect(input).toContain('[data-viewport-short]')
@@ -82,13 +82,30 @@ describe('conversation compact chrome', () => {
 
   it('degrades composer chips by container width, not viewport width', () => {
     const permission = readFileSync(fileURLToPath(new URL('../src/client/skeleton/PermissionSelect.module.css', import.meta.url)), 'utf8')
+    const contextMeter = readFileSync(fileURLToPath(new URL('../src/client/skeleton/ContextMeter.module.css', import.meta.url)), 'utf8')
     // The row is an anonymous inline-size container so the queries below answer
     // the card's real width — a narrow workbench column inside a wide window
-    // degrades there. The compact phone layout exempts the label: its trailing
-    // grid cell already fits the text.
+    // degrades there. Compact phones instead collapse the seat to its icon so
+    // the toolbar holds a single line at every width.
     expect(input).toMatch(/\.row\s*\{[^}]*container-type:\s*inline-size/u)
-    expect(permission).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.triggerLabel\s*\{[^}]*display:\s*none/u)
-    expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel\s*\{[^}]*display:\s*block/u)
-    expect(input).toMatch(/@container\s*\(max-width:\s*300px\)\s*\{[^@]*\.trailing\s*\{[^}]*flex-basis:\s*100%/u)
+    expect(permission).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.triggerLabel,[^@]*\.chevron\s*\{[^}]*display:\s*none/u)
+    expect(permission).toMatch(/\.triggerIcon\s*\{[^}]*width:\s*24px/u)
+    expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel,[^@]*display:\s*none/u)
+    // Narrow panes seat the tool buttons as bare glyphs with a small hover
+    // disc; compact phones restore the filled selector circle.
+    expect(input).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.add::before\s*\{[^}]*inset:\s*2px/u)
+    expect(input).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.add\s*\{[^}]*background:\s*var\(--dsw-specific-selector\)/u)
+    // The very narrowest panes hide the context meter; compact phones keep it.
+    expect(contextMeter).toMatch(/@container\s*\(max-width:\s*340px\)\s*\{[^@]*\.root\s*\{[^}]*display:\s*none/u)
+    expect(contextMeter).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.root\s*\{[^}]*display:\s*inline-flex/u)
+    // Nothing may force the trailing group onto a second line.
+    expect(input).not.toContain('flex-basis: 100%')
+    expect(input).not.toMatch(/\.row:has\(\[data-model-select\]\)/u)
+    expect(input).not.toContain('sessionSummary')
+    // Both row groups shrink on a short line so the labels contract instead
+    // of pushing Send outside the card; a rigid group (flex: none) is the
+    // overflow regression this guards.
+    expect(input).toMatch(/\.tools\s*\{[^}]*flex:\s*0 1 auto/u)
+    expect(input).toMatch(/\.trailing\s*\{[^}]*flex:\s*0 1 auto/u)
   })
 })

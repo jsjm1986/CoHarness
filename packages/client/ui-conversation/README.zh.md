@@ -18,7 +18,7 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 在 composer 中直接选择的文件也使用与文档管理器相同的可续传上传会话，包括有界分片、SHA-256 校验、重试，以及重新选择同一文件后继续上传。
 
-根作用域的 `conversation` 入口声明 `conversation.pane`（允许当前 Session 缺席的对话树），以及可选工作台使用的工具栏、空状态和面板头 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
+根作用域的 `conversation` 入口声明 `conversation.pane`（允许当前 Session 缺席的对话树），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 
@@ -64,7 +64,7 @@ composer 统计 pill 的 token 账目来自经标准套件 `useProjection` 读�
 
 ## 设置权限
 
-忙碌状态下的 Enter 偏好以及对话显示偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。
+忙碌状态下的 Enter 偏好以及对话显示偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
 
 ## 模型体验
 

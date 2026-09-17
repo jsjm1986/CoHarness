@@ -32,3 +32,4 @@ A narrow composer inside a non-compact frame — narrow window or a workbench co
 
 - [Responsive shell viewport modes](../architecture/2026-08-14-responsive-shell-viewport-modes.md) — the anonymous-container and shared-step vocabulary this follows.
 - [Compact chrome density](../architecture/2026-08-19-compact-chrome-density.md) — the compact-viewport rules this complements.
+- [Narrow-pane composer bare icon seats](2026-09-18-composer-narrow-pane-bare-icons.md) — refines the seat treatment at this step (bare 28px seats, hover discs, meter hide); this note still owns the container mechanism and step vocabulary.

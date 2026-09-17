@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-unified-mobile-session-settings.md
-2026-08-24-unified-mobile-session-settings.md: 64f58240a8905b301d8b6de3a1ea8be5d7d6b195
-2026-08-24-unified-mobile-session-settings.zh.md: 8baa066c560c41bb53fb6702defe5cc54e89a11d
+2026-08-24-unified-mobile-session-settings.md: a5bbe5090ebf2115c663b6ef6db69688795a55d7
+2026-08-24-unified-mobile-session-settings.zh.md: 5c2548492918697d5bdc3a5971a9d121cf8c07b7

@@ -3,10 +3,11 @@ import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore, WorkspaceResourceRegistry, workspaceResourceAddress, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, WorkspaceResourceRegistry, workspaceResourceAddress, type ConversationViewportSnapshot, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
+import { WorkbenchSidebar } from '../src/client/components/WorkbenchSidebar.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
 import { createWorkbenchStore } from '../src/client/stores.ts'
 import { zh } from '../src/client/locales.ts'
@@ -707,5 +708,63 @@ describe('workbench toolbar edge paths', () => {
     expect(closePicker).not.toHaveBeenCalled()
     pendingCreate.resolve({ ok: true })
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+  })
+})
+
+describe('workbench sidebar panel', () => {
+  function sidebar(p: ReturnType<typeof props>, snapshot: Partial<ConversationViewportSnapshot> = {}) {
+    const viewportStore = createSnapshotStore<ConversationViewportSnapshot>({
+      mode: 'workbench', paneIds: [SID_A, SID_B], activePaneId: SID_A, paneRatios: [2, 1], ...snapshot,
+    })
+    const face = { focusPane: vi.fn(), removePane: vi.fn(), setPaneRatios: vi.fn(), exitWorkbench: vi.fn() }
+    const renderSlot = vi.fn(() => null)
+    render(<WorkbenchSidebar
+      {...p}
+      useViewport={bindSnapshotSelector(viewportStore)}
+      {...face}
+      renderSlot={renderSlot} t={t}
+    />)
+    return { face, renderSlot, viewportStore }
+  }
+
+  it('renders the pane roster with focus, close, add, and equalize controls', () => {
+    const p = props()
+    act(() => {
+      p.sessionsStore.update((draft) => {
+        draft.byId[SID_A]!.pendingInteraction = 'approval'
+      })
+    })
+    const { face, renderSlot } = sidebar(p)
+    expect(screen.getByText('工作台')).toBeTruthy()
+    expect(screen.getByText('等待处理')).toBeTruthy()
+    const alpha = screen.getByRole('button', { name: /Alpha/ })
+    expect(alpha.getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: /Beta/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Beta/ }))
+    expect(face.focusPane).toHaveBeenCalledWith(SID_B)
+    fireEvent.click(screen.getAllByRole('button', { name: '关闭面板' })[0]!)
+    expect(face.removePane).toHaveBeenCalledWith(SID_A)
+    const openPicker = vi.spyOn(p.actions, 'openPicker')
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    expect(openPicker).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '等宽' }))
+    expect(face.setPaneRatios).toHaveBeenCalledWith([1, 1])
+    fireEvent.click(screen.getByRole('button', { name: '退出工作台' }))
+    expect(face.exitWorkbench).toHaveBeenCalledOnce()
+    expect(renderSlot).toHaveBeenCalledWith('conversation.workbench.display', {})
+  })
+
+  it('gates add at four panes and equalize below two', () => {
+    const p = props()
+    sidebar(p, { paneIds: ['a', 'b', 'c', 'd'] as SessionId[], paneRatios: [1, 1, 1, 1] })
+    expect(screen.getByRole('button', { name: '添加对话' })).toHaveProperty('disabled', true)
+    cleanup()
+    sidebar(props(), { paneIds: [SID_A], paneRatios: [1] })
+    expect(screen.getByRole('button', { name: '等宽' })).toHaveProperty('disabled', true)
+  })
+
+  it('shows the empty hint in single mode', () => {
+    sidebar(props(), { mode: 'single', paneIds: [], paneRatios: [] })
+    expect(screen.getByText('暂无分栏')).toBeTruthy()
   })
 })

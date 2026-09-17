@@ -1,0 +1,65 @@
+/* Workbench-sidebar display controls: the same settings face stacked to fit
+   the sidebar's single-column width. */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  padding: 0 var(--dsw-space-1);
+}
+
+.notice {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.notice[role='alert'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.control {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.controlRow {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+}
+
+.controlRow input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--dsw-alias-state-business-primary);
+}
+
+.controlRow output {
+  flex: none;
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+}
+
+.fillToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fillToggle input {
+  margin: 0;
+  accent-color: var(--dsw-alias-state-business-primary);
+}
