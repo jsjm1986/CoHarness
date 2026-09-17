@@ -2,11 +2,12 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError } from '../src/instances.ts'
 import type { InstanceRepository, RuntimeTarget } from '../src/instances.ts'
+import type { InstanceProc } from '../src/launcher.ts'
 import { UserService } from '../src/users.ts'
 
 const FAKE_DSH = `const fs=require('fs'),crypto=require('crypto'),http=require('http');const c=JSON.parse(fs.readFileSync(3,'utf8'));const material=(kind,nonce)=>'dsh-gateway-readiness-v1\\0'+kind+'\\0'+nonce+'\\0'+c.runtime.kind+'\\0'+String(c.runtime.id)+'\\0'+String(c.runtime.generation);const proof=(kind,nonce)=>crypto.createHmac('sha256',c.token).update(material(kind,nonce)).digest('base64url');http.createServer((q,s)=>{if(q.url==='/exit'){s.end('bye');process.exit(0);return}if(q.url==='/api/internal/gateway/readiness'){const nonce=q.headers['x-dsh-gateway-readiness-nonce'];const request=q.headers['x-dsh-gateway-readiness-request'];if(typeof nonce!=='string'||request!==proof('request',nonce)){s.statusCode=403;s.end();return}s.setHeader('content-type','application/json');s.end(JSON.stringify({version:1,runtime:c.runtime,proof:proof('response',nonce)}));return}s.end('ok')}).listen(Number(process.argv[1]),'127.0.0.1')`
@@ -149,6 +150,29 @@ class SurvivorRepository implements InstanceRepository {
   }
 }
 
+class FailingStopRepository implements InstanceRepository {
+  readonly attempts: RuntimeTarget[] = []
+
+  constructor(private readonly failIds: ReadonlySet<number>) {}
+
+  initialize(): Promise<void> { return Promise.resolve() }
+  portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(43100) }
+  stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
+  generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(1) }
+  touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
+  beginStart(): Promise<number> { throw new Error('stopAll regression never starts runtimes') }
+  markReady(): Promise<void> { return Promise.resolve() }
+  idleTargets(): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
+  idleTarget(): Promise<boolean> { return Promise.resolve(false) }
+  markStopping(target: RuntimeTarget): Promise<void> {
+    this.attempts.push(target)
+    if (this.failIds.has(target.id)) throw new Error('database unavailable')
+    return Promise.resolve()
+  }
+  markStopped(): Promise<void> { return Promise.resolve() }
+  owner(): Promise<null> { return Promise.resolve(null) }
+}
+
 describe('InstanceManager', () => {
   it('spawns, reports ready, and dedupes concurrent starts', async () => {
     const { alice, manager } = await setup()
@@ -167,7 +191,7 @@ describe('InstanceManager', () => {
     const attached = {
       hasExited: () => false,
       isAlive: async () => true,
-      terminate: async () => {},
+      terminate: vi.fn(async () => {}),
     }
     const launcher = {
       instancesOutliveGateway: true,
@@ -184,6 +208,8 @@ describe('InstanceManager', () => {
     const result = await survivorManager.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath })
     expect(result).toEqual({ port: 43250, generation: 7 })
     expect(await survivorManager.isLive({ kind: 'project', id: 41 })).toBe(true)
+    await survivorManager.stopAll()
+    expect(attached.terminate).not.toHaveBeenCalled()
   })
 
   it('reaps idle instances but keeps active ones', async () => {
@@ -216,6 +242,28 @@ describe('InstanceManager', () => {
     const { port } = await manager.ensureRunning(alice)
     await manager.stop(alice.id)
     await expect(fetch(`http://127.0.0.1:${port}/`)).rejects.toThrow()
+  })
+
+  it.each([{ failedIds: [] }, { failedIds: [1] }, { failedIds: [1, 2, 3, 4, 5, 6, 7, 8] }])('stopAll drains tracked runtimes with failed targets $failedIds', async ({ failedIds }) => {
+    const { cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const repository = new FailingStopRepository(new Set(failedIds))
+    const stopManager = new InstanceManager(repository, cfg)
+    manager = stopManager
+    // stopAll drains the tracked-process map; seed the post-start state
+    // directly instead of launching nine real runtimes for one ordering
+    // regression.
+    const procs = (stopManager as unknown as { procs: Map<string, InstanceProc> }).procs
+    for (let id = 1; id <= 9; id += 1) {
+      procs.set(`user:${String(id)}`, { hasExited: () => true, terminate: async () => {} })
+    }
+    try {
+      if (failedIds.length > 0) await expect(stopManager.stopAll()).rejects.toThrow('database unavailable')
+      else await expect(stopManager.stopAll()).resolves.toBeUndefined()
+      expect(repository.attempts.map(target => target.id).sort((a, b) => a - b))
+        .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    } finally {
+      procs.clear()
+    }
   })
 
   it('materializes policy packages so profile peers resolve from the compiled runtime', async () => {

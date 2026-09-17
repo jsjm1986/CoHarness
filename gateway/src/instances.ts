@@ -779,6 +779,10 @@ export class InstanceManager {
     else totals.set(key, next)
   }
 
+  /**
+   * Drain tracked local runtimes despite individual stop failures; leave supervisor-owned runtimes running.
+   * @returns completion after all workers settle; rejects with the first failed worker's original error
+   */
   async stopAll(): Promise<void> {
     // Local children must not outlive the gateway; systemd units stay up
     // across a gateway restart by design.
@@ -793,13 +797,19 @@ export class InstanceManager {
     }))
     let cursor = 0
     const worker = async (): Promise<void> => {
+      const errors: unknown[] = []
       for (;;) {
         const index = cursor
         cursor += 1
         const target = targets[index]
-        if (target === undefined) return
-        await this.stop(target)
+        if (target === undefined) break
+        try {
+          await this.stop(target)
+        } catch (error) {
+          errors.push(error)
+        }
       }
+      if (errors.length > 0) throw errors[0]
     }
     const settled = await Promise.allSettled(Array.from(
       { length: Math.min(STOP_ALL_CONCURRENCY, targets.length) },
