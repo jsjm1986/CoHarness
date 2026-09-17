@@ -1274,8 +1274,8 @@
         ".github/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "8",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         ".github/AGENTS.md",
         ".github/issue-management/README.i18n.yaml",
@@ -1333,7 +1333,8 @@
         "area": "non-package:.github",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localDisposition": "Gate surface: cumulative diff is compared and new required checks registered during 0R before implementation batches start."
     },
     {
       "area": "non-package:.gitignore",
@@ -3102,15 +3103,16 @@
         "lefthook.yml"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "lefthook.yml"
       ],
       "incrementFiles": [
         "lefthook.yml"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localDisposition": "Gate surface: cumulative diff is compared and new required checks registered during 0R before implementation batches start."
     },
     {
       "area": "non-package:native",
@@ -3495,8 +3497,8 @@
         "scripts/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "8",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "scripts/browser-bundled-externals.spec.ts",
         "scripts/browser-bundled-externals.ts",
@@ -3680,7 +3682,8 @@
         "area": "non-package:scripts",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localDisposition": "Gate surface: cumulative diff is compared and new required checks registered during 0R before implementation batches start."
     },
     {
       "area": "non-package:snapshots",
@@ -4539,7 +4542,8 @@
         "area": "packages/acp/acp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/api/gateway",
@@ -4582,7 +4586,8 @@
         "area": "packages/api/gateway",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "replaced"
     },
     {
       "area": "packages/api/remotes",
@@ -4622,7 +4627,8 @@
         "area": "packages/api/remotes",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/api/session-controller",
@@ -4632,7 +4638,7 @@
         "packages/api/session-controller/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "2B",
+      "phase": "7A",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
         "packages/api/session-controller/README.i18n.yaml",
@@ -4735,7 +4741,13 @@
         "area": "packages/api/session-controller",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the desktop session controller is not carried",
+        "replacedBy": "host/apiproxy"
+      },
+      "localDisposition": "Upstream-only BFF; the Session multi-instance, slot, and inbox-mirror behavior is ported through host/apiproxy and client/runtime, not by carrying this package."
     },
     {
       "area": "packages/api/settings-controller",
@@ -4760,7 +4772,13 @@
         "area": "packages/api/settings-controller",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "settings flow through host/apiproxy under the same principal/ACL dispatch",
+        "replacedBy": "host/apiproxy"
+      },
+      "localDisposition": "Upstream-only; settings flow through host/apiproxy — review delta for the replacement owner."
     },
     {
       "area": "packages/api/terminal-controller",
@@ -4830,7 +4848,8 @@
         "area": "packages/api/terminal-controller",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/api/workspace-controller",
@@ -4865,7 +4884,13 @@
         "area": "packages/api/workspace-controller",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "workspace operations are served by host/apiproxy and the Workbench runtime targets",
+        "replacedBy": "host/apiproxy"
+      },
+      "localDisposition": "Upstream-only; workspace operations are served by host/apiproxy and Workbench runtime targets — review delta for the replacement owner."
     },
     {
       "area": "packages/api/workspace-files",
@@ -4875,7 +4900,7 @@
         "packages/api/workspace-files/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7A",
+      "phase": "7C",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
         "packages/api/workspace-files/README.i18n.yaml",
@@ -4898,7 +4923,13 @@
         "area": "packages/api/workspace-files",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
+        "replacedBy": "host/apiproxy"
+      },
+      "localDisposition": "Upstream-only; workspace file reads are served by the host/apiproxy workspaceFiles RPC — review delta under the 7C authorization work."
     },
     {
       "area": "packages/attachment/attachment",
@@ -4929,7 +4960,8 @@
         "area": "packages/attachment/attachment",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/attachment/attachment-local",
@@ -4971,7 +5003,8 @@
         "area": "packages/attachment/attachment-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/boot/app-boot",
@@ -5035,7 +5068,8 @@
         "area": "packages/boot/app-boot",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/boot/cmdline",
@@ -5060,7 +5094,8 @@
         "area": "packages/boot/cmdline",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/boot/hmr",
@@ -5106,7 +5141,8 @@
         "packages/boot/hmr/tests/watch-config.spec.ts",
         "packages/boot/hmr/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/boot/plugin-manager",
@@ -5162,7 +5198,8 @@
         "packages/boot/plugin-manager/tests/tools.spec.ts",
         "packages/boot/plugin-manager/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/browser-use/browser-use",
@@ -5192,18 +5229,19 @@
         "area": "packages/browser-use/browser-use",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/bundle/acp-app",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/bundle/acp-app",
       "commitScope": [
         "packages/bundle/acp-app/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/bundle/acp-app/README.i18n.yaml",
         "packages/bundle/acp-app/README.md",
@@ -5225,7 +5263,12 @@
         "area": "packages/bundle/acp-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "CoHarness ships its own installable bundle profiles; the upstream ACP bundle is not carried"
+      },
+      "localDisposition": "Not carried: CoHarness ships its own installable bundle profiles; upstream example-bundle churn needs no port."
     },
     {
       "area": "packages/bundle/base",
@@ -5255,7 +5298,8 @@
         "area": "packages/bundle/base",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/bundle/headless",
@@ -5293,18 +5337,19 @@
         "area": "packages/bundle/headless",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/bundle/sdk-app",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/bundle/sdk-app",
       "commitScope": [
         "packages/bundle/sdk-app/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "2B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/bundle/sdk-app/README.i18n.yaml",
         "packages/bundle/sdk-app/README.md",
@@ -5326,18 +5371,23 @@
         "area": "packages/bundle/sdk-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "CoHarness ships its own installable bundle profiles; the upstream SDK bundle is not carried"
+      },
+      "localDisposition": "Not carried: CoHarness ships its own installable bundle profiles; upstream example-bundle churn needs no port."
     },
     {
       "area": "packages/bundle/sdk-minimal",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/bundle/sdk-minimal",
       "commitScope": [
         "packages/bundle/sdk-minimal/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "2B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/bundle/sdk-minimal/README.i18n.yaml",
         "packages/bundle/sdk-minimal/README.md",
@@ -5354,7 +5404,12 @@
         "area": "packages/bundle/sdk-minimal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "CoHarness ships its own installable bundle profiles; the upstream minimal SDK bundle is not carried"
+      },
+      "localDisposition": "Not carried: CoHarness ships its own installable bundle profiles; upstream example-bundle churn needs no port."
     },
     {
       "area": "packages/bundle/web-app",
@@ -5393,7 +5448,8 @@
         "area": "packages/bundle/web-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/connection",
@@ -5435,18 +5491,19 @@
         "area": "packages/client/connection",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/file-upload",
-      "status": "adapt",
+      "status": "defer",
       "localOwner": "packages/client/file-upload",
       "commitScope": [
         "packages/client/file-upload/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/client/file-upload/README.i18n.yaml",
         "packages/client/file-upload/README.md",
@@ -5464,7 +5521,12 @@
         "area": "packages/client/file-upload",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "deferred-this-release",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "attachment/userdoc-local plus host/userdoc-http provide resumable chunked upload with SHA-256 resume; the upstream transient file-upload receipt surface is deferred"
+      },
+      "localDisposition": "Deferred at the rc.2 baseline: attachment/userdoc-local plus host/userdoc-http provide resumable chunked upload; the upstream transient receipt surface is not adopted this release."
     },
     {
       "area": "packages/client/hmr",
@@ -5505,7 +5567,8 @@
         "area": "packages/client/hmr",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/locale",
@@ -5534,7 +5597,8 @@
         "area": "packages/client/locale",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/modules",
@@ -5583,7 +5647,8 @@
         "area": "packages/client/modules",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/resources",
@@ -5610,7 +5675,13 @@
         "area": "packages/client/resources",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "cloud runtime resources live in client/runtime WorkspaceResourceRegistry bound to bootstrap/project runtimes; the upstream single-session registry is not carried",
+        "replacedBy": "client/runtime"
+      },
+      "localDisposition": "Upstream-only; cloud runtime resources live in client/runtime WorkspaceResourceRegistry — review delta for the replacement owner."
     },
     {
       "area": "packages/client/store",
@@ -5637,7 +5708,13 @@
         "area": "packages/client/store",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "Workbench multi-runtime client state replaces the single-session upstream store",
+        "replacedBy": "client/runtime"
+      },
+      "localDisposition": "Upstream-only; the Workbench multi-runtime client state replaces the single-session store — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-agent-preset",
@@ -5684,7 +5761,8 @@
         "area": "packages/client/ui-agent-preset",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-approval",
@@ -5709,7 +5787,12 @@
         "area": "packages/client/ui-approval",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "approval surfaces live inside the CoHarness Workbench conversation UI"
+      },
+      "localDisposition": "Upstream-only; approval surfaces live inside the Workbench conversation UI — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-attachment",
@@ -5748,7 +5831,8 @@
         "area": "packages/client/ui-attachment",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-brand-official",
@@ -5773,7 +5857,8 @@
         "area": "packages/client/ui-brand-official",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-chat",
@@ -5853,7 +5938,13 @@
         "area": "packages/client/ui-chat",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "client/ui-conversation owns the chat surface for the cloud product",
+        "replacedBy": "client/ui-conversation"
+      },
+      "localDisposition": "Upstream-only; client/ui-conversation owns the chat surface — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-commands",
@@ -5907,7 +5998,8 @@
         "area": "packages/client/ui-commands",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-conversation",
@@ -6044,7 +6136,8 @@
         "area": "packages/client/ui-conversation",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-deliverables",
@@ -6135,7 +6228,8 @@
         "area": "packages/client/ui-deliverables",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-directory-picker-browse",
@@ -6160,7 +6254,8 @@
         "area": "packages/client/ui-directory-picker-browse",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-directory-picker-native",
@@ -6197,18 +6292,19 @@
         "area": "packages/client/ui-directory-picker-native",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-dockkit",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/client/ui-dockkit",
       "commitScope": [
         "packages/client/ui-dockkit/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/client/ui-dockkit/README.i18n.yaml",
         "packages/client/ui-dockkit/README.zh.md",
@@ -6224,7 +6320,12 @@
         "area": "packages/client/ui-dockkit",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "the desktop docking layout belongs to the rejected upstream ui-package tree; the Workbench owns the cloud layout"
+      },
+      "localDisposition": "Rejected upstream desktop docking layout; the Workbench owns the cloud layout."
     },
     {
       "area": "packages/client/ui-goal",
@@ -6250,7 +6351,8 @@
         "area": "packages/client/ui-goal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-input-trigger",
@@ -6293,7 +6395,8 @@
         "area": "packages/client/ui-input-trigger",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-jobs",
@@ -6321,7 +6424,8 @@
         "area": "packages/client/ui-jobs",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-layout",
@@ -6368,7 +6472,8 @@
         "area": "packages/client/ui-layout",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-message-feedback",
@@ -6396,7 +6501,8 @@
         "area": "packages/client/ui-message-feedback",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-model-selection",
@@ -6443,7 +6549,8 @@
         "area": "packages/client/ui-model-selection",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-open-in-app",
@@ -6468,7 +6575,8 @@
         "area": "packages/client/ui-open-in-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-permission-presets",
@@ -6506,7 +6614,8 @@
         "area": "packages/client/ui-permission-presets",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-plan",
@@ -6565,7 +6674,8 @@
         "area": "packages/client/ui-plan",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-plugin-manager",
@@ -6623,7 +6733,8 @@
         "packages/client/ui-plugin-manager/tsconfig.json",
         "packages/client/ui-plugin-manager/tsdown.config.ts"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/client/ui-primitives",
@@ -6729,7 +6840,8 @@
         "area": "packages/client/ui-primitives",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-reference",
@@ -6765,7 +6877,8 @@
         "area": "packages/client/ui-reference",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-renderer",
@@ -6820,7 +6933,8 @@
         "area": "packages/client/ui-renderer",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-schedule",
@@ -6847,7 +6961,8 @@
         "area": "packages/client/ui-schedule",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-session",
@@ -6884,7 +6999,13 @@
         "area": "packages/client/ui-session",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "client/ui-conversation and ui-workbench own the session surface",
+        "replacedBy": "client/ui-conversation"
+      },
+      "localDisposition": "Upstream-only; client/ui-conversation and ui-workbench own the session surface — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-settings",
@@ -6907,7 +7028,8 @@
         "area": "packages/client/ui-settings",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-settings-general",
@@ -6963,7 +7085,8 @@
         "area": "packages/client/ui-settings-general",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-settings-models",
@@ -7019,7 +7142,8 @@
         "area": "packages/client/ui-settings-models",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-settings-plugin-inventory",
@@ -7060,7 +7184,8 @@
         "area": "packages/client/ui-settings-plugin-inventory",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-settings-plugins",
@@ -7149,7 +7274,8 @@
         "area": "packages/client/ui-settings-plugins",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-settings-unarchive-sessions",
@@ -7186,7 +7312,8 @@
         "area": "packages/client/ui-settings-unarchive-sessions",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/client/ui-sidebar",
@@ -7239,7 +7366,8 @@
         "area": "packages/client/ui-sidebar",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-sidebar-browser",
@@ -7309,7 +7437,8 @@
         "packages/client/ui-sidebar-browser/tsconfig.json",
         "packages/client/ui-sidebar-browser/tsdown.config.ts"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/client/ui-sidebar-documentpreview",
@@ -7319,7 +7448,7 @@
         "packages/client/ui-sidebar-documentpreview/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7A",
+      "phase": "7C",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
         "packages/client/ui-sidebar-documentpreview/README.i18n.yaml",
@@ -7463,18 +7592,23 @@
         "area": "packages/client/ui-sidebar-documentpreview",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews"
+      },
+      "localDisposition": "Upstream-only package, but its 58-file delta is the upstream Office/PDF preview surface — review as reference for the Workbench document surface under 7C."
     },
     {
       "area": "packages/client/ui-sidebar-files",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/client/ui-sidebar-files",
       "commitScope": [
         "packages/client/ui-sidebar-files/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/client/ui-sidebar-files/README.i18n.yaml",
         "packages/client/ui-sidebar-files/README.md",
@@ -7495,7 +7629,12 @@
         "area": "packages/client/ui-sidebar-files",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
+      },
+      "localDisposition": "Rejected upstream sidebar tree; the cloud Workbench owns workspace browsing."
     },
     {
       "area": "packages/client/ui-sidebar-right",
@@ -7563,7 +7702,12 @@
         "area": "packages/client/ui-sidebar-right",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
+      },
+      "localDisposition": "Upstream-only dock tree; the Workbench right-sidebar slots (client/ui-slots) own the cloud panel layout — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-sidebar-terminal",
@@ -7632,7 +7776,8 @@
         "area": "packages/client/ui-sidebar-terminal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/client/ui-skill",
@@ -7661,7 +7806,8 @@
         "area": "packages/client/ui-skill",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-slots",
@@ -7698,7 +7844,8 @@
         "area": "packages/client/ui-slots",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-subagent",
@@ -7747,7 +7894,8 @@
         "area": "packages/client/ui-subagent",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-theme",
@@ -7793,7 +7941,8 @@
         "area": "packages/client/ui-theme",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-tool",
@@ -7845,7 +7994,8 @@
         "area": "packages/client/ui-tool",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-trajectory",
@@ -7905,7 +8055,8 @@
         "area": "packages/client/ui-trajectory",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-user-questions",
@@ -7952,7 +8103,8 @@
         "area": "packages/client/ui-user-questions",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-workflow-run",
@@ -7985,7 +8137,8 @@
         "area": "packages/client/ui-workflow-run",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/ui-workspace",
@@ -8053,7 +8206,8 @@
         "area": "packages/client/ui-workspace",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/client/web",
@@ -8103,7 +8257,8 @@
         "area": "packages/client/web",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/code-runtime/code-runtime",
@@ -8132,7 +8287,8 @@
         "area": "packages/code-runtime/code-runtime",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/code-runtime/code-runtime-worker-thread",
@@ -8171,7 +8327,8 @@
         "area": "packages/code-runtime/code-runtime-worker-thread",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/compaction/command-compact",
@@ -8200,7 +8357,8 @@
         "area": "packages/compaction/command-compact",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/compaction/compaction",
@@ -8231,7 +8389,8 @@
         "area": "packages/compaction/compaction",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked"
     },
     {
       "area": "packages/compaction/compaction-basic",
@@ -8261,7 +8420,8 @@
         "area": "packages/compaction/compaction-basic",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/compaction/compaction-image-offload",
@@ -8294,7 +8454,8 @@
         "area": "packages/compaction/compaction-image-offload",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/compaction/compaction-tool-result-pruner",
@@ -8322,7 +8483,8 @@
         "area": "packages/compaction/compaction-tool-result-pruner",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/computer-use/computer-use",
@@ -8352,7 +8514,8 @@
         "area": "packages/computer-use/computer-use",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/context/agent-instructions",
@@ -8384,7 +8547,8 @@
         "area": "packages/context/agent-instructions",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/context/file-reference",
@@ -8409,7 +8573,8 @@
         "area": "packages/context/file-reference",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/context/file-reference-local",
@@ -8438,7 +8603,8 @@
         "area": "packages/context/file-reference-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/context/session-reference",
@@ -8475,7 +8641,8 @@
         "area": "packages/context/session-reference",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/context/time-context",
@@ -8504,7 +8671,8 @@
         "area": "packages/context/time-context",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/context/tmux-context",
@@ -8531,7 +8699,8 @@
         "area": "packages/context/tmux-context",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/agent",
@@ -8560,7 +8729,8 @@
         "area": "packages/core/agent",
         "reviewState": "local-tests-passing-production-unverified"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/agent-default-model",
@@ -8585,7 +8755,8 @@
         "area": "packages/core/agent-default-model",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/agent-loop",
@@ -8630,7 +8801,8 @@
         "area": "packages/core/agent-loop",
         "reviewState": "local-tests-passing-production-unverified"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/agent-tool-presentation",
@@ -8658,7 +8830,8 @@
         "area": "packages/core/agent-tool-presentation",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/scope",
@@ -8685,7 +8858,8 @@
         "area": "packages/core/scope",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/session",
@@ -8722,7 +8896,8 @@
         "area": "packages/core/session",
         "reviewState": "local-tests-passing-production-unverified"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/system-prompt",
@@ -8750,7 +8925,8 @@
         "area": "packages/core/system-prompt",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/core/tools",
@@ -8788,7 +8964,8 @@
         "area": "packages/core/tools",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/credentials/authorization",
@@ -8813,7 +8990,8 @@
         "area": "packages/credentials/authorization",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/credentials/credentials",
@@ -8839,7 +9017,8 @@
         "area": "packages/credentials/credentials",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/credentials/credentials-local",
@@ -8865,7 +9044,8 @@
         "area": "packages/credentials/credentials-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/deliverables/tool-present",
@@ -8899,7 +9079,8 @@
         "packages/deliverables/tool-present/tests/present.spec.ts",
         "packages/deliverables/tool-present/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/deliverables/workspace-changes",
@@ -8957,7 +9138,8 @@
         "packages/deliverables/workspace-changes/tests/support.ts",
         "packages/deliverables/workspace-changes/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/document/office-to-pdf",
@@ -9003,7 +9185,8 @@
         "packages/document/office-to-pdf/tests/remote.spec.ts",
         "packages/document/office-to-pdf/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/e2b/e2b",
@@ -9036,7 +9219,8 @@
         "area": "packages/e2b/e2b",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/e2b/fs-e2b",
@@ -9063,7 +9247,8 @@
         "area": "packages/e2b/fs-e2b",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/e2b/subprocess-e2b",
@@ -9096,7 +9281,8 @@
         "area": "packages/e2b/subprocess-e2b",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/experimental/agent-team",
@@ -9125,18 +9311,19 @@
         "area": "packages/experimental/agent-team",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/experimental/agent-team-profile",
-      "status": "adapt",
+      "status": "defer",
       "localOwner": "packages/experimental/agent-team-profile",
       "commitScope": [
         "packages/experimental/agent-team-profile/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/experimental/agent-team-profile/README.i18n.yaml",
         "packages/experimental/agent-team-profile/README.md",
@@ -9156,18 +9343,23 @@
         "area": "packages/experimental/agent-team-profile",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "deferred-this-release",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+      },
+      "localDisposition": "Agent Teams productization deferred pending a product decision."
     },
     {
       "area": "packages/experimental/agent-team-web-profile",
-      "status": "adapt",
+      "status": "defer",
       "localOwner": "packages/experimental/agent-team-web-profile",
       "commitScope": [
         "packages/experimental/agent-team-web-profile/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/experimental/agent-team-web-profile/README.i18n.yaml",
         "packages/experimental/agent-team-web-profile/README.md",
@@ -9185,7 +9377,12 @@
         "area": "packages/experimental/agent-team-web-profile",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "deferred-this-release",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+      },
+      "localDisposition": "Agent Teams productization deferred pending a product decision."
     },
     {
       "area": "packages/experimental/auto-review",
@@ -9219,7 +9416,8 @@
         "area": "packages/experimental/auto-review",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/browser-use-chrome-devtools-mcp",
@@ -9249,7 +9447,8 @@
         "area": "packages/experimental/browser-use-chrome-devtools-mcp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/browser-use-playwright-mcp",
@@ -9279,7 +9478,8 @@
         "area": "packages/experimental/browser-use-playwright-mcp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/browser-use-runtime",
@@ -9313,7 +9513,8 @@
         "area": "packages/experimental/browser-use-runtime",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/browser-use-stagehand-native",
@@ -9361,18 +9562,19 @@
         "area": "packages/experimental/browser-use-stagehand-native",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/client-ui-agent-team",
-      "status": "adapt",
+      "status": "defer",
       "localOwner": "packages/experimental/client-ui-agent-team",
       "commitScope": [
         "packages/experimental/client-ui-agent-team/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/experimental/client-ui-agent-team/README.i18n.yaml",
         "packages/experimental/client-ui-agent-team/README.zh.md",
@@ -9392,7 +9594,12 @@
         "area": "packages/experimental/client-ui-agent-team",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "deferred-this-release",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+      },
+      "localDisposition": "Agent Teams productization deferred pending a product decision."
     },
     {
       "area": "packages/experimental/code-runtime-python",
@@ -9427,7 +9634,8 @@
         "area": "packages/experimental/code-runtime-python",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/experimental/computer-use-cua-driver-mcp",
@@ -9459,7 +9667,8 @@
         "area": "packages/experimental/computer-use-cua-driver-mcp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/computer-use-cua-driver-native",
@@ -9492,18 +9701,19 @@
         "area": "packages/experimental/computer-use-cua-driver-native",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/inspector",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/experimental/inspector",
       "commitScope": [
         "packages/experimental/inspector/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/experimental/inspector/README.i18n.yaml",
         "packages/experimental/inspector/README.md",
@@ -9521,7 +9731,12 @@
         "area": "packages/experimental/inspector",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "experimental prototype with no cloud consumer"
+      },
+      "localDisposition": "Experimental prototype with no cloud consumer."
     },
     {
       "area": "packages/experimental/ptc-runtime-python",
@@ -9559,7 +9774,8 @@
         "area": "packages/experimental/ptc-runtime-python",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/tool-agent-team",
@@ -9587,18 +9803,19 @@
         "area": "packages/experimental/tool-agent-team",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/experimental/webworker-packer",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/experimental/webworker-packer",
       "commitScope": [
         "packages/experimental/webworker-packer/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/experimental/webworker-packer/README.i18n.yaml",
         "packages/experimental/webworker-packer/README.md",
@@ -9621,18 +9838,23 @@
         "area": "packages/experimental/webworker-packer",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "experimental prototype with no cloud consumer"
+      },
+      "localDisposition": "Experimental prototype with no cloud consumer."
     },
     {
       "area": "packages/experimental/webworker-runtime",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/experimental/webworker-runtime",
       "commitScope": [
         "packages/experimental/webworker-runtime/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/experimental/webworker-runtime/README.i18n.yaml",
         "packages/experimental/webworker-runtime/README.md",
@@ -9675,7 +9897,12 @@
         "area": "packages/experimental/webworker-runtime",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "experimental prototype with no cloud consumer"
+      },
+      "localDisposition": "Experimental prototype with no cloud consumer."
     },
     {
       "area": "packages/extensions/cordis-client-runner",
@@ -9722,7 +9949,8 @@
         "area": "packages/extensions/cordis-client-runner",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/extensions/cordis-host-runner",
@@ -9757,7 +9985,8 @@
         "area": "packages/extensions/cordis-host-runner",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/extensions/tool-cordis",
@@ -9802,7 +10031,8 @@
         "area": "packages/extensions/tool-cordis",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/extensions/ui-cordis",
@@ -9837,7 +10067,8 @@
         "area": "packages/extensions/ui-cordis",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/feedback/command-feedback",
@@ -9866,7 +10097,8 @@
         "area": "packages/feedback/command-feedback",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/feedback/message-feedback",
@@ -9893,7 +10125,8 @@
         "area": "packages/feedback/message-feedback",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/fs",
@@ -9919,7 +10152,8 @@
         "area": "packages/fs/fs",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/fs-local",
@@ -9949,7 +10183,8 @@
         "area": "packages/fs/fs-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/fs-observation-policy",
@@ -9975,7 +10210,8 @@
         "area": "packages/fs/fs-observation-policy",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/fs-sandbox",
@@ -10001,7 +10237,8 @@
         "area": "packages/fs/fs-sandbox",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/tool-fs",
@@ -10036,7 +10273,8 @@
         "area": "packages/fs/tool-fs",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/tool-fs-search",
@@ -10064,7 +10302,8 @@
         "area": "packages/fs/tool-fs-search",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/fs/tool-present",
@@ -10103,7 +10342,12 @@
         "area": "packages/fs/tool-present",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "the present-file tool adds a model-visible deliverable declaration surface; adoption is deferred pending a product decision on the cloud produced-files flow"
+      },
+      "localDisposition": "Former upstreamOnly deferral superseded by the 2026-09-18 D7 decision."
     },
     {
       "area": "packages/fs/tool-str-replace-editor",
@@ -10129,7 +10373,8 @@
         "area": "packages/fs/tool-str-replace-editor",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/goal/command-goal",
@@ -10156,7 +10401,8 @@
         "area": "packages/goal/command-goal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/goal/goal",
@@ -10186,7 +10432,8 @@
         "area": "packages/goal/goal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/goal/goal-round-driver",
@@ -10214,7 +10461,8 @@
         "area": "packages/goal/goal-round-driver",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/goal/tool-goal",
@@ -10241,7 +10489,8 @@
         "area": "packages/goal/tool-goal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/guard/repeat-tool-reminder",
@@ -10266,7 +10515,8 @@
         "area": "packages/guard/repeat-tool-reminder",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/guard/timeout-policy",
@@ -10292,7 +10542,8 @@
         "area": "packages/guard/timeout-policy",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/hooks/hook-protocol",
@@ -10318,7 +10569,8 @@
         "area": "packages/hooks/hook-protocol",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/hooks/hooks-claude-code",
@@ -10346,7 +10598,8 @@
         "area": "packages/hooks/hooks-claude-code",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/hooks/hooks-codex",
@@ -10375,7 +10628,8 @@
         "area": "packages/hooks/hooks-codex",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/directory-picker",
@@ -10401,7 +10655,8 @@
         "area": "packages/host/directory-picker",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/directory-picker-auto",
@@ -10429,7 +10684,8 @@
         "area": "packages/host/directory-picker-auto",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/directory-picker-browse",
@@ -10454,7 +10710,8 @@
         "area": "packages/host/directory-picker-browse",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/directory-picker-native",
@@ -10482,7 +10739,8 @@
         "area": "packages/host/directory-picker-native",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/frontend-static",
@@ -10508,7 +10766,8 @@
         "area": "packages/host/frontend-static",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/open-in-app",
@@ -10533,7 +10792,8 @@
         "area": "packages/host/open-in-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/plugin-inventory",
@@ -10564,7 +10824,8 @@
         "area": "packages/host/plugin-inventory",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/host/webserver",
@@ -10590,7 +10851,8 @@
         "area": "packages/host/webserver",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/identity/anonymous-user-id",
@@ -10616,7 +10878,8 @@
         "area": "packages/identity/anonymous-user-id",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/interaction/commands",
@@ -10647,7 +10910,8 @@
         "area": "packages/interaction/commands",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/interaction/permission-presets",
@@ -10679,7 +10943,8 @@
         "area": "packages/interaction/permission-presets",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/interaction/tool-ask-user",
@@ -10705,7 +10970,8 @@
         "area": "packages/interaction/tool-ask-user",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/interaction/user-approval",
@@ -10733,7 +10999,8 @@
         "area": "packages/interaction/user-approval",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/interaction/user-questions",
@@ -10764,7 +11031,8 @@
         "area": "packages/interaction/user-questions",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/jobs/jobs",
@@ -10790,7 +11058,8 @@
         "area": "packages/jobs/jobs",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked"
     },
     {
       "area": "packages/jobs/jobs-local",
@@ -10818,7 +11087,8 @@
         "area": "packages/jobs/jobs-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/jobs/tool-jobs",
@@ -10846,7 +11116,8 @@
         "area": "packages/jobs/tool-jobs",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/deepseek-llm-api-extensions",
@@ -10872,7 +11143,8 @@
         "area": "packages/llm/deepseek-llm-api-extensions",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/llm",
@@ -10912,7 +11184,8 @@
         "area": "packages/llm/llm",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/llm-deepseek",
@@ -11021,7 +11294,8 @@
         "area": "packages/llm/llm-deepseek",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/llm-pi-ai",
@@ -11074,7 +11348,8 @@
         "area": "packages/llm/llm-pi-ai",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/llm-retry",
@@ -11101,7 +11376,8 @@
         "area": "packages/llm/llm-retry",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/plugin-package-inventory-deepseek",
@@ -11130,7 +11406,8 @@
         "area": "packages/llm/plugin-package-inventory-deepseek",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/llm/token-meter",
@@ -11165,7 +11442,8 @@
         "area": "packages/llm/token-meter",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/lsp/lsp",
@@ -11190,7 +11468,8 @@
         "area": "packages/lsp/lsp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/lsp/lsp-stdio",
@@ -11215,7 +11494,8 @@
         "area": "packages/lsp/lsp-stdio",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/lsp/tool-lsp",
@@ -11240,7 +11520,8 @@
         "area": "packages/lsp/tool-lsp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/mcp/mcp-client",
@@ -11290,7 +11571,8 @@
         "area": "packages/mcp/mcp-client",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/mcp/mcp-resources",
@@ -11321,7 +11603,8 @@
         "area": "packages/mcp/mcp-resources",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/plan/plan-mode",
@@ -11356,7 +11639,8 @@
         "area": "packages/plan/plan-mode",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/preset/agent-presets",
@@ -11403,7 +11687,8 @@
         "area": "packages/preset/agent-presets",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/preset/persona",
@@ -11428,7 +11713,8 @@
         "area": "packages/preset/persona",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/ptc-runtime/ptc-runtime",
@@ -11459,7 +11745,8 @@
         "area": "packages/ptc-runtime/ptc-runtime",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/ptc-runtime/ptc-runtime-node",
@@ -11519,7 +11806,8 @@
         "area": "packages/ptc-runtime/ptc-runtime-node",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/runtime-diagnostics/invariants",
@@ -11544,7 +11832,8 @@
         "area": "packages/runtime-diagnostics/invariants",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sandbox/sandbox",
@@ -11580,7 +11869,8 @@
         "area": "packages/sandbox/sandbox",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sandbox/sandbox-local",
@@ -11613,7 +11903,8 @@
         "area": "packages/sandbox/sandbox-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sandbox/sandbox-policy",
@@ -11642,7 +11933,8 @@
         "area": "packages/sandbox/sandbox-policy",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sandbox/sandbox-windows-acl",
@@ -11680,7 +11972,8 @@
         "area": "packages/sandbox/sandbox-windows-acl",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/schedule/schedule",
@@ -11712,7 +12005,8 @@
         "area": "packages/schedule/schedule",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sdk/client",
@@ -11738,7 +12032,8 @@
         "area": "packages/sdk/client",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sdk/protocol",
@@ -11763,7 +12058,8 @@
         "area": "packages/sdk/protocol",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/sdk/server",
@@ -11793,7 +12089,8 @@
         "area": "packages/sdk/server",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session-query/session-log-export",
@@ -11821,7 +12118,8 @@
         "area": "packages/session-query/session-log-export",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session-query/session-query",
@@ -11854,7 +12152,8 @@
         "area": "packages/session-query/session-query",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session-query/session-query-sqlite",
@@ -11880,7 +12179,8 @@
         "area": "packages/session-query/session-query-sqlite",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session-query/tool-session-query",
@@ -11905,7 +12205,8 @@
         "area": "packages/session-query/tool-session-query",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-checkpoint-policy",
@@ -11931,7 +12232,8 @@
         "area": "packages/session/session-checkpoint-policy",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-format",
@@ -11956,7 +12258,8 @@
         "area": "packages/session/session-format",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-format-catalog",
@@ -11986,7 +12289,13 @@
         "area": "packages/session/session-format-catalog",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
+        "replacedBy": "session/session-format"
+      },
+      "localDisposition": "Not carried as a package: the catalog is inlined in session/session-format (catalog-default.ts) — review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v0-to-v1",
@@ -12020,7 +12329,13 @@
         "area": "packages/session/session-format-v0-to-v1",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "real v0 normalization inlines into session/session-format; empty bump() shells are replaced under the rc.2 Session-correctness work",
+        "replacedBy": "session/session-format"
+      },
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v1-to-v2",
@@ -12051,7 +12366,13 @@
         "area": "packages/session/session-format-v1-to-v2",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
+        "replacedBy": "session/session-format"
+      },
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v2-to-v3",
@@ -12079,7 +12400,13 @@
         "area": "packages/session/session-format-v2-to-v3",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "v2→v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
+        "replacedBy": "session/session-format"
+      },
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
     },
     {
       "area": "packages/session/session-log-deepseek",
@@ -12111,7 +12438,8 @@
         "area": "packages/session/session-log-deepseek",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-persistence",
@@ -12137,7 +12465,8 @@
         "area": "packages/session/session-persistence",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "replaced"
     },
     {
       "area": "packages/session/session-persistence-jsonl",
@@ -12165,7 +12494,8 @@
         "area": "packages/session/session-persistence-jsonl",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-projection",
@@ -12192,7 +12522,8 @@
         "area": "packages/session/session-projection",
         "reviewState": "local-tests-passing-production-unverified"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-projection-cache",
@@ -12219,7 +12550,8 @@
         "area": "packages/session/session-projection-cache",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-stats",
@@ -12244,7 +12576,8 @@
         "area": "packages/session/session-stats",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-telemetry",
@@ -12270,7 +12603,8 @@
         "area": "packages/session/session-telemetry",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-telemetry-otel",
@@ -12297,7 +12631,8 @@
         "area": "packages/session/session-telemetry-otel",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-title",
@@ -12325,7 +12660,8 @@
         "area": "packages/session/session-title",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-title-all-prompts-llm",
@@ -12350,7 +12686,8 @@
         "area": "packages/session/session-title-all-prompts-llm",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-title-first-prompt-llm",
@@ -12375,7 +12712,8 @@
         "area": "packages/session/session-title-first-prompt-llm",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-title-llm",
@@ -12399,7 +12737,8 @@
         "area": "packages/session/session-title-llm",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/session/session-turn-outline",
@@ -12424,7 +12763,12 @@
         "area": "packages/session/session-turn-outline",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "readHistoryIndex covers the lookup surface but only the gateway provider produces indexes; the exclusion is under review"
+      },
+      "localDisposition": "Upstream-only pending review: decide during 2B whether the gateway index producer needs this read path."
     },
     {
       "area": "packages/settings/settings",
@@ -12449,7 +12793,8 @@
         "area": "packages/settings/settings",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/settings/settings-file",
@@ -12474,7 +12819,8 @@
         "area": "packages/settings/settings-file",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/bash-local",
@@ -12502,7 +12848,8 @@
         "area": "packages/shell/bash-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/bash-sandbox",
@@ -12538,7 +12885,8 @@
         "area": "packages/shell/bash-sandbox",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/pwsh-local",
@@ -12566,7 +12914,8 @@
         "area": "packages/shell/pwsh-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/pwsh-sandbox",
@@ -12596,7 +12945,8 @@
         "area": "packages/shell/pwsh-sandbox",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/shell",
@@ -12625,7 +12975,8 @@
         "area": "packages/shell/shell",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/shell-env",
@@ -12650,7 +13001,8 @@
         "area": "packages/shell/shell-env",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/tool-bash",
@@ -12685,7 +13037,8 @@
         "area": "packages/shell/tool-bash",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/tool-bash-persistent",
@@ -12713,7 +13066,8 @@
         "area": "packages/shell/tool-bash-persistent",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/tool-pwsh",
@@ -12745,7 +13099,8 @@
         "area": "packages/shell/tool-pwsh",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/shell/tool-pwsh-persistent",
@@ -12772,7 +13127,8 @@
         "area": "packages/shell/tool-pwsh-persistent",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/skill/skill",
@@ -12800,7 +13156,8 @@
         "area": "packages/skill/skill",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/skill/skill-badge",
@@ -12826,7 +13183,8 @@
         "area": "packages/skill/skill-badge",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/skill/skill-filesystem",
@@ -12854,7 +13212,8 @@
         "area": "packages/skill/skill-filesystem",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/skill/skill-office",
@@ -12898,7 +13257,8 @@
         "packages/skill/skill-office/tests/skill-office.spec.ts",
         "packages/skill/skill-office/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/skill/tool-skill",
@@ -12925,7 +13285,8 @@
         "area": "packages/skill/tool-skill",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/spill/spill",
@@ -12952,7 +13313,8 @@
         "area": "packages/spill/spill",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/spill/spill-local",
@@ -12977,7 +13339,8 @@
         "area": "packages/spill/spill-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/spill/spill-policy",
@@ -13004,7 +13367,8 @@
         "area": "packages/spill/spill-policy",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/ssh/fs-ssh",
@@ -13033,7 +13397,8 @@
         "area": "packages/ssh/fs-ssh",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/ssh/sandbox-ssh",
@@ -13062,7 +13427,8 @@
         "area": "packages/ssh/sandbox-ssh",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/ssh/ssh",
@@ -13126,7 +13492,8 @@
         "area": "packages/ssh/ssh",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/ssh/subprocess-ssh",
@@ -13164,7 +13531,8 @@
         "area": "packages/ssh/subprocess-ssh",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/storage/storage",
@@ -13189,7 +13557,8 @@
         "area": "packages/storage/storage",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/storage/storage-domain",
@@ -13215,7 +13584,8 @@
         "area": "packages/storage/storage-domain",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/storage/storage-json",
@@ -13240,7 +13610,8 @@
         "area": "packages/storage/storage-json",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/storage/storage-sqlite",
@@ -13265,7 +13636,8 @@
         "area": "packages/storage/storage-sqlite",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent",
@@ -13316,7 +13688,8 @@
         "area": "packages/subagent/subagent",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-acp",
@@ -13342,7 +13715,8 @@
         "area": "packages/subagent/subagent-acp",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-claude-code",
@@ -13370,7 +13744,8 @@
         "area": "packages/subagent/subagent-claude-code",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-codex",
@@ -13397,7 +13772,8 @@
         "area": "packages/subagent/subagent-codex",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-dsh-sdk",
@@ -13424,7 +13800,8 @@
         "area": "packages/subagent/subagent-dsh-sdk",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-fork-in-process",
@@ -13450,7 +13827,8 @@
         "area": "packages/subagent/subagent-fork-in-process",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-in-process-driver",
@@ -13479,7 +13857,8 @@
         "area": "packages/subagent/subagent-in-process-driver",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/subagent-spawn-in-process",
@@ -13505,7 +13884,8 @@
         "area": "packages/subagent/subagent-spawn-in-process",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/tool-subagent",
@@ -13540,7 +13920,8 @@
         "area": "packages/subagent/tool-subagent",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subagent/tool-subagent-control",
@@ -13565,7 +13946,8 @@
         "area": "packages/subagent/tool-subagent-control",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subprocess/subprocess",
@@ -13603,7 +13985,8 @@
         "area": "packages/subprocess/subprocess",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subprocess/subprocess-local",
@@ -13687,7 +14070,8 @@
         "area": "packages/subprocess/subprocess-local",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/subprocess/win32-process",
@@ -13741,7 +14125,12 @@
         "area": "packages/subprocess/win32-process",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "shared Windows process helper library; adopted or rejected with the PR-11 subprocess runner rebuild"
+      },
+      "localDisposition": "Upstream-only: adopted or rejected together with the local subprocess runner rebuild decided in 4B."
     },
     {
       "area": "packages/terminal/terminal",
@@ -13767,7 +14156,8 @@
         "area": "packages/terminal/terminal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/terminal/terminal-bash",
@@ -13806,7 +14196,8 @@
         "area": "packages/terminal/terminal-bash",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/terminal/tool-terminal",
@@ -13834,7 +14225,8 @@
         "area": "packages/terminal/tool-terminal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/test-support/agent-loop-testkit",
@@ -13859,7 +14251,8 @@
         "area": "packages/test-support/agent-loop-testkit",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/test-support/client-runtime",
@@ -13924,7 +14317,8 @@
         "area": "packages/test-support/client-runtime",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/test-support/llm-mock-server",
@@ -13949,7 +14343,8 @@
         "area": "packages/test-support/llm-mock-server",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/test-support/llm-replay",
@@ -13976,7 +14371,8 @@
         "area": "packages/test-support/llm-replay",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/test-support/loader-smoke",
@@ -14006,7 +14402,8 @@
         "area": "packages/test-support/loader-smoke",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/test-support/remote-mock",
@@ -14044,18 +14441,19 @@
         "area": "packages/test-support/remote-mock",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/test-support/session-snapshot",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/test-support/session-snapshot",
       "commitScope": [
         "packages/test-support/session-snapshot/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "2B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/test-support/session-snapshot/README.i18n.yaml",
         "packages/test-support/session-snapshot/README.md",
@@ -14080,7 +14478,12 @@
         "area": "packages/test-support/session-snapshot",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "snapshot coverage runs through test:snapshot and apps/web fixtures; the helper package is not carried"
+      },
+      "localDisposition": "Not carried: snapshot coverage runs through test:snapshot and apps/web fixtures."
     },
     {
       "area": "packages/todo/tool-todo",
@@ -14108,7 +14511,8 @@
         "area": "packages/todo/tool-todo",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/typert/generator",
@@ -14153,7 +14557,8 @@
         "area": "packages/typert/generator",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/typert/loader",
@@ -14187,7 +14592,8 @@
         "area": "packages/typert/loader",
         "reviewState": "implemented-local-tests-passing"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/typert/protocol",
@@ -14224,7 +14630,8 @@
         "area": "packages/typert/protocol",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/typert/registry",
@@ -14259,7 +14666,8 @@
         "area": "packages/typert/registry",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/atomic-write",
@@ -14292,7 +14700,8 @@
         "area": "packages/util/atomic-write",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/brand",
@@ -14317,7 +14726,8 @@
         "area": "packages/util/brand",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/chunked-list",
@@ -14342,7 +14752,8 @@
         "area": "packages/util/chunked-list",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/crypto",
@@ -14367,18 +14778,19 @@
         "area": "packages/util/crypto",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/deque",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/util/deque",
       "commitScope": [
         "packages/util/deque/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/util/deque/README.i18n.yaml",
         "packages/util/deque/README.zh.md",
@@ -14392,7 +14804,12 @@
         "area": "packages/util/deque",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "no current consumer requires it"
+      },
+      "localDisposition": "No consumer requires it."
     },
     {
       "area": "packages/util/home-paths",
@@ -14420,7 +14837,8 @@
         "area": "packages/util/home-paths",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/http-proxy",
@@ -14447,7 +14865,8 @@
         "area": "packages/util/http-proxy",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/launch-environment",
@@ -14472,7 +14891,8 @@
         "area": "packages/util/launch-environment",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/lazy-require",
@@ -14504,7 +14924,8 @@
         "packages/util/lazy-require/tests/index.spec.ts",
         "packages/util/lazy-require/tsconfig.json"
       ],
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/util/native-command",
@@ -14530,7 +14951,8 @@
         "area": "packages/util/native-command",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/output-retention",
@@ -14555,7 +14977,8 @@
         "area": "packages/util/output-retention",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/package-manifest",
@@ -14585,7 +15008,8 @@
         "area": "packages/util/package-manifest",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/time",
@@ -14610,7 +15034,8 @@
         "area": "packages/util/time",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/timeout",
@@ -14635,7 +15060,8 @@
         "area": "packages/util/timeout",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/values",
@@ -14668,18 +15094,19 @@
         "area": "packages/util/values",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/util/workspace-path",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/util/workspace-path",
       "commitScope": [
         "packages/util/workspace-path/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "7E",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "0R",
+      "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
         "packages/util/workspace-path/package.json"
       ],
@@ -14691,7 +15118,12 @@
         "area": "packages/util/workspace-path",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "workspace path policy is owned by host/apiproxy containment plus the fs seam; the upstream helper is not carried"
+      },
+      "localDisposition": "Workspace path policy is owned by host/apiproxy containment plus the fs seam."
     },
     {
       "area": "packages/web/tool-web",
@@ -14716,7 +15148,8 @@
         "area": "packages/web/tool-web",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/web/web",
@@ -14741,7 +15174,8 @@
         "area": "packages/web/web",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/web/web-fetch-http",
@@ -14766,7 +15200,8 @@
         "area": "packages/web/web-fetch-http",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/web/web-search-deepseek",
@@ -14794,7 +15229,8 @@
         "area": "packages/web/web-search-deepseek",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/web/web-search-exa",
@@ -14819,7 +15255,8 @@
         "area": "packages/web/web-search-exa",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/web/web-search-perplexity",
@@ -14844,7 +15281,8 @@
         "area": "packages/web/web-search-perplexity",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/webhook/webhook",
@@ -14873,7 +15311,11 @@
         "area": "packages/webhook/webhook",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "a cloud HTTP entry that creates Sessions needs a separate security review; deferred"
+      }
     },
     {
       "area": "packages/webhook/webhook-github",
@@ -14898,7 +15340,11 @@
         "area": "packages/webhook/webhook-github",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "upstreamOnly",
+      "upstreamOnly": {
+        "reason": "a cloud HTTP entry that creates Sessions needs a separate security review; deferred"
+      }
     },
     {
       "area": "packages/workflow/tool-ralph",
@@ -14925,7 +15371,8 @@
         "area": "packages/workflow/tool-ralph",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/workflow/tool-workflow",
@@ -14954,7 +15401,8 @@
         "area": "packages/workflow/tool-workflow",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/workflow/workflow",
@@ -14983,7 +15431,8 @@
         "area": "packages/workflow/workflow",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked"
     },
     {
       "area": "packages/workflow/workflow-ptc",
@@ -15031,7 +15480,8 @@
         "area": "packages/workflow/workflow-ptc",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/workflow/workflow-worker-thread",
@@ -15075,7 +15525,8 @@
         "area": "packages/workflow/workflow-worker-thread",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/workspace/workspace",
@@ -15103,7 +15554,8 @@
         "area": "packages/workspace/workspace",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted"
     }
   ]
 }

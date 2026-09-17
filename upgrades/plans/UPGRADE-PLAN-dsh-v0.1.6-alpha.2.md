@@ -22,6 +22,10 @@ Phase 1 收口提交为 `6bd418cba3`，原生加载器依赖批次为 `94ea1e1dd
 
 继承 alpha.1 所有已批准的产品决定（含 webhook 默认关闭）、二开保留要求、数据恢复约束和过程约束；新增能力的具体开放策略以本计划的已确认和待确认项为准。后续 tag 不自动跟进：必要修复以固定 SHA 单列范围，其余变更另行批准。每个实施批次记录上游范围、本地适配、消费者、负例、组装快照、验证提交和未验证环境；已删除的上游包在等价替代与部署依赖核验前不得删除。上游 `apps/desktop` 与 `apps/desktop-host` 桌面客户端不携带（2026-09-18 确认，矩阵 reject 行）；`apps/cli` 归 1B，`apps/web` 归 7A。
 
+本升级处于开发阶段、无生产数据，允许破坏性更新：目标是把上游代码尽可能全量对齐到 alpha.2，本地差异只保留二开主权面（矩阵 `localSovereignty` 为 `replaced`／`owned` 的区域和 `upstreamOnly` 行中经替代面承接的行为），不为兼容旧行为保留并行实现；行为变化必须在批次记录中写明。本地不携带的上游包仍须逐行审查增量并把应承接的行为移植到替代面（如 `api/session-controller` 的 Session 多实例经 `host/apiproxy` 与 `client/runtime`），"不携带"不等于"不审查"。`localSovereignty` 为 `unmanifested` 的 32 个上游新包在各自阶段决定携带与否并登记主权，同步基线前移时写入 `upstream-sync.json`。
+
+全局管理面：`/admin`（`gateway/admin-ui`）是组织级设置的唯一入口。插件管理（7D）、webhook 端点与开关（7B）、终端用户／项目授权（7B，挂在用户与项目页面）、auto-review 资格（6B）的服务端强制设置落在 `/admin`；模型治理沿用现有 Models 页。上游 Web 插件页等会话内入口只提供个人级补充视图，不作为组织策略面。
+
 过程约束：自 `cfb1949958` 起 `master` 同时包含 Phase 1/2 升级代码与生产修复，当前生产运行 `f92068e800`；Phase 8 验收完成前不得以 `master` 部署生产，生产紧急修复从生产提交另开分支单独发布。Phase 1/2 从未执行 `pnpm run test:coverage`（alpha.1 审计记录 coverage 分片被主动终止），1B、2B 首个实施批次前先对现有 Phase 1/2 源码补跑并收口 per-file 100%，不把缺口带入新代码。`.github`、`scripts`、`lefthook.yml` 的累计门禁变化在 0R 完成后、1B 开工前先比对，新增必需检查登记为前置而不是等到 7E。部署前提——文件描述符上限（原生 watcher `EMFILE`）、CPython ≥3.10、平台能力逐项实测——进入 Phase 8 证据列并写入部署文档。
 
 ## 已确认的产品策略
@@ -56,12 +60,12 @@ Phase 1 收口提交为 `6bd418cba3`，原生加载器依赖批次为 `94ea1e1dd
 | 5 | 2B、4B；设计可提前 | Gateway／执行节点：桌面资源协调、runtime 认证和准入 | 双运行时争用、旧代次拒绝、FIFO/去重/取消、撤权、失联、崩溃、协调者重启和停止失败；模型可见结果入日志 |
 | 6A | 3B、4B、5 对桌面路径放行 | browser-use／computer-use providers | 独立浏览器资源生命周期、附着授权、截图可见性、外部监听／下载；桌面驱动与系统权限（验收设备按 Q4 确认项在 Phase 5 设计时单列）；无 GUI 节点其他能力仍可用 |
 | 6B | 5、6A、7A | 权限／Web：占用与队列 UI、auto-review、当前有效权限模式不重复审批 | LAN/公网真实双用户流程，撤权和 PTC 内层调用不可绕过；隐私、减少动画、未知状态；审查失败关闭及用量归因 |
-| 7A | 1B、2B | client／Gateway：Session 多实例与 slot、Workbench、子会话和计划侧栏、`apps/web` 组装测试；`ui-conversation` 上下文用量移至输入框底部与拖拽区域修复先与本地 composer 修复（#215–#217）逐规则对照再迁移 | pane、Session、runtime 显式对应；切换／关闭／恢复不误发请求；项目 ACL、归档过滤、历史地址；Web 多实例快照及 Android/API 消费者；composer 窄分栏回归不复现 |
+| 7A | 1B、2B | client／Gateway：Session 多实例与 slot、Workbench、子会话和计划侧栏、`apps/web` 组装测试；`ui-conversation` 上下文用量移至输入框底部与拖拽区域修复先与本地 composer 修复（#215–#217）逐规则对照再迁移；`api/session-controller`（38 个增量文件）、`api/gateway`、`client/store`／`resources`／`ui-chat`／`ui-session`／`ui-approval`／`ui-sidebar-right` 为不携带包的参考实现，多实例、slot 与 inbox 镜像行为经 `host/apiproxy` 与 `client/runtime` 移植 | pane、Session、runtime 显式对应；切换／关闭／恢复不误发请求；项目 ACL、归档过滤、历史地址；Web 多实例快照及 Android/API 消费者；composer 窄分栏回归不复现 |
 | 7B | 4B、7A | terminal／SSH／MCP／webhook：终端授权、retain/重连/关闭、MCP resources、webhook 与 webhook-github 入站端点 | 默认禁用、Q2 双门（用户且项目）授权矩阵、只读成员完全不可用、创建者私有、管理员仅列与关；撤权清理、刷新不重生 shell；SSH 凭据与路径授权；webhook 默认关闭、管理员显式启用、签名校验、重放与限流、Session 创建归属；LAN/公网场景 |
-| 7C | 3B、7A | files／deliverables／Office／preview：D7 交付物（tool-present、workspace-changes 变更卡片与逐文件审阅）、Office、侧栏 URL | workspaceFiles 授权及版本校验、缓存隔离／撤权、并发修改不误归因；Office 原生 macOS arm64 与 Linux WASM 实测（含缺字体、取消、资源限制与平台产物）；Browser 载体、URL 和 sandbox 政策；授权负例及快照 |
+| 7C | 3B、7A | files／deliverables／Office／preview：D7 交付物（tool-present、workspace-changes 变更卡片与逐文件审阅）、Office、侧栏 URL；`ui-sidebar-documentpreview`（58 个增量文件）与 `api/workspace-files` 为不携带包的参考实现，预览与授权行为移植到 Workbench 文档面与 `host/apiproxy` | workspaceFiles 授权及版本校验、缓存隔离／撤权、并发修改不误归因；Office 原生 macOS arm64 与 Linux WASM 实测（含缺字体、取消、资源限制与平台产物）；Browser 载体、URL 和 sandbox 政策；授权负例及快照 |
 | 7D | 1B、7A | plugin-manager／Creator／Gateway 管理；Creator 移除 `tool-cordis` 动态定义与运行工具后的 api-catalog 与 ui-cordis 调整 | D1 服务端强制执行，普通用户直接 RPC/工具均拒绝；强制治理插件保护；管理员操作审计、安装取消／失败、重载和卸载；Q1 四来源与构建脚本批准路径按确认项实现；持久化 profile 与 source/built 启动 |
 | 7E | 按矩阵逐项前置 | 各包责任域：其余累计差异、工作区分组、菜单键盘、轨迹附件、思考内容紧凑排版、性能与非 packages 文件（门禁差异已在 0R 处理） | 每行闭环源码／消费者／决定；保留 User Documents、Workbench、归档、协作及 SDK；新增、删除、替代逐项销账，不能以“其他”整体放行 |
-| 8 | 所有拟发布项完成；Q1–Q4 已决定或入口明确禁用 | 发布／数据／运维：迁移、产物、平台与生产 | 脱敏副本恢复演练、published paths/hygiene/built smoke、必需 CI 和明确 skip；部署前提清单核验；双用户验收、停机窗口与一致备份恢复、版本闭包及健康证据；解除 `master` 部署冻结 |
+| 8 | 所有拟发布项完成；Q1–Q4 已决定或入口明确禁用 | 发布／数据／运维：迁移、产物、平台与生产 | published paths/hygiene/built smoke、必需 CI 和明确 skip；部署前提清单核验；合成数据迁移演练（Session 代次链、SQLite schema、未来格式拒绝）；双用户验收、版本闭包及健康证据；解除 `master` 部署冻结。无生产数据，不做脱敏副本恢复与停机窗口 |
 
 关键路径为 0R→1B/2B→协议及执行迁移→所依赖的新入口→8。7A 在接口稳定后可与 3/4 并行；5 的设计与测试环境准备立即开展，但不能在执行端未落实时开放桌面操作。每个任务只执行其相关检查，已通过且输入未改变的检查不因提交／推送机械重跑；vendor 同步仍按 vendoring 特殊要求执行。
 
@@ -90,9 +94,7 @@ UI 区分空闲、自己／他人占用、排队、停止中、不可用、待�
 
 持续验证登录、身份、项目 ACL、只读成员、目录授权，模型策略/BYOK/提示性配额/用量归属，协作/私有性/父属/inbox 配额，User Documents/Workbench/资源预览，以及 Android、TS/Python SDK、推送、LAN/公网和 PostgreSQL/Linux/macOS 部署。树外治理插件和 Gateway 的独立测试不由根单测替代。
 
-迁移前盘点 Session 代次、未知必读事件、SQLite schema、PostgreSQL ledger、附件及归档引用；仅结构变化增加相邻 Session 格式迁移。JSONL 新代次发布不移动、覆盖或删除已提交代次；SQLite 版本单调，PostgreSQL 编号按实际 ledger 续排。停止相关写入后建立一致备份，包含附件、运行时目录及外置加密密钥；SQLite 在线备份、PostgreSQL dump 均需恢复校验，不在记录写秘密。
-
-在 staging 验证迁移重跑、中断、损坏及未来格式拒绝；对比对象数量、引用和摘要。代码回退不等于数据可降级；新事件是否 ignorable 由语义决定。恢复旧产物必须配套一致数据，隔离保留切换后的新写入并批准损失窗口，不允许新旧运行时同时写同一资源。
+迁移前盘点 Session 代次、未知必读事件、SQLite schema、PostgreSQL ledger、附件及归档引用；仅结构变化增加相邻 Session 格式迁移。JSONL 新代次发布不移动、覆盖或删除已提交代次；SQLite 版本单调，PostgreSQL 编号按实际 ledger 续排。本阶段无生产数据，允许重置环境直接迁移；迁移机制本身仍按发布质量验证——在合成数据上验证迁移重跑、中断、损坏及未来格式拒绝，对比对象数量、引用和摘要，保证机制对将来真实数据正确。代码回退不等于数据可降级；新事件是否 ignorable 由语义决定；开发环境允许整体重建，不要求备份窗口。
 
 验收记录需要本地 commit、上游范围、命令、退出码、环境和覆盖能力；unit、keyless snapshot、真实 provider、built artifact、平台与生产分别记录。SDK 输出变化同时覆盖两种 SDK；GUI/终端/插件管理需真实组装，mock 不替代。外部凭据或权限缺失记 unverified/blocked，skip 不计通过；CI 必需任务未执行时不能只凭汇总绿灯放行。alpha.1 遗留的未验证项、环境阻塞、不稳定用例和观察项集中在[本轮审计的台账](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md#未验证与环境阻塞台账)，共 23 项，每项已绑定承接阶段；新增欠账追加到该台账，不另建清单，销账时记录验证提交与命令。
 

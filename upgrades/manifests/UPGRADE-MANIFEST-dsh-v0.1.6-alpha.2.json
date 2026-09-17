@@ -146,7 +146,7 @@
         "packages/experimental/computer-use-cua-driver-mcp"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "requiredVerification": "Cross-runtime node/desktop ownership, execution fencing, revocation, FIFO, cancellation, restart and shutdown failures; private text/icon status, reduced motion, queue and unknown state.",
+      "requiredVerification": "Cross-runtime node/desktop ownership, execution fencing, revocation, FIFO, cancellation, restart and shutdown failures; private text/icon status, reduced motion, queue and unknown state. Desktop-occupancy administration and emergency stop surface under /admin.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
         "id": "desktop-coordination-ui",
@@ -155,7 +155,8 @@
       "phases": [
         "5",
         "6B"
-      ]
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
     },
     {
       "id": "browser-use",
@@ -188,7 +189,7 @@
         "packages/interaction"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review.",
+      "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review. Eligibility is granted by an administrator from /admin.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
         "id": "auto-review",
@@ -196,7 +197,8 @@
       },
       "phases": [
         "6B"
-      ]
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
     },
     {
       "id": "webhook",
@@ -207,7 +209,7 @@
         "packages/webhook/webhook-github"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "requiredVerification": "Inbound endpoint authentication, signature verification, replay and rate limiting, Session-creation authorization ownership and secret storage; default off until enabled by an administrator.",
+      "requiredVerification": "Inbound endpoint authentication, signature verification, replay and rate limiting, Session-creation authorization ownership and secret storage; default off until enabled by an administrator. Endpoint configuration and the enable switch live under /admin.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
         "id": "webhook",
@@ -215,7 +217,8 @@
       },
       "phases": [
         "7B"
-      ]
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
     },
     {
       "id": "remote-product-and-release",
@@ -246,7 +249,8 @@
         "7C",
         "7E",
         "8"
-      ]
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
     },
     {
       "id": "plugin-management-admin-only",
@@ -260,7 +264,8 @@
       "phases": [
         "7D"
       ],
-      "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 resolved 2026-09-18: all four upstream install sources (registry, absolute path, git, tarball) are allowed for administrators; dependency build scripts follow the upstream approval model (Web allow-and-retry and tool-side approvedBuilds), persisted per package name and attributed to the approving administrator."
+      "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 resolved 2026-09-18: all four upstream install sources (registry, absolute path, git, tarball) are allowed for administrators; dependency build scripts follow the upstream approval model (Web allow-and-retry and tool-side approvedBuilds), persisted per package name and attributed to the approving administrator. Admin operations are exposed through the /admin surface (gateway/admin-ui), not only in-session UI.",
+      "adminSurface": "gateway/admin-ui (/admin)"
     },
     {
       "id": "terminal-user-project-grants",
@@ -274,7 +279,8 @@
       "phases": [
         "7B"
       ],
-      "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 resolved 2026-09-18: dual gate — an administrator must enable both the user and the project; terminals are private to their creator, invisible to other project members; administrators may list and close but never take over input; read-only members have no terminal access at all."
+      "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 resolved 2026-09-18: dual gate — an administrator must enable both the user and the project; terminals are private to their creator, invisible to other project members; administrators may list and close but never take over input; read-only members have no terminal access at all. User and project grants are administered from the /admin Users and project pages.",
+      "adminSurface": "gateway/admin-ui (/admin)"
     },
     {
       "id": "office-and-sidebar-browser",
@@ -400,6 +406,11 @@
       "record": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md",
       "section": "未验证与环境阻塞台账",
       "items": 23
+    },
+    "developmentPosture": {
+      "breakingChanges": "allowed — target full upstream parity; behavior changes must be recorded per batch; no parallel compat implementations outside the local sovereignty surface",
+      "productionData": "none — synthetic-data migration rehearsal replaces sanitized-copy restore; environment rebuild is allowed",
+      "adminSurface": "global and organization-level settings land in gateway/admin-ui (/admin): plugin management, webhook, terminal grants, auto-review eligibility, desktop occupancy, model governance"
     }
   }
 }
