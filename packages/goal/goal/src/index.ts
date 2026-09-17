@@ -263,7 +263,7 @@ export class GoalService extends TypertRemoteService {
     this.resolved = {
       defaultMaxGoalRounds: resolveMaxGoalRounds(config.defaultMaxGoalRounds ?? 256),
     }
-    ctx.on('agent/session-start', ({ agent }) => {
+    ctx.on('agent/created', ({ agent }) => {
       const cache = this.caches.get(agent.session)
       if (cache !== undefined) cache.activation = 'disarmed'
       this.runtimeState(agent.session).activation = 'disarmed'

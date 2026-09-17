@@ -189,11 +189,11 @@ describe('GoalService creation and replay', () => {
     expect(child.session.inheritedEventCount).toBe(parent.session.seq)
   })
 
-  it('disarms live activation on every session-start edge', async () => {
+  it('disarms live activation during serial creation', async () => {
     const { ctx, agent, session } = await harness()
     let goal = ctx.goals.create(agent, { objective: 'stay stopped after resume' })
     expect(goal.activation).toBe('armed')
-    agentEvents(ctx, agent).emit('agent/session-start', { source: 'resume' })
+    await agentEvents(ctx, agent).serial('agent/created', { source: 'resume' })
     expect(ctx.goals.get(agent)?.activation).toBe('disarmed')
     goal = ctx.goals.resume(agent, goal)
     expect(goal).toMatchObject({ phase: 'active', activation: 'armed', revision: 2 })
@@ -214,7 +214,7 @@ describe('GoalService creation and replay', () => {
     expect(ctx.goals.resume(agent, goal)).toMatchObject({ revision: 2, activation: 'armed' })
   })
 
-  it('removes the service and its session-start listener with the providing fiber', async () => {
+  it('removes the service and its creation listener with the providing fiber', async () => {
     const ctx = new Context()
     await ctx.plugin(AgentRegistry)
     const fiber = await ctx.plugin(GoalService)
@@ -225,7 +225,7 @@ describe('GoalService creation and replay', () => {
 
     await fiber.dispose()
     expect(ctx.get('goals')).toBeUndefined()
-    agentEvents(ctx, stub.agent).emit('agent/session-start', { source: 'resume' })
+    await agentEvents(ctx, stub.agent).serial('agent/created', { source: 'resume' })
     expect(first.get(stub.agent)).toMatchObject({ id: goal.id, activation: 'armed' })
 
     await ctx.plugin(GoalService)

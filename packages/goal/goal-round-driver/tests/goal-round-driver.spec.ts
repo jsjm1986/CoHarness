@@ -876,10 +876,39 @@ describe('same-session goal driving', () => {
     expect(test.adapter.requests).toHaveLength(0)
   })
 
-  it('resets process-local scheduling state at a session-start edge', async () => {
+  it('disarms a published goal before later creation listeners and queued work run', async () => {
+    const test = await harness([])
+    const id = SessionId('goal-created-initialization')
+    test.ctx.on('session/created', (session) => {
+      if (session.id !== id) return
+      const agent = test.ctx.agents.get(id)!
+      test.ctx.goals.create(agent, { objective: 'wait for explicit resume', maxGoalRounds: 1 })
+    })
+    let observed = false
+    test.ctx.on('agent/created', ({ agent }) => {
+      if (agent.id !== id) return
+      observed = true
+      expect(test.ctx.goals.get(agent)).toMatchObject({ activation: 'disarmed', roundsStarted: 0 })
+    })
+
+    const handle = await test.ctx.agents.create({
+      sessionId: id,
+      agentOptions: { provider: 'mock', model: 'mock' },
+    })
+    try {
+      await handle.agent.whenIdle()
+      expect(observed).toBe(true)
+      expect(test.adapter.requests).toHaveLength(0)
+      expect(test.ctx.goals.get(handle.agent)).toMatchObject({ activation: 'disarmed', roundsStarted: 0 })
+    } finally {
+      await handle.dispose()
+    }
+  })
+
+  it('resets process-local scheduling state during serial creation', async () => {
     const test = await harness([textResponse('after explicit resume')])
     const created = test.ctx.goals.create(test.agent, { objective: 'restart safely', maxGoalRounds: 1 })
-    agentEvents(test.ctx, test.agent).emit('agent/session-start', { source: 'resume' })
+    await agentEvents(test.ctx, test.agent).serial('agent/created', { source: 'resume' })
     await Promise.resolve()
 
     expect(test.ctx.goals.get(test.agent)).toMatchObject({ activation: 'disarmed', roundsStarted: 0 })
