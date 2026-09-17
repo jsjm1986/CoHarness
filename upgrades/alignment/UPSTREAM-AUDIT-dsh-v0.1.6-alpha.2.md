@@ -45,6 +45,8 @@
 - `agent-loop` 本地已有 `turnBoundaryProjectionDefinition` 注册（index.ts:431）；alpha.2 仅在同处新增 `inboxProjectionDefinition` 注册（上游 416–417），与本地 `setupAndPublish`／`runMaintenance` 结构无冲突，2B 增量面小。
 - `llm-deepseek` 的 Messages 修复是新增 `common/messages-api.ts`：`messagesApiRoot()` 统一规范化 endpoint root，files API 与请求路径改用之（替代内联 `/v1` 拼接）。
 - `deliverables/workspace-changes` 的 `TurnRecorder` 在每个 turn 起止对 git 工作树做快照、对非 git 覆盖路径在文件工具编辑前后做整文件捕获，`workspace/changes` 事件只携带 turn 摘要；非 git 目录只列文件工具编辑。
+- `apps/cli/src/profile-boot.ts` 是重写：补丁分层栈（bundlePatches/homePatches/overlays、`allPatches`）由 `readProfilePatches`/`ProfileContext`（新文件 `app-boot/src/profile-context.ts`）取代；`resolveTelemetryPatch` 是**移动**非删除；新增 `healIsolatedProfileModuleFallback` 与 `resolutionMode` runtime/link/dual 三态（`dual` 走 `behavior:'verify'`）；上游 `inactiveEntries` 同样以 phase 标注包装 disabled 表达式错误，与本地 `assertEntries*` 守卫同型，1B 采用上游实现时本地守卫语义可直接映射。新增 `resolved-profile-boot.spec.ts`／`startup-diagnostics.spec.ts` 两份行为测试。
+- retain 模型的真实消费点：`terminal-controller/src/client/retention.ts` 以 `remote.retain(sessionId, id, signal)` 持有终端窗口——retain 同时是 Typert Remote 动词，7A 移植的 retain Remote 是 7B 侧栏终端窗口持有的前置依赖（与阶段排序一致）。本地 `client/runtime` 的 `ISessions` 是 `open`/`setAdditionalStaged` 选择模型，非引用计数，移植需新增 per-consumer 引用而非改名。
 
 ## 本审计的边界
 

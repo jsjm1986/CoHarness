@@ -4747,7 +4747,7 @@
         "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the desktop session controller is not carried",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only BFF; the Session multi-instance, slot, and inbox-mirror behavior is ported through host/apiproxy and client/runtime, not by carrying this package."
+      "localDisposition": "Upstream-only BFF. Source-verified: the multi-instance change is a reference-counted retain model — sessions.retain(target,{source,signal}) returns SessionReference{binding,ready,release}, SessionRetainInfo counts per source, last release tears down local scope/history; service.ts rewritten (557 lines), manager.ts −250, queue-mirror.ts deleted. Port target: an equivalent retain verb on host/apiproxy plus per-consumer references in client/runtime (current ISessions is an open/additionalStaged selection model, not reference counting)."
     },
     {
       "area": "packages/api/settings-controller",
@@ -4849,7 +4849,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested"
+      "localSovereignty": "unmanifested",
+      "localDisposition": "Source-verified: client/retention.ts holds a terminal window by remote.retain(sessionId, id, signal) — the session-retain Remote verb 7A ports is a 7B prerequisite for sidebar-terminal window holds."
     },
     {
       "area": "packages/api/workspace-controller",
