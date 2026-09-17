@@ -266,20 +266,6 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'agent/inbox/discarded'(this: Scoped<Agent>, payload: { agent: Agent; message: UserMessage }): void
-    // ---- session lifecycle (emit) ----
-    /**
-     * Retained for staged migration; use awaited `agent/created` initialization.
-     * The session lifecycle began, once before the first turn. Use
-     * `agent.inject()` to seed model-facing context. This is a notification, not
-     * a veto; disposal requested by a lifecycle owner is rechecked before the
-     * driver starts.
-     * @param payload.agent - the agent whose session lifecycle began.
-     * @param payload.source - why the session started (fresh startup, resume, …).
-     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
-     * @mode emit
-     */
-    'agent/session-start'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource }): void
-
     // ---- the machine's extension points ----
     /**
      * Reject a proposed step or replace the messages that enter it. Calling

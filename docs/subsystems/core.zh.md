@@ -325,9 +325,9 @@ type PreStepDecision =
 type RequestErrorAction = { kind: 'retry' } | undefined
 ```
 
-`agent/pre-step` 是请求推导前唯一的串行监听器链。`agent/turn-stopping` 在轮次没有工具或 steering（中途引导）后续时运行，先于最后一次 steering 排空。
+每个步骤推导请求前都会等待 `agent/pre-step` 完成。`agent/turn-stopping` 在轮次没有工具或 steering（中途引导）后续时运行，先于最后一次 steering 排空。
 
-`agent/session-start` 携带 `SessionStartSource`（会话生命周期为何开始；桥接层据此匹配其 SessionStart）：
+`agent/created` 携带 `SessionStartSource`（会话生命周期为何开始；桥接层据此匹配其 SessionStart）：
 
 ```ts type-equiv
 /** Why a session lifecycle began; seeded creates are `startup`, while persisted loads are `resume`. */
@@ -1136,31 +1136,6 @@ Handle one failed model-request attempt before the loop retries or closes its st
 ```
 
 Types: [LlmFailure](llm-streaming.zh.md) · [ResolvedRetryPolicy](llm-streaming.zh.md) · [Scoped](scope.zh.md)
-
-Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
-
-<a id="agentsession-start--emit"></a>
-
-#### `agent/session-start` — emit
-
-Retained for staged migration; use awaited `agent/created` initialization. The session lifecycle began, once before the first turn. Use `agent.inject()` to seed model-facing context. This is a notification, not a veto; disposal requested by a lifecycle owner is rechecked before the driver starts.
-
-```ts cordis-catalog
-/**
- * Retained for staged migration; use awaited `agent/created` initialization.
- * The session lifecycle began, once before the first turn. Use
- * `agent.inject()` to seed model-facing context. This is a notification, not
- * a veto; disposal requested by a lifecycle owner is rechecked before the
- * driver starts.
- * @param payload.agent - the agent whose session lifecycle began.
- * @param payload.source - why the session started (fresh startup, resume, …).
- * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
- * @mode emit
- */
-'agent/session-start'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource }): void
-```
-
-Types: [Scoped](scope.zh.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 

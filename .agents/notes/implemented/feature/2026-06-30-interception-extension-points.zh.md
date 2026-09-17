@@ -12,10 +12,10 @@ harness 需要一套钩子子系统：用户像 Claude Code（CC）和 Codex 那
 
 ## 决策
 
-规范接口将可变换策略、环绕调度控制与仅观测通知分离。策略 waterfall（瀑布式事件）返回小型的、扩展点专属的**类型化 Decision 联合类型**；包装层返回规范化结果；通知接收不可变快照，无法影响结果。覆盖的钩子点包括 `session-start`、`prompt-submit`、`pre-tool`、`post-tool`、通过 continuation 实现的 `stop`，同时将非钩子的执行策略留作独立可组合。
+规范接口将可变换策略、环绕调度控制、等待完成的初始化与仅观测通知分离。策略 waterfall（瀑布式事件）返回小型的、扩展点专属的**类型化 Decision 联合类型**；包装层返回规范化结果；最终结果通知接收不可变快照，无法影响结果。覆盖的钩子点包括 `session-start`、`prompt-submit`、`pre-tool`、`post-tool`、通过 continuation 实现的 `stop`，同时将非钩子的执行策略留作独立可组合。
 
 **Agent 事件**（`dsh-agent`）：
-- `agent/session-start({ agent, source })` ——emit，在第 1 轮次之前触发一次，携带 `SessionStartSource`（`startup` 表示全新/fork 创建，`resume` 表示重新加载的持久化会话；`clear`/`compact` 保留）。纯通知，不能阻塞启动（这是有意的空白：桥接可以记录/注入，但不管控启动）。监听器通过 `agent.inject()` 注入上下文。
+- `agent/created({ agent, source, signal? })` ——在 setup 和注册表插入完成后、排队任务运行前，按串行顺序等待初始化。`SessionStartSource` 中，`startup` 表示全新/fork 创建，`resume` 表示重新加载的持久化会话；`clear`/`compact` 保留。监听器返回 `undefined`；抛出异常或 Promise 拒绝会跳过后续监听器并回滚创建。监听器通过 `agent.inject()` 注入上下文。可选 signal 用于取消初始化，而非后续轮次；监听器不得等待 `agent.whenIdle()` 或自身所有者的卸载。钩子桥接自行隔离失败，而不否决创建。
 - `agent/pre-step({ agent, messages, turn, step, signal }, next) → PreStepDecision` ——waterfall，在每个拟议步骤之前、循环原子移除其独占 inbox 批次后触发。payload 携带该请求的 `turn`、`step` 与取消 `signal`（已退役的 `PreStepContext` 字段位于 payload 中；参见 [payload-object 事件决策](../architecture/2026-08-06-agent-event-payload-objects.zh.md)）；没有中途输入的工具续步会收到空批次。`enter` 返回完整消息批次，其中包括监听器为当前请求贡献的上下文；`reject` 不打开步骤，并让已领取消息保持已删除。
 
 **`agent/turn-stopping`** 是自然停止边界上的一次 awaited 通知。需要再执行一步的监听器调用 `agent.steer()`，传入来源显式的 steering（中途引导）内容供模型使用；循环随后重新读取 outbox，继续执行或关闭轮次。
@@ -56,4 +56,4 @@ Service Definition 包**不**声明 `hook/*` 会话事件（持久的钩子调�
 
 ## 后果
 
-规范拦截接口具有统一的类型化，同时不给每个扩展相同的权力：钩子返回 decision，执行包装层做包装，终结 guard 只能拒绝，最终观测者只能观测。循环负责 session-start、pre-step 领取结算、工具执行后上下文缓冲和 stopping；`dsh-tools` 负责身份封存与五阶段执行流水线。它们的约定记录在 [architecture.md](../../../../docs/architecture.zh.md)、各包 README、[核心拦截 decision](../../../../docs/subsystems/core.zh.md#interception-decisions) 与[工具结构](../../../../docs/subsystems/tools.zh.md)中。ACP 桥接会把 blocked 无步骤轮次中的首次 pre-step reject 结算为 `end_turn`，而钩子驱动的快照端到端验证可观测的桥接行为。
+规范拦截接口具有统一的类型化，同时不给每个扩展相同的权力：钩子返回 decision，执行包装层做包装，终结 guard 只能拒绝，最终观测者只能观测。`dsh-agent` 负责等待初始化完成；循环负责 pre-step 领取结算、工具执行后上下文缓冲和 stopping；`dsh-tools` 负责身份封存与五阶段执行流水线。它们的约定记录在 [architecture.md](../../../../docs/architecture.zh.md)、各包 README、[核心拦截 decision](../../../../docs/subsystems/core.zh.md#interception-decisions) 与[工具结构](../../../../docs/subsystems/tools.zh.md)中。ACP 桥接会把 blocked 无步骤轮次中的首次 pre-step reject 结算为 `end_turn`，而钩子驱动的快照端到端验证可观测的桥接行为。

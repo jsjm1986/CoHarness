@@ -21,7 +21,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 /**
  * The interception points introduced by the hooks taxonomy: `agent/pre-step`,
- * `agent/session-start`, `agent/turn-stopping`, and the
+ * `agent/created`, `agent/turn-stopping`, and the
  * `tools/pre-execute` / `tools/post-execute`
  * split with `additionalContexts` buffering. These verify the canonical event
  * API a hook bridge (or a native plugin) programs against, WITHOUT any
@@ -556,7 +556,7 @@ describe('agent/pre-step', () => {
 })
 
 describe('async creation initialization', () => {
-  it('holds creation, legacy startup, and queued input until serial listeners finish', async () => {
+  it('holds creation and queued input until serial listeners finish', async () => {
     const adapter = new MockAdapter([textResponse('ready')])
     const ctx = await harness(adapter)
     const entered = Promise.withResolvers<undefined>()
@@ -571,7 +571,6 @@ describe('async creation initialization', () => {
       order.push('initialized')
     })
     ctx.on('agent/created', () => { order.push('next initializer') })
-    ctx.on('agent/session-start', () => { order.push('legacy startup') })
     let settled = false
     const creating = ctx.agentLoop.create(SessionId('async-initialization'), { provider: 'mock', model: 'mock' })
     const observed = creating.then(() => { settled = true })
@@ -585,7 +584,7 @@ describe('async creation initialization', () => {
       const agent = await creating
       await observed
       await agent.whenIdle()
-      expect(order).toEqual(['initialized', 'next initializer', 'legacy startup'])
+      expect(order).toEqual(['initialized', 'next initializer'])
       expect(adapter.requests).toHaveLength(1)
     } finally {
       release.resolve(undefined)
@@ -769,30 +768,29 @@ describe('publication rollback', () => {
   })
 })
 
-describe('agent/session-start', () => {
+describe('agent/created', () => {
   it('fires once with source "startup" for a fresh create, before the first turn', async () => {
     const adapter = new MockAdapter([textResponse('ok')])
     const ctx = await harness(adapter)
 
     const sources: SessionStartSource[] = []
-    ctx.on('agent/session-start', ({ source }) => void sources.push(source))
+    ctx.on('agent/created', ({ source }) => void sources.push(source))
 
     const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
-    // fires synchronously at create, before any turn
     expect(sources).toEqual(['startup'])
     expect(events(agent).some(e => e.type === 'turn/start')).toBe(false)
 
     send(agent, 'go')
     await waitForIdle(ctx, agent)
-    // still only one session-start
+    // still only one creation
     expect(sources).toEqual(['startup'])
   })
 
-  it('a session-start listener can inject context the first request sees', async () => {
+  it('a creation listener can inject context the first request sees', async () => {
     const adapter = new MockAdapter([textResponse('ok')])
     const ctx = await harness(adapter)
 
-    ctx.on('agent/session-start', ({ agent }) => {
+    ctx.on('agent/created', ({ agent }) => {
       agent.inject(createUserMessage({ content: [{ type: 'text', text: 'session preamble' }], source: { kind: 'plugin', plugin: 'test' } }))
     })
 
@@ -807,20 +805,22 @@ describe('agent/session-start', () => {
     expect(ctxMsg?.type === 'user/message' && ctxMsg.data.source).toEqual({ kind: 'plugin', plugin: 'test' })
   })
 
-  it('a throwing session-start listener does not abort agent construction', async () => {
-    const adapter = new MockAdapter([textResponse('ok')])
+  it('a rejecting initializer aborts construction and skips later listeners', async () => {
+    const adapter = new MockAdapter([])
     const ctx = await harness(adapter)
-
-    ctx.on('agent/session-start', () => { throw new Error('session-start hook broke') })
-
-    // create must not throw — the listener error is contained/logged
-    const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
-    expect(agent.id).toBe(SessionId('a1'))
-
-    // and the agent still runs
-    send(agent, 'go')
-    await waitForIdle(ctx, agent)
-    expect(adapter.requests).toHaveLength(1)
+    let laterCalled = false
+    ctx.on('agent/created', async () => { throw new Error('initializer broke') })
+    ctx.on('agent/created', () => { laterCalled = true })
+    try {
+      await expect(ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' }))
+        .rejects.toThrow('initializer broke')
+      expect(laterCalled).toBe(false)
+      expect(ctx.agents.get(SessionId('a1'))).toBeUndefined()
+      expect(ctx.sessions.get(SessionId('a1'))).toBeUndefined()
+      expect(adapter.requests).toHaveLength(0)
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 })
 
@@ -940,7 +940,7 @@ describe('worked example: a native hook plugin is just a cordis plugin on the se
     name: 'native-guard',
     apply(ctx: Context) {
       // 1. SessionStart: seed a standing instruction.
-      ctx.on('agent/session-start', ({ agent, source }) => {
+      ctx.on('agent/created', ({ agent, source }) => {
         agent.inject(createUserMessage({ content: [{ type: 'text', text: `policy active (started: ${source})` }], source: { kind: 'plugin', plugin: 'native-guard' } }))
       })
       // 2. PreStep: reject a forbidden prompt, annotate the rest.
@@ -984,7 +984,7 @@ describe('worked example: a native hook plugin is just a cordis plugin on the se
     await waitForIdle(ctx, agent)
 
     const log = events(agent)
-    // session-start preamble injected
+    // creation preamble injected
     expect(log.some(e => e.type === 'user/message' && e.data.source.kind === 'plugin'
       && e.data.content.some(b => b.type === 'text' && b.text.includes('policy active (started: startup)')))).toBe(true)
     // prompt allowed → user-sourced user/message recorded

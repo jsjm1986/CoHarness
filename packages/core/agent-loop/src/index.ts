@@ -9,7 +9,6 @@ import { Context, FiberState, Service } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
-import { emitAgentEvent } from '@deepseek-ai/dsh-agent'
 import type {
   Agent,
   AgentFactory,
@@ -693,11 +692,6 @@ export class AgentLoop extends Service implements AgentFactory {
           agent.ctx.sessions.announce(session)
           assertLive()
           await loopCtx.agents.announce(agent, source, abort.signal)
-          assertLive()
-          // A synchronous announce/session-start listener may have started
-          // teardown; the machine is already live (delivery works from the
-          // session-start extension point), so only the liveness recheck is owed.
-          emitAgentEvent(loopCtx, agent, 'agent/session-start', { source })
           assertLive()
           return { agent, dispose }
         },

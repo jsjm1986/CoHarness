@@ -116,7 +116,7 @@ export interface CreateAgentOptions {
    * the exact publication boundary. Everything registered through `agentCtx`
    * (scoped tools, prompt sections/variables, `restrict()`, listeners, awaited
    * child plugins) exists before `session/created`, `agent/created`,
-   * `agent/session-start`, and the first prompt assembly. A setup
+   * and the first prompt assembly. A setup
    * throw/rejection, commit throw, or owner disposal rolls the scope back
    * without publishing either id.
    *
@@ -182,8 +182,7 @@ export interface AgentFactory {
    * Create a new agent on a caller-supplied session id. Async because creation
    * awaits unpublished setup, invokes its optional synchronous commit, inserts
    * both session and agent, announces session creation, awaits serial
-   * `agent/created` initialization, emits
-   * `agent/session-start`, and only then starts the loop. The sequence is
+   * `agent/created` initialization, and only then starts the loop. The sequence is
    * rollback-covered, but notifications delivered before a later listener
    * failure remain observable; every agent or session creation announcement
    * that began is paired by `agent/disposed` or `session/disposed` during

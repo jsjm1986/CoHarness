@@ -317,9 +317,9 @@ type PreStepDecision =
 type RequestErrorAction = { kind: 'retry' } | undefined
 ```
 
-`agent/pre-step` is the only serial listener chain before request derivation. `agent/turn-stopping` runs when a turn has no tool or steering continuation, before one final steering drain.
+`agent/pre-step` is awaited before each step's request derivation. `agent/turn-stopping` runs when a turn has no tool or steering continuation, before one final steering drain.
 
-`agent/session-start` carries a `SessionStartSource` (why the session lifecycle began; a bridge keys its SessionStart matcher on it):
+`agent/created` carries a `SessionStartSource` (why the session lifecycle began; a bridge keys its SessionStart matcher on it):
 
 ```ts type-equiv
 /** Why a session lifecycle began; seeded creates are `startup`, while persisted loads are `resume`. */
@@ -1126,31 +1126,6 @@ Handle one failed model-request attempt before the loop retries or closes its st
 ```
 
 Types: [LlmFailure](llm-streaming.md) · [ResolvedRetryPolicy](llm-streaming.md) · [Scoped](scope.md)
-
-Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
-
-<a id="agentsession-start--emit"></a>
-
-#### `agent/session-start` — emit
-
-Retained for staged migration; use awaited `agent/created` initialization. The session lifecycle began, once before the first turn. Use `agent.inject()` to seed model-facing context. This is a notification, not a veto; disposal requested by a lifecycle owner is rechecked before the driver starts.
-
-```ts cordis-catalog
-/**
- * Retained for staged migration; use awaited `agent/created` initialization.
- * The session lifecycle began, once before the first turn. Use
- * `agent.inject()` to seed model-facing context. This is a notification, not
- * a veto; disposal requested by a lifecycle owner is rechecked before the
- * driver starts.
- * @param payload.agent - the agent whose session lifecycle began.
- * @param payload.source - why the session started (fresh startup, resume, …).
- * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
- * @mode emit
- */
-'agent/session-start'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource }): void
-```
-
-Types: [Scoped](scope.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 

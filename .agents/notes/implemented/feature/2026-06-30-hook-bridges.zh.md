@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-harness 的扩展面是其类型化拦截点（见[拦截扩展点 Agent Note](2026-06-30-interception-extension-points.zh.md)）：所谓「原生钩子」不过是一个普通的 Cordis 插件，订阅 `agent/session-start`、`agent/pre-step`、`tools/pre-execute`、`tools/post-execute`、`agent/turn-stopping`、`subagent/start` 或 `subagent/end`。但用户带着**既有的** Claude Code（CC）和 Codex 钩子配置到来，一个 `hooks.json`（或 settings 文件中的 `hooks` 键）里满是 shell 命令钩子，并希望它们原样运行。本 Agent Note 引入两个**桥接插件**，将外部 shell 钩子协议翻译到类型化扩展点上，构建于共享的协议格式（wire format）库之上（见 [hook-protocol-lib Agent Note](2026-06-30-hook-protocol-lib.zh.md)）。
+harness 的扩展面是其类型化拦截点（见[拦截扩展点 Agent Note](2026-06-30-interception-extension-points.zh.md)）：所谓「原生钩子」不过是一个普通的 Cordis 插件，订阅 `agent/created`、`agent/pre-step`、`tools/pre-execute`、`tools/post-execute`、`agent/turn-stopping`、`subagent/start` 或 `subagent/end`。但用户带着**既有的** Claude Code（CC）和 Codex 钩子配置到来，一个 `hooks.json`（或 settings 文件中的 `hooks` 键）里满是 shell 命令钩子，并希望它们原样运行。本 Agent Note 引入两个**桥接插件**，将外部 shell 钩子协议翻译到类型化扩展点上，构建于共享的协议格式（wire format）库之上（见 [hook-protocol-lib Agent Note](2026-06-30-hook-protocol-lib.zh.md)）。
 
 核心规则是：**桥接是兼容性适配器，不是高级工具。** 桥接能做的事（阻止工具、注入上下文、强制继续、观察 subagent），原生 Cordis 插件都能做得更强——类型化返回值、完整 `ctx`、无序列化边界。桥接存在的理由是运行外部 CC/Codex 命令钩子中被明确支持的子集。这使每个桥接保持精简：解析配置、选择匹配模式、构建每事件的 payload、调用共享库的 `runHook` + `mergeHookOutputs`，再将中性结果映射为类型化 Decision。各包的 README 维护着当前不支持的事件和部分支持的字段的完整清单，以官方协议为参照。
 
@@ -23,7 +23,7 @@ harness 的扩展面是其类型化拦截点（见[拦截扩展点 Agent Note](2
 
 | 扩展点 | CC | Codex |
 |---|---|---|
-| `agent/session-start`（emit） | additionalContext → `agent.inject()` | 纯 stdout 输出 → additionalContext → `agent.inject()` |
+| `agent/created`（串行等待，携带 `source`） | additionalContext → 创建返回前调用 `agent.inject()` | 纯 stdout 输出 → additionalContext → 创建返回前调用 `agent.inject()` |
 | `agent/pre-step` | `deny`→`reject`；仅上下文→委托并折叠到 `enter` | `block`→`reject`；仅上下文→委托并折叠到 `enter` |
 | `tools/pre-execute` | `deny`→`deny`；`ask`→`ask` | `block`→`deny`（无 allow/ask） |
 | `tools/post-execute` | `deny`→`block`+反馈；仅上下文→委托并折叠 | 同上 |
@@ -49,7 +49,7 @@ Claude Code 始终导出 `CLAUDE_PROJECT_DIR`，常见的未修改钩子引用 `
 
 ### 隔离
 
-配置在加载时一次性解析；读取/解析失败时记录日志并不注册任何内容，而非导致启动崩溃（一个拼错的路径不应拖垮 agent）。CC 桥接只运行 shell 形式的 `type: 'command'` 钩子；`http`、`mcp_tool`、`prompt` 和 `agent` 处理器被解析后跳过。Codex 桥接只运行同步命令处理器，跳过 `async: true` 或非命令条目。emit 监听路径（`session-start`、`subagent/start`）以 detached 方式运行，其 `inject` 包裹在 `.catch` 中记录日志（抛异常的 inject 不得中断会话启动或循环）。
+配置在加载时一次性解析；读取/解析失败时记录日志并不注册任何内容，而非导致启动崩溃（一个拼错的路径不应拖垮 agent）。CC 桥接只运行 shell 形式的 `type: 'command'` 钩子；`http`、`mcp_tool`、`prompt` 和 `agent` 处理器被解析后跳过。Codex 桥接只运行同步命令处理器，跳过 `async: true` 或非命令条目。两个桥接都在 `agent/created` 期间等待 `SessionStart`，并捕获、记录钩子或注入失败，因此这些失败不会拒绝创建。它们将可选的初始化信号与插件卸载取消信号合并，取消后跳过上下文注入。`subagent/start` 监听器仍以 detached 方式运行，并捕获、记录注入失败。
 
 ### 钩子在哪里运行，配置从哪里来
 
@@ -61,7 +61,7 @@ Claude Code 始终导出 `CLAUDE_PROJECT_DIR`，常见的未修改钩子引用 `
 - **Stop 循环防护**（`TODO(stop-loop-guard)`）。Claude Code 提供 `stop_hook_active` 并在连续八次阻塞后覆盖钩子；Codex 提供 `stop_hook_active` 但未记录等效上限。两个桥接始终报告 `false`，因此一个无条件阻塞的 Stop 钩子会在每一步强制继续——在状态追踪落地之前，钩子作者必须自行限制。
 - **钩子 `continue:false`（硬停止）。** 钩子可以请求终止整个运行（CC/Codex `continue:false`）；共享合并将其折叠为 `MergedHookOutcome.stop`/`stopReason`，但没有桥接对其采取行动（`TODO(hook-continue-false)`）——拦截点尚无「硬停止 agent」原语（Decision 阻塞/引导的是单个点，而非整个运行）。与循环防护工作一同推迟；轮中请求会将停止请求记录在 `hook/result` 中，钩子在此期间保留其逐点效果（决策/上下文）。
 - **配置发现。** 路径在 `cordis.yml` 中显式指定且为进程级（见上文）；完整的多层 CC/Codex 优先级遍历、按会话的项目本地发现以及信任/hash 模型未被重新实现（`TODO(per-session-hook-config)`）。
-- **Session-start / subagent-start 上下文为尽力而为（`TODO(session-start-gating)`）。** 两个钩子以 detached 方式运行，不阻塞启动流程，因此其上下文在就绪时注入，但可能错过首个请求或短命的 subagent。要保证首请求送达，需要一个 awaited 的启动扩展点。
+- **Subagent-start 上下文为尽力而为。** `SubagentStart` 以 detached 方式运行，因此其上下文可能错过首个请求或短命的 subagent。`SessionStart` 在 `agent/created` 期间被等待；成功且未被取消的上下文注入会在创建返回前完成。
 
 ## 曾考虑的替代方案
 

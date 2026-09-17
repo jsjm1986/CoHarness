@@ -6,7 +6,7 @@ English | [中文](2026-06-30-hook-bridges.zh.md)
 
 ## Problem
 
-The harness's extension surface is its typed interception points ([the interception extension-points Agent Note](2026-06-30-interception-extension-points.md)): a "native hook" is just an ordinary cordis plugin subscribing to `agent/session-start`, `agent/pre-step`, `tools/pre-execute`, `tools/post-execute`, `agent/turn-stopping`, `subagent/start`, or `subagent/end`. But users arrive with **existing** Claude Code (CC) and Codex hook configs — a `hooks.json` (or a settings file's `hooks` key) full of shell-command hooks — and want those to run unmodified. This Agent Note introduces the two **bridge plugins** that translate that external shell-hook protocol onto the typed extension points, built on the shared wire-protocol library ([the hook-protocol-lib Agent Note](2026-06-30-hook-protocol-lib.md)).
+The harness's extension surface is its typed interception points ([the interception extension-points Agent Note](2026-06-30-interception-extension-points.md)): a "native hook" is just an ordinary cordis plugin subscribing to `agent/created`, `agent/pre-step`, `tools/pre-execute`, `tools/post-execute`, `agent/turn-stopping`, `subagent/start`, or `subagent/end`. But users arrive with **existing** Claude Code (CC) and Codex hook configs — a `hooks.json` (or a settings file's `hooks` key) full of shell-command hooks — and want those to run unmodified. This Agent Note introduces the two **bridge plugins** that translate that external shell-hook protocol onto the typed extension points, built on the shared wire-protocol library ([the hook-protocol-lib Agent Note](2026-06-30-hook-protocol-lib.md)).
 
 The core rule is: **a bridge is a compatibility adapter, not a power tool.** Anything a bridge does (block a tool, inject context, force continuation, observe a subagent) a native cordis plugin does more powerfully — typed returns, full `ctx`, no serialization boundary. The bridge's reason to exist is to run the explicitly supported subset of external CC/Codex command hooks. That keeps each bridge thin: parse the config, pick a matcher mode, build the per-event payload, call `runHook` + `mergeHookOutputs` from the shared lib, and map the neutral outcome to a typed Decision. The package READMEs own the exact current unsupported-event and partial-field inventory against the official protocols.
 
@@ -23,7 +23,7 @@ Each bridge maps the neutral `MergedHookOutcome` from the shared lib onto each e
 
 | Extension point | CC | Codex |
 |---|---|---|
-| `agent/session-start` (emit) | additionalContext → `agent.inject()` | plain-stdout output → additionalContext → `agent.inject()` |
+| `agent/created` (awaited serial, with `source`) | additionalContext → `agent.inject()` before creation returns | plain-stdout output → additionalContext → `agent.inject()` before creation returns |
 | `agent/pre-step` | `deny`→`reject`; context-only→delegate+fold into `enter` | `block`→`reject`; context-only→delegate+fold into `enter` |
 | `tools/pre-execute` | `deny`→`deny`; `ask`→`ask` | `block`→`deny` (no allow/ask) |
 | `tools/post-execute` | `deny`→`block`+feedback; context-only→delegate+fold | same |
@@ -49,7 +49,7 @@ Claude Code always exports `CLAUDE_PROJECT_DIR`, and common unmodified hooks ref
 
 ### Containment
 
-The config is parsed ONCE at load; a read/parse failure logs and registers nothing rather than crashing boot (a typo'd path must not take the agent down). Only shell-form `type: 'command'` hooks run for CC; `http`, `mcp_tool`, `prompt`, and `agent` handlers are parsed-and-skipped. Codex runs only synchronous command handlers and skips `async: true` or non-command entries. The emit-listener paths (`session-start`, `subagent/start`) run detached, with their `inject` contained in a `.catch` that logs (a throwing inject must not break session boot or the loop).
+The config is parsed ONCE at load; a read/parse failure logs and registers nothing rather than crashing boot (a typo'd path must not take the agent down). Only shell-form `type: 'command'` hooks run for CC; `http`, `mcp_tool`, `prompt`, and `agent` handlers are parsed-and-skipped. Codex runs only synchronous command handlers and skips `async: true` or non-command entries. Both bridges await `SessionStart` during `agent/created` and catch and log hook or injection failures, so those failures do not reject creation. They combine the optional initialization signal with plugin-unload cancellation and skip context injection after cancellation. The `subagent/start` listener remains detached and catches and logs injection failures.
 
 ### Where hooks run, and where their config comes from
 
@@ -61,7 +61,7 @@ Hooks run in the agent's session workspace, so relative paths target the user's 
 - **Stop loop-guard** (`TODO(stop-loop-guard)`). Claude Code supplies `stop_hook_active` and overrides a hook after eight consecutive blocks; Codex supplies `stop_hook_active` but documents no equivalent cap. Both bridges always report `false`, so a Stop hook that unconditionally blocks force-continues every step — a hook author must self-limit until state tracking lands.
 - **Hook `continue:false` (hard halt).** A hook can ask to halt the whole run (CC/Codex `continue:false`); the shared merge folds it into `MergedHookOutcome.stop`/`stopReason`, but no bridge acts on it (`TODO(hook-continue-false)`) — the interception points have no "hard-halt the agent" primitive yet (a Decision blocks/steers a single point, not the run). Deferred with the loop-guard work; mid-turn requests record the halt in `hook/result`, and the hook keeps its per-point effect (decision/context) meanwhile.
 - **Config discovery.** The path is explicit in `cordis.yml` and process-level (see above); the full multi-layer CC/Codex precedence walk, per-session project-local discovery, and the trust/hash model are not reimplemented (`TODO(per-session-hook-config)`).
-- **Session-start / subagent-start context is best-effort (`TODO(session-start-gating)`).** Both hooks run detached from startup, so their context is injected when ready but may miss the first request or a short-lived child. Guaranteeing first-request delivery requires an awaited startup extension point.
+- **Subagent-start context is best-effort.** `SubagentStart` runs detached, so its context may miss the first request or a short-lived child. `SessionStart` is awaited during `agent/created`; successful, uncancelled context injection completes before creation returns.
 
 ## Alternatives considered
 

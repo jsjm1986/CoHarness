@@ -258,15 +258,13 @@ describe('agent scope lifecycle', () => {
     expect(heard).toContain('a-sees:user-message')
   })
 
-  it('runs setup in the guaranteed slot: scoped world complete before session-start and the first assembly', async () => {
+  it('runs setup in the guaranteed slot: scoped world complete before agent-created and the first assembly', async () => {
     const ctx = await harness()
     const order: string[] = []
-    ctx.on('agent/session-start', ({ agent }) => {
-      order.push('session-start')
-      // The scoped section is already registered by the time session-start fires.
-      void ctx.systemPrompt.assemble(assembleContextFor(agent)).then((assembly) => {
-        order.push(`persona:${assembly.sections.find(s => s.name === 'deployment:persona-prefix')?.text}`)
-      })
+    ctx.on('agent/created', async ({ agent }) => {
+      order.push('agent-created')
+      const assembly = await ctx.systemPrompt.assemble(assembleContextFor(agent))
+      order.push(`persona:${assembly.sections.find(s => s.name === 'deployment:persona-prefix')?.text}`)
     })
 
     const handle = await ctx.agents.create({
@@ -278,8 +276,7 @@ describe('agent scope lifecycle', () => {
         agentCtx.systemPrompt.section({ name: 'deployment:persona-prefix', order: 0, text: 'You are the child.' })
       },
     })
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(order).toEqual(['setup', 'session-start', 'persona:You are the child.'])
+    expect(order).toEqual(['setup', 'agent-created', 'persona:You are the child.'])
     await handle.dispose()
   })
 
@@ -294,7 +291,6 @@ describe('agent scope lifecycle', () => {
       order.push('session/created')
     })
     ctx.on('agent/created', () => void order.push('agent/created'))
-    ctx.on('agent/session-start', () => void order.push('agent/session-start'))
     const acceptedOptions = { provider: 'mock', model: 'mock' }
 
     const creating = ctx.agents.create({
@@ -332,7 +328,6 @@ describe('agent scope lifecycle', () => {
       'setup-listener:session/created',
       'agent/created',
       'setup-listener:agent/created',
-      'agent/session-start',
     ])
     await handle.dispose()
   })
@@ -767,7 +762,7 @@ describe('agent scope lifecycle', () => {
     const starts: string[] = []
     let ownerCtx!: Context
     let creating!: ReturnType<typeof ctx.agents.create>
-    ctx.on('agent/session-start', ({ agent }) => void starts.push(agent.id))
+    ctx.on('agent/status', ({ agent, status }) => { if (status === 'running') starts.push(agent.id) })
     ctx.on('agent/created', ({ agent }) => {
       if (agent.id === SessionId('listener-dispose-s')) disposeCurrentLifecycle(ownerCtx)
     })
@@ -788,7 +783,7 @@ describe('agent scope lifecycle', () => {
     await ctx.fiber.dispose()
   })
 
-  it('rechecks caller liveness after session-start before starting the driver', async () => {
+  it('rechecks caller liveness after agent-created before starting the driver', async () => {
     const ctx = await harness()
     let ownerCtx!: Context
     let creating!: ReturnType<typeof ctx.agents.create>
@@ -797,15 +792,15 @@ describe('agent scope lifecycle', () => {
     let scopeDisposed = false
     let observerSawLive = false
     ctx.on('agent/status', ({ agent, status }) => {
-      if (agent.id === SessionId('session-start-dispose-s')) statuses.push(status)
+      if (agent.id === SessionId('agent-created-dispose-s')) statuses.push(status)
     })
-    ctx.on('agent/session-start', ({ agent }) => {
-      if (agent.id !== SessionId('session-start-dispose-s')) return
+    ctx.on('agent/created', ({ agent }) => {
+      if (agent.id !== SessionId('agent-created-dispose-s')) return
       announced = agent
       disposeCurrentLifecycle(ownerCtx)
     })
-    ctx.on('agent/session-start', ({ agent }) => {
-      if (agent.id !== SessionId('session-start-dispose-s')) return
+    ctx.on('agent/created', ({ agent }) => {
+      if (agent.id !== SessionId('agent-created-dispose-s')) return
       expect(ctx.agents.get(agent.id)).toBe(agent)
       expect(ctx.sessions.get(agent.session.id)).toBe(agent.session)
       agent.ctx.effect(() => () => { scopeDisposed = true })
@@ -815,7 +810,7 @@ describe('agent scope lifecycle', () => {
     const owner = await ctx.plugin(Object.assign((inner: Context) => {
       ownerCtx = inner
       creating = inner.agents.create({
-        sessionId: SessionId('session-start-dispose-s'),
+        sessionId: SessionId('agent-created-dispose-s'),
         agentOptions: { provider: 'mock', model: 'mock' },
       })
     }, { inject: ['agents'] }))
@@ -827,8 +822,8 @@ describe('agent scope lifecycle', () => {
     expect(observerSawLive).toBe(true)
     expect(scopeDisposed).toBe(true)
     expect(announced.session.snapshotEvents()).toEqual([])
-    expect(ctx.agents.get(SessionId('session-start-dispose-s'))).toBeUndefined()
-    expect(ctx.sessions.get(SessionId('session-start-dispose-s'))).toBeUndefined()
+    expect(ctx.agents.get(SessionId('agent-created-dispose-s'))).toBeUndefined()
+    expect(ctx.sessions.get(SessionId('agent-created-dispose-s'))).toBeUndefined()
     await ctx.fiber.dispose()
   })
 
@@ -837,7 +832,6 @@ describe('agent scope lifecycle', () => {
     const published: string[] = []
     ctx.on('session/created', () => void published.push('session/created'))
     ctx.on('agent/created', () => void published.push('agent/created'))
-    ctx.on('agent/session-start', () => void published.push('agent/session-start'))
     await expect(ctx.agents.create({
       sessionId: SessionId('bad-s'),
       agentOptions: { provider: 'mock', model: 'mock' },

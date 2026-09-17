@@ -1031,7 +1031,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote(\'resume\') resume(agent: Agent, ref: GoalRef): GoalView',
-        description: 'Resume and arm a stopped goal, or rearm an active goal after a session-start edge, while its round budget still has capacity.',
+        description: 'Resume and arm a stopped goal, or rearm an active goal after a agent initialization, while its round budget still has capacity.',
         parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }],
         returns: 'the active view.',
       },
@@ -3040,14 +3040,6 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Handle one failed model-request attempt before the loop retries or closes its step.',
     description: 'Handle one failed model-request attempt before the loop retries or closes its step. A listener returns `{ kind: \'retry\' }` without calling `next()` when it owns recovery, or calls `next()` to delegate. The default `undefined` leaves the failure terminal.',
     parameters: [{ name: 'payload', description: '.signal - the turn abort signal. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
-  },
-  {
-    name: 'agent/session-start',
-    mode: 'emit',
-    signature: '\'agent/session-start\'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource }): void',
-    summary: 'Retained for staged migration; use awaited `agent/created` initialization.',
-    description: 'Retained for staged migration; use awaited `agent/created` initialization. The session lifecycle began, once before the first turn. Use `agent.inject()` to seed model-facing context. This is a notification, not a veto; disposal requested by a lifecycle owner is rechecked before the driver starts.',
-    parameters: [{ name: 'payload', description: '.source - why the session started (fresh startup, resume, …). Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
     name: 'agent/status',

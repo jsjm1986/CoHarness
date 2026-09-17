@@ -237,7 +237,7 @@ create(agent: Agent, request: CreateGoalRequest): GoalView
 
 /**
  * Resume and arm a stopped goal, or rearm an active goal after a
- * session-start edge, while its round budget still has capacity.
+ * agent initialization, while its round budget still has capacity.
  * @param agent - owning live agent.
  * @param ref - expected current revision.
  * @returns the active view.

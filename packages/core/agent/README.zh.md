@@ -50,7 +50,7 @@ Agent *创建* 由实现 `AgentFactory` 的插件（`dsh-agent-loop`）提供，
 
 `dsh-agent` 声明实时 `agent/*` 协调词汇，使插件不必依赖具体循环。确切签名、分发 mode、作用域筛选规则与 payload 约定位于 [core.md](../../../docs/subsystems/core.zh.md#cordis-surface) 的生成区块；[架构轮次流](../../../docs/architecture.zh.md#turn-flow) 展示它们与持久会话事件的相对顺序。
 
-`agent/created` 在作用域 setup 之后、两个注册表条目都存在之后运行。它是可等待的串行初始化：监听器必须返回 `undefined` 或 `Promise<undefined>`，抛出或拒绝会使创建失败并跳过后续监听器。载荷携带启动来源与可选的初始化取消信号。监听器可以注入启动上下文，但不得等待 `agent.whenIdle()` 或自身所有者的 disposal，因为排队工作和 teardown 都在等待初始化。`agent/session-start` 作为不可 veto 的通知保留，用于分阶段迁移；不要在两个事件上重复注册同一初始化逻辑。
+`agent/created` 在作用域 setup 之后、两个注册表条目都存在之后运行。它是可等待的串行初始化：监听器必须返回 `undefined` 或 `Promise<undefined>`，抛出或拒绝会使创建失败并跳过后续监听器。载荷携带启动来源与可选的初始化取消信号。监听器可以注入启动上下文，但不得等待 `agent.whenIdle()` 或自身所有者的 disposal，因为排队工作和 teardown 都在等待初始化。
 
 `agent/disposed` 始终表示确切 agent 已离开注册表。AgentLoop 在其驱动器完全停稳后发出该事件，而有序 teardown 此时可能仍在分离会话并撤销作用域；直接注册的自定义 agent 自行拥有任何更强的驱动器顺序约定。
 
@@ -121,7 +121,6 @@ inbox 的实时通知刻意采用逐消息的最小载荷：`agent/inbox/inserte
 - **发起方作用域只存在于进程内**：worker、子进程、HTTP、持久队列和重启必须显式传递所需身份。
 - **环境身份可能比存活状态更久**：消费方在生命周期敏感工作前，仍要检查 `agent.status`、取消状态和所属能力约定。
 - **委派以外的 agent 间通道**：共享状态、流式子输出和后台／轮询语义仍在当前同步 `ctx.subagents` seam 之外。
-- **`agent/session-start` 不能为启动设置门禁**：它仍是同步且不可 veto 的迁移通知。可等待的启动初始化属于 `agent/created`；未发布的组合属于工厂 `setup(agentCtx, agent)`。
 - **`cancel()` 默认清空 inbox**：它会中止正在处理的轮次以及排队和 steering 工作；`cancel(cause, { keepInbox: true })` 只中止轮次并保留待处理项。仍不存在只中止步骤、同时让正在处理的轮次继续运行的操作（[停止 API Agent Note](../../../.agents/notes/implemented/simplification/2026-06-20-public-agent-stop-api.zh.md)）。
 - **每条附加 `UserMessage` 恰好携带一个 `MessageSource`**：多个插件合并到一次工具调用上的贡献会归入同一来源，因此该消息无法列出多个生产者。
 - **`SessionStartSource` 预留 `'clear'`/`'compact'`，但还没有发出方**：在驱动子系统落地前，只会出现 `'startup'`/`'resume'`（`TODO(compaction)`）。

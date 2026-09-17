@@ -117,48 +117,47 @@ Setup 接收完整的子上下文，可以等待插件激活。它可以注册�
 1. 将会话写入注册表。
 2. 将 agent 写入注册表。
 3. 宣告 `session/created`。
-4. 宣告 `agent/created`。
-5. 启用公开驱动。
-6. 发射 `agent/session-start`。
-7. 启动 driver。
+4. 携带 `source` 和初始化取消信号，等待串行 `agent/created` 初始化完成。
+5. 仅在发布成功后放行排队的驱动任务。
 
-Agent 在两个注册表和创建通知都达成一致之前绝不驱动。同步监听器可以否决或 dispose 一个所有者；事务记录发布进行中，并等待该回调栈展开后再继续拆除。每个已开始的创建宣告在回滚期间都有匹配的销毁宣告。
+Agent 在两个注册表和创建通知都达成一致之前绝不驱动。`agent/created` 监听器抛出异常或 Promise 拒绝会跳过后续监听器并回滚创建。分发期间请求的分离会等待串行链结算。每个已开始的创建宣告在回滚期间都有匹配的销毁宣告。监听器必须响应初始化取消，且不得等待 `agent.whenIdle()` 或自身所有者的卸载。
 
-以下序列图隔离了非显而易见的竞态：同步创建监听器可以在发布调用栈仍拥有两个注册表条目时请求 dispose。拆除必须立即停用，但要等待该栈展开后才停止和分离任何东西。
+以下序列图展示创建监听器在初始化尚未完成时请求 dispose。拆除立即请求取消，但保留注册表条目，直到被等待的分发结算。
 
 ```mermaid
 sequenceDiagram
   participant Tx as AgentCreationTransaction
   participant Registries
-  participant Listener as Synchronous listener
+  participant Listener as Creation listener
   participant Driver
 
-  Tx->>Tx: mark publication in progress
-  Tx->>Registries: announce agent/created
-  Registries->>Listener: invoke inside the same call stack
-  Listener->>Tx: dispose reentrantly
-  Tx->>Tx: deactivate, teardown waits for publication
+  Tx->>Tx: begin publication maintenance
+  Tx->>Registries: await agent/created(source, signal)
+  Registries->>Listener: invoke and await serial listener
+  Listener->>Tx: request disposal without awaiting it
+  Tx->>Tx: abort initialization, await quiescence
   Tx-->>Listener: disposal request accepted
-  Listener-->>Registries: return
-  Registries-->>Tx: announcement unwound
-  Tx->>Tx: resolve publication settlement
+  Listener-->>Registries: settle
+  Registries-->>Tx: serial initialization settled
+  Tx->>Tx: finish publication maintenance
   Tx->>Driver: stop and drain
+  Tx->>Tx: dispose scope, close persistence handle
   Tx->>Registries: detach agent, then session
-  Tx->>Tx: dispose scope and resolve teardown
+  Tx->>Tx: release ownership and resolve teardown
 ```
 
 ### 拆除在撤销注册之前保留工作
 
 每个拆除请求加入一条记忆化路径。顺序为：
 
-1. 停用创建或驱动，让同步发布完成。
+1. 停用创建或驱动，等待初始化结算。
 2. 停止并排空 driver，丢弃仍处于待处理状态的注入。
-3. 分离 agent。
-4. 分离会话。
-5. dispose agent 作用域。
+3. dispose agent 作用域。
+4. 关闭持久化句柄，排空已提交的事件。
+5. 分离 agent，再分离会话。
 6. 退役事务所有权追踪。
 
-此顺序让最终的 agent 和会话事件能使用匹配的作用域监听器，并使持久化观察者在最终刷新完成前保持附加。作用域 dispose 放在最后，因为注册撤销是外部可见的生命期边界。
+Driver 在作用域销毁前提交关闭事件。持久化句柄在注册分离前排空这些事件；清理失败仍向调用方报告。
 
 <a id="session-append-materialize-validate-commit-notify"></a>
 

@@ -52,7 +52,6 @@ describe('scoped-dispatch invariants', () => {
       'agent/inbox/inserted': [{ agent, message }],
       'agent/inbox/claimed': [{ agent, message, turn: 1 }],
       'agent/inbox/discarded': [{ agent, message }],
-      'agent/session-start': [{ agent, source: 'startup' }],
       'agent/pre-step': [{ agent, messages: [message], turn: 1, step: 1, signal }, () => Promise.resolve({ kind: 'enter', messages: [message] })],
       'agent/message-entered': [{ agent, event: { type: 'user/message', seq: SessionSeq(0), time: 1, data: message, surfaceOp: 'append' }, turn: 1, step: 1, signal }],
       'agent/request': [{ agent, turn: 1, step: 1, signal }, () => Promise.resolve(config)],
