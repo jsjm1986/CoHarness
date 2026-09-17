@@ -1825,11 +1825,11 @@ importers:
   packages/client/runtime:
     dependencies:
       immer:
-        specifier: ^11.1.16
-        version: 11.1.16
+        specifier: ^11.1.17
+        version: 11.1.17
       zustand:
         specifier: ~5.0.14
-        version: 5.0.14(@types/react@18.3.31)(immer@11.1.16)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
+        version: 5.0.14(@types/react@18.3.31)(immer@11.1.17)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -14592,8 +14592,8 @@ packages:
   immediate@3.0.6:
     resolution: {integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ==}
 
-  immer@11.1.16:
-    resolution: {integrity: sha512-Xs7H9rBc+kti1J6RueUvbEBkmOz7jqj11XYgf+YMXAYzu8EeE7hwZ9poLXdVfVnGmJu7QAf41T7H2KuF6QoK6Q==}
+  immer@11.1.17:
+    resolution: {integrity: sha512-8Vu44Y0MuMBlTQz/jQ8HEMYNq/bBqk87MnBwYR5mC8AthfhEXidZ5aT/oA/CUqboa8THKltnD9L3xyqhU/Sy1Q==}
 
   import-meta-resolve@4.2.0:
     resolution: {integrity: sha512-Iqv2fzaTQN28s/FwZAoFq0ZSs/7hMAHJVX+w8PZl3cY19Pxk6jFFalxQoIfW2826i/fDLXv8IiEZRIT0lDuWcg==}
@@ -20601,7 +20601,7 @@ snapshots:
 
   immediate@3.0.6: {}
 
-  immer@11.1.16: {}
+  immer@11.1.17: {}
 
   import-meta-resolve@4.2.0: {}
 
@@ -22863,10 +22863,10 @@ snapshots:
 
   zod@4.4.3: {}
 
-  zustand@5.0.14(@types/react@18.3.31)(immer@11.1.16)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1)):
+  zustand@5.0.14(@types/react@18.3.31)(immer@11.1.17)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1)):
     optionalDependencies:
       '@types/react': 18.3.31
-      immer: 11.1.16
+      immer: 11.1.17
       react: 18.3.1
       use-sync-external-store: 1.6.0(react@18.3.1)
 
