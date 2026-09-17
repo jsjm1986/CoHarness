@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "reviewDate": "2026-09-17",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "previousTag": "dsh-v0.1.5-rc.2",
+    "previousCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+    "targetTags": [{ "tag": "dsh-v0.1.6-alpha.1", "commit": "0a15e36e7f82b6ed45af6fa9759f29b40dcd965d" }]
+  },
+  "baseline": {
+    "commit": "a901bff5f44bf9d51b99019b5c8085a0d93f248b",
+    "branch": "fix/release-session-format"
+  },
+  "targetVersion": "0.1.6-alpha.1.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "phase-0-records-created-implementation-pending",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+  "verification": [],
+  "decisions": [
+    {
+      "id": "foundation",
+      "status": "adapt",
+      "localOwner": "vendor, Typert and workspace build owners",
+      "commitScope": ["vendor", "packages/typert"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Vendor procedure, local modifications replay, test/build and compiler consumers; js-yaml dependency review."
+    },
+    {
+      "id": "agent-session",
+      "status": "adapt",
+      "localOwner": "Agent, Session and Gateway persistence",
+      "commitScope": ["packages/core", "packages/session"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Async initialization, recovery, cancellation, write locks, parent ownership, quotas, immutable-generation migrations and both SDK transcripts."
+    },
+    {
+      "id": "messages-images-governance",
+      "status": "adapt",
+      "localOwner": "LLM providers, compaction, attachments and model governance",
+      "commitScope": ["packages/llm", "packages/compaction", "packages/attachment"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Both protocols through organization/BYOK routing, real credential attribution and image encoding/pricing/projection/cold recovery; no implicit stored endpoint rewrite."
+    },
+    {
+      "id": "log-upload-default-off",
+      "status": "retain",
+      "localOwner": "Session log upload provider and bundles",
+      "commitScope": ["packages/session/session-log-deepseek", "packages/bundle"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Default off, explicit opt-in, endpoint policy and kill switch across assembled presets; independent from OTel."
+    },
+    {
+      "id": "execution-migration",
+      "status": "adapt",
+      "localOwner": "PTC, workflow, shell, subprocess, sandbox, jobs and directory authorization",
+      "commitScope": ["packages/ptc-runtime", "packages/code-runtime", "packages/workflow", "packages/shell", "packages/subprocess", "packages/sandbox", "packages/jobs", "packages/e2b"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Migrate all consumers, cancel and await quiescence, preserve directory policy. Remove E2B only after deployment inventory and equivalent capability proof."
+    },
+    {
+      "id": "desktop-coordination-ui",
+      "status": "required",
+      "localOwner": "Proposed Gateway desktop authority, execution adapter and shell.overlay UI",
+      "commitScope": ["packages/computer-use", "packages/experimental/computer-use-cua-driver-native", "packages/experimental/computer-use-cua-driver-mcp"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Cross-runtime node/desktop ownership, execution fencing, revocation, FIFO, cancellation, restart and shutdown failures; private text/icon status, reduced motion, queue and unknown state."
+    },
+    {
+      "id": "browser-use",
+      "status": "adapt",
+      "localOwner": "Browser providers, Session initialization and capability policy",
+      "commitScope": ["packages/browser-use", "packages/experimental/browser-use-runtime", "packages/experimental/browser-use-playwright-mcp", "packages/experimental/browser-use-chrome-devtools-mcp", "packages/experimental/browser-use-stagehand-native"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Isolated launch default, explicit attach authorization, resource cleanup, external listeners and screenshot visibility; history recovery does not recover browser state."
+    },
+    {
+      "id": "auto-review",
+      "status": "adapt",
+      "localOwner": "Permission presets, pre-execute governance and Web permission UI",
+      "commitScope": ["packages/experimental/auto-review", "packages/interaction"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review."
+    },
+    {
+      "id": "remote-product-and-release",
+      "status": "adapt",
+      "localOwner": "Gateway, client, SSH, MCP, SDK, Android, native and release owners",
+      "commitScope": ["packages/api", "packages/client", "packages/ssh", "packages/mcp", "packages/sdk", "python", "native", "scripts", "website", "examples"],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Preserve collaboration, User Documents, Workbench, archives, Android and LAN/public authorization; terminal lifecycle, source/built consumers, restore and deployment acceptance."
+    }
+  ]
+}

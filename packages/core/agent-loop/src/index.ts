@@ -201,8 +201,8 @@ interface PreparedAgent {
   agent: ReactLoopAgent
   /** Aborts when the factory unloads, the caller cancels, or teardown begins — ends any setup await. */
   signal: AbortSignal
-  /** Enter registries, announce, notify session-start, and start the machine. */
-  publish(source: SessionStartSource): AgentHandle
+  /** Enter registries and emit creation notifications; publication failures reject. */
+  publish(source: SessionStartSource): Promise<AgentHandle>
   /** Reverse teardown: stop the machine, unregister, unwind the scope. Memoized. */
   dispose(): Promise<void>
 }
@@ -686,7 +686,8 @@ export class AgentLoop extends Service implements AgentFactory {
       return {
         agent,
         signal: abort.signal,
-        publish: (source) => {
+        // oxlint-disable-next-line typescript/require-await -- async surfaces publication throws as rejections.
+        publish: async (source) => {
           assertLive()
           detachSession = agent.ctx.sessions.enter(session)
           detachAgent = loopCtx.agents.enter(agent, parentAgent)
@@ -810,7 +811,7 @@ export class AgentLoop extends Service implements AgentFactory {
     try {
       const setupCommit = await raceAbort(setup?.(prepared.agent.ctx, prepared.agent), prepared.signal, id)
       setupCommit?.commit()
-      return prepared.publish(source)
+      return await prepared.publish(source)
     } catch (error: unknown) {
       await prepared.dispose()
       throw error

@@ -555,6 +555,25 @@ describe('agent/pre-step', () => {
   })
 })
 
+describe('publication rollback', () => {
+  it.each(['session/created', 'agent/created'] as const)('cleans up before create rejects when %s throws', async (event) => {
+    const ctx = await harness(new MockAdapter([]))
+    const id = SessionId('publication-rollback')
+    const failure = new Error('publication rejected')
+    const remove = ctx.on(event, () => { throw failure })
+    try {
+      await expect(ctx.agentLoop.create(id, { provider: 'mock', model: 'mock' })).rejects.toBe(failure)
+      expect(ctx.agents.get(id) === undefined).toBe(true)
+      expect(ctx.sessions.get(id) === undefined).toBe(true)
+      remove()
+      const retry = await ctx.agentLoop.create(id, { provider: 'mock', model: 'mock' })
+      expect(ctx.agents.get(id)).toBe(retry)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
 describe('agent/session-start', () => {
   it('fires once with source "startup" for a fresh create, before the first turn', async () => {
     const adapter = new MockAdapter([textResponse('ok')])

@@ -1,0 +1,3595 @@
+{
+  "schemaVersion": 2,
+  "reviewDate": "2026-09-17",
+  "baseline": {
+    "tag": "dsh-v0.1.5-rc.2",
+    "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+    "localCommit": "a901bff5f44bf9d51b99019b5c8085a0d93f248b"
+  },
+  "target": {
+    "tag": "dsh-v0.1.6-alpha.1",
+    "commit": "0a15e36e7f82b6ed45af6fa9759f29b40dcd965d"
+  },
+  "inventoryMethod": "git ls-tree package manifests and git diff --name-only --no-renames between pinned upstream trees; no ancestry or completed semantic review claim.",
+  "summary": {
+    "changedPackages": 290,
+    "addedPackages": 23,
+    "removedPackages": 7,
+    "nonPackageGroups": 28
+  },
+  "rows": [
+    {
+      "area": "packages/acp/acp",
+      "status": "adapt",
+      "localOwner": "packages/acp/acp",
+      "commitScope": [
+        "packages/acp/acp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/api/gateway",
+      "status": "adapt",
+      "localOwner": "packages/api/gateway",
+      "commitScope": [
+        "packages/api/gateway/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "replaced"
+    },
+    {
+      "area": "packages/api/remotes",
+      "status": "adapt",
+      "localOwner": "packages/api/remotes",
+      "commitScope": [
+        "packages/api/remotes/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/api/session-controller",
+      "status": "adapt",
+      "localOwner": "packages/api/session-controller",
+      "commitScope": [
+        "packages/api/session-controller/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/api/settings-controller",
+      "status": "adapt",
+      "localOwner": "packages/api/settings-controller",
+      "commitScope": [
+        "packages/api/settings-controller/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/api/terminal-controller",
+      "status": "required",
+      "localOwner": "packages/api/terminal-controller",
+      "commitScope": [
+        "packages/api/terminal-controller/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/api/workspace-controller",
+      "status": "adapt",
+      "localOwner": "packages/api/workspace-controller",
+      "commitScope": [
+        "packages/api/workspace-controller/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/api/workspace-files",
+      "status": "adapt",
+      "localOwner": "packages/api/workspace-files",
+      "commitScope": [
+        "packages/api/workspace-files/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/attachment/attachment",
+      "status": "adapt",
+      "localOwner": "packages/attachment/attachment",
+      "commitScope": [
+        "packages/attachment/attachment/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/attachment/attachment-local",
+      "status": "adapt",
+      "localOwner": "packages/attachment/attachment-local",
+      "commitScope": [
+        "packages/attachment/attachment-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/boot/app-boot",
+      "status": "adapt",
+      "localOwner": "packages/boot/app-boot",
+      "commitScope": [
+        "packages/boot/app-boot/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/boot/cmdline",
+      "status": "adapt",
+      "localOwner": "packages/boot/cmdline",
+      "commitScope": [
+        "packages/boot/cmdline/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/browser-use/browser-use",
+      "status": "required",
+      "localOwner": "packages/browser-use/browser-use",
+      "commitScope": [
+        "packages/browser-use/browser-use/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/bundle/acp-app",
+      "status": "adapt",
+      "localOwner": "packages/bundle/acp-app",
+      "commitScope": [
+        "packages/bundle/acp-app/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/bundle/base",
+      "status": "adapt",
+      "localOwner": "packages/bundle/base",
+      "commitScope": [
+        "packages/bundle/base/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/bundle/headless",
+      "status": "adapt",
+      "localOwner": "packages/bundle/headless",
+      "commitScope": [
+        "packages/bundle/headless/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/bundle/sdk-app",
+      "status": "adapt",
+      "localOwner": "packages/bundle/sdk-app",
+      "commitScope": [
+        "packages/bundle/sdk-app/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/bundle/sdk-minimal",
+      "status": "adapt",
+      "localOwner": "packages/bundle/sdk-minimal",
+      "commitScope": [
+        "packages/bundle/sdk-minimal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/bundle/web-app",
+      "status": "adapt",
+      "localOwner": "packages/bundle/web-app",
+      "commitScope": [
+        "packages/bundle/web-app/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/connection",
+      "status": "adapt",
+      "localOwner": "packages/client/connection",
+      "commitScope": [
+        "packages/client/connection/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/file-upload",
+      "status": "adapt",
+      "localOwner": "packages/client/file-upload",
+      "commitScope": [
+        "packages/client/file-upload/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/hmr",
+      "status": "adapt",
+      "localOwner": "packages/client/hmr",
+      "commitScope": [
+        "packages/client/hmr/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/locale",
+      "status": "adapt",
+      "localOwner": "packages/client/locale",
+      "commitScope": [
+        "packages/client/locale/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/modules",
+      "status": "adapt",
+      "localOwner": "packages/client/modules",
+      "commitScope": [
+        "packages/client/modules/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/resources",
+      "status": "adapt",
+      "localOwner": "packages/client/resources",
+      "commitScope": [
+        "packages/client/resources/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/store",
+      "status": "adapt",
+      "localOwner": "packages/client/store",
+      "commitScope": [
+        "packages/client/store/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-agent-preset",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-agent-preset",
+      "commitScope": [
+        "packages/client/ui-agent-preset/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-approval",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-approval",
+      "commitScope": [
+        "packages/client/ui-approval/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-attachment",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-attachment",
+      "commitScope": [
+        "packages/client/ui-attachment/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-brand-official",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-brand-official",
+      "commitScope": [
+        "packages/client/ui-brand-official/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-chat",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-chat",
+      "commitScope": [
+        "packages/client/ui-chat/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-commands",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-commands",
+      "commitScope": [
+        "packages/client/ui-commands/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-conversation",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-conversation",
+      "commitScope": [
+        "packages/client/ui-conversation/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-deliverables",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-deliverables",
+      "commitScope": [
+        "packages/client/ui-deliverables/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-directory-picker-browse",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-directory-picker-browse",
+      "commitScope": [
+        "packages/client/ui-directory-picker-browse/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-directory-picker-native",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-directory-picker-native",
+      "commitScope": [
+        "packages/client/ui-directory-picker-native/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-dockkit",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-dockkit",
+      "commitScope": [
+        "packages/client/ui-dockkit/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-goal",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-goal",
+      "commitScope": [
+        "packages/client/ui-goal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-input-trigger",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-input-trigger",
+      "commitScope": [
+        "packages/client/ui-input-trigger/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-jobs",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-jobs",
+      "commitScope": [
+        "packages/client/ui-jobs/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-layout",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-layout",
+      "commitScope": [
+        "packages/client/ui-layout/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-message-feedback",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-message-feedback",
+      "commitScope": [
+        "packages/client/ui-message-feedback/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-model-selection",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-model-selection",
+      "commitScope": [
+        "packages/client/ui-model-selection/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-open-in-app",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-open-in-app",
+      "commitScope": [
+        "packages/client/ui-open-in-app/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-permission-presets",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-permission-presets",
+      "commitScope": [
+        "packages/client/ui-permission-presets/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-plan",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-plan",
+      "commitScope": [
+        "packages/client/ui-plan/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-primitives",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-primitives",
+      "commitScope": [
+        "packages/client/ui-primitives/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-reference",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-reference",
+      "commitScope": [
+        "packages/client/ui-reference/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-renderer",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-renderer",
+      "commitScope": [
+        "packages/client/ui-renderer/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-schedule",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-schedule",
+      "commitScope": [
+        "packages/client/ui-schedule/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-session",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-session",
+      "commitScope": [
+        "packages/client/ui-session/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-settings",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-settings",
+      "commitScope": [
+        "packages/client/ui-settings/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-settings-general",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-settings-general",
+      "commitScope": [
+        "packages/client/ui-settings-general/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-settings-models",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-settings-models",
+      "commitScope": [
+        "packages/client/ui-settings-models/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-settings-plugin-inventory",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-settings-plugin-inventory",
+      "commitScope": [
+        "packages/client/ui-settings-plugin-inventory/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-settings-plugins",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-settings-plugins",
+      "commitScope": [
+        "packages/client/ui-settings-plugins/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-settings-unarchive-sessions",
+      "status": "required",
+      "localOwner": "packages/client/ui-settings-unarchive-sessions",
+      "commitScope": [
+        "packages/client/ui-settings-unarchive-sessions/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-sidebar",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-sidebar",
+      "commitScope": [
+        "packages/client/ui-sidebar/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-sidebar-documentpreview",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-sidebar-documentpreview",
+      "commitScope": [
+        "packages/client/ui-sidebar-documentpreview/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-sidebar-files",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-sidebar-files",
+      "commitScope": [
+        "packages/client/ui-sidebar-files/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-sidebar-right",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-sidebar-right",
+      "commitScope": [
+        "packages/client/ui-sidebar-right/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-sidebar-terminal",
+      "status": "required",
+      "localOwner": "packages/client/ui-sidebar-terminal",
+      "commitScope": [
+        "packages/client/ui-sidebar-terminal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/client/ui-skill",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-skill",
+      "commitScope": [
+        "packages/client/ui-skill/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-slots",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-slots",
+      "commitScope": [
+        "packages/client/ui-slots/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-subagent",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-subagent",
+      "commitScope": [
+        "packages/client/ui-subagent/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-theme",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-theme",
+      "commitScope": [
+        "packages/client/ui-theme/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-tool",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-tool",
+      "commitScope": [
+        "packages/client/ui-tool/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-trajectory",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-trajectory",
+      "commitScope": [
+        "packages/client/ui-trajectory/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-user-questions",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-user-questions",
+      "commitScope": [
+        "packages/client/ui-user-questions/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-workflow-run",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-workflow-run",
+      "commitScope": [
+        "packages/client/ui-workflow-run/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/ui-workspace",
+      "status": "adapt",
+      "localOwner": "packages/client/ui-workspace",
+      "commitScope": [
+        "packages/client/ui-workspace/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/client/web",
+      "status": "adapt",
+      "localOwner": "packages/client/web",
+      "commitScope": [
+        "packages/client/web/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/code-runtime/code-runtime",
+      "status": "adapt",
+      "localOwner": "packages/code-runtime/code-runtime",
+      "commitScope": [
+        "packages/code-runtime/code-runtime/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/code-runtime/code-runtime-worker-thread",
+      "status": "adapt",
+      "localOwner": "packages/code-runtime/code-runtime-worker-thread",
+      "commitScope": [
+        "packages/code-runtime/code-runtime-worker-thread/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/compaction/command-compact",
+      "status": "adapt",
+      "localOwner": "packages/compaction/command-compact",
+      "commitScope": [
+        "packages/compaction/command-compact/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/compaction/compaction",
+      "status": "adapt",
+      "localOwner": "packages/compaction/compaction",
+      "commitScope": [
+        "packages/compaction/compaction/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "tracked"
+    },
+    {
+      "area": "packages/compaction/compaction-basic",
+      "status": "adapt",
+      "localOwner": "packages/compaction/compaction-basic",
+      "commitScope": [
+        "packages/compaction/compaction-basic/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/compaction/compaction-image-offload",
+      "status": "required",
+      "localOwner": "packages/compaction/compaction-image-offload",
+      "commitScope": [
+        "packages/compaction/compaction-image-offload/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/compaction/compaction-tool-result-pruner",
+      "status": "adapt",
+      "localOwner": "packages/compaction/compaction-tool-result-pruner",
+      "commitScope": [
+        "packages/compaction/compaction-tool-result-pruner/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/computer-use/computer-use",
+      "status": "required",
+      "localOwner": "packages/computer-use/computer-use",
+      "commitScope": [
+        "packages/computer-use/computer-use/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/context/agent-instructions",
+      "status": "adapt",
+      "localOwner": "packages/context/agent-instructions",
+      "commitScope": [
+        "packages/context/agent-instructions/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/context/file-reference",
+      "status": "adapt",
+      "localOwner": "packages/context/file-reference",
+      "commitScope": [
+        "packages/context/file-reference/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/context/file-reference-local",
+      "status": "adapt",
+      "localOwner": "packages/context/file-reference-local",
+      "commitScope": [
+        "packages/context/file-reference-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/context/session-reference",
+      "status": "adapt",
+      "localOwner": "packages/context/session-reference",
+      "commitScope": [
+        "packages/context/session-reference/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/context/time-context",
+      "status": "adapt",
+      "localOwner": "packages/context/time-context",
+      "commitScope": [
+        "packages/context/time-context/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/context/tmux-context",
+      "status": "adapt",
+      "localOwner": "packages/context/tmux-context",
+      "commitScope": [
+        "packages/context/tmux-context/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/agent",
+      "status": "adapt",
+      "localOwner": "packages/core/agent",
+      "commitScope": [
+        "packages/core/agent/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/agent-default-model",
+      "status": "adapt",
+      "localOwner": "packages/core/agent-default-model",
+      "commitScope": [
+        "packages/core/agent-default-model/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/agent-loop",
+      "status": "adapt",
+      "localOwner": "packages/core/agent-loop",
+      "commitScope": [
+        "packages/core/agent-loop/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/agent-tool-presentation",
+      "status": "adapt",
+      "localOwner": "packages/core/agent-tool-presentation",
+      "commitScope": [
+        "packages/core/agent-tool-presentation/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/scope",
+      "status": "adapt",
+      "localOwner": "packages/core/scope",
+      "commitScope": [
+        "packages/core/scope/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/session",
+      "status": "adapt",
+      "localOwner": "packages/core/session",
+      "commitScope": [
+        "packages/core/session/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/system-prompt",
+      "status": "adapt",
+      "localOwner": "packages/core/system-prompt",
+      "commitScope": [
+        "packages/core/system-prompt/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/core/tools",
+      "status": "adapt",
+      "localOwner": "packages/core/tools",
+      "commitScope": [
+        "packages/core/tools/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/credentials/authorization",
+      "status": "adapt",
+      "localOwner": "packages/credentials/authorization",
+      "commitScope": [
+        "packages/credentials/authorization/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/credentials/credentials",
+      "status": "adapt",
+      "localOwner": "packages/credentials/credentials",
+      "commitScope": [
+        "packages/credentials/credentials/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/credentials/credentials-local",
+      "status": "adapt",
+      "localOwner": "packages/credentials/credentials-local",
+      "commitScope": [
+        "packages/credentials/credentials-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/e2b/e2b",
+      "status": "adapt",
+      "localOwner": "packages/e2b/e2b",
+      "commitScope": [
+        "packages/e2b/e2b/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/e2b/fs-e2b",
+      "status": "adapt",
+      "localOwner": "packages/e2b/fs-e2b",
+      "commitScope": [
+        "packages/e2b/fs-e2b/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/e2b/subprocess-e2b",
+      "status": "adapt",
+      "localOwner": "packages/e2b/subprocess-e2b",
+      "commitScope": [
+        "packages/e2b/subprocess-e2b/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/experimental/agent-team",
+      "status": "adapt",
+      "localOwner": "packages/experimental/agent-team",
+      "commitScope": [
+        "packages/experimental/agent-team/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/experimental/agent-team-profile",
+      "status": "adapt",
+      "localOwner": "packages/experimental/agent-team-profile",
+      "commitScope": [
+        "packages/experimental/agent-team-profile/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/agent-team-web-profile",
+      "status": "adapt",
+      "localOwner": "packages/experimental/agent-team-web-profile",
+      "commitScope": [
+        "packages/experimental/agent-team-web-profile/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/auto-review",
+      "status": "required",
+      "localOwner": "packages/experimental/auto-review",
+      "commitScope": [
+        "packages/experimental/auto-review/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/browser-use-chrome-devtools-mcp",
+      "status": "required",
+      "localOwner": "packages/experimental/browser-use-chrome-devtools-mcp",
+      "commitScope": [
+        "packages/experimental/browser-use-chrome-devtools-mcp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/browser-use-playwright-mcp",
+      "status": "required",
+      "localOwner": "packages/experimental/browser-use-playwright-mcp",
+      "commitScope": [
+        "packages/experimental/browser-use-playwright-mcp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/browser-use-runtime",
+      "status": "required",
+      "localOwner": "packages/experimental/browser-use-runtime",
+      "commitScope": [
+        "packages/experimental/browser-use-runtime/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/browser-use-stagehand-native",
+      "status": "required",
+      "localOwner": "packages/experimental/browser-use-stagehand-native",
+      "commitScope": [
+        "packages/experimental/browser-use-stagehand-native/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/client-ui-agent-team",
+      "status": "adapt",
+      "localOwner": "packages/experimental/client-ui-agent-team",
+      "commitScope": [
+        "packages/experimental/client-ui-agent-team/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/code-runtime-python",
+      "status": "adapt",
+      "localOwner": "packages/experimental/code-runtime-python",
+      "commitScope": [
+        "packages/experimental/code-runtime-python/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/experimental/computer-use-cua-driver-mcp",
+      "status": "required",
+      "localOwner": "packages/experimental/computer-use-cua-driver-mcp",
+      "commitScope": [
+        "packages/experimental/computer-use-cua-driver-mcp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/computer-use-cua-driver-native",
+      "status": "required",
+      "localOwner": "packages/experimental/computer-use-cua-driver-native",
+      "commitScope": [
+        "packages/experimental/computer-use-cua-driver-native/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/inspector",
+      "status": "adapt",
+      "localOwner": "packages/experimental/inspector",
+      "commitScope": [
+        "packages/experimental/inspector/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/ptc-runtime-python",
+      "status": "required",
+      "localOwner": "packages/experimental/ptc-runtime-python",
+      "commitScope": [
+        "packages/experimental/ptc-runtime-python/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/tool-agent-team",
+      "status": "adapt",
+      "localOwner": "packages/experimental/tool-agent-team",
+      "commitScope": [
+        "packages/experimental/tool-agent-team/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/experimental/webworker-packer",
+      "status": "adapt",
+      "localOwner": "packages/experimental/webworker-packer",
+      "commitScope": [
+        "packages/experimental/webworker-packer/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/experimental/webworker-runtime",
+      "status": "adapt",
+      "localOwner": "packages/experimental/webworker-runtime",
+      "commitScope": [
+        "packages/experimental/webworker-runtime/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/extensions/cordis-client-runner",
+      "status": "adapt",
+      "localOwner": "packages/extensions/cordis-client-runner",
+      "commitScope": [
+        "packages/extensions/cordis-client-runner/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/extensions/cordis-host-runner",
+      "status": "adapt",
+      "localOwner": "packages/extensions/cordis-host-runner",
+      "commitScope": [
+        "packages/extensions/cordis-host-runner/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/extensions/tool-cordis",
+      "status": "adapt",
+      "localOwner": "packages/extensions/tool-cordis",
+      "commitScope": [
+        "packages/extensions/tool-cordis/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/extensions/ui-cordis",
+      "status": "adapt",
+      "localOwner": "packages/extensions/ui-cordis",
+      "commitScope": [
+        "packages/extensions/ui-cordis/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/feedback/command-feedback",
+      "status": "adapt",
+      "localOwner": "packages/feedback/command-feedback",
+      "commitScope": [
+        "packages/feedback/command-feedback/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/feedback/message-feedback",
+      "status": "adapt",
+      "localOwner": "packages/feedback/message-feedback",
+      "commitScope": [
+        "packages/feedback/message-feedback/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/fs",
+      "status": "adapt",
+      "localOwner": "packages/fs/fs",
+      "commitScope": [
+        "packages/fs/fs/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/fs-local",
+      "status": "adapt",
+      "localOwner": "packages/fs/fs-local",
+      "commitScope": [
+        "packages/fs/fs-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/fs-observation-policy",
+      "status": "adapt",
+      "localOwner": "packages/fs/fs-observation-policy",
+      "commitScope": [
+        "packages/fs/fs-observation-policy/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/fs-sandbox",
+      "status": "adapt",
+      "localOwner": "packages/fs/fs-sandbox",
+      "commitScope": [
+        "packages/fs/fs-sandbox/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/tool-fs",
+      "status": "adapt",
+      "localOwner": "packages/fs/tool-fs",
+      "commitScope": [
+        "packages/fs/tool-fs/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/tool-fs-search",
+      "status": "adapt",
+      "localOwner": "packages/fs/tool-fs-search",
+      "commitScope": [
+        "packages/fs/tool-fs-search/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/fs/tool-present",
+      "status": "adapt",
+      "localOwner": "packages/fs/tool-present",
+      "commitScope": [
+        "packages/fs/tool-present/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/fs/tool-str-replace-editor",
+      "status": "adapt",
+      "localOwner": "packages/fs/tool-str-replace-editor",
+      "commitScope": [
+        "packages/fs/tool-str-replace-editor/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/goal/command-goal",
+      "status": "adapt",
+      "localOwner": "packages/goal/command-goal",
+      "commitScope": [
+        "packages/goal/command-goal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/goal/goal",
+      "status": "adapt",
+      "localOwner": "packages/goal/goal",
+      "commitScope": [
+        "packages/goal/goal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/goal/goal-round-driver",
+      "status": "adapt",
+      "localOwner": "packages/goal/goal-round-driver",
+      "commitScope": [
+        "packages/goal/goal-round-driver/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/goal/tool-goal",
+      "status": "adapt",
+      "localOwner": "packages/goal/tool-goal",
+      "commitScope": [
+        "packages/goal/tool-goal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/guard/repeat-tool-reminder",
+      "status": "adapt",
+      "localOwner": "packages/guard/repeat-tool-reminder",
+      "commitScope": [
+        "packages/guard/repeat-tool-reminder/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/guard/timeout-policy",
+      "status": "adapt",
+      "localOwner": "packages/guard/timeout-policy",
+      "commitScope": [
+        "packages/guard/timeout-policy/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/hooks/hook-protocol",
+      "status": "adapt",
+      "localOwner": "packages/hooks/hook-protocol",
+      "commitScope": [
+        "packages/hooks/hook-protocol/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/hooks/hooks-claude-code",
+      "status": "adapt",
+      "localOwner": "packages/hooks/hooks-claude-code",
+      "commitScope": [
+        "packages/hooks/hooks-claude-code/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/hooks/hooks-codex",
+      "status": "adapt",
+      "localOwner": "packages/hooks/hooks-codex",
+      "commitScope": [
+        "packages/hooks/hooks-codex/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/directory-picker",
+      "status": "adapt",
+      "localOwner": "packages/host/directory-picker",
+      "commitScope": [
+        "packages/host/directory-picker/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/directory-picker-auto",
+      "status": "adapt",
+      "localOwner": "packages/host/directory-picker-auto",
+      "commitScope": [
+        "packages/host/directory-picker-auto/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/directory-picker-browse",
+      "status": "adapt",
+      "localOwner": "packages/host/directory-picker-browse",
+      "commitScope": [
+        "packages/host/directory-picker-browse/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/directory-picker-native",
+      "status": "adapt",
+      "localOwner": "packages/host/directory-picker-native",
+      "commitScope": [
+        "packages/host/directory-picker-native/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/frontend-static",
+      "status": "adapt",
+      "localOwner": "packages/host/frontend-static",
+      "commitScope": [
+        "packages/host/frontend-static/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/open-in-app",
+      "status": "adapt",
+      "localOwner": "packages/host/open-in-app",
+      "commitScope": [
+        "packages/host/open-in-app/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/plugin-inventory",
+      "status": "adapt",
+      "localOwner": "packages/host/plugin-inventory",
+      "commitScope": [
+        "packages/host/plugin-inventory/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/host/webserver",
+      "status": "adapt",
+      "localOwner": "packages/host/webserver",
+      "commitScope": [
+        "packages/host/webserver/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/identity/anonymous-user-id",
+      "status": "adapt",
+      "localOwner": "packages/identity/anonymous-user-id",
+      "commitScope": [
+        "packages/identity/anonymous-user-id/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/interaction/commands",
+      "status": "adapt",
+      "localOwner": "packages/interaction/commands",
+      "commitScope": [
+        "packages/interaction/commands/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/interaction/permission-presets",
+      "status": "adapt",
+      "localOwner": "packages/interaction/permission-presets",
+      "commitScope": [
+        "packages/interaction/permission-presets/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/interaction/tool-ask-user",
+      "status": "adapt",
+      "localOwner": "packages/interaction/tool-ask-user",
+      "commitScope": [
+        "packages/interaction/tool-ask-user/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/interaction/user-approval",
+      "status": "adapt",
+      "localOwner": "packages/interaction/user-approval",
+      "commitScope": [
+        "packages/interaction/user-approval/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/interaction/user-questions",
+      "status": "adapt",
+      "localOwner": "packages/interaction/user-questions",
+      "commitScope": [
+        "packages/interaction/user-questions/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/jobs/jobs",
+      "status": "adapt",
+      "localOwner": "packages/jobs/jobs",
+      "commitScope": [
+        "packages/jobs/jobs/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "tracked"
+    },
+    {
+      "area": "packages/jobs/jobs-local",
+      "status": "adapt",
+      "localOwner": "packages/jobs/jobs-local",
+      "commitScope": [
+        "packages/jobs/jobs-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/jobs/tool-jobs",
+      "status": "adapt",
+      "localOwner": "packages/jobs/tool-jobs",
+      "commitScope": [
+        "packages/jobs/tool-jobs/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/deepseek-llm-api-extensions",
+      "status": "adapt",
+      "localOwner": "packages/llm/deepseek-llm-api-extensions",
+      "commitScope": [
+        "packages/llm/deepseek-llm-api-extensions/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/llm",
+      "status": "adapt",
+      "localOwner": "packages/llm/llm",
+      "commitScope": [
+        "packages/llm/llm/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/llm-deepseek",
+      "status": "adapt",
+      "localOwner": "packages/llm/llm-deepseek",
+      "commitScope": [
+        "packages/llm/llm-deepseek/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/llm-pi-ai",
+      "status": "adapt",
+      "localOwner": "packages/llm/llm-pi-ai",
+      "commitScope": [
+        "packages/llm/llm-pi-ai/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/llm-retry",
+      "status": "adapt",
+      "localOwner": "packages/llm/llm-retry",
+      "commitScope": [
+        "packages/llm/llm-retry/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/plugin-package-inventory-deepseek",
+      "status": "adapt",
+      "localOwner": "packages/llm/plugin-package-inventory-deepseek",
+      "commitScope": [
+        "packages/llm/plugin-package-inventory-deepseek/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/llm/token-meter",
+      "status": "adapt",
+      "localOwner": "packages/llm/token-meter",
+      "commitScope": [
+        "packages/llm/token-meter/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/lsp/lsp",
+      "status": "adapt",
+      "localOwner": "packages/lsp/lsp",
+      "commitScope": [
+        "packages/lsp/lsp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/lsp/lsp-stdio",
+      "status": "adapt",
+      "localOwner": "packages/lsp/lsp-stdio",
+      "commitScope": [
+        "packages/lsp/lsp-stdio/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/lsp/tool-lsp",
+      "status": "adapt",
+      "localOwner": "packages/lsp/tool-lsp",
+      "commitScope": [
+        "packages/lsp/tool-lsp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/mcp/mcp-client",
+      "status": "adapt",
+      "localOwner": "packages/mcp/mcp-client",
+      "commitScope": [
+        "packages/mcp/mcp-client/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/mcp/mcp-resources",
+      "status": "required",
+      "localOwner": "packages/mcp/mcp-resources",
+      "commitScope": [
+        "packages/mcp/mcp-resources/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/plan/plan-mode",
+      "status": "adapt",
+      "localOwner": "packages/plan/plan-mode",
+      "commitScope": [
+        "packages/plan/plan-mode/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/preset/agent-presets",
+      "status": "adapt",
+      "localOwner": "packages/preset/agent-presets",
+      "commitScope": [
+        "packages/preset/agent-presets/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/preset/persona",
+      "status": "adapt",
+      "localOwner": "packages/preset/persona",
+      "commitScope": [
+        "packages/preset/persona/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/ptc-runtime/ptc-runtime",
+      "status": "required",
+      "localOwner": "packages/ptc-runtime/ptc-runtime",
+      "commitScope": [
+        "packages/ptc-runtime/ptc-runtime/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/ptc-runtime/ptc-runtime-node",
+      "status": "required",
+      "localOwner": "packages/ptc-runtime/ptc-runtime-node",
+      "commitScope": [
+        "packages/ptc-runtime/ptc-runtime-node/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/runtime-diagnostics/invariants",
+      "status": "adapt",
+      "localOwner": "packages/runtime-diagnostics/invariants",
+      "commitScope": [
+        "packages/runtime-diagnostics/invariants/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sandbox/sandbox",
+      "status": "adapt",
+      "localOwner": "packages/sandbox/sandbox",
+      "commitScope": [
+        "packages/sandbox/sandbox/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sandbox/sandbox-local",
+      "status": "adapt",
+      "localOwner": "packages/sandbox/sandbox-local",
+      "commitScope": [
+        "packages/sandbox/sandbox-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sandbox/sandbox-policy",
+      "status": "adapt",
+      "localOwner": "packages/sandbox/sandbox-policy",
+      "commitScope": [
+        "packages/sandbox/sandbox-policy/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sandbox/sandbox-windows-acl",
+      "status": "adapt",
+      "localOwner": "packages/sandbox/sandbox-windows-acl",
+      "commitScope": [
+        "packages/sandbox/sandbox-windows-acl/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/schedule/schedule",
+      "status": "adapt",
+      "localOwner": "packages/schedule/schedule",
+      "commitScope": [
+        "packages/schedule/schedule/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sdk/client",
+      "status": "adapt",
+      "localOwner": "packages/sdk/client",
+      "commitScope": [
+        "packages/sdk/client/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sdk/protocol",
+      "status": "adapt",
+      "localOwner": "packages/sdk/protocol",
+      "commitScope": [
+        "packages/sdk/protocol/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/sdk/server",
+      "status": "adapt",
+      "localOwner": "packages/sdk/server",
+      "commitScope": [
+        "packages/sdk/server/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session-query/session-log-export",
+      "status": "adapt",
+      "localOwner": "packages/session-query/session-log-export",
+      "commitScope": [
+        "packages/session-query/session-log-export/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session-query/session-query",
+      "status": "adapt",
+      "localOwner": "packages/session-query/session-query",
+      "commitScope": [
+        "packages/session-query/session-query/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session-query/session-query-sqlite",
+      "status": "adapt",
+      "localOwner": "packages/session-query/session-query-sqlite",
+      "commitScope": [
+        "packages/session-query/session-query-sqlite/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session-query/tool-session-query",
+      "status": "adapt",
+      "localOwner": "packages/session-query/tool-session-query",
+      "commitScope": [
+        "packages/session-query/tool-session-query/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-checkpoint-policy",
+      "status": "adapt",
+      "localOwner": "packages/session/session-checkpoint-policy",
+      "commitScope": [
+        "packages/session/session-checkpoint-policy/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-format",
+      "status": "adapt",
+      "localOwner": "packages/session/session-format",
+      "commitScope": [
+        "packages/session/session-format/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-format-catalog",
+      "status": "adapt",
+      "localOwner": "packages/session/session-format-catalog",
+      "commitScope": [
+        "packages/session/session-format-catalog/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/session/session-format-v0-to-v1",
+      "status": "adapt",
+      "localOwner": "packages/session/session-format-v0-to-v1",
+      "commitScope": [
+        "packages/session/session-format-v0-to-v1/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/session/session-format-v1-to-v2",
+      "status": "adapt",
+      "localOwner": "packages/session/session-format-v1-to-v2",
+      "commitScope": [
+        "packages/session/session-format-v1-to-v2/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/session/session-format-v2-to-v3",
+      "status": "adapt",
+      "localOwner": "packages/session/session-format-v2-to-v3",
+      "commitScope": [
+        "packages/session/session-format-v2-to-v3/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/session/session-log-deepseek",
+      "status": "adapt",
+      "localOwner": "packages/session/session-log-deepseek",
+      "commitScope": [
+        "packages/session/session-log-deepseek/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-persistence",
+      "status": "adapt",
+      "localOwner": "packages/session/session-persistence",
+      "commitScope": [
+        "packages/session/session-persistence/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "replaced"
+    },
+    {
+      "area": "packages/session/session-persistence-jsonl",
+      "status": "adapt",
+      "localOwner": "packages/session/session-persistence-jsonl",
+      "commitScope": [
+        "packages/session/session-persistence-jsonl/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-projection",
+      "status": "adapt",
+      "localOwner": "packages/session/session-projection",
+      "commitScope": [
+        "packages/session/session-projection/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-projection-cache",
+      "status": "adapt",
+      "localOwner": "packages/session/session-projection-cache",
+      "commitScope": [
+        "packages/session/session-projection-cache/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-stats",
+      "status": "adapt",
+      "localOwner": "packages/session/session-stats",
+      "commitScope": [
+        "packages/session/session-stats/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-telemetry",
+      "status": "adapt",
+      "localOwner": "packages/session/session-telemetry",
+      "commitScope": [
+        "packages/session/session-telemetry/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-telemetry-otel",
+      "status": "adapt",
+      "localOwner": "packages/session/session-telemetry-otel",
+      "commitScope": [
+        "packages/session/session-telemetry-otel/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-title",
+      "status": "adapt",
+      "localOwner": "packages/session/session-title",
+      "commitScope": [
+        "packages/session/session-title/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-title-all-prompts-llm",
+      "status": "adapt",
+      "localOwner": "packages/session/session-title-all-prompts-llm",
+      "commitScope": [
+        "packages/session/session-title-all-prompts-llm/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-title-first-prompt-llm",
+      "status": "adapt",
+      "localOwner": "packages/session/session-title-first-prompt-llm",
+      "commitScope": [
+        "packages/session/session-title-first-prompt-llm/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-title-llm",
+      "status": "adapt",
+      "localOwner": "packages/session/session-title-llm",
+      "commitScope": [
+        "packages/session/session-title-llm/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/session/session-turn-outline",
+      "status": "adapt",
+      "localOwner": "packages/session/session-turn-outline",
+      "commitScope": [
+        "packages/session/session-turn-outline/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/settings/settings",
+      "status": "adapt",
+      "localOwner": "packages/settings/settings",
+      "commitScope": [
+        "packages/settings/settings/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/settings/settings-file",
+      "status": "adapt",
+      "localOwner": "packages/settings/settings-file",
+      "commitScope": [
+        "packages/settings/settings-file/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/bash-local",
+      "status": "adapt",
+      "localOwner": "packages/shell/bash-local",
+      "commitScope": [
+        "packages/shell/bash-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/bash-sandbox",
+      "status": "adapt",
+      "localOwner": "packages/shell/bash-sandbox",
+      "commitScope": [
+        "packages/shell/bash-sandbox/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/pwsh-local",
+      "status": "adapt",
+      "localOwner": "packages/shell/pwsh-local",
+      "commitScope": [
+        "packages/shell/pwsh-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/pwsh-sandbox",
+      "status": "adapt",
+      "localOwner": "packages/shell/pwsh-sandbox",
+      "commitScope": [
+        "packages/shell/pwsh-sandbox/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/shell",
+      "status": "adapt",
+      "localOwner": "packages/shell/shell",
+      "commitScope": [
+        "packages/shell/shell/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/shell-env",
+      "status": "adapt",
+      "localOwner": "packages/shell/shell-env",
+      "commitScope": [
+        "packages/shell/shell-env/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/tool-bash",
+      "status": "adapt",
+      "localOwner": "packages/shell/tool-bash",
+      "commitScope": [
+        "packages/shell/tool-bash/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/tool-bash-persistent",
+      "status": "adapt",
+      "localOwner": "packages/shell/tool-bash-persistent",
+      "commitScope": [
+        "packages/shell/tool-bash-persistent/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/tool-pwsh",
+      "status": "adapt",
+      "localOwner": "packages/shell/tool-pwsh",
+      "commitScope": [
+        "packages/shell/tool-pwsh/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/shell/tool-pwsh-persistent",
+      "status": "adapt",
+      "localOwner": "packages/shell/tool-pwsh-persistent",
+      "commitScope": [
+        "packages/shell/tool-pwsh-persistent/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/skill/skill",
+      "status": "adapt",
+      "localOwner": "packages/skill/skill",
+      "commitScope": [
+        "packages/skill/skill/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/skill/skill-badge",
+      "status": "adapt",
+      "localOwner": "packages/skill/skill-badge",
+      "commitScope": [
+        "packages/skill/skill-badge/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/skill/skill-filesystem",
+      "status": "adapt",
+      "localOwner": "packages/skill/skill-filesystem",
+      "commitScope": [
+        "packages/skill/skill-filesystem/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/skill/tool-skill",
+      "status": "adapt",
+      "localOwner": "packages/skill/tool-skill",
+      "commitScope": [
+        "packages/skill/tool-skill/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/spill/spill",
+      "status": "adapt",
+      "localOwner": "packages/spill/spill",
+      "commitScope": [
+        "packages/spill/spill/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/spill/spill-local",
+      "status": "adapt",
+      "localOwner": "packages/spill/spill-local",
+      "commitScope": [
+        "packages/spill/spill-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/spill/spill-policy",
+      "status": "adapt",
+      "localOwner": "packages/spill/spill-policy",
+      "commitScope": [
+        "packages/spill/spill-policy/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/ssh/fs-ssh",
+      "status": "required",
+      "localOwner": "packages/ssh/fs-ssh",
+      "commitScope": [
+        "packages/ssh/fs-ssh/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/ssh/sandbox-ssh",
+      "status": "required",
+      "localOwner": "packages/ssh/sandbox-ssh",
+      "commitScope": [
+        "packages/ssh/sandbox-ssh/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/ssh/ssh",
+      "status": "required",
+      "localOwner": "packages/ssh/ssh",
+      "commitScope": [
+        "packages/ssh/ssh/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/ssh/subprocess-ssh",
+      "status": "required",
+      "localOwner": "packages/ssh/subprocess-ssh",
+      "commitScope": [
+        "packages/ssh/subprocess-ssh/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/storage/storage",
+      "status": "adapt",
+      "localOwner": "packages/storage/storage",
+      "commitScope": [
+        "packages/storage/storage/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/storage/storage-domain",
+      "status": "adapt",
+      "localOwner": "packages/storage/storage-domain",
+      "commitScope": [
+        "packages/storage/storage-domain/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/storage/storage-json",
+      "status": "adapt",
+      "localOwner": "packages/storage/storage-json",
+      "commitScope": [
+        "packages/storage/storage-json/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/storage/storage-sqlite",
+      "status": "adapt",
+      "localOwner": "packages/storage/storage-sqlite",
+      "commitScope": [
+        "packages/storage/storage-sqlite/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent",
+      "commitScope": [
+        "packages/subagent/subagent/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-acp",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-acp",
+      "commitScope": [
+        "packages/subagent/subagent-acp/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-claude-code",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-claude-code",
+      "commitScope": [
+        "packages/subagent/subagent-claude-code/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-codex",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-codex",
+      "commitScope": [
+        "packages/subagent/subagent-codex/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-dsh-sdk",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-dsh-sdk",
+      "commitScope": [
+        "packages/subagent/subagent-dsh-sdk/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-fork-in-process",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-fork-in-process",
+      "commitScope": [
+        "packages/subagent/subagent-fork-in-process/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-in-process-driver",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-in-process-driver",
+      "commitScope": [
+        "packages/subagent/subagent-in-process-driver/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/subagent-spawn-in-process",
+      "status": "adapt",
+      "localOwner": "packages/subagent/subagent-spawn-in-process",
+      "commitScope": [
+        "packages/subagent/subagent-spawn-in-process/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/tool-subagent",
+      "status": "adapt",
+      "localOwner": "packages/subagent/tool-subagent",
+      "commitScope": [
+        "packages/subagent/tool-subagent/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subagent/tool-subagent-control",
+      "status": "adapt",
+      "localOwner": "packages/subagent/tool-subagent-control",
+      "commitScope": [
+        "packages/subagent/tool-subagent-control/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subprocess/subprocess",
+      "status": "adapt",
+      "localOwner": "packages/subprocess/subprocess",
+      "commitScope": [
+        "packages/subprocess/subprocess/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subprocess/subprocess-local",
+      "status": "adapt",
+      "localOwner": "packages/subprocess/subprocess-local",
+      "commitScope": [
+        "packages/subprocess/subprocess-local/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/subprocess/win32-process",
+      "status": "adapt",
+      "localOwner": "packages/subprocess/win32-process",
+      "commitScope": [
+        "packages/subprocess/win32-process/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/terminal/terminal",
+      "status": "adapt",
+      "localOwner": "packages/terminal/terminal",
+      "commitScope": [
+        "packages/terminal/terminal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/terminal/terminal-bash",
+      "status": "adapt",
+      "localOwner": "packages/terminal/terminal-bash",
+      "commitScope": [
+        "packages/terminal/terminal-bash/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/terminal/tool-terminal",
+      "status": "adapt",
+      "localOwner": "packages/terminal/tool-terminal",
+      "commitScope": [
+        "packages/terminal/tool-terminal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/test-support/agent-loop-testkit",
+      "status": "adapt",
+      "localOwner": "packages/test-support/agent-loop-testkit",
+      "commitScope": [
+        "packages/test-support/agent-loop-testkit/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/test-support/client-runtime",
+      "status": "adapt",
+      "localOwner": "packages/test-support/client-runtime",
+      "commitScope": [
+        "packages/test-support/client-runtime/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/test-support/llm-mock-server",
+      "status": "adapt",
+      "localOwner": "packages/test-support/llm-mock-server",
+      "commitScope": [
+        "packages/test-support/llm-mock-server/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/test-support/llm-replay",
+      "status": "adapt",
+      "localOwner": "packages/test-support/llm-replay",
+      "commitScope": [
+        "packages/test-support/llm-replay/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/test-support/loader-smoke",
+      "status": "adapt",
+      "localOwner": "packages/test-support/loader-smoke",
+      "commitScope": [
+        "packages/test-support/loader-smoke/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/test-support/remote-mock",
+      "status": "required",
+      "localOwner": "packages/test-support/remote-mock",
+      "commitScope": [
+        "packages/test-support/remote-mock/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/test-support/session-snapshot",
+      "status": "adapt",
+      "localOwner": "packages/test-support/session-snapshot",
+      "commitScope": [
+        "packages/test-support/session-snapshot/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/todo/tool-todo",
+      "status": "adapt",
+      "localOwner": "packages/todo/tool-todo",
+      "commitScope": [
+        "packages/todo/tool-todo/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/typert/generator",
+      "status": "adapt",
+      "localOwner": "packages/typert/generator",
+      "commitScope": [
+        "packages/typert/generator/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/typert/loader",
+      "status": "adapt",
+      "localOwner": "packages/typert/loader",
+      "commitScope": [
+        "packages/typert/loader/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/typert/protocol",
+      "status": "adapt",
+      "localOwner": "packages/typert/protocol",
+      "commitScope": [
+        "packages/typert/protocol/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/typert/registry",
+      "status": "adapt",
+      "localOwner": "packages/typert/registry",
+      "commitScope": [
+        "packages/typert/registry/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/atomic-write",
+      "status": "adapt",
+      "localOwner": "packages/util/atomic-write",
+      "commitScope": [
+        "packages/util/atomic-write/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/brand",
+      "status": "adapt",
+      "localOwner": "packages/util/brand",
+      "commitScope": [
+        "packages/util/brand/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/chunked-list",
+      "status": "adapt",
+      "localOwner": "packages/util/chunked-list",
+      "commitScope": [
+        "packages/util/chunked-list/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/crypto",
+      "status": "adapt",
+      "localOwner": "packages/util/crypto",
+      "commitScope": [
+        "packages/util/crypto/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/deque",
+      "status": "adapt",
+      "localOwner": "packages/util/deque",
+      "commitScope": [
+        "packages/util/deque/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/util/home-paths",
+      "status": "adapt",
+      "localOwner": "packages/util/home-paths",
+      "commitScope": [
+        "packages/util/home-paths/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/http-proxy",
+      "status": "adapt",
+      "localOwner": "packages/util/http-proxy",
+      "commitScope": [
+        "packages/util/http-proxy/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/launch-environment",
+      "status": "adapt",
+      "localOwner": "packages/util/launch-environment",
+      "commitScope": [
+        "packages/util/launch-environment/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/native-command",
+      "status": "adapt",
+      "localOwner": "packages/util/native-command",
+      "commitScope": [
+        "packages/util/native-command/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/output-retention",
+      "status": "adapt",
+      "localOwner": "packages/util/output-retention",
+      "commitScope": [
+        "packages/util/output-retention/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/package-manifest",
+      "status": "adapt",
+      "localOwner": "packages/util/package-manifest",
+      "commitScope": [
+        "packages/util/package-manifest/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/time",
+      "status": "adapt",
+      "localOwner": "packages/util/time",
+      "commitScope": [
+        "packages/util/time/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/timeout",
+      "status": "adapt",
+      "localOwner": "packages/util/timeout",
+      "commitScope": [
+        "packages/util/timeout/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/values",
+      "status": "adapt",
+      "localOwner": "packages/util/values",
+      "commitScope": [
+        "packages/util/values/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/util/workspace-path",
+      "status": "adapt",
+      "localOwner": "packages/util/workspace-path",
+      "commitScope": [
+        "packages/util/workspace-path/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/web/tool-web",
+      "status": "adapt",
+      "localOwner": "packages/web/tool-web",
+      "commitScope": [
+        "packages/web/tool-web/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/web/web",
+      "status": "adapt",
+      "localOwner": "packages/web/web",
+      "commitScope": [
+        "packages/web/web/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/web/web-fetch-http",
+      "status": "adapt",
+      "localOwner": "packages/web/web-fetch-http",
+      "commitScope": [
+        "packages/web/web-fetch-http/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/web/web-search-deepseek",
+      "status": "adapt",
+      "localOwner": "packages/web/web-search-deepseek",
+      "commitScope": [
+        "packages/web/web-search-deepseek/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/web/web-search-exa",
+      "status": "adapt",
+      "localOwner": "packages/web/web-search-exa",
+      "commitScope": [
+        "packages/web/web-search-exa/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/web/web-search-perplexity",
+      "status": "adapt",
+      "localOwner": "packages/web/web-search-perplexity",
+      "commitScope": [
+        "packages/web/web-search-perplexity/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/webhook/webhook",
+      "status": "adapt",
+      "localOwner": "packages/webhook/webhook",
+      "commitScope": [
+        "packages/webhook/webhook/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/webhook/webhook-github",
+      "status": "adapt",
+      "localOwner": "packages/webhook/webhook-github",
+      "commitScope": [
+        "packages/webhook/webhook-github/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/workflow/tool-ralph",
+      "status": "adapt",
+      "localOwner": "packages/workflow/tool-ralph",
+      "commitScope": [
+        "packages/workflow/tool-ralph/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/workflow/tool-workflow",
+      "status": "adapt",
+      "localOwner": "packages/workflow/tool-workflow",
+      "commitScope": [
+        "packages/workflow/tool-workflow/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/workflow/workflow",
+      "status": "adapt",
+      "localOwner": "packages/workflow/workflow",
+      "commitScope": [
+        "packages/workflow/workflow/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "tracked"
+    },
+    {
+      "area": "packages/workflow/workflow-ptc",
+      "status": "required",
+      "localOwner": "packages/workflow/workflow-ptc",
+      "commitScope": [
+        "packages/workflow/workflow-ptc/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "added",
+      "currentSovereignty": "unmanifested"
+    },
+    {
+      "area": "packages/workflow/workflow-worker-thread",
+      "status": "adapt",
+      "localOwner": "packages/workflow/workflow-worker-thread",
+      "commitScope": [
+        "packages/workflow/workflow-worker-thread/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "removed",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "packages/workspace/workspace",
+      "status": "adapt",
+      "localOwner": "packages/workspace/workspace",
+      "commitScope": [
+        "packages/workspace/workspace/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "changeKind": "modified",
+      "currentSovereignty": "adapted"
+    },
+    {
+      "area": "non-package:.agents",
+      "status": "adapt",
+      "localOwner": ".agents",
+      "commitScope": [
+        ".agents"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:.gitattributes",
+      "status": "adapt",
+      "localOwner": ".gitattributes",
+      "commitScope": [
+        ".gitattributes"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:.github",
+      "status": "adapt",
+      "localOwner": ".github",
+      "commitScope": [
+        ".github"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:.oxlintrc.json",
+      "status": "adapt",
+      "localOwner": ".oxlintrc.json",
+      "commitScope": [
+        ".oxlintrc.json"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:AGENTS.md",
+      "status": "adapt",
+      "localOwner": "AGENTS.md",
+      "commitScope": [
+        "AGENTS.md"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:README.i18n.yaml",
+      "status": "adapt",
+      "localOwner": "README.i18n.yaml",
+      "commitScope": [
+        "README.i18n.yaml"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:README.md",
+      "status": "adapt",
+      "localOwner": "README.md",
+      "commitScope": [
+        "README.md"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:README.zh.md",
+      "status": "adapt",
+      "localOwner": "README.zh.md",
+      "commitScope": [
+        "README.zh.md"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:THIRD_PARTY_NOTICES.md",
+      "status": "adapt",
+      "localOwner": "THIRD_PARTY_NOTICES.md",
+      "commitScope": [
+        "THIRD_PARTY_NOTICES.md"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:apps",
+      "status": "adapt",
+      "localOwner": "apps",
+      "commitScope": [
+        "apps/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:benchmarks",
+      "status": "adapt",
+      "localOwner": "benchmarks",
+      "commitScope": [
+        "benchmarks/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:docs",
+      "status": "adapt",
+      "localOwner": "docs",
+      "commitScope": [
+        "docs/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:native",
+      "status": "adapt",
+      "localOwner": "native",
+      "commitScope": [
+        "native/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:package.json",
+      "status": "adapt",
+      "localOwner": "package.json",
+      "commitScope": [
+        "package.json"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:packages",
+      "status": "adapt",
+      "localOwner": "packages",
+      "commitScope": [
+        "packages/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:patches",
+      "status": "adapt",
+      "localOwner": "patches",
+      "commitScope": [
+        "patches/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:pnpm-lock.yaml",
+      "status": "adapt",
+      "localOwner": "pnpm-lock.yaml",
+      "commitScope": [
+        "pnpm-lock.yaml"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:pnpm-workspace.yaml",
+      "status": "adapt",
+      "localOwner": "pnpm-workspace.yaml",
+      "commitScope": [
+        "pnpm-workspace.yaml"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:python",
+      "status": "adapt",
+      "localOwner": "python",
+      "commitScope": [
+        "python/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:scripts",
+      "status": "adapt",
+      "localOwner": "scripts",
+      "commitScope": [
+        "scripts/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:snapshots",
+      "status": "adapt",
+      "localOwner": "snapshots",
+      "commitScope": [
+        "snapshots/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:tsconfig.base.json",
+      "status": "adapt",
+      "localOwner": "tsconfig.base.json",
+      "commitScope": [
+        "tsconfig.base.json"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:tsconfig.client.json",
+      "status": "adapt",
+      "localOwner": "tsconfig.client.json",
+      "commitScope": [
+        "tsconfig.client.json"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:tsconfig.host.json",
+      "status": "adapt",
+      "localOwner": "tsconfig.host.json",
+      "commitScope": [
+        "tsconfig.host.json"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:vendor",
+      "status": "adapt",
+      "localOwner": "vendor",
+      "commitScope": [
+        "vendor/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:vitest.config.ts",
+      "status": "adapt",
+      "localOwner": "vitest.config.ts",
+      "commitScope": [
+        "vitest.config.ts"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:vitest.web-stress.config.ts",
+      "status": "adapt",
+      "localOwner": "vitest.web-stress.config.ts",
+      "commitScope": [
+        "vitest.web-stress.config.ts"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "area": "non-package:website",
+      "status": "adapt",
+      "localOwner": "website",
+      "commitScope": [
+        "website/"
+      ],
+      "reviewState": "pending-cumulative-source-review"
+    }
+  ],
+  "previousUpgradeCarryForward": {
+    "source": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.5-rc.2.json",
+    "items": [
+      {
+        "area": "session-format-and-agent",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "default-model",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "token-cache-disclosure",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "real provider cache usage unverified"
+      },
+      {
+        "area": "v41-image-token-pricing",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "real provider image request unverified"
+      },
+      {
+        "area": "filesystem-byte-range",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "workspace-files",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "feedback",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "delivered-files",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "ui-package-tree",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "native-desktop-and-electron",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for this worktree"
+      },
+      {
+        "area": "persistent-bash-model-status",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "Linux local; Windows/macOS x64 unverified"
+      },
+      {
+        "area": "composer-command-presentation",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified in deployed browsers"
+      },
+      {
+        "area": "web-boot-readiness",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified in production tunnel"
+      },
+      {
+        "area": "shared-package-manifest-types",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified for published artifacts"
+      },
+      {
+        "area": "markdown-image-failure-ux",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "unverified in production browser"
+      },
+      {
+        "area": "linux-process-cancellation",
+        "reviewState": "deferred-platform-review",
+        "externalValidation": "Linux hosted-image and production process teardown unverified"
+      },
+      {
+        "area": "repo-file-discovery",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "CI runner matrix pending"
+      },
+      {
+        "area": "subagent-family",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "See source record"
+      },
+      {
+        "area": "client-ui-surface",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "browser acceptance unverified for this worktree"
+      },
+      {
+        "area": "cordis-typert-tooling",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "See source record"
+      },
+      {
+        "area": "llm-and-metering",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "See source record"
+      },
+      {
+        "area": "shell-terminal-runtime",
+        "reviewState": "deferred-platform-review",
+        "externalValidation": "See source record"
+      },
+      {
+        "area": "core-tools-and-context",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "See source record"
+      },
+      {
+        "area": "api-host-goal-boot",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "Gateway PostgreSQL multi-user + browser revocation acceptance pending (named by workspace-files row)"
+      },
+      {
+        "area": "residual-carried-surface",
+        "reviewState": "implemented-local-tests-passing",
+        "externalValidation": "real LLM provider image pricing unverified for this worktree"
+      }
+    ]
+  },
+  "requiredVerification": "Each row requires source-delta and consumer review, preserved local features/authorization, focused tests and applicable assembled snapshots. Removed packages require equivalent capability proof before deletion. Non-package rows require applicable configuration, documentation and artifact validation."
+}
