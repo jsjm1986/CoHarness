@@ -39,6 +39,8 @@ function release(root: string, name: string): string {
     'gateway/node_modules/argon2/package.json',
     'gateway/node_modules/better-sqlite3/package.json',
     'packages/llm/llm/lib/types/discovery.js',
+    'packages/session/session-format/lib/index.js',
+    'packages/session/session-format/lib/types/surface.js',
     'plugins/dsh-directory-guard/lib/index.js',
     'plugins/dsh-directory-guard/cordis.patch.yml',
     'plugins/dsh-model-governance/lib/index.js',
@@ -157,6 +159,9 @@ set -euo pipefail
       'gateway/lib/config.js',
       'gateway/lib/server.js',
       'gateway/lib/runtime-api.js',
+      'packages/llm/llm/lib/types/discovery.js',
+      'packages/session/session-format/lib/index.js',
+      'packages/session/session-format/lib/types/surface.js',
     ]) unlinkSync(join(legacy, path))
     mkdirSync(join(legacy, 'gateway/src'), { recursive: true })
     mkdirSync(join(legacy, 'gateway/node_modules/tsx'), { recursive: true })
@@ -179,6 +184,37 @@ printf '%s\n' "$*" > "$CAPTURE"
     expect(readFileSync(capture, 'utf8')).toBe(
       `--import tsx/esm ${realpathSync(legacy)}/gateway/src/index.ts\n`,
     )
+  })
+
+  it.each([
+    'packages/session/session-format/lib/index.js',
+    'packages/session/session-format/lib/types/surface.js',
+  ])('rejects a compiled release missing %s before switching current', (missing) => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-missing-'))
+    const previous = release(root, 'release-one')
+    const candidate = release(root, 'release-two')
+    pointCurrent(root, previous)
+    unlinkSync(join(candidate, missing))
+    const envFile = environmentFile(root)
+    const state = join(root, 'state')
+    const bin = fakeTools(root, state)
+    writeFileSync(join(state, 'pid'), '100\n')
+    writeFileSync(join(state, 'cwd'), `${realpathSync(previous)}/gateway\n`)
+
+    const result = spawnSync('/bin/bash', [control, 'activate', candidate], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        FAKE_STATE: state,
+        HGW_GATEWAY_ENV_FILE: envFile,
+      },
+    })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('release has no complete compiled Gateway payload')
+    expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
+    expect(existsSync(join(root, '.activation.lock'))).toBe(false)
   })
 
   it('activates only after the new pid, cwd, and health release agree, then rolls back a failed release', () => {
