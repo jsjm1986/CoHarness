@@ -24,6 +24,16 @@
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
+
+  /* The shared markdown sheet pins its type through the dsw markdown font
+     tokens, which would cut the chat font-size preference off from transcript
+     text; re-point the body-size tokens so the preference scales the reading
+     surface around its 16px/28px design baseline (preference 14 ↔ design 16;
+     the 1.75 line-height ratio is kept). Headings h1–h3, code, and table
+     tokens keep their design sizes. */
+  --dsw-font-markdown-base: calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family);
+  --dsw-font-markdown-base-strong: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family);
+  --dsw-font-markdown-h4: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family);
 }
 
 .header {
