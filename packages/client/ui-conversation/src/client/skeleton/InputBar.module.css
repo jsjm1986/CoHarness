@@ -405,11 +405,13 @@
    Read-only; the chip gap widened to 12 so the pill chips read as separate
    controls. */
 .tools {
-  /* Keep the left touch targets together. The model seat is the flexible
-     region; shrinking this group lets its children paint outside their flex
-     item and cover the model label on narrow cards. */
-  flex: 0 0 auto;
+  /* Keep the left touch targets together. The group still shrinks before the
+     card overflows: its mode chips truncate and contributed items clip, and
+     the hidden overflow keeps a too-narrow child from painting over the
+     trailing controls. */
+  flex: 0 1 auto;
   gap: var(--dsw-space-4);
+  overflow: hidden;
 }
 
 .modes {
@@ -417,7 +419,11 @@
 }
 
 .trailing {
-  flex: none;
+  /* The group shrinks on a short line: the model seat is the flexible region
+     (its root contracts and truncates the name) while the context meter and
+     send stay fixed. Without this the whole group holds max-content width
+     and the overflowing edge pushes Send outside the card. */
+  flex: 0 1 auto;
   /* The auto margin keeps the trailing group pinned right; space-between
      already anchors it on the single line. */
   margin-left: auto;

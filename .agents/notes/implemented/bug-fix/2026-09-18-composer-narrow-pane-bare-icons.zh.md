@@ -10,7 +10,7 @@
 
 ## 决策
 
-Composer 的 `.row` 直接 `nowrap`：任意宽度都不会折成第二行，降级因此可以连续进行——chip 标签随可用宽度流式截断（flex `min-width: 0` + 省略号），扩展项在自己的轨道内被裁剪，而在 `@container (max-width: 480px)`——共享的窄面板档位——下，每个 composer 控件降级为 28px 裸座：权限和模型触发器只留字形、去掉标签与下三角，附件/文档/命令座变为透明。悬停时在字形背后绘制一个 24px 圆——chip 上是 `triggerGlyph` 圆，`.add` 上是内缩 `::before`——静置行保持扁平，可点提示只在指针下出现。容器宽度低于 340px 时上下文表整体隐藏，因为它的明细已经存在于弹层和 composer 页脚统计里，不必再为一行挤不下的空间竞争。compact 手机档不变：`[data-viewport='compact']` 恢复 40px 填充座（360px 以下 36px）、保持上下文表可见，并清掉悬停伪元素，使触击残留的悬停态不会重绘圆底。
+Composer 的 `.row` 直接 `nowrap`：任意宽度都不会折成第二行，降级因此可以连续进行——两个行组都参与收缩，`.tools` 与 `.trailing` 均为 `flex: 0 1 auto`，因为刚性组会保持 max-content 宽度、溢出的右缘会把发送按钮推出卡片。chip 标签随可用宽度流式截断（flex `min-width: 0` + 省略号），扩展项在自己的轨道内被裁剪，而在 `@container (max-width: 480px)`——共享的窄面板档位——下，每个 composer 控件降级为 28px 裸座：权限和模型触发器只留字形、去掉标签与下三角，附件/文档/命令座变为透明。悬停时在字形背后绘制一个 24px 圆——chip 上是 `triggerGlyph` 圆，`.add` 上是内缩 `::before`——静置行保持扁平，可点提示只在指针下出现。容器宽度低于 340px 时上下文表整体隐藏，因为它的明细已经存在于弹层和 composer 页脚统计里，不必再为一行挤不下的空间竞争。compact 手机档不变：`[data-viewport='compact']` 恢复 40px 填充座（360px 以下 36px）、保持上下文表可见，并清掉悬停伪元素，使触击残留的悬停态不会重绘圆底。
 
 ## 备选方案
 
@@ -26,4 +26,4 @@ composer 在工作台分栏最小宽度下保持单行，更窄时仅通过隐�
 
 ## 验证
 
-`model-select-styles` 与 `compact-chrome-styles` 对照样式表文本固定 28px 座、24px 悬停圆、下三角移除和 compact 恢复项；同一规范断言上下文表的 340px 容器隐藏及 compact 豁免。在构建产物上经浏览器核验：360px 工作台分栏呈现单行 28px 高工具行、裸图标座、无上下文表；800px 分栏保留带标签 chip；悬停计算样式为内缩圆。`composer-model-mobile.e2e.ts` 在 compact 档上原样通过。
+`model-select-styles` 与 `compact-chrome-styles` 对照样式表文本固定 28px 座、24px 悬停圆、下三角移除、行组可收缩和 compact 恢复项；同一规范断言上下文表的 340px 容器隐藏及 compact 豁免。在构建产物上经浏览器核验：360px 工作台分栏呈现单行 28px 高工具行、裸图标座、无上下文表；800px 分栏保留带标签 chip；悬停计算样式为内缩圆。分栏扫过 480–560px 容器带时发送按钮始终留在卡片内、模型名收缩让位；同一带宽下刚性组复现了促使本次收缩的溢出。`composer-model-mobile.e2e.ts` 在 compact 档上原样通过。
