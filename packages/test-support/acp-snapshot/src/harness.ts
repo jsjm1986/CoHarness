@@ -676,12 +676,25 @@ async function waitForPersistedTitleAfterTurnEnd(
   sessionId: string,
   timeoutMs = DEFAULT_WAIT_TIMEOUT_MS,
 ): Promise<void> {
-  await vi.waitFor(async () => {
-    const log = (await harvestSessionLogs(root)).find(candidate => candidate.id === sessionId)
-    if (log === undefined || !latestTitleFollowsTurnEnd(log.content)) {
-      throw new Error(`snapshot-harness: session "${sessionId}" did not persist session/title after turn/end within ${timeoutMs}ms`)
-    }
-  }, { interval: WAIT_POLL_INTERVAL_MS, timeout: timeoutMs })
+  const deadlineError = new Error(
+    `snapshot-harness: session "${sessionId}" did not persist session/title after turn/end within ${timeoutMs}ms`,
+  )
+  // Keep the scenario diagnostic even when the first read outlasts the deadline.
+  let lastError: unknown = deadlineError
+  try {
+    await vi.waitFor(async () => {
+      try {
+        const log = (await harvestSessionLogs(root)).find(candidate => candidate.id === sessionId)
+        if (log === undefined || !latestTitleFollowsTurnEnd(log.content)) throw deadlineError
+      } catch (error) {
+        lastError = error
+        throw error
+      }
+    }, { interval: WAIT_POLL_INTERVAL_MS, timeout: timeoutMs })
+  } catch {
+    // waitFor rejects on its deadline; preserve the most recent observation error.
+    throw lastError
+  }
 }
 
 /** Wait until a complete record of `type` follows the latest closed turn. */

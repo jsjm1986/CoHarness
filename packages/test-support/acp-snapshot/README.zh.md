@@ -63,6 +63,9 @@ defineAcpSnapshotSuite({
 
 约束：`suite.ts` 与 `harness.ts` 导入 vitest（harness 通过 `vi.waitFor` 轮询其持久边界等待），因此包入口只能在 vitest 运行中导入（启动器和规范化器没有此依赖，但从同一入口发布）。启动器和套件工厂按设计专用于 ACP，启动器使用 SDK 的类型化 `client()` app 及其 `connection.agent` facade；规范化器是与传输无关的会话日志/文本辅助工具，还由 JSON-RPC 和 Web 快照录制器消费。输入脚本覆盖初始化、新建会话、文本提示简写、精确结构化 ACP 提示词块、取消、预期 RPC 失败和持久轮次边界等待。权限往返是选项类别选择（`allow_once`、`reject_once` 等）的 FIFO 队列，映射到 agent 发出的 `optionId`；缺少或耗尽的队列回答 `cancelled`，未提供类别会拒绝运行。
 
+`waitForTitleAfterTurnEnd` 在首次日志读取超过期限时保留指定会话的超时诊断；已捕获的读取或解析错误优先报告。位于最后一个 `turn/end` 之前的标题不能满足等待条件。
+
+
 ## 模型体验
 
 无。该测试专用 harness 记录、规范化并比较 ACP transcript（文本记录），不会改变 agent 组装的模型请求。

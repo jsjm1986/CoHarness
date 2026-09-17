@@ -63,6 +63,9 @@ The example also ships a `cordis.snapshot.yml` replay overlay next to its `cordi
 
 Constraints: `suite.ts` and `harness.ts` import vitest (the harness polls its durable-boundary waits through `vi.waitFor`), so the package entry is importable only inside a vitest run (the launcher and normalizers have no such dependency but ship from the same entry). The launcher and suite factory are ACP-specific by design — the launcher uses the SDK's typed `client()` app and its `connection.agent` facade — while the normalizers are transport-neutral session-log/text helpers also consumed by the JSON-RPC and Web snapshot recorders. Input scripts cover initialization, fresh-session creation, shorthand text prompts, exact structured ACP prompt blocks, cancellation, expected RPC failures, and durable turn-boundary waits. Permission round-trips are a FIFO queue of option-kind selections (`allow_once`, `reject_once`, …) mapped to the agent-issued `optionId`; an absent or exhausted queue answers `cancelled`, and an unoffered kind rejects the run.
 
+`waitForTitleAfterTurnEnd` retains its session-specific timeout diagnostic when the first log read exceeds the deadline; a captured read or parse error takes precedence. A title preceding the latest `turn/end` never satisfies the wait.
+
+
 ## Model Experience
 
 None, as this test-only harness records, normalizes, and compares ACP transcripts without changing the agent's assembled model request.

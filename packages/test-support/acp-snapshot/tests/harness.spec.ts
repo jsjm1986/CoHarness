@@ -8,12 +8,26 @@ import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
 import { runScenario, snapshotSpillRoot, type AgentUnderTest, type InputStep } from '../src/harness.ts'
 import { launchAcpTestAgent } from '../src/launcher.ts'
 
-const fsControl = vi.hoisted(() => ({ cleanupFailure: undefined as Error | undefined }))
+const fsControl = vi.hoisted(() => ({
+  cleanupFailure: undefined as Error | undefined,
+  delayedContent: undefined as string | undefined,
+  readGate: undefined as Promise<void> | undefined,
+  delayedReads: 0,
+}))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    async readFile(...args: Parameters<typeof actual.readFile>) {
+      const content = await actual.readFile(...args)
+      if (fsControl.delayedContent !== undefined && String(content).includes(fsControl.delayedContent)) {
+        fsControl.delayedReads++
+        fsControl.delayedContent = undefined
+        await fsControl.readGate
+      }
+      return content
+    },
     async rm(...args: Parameters<typeof actual.rm>): Promise<void> {
       if (String(args[0]).includes('acp-snap-cwd-') && fsControl.cleanupFailure !== undefined) {
         const failure = fsControl.cleanupFailure
@@ -928,7 +942,7 @@ describe('runScenario', () => {
     )).rejects.toThrow(/subagent child #2 did not persist closed turn 1 within 20ms/)
   })
 
-  it('waitForTitleAfterTurnEnd times out when the title precedes the boundary', { timeout: 20_000 }, async () => {
+  it.each([false, true])('waitForTitleAfterTurnEnd reports its deadline with slow reads: %s', { timeout: 20_000 }, async (slowReads) => {
     const { fixtureFile } = await scenario({
       prompt: 'hang-until-cancel',
       persistLogsOnCancel: true,
@@ -941,16 +955,27 @@ describe('runScenario', () => {
         ],
       }],
     })
-    await expect(runScenario(
-      {
-        steps: [
-          ...boot,
-          { op: 'promptAndCancel', text: 'hang' },
-          { op: 'waitForTitleAfterTurnEnd', timeoutMs: 20 },
-        ],
-      },
-      { agent: AGENT, mode: 'replay', fixtureFile },
-    )).rejects.toThrow(/did not persist session\/title after turn\/end within 20ms/)
+    let releaseRead!: () => void
+    fsControl.delayedReads = 0
+    fsControl.readGate = new Promise<void>((resolve) => { releaseRead = resolve })
+    fsControl.delayedContent = slowReads ? 'Early title' : undefined
+    try {
+      await expect(runScenario(
+        {
+          steps: [
+            ...boot,
+            { op: 'promptAndCancel', text: 'hang' },
+            { op: 'waitForTitleAfterTurnEnd', timeoutMs: 20 },
+          ],
+        },
+        { agent: AGENT, mode: 'replay', fixtureFile },
+      )).rejects.toThrow(/did not persist session\/title after turn\/end within 20ms/)
+      expect(fsControl.delayedReads).toBe(slowReads ? 1 : 0)
+    } finally {
+      releaseRead()
+      fsControl.delayedContent = undefined
+      fsControl.readGate = undefined
+    }
   })
 
   it('waitForEventAfterTurnEnd holds the app for a typed post-boundary record and times out otherwise', { timeout: 20_000 }, async () => {
