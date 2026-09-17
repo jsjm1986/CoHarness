@@ -77,3 +77,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'userdoc/attached',
   'web/deepseek-search-llm-request',
 ])
+
+/** Event types whose model-visible effects require an explicit pure interpreter. */
+export const MESSAGE_PROJECTION_EVENT_TYPES: ReadonlySet<string> = new Set([
+])

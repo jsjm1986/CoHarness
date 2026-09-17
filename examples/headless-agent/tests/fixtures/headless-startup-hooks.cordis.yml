@@ -5,7 +5,7 @@
 
 - insert:
     - id: cli-mock-llm
-      name: './snapshot-fixtures/cli-mock-llm.ts'
+      name: './cli-mock-llm.ts'
     - id: startup-hooks
       name: '@deepseek-ai/dsh-hooks-claude-code'
       config:

@@ -20,6 +20,7 @@ import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import {
   boot,
+  assertEntriesActivated,
   composeEntries,
   healProfilesModuleFallback,
   installFailLoud,
@@ -324,6 +325,8 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
           await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-timer' })
         }
         await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-hmr', config: { root: [] } })
+        await ctx.loader.await()
+        await assertEntriesActivated(ctx, NAME)
       }
       await watchUserPatches(ctx, {
         binName: NAME,

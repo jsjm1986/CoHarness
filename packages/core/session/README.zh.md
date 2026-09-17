@@ -10,6 +10,12 @@
 
 创建并持有事件溯源的 `Session` 实例。这里有意不实现持久化：插件订阅 `session/event`，在 `session/flush` 时刷新，并可镜像成对的 `session/created`／`session/disposed` 生命周期。
 
+### 消息投影
+
+`ctx.sessions.registerMessageProjection(definition)` 为插件事件注册由 fiber 持有的纯解释器。在其 `SessionEventMap` 声明上标记 `@messageProjection`；持久化目录生成器记录必需的解释器，并拒绝同时带有 surface 操作的声明。创建、恢复和 fork 共用这些定义。解释器先校验完整决策，再返回不可变消息副本；被拒绝的决策不追加事件。卸载已使用的定义后，后续派生和追加会失败，不会复用陈旧内容。脱离运行时的重建须向 `Session.create()` 或 `foldSurface()` 提供定义，并将折叠结果的 `projectedMessages` 传给 `deriveEventMessage()`。
+
+投影事件保留原始持久消息与序号身份。`surface.contentGeneration` 在位置替换或内容变化时使派生消息缓存失效；`replaceGeneration` 仅统计位置替换。此机制不增加事件格式版本，也不改写已提交代次。由 provider 持有的图片事件仍是独立消费者。
+
 ### 公共 API
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` 校验持久种子／头部数据并生成脱离副本，补齐版本和 id，在未提供 `createdAt` 时使用当前时间，发布会话并将其绑定到调用方 fiber。带种子的 header（`meta.isSeeded: true`）必须同时提供 `seed` 与精确的 `inheritedEventCount`，因为构造种子可能在继承前缀之后还包含子级自有的初始化事件；无种子的 header 拒绝非零切点。持久化重建会提供原始的 `createdAt`、谱系与 `delegationDepth`。

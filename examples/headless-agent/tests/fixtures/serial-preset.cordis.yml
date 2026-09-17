@@ -1,0 +1,24 @@
+- id: agent
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    agents: []
+    workspaceContext: false
+    skills:
+      enabled: false
+    toolBash: false
+    toolJobs: false
+    goals: false
+
+- id: subagent
+  name: '@deepseek-ai/dsh-subagent'
+
+- id: spawn
+  name: '@deepseek-ai/dsh-subagent-spawn-in-process'
+  config:
+    providerName: spawn
+
+- id: selection
+  name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
+
+- id: serial-preset
+  name: './serial-preset.ts'

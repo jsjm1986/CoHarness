@@ -450,6 +450,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   EpochHeader: 'session.md',
   Session: 'session.md',
   SessionEventMap: 'session.md',
+  SessionMessageProjection: 'session.md',
   TurnEndReason: 'session.md',
   TurnTrigger: 'session.md',
   SessionEventReadRequest: 'session-query.md',

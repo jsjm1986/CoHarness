@@ -971,9 +971,10 @@
       "commitScope": [
         "packages/core/agent/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-production-unverified",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 2 local closure: lifecycle and upstream message-projection regressions, immutable-window adaptation, real Loader and TypeScript/Python SDK runtime snapshots. See UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md; production validation remains later-phase."
     },
     {
       "area": "packages/core/agent-default-model",
@@ -993,9 +994,10 @@
       "commitScope": [
         "packages/core/agent-loop/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-production-unverified",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 2 local closure: lifecycle and upstream message-projection regressions, immutable-window adaptation, real Loader and TypeScript/Python SDK runtime snapshots. See UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md; production validation remains later-phase."
     },
     {
       "area": "packages/core/agent-tool-presentation",
@@ -1026,9 +1028,10 @@
       "commitScope": [
         "packages/core/session/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-production-unverified",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 2 local closure: lifecycle and upstream message-projection regressions, immutable-window adaptation, real Loader and TypeScript/Python SDK runtime snapshots. See UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md; production validation remains later-phase."
     },
     {
       "area": "packages/core/system-prompt",
@@ -2181,9 +2184,10 @@
       "commitScope": [
         "packages/session/session-projection/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-production-unverified",
       "changeKind": "modified",
-      "currentSovereignty": "adapted"
+      "currentSovereignty": "adapted",
+      "evidence": "Phase 2 local closure: lifecycle and upstream message-projection regressions, immutable-window adaptation, real Loader and TypeScript/Python SDK runtime snapshots. See UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md; production validation remains later-phase."
     },
     {
       "area": "packages/session/session-projection-cache",

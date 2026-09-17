@@ -17,8 +17,8 @@ import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
 import type { TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
 import type { CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
 import { snapshotJsonValue } from './json.ts'
-import { deriveEventMessage, SurfaceManager, validateSessionEventData, validateSurfaceMetadata } from './surface.ts'
-import type { SessionSurface } from './surface.ts'
+import { SurfaceManager, validateSessionEventData, validateSurfaceMetadata } from './surface.ts'
+import type { SessionSurface, SessionMessageProjection } from './surface.ts'
 import { foldRequestHeader } from './request-header.ts'
 
 export * from './types.ts'
@@ -30,7 +30,7 @@ export type { JsonValue } from './json.ts'
 export { interruptedTurnClosers, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from './repair.ts'
 export { decodeStorageRecord, packChunkRuns } from './chunk-rows.ts'
 export type { ChunkRow, StorageRecord } from './chunk-rows.ts'
-export type { SessionSurface, SurfaceFoldReplacement, SurfaceFoldResult } from './surface.ts'
+export type { SessionSurface, SurfaceFoldReplacement, SurfaceFoldResult, SessionMessageProjection, SessionMessageProjectionContext } from './surface.ts'
 export {
   deriveEventMessage,
   foldSurface,
@@ -492,7 +492,7 @@ const attachments = new WeakMap<Session, SessionEntry>()
 export class Session {
   private log: SessionEvent[] = []
   /** Single incremental owner of surface acceptance and projection state. */
-  private readonly surfaceManager = new SurfaceManager(this.log)
+  private readonly surfaceManager: SurfaceManager
 
   /** The ordered surface over this session's event log. */
   get surface(): SessionSurface {
@@ -548,6 +548,7 @@ export class Session {
    * @param seed - optional borrowed replay or fork events.
    * @param header - optional borrowed storage metadata.
    * @param inheritedEventCount - exact fork-inherited prefix length for a seeded header.
+   * @param projections - pure interpreters for plugin-owned message changes.
    * @returns a detached session.
    */
   static create(
@@ -555,8 +556,9 @@ export class Session {
     seed?: readonly SessionEvent[],
     header?: SessionHeader,
     inheritedEventCount?: SessionLogOffset,
+    projections?: readonly SessionMessageProjection[],
   ): Session {
-    return new Session(id, seed, header, 'snapshot', inheritedEventCount)
+    return new Session(id, seed, header, 'snapshot', inheritedEventCount, projections)
   }
 
   /**
@@ -567,6 +569,7 @@ export class Session {
    * @param seed - fresh detached events whose ownership is transferred.
    * @param header - fresh detached metadata whose ownership is transferred.
    * @param inheritedEventCount - exact fork-inherited prefix length decoded from storage.
+   * @param projections - pure interpreters for plugin-owned message changes.
    * @returns a restored detached session.
    */
   static fromRestore(
@@ -574,8 +577,9 @@ export class Session {
     seed: readonly SessionEvent[],
     header: SessionHeader,
     inheritedEventCount: SessionLogOffset,
+    projections?: readonly SessionMessageProjection[],
   ): Session {
-    return new Session(id, seed, header, 'restore', inheritedEventCount)
+    return new Session(id, seed, header, 'restore', inheritedEventCount, projections)
   }
 
   private constructor(
@@ -584,7 +588,9 @@ export class Session {
     header?: SessionHeader,
     mode: 'snapshot' | 'restore' = 'snapshot',
     suppliedInheritedEventCount?: SessionLogOffset,
+    projections: readonly SessionMessageProjection[] = [],
   ) {
+    this.surfaceManager = new SurfaceManager(this.log, SessionLogOffset(0), projections)
     const restoredHeader = mode === 'restore'
       ? validateRestoredSessionHeader(id, header)
       : undefined
@@ -849,7 +855,7 @@ export class Session {
   private derived: Message[] = []
   /** Surface position (nodes projected) the cache has reached. */
   private derivedNodes = 0
-  /** {@link SurfaceManager.replaceGeneration} the cache was built under. */
+  /** {@link SurfaceManager.contentGeneration} the cache was built under. */
   private derivedGeneration = 0
 
   /**
@@ -866,14 +872,14 @@ export class Session {
    * {@link SessionSurface.replaceGeneration}) rebuilds. The returned array is
    * a fresh snapshot per call (later appends never grow an array a caller
    * already holds); the `Message` objects in it are SHARED and **deep-frozen**.
-   * Their content reuses the already frozen durable event data, so the cache
-   * needs no second deep clone and consumers still cannot mutate the log.
+   * Unchanged content reuses frozen event data; projections supply frozen
+   * derived copies. Neither form permits mutation of the durable log.
    * @returns a fresh array of the shared, frozen derived history.
    */
   deriveMessages(): Message[] {
     const surface = this.surface
     const nodes = surface.nodes
-    const generation = surface.replaceGeneration
+    const generation = surface.contentGeneration
     if (generation !== this.derivedGeneration) {
       this.derived = []
       this.derivedNodes = 0
@@ -894,13 +900,13 @@ export class Session {
   }
 
   /**
-   * Instance face of the pure per-node `deriveEventMessage` export from
-   * `surface.ts`.
+   * Project one event with every committed message projection applied.
+   * The original durable event remains unchanged.
    * @param event - the event to project.
    * @returns the derived message, or null when the event produces none.
    */
   deriveEventMessage(event: SessionEvent): Message | null {
-    return deriveEventMessage(event)
+    return this.surfaceManager.deriveEventMessage(event)
   }
 }
 
@@ -939,6 +945,29 @@ export class SessionForkError extends Error {
 export class SessionStore extends Service {
   private store = new Map<SessionId, SessionEntry>()
   private counter = 0
+  private readonly projections: SessionMessageProjection[] = []
+
+  /** Borrowed definitions for detached replay; contributions live until their registering fibers unload. */
+  get messageProjections(): readonly SessionMessageProjection[] {
+    return this.projections
+  }
+
+  /**
+   * Register one event interpreter for live creation, restore, and fork.
+   * Disposing the contribution makes sessions that used it refuse further derivation.
+   * @param projection - pure definition owned by the event's plugin.
+   * @returns the fiber-owned disposer.
+   * @throws when another definition already owns this event type.
+   */
+  registerMessageProjection(projection: SessionMessageProjection): () => Promise<void> {
+    if (this.projections.some(item => item.type === projection.type)) {
+      throw new Error(`session message projection "${projection.type}" is already registered`)
+    }
+    return this.ctx.effect(() => {
+      this.projections.push(projection)
+      return () => { this.projections.splice(this.projections.indexOf(projection), 1) }
+    }, 'sessions.registerMessageProjection()')
+  }
 
   constructor(ctx: Context) {
     super(ctx, 'sessions')
@@ -1017,7 +1046,7 @@ export class SessionStore extends Service {
     }
     if (this.store.has(sessionId)) throw new Error(`session "${sessionId}" already exists`)
     if (options?.seedSource === 'persistence') {
-      return Session.fromRestore(sessionId, options.seed, options.meta, options.inheritedEventCount)
+      return Session.fromRestore(sessionId, options.seed, options.meta, options.inheritedEventCount, this.projections)
     }
     const seed = options?.seed
     const meta = options?.meta
@@ -1033,7 +1062,7 @@ export class SessionStore extends Service {
       ...meta?.agentPreset === undefined ? {} : { agentPreset: meta.agentPreset },
       ...meta?.draft === undefined ? {} : { draft: meta.draft },
     }
-    return Session.create(sessionId, seed, header, options?.inheritedEventCount)
+    return Session.create(sessionId, seed, header, options?.inheritedEventCount, this.projections)
   }
 
   /**

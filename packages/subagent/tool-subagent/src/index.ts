@@ -308,7 +308,8 @@ function resolveDelegationRun(
 }
 
 /**
- * Install one delegation-tool composition.
+ * Install one delegation-tool composition. Standing model-selection presets await
+ * Agent-scoped installation during creation; installation failure rejects creation.
  * @param ctx - Context that owns the registrations.
  * @param config - delegation-tool configuration.
  * @param session - unpublished Session supplied by a direct Agent setup; omit for a standing composition.
@@ -663,8 +664,10 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   const installing = new WeakSet<Agent>()
   const belongsToComposition = (candidate: Agent): boolean =>
     scopeChainOf(scopeOf(candidate.ctx)).includes(compositionScope)
-  const installScoped = (candidate: Agent): void => {
-    if (scopedInstalls.has(candidate) || installing.has(candidate)) return
+  const installScoped = (candidate: Agent): ReturnType<Context['inject']> | undefined => {
+    const existing = scopedInstalls.get(candidate)
+    if (existing !== undefined) return existing
+    if (installing.has(candidate)) return
     // Reserve before the injected fiber runs: tool registration emits
     // `tools/change` synchronously, which re-enters the reconciliation below.
     installing.add(candidate)
@@ -678,6 +681,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
       installing.delete(candidate)
     }
     scopedInstalls.set(candidate, fiber)
+    return fiber
   }
   const removeScoped = (candidate: Agent): void => {
     const fiber = scopedInstalls.get(candidate)
@@ -697,8 +701,8 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   // The preset-scoped listener admits descendant Agents and installs the
   // sampled tool definition in each Agent's own scope, so a later settings
   // change cannot mutate a live session.
-  ctx.on('agent/created', ({ agent: created }) => {
-    installScoped(created)
+  ctx.on('agent/created', async ({ agent: created }) => {
+    await installScoped(created)
   })
   ctx.on('agent/disposed', ({ agent: disposed }) => { removeScoped(disposed) })
   // Reparenting an Agent between standing presets changes its inherited tool

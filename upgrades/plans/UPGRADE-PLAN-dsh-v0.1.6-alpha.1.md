@@ -2,7 +2,7 @@
 
 ## 状态与范围
 
-状态：Phase 0 记录已恢复到当前主线；Phase 2 完成私有发布操作异步化、回滚验证和发布期间输入暂存，串行创建事件及消费者迁移仍待实施；生产验收尚未开始。本计划是此次升级的执行参考，不是已发布能力说明。
+状态：Phase 2 已完成本地收口：串行预设安装回滚、首请求输入屏障、Session 消息投影与卸载拒读、TS/Python SDK 运行时输出均通过；Phase 1 底座改动仍保留在未提交工作树中，整次升级与生产验收尚未完成。本计划是执行参考，不是已发布能力说明。
 
 本地起点为 `a901bff5f44bf9d51b99019b5c8085a0d93f248b`；已登记的上游基线为 `dsh-v0.1.5-rc.2`（`fb2c4b9e698e30edb738bca4cf0618587db7d203`）；目标固定为 `dsh-v0.1.6-alpha.1`（`0a15e36e7f82b6ed45af6fa9759f29b40dcd965d`）。树差异不证明共同祖先；逐提交归属核验尚待完成。发布版本暂拟 `0.1.6-alpha.1.coharness.1`，发布前核验 release families，不在 Phase 0 修改包版本。
 
@@ -61,8 +61,8 @@
 | 阶段 | 内容 | 放行证据 | 状态 |
 | --- | --- | --- | --- |
 | 0 | 固定引用、生成包级库存、记录决定及未验证项 | 升级记录校验、文档检查、文件差异检查 | 进行中 |
-| 1 | vendor、Typert、依赖及底座接口同步，按 vendoring 流程重放本地差量 | vendor manifest、要求的 test/build，相关类型检查 | 待实施 |
-| 2 | Agent 异步创建、首轮输入屏障、Session 与投影适配 | 创建/恢复/fork/失败/取消/父属测试，TS 与 Python SDK 输出、真实组装快照 | 进行中：发布回滚、输入暂存、串行创建及全部旧启动消费者已迁移，旧事件已移除；本批全量单测通过，Python SDK 产物和 Session/投影对齐仍待完成 |
+| 1 | vendor、Typert、依赖及底座接口同步，按 vendoring 流程重放本地差量 | vendor manifest、要求的 test/build，相关类型检查 | 已完成：非事务 Loader 消费方适配、Typert 上游语义（别名/子路径）与 vendor 差量记录收口；Python 3.12 `pnpm run test` 退出码 0（18075 通过、116 跳过、0 失败），`pnpm run build` 与 `pnpm run typecheck` 退出码 0。 |
+| 2 | Agent 异步创建、首轮输入屏障、Session 与投影适配 | 创建/恢复/fork/失败/取消/父属测试，TS 与 Python SDK 输出、真实组装快照 | 已完成本地验收：投影回归 5/5、生成器 26/26、全量单测 18082 通过/116 跳过；Headless 与 TS SDK 快照 34/34，Python 真实 carrier SDK 快照通过。保留事件窗口、不可变日志及 Gateway 语义；生产与跨平台验收归后续阶段 |
 | 3 | Messages、Files、图片编码/计价/offload/冷恢复及模型治理 | 双协议真实 provider、凭据来源、用量、截图持久化与重放 | 待实施 |
 | 4 | PTC、workflow、Shell、sandbox、jobs 全部消费者迁移 | 原生/PTC 路径、目录拒绝、取消超时、子进程静止与资源回收 | 待实施 |
 | 5 | 桌面资源服务、runtime 认证、项目能力授权与执行端准入 | 双运行时争用、过期持有人拒绝、撤权、崩溃、重启、关闭失败 | 待实施 |

@@ -10,6 +10,12 @@ The optional `@deepseek-ai/dsh-session/invariant` companion registers this packa
 
 Creates and holds event-sourced `Session` instances. Persistence is intentionally not implemented here — plugins subscribe to `session/event`, flush on `session/flush`, and may mirror the paired `session/created`/`session/disposed` lifecycle.
 
+### Message projections
+
+`ctx.sessions.registerMessageProjection(definition)` registers a fiber-owned pure interpreter for a plugin event. Mark its `SessionEventMap` declaration with `@messageProjection`; the persistence catalog generator records required interpreters and rejects declarations that also carry surface operations. Creation, restore and fork borrow the same definitions. An interpreter validates the entire decision before returning immutable message copies; rejected decisions append nothing. Unloading a used definition makes subsequent derivation and appends fail rather than reuse stale content. Detached reconstruction supplies definitions to `Session.create()` or `foldSurface()` and passes the fold's `projectedMessages` to `deriveEventMessage()`.
+
+Projection events retain original durable messages and sequence identities. `surface.contentGeneration` invalidates the derived-message cache for either positional replacements or content changes; `replaceGeneration` counts only positional replacements. This adds no event-format version or committed-generation rewrite. Provider-owned image events remain separate consumers.
+
 ### Public API
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` validates and detaches durable seed/header data, fills the version and id, defaults `createdAt` to now, publishes the session, and binds it to the calling fiber. A seeded header (`meta.isSeeded: true`) must supply both `seed` and the exact `inheritedEventCount`, because the constructor seed can contain child-owned setup events after the inherited prefix; an unseeded header rejects a nonzero cut. Persisted reconstruction supplies its original `createdAt`, lineage, and `delegationDepth`.

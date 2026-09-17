@@ -30,6 +30,8 @@ A foreground call passes the execution signal through startup and execution, awa
 
 ## Concurrency
 
+Standing presets with `modelSelectionSettings` await Agent-scoped tool installation during serial `agent/created` initialization. An installation conflict rejects creation and rolls back the unpublished Agent and Session; it cannot admit first-turn input with incomplete tools.
+
 Foreground and background calls are concurrency-safe: sibling delegations in one assistant message overlap under the loop's rolling pool (`maxParallelToolCalls`), and results still commit in model order. Children work in their own sessions and a run never mutates the parent session; the one-shot background form's one parent-owned write — registering a Task — is a synchronous, commutative insertion that tolerates concurrent dispatch, so overlapping background calls acquire their job ids in dispatch-race order. Coordinating sibling workspace effects belongs to the model, exactly as it already does for background and continuable children. See the [parallel subagent Agent Note](../../../.agents/notes/implemented/feature/2026-08-09-parallel-subagent-delegations.md) and the [parallel tool-call Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md).
 
 ## Model Experience

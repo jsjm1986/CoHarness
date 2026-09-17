@@ -61,6 +61,8 @@ const LINK_MAP: Record<string, string> = {
 
 /** One log event, extracted from a `SessionEventMap` declaration. */
 export interface LogEventEntry {
+  /** Whether interpreting this event requires its owning message projection. */
+  messageProjection?: boolean
   /** Scoped name, e.g. `turn/start`. */
   name: string
   /** The scope prefix, e.g. `turn` (everything before the first `/`). */
@@ -234,7 +236,9 @@ export function collectLogEvents(scanRoot: string = root): LogEventEntry[] {
           violations.push(`${where} has no description prose. Say what the event records and what its payload means — the JSDoc becomes the catalog entry.`)
         }
         const declaration = declarationText(text, sf, member)
-        entries.push({ name, scope: name.split('/')[0] ?? name, payload, declaration, doc, source: src })
+        entries.push({ name, scope: name.split('/')[0] ?? name, payload, declaration, doc, source: src,
+          .../@messageProjection\b/.test(rawJsDoc(text, member)) ? { messageProjection: true } : {},
+        })
       }
     }
   }
@@ -331,7 +335,12 @@ export function annotateSurface(events: LogEventEntry[], surfaceTypes: string[])
     throw new Error(`gen-persistence-catalog: SurfaceEventType member(s) ${stale.map(t => `'${t}'`).join(', ')} name no declared log event (stale union member?).`)
   }
   const surface = new Set(surfaceTypes)
-  return events.map(e => ({ ...e, surface: surface.has(e.name) }))
+  return events.map((e) => {
+    if (e.messageProjection && surface.has(e.name)) {
+      throw new Error(`session event "${e.name}" cannot declare both surface operations and a message projection`)
+    }
+    return { ...e, surface: surface.has(e.name) }
+  })
 }
 
 /** Render the cross-link "Types:" line for a payload, or '' if none apply. */
@@ -419,6 +428,11 @@ export function renderKnownEventTypes(events: AnnotatedLogEventEntry[]): string 
     ' */',
     'export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([',
     ...names.map(name => `  '${name}',`),
+    '])',
+    '',
+    '/** Event types whose model-visible effects require an explicit pure interpreter. */',
+    'export const MESSAGE_PROJECTION_EVENT_TYPES: ReadonlySet<string> = new Set([',
+    ...events.filter(e => e.messageProjection).map(e => e.name).sort().map(n => `  '${n}',`),
     '])',
     '',
   ].join('\n')

@@ -362,6 +362,8 @@ interface SessionSurface {
   readonly nodes: readonly SessionSeq[]
   /** Monotonic count of committed positional replacements. */
   readonly replaceGeneration: number
+  /** Monotonic count of committed replacements and plugin-owned message changes. */
+  readonly contentGeneration: number
 }
 ```
 
@@ -390,6 +392,8 @@ interface SurfaceFoldResult {
   nodes: SessionSeq[]
   /** Replacement operations in event order. */
   replacements: SurfaceFoldReplacement[]
+  /** Immutable projected messages, keyed by their original event sequences. */
+  projectedMessages: ReadonlyMap<SessionSeq, Message>
 }
 ```
 
@@ -443,7 +447,7 @@ declare class Session {
    * When this lifecycle appends the marker, it occupies this seq before the
    * store attaches and therefore does not publish either. Otherwise this seq
    * holds an ordinary published write.
-  */
+   */
   readonly firstLiveSeq: SessionLogOffset;
   /**
    * Create a detached session by validating and snapshotting borrowed seed
@@ -452,14 +456,16 @@ declare class Session {
    * @param seed - optional borrowed replay or fork events.
    * @param header - optional borrowed storage metadata.
    * @param inheritedEventCount - exact fork-inherited prefix length for a seeded header.
+   * @param projections - pure interpreters for plugin-owned message changes.
    * @returns a detached session.
    */
   static create(
-    id: SessionId,
-    seed?: readonly SessionEvent[],
-    header?: SessionHeader,
-    inheritedEventCount?: SessionLogOffset,
-  ): Session;
+      id: SessionId,
+      seed?: readonly SessionEvent[],
+      header?: SessionHeader,
+      inheritedEventCount?: SessionLogOffset,
+      projections?: readonly SessionMessageProjection[],
+    ): Session;
   /**
    * Restore a detached session by taking ownership of fresh persistence values.
    * The storage format, event envelopes, sequence continuity, surface transitions,
@@ -468,14 +474,16 @@ declare class Session {
    * @param seed - fresh detached events whose ownership is transferred.
    * @param header - fresh detached metadata whose ownership is transferred.
    * @param inheritedEventCount - exact fork-inherited prefix length decoded from storage.
+   * @param projections - pure interpreters for plugin-owned message changes.
    * @returns a restored detached session.
    */
   static fromRestore(
-    id: SessionId,
-    seed: readonly SessionEvent[],
-    header: SessionHeader,
-    inheritedEventCount: SessionLogOffset,
-  ): Session;
+      id: SessionId,
+      seed: readonly SessionEvent[],
+      header: SessionHeader,
+      inheritedEventCount: SessionLogOffset,
+      projections?: readonly SessionMessageProjection[],
+    ): Session;
   /**
    * An immutable snapshot of the whole append-only event log — the same cached
    * array {@link snapshotEvents} returns for the full range, so reading it costs
@@ -503,9 +511,9 @@ declare class Session {
    * @returns a frozen array of the selected deeply frozen events.
    */
   snapshotEvents(
-    fromSeq: SessionLogOffset = SessionLogOffset(0),
-    toSeqExclusive: SessionLogOffset = this.seq,
-  ): readonly SessionEvent[];
+      fromSeq: SessionLogOffset = SessionLogOffset(0),
+      toSeqExclusive: SessionLogOffset = this.seq,
+    ): readonly SessionEvent[];
   /**
    * Return this Session's events after its fork-inherited prefix.
    * @returns a fresh array containing child-owned events in log order.
@@ -555,10 +563,10 @@ declare class Session {
    *   rejects before the log changes.
    */
   append<T extends SessionEventType>(
-    type: T,
-    data: SessionEventMap[T],
-    ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : []
-  ): SessionEvent<T>;
+      type: T,
+      data: SessionEventMap[T],
+      ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : []
+    ): SessionEvent<T>;
   /**
    * The {@link EpochHeader} in force after the log's last header event — the
    * header the NEXT request will be compared against — or undefined before
@@ -588,14 +596,14 @@ declare class Session {
    * {@link SessionSurface.replaceGeneration}) rebuilds. The returned array is
    * a fresh snapshot per call (later appends never grow an array a caller
    * already holds); the `Message` objects in it are SHARED and **deep-frozen**.
-   * Their content reuses the already frozen durable event data, so the cache
-   * needs no second deep clone and consumers still cannot mutate the log.
+   * Unchanged content reuses frozen event data; projections supply frozen
+   * derived copies. Neither form permits mutation of the durable log.
    * @returns a fresh array of the shared, frozen derived history.
    */
   deriveMessages(): Message[];
   /**
-   * Instance face of the pure per-node `deriveEventMessage` export from
-   * `surface.ts`.
+   * Project one event with every committed message projection applied.
+   * The original durable event remains unchanged.
    * @param event - the event to project.
    * @returns the derived message, or null when the event produces none.
    */
@@ -706,6 +714,15 @@ In-memory session store (`ctx.sessions`).
 Persistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.
 
 ```ts cordis-catalog
+/**
+ * Register one event interpreter for live creation, restore, and fork.
+ * Disposing the contribution makes sessions that used it refuse further derivation.
+ * @param projection - pure definition owned by the event's plugin.
+ * @returns the fiber-owned disposer.
+ * @throws when another definition already owns this event type.
+ */
+registerMessageProjection(projection: SessionMessageProjection): () => Promise<void>
+
 /**
  * Create a session owned by the calling fiber: disposing that fiber stops
  * event notification and removes the session from the store. `options.seed`
