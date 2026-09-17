@@ -247,6 +247,7 @@ export function gatesForMode(selected: Mode): Gate[] {
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
         pnpmScript('test', 'test'),
+        ...pluginTestGates(),
         pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
         pnpmScript('duplication', 'duplication'),
         snapshotGate(),
@@ -263,6 +264,12 @@ export function gatesForMode(selected: Mode): Gate[] {
     case 'doc-sync':
       return docSyncLeafGates()
   }
+}
+
+function pluginTestGates(): Gate[] {
+  return ['dsh-directory-guard', 'dsh-model-governance'].map(plugin =>
+    pnpmExec(`test-${plugin}`, ['vitest', 'run', '--config', `plugins/${plugin}/vitest.config.ts`]),
+  )
 }
 
 function ciSharedStaticGates(): Gate[] {
@@ -291,6 +298,7 @@ function ciPrimaryGates(): Gate[] {
     lintGate({ needs: ['typert-contracts'] }),
     pnpmScript('duplication', 'duplication'),
     ...coverageGates(),
+    ...pluginTestGates(),
     ...nodeCompatSmokeGates(),
     snapshotGate(),
     ...docSyncLeafGates({
@@ -420,6 +428,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
   const builtTree = ['build']
   const validatedBuild = ['built-package-invariants']
   return [
+    ...pluginTestGates(),
     ciBuildGate(),
     pnpmScript('node-compat', 'check:node-compat', {
       label: 'Node compatibility',

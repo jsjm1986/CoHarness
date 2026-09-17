@@ -6,6 +6,8 @@ How this repo tests, tier by tier, and the rules that keep a green suite meaning
 
 ## Tiers
 
+- **Gateway plugins** (`pnpm run test:plugins`): both plugin suites run as required runtime CI checks; plugin changes also trigger Gateway integration checks ([details](../.agents/notes/implemented/testing/2026-09-17-required-gateway-plugin-tests.md)).
+
 - **Unit** (`pnpm run test`): vitest over package and example `tests/**` specs plus repository script `scripts/**/*.spec.ts`; tests stay with the code they exercise. Every registry gets an HMR-safety test (dispose the contributing fiber, assert cleanup). Prefer edge cases, error paths, event ordering, concurrency races, and permanent tests for contract regressions (see `packages/core/agent-loop/tests/contract-regressions.spec.ts`).
 - **Coverage gate** (`pnpm run test:coverage`): the gating run, per-file 100% on `packages/*/*/src`. An uncovered line is often dead code the gate flags for deletion, not a missing test. Line coverage is necessary, never sufficient — it proves lines ran, not that the feature works as shipped. Per-file 100% on `packages/shell/pwsh-local/src` needs a real `pwsh`: its executor suites self-skip and `vitest.config.ts` exempts the file on pwsh-less hosts, while CI runners ship pwsh and enforce the bar.
 - **Real-API e2e** (`pnpm run test:e2e`): with-key tests against live provider APIs — the DeepSeek model plus provider-specific smokes that gate on their own keys (`EXA_API_KEY`, `PERPLEXITY_API_KEY`, …); each suite self-skips without its key so keyless CI stays green ([real-API e2e Agent Note](../.agents/notes/implemented/testing/2026-06-19-real-api-e2e-ci.md)).

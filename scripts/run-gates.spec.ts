@@ -54,6 +54,35 @@ function withEnv<T>(name: string, value: string | undefined, action: () => T): T
   }
 }
 
+describe('plugin test gates', () => {
+  it.each(['ci-primary', 'ci-linux-primary', 'ci-consumers', 'ci-consumers-scoped', 'check-all'] as const)(
+    'runs both source suites as required gates in %s', (mode) => {
+      const gates = withPnpmEntrypoint(() => gatesForMode(mode))
+      for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
+        const subject = gates.find(item => item.id === `test-${plugin}`)
+        expect(subject).toMatchObject({
+          args: ['/private/pnpm.cjs', 'exec', 'vitest', 'run', '--config', `plugins/${plugin}/vitest.config.ts`],
+        })
+        expect(subject?.needs ?? []).toEqual([])
+        expect(subject?.allowFailure).not.toBe(true)
+      }
+    },
+  )
+
+  it.each(['dsh-directory-guard', 'dsh-model-governance'])('reports a failing %s process as a required failure', async (plugin) => {
+    const gates = withPnpmEntrypoint(() => gatesForMode('ci-consumers-scoped'))
+      .filter(item => item.id.startsWith('test-dsh-'))
+    expect(gates).toHaveLength(2)
+    const results = await runGates(gates, 2, subject => runGate({
+      ...subject,
+      command: process.execPath,
+      args: ['-e', `process.exit(${subject.id === `test-${plugin}` ? 7 : 0})`],
+    }))
+    expect(results.find(item => item.gate.id === `test-${plugin}`)).toMatchObject({ status: 'failed', exitCode: 7 })
+    expect(results.filter(item => item.gate.allowFailure !== true && item.status === 'failed')).toHaveLength(1)
+  })
+})
+
 describe('gate graph validation', () => {
   it('launches a native pnpm entrypoint directly', () => {
     const entrypoint = String.raw`C:\Program Files\pnpm\pnpm.exe`
@@ -401,10 +430,12 @@ describe('Node 24 lane ownership', () => {
     const subject = withPnpmEntrypoint(() => gatesForMode('ci-consumers'))
 
     expect(defaultConcurrency('ci-consumers', subject.length, 4)).toEqual({
-      workers: 10,
+      workers: 12,
       source: 'ci-consumers gate count',
     })
     expect(subject.map(item => item.id)).toEqual([
+      'test-dsh-directory-guard',
+      'test-dsh-model-governance',
       'build',
       'node-compat',
       'publint',

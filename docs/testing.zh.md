@@ -6,6 +6,8 @@
 
 ## 层级
 
+- **Gateway 插件**（`pnpm run test:plugins`）：两个插件测试套件均为 runtime CI 必需检查；插件变更也会触发 Gateway 集成检查（[详情](../.agents/notes/implemented/testing/2026-09-17-required-gateway-plugin-tests.zh.md)）。
+
 - **单元测试**（`pnpm run test`）：vitest 运行包和示例的 `tests/**` 测试与仓库脚本的 `scripts/**/*.spec.ts`；测试文件与其所覆盖的代码放在一起。每个注册表都有一个 HMR（热模块替换）安全测试（对向该注册表贡献内容的 fiber 执行 dispose（资源释放），并断言清理完成）。优先覆盖边界情况、错误路径、事件顺序、并发竞态，以及针对约定回归的永久测试（见 `packages/core/agent-loop/tests/contract-regressions.spec.ts`）。
 - **覆盖率门禁**（`pnpm run test:coverage`）：门禁级运行，对 `packages/*/*/src` 按文件 100% 覆盖。未覆盖的行往往是门禁标记出的死代码（应删除），而非需要补写的测试。行覆盖率是必要条件，但永远不是充分条件：它证明行被执行过，不证明功能按交付预期工作。`packages/shell/pwsh-local/src` 的按文件 100% 覆盖需要真实的 `pwsh`：无 `pwsh` 的主机上其执行器套件会自动跳过且 `vitest.config.ts` 豁免该文件，而 CI runner 自带 pwsh，仍按完整标准执行门禁。
 - **真实 API e2e**（`pnpm run test:e2e`）：带密钥测试调用真实提供方 API，包括 DeepSeek 模型以及各提供方特有的冒烟测试；这些测试各自由自己的密钥控制（`EXA_API_KEY`、`PERPLEXITY_API_KEY` 等），缺少密钥时套件会自动跳过，使 keyless CI 保持绿色（[真实 API e2e Agent Note](../.agents/notes/implemented/testing/2026-06-19-real-api-e2e-ci.zh.md)）。

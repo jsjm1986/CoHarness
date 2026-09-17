@@ -205,6 +205,18 @@ describe('classifyCiPrScope', () => {
     })
   })
 
+  it.each(['dsh-directory-guard', 'dsh-model-governance'])('runs Gateway and runtime lanes for %s changes', (plugin) => {
+    for (const file of ['src/index.ts', 'tests/plugin.spec.ts', 'vitest.config.ts']) {
+      expect(classifyCiPrScope([`plugins/${plugin}/${file}`], '')).toMatchObject({
+        runExpensive: true,
+        reason: 'full',
+        coverageMode: 'full',
+        gatewayMode: 'full',
+        adminUiMode: 'skip',
+      })
+    }
+  })
+
   it('selects the independent Gateway lanes for cloud protocol changes', () => {
     expect(classifyCiPrScope(['gateway/src/principal.ts'], '')).toMatchObject({
       reason: 'full',
