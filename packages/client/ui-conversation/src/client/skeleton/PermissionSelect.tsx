@@ -7,7 +7,7 @@ import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import css from './PermissionSelect.module.css'
 
-type Presentation = 'trigger' | 'summary' | 'section'
+type Presentation = 'trigger' | 'section'
 
 const FULL_ACCESS = 'danger-full-access'
 
@@ -138,18 +138,6 @@ export function PermissionSelect({ value, locked, command, t, presentation = 'tr
   }
 
   const currentLabel = current === undefined ? displayName(currentValue) : optionLabel(current, t)
-  const summary = presentation === 'summary'
-    ? (
-      <span className={css.summary} data-permission-summary="">
-        {permissionGlyph(currentValue) !== undefined && (
-          <span className={css.summaryIcon} aria-hidden>{permissionGlyph(currentValue)}</span>
-        )}
-        <span>{currentLabel}</span>
-      </span>
-    )
-    : null
-  if (summary !== null) return summary
-
   const confirmationDialog = (
     <RiskConfirmation
       open={confirmation !== null}

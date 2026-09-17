@@ -28,14 +28,14 @@ describe('conversation compact chrome', () => {
     expect(hero).toContain('min-height: var(--dsw-touch-target)')
   })
 
-  it('gives attach and send the touch target on compact viewports', () => {
+  it('gives attach and send the compact icon target on compact viewports', () => {
     expect(input).toContain("[data-viewport='compact']")
     expect(input).toContain('.add')
     expect(input).toContain('.primary')
     expect(input).toContain('.documentRail')
     expect(input).toContain('.documentStatus')
-    expect(input).toContain('var(--dsw-touch-target)')
-    expect(input).toContain('.sessionSummary > svg')
+    expect(input).toContain('width: 40px')
+    expect(input).toContain('width: 36px')
     expect(input).toContain('var(--dsw-mobile-icon-secondary)')
     expect(input).toContain('flex-wrap: wrap')
     expect(input).toContain('[data-viewport-short]')
@@ -84,11 +84,14 @@ describe('conversation compact chrome', () => {
     const permission = readFileSync(fileURLToPath(new URL('../src/client/skeleton/PermissionSelect.module.css', import.meta.url)), 'utf8')
     // The row is an anonymous inline-size container so the queries below answer
     // the card's real width — a narrow workbench column inside a wide window
-    // degrades there. The compact phone layout exempts the label: its trailing
-    // grid cell already fits the text.
+    // degrades there. Compact phones instead collapse the seat to its icon so
+    // the toolbar holds a single line at every width.
     expect(input).toMatch(/\.row\s*\{[^}]*container-type:\s*inline-size/u)
     expect(permission).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.triggerLabel\s*\{[^}]*display:\s*none/u)
-    expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel\s*\{[^}]*display:\s*block/u)
-    expect(input).toMatch(/@container\s*\(max-width:\s*300px\)\s*\{[^@]*\.trailing\s*\{[^}]*flex-basis:\s*100%/u)
+    expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel,[^@]*display:\s*none/u)
+    // Nothing may force the trailing group onto a second line.
+    expect(input).not.toContain('flex-basis: 100%')
+    expect(input).not.toMatch(/\.row:has\(\[data-model-select\]\)/u)
+    expect(input).not.toContain('sessionSummary')
   })
 })

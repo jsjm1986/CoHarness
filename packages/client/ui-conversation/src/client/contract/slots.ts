@@ -689,7 +689,7 @@ export interface InputControlOwnerProps {
   /** Session-removed lock (the bar's chrome disable state). */
   locked: boolean
   /** Whether the occupant renders its normal trigger or a section in the shared mobile sheet. */
-  presentation?: 'trigger' | 'summary' | 'section'
+  presentation?: 'trigger' | 'section'
   /** Section opened when a mobile trigger is activated. */
   settingsSection?: 'model' | 'reasoning' | 'permission'
   /** Shared mobile session-settings opener supplied by InputBar. */

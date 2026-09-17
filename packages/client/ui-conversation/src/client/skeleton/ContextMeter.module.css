@@ -151,9 +151,18 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Same 40px circular hit target family as the compact composer's other icon
+   controls; the narrowest phones step down with them. */
 :global([data-viewport='compact']) .trigger {
-  width: var(--dsw-touch-target);
-  height: var(--dsw-touch-target);
+  width: 40px;
+  height: 40px;
+}
+
+@media (max-width: 359px) {
+  :global([data-viewport='compact']) .trigger {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 :global([data-viewport='compact']) .trigger svg {

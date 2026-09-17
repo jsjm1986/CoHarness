@@ -19,8 +19,8 @@ import {
 import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
-  IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconChevronLeftOutline14, IconSparkle16, MobileSheetBackdrop, IconWarningOutline16, Toast, useMediaQuery,
+  IconBrainOutline16, IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
+  IconChevronLeftOutline14, MobileSheetBackdrop, IconWarningOutline16, Toast, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -29,7 +29,7 @@ import css from './ModelSelect.module.css'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
 type Pane = 'root' | 'model' | 'effort'
-type Presentation = 'trigger' | 'summary' | 'section'
+type Presentation = 'trigger' | 'section'
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -319,10 +319,6 @@ export function ModelSelect(
       </div>
     )
 
-  if (presentation === 'summary') {
-    return <span className={css.summary} data-model-summary="">{triggerLabel}</span>
-  }
-
   if (presentation === 'section') {
     return (
       <div className={css.sectionContent} data-model-settings-section={settingsSection}>
@@ -354,8 +350,9 @@ export function ModelSelect(
       >
         {/* The glyph is the narrow-container fallback: the row's anonymous
             inline-size container collapses the label below the readable
-            width, leaving icon + chevron; the title still names the model. */}
-        <span className={css.triggerGlyph} aria-hidden><IconSparkle16 /></span>
+            width, leaving icon + chevron; the title still names the model.
+            On the compact phone row the trigger is this glyph alone. */}
+        <span className={css.triggerGlyph} aria-hidden><IconBrainOutline16 /></span>
         <span className={css.triggerLabel}>{modelLabel}</span>
         {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />

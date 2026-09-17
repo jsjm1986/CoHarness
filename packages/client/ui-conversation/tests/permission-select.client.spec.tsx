@@ -38,10 +38,12 @@ const value: PermissionSelectValue = {
 afterEach(cleanup)
 
 describe('PermissionSelect mobile presentation', () => {
-  it('keeps the current permission label visible in the compact summary', () => {
-    render(<PermissionSelect value={value} locked={false} command={vi.fn()} t={t} presentation="summary" />)
-    expect(screen.getByText('Workspace Write')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
+  it('names the current permission on the compact icon trigger', () => {
+    render(<PermissionSelect value={value} locked={false} command={vi.fn()} t={t} />)
+    // The icon-only trigger keeps the mode on its accessible name; the label
+    // span stays in the DOM for the desktop tier and is hidden by compact CSS.
+    const trigger = screen.getByRole('button', { name: '访问模式，当前：Workspace Write' })
+    expect(trigger.textContent).toContain('Workspace Write')
   })
 
   it('renders section options and submits the current-session command', async () => {
