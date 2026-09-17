@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-composer-narrow-pane-bare-icons.md
-2026-09-18-composer-narrow-pane-bare-icons.md: 4b002ea73033532dbc7f22d72341d039d92553e2
-2026-09-18-composer-narrow-pane-bare-icons.zh.md: 5067d4700f9389a2784bd908c81fc265408c2459
+2026-09-18-composer-narrow-pane-bare-icons.md: edab68d1f80856cca1db3974669154116b6d35ed
+2026-09-18-composer-narrow-pane-bare-icons.zh.md: d97efcbf79d95df20cf4648a6f390b3cbc5e7d79

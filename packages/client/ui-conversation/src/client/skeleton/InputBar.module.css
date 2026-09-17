@@ -406,12 +406,12 @@
    controls. */
 .tools {
   /* Keep the left touch targets together. The group still shrinks before the
-     card overflows: its mode chips truncate and contributed items clip, and
-     the hidden overflow keeps a too-narrow child from painting over the
-     trailing controls. */
+     card overflows: its mode chips truncate and contributed items clip. No
+     overflow clip here — the permission and command menus render inside this
+     lane and must paint past it; the flex min-content floor already keeps
+     fixed seats from reaching the trailing controls. */
   flex: 0 1 auto;
   gap: var(--dsw-space-4);
-  overflow: hidden;
 }
 
 .modes {
