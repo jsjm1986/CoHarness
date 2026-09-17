@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-composer-narrow-pane-bare-icons.md
+2026-09-18-composer-narrow-pane-bare-icons.md: e82002b3ac1a2dfe17db2c14ca26c66d7a16e699
+2026-09-18-composer-narrow-pane-bare-icons.zh.md: 5b867d7f8b82b3b90f442722851dd4495be60d12

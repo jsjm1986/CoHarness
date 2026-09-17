@@ -364,7 +364,10 @@
    (figma Input_Bottom chrome). */
 .row {
   display: flex;
-  flex-wrap: wrap;
+  /* The toolbar never takes a second line: controls degrade by the row's own
+     inline-size (icon tiers, then the context meter hides) and extension
+     items clip rather than wrap. */
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--dsw-space-3);
@@ -393,6 +396,9 @@
 .extensionItems {
   flex: 0 1 auto;
   gap: var(--dsw-space-1);
+  /* The row never wraps; contributed items are the first thing to clip when
+     the line runs out of width. */
+  overflow: hidden;
 }
 
 /* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
@@ -412,18 +418,11 @@
 
 .trailing {
   flex: none;
-  /* Wrap keeps the left mode chips and the right controls apart when the card
-     runs out of row width: the trailing group (model + send) moves to its own
-     line instead of the left group shrinking until its chip overlaps the
-     model trigger (external:107). The auto margin re-anchors it right on the
-     wrapped line; on a single line space-between already pins it right. */
+  /* The auto margin keeps the trailing group pinned right; space-between
+     already anchors it on the single line. */
   margin-left: auto;
   gap: 12px;
 }
-
-/* Even below 300px the row keeps one line: the 480px tier has already
-   collapsed the permission and model chips to icons, so plain flex-wrap is
-   the only remaining fallback for genuinely overflowing extension items. */
 
 /* Attach circle (figma + control): 28px, selector fill, primary glyph. */
 .add {
@@ -447,6 +446,58 @@
 .add:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Narrow composer rows (a workbench pane under the 480px step): the tool
+   seats drop their filled disc and hover paints a 24px circle behind the
+   glyph instead, matching the collapsed model/permission triggers. The
+   compact phone row restores the filled seat below. */
+@container (max-width: 480px) {
+  .tools {
+    gap: var(--dsw-space-2);
+  }
+
+  .trailing {
+    gap: var(--dsw-space-1);
+  }
+
+  .add {
+    position: relative;
+    background: transparent;
+  }
+
+  .add::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: 999px;
+    corner-shape: round;
+    background: transparent;
+  }
+
+  .add > * {
+    position: relative;
+  }
+
+  .add:hover:not(:disabled) {
+    background: transparent;
+  }
+
+  .add:hover:not(:disabled)::before {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+:global([data-viewport='compact']) .add {
+  background: var(--dsw-specific-selector);
+}
+
+:global([data-viewport='compact']) .add:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+:global([data-viewport='compact']) .add::before {
+  content: none;
 }
 
 /* The visible paperclip button owns the accessible file-picker action; keep
@@ -597,8 +648,9 @@
 }
 
 :global([data-viewport='compact']) .row {
-  flex-wrap: wrap;
-  row-gap: var(--dsw-space-2);
+  /* The compact toolbar holds one icon line at every width; extension items
+     scroll inside their own lane instead of pushing the row taller. */
+  flex-wrap: nowrap;
 }
 
 :global([data-viewport='compact']) .tools {

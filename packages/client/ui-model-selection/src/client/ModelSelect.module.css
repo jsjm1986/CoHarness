@@ -68,11 +68,13 @@
   height: 14px;
 }
 
-/* Composer-row collapse tier: the name and effort give way to the sparkle
-   glyph + chevron so the row keeps a single line before anything must wrap.
-   The nearest container ancestor is the composer row itself (InputBar's
-   anonymous inline-size container); with no container ancestor — the session
-   settings sheet — this never matches. 480 is the shared narrow-panel step. */
+/* Composer-row collapse tier: the name, effort, and chevron give way to a
+   bare 28px brain-glyph seat so the row keeps a single line before anything
+   must wrap. Hover paints a 24px disc around the glyph instead of filling
+   the whole seat. The nearest container ancestor is the composer row itself
+   (InputBar's anonymous inline-size container); with no container ancestor —
+   the session settings sheet — this never matches. 480 is the shared
+   narrow-panel step. */
 @container (max-width: 480px) {
   .root {
     flex: 0 0 auto;
@@ -80,18 +82,33 @@
   }
 
   .trigger {
-    width: auto;
+    justify-content: center;
+    width: 28px;
     max-width: none;
-    padding-inline: var(--dsw-space-2) var(--dsw-space-1);
+    padding: 0;
+  }
+
+  .trigger:hover:not(:disabled) {
+    background: transparent;
+  }
+
+  .trigger:hover:not(:disabled) .triggerGlyph {
+    background: var(--dsw-alias-interactive-bg-hover);
   }
 
   .triggerLabel,
-  .triggerEffort {
+  .triggerEffort,
+  .chevron {
     display: none;
   }
 
   .triggerGlyph {
-    display: inline-flex;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    corner-shape: round;
   }
 }
 
@@ -111,8 +128,18 @@
   display: none;
 }
 
+:global([data-viewport='compact']) .trigger:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 :global([data-viewport='compact']) .triggerGlyph {
   display: inline-flex;
+  width: auto;
+  height: auto;
+}
+
+:global([data-viewport='compact']) .trigger:hover:not(:disabled) .triggerGlyph {
+  background: transparent;
 }
 
 :global([data-viewport='compact']) .triggerGlyph svg {

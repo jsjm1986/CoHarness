@@ -32,3 +32,4 @@ Composer 的 `.row` 是匿名 inline-size 容器（此前已为模型触发器�
 
 - [响应式 shell 视口模式](../architecture/2026-08-14-responsive-shell-viewport-modes.zh.md)——本次遵循的匿名容器与共享档位词汇表。
 - [Compact chrome 密度](../architecture/2026-08-19-compact-chrome-density.zh.md)——本次补充的 compact 视口规则。
+- [窄分栏 composer 裸图标座](2026-09-18-composer-narrow-pane-bare-icons.zh.md)——细化该档位的座处理（28px 裸座、悬停圆、隐藏上下文表）；本笔记仍拥有容器机制与档位词汇表。
