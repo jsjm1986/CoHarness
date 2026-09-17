@@ -1,6 +1,7 @@
-// Web e2e scenario: a long model label keeps the mobile composer toolbar
-// partitioned. The test measures the assembled card because jsdom does not
-// perform flex layout and cannot detect the overlap reported by the browser.
+// Web e2e scenario: the icon-only model seat keeps the mobile composer
+// toolbar on a single line at every phone width. The test measures the
+// assembled card because jsdom does not perform flex layout and cannot
+// detect the overlap reported by the browser.
 // Zero model calls: the declared route only supplies catalog data, and a
 // stray stream fails loud through the scaffold's route-only adapter.
 import { fileURLToPath } from 'node:url'
@@ -38,12 +39,7 @@ interface ComposerMetrics {
   model: Rect
   send: Rect
   modelTitle: string | null
-  modelPresentation: 'trigger' | 'summary'
-  modelEffortDisplay: string
-  modelLabelOverflow: string
-  modelLabelWhiteSpace: string
-  modelLabelTextOverflow: string
-  modelLabelWidth: number
+  modelLabelDisplay: string
   trailingWrapped: boolean
   toolControlRight: number
 }
@@ -56,17 +52,12 @@ function measureComposer(page: Page): Promise<ComposerMetrics> {
     const tools = row?.querySelector<HTMLElement>(':scope > [class*="tools"]') ?? null
     const trailing = row?.querySelector<HTMLElement>(':scope > [class*="trailing"]') ?? null
     const modelButton = card.querySelector<HTMLButtonElement>(`button[title^="${modelId}"][aria-haspopup="menu"]`)
-    const modelSummary = card.querySelector<HTMLElement>('[data-session-summary]')
-    const model = modelButton ?? modelSummary
-    const modelLabel = modelButton?.querySelector<HTMLElement>('[class*="triggerLabel"]')
-      ?? card.querySelector<HTMLElement>('[data-model-summary]')
-      ?? null
-    const modelEffort = modelButton?.querySelector<HTMLElement>('[class*="triggerEffort"]') ?? null
+    const modelLabel = modelButton?.querySelector<HTMLElement>('[class*="triggerLabel"]') ?? null
     const send: HTMLButtonElement | null = trailing === null
       ? card.querySelector<HTMLButtonElement>('button[aria-label="发送消息"], button[aria-label="Send message"]')
       : [...trailing.querySelectorAll<HTMLButtonElement>('[class*="primary"]')].at(-1) ?? null
     if (
-      row === null || tools === null || trailing === null || model === null
+      row === null || tools === null || trailing === null || modelButton === null
       || modelLabel === null || send === null
     ) {
       throw new Error('composer toolbar controls not found')
@@ -92,15 +83,10 @@ function measureComposer(page: Page): Promise<ComposerMetrics> {
       row: rect(row),
       tools: rect(tools),
       trailing: rect(trailing),
-      model: rect(model),
+      model: rect(modelButton),
       send: rect(send),
-      modelTitle: modelButton?.getAttribute('title') ?? modelSummary?.textContent ?? null,
-      modelPresentation: modelButton === null ? 'summary' : 'trigger',
-      modelEffortDisplay: modelEffort === null ? 'summary' : getComputedStyle(modelEffort).display,
-      modelLabelOverflow: getComputedStyle(modelLabel).overflow,
-      modelLabelWhiteSpace: getComputedStyle(modelLabel).whiteSpace,
-      modelLabelTextOverflow: getComputedStyle(modelLabel).textOverflow,
-      modelLabelWidth: modelLabel.getBoundingClientRect().width,
+      modelTitle: modelButton.getAttribute('title'),
+      modelLabelDisplay: getComputedStyle(modelLabel).display,
       trailingWrapped: trailing.getBoundingClientRect().top >= tools.getBoundingClientRect().bottom - 1,
       toolControlRight,
     }
@@ -111,17 +97,13 @@ function renderGeometry(rows: readonly { width: number; metrics: ComposerMetrics
   const lines = [
     '# Mobile composer model seat',
     '',
-    '| viewport | tool controls before model | model before Send | trailing layout | row inside card | effort display | label overflow | label white-space | label text overflow | label width class |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| viewport | tool controls before model | model before Send | single line | row inside card | label hidden |',
+    '| --- | --- | --- | --- | --- | --- |',
   ]
   for (const { width, metrics } of rows) {
-    const toolsBeforeModel = metrics.modelPresentation === 'summary' || metrics.toolControlRight <= metrics.model.left + 1 || metrics.trailingWrapped
-    const modelBeforeSend = metrics.modelPresentation === 'summary' || metrics.model.right <= metrics.send.left + 1
-    const layout = metrics.modelPresentation === 'summary' ? 'summary' : metrics.trailingWrapped ? 'wrapped' : 'same-line'
-    // Exact pixels vary with browser font metrics and the platform scrollbar,
-    // while the product contract is the available seat class.
-    const labelWidthClass = metrics.modelLabelWidth >= 100 ? 'wide' : 'compact'
-    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${layout} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${labelWidthClass} |`)
+    const toolsBeforeModel = metrics.toolControlRight <= metrics.model.left + 1
+    const modelBeforeSend = metrics.model.right <= metrics.send.left + 1
+    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${String(!metrics.trailingWrapped)} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${String(metrics.modelLabelDisplay === 'none')} |`)
   }
   return lines.join('\n')
 }
@@ -191,7 +173,7 @@ describe('web e2e: mobile composer model label geometry', () => {
       })
       const metrics = await measureComposer(page)
       const tolerance = 1
-      const actionIconSizes = await page.locator('[data-composer-card] [class*="add"] svg, [data-composer-card] [class*="primary"] svg, [data-composer-card] [data-session-summary] > svg')
+      const actionIconSizes = await page.locator('[data-composer-card] [class*="add"] svg, [data-composer-card] [class*="primary"] svg, [data-composer-card] [data-model-select] svg')
         .evaluateAll(icons => icons
           .map(icon => icon.getBoundingClientRect())
           .filter(box => box.width > 0 && box.height > 0)
@@ -200,25 +182,14 @@ describe('web e2e: mobile composer model label geometry', () => {
       expect(metrics.modelTitle?.startsWith(MODEL_NAME)).toBe(true)
       expect(actionIconSizes.length, `viewport ${String(width)} has composer action icons`).toBeGreaterThan(0)
       expect(Math.max(...actionIconSizes), `viewport ${String(width)} composer icon scale`).toBeLessThanOrEqual(16)
-      if (metrics.modelPresentation === 'summary') {
-        expect(metrics.model.height).toBeGreaterThanOrEqual(56)
-        continue
-      }
-      expect(
-        metrics.tools.right <= metrics.trailing.left + tolerance || metrics.trailingWrapped,
-      ).toBe(true)
-      expect(
-        metrics.toolControlRight <= metrics.model.left + tolerance || metrics.trailingWrapped,
-      ).toBe(true)
+      expect(metrics.trailingWrapped, `viewport ${String(width)} keeps one toolbar line`).toBe(false)
+      expect(metrics.tools.right).toBeLessThanOrEqual(metrics.trailing.left + tolerance)
+      expect(metrics.toolControlRight).toBeLessThanOrEqual(metrics.model.left + tolerance)
       expect(metrics.model.right).toBeLessThanOrEqual(metrics.send.left + tolerance)
       expect(metrics.row.left).toBeGreaterThanOrEqual(metrics.card.left - tolerance)
       expect(metrics.row.right).toBeLessThanOrEqual(metrics.card.right + tolerance)
       expect(metrics.send.right).toBeLessThanOrEqual(metrics.card.right + tolerance)
-      expect(metrics.modelEffortDisplay).toBe('block')
-      expect(metrics.modelLabelOverflow).toBe('hidden')
-      expect(metrics.modelLabelWhiteSpace).toBe('nowrap')
-      expect(metrics.modelLabelTextOverflow).toBe('ellipsis')
-      expect(metrics.modelLabelWidth, `viewport ${String(width)}`).toBeGreaterThanOrEqual(width === 320 ? 80 : 32)
+      expect(metrics.modelLabelDisplay, `viewport ${String(width)} model seat is icon-only`).toBe('none')
     }
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)

@@ -22,4 +22,4 @@ Status: implemented
 
 ## Consequences
 
-手机用户可以走完工作区选择，点到输入栏/侧栏/会话溢出菜单，hero 行不再横向裁切。compact 输入工具栏会换行，模型名能保住真实宽度。粗指针与 compact 会话行藏起时间标签，好让始终可见的操作放下。compact 会话标题 Tab 可横向滚动。portal 菜单限制高度并可滚动；目录「打开/取消」共用拉伸后的页脚一行。compact 下对话工具摘要、统计行、推理/命令行和轨迹单元格改为换行而不是裁切；回到底部、轨迹关闭、产出文件芯片和工作流运行标题达到共享触控热区。portal 的 HoverCard、Toast、RiskConfirmation 和图片灯箱关闭控件留在 767px 稿内，Toast 与用量提示尊重 `--dsw-safe-top`。侧栏脚注把 `sidebar.footer.action` 叠成 Settings 通栏行，叠在 Settings 上方，空间切换、Cordis 和文档不再挤在同一行。
+手机用户可以走完工作区选择，点到输入栏/侧栏/会话溢出菜单，hero 行不再横向裁切。compact 输入工具栏保持单行纯图标（[composer 单行图标](../bug-fix/2026-09-18-composer-single-icon-row.zh.md)）。粗指针与 compact 会话行藏起时间标签，好让始终可见的操作放下。compact 会话标题 Tab 可横向滚动。portal 菜单限制高度并可滚动；目录「打开/取消」共用拉伸后的页脚一行。compact 下对话工具摘要、统计行、推理/命令行和轨迹单元格改为换行而不是裁切；回到底部、轨迹关闭、产出文件芯片和工作流运行标题达到共享触控热区。portal 的 HoverCard、Toast、RiskConfirmation 和图片灯箱关闭控件留在 767px 稿内，Toast 与用量提示尊重 `--dsw-safe-top`。侧栏脚注把 `sidebar.footer.action` 叠成 Settings 通栏行，叠在 Settings 上方，空间切换、Cordis 和文档不再挤在同一行。

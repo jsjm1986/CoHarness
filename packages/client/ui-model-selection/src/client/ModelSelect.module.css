@@ -95,20 +95,29 @@
   }
 }
 
-/* The compact phone layout already seats the trailing group in its own grid
-   cell with room for the name and effort; the collapse above targets
-   squeezed non-compact columns, not the phone row. */
+/* The compact phone row carries every seat as an icon-only control on one
+   line: the brain glyph alone (a tap opens the session sheet) while the
+   title/aria-label still name the current model. */
 :global([data-viewport='compact']) .trigger {
-  width: 100%;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
 }
 
 :global([data-viewport='compact']) .triggerLabel,
-:global([data-viewport='compact']) .triggerEffort {
-  display: block;
+:global([data-viewport='compact']) .triggerEffort,
+:global([data-viewport='compact']) .chevron {
+  display: none;
 }
 
 :global([data-viewport='compact']) .triggerGlyph {
-  display: none;
+  display: inline-flex;
+}
+
+:global([data-viewport='compact']) .triggerGlyph svg {
+  width: var(--dsw-mobile-icon-secondary);
+  height: var(--dsw-mobile-icon-secondary);
 }
 
 /* Effort value beside the model name (mock's 'High': same 13/20/500, caption tone). */
@@ -209,15 +218,6 @@
 .groups {
   min-height: 0;
   overflow-y: auto;
-}
-
-.summary {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font: var(--dsw-mobile-font-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sectionContent {
@@ -364,31 +364,17 @@
 }
 
 :global([data-viewport='compact']) .root {
+  flex: 0 0 auto;
   max-width: none;
 }
 
-/* Keep a recognizable model label on the narrowest phones. The trailing row
-   may wrap, but collapsing the seat to its chevron makes the current route
-   impossible to identify without opening the picker. */
+/* The narrowest phones keep the same single icon row at a slightly smaller
+   target so every control still fits. */
 @media (max-width: 359px) {
-  .root {
-    min-width: 64px;
-  }
-
-  .triggerLabel {
-    min-width: 32px;
-  }
-
   :global([data-viewport='compact']) .trigger {
-    justify-content: flex-start;
-    text-align: left;
+    width: 36px;
+    height: 36px;
   }
-}
-
-:global([data-viewport='compact']) .trigger {
-  height: var(--dsw-touch-target);
-  max-width: 100%;
-  font: var(--dsw-mobile-font-secondary);
 }
 
 :global([data-viewport='compact']) .menu {

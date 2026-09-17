@@ -10,8 +10,8 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconBrowseOutline16, IconChevronDownOutline14, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
-  IconSettingsOutline16, IconWarningOutline16, ReferenceIcon, Toast, Tooltip, useMediaQuery,
+  IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
+  IconWarningOutline16, ReferenceIcon, Toast, Tooltip, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -157,7 +157,6 @@ export const InputBar = memo(function InputBar({
   const input = useInput(s => s)
   const viewportPhone = useMediaQuery('(max-width: 767px)')
   const phone = compact || viewportPhone
-  const narrowPhone = useMediaQuery('(max-width: 359px)')
   const notice = useNotices(s => s)
   const lexicon = useLexicon(s => s)
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
@@ -711,51 +710,6 @@ export const InputBar = memo(function InputBar({
       onOpenSettings={openSessionSettings}
     />
 
-  const modelSummary = narrowPhone
-    ? renderSlot('conversation.input.model', {
-      locked: modelSeatLocked,
-      presentation: 'summary',
-      settingsSection: 'model',
-      onOpenSettings: openSessionSettings,
-    })
-    : null
-  const permissionSummary = narrowPhone && command !== undefined
-    ? <PermissionSelect
-      key={`${sessionId}-summary`}
-      value={permissions}
-      locked={locked}
-      command={command}
-      t={t}
-      presentation="summary"
-      onOpenSettings={openSessionSettings}
-    />
-    : null
-  // The phone summary describes an existing session only. The hero keeps the
-  // same resident composer DOM for transition stability, but it has no model
-  // or permission facts yet; rendering a disabled empty pill there wastes the
-  // narrowest phone's only toolbar row and reads like a broken control.
-  const hasSessionSummary = narrowPhone && live && (modelSummary != null || permissionSummary != null)
-  const sessionSummary = hasSessionSummary
-    ? (
-      <button
-        type="button"
-        className={css.sessionSummary}
-        aria-label={t('input.sessionSettings')}
-        data-session-summary=""
-        disabled={locked}
-        onMouseDown={keepFocus}
-        onClick={() => { openSessionSettings('model') }}
-      >
-        <IconSettingsOutline16 size={20} />
-        <span className={css.sessionSummaryText}>
-          <span className={css.sessionSummaryModel}>{modelSummary ?? t('input.sessionSettings')}</span>
-          {permissionSummary !== null && <span className={css.sessionSummaryMeta}>{permissionSummary}</span>}
-        </span>
-        <IconChevronDownOutline14 className={css.sessionSummaryChevron} aria-hidden />
-      </button>
-    )
-    : null
-
   const sessionSettingsSections: readonly SessionSettingsSection[] = phone && sessionSettingsOpen ? [
     {
       id: 'model',
@@ -1038,7 +992,7 @@ export const InputBar = memo(function InputBar({
               </button>
             </Tooltip>
             <div className={css.modes}>
-              {!narrowPhone && accessSelect}
+              {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}
             </div>
             {leftItems != null && (
@@ -1053,7 +1007,7 @@ export const InputBar = memo(function InputBar({
                 {rightItems}
               </div>
             )}
-            {!narrowPhone && renderSlot('conversation.input.model', {
+            {renderSlot('conversation.input.model', {
               locked: modelSeatLocked,
               presentation: 'trigger',
               settingsSection: 'model',
@@ -1097,9 +1051,6 @@ export const InputBar = memo(function InputBar({
               </button>
             </Tooltip>
           </div>
-          {narrowPhone && sessionSummary !== null && (
-            <div className={css.sessionSettingsRow}>{sessionSummary}</div>
-          )}
         </div>
       </div>
       {phone && (
