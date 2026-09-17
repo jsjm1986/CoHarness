@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.md
-2026-08-18-atomic-macos-gateway-releases.md: 64fedf37d206db9a0d126e38ca291b7425379b24
-2026-08-18-atomic-macos-gateway-releases.zh.md: 410444ce65ffaaec41f009ced610e6c1d3378672
+2026-08-18-atomic-macos-gateway-releases.md: 25fa43b6f41eccc89726c936b6d41489ba278b24
+2026-08-18-atomic-macos-gateway-releases.zh.md: e75795c75f259c01391e269608c4421cb3790c24

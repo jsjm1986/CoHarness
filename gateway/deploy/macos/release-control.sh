@@ -66,7 +66,9 @@ validate_release() {
     && -s "$release/gateway/lib/config.js" \
     && -s "$release/gateway/lib/server.js" \
     && -s "$release/gateway/lib/runtime-api.js" \
-    && -s "$release/packages/llm/llm/lib/types/discovery.js" ]]; then
+    && -s "$release/packages/llm/llm/lib/types/discovery.js" \
+    && -s "$release/packages/session/session-format/lib/index.js" \
+    && -s "$release/packages/session/session-format/lib/types/surface.js" ]]; then
     return 0
   fi
   if [[ "$allow_legacy" == true \
