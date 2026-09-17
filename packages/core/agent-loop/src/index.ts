@@ -809,9 +809,17 @@ export class AgentLoop extends Service implements AgentFactory {
     const session = ownedPreparation.session
     const prepared = this.prepare(ownerCtx, id, agentOptions, session, signal, handle, parentAgent)
     try {
-      const setupCommit = await raceAbort(setup?.(prepared.agent.ctx, prepared.agent), prepared.signal, id)
-      setupCommit?.commit()
-      return await prepared.publish(source)
+      return await prepared.agent.runMaintenance(async () => {
+        try {
+          const setupCommit = await raceAbort(setup?.(prepared.agent.ctx, prepared.agent), prepared.signal, id)
+          setupCommit?.commit()
+          return await prepared.publish(source)
+        } catch (error: unknown) {
+          // Suppress queued wakes before maintenance exits; teardown owns inbox cleanup.
+          prepared.agent.cancel({ kind: 'disposed' }, { keepInbox: true })
+          throw error
+        }
+      })
     } catch (error: unknown) {
       await prepared.dispose()
       throw error

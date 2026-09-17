@@ -21,3 +21,12 @@ Lint（oxlint）0 告警 0 错误。
 ## 实施后全量复跑（c980a7e7b7）
 
 全量单测 1067 个文件、18150 项：4 个文件失败。对比实施前基线：Python 3.9.6 环境性失败不变；`app-boot/tests/hmr-config.spec.ts` 与 `session-persistence-jsonl/tests/lease.spec.ts` 在全量并发下失败、单独重跑全部通过（23 项），属资源争用型不稳定，与本次改动无关。无本次改动引入的失败。
+
+
+## Phase 2：发布期间输入暂存
+
+- setup 和发布复用维护操作，成功才释放排队唤醒；失败时先取消唤醒再回滚，避免尚未成功创建的 Agent 开启模型轮次。
+- disposed 取消会清除唤醒标记，即使先前已发生保留收件箱的普通取消；状态回调卸载根作用域时，未启动的驱动结算完成，不阻塞清理。
+- AgentLoop 单测 19 文件、359 项通过；聚焦 interception 32 项与 cancel 37 项通过；包级 TypeScript 编译和局部 oxlint 通过。审查补充两条回归，确认普通取消保留输入但清除旧唤醒，之后的新输入仍可唤醒。
+- Headless 产品与 TypeScript SDK 快照共 22 项通过；新增发布失败快照输出 `publication turn started: false`，其余已有预期输出不变。
+- 公开创建事件仍为同步事件；串行事件、消费者迁移、Python 打包运行时快照、真实 provider 和桌面能力验收未完成。本批未重复执行仓库全量单测。

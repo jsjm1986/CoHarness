@@ -555,6 +555,160 @@ describe('agent/pre-step', () => {
   })
 })
 
+describe('publication input gating', () => {
+  it('parks retained input cancelled during setup until another waking send', async () => {
+    const adapter = new MockAdapter([textResponse('first'), textResponse('second')])
+    const ctx = await harness(adapter)
+    try {
+      const handle = await ctx.agents.create({
+        sessionId: SessionId('cancelled-setup-input'),
+        agentOptions: { provider: 'mock', model: 'mock' },
+        setup: async (_agentCtx, agent) => {
+          send(agent, 'retained during setup')
+          agent.cancel({ kind: 'user' }, { keepInbox: true })
+        },
+      })
+      await handle.agent.whenIdle()
+      expect(adapter.requests).toHaveLength(0)
+      expect(events(handle.agent).some(event => event.type === 'turn/start')).toBe(false)
+      expect(handle.agent.inbox.nextTurn).toHaveLength(1)
+      send(handle.agent, 'wake retained input')
+      await handle.agent.whenIdle()
+      expect(adapter.requests).toHaveLength(2)
+      await handle.dispose()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('replays input submitted after retained-inbox cancellation during setup', async () => {
+    const adapter = new MockAdapter([textResponse('first'), textResponse('second')])
+    const ctx = await harness(adapter)
+    try {
+      const handle = await ctx.agents.create({
+        sessionId: SessionId('rewoken-setup-input'),
+        agentOptions: { provider: 'mock', model: 'mock' },
+        setup: async (_agentCtx, agent) => {
+          send(agent, 'retained during setup')
+          agent.cancel({ kind: 'user' }, { keepInbox: true })
+          send(agent, 'new wake during setup')
+          expect(adapter.requests).toHaveLength(0)
+        },
+      })
+      await handle.agent.whenIdle()
+      expect(adapter.requests).toHaveLength(2)
+      await handle.dispose()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('does not replay a latched maintenance wake after disposal', async () => {
+    const adapter = new MockAdapter([])
+    const ctx = await harness(adapter)
+    try {
+      const agent = await ctx.agentLoop.create(SessionId('disposed-maintenance'), { provider: 'mock', model: 'mock' })
+      await agent.runMaintenance(async () => {
+        send(agent, 'parked input')
+        agent.cancel({ kind: 'disposed' }, { keepInbox: true })
+      })
+      await agent.whenIdle()
+      expect(events(agent).some(event => event.type === 'turn/start')).toBe(false)
+      expect(adapter.requests).toHaveLength(0)
+      expect(agent.inbox.nextTurn).toHaveLength(1)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+  it('suppresses failed publication after a prior retained-inbox cancellation', async () => {
+    const adapter = new MockAdapter([])
+    const ctx = await harness(adapter)
+    const failure = new Error('cancelled publication failed')
+    let published: Agent | undefined
+    ctx.on('agent/inbox/inserted', ({ agent }) => {
+      agent.cancel({ kind: 'user' }, { keepInbox: true })
+    })
+    ctx.on('agent/created', ({ agent }) => {
+      published = agent
+      send(agent, 'must stay parked')
+      throw failure
+    })
+    try {
+      await expect(ctx.agentLoop.create(SessionId('cancelled-publication'), { provider: 'mock', model: 'mock' })).rejects.toBe(failure)
+      expect(events(published!).some(event => event.type === 'turn/start')).toBe(false)
+      expect(adapter.requests).toHaveLength(0)
+      expect(ctx.agents.list()).toEqual([])
+      expect(ctx.sessions.list()).toEqual([])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('settles publication and teardown when a replay status listener unloads the root', async () => {
+    const ctx = await harness(new MockAdapter([]))
+    let teardown: Promise<void> | undefined
+    let published: Agent | undefined
+    ctx.on('agent/created', ({ agent }) => {
+      published = agent
+      send(agent, 'queued before unload')
+    })
+    ctx.on('agent/status', ({ status }) => {
+      if (status === 'running') teardown ??= ctx.fiber.dispose()
+    })
+    const result = await Promise.allSettled([
+      ctx.agentLoop.create(SessionId('reentrant-publication-unload'), { provider: 'mock', model: 'mock' }),
+    ])
+    expect(result[0]?.status).toBe('fulfilled')
+    expect(teardown).toBeDefined()
+    await teardown
+    // The root unload removed the registry services; publication and the
+    // replacement driver still settle, with no turn ever started.
+    await published!.whenIdle()
+    expect(events(published!).some(event => event.type === 'turn/start')).toBe(false)
+  }, 2000)
+
+  it('holds waking input until creation notifications finish', async () => {
+    const adapter = new MockAdapter([textResponse('ok')])
+    const ctx = await harness(adapter)
+    const turnsDuringPublication: boolean[] = []
+    ctx.on('agent/created', ({ agent }) => {
+      send(agent, 'queued during publication')
+      turnsDuringPublication.push(events(agent).some(event => event.type === 'turn/start'))
+    })
+    try {
+      const agent = await ctx.agentLoop.create(SessionId('publication-input'), { provider: 'mock', model: 'mock' })
+      await agent.whenIdle()
+      expect(turnsDuringPublication).toEqual([false])
+      expect(adapter.requests).toHaveLength(1)
+      expect(JSON.stringify(adapter.requests[0]!.messages)).toContain('queued during publication')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('discards queued waking input when publication fails', async () => {
+    const adapter = new MockAdapter([textResponse('must not run')])
+    const ctx = await harness(adapter)
+    const failure = new Error('publication failed after input')
+    let published: Agent | undefined
+    ctx.on('agent/created', ({ agent }) => {
+      published = agent
+      send(agent, 'must not run')
+      throw failure
+    })
+    try {
+      await expect(ctx.agentLoop.create(SessionId('failed-publication-input'), { provider: 'mock', model: 'mock' })).rejects.toBe(failure)
+      expect(published).toBeDefined()
+      expect(events(published!).some(event => event.type === 'turn/start')).toBe(false)
+      expect(adapter.requests).toHaveLength(0)
+      expect(ctx.agents.list()).toEqual([])
+      expect(ctx.sessions.list()).toEqual([])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
 describe('publication rollback', () => {
   it.each(['session/created', 'agent/created'] as const)('cleans up before create rejects when %s throws', async (event) => {
     const ctx = await harness(new MockAdapter([]))

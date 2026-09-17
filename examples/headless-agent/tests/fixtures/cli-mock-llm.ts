@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import {
   CallId,
+  createUserMessage,
   LlmAdapter,
   ReasoningEffortId,
   type GenerateOptions,
@@ -63,6 +64,14 @@ export const inject = ['llm']
 /** Register the keyless `cli-mock` adapter. */
 export function apply(ctx: Context): void {
   ctx.llm.registerAdapter(['cli-mock'], new CliMockAdapter())
+  if (process.env.DSH_CLI_PUBLICATION_FAILURE === '1') {
+    ctx.on('agent/created', ({ agent }) => {
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Do not execute unpublished work.' }], source: { kind: 'user' } }))
+      const started = agent.session.snapshotEvents().some(event => event.type === 'turn/start')
+      process.stdout.write(`publication turn started: ${started}\n`)
+      throw new Error('CLI publication rejected')
+    })
+  }
   ctx.on('agent/request', async ({ step }, next) => {
     const config = await next()
     return step === 2 ? { ...config, reasoningEffort: OFF } : config

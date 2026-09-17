@@ -345,6 +345,25 @@ describe('headless stream-json snapshots', () => {
     expect(result.stderr).toBe('')
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
+  it('rejects publication without starting queued input through the product headless profile', async () => {
+    const result = await runLoaderSmoke({
+      label: 'product headless publication input snapshot',
+      tempDirPrefix: 'headless-snapshot-publication-',
+      binScript: dshBinScript,
+      configPath: headlessOverlayPath,
+      binArgs: ['--profile', 'headless', '--patch', headlessOverlayPath, 'Unreachable task.'],
+      tsconfigPath,
+      expectedExitCode: 1,
+      env: {
+        DSH_CLI_PUBLICATION_FAILURE: '1',
+        DSH_TELEMETRY_DISABLED: '1',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: prepareCliMockFixture,
+    })
+    await expect(`${result.stdout}${result.stderr}`).toMatchFileSnapshot(join(snapshotsDir, 'headless-profile', 'publication-failure.expected.txt'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('prints a terminal model failure through the product headless profile command', async () => {
     const result = await runLoaderSmoke({
       label: 'product headless profile model failure snapshot',

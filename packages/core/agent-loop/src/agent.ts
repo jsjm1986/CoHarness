@@ -153,10 +153,8 @@ export class ReactLoopAgent implements Agent {
   }
 
   cancel(cause: AgentCancelCause, options: CancelOptions = {}): void {
-    if (!options.keepInbox) {
-      this.inbox.clear()
-      if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
-    }
+    if (!options.keepInbox) this.inbox.clear()
+    if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
     // Kept inbox work parks until the next waking send; a cancellation never
     // turns an already accepted wake into an automatic replay.
     this.pendingWakes.clear()
@@ -178,9 +176,15 @@ export class ReactLoopAgent implements Agent {
       try {
         return await job(maintenance.abort.signal)
       } finally {
+        // Replay settles only through the replacement driver: a throwing or
+        // disposed replay must still settle `done` for every racing waiter.
         this.setPhase({ kind: 'idle', lastTurn: maintenance.lastTurn })
-        if (maintenance.wakeRequested && this.inbox.hasPending) this.wakeDriver()
-        done.resolve()
+        try {
+          const cause = maintenance.abort.signal.reason as AgentCancelCause | undefined
+          if (cause?.kind !== 'disposed' && maintenance.wakeRequested && this.inbox.hasPending) this.wakeDriver()
+        } finally {
+          done.resolve()
+        }
       }
     })()
   }
@@ -213,7 +217,17 @@ export class ReactLoopAgent implements Agent {
       step: 0,
       wakeRequested: false,
     })
-    this.loopCtx.agents.withInitiator(this, () => this.kick()).then(driver.resolve, driver.reject)
+    let task: Promise<void>
+    try {
+      task = this.loopCtx.agents.withInitiator(this, () => this.kick())
+    } catch {
+      // withInitiator rejects synchronously only when its scope is closing;
+      // kick is async. No driver started, so teardown can finish quiescence.
+      this.setPhase({ kind: 'idle', lastTurn: this.phase.lastTurn })
+      driver.resolve()
+      return
+    }
+    void task.then(driver.resolve, driver.reject)
   }
 
   async whenIdle(): Promise<void> {

@@ -12,7 +12,7 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 
 创建与恢复属于同一个受回滚保护的事务：构造私有会话、具体 agent 和带作用域的上下文；等待可选 setup；进入两个注册表；依次宣告 `session/created` 和 `agent/created`；发出 `agent/session-start`；此后才启动驱动器。Setup 作为受信任的同进程组合代码，接收完整的带作用域 `Context`，并且不得驱动尚未发布的 agent。普通的类型化身份与选项输入按只读约定借用；seed 事件和会话元数据会跨越持久会话边界，因此系统会对其进行验证并创建快照。可选的 `AbortSignal` 只取消加载／setup／发布，并在返回的 handle 可见前分离。
 
-内部发布操作返回 Promise，并在 setup 事务的回滚处理范围内等待完成。发布失败时，清理完成后 create/resume Promise 才拒绝。这不会等待 `agent/created` 监听器返回的 Promise，也不改变同步的 `agent/session-start` 通知。
+内部发布操作返回 Promise，并在 setup 事务的回滚处理范围内等待完成。Setup 与发布在维护任务中执行：唤醒输入排队到发布成功，发布失败则先抑制排队唤醒，再清理并拒绝创建。取消会清除已有唤醒请求，即使使用 `keepInbox`；普通取消后，新的唤醒输入仍可恢复保留的任务。以 `disposed` 取消的维护任务不会重放待处理唤醒。创建监听器不得等待 `agent.whenIdle()`，因为它包含本次维护任务。这不会等待 `agent/created` 监听器返回的 Promise，也不改变同步的 `agent/session-start` 通知。
 
 
 调用方 fiber 与 AgentLoop 提供方共同拥有 agent。`AgentFactory.createAgent(ownerCtx, options)` 与 `resume(ownerCtx, options)` 显式接收调用方所有权，而工厂为 `sessions`/`llm`/`tools`/`systemPrompt` 保留自身的依赖上下文；这样，调用方可以只注入 `agents`，而不会缩减新 agent 的服务接口。调用方卸载、handle dispose（资源释放）或提供方卸载都会汇合到同一个记忆化的完全停稳边界。提供方关闭会同时等待资源 teardown，以及已经观测到停用的公开 create/resume 包装层，因此依赖消失后，任何 continuation 都无法继续发布。
