@@ -98,6 +98,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Per-pane header actions contributed by the workbench plugin. */
     'conversation.workbench.pane.header': { kind: 'list'; scope: 'session'; owner: ConversationWorkbenchPaneHeaderOwnerProps }
     /**
+     * Conversation display settings rendered inside the sidebar workbench
+     * panel. The merge stays in this package — the display-settings domain
+     * owner — so the filler needs no dependency on the declaring entry's
+     * package; the declaring entry lives under `sidebar.workspaces.workbench`.
+     */
+    'conversation.workbench.display': { kind: 'single'; scope: 'root'; owner: ConversationWorkbenchDisplayOwnerProps }
+    /**
      * The entire body of one session: taking this seat means rendering that
      * session's conversation yourself. The occupant also owns the per-session
      * draft mirror and the active view ring, so a replacement inherits both
@@ -751,6 +758,12 @@ export interface ConversationWorkbenchToolbarOwnerProps {
 /** Owner share for the empty workbench state. */
 export interface ConversationWorkbenchEmptyOwnerProps {
   /** Marker owner share for the empty workbench surface. */
+  children?: never
+}
+
+/** Owner share for the sidebar workbench display-settings hole. */
+export interface ConversationWorkbenchDisplayOwnerProps {
+  /** Marker owner share for the workbench display-settings seat. */
   children?: never
 }
 

@@ -81,4 +81,16 @@ describe('primitive compact chrome', () => {
     expect(load('../src/WebBlock.module.css')).toContain('max-height: min(240px, 45vh)')
     expect(load('../src/markdown/JsonBlock.module.css')).toContain('max-height: min(200px, 40vh)')
   })
+
+  it('caps markdown table cells by the workbench pane and keeps wide tables scrollable', () => {
+    const markdown = load('../src/markdown/MarkdownText.module.css')
+    // The scroller leaf is the cqw container only under data-workbench; outside
+    // a workbench pane cqw falls back to small-viewport units, so the single
+    // conversation keeps the previous 30vw behavior.
+    expect(markdown).toContain('max-width: min(30cqw, 320px)')
+    expect(markdown).toContain(':global([data-workbench]) .tableScroll {')
+    expect(markdown).toContain('container-type: inline-size')
+    expect(markdown).toContain(':global([data-workbench]) .tableScroll:global(.md-table-wide) {')
+    expect(markdown).toContain('overflow-x: auto')
+  })
 })

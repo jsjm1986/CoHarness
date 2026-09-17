@@ -2,13 +2,13 @@
 
 [English](README.md) | 中文
 
-此 Cordis 浏览器插件在一个多面板对话工作台中展示最多四个已有 Workspace Session。它负责 Workspace／会话选择器，以及面板选择、顺序、比例和模式切换的操作；它消费 `conversationViewport` 能力，通过 ui-conversation 声明的 slots 贡献工具栏、空状态和面板头。
+此 Cordis 浏览器插件在一个多面板对话工作台中展示最多四个已有 Workspace Session。它负责 Workspace／会话选择器，以及面板选择、顺序、比例和模式切换的操作；它消费 `conversationViewport` 能力，通过 ui-conversation 声明的 slots 贡献工具栏、空状态和面板头，并通过 ui-workspace 声明的 `sidebar.workspaces.workbench` 孔位贡献侧栏面板。
 
 插件不导入 ConversationRoot、ChatView、InputBar 或其他呈现实现。conversation slot 的拥有者通过显式 SessionProvider 渲染各面板，因此每个面板都从同一对象层获取独立的 Session 标准 props、会话 store、projection 和注入操作。根 slot 的注入控件会在渲染时解析活动面板；缓存的根注入不会固定持有某个 Session 或 runtime target。
 
 ## 组合
 
-`apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，共用资源元数据，并通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。本地 loopback 只有在所属连接声明原生打开能力时才调用 Host 的 `openPath`。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
+`apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。侧栏面板列出已暂存的面板并提供聚焦与关闭操作，Add 与等宽操作绑定同一个选择器 store 和 viewport 能力，可退出回单会话模式，并声明由 ui-conversation 以紧凑显示偏好行填充的 `conversation.workbench.display` 孔位。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，共用资源元数据，并通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。本地 loopback 只有在所属连接声明原生打开能力时才调用 Host 的 `openPath`。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
 
 ## 视图状态
 

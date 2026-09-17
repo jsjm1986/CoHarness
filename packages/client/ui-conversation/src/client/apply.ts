@@ -32,6 +32,7 @@ import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { DisplaySettingsRow } from './settings/DisplaySettingsRow.tsx'
 import type { DisplaySettingsRowInjected } from './settings/DisplaySettingsRow.tsx'
+import { WorkbenchDisplayRow } from './settings/WorkbenchDisplayRow.tsx'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsPills } from './chat/StatsPills.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
@@ -183,6 +184,18 @@ export function apply(ctx: Context): void {
       setFontSize: (value) => { displaySettings.setFontSize(value) },
     }),
   }, DisplaySettingsRow))
+  // Same display-settings face inside the workbench sidebar panel: the hole is
+  // declared by ui-workbench's sidebar registration and owned by this package.
+  ctx.slots.inject('conversation.workbench.display', () => ctx.slots.register({
+    name: 'conversation.workbench.display',
+    locale: NS,
+    inject: (): DisplaySettingsRowInjected => ({
+      hooks: { displaySettings },
+      setWidth: (value) => { displaySettings.setWidth(value) },
+      setFullWidth: (value) => { displaySettings.setFullWidth(value) },
+      setFontSize: (value) => { displaySettings.setFontSize(value) },
+    }),
+  }, WorkbenchDisplayRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not

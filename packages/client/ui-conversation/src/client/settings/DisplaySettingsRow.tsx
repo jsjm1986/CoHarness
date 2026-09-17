@@ -29,12 +29,55 @@ export type DisplaySettingsRowProps =
   & PropsLocale<'conversation'>
   & InjectFace<DisplaySettingsRowInjected>
 
-function inputValue(event: ChangeEvent<HTMLInputElement>): number {
+/**
+ * Read a numeric range-input value, mapping unparseable input to 0.
+ * @param event - the input change event.
+ * @returns the numeric value.
+ */
+export function inputValue(event: ChangeEvent<HTMLInputElement>): number {
   const value = Number(event.currentTarget.value)
   return Number.isFinite(value) ? value : 0
 }
 
-function noticeOf(
+/**
+ * Shared range input for the display preference sliders.
+ * @param props - slider label, bounds, value, and write callback.
+ * @returns the range input element.
+ */
+export function RangeInput({ label, min, max, value, disabled, onChange }: {
+  /** Accessible label and control name. */
+  label: string
+  /** Slider bounds. */
+  min: number
+  max: number
+  /** Current numeric value. */
+  value: number
+  /** Whether the slider rejects input. */
+  disabled: boolean
+  /** Persist the numeric value. */
+  onChange: (value: number) => void
+}) {
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step="1"
+      value={value}
+      disabled={disabled}
+      aria-label={label}
+      onChange={(event) => { onChange(inputValue(event)) }}
+    />
+  )
+}
+
+/**
+ * Map the settings write/readiness state to its user-visible notice, when any.
+ * @param state - the settings control state.
+ * @param t - the conversation locale translator.
+ * @returns the notice text, or undefined when nothing needs surfacing.
+ */
+export function noticeOf(
   state: ConversationDisplaySettingsSnapshot['settings'],
   t: DisplaySettingsRowProps['t'],
 ): string | undefined {
@@ -78,15 +121,13 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth,
       <div className={css.controls}>
         <label className={css.control}>
           <span className={css.controlLabel}>{t(widthLabel)}</span>
-          <input
-            type="range"
+          <RangeInput
+            label={t(widthLabel)}
             min={CHAT_CONTENT_WIDTH_RANGE.min}
             max={CHAT_CONTENT_WIDTH_RANGE.max}
-            step="1"
             value={snapshot.chatContentWidth}
             disabled={disabled || snapshot.chatFullWidth}
-            aria-label={t(widthLabel)}
-            onChange={(event) => { setWidth(inputValue(event)) }}
+            onChange={setWidth}
           />
           <span className={css.widthOutput}>
             <output>{snapshot.chatFullWidth ? t('settings.display.fill') : t('settings.display.widthValue', { value: snapshot.chatContentWidth })}</output>
@@ -104,15 +145,13 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth,
         </label>
         <label className={css.control}>
           <span className={css.controlLabel}>{t(fontLabel)}</span>
-          <input
-            type="range"
+          <RangeInput
+            label={t(fontLabel)}
             min={CHAT_FONT_SIZE_RANGE.min}
             max={CHAT_FONT_SIZE_RANGE.max}
-            step="1"
             value={snapshot.chatFontSize}
             disabled={disabled}
-            aria-label={t(fontLabel)}
-            onChange={(event) => { setFontSize(inputValue(event)) }}
+            onChange={setFontSize}
           />
           <output>{t('settings.display.fontSizeValue', { value: snapshot.chatFontSize })}</output>
         </label>
