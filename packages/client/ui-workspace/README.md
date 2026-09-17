@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Shared Workspace browser and picker plugin. `WorkspaceBrowser` fills the sidebar's `sidebar.workspaces` slot, while `WorkspacePicker` fills the page-local Session Intent hero's `conversation.hero.workspace` slot; both surfaces use the same Workspace menu and add flow.
+Shared Workspace browser and picker plugin. `WorkspaceBrowser` fills the sidebar's `sidebar.workspaces` slot, while `WorkspacePicker` fills the page-local Session Intent hero's `conversation.hero.workspace` slot; both surfaces use the same Workspace menu and add flow. While the conversation viewport is in workbench mode, the browser hides its Workspace/Session list, section header, and rail search, and renders the `sidebar.workspaces.workbench` hole it declares — the workbench plugin fills it with the pane-management panel.
 
 Folded Workspace sections show up to five non-blank Sessions and retain the selected blank New Session as a provisional row until its first prompt. The overflow count excludes that provisional row, and collapsed drag placement keeps a visible source ahead of hidden rows.
 

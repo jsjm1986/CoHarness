@@ -16,7 +16,8 @@ interface Props extends PropsRuntime<'conversation.workbench.pane.header'>, Prop
   openFiles?: () => void
 }
 
-function stateOf(summary: SessionListState['byId'][SessionId] | undefined): 'ongoing' | 'warning' | 'done' {
+/** Map a Session summary to its pane status dot: pending interaction, running, or idle. */
+export function stateOf(summary: SessionListState['byId'][SessionId] | undefined): 'ongoing' | 'warning' | 'done' {
   if (summary?.pendingInteraction !== undefined) return 'warning'
   if (summary?.running) return 'ongoing'
   return 'done'

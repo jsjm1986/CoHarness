@@ -8,6 +8,7 @@
     { "path": "../ui-primitives" },
     { "path": "../runtime" },
     { "path": "../ui-conversation" },
+    { "path": "../ui-workspace" },
     { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../locale" }
   ]

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-共享 Workspace 浏览器与选择器插件。`WorkspaceBrowser` 填充侧边栏的 `sidebar.workspaces` slot，`WorkspacePicker` 则填充页面局部 Session Intent 主视觉区的 `conversation.hero.workspace` slot；两个界面使用同一套 Workspace 菜单和添加流程。
+共享 Workspace 浏览器与选择器插件。`WorkspaceBrowser` 填充侧边栏的 `sidebar.workspaces` slot，`WorkspacePicker` 则填充页面局部 Session Intent 主视觉区的 `conversation.hero.workspace` slot；两个界面使用同一套 Workspace 菜单和添加流程。当 conversation viewport 处于工作台模式时，浏览器隐藏自身的 Workspace/Session 列表、分节头和 rail 搜索，改为渲染其声明的 `sidebar.workspaces.workbench` 孔位——由工作台插件以面板管理界面填充。
 
 折叠的 Workspace 分区最多显示五条非空 Session，并在选中的空白 New Session 首条提示词落地前保留它作为临时行。溢出数量不计入该临时行，折叠状态下的拖拽会把可见来源保持在隐藏行之前。
 

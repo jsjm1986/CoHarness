@@ -51,12 +51,20 @@ export interface DirectoryFlowOwnerProps {
   onError: (message: string) => void
 }
 
+/** Owner share for the sidebar workbench panel; the region renders no owner data. */
+export interface SidebarWorkspacesWorkbenchOwnerProps {
+  /** Marker owner share for the workbench panel region. */
+  children?: never
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Directory-flow hole under the conversation empty-state picker (declared by the WorkspacePicker entry). */
     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
+    /** Workbench panel hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
+    'sidebar.workspaces.workbench': { kind: 'single'; scope: 'root'; owner: SidebarWorkspacesWorkbenchOwnerProps }
   }
 }
 
@@ -104,8 +112,6 @@ export type WorkspaceBrowserInjected = {
     /** Current generation's Host description, bound by the slot renderer. */
     hostDescription: HostDescriptionSource
   }
-  /** Leave the independent workbench view and restore the current space. */
-  exitWorkbench?: () => void
   /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and
    * open it; without an explicit workspace, inherit the current Session
@@ -158,7 +164,7 @@ export type WorkspaceBrowserInjected = {
 /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
 export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
-  & PropsRenderSlots<'sidebar.workspaces.directoryFlow'>
+  & PropsRenderSlots<'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.workbench'>
   & PropsStore<ReturnType<typeof createWorkspaceViewStore>>
   & Omit<WorkspaceBrowserInjected, 'hooks'>
   & PropsHooks<WorkspaceBrowserInjected['hooks']>

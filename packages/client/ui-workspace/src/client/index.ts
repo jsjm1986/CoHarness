@@ -21,6 +21,7 @@ import { en, zh, type WorkspaceKey } from './locales.ts'
 
 export type {
   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
+  SidebarWorkspacesWorkbenchOwnerProps,
   WorkspaceBrowserInjected, WorkspaceBrowserProps, WorkspacePickerInjected, WorkspacePickerProps,
 } from './contract/slots.ts'
 export type { WorkspaceKey } from './locales.ts'
@@ -80,7 +81,6 @@ export function apply(ctx: ClientContext): void {
     ctx.sessions.open(sessionId)
   }
   const browserInjected = (): WorkspaceBrowserInjected => ({
-    exitWorkbench: () => { viewport?.setMode('single') },
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
     startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
@@ -130,7 +130,10 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register(
     {
       name: 'sidebar.workspaces',
-      children: { 'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' } },
+      children: {
+        'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
+        'sidebar.workspaces.workbench': { kind: 'single', scope: 'root' },
+      },
       store: createWorkspaceViewStore(),
       inject: browserInjected,
       locale: NS,
