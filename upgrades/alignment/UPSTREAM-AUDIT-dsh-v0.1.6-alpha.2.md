@@ -20,6 +20,17 @@
 - `apps/` 449 个增量文件中 `apps/desktop` 289、`apps/desktop-host` 11 属上游桌面客户端（本地 `apps/` 只有 android-shell、cli、web，从未携带），2026-09-18 用户确认不携带，矩阵拆为独立 reject 行；`apps/cli` 34 个文件（含 `profile-boot.ts` 的 runtime 解析默认与 `dsh <profile>`）归 1B，`apps/web` 115 个文件（112 个为测试）归 7A。
 - 上游发布说明中未被原计划点名、已补入阶段表的条目：上下文用量移至输入框底部与会话拖拽区域修复（7A，与本地 composer 修复 #215–#217 重叠）、重复申请当前有效权限模式不再审批（6B）、会话被其他 DSH 实例占用时的提示（2B）、思考内容紧凑排版（7E）、Creator 移除 `tool-cordis` 动态定义与运行工具（7D；`tool-cordis/src/fiber-state.ts`、`inspect.ts` 已删除）。
 
+## 用户决定（2026-09-18）
+
+- `apps/desktop`／`apps/desktop-host`：不携带（矩阵 reject 行，理由与上游桌面 ui-package 树一致；apps/cli 共享接口经 1B 行审查）。
+- D7：`deliverables/tool-present` 与 `deliverables/workspace-changes` 采纳，撤销 rc.2 基线的 upstreamOnly 推迟。
+- Q1：插件安装允许上游全部四种来源（registry、绝对路径、git、tarball）；依赖构建脚本沿用上游批准模型（Web「允许并重试」／工具侧 `approvedBuilds`，按包名持久）。
+- Q2：终端双门授权——管理员分别开启用户与项目，两者都开才可创建；终端归创建者私有；管理员仅列与关；只读成员完全不可用。
+- Q3：侧栏 Browser 开放并与上游行为一致（iframe、loopback、每 tab 临时关沙箱）；loopback 地址提示指向访问者本机。
+- Q4：Office 首发声明 macOS arm64（原生）与 Linux（WASM）；Windows 不宣称；Linux WASM 需一台验收环境否则标 unverified。
+- 1B 启动审计：采用上游 `inactiveEntries` 结构化实现与诊断日志文件，替换本地 `assertEntriesLoaded`／`assertEntriesActivated`；本地 `disabled` 包装诊断与守卫测试在上游结构上重写。
+- LibreOffice kit 事实：上游固定 `@deepseek-ai/libreoffice-kit@0.0.1`，原生包仅 macOS/Windows arm64 与 x64，Linux 选 WASM；缺声明的原生包是安装不完整，不会回退 WASM。
+
 ## 本审计的边界
 
 - 尚未完成 2,641 个变化文件的逐文件语义审查，未完成逐提交归属；矩阵行与清单决定只声明范围与待验证要求，不声明实现完成。矩阵 333 行中只有 `apps/desktop`、`apps/desktop-host` 两行为用户确认路由，其余仍为初始路由。

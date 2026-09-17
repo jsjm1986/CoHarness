@@ -18,7 +18,7 @@
   },
   "targetVersion": "0.1.6-alpha.2.coharness.1",
   "versionStatus": "proposed-release-families-unverified",
-  "status": "retargeted-increment-implementation-pending",
+  "status": "decisions-confirmed-increment-implementation-pending",
   "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.2.md",
   "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
   "verification": [],
@@ -260,7 +260,7 @@
       "phases": [
         "7D"
       ],
-      "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 sources and build-script policy unresolved."
+      "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 resolved 2026-09-18: all four upstream install sources (registry, absolute path, git, tarball) are allowed for administrators; dependency build scripts follow the upstream approval model (Web allow-and-retry and tool-side approvedBuilds), persisted per package name and attributed to the approving administrator."
     },
     {
       "id": "terminal-user-project-grants",
@@ -274,7 +274,7 @@
       "phases": [
         "7B"
       ],
-      "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 grant composition and cross-member control unresolved."
+      "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 resolved 2026-09-18: dual gate — an administrator must enable both the user and the project; terminals are private to their creator, invisible to other project members; administrators may list and close but never take over input; read-only members have no terminal access at all."
     },
     {
       "id": "office-and-sidebar-browser",
@@ -288,7 +288,7 @@
       "phases": [
         "7C"
       ],
-      "requiredVerification": "Q3 browser carrier/URL/sandbox policy and Q4 Office platforms unresolved. File authorization, conversion cache isolation, resource limits and native/WASM artifact checks required. Deliverables are owned by the deliverables-workspace-changes decision."
+      "requiredVerification": "Q3 resolved 2026-09-18: ship the sidebar Browser matching upstream — iframe carrier, loopback allowed, per-tab temporary unsandbox toggle with warning, DSH origin rejected; address bar must note that loopback resolves on the visitor’s machine, never as a host-URL promise. Q4 resolved 2026-09-18: declared platforms are macOS arm64 (native engine) and Linux (WASM); Windows is not claimed; a Linux WASM acceptance environment is required or Linux stays unverified. File authorization, conversion cache isolation, resource limits and native/WASM artifact checks required. Deliverables are owned by the deliverables-workspace-changes decision."
     },
     {
       "id": "deliverables-workspace-changes",
@@ -304,7 +304,13 @@
         "2B",
         "7C"
       ],
-      "requiredVerification": "User-confirmed 2026-09-18 (plan D7): adopt deliverables/tool-present (moved from fs/tool-present) and deliverables/workspace-changes, reversing the rc.2 upstreamOnly deferral. Verify workspace/changes required-on-read semantics before enabling the recorder, workspaceFiles authorization, project ACL and read-only member rules for change cards and per-file review; update scripts/upstream-sync.json upstreamOnly when the sync baseline advances."
+      "requiredVerification": "User-confirmed 2026-09-18 (plan D7): adopt deliverables/tool-present (moved from fs/tool-present) and deliverables/workspace-changes, reversing the rc.2 upstreamOnly deferral. Verify workspace/changes required-on-read semantics before enabling the recorder, workspaceFiles authorization, project ACL and read-only member rules for change cards and per-file review; update scripts/upstream-sync.json upstreamOnly when the sync baseline advances.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "remote-product-and-release",
+        "reviewState": "pending-cumulative-source-review",
+        "note": "fs/tool-present carried an upstreamOnly deferral in scripts/upstream-sync.json at the rc.2 baseline; no alpha.1 decision row existed."
+      }
     },
     {
       "id": "apps-desktop-not-carried",
@@ -330,28 +336,28 @@
   "openQuestions": [
     {
       "id": "Q1",
-      "state": "awaiting-user-clarification",
+      "state": "resolved-2026-09-18: administrators may use all four upstream install sources; build-script approval follows the upstream allow-and-retry / approvedBuilds model persisted per package name.",
       "blocks": [
         "7D"
       ]
     },
     {
       "id": "Q2",
-      "state": "awaiting-user-clarification",
+      "state": "resolved-2026-09-18: dual gate — user AND project must each be enabled by an administrator; creator-private terminals; admin lists/closes without input takeover; read-only members excluded.",
       "blocks": [
         "7B"
       ]
     },
     {
       "id": "Q3",
-      "state": "awaiting-user-clarification",
+      "state": "resolved-2026-09-18: ship the sidebar Browser matching upstream semantics; loopback label notes it resolves on the visitor’s machine.",
       "blocks": [
         "7C"
       ]
     },
     {
       "id": "Q4",
-      "state": "awaiting-user-clarification",
+      "state": "resolved-2026-09-18: declare macOS arm64 native + Linux WASM; Windows not claimed; Linux WASM acceptance environment required; desktop-driver devices decided with the Phase 5 design.",
       "blocks": [
         "6A",
         "7C",

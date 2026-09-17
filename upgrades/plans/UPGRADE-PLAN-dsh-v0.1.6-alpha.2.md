@@ -2,7 +2,7 @@
 
 ## 状态、目标与证据
 
-状态：升级终点调整为 alpha.2；alpha.1 Phase 1、2 的实现和历史验收保留，alpha.2 增量尚未实施或验收。不先完成一轮 alpha.1 发布再启动第二轮升级，不整体覆盖上游树，不因目标改变默认开放所有新能力。
+状态：升级终点调整为 alpha.2；alpha.1 Phase 1、2 的实现和历史验收保留，alpha.2 增量尚未实施或验收。不先完成一轮 alpha.1 发布再启动第二轮升级，不整体覆盖上游树，不因目标改变默认开放所有新能力。Q1–Q4 与 1B 启动审计方案已于 2026-09-18 全部确认（见下表），暂无待澄清产品决定。
 
 | 引用 | 固定值 | 用途 |
 | --- | --- | --- |
@@ -54,12 +54,12 @@ Phase 1 收口提交为 `6bd418cba3`，原生加载器依赖批次为 `94ea1e1dd
 | 4A | 1B、2B | PTC／workflow：新运行时与所有消费者迁移 | 原生/PTC 工具同一授权，绑定与协议错误、取消／超时、worker/subprocess 静止；相关组装快照 |
 | 4B | 4A | shell／subprocess／sandbox／jobs：资源回收、Windows 无闪窗、SSH 所需适配、旧包去留 | 目录拒绝、撤权、进程树终止和重启；Linux/macOS/Windows 实测；E2B 替代证明后才能删除，缺环境记阻塞 |
 | 5 | 2B、4B；设计可提前 | Gateway／执行节点：桌面资源协调、runtime 认证和准入 | 双运行时争用、旧代次拒绝、FIFO/去重/取消、撤权、失联、崩溃、协调者重启和停止失败；模型可见结果入日志 |
-| 6A | 3B、4B、5 对桌面路径放行；Q4 对验收设备明确 | browser-use／computer-use providers | 独立浏览器资源生命周期、附着授权、截图可见性、外部监听／下载；桌面驱动与系统权限；无 GUI 节点其他能力仍可用 |
+| 6A | 3B、4B、5 对桌面路径放行 | browser-use／computer-use providers | 独立浏览器资源生命周期、附着授权、截图可见性、外部监听／下载；桌面驱动与系统权限（验收设备按 Q4 确认项在 Phase 5 设计时单列）；无 GUI 节点其他能力仍可用 |
 | 6B | 5、6A、7A | 权限／Web：占用与队列 UI、auto-review、当前有效权限模式不重复审批 | LAN/公网真实双用户流程，撤权和 PTC 内层调用不可绕过；隐私、减少动画、未知状态；审查失败关闭及用量归因 |
 | 7A | 1B、2B | client／Gateway：Session 多实例与 slot、Workbench、子会话和计划侧栏、`apps/web` 组装测试；`ui-conversation` 上下文用量移至输入框底部与拖拽区域修复先与本地 composer 修复（#215–#217）逐规则对照再迁移 | pane、Session、runtime 显式对应；切换／关闭／恢复不误发请求；项目 ACL、归档过滤、历史地址；Web 多实例快照及 Android/API 消费者；composer 窄分栏回归不复现 |
-| 7B | 4B、7A、Q2 | terminal／SSH／MCP／webhook：终端授权、retain/重连/关闭、MCP resources、webhook 与 webhook-github 入站端点 | 默认禁用、用户／项目授权矩阵、只读成员拒写、跨成员控制规则、撤权清理、刷新不重生 shell；SSH 凭据与路径授权；webhook 默认关闭、管理员显式启用、签名校验、重放与限流、Session 创建归属；LAN/公网场景 |
-| 7C | 3B、7A、Q3/Q4 对各入口明确 | files／deliverables／Office／preview：D7 交付物（tool-present、workspace-changes 变更卡片与逐文件审阅）、Office、侧栏 URL | workspaceFiles 授权及版本校验、缓存隔离／撤权、并发修改不误归因；Office 资源限制与平台产物；Browser 载体、URL 和 sandbox 政策；授权负例及快照 |
-| 7D | 1B、7A、Q1 | plugin-manager／Creator／Gateway 管理；Creator 移除 `tool-cordis` 动态定义与运行工具后的 api-catalog 与 ui-cordis 调整 | D1 服务端强制执行，普通用户直接 RPC/工具均拒绝；强制治理插件保护；管理员操作审计、安装取消／失败、重载和卸载；持久化 profile 与 source/built 启动 |
+| 7B | 4B、7A | terminal／SSH／MCP／webhook：终端授权、retain/重连/关闭、MCP resources、webhook 与 webhook-github 入站端点 | 默认禁用、Q2 双门（用户且项目）授权矩阵、只读成员完全不可用、创建者私有、管理员仅列与关；撤权清理、刷新不重生 shell；SSH 凭据与路径授权；webhook 默认关闭、管理员显式启用、签名校验、重放与限流、Session 创建归属；LAN/公网场景 |
+| 7C | 3B、7A | files／deliverables／Office／preview：D7 交付物（tool-present、workspace-changes 变更卡片与逐文件审阅）、Office、侧栏 URL | workspaceFiles 授权及版本校验、缓存隔离／撤权、并发修改不误归因；Office 原生 macOS arm64 与 Linux WASM 实测（含缺字体、取消、资源限制与平台产物）；Browser 载体、URL 和 sandbox 政策；授权负例及快照 |
+| 7D | 1B、7A | plugin-manager／Creator／Gateway 管理；Creator 移除 `tool-cordis` 动态定义与运行工具后的 api-catalog 与 ui-cordis 调整 | D1 服务端强制执行，普通用户直接 RPC/工具均拒绝；强制治理插件保护；管理员操作审计、安装取消／失败、重载和卸载；Q1 四来源与构建脚本批准路径按确认项实现；持久化 profile 与 source/built 启动 |
 | 7E | 按矩阵逐项前置 | 各包责任域：其余累计差异、工作区分组、菜单键盘、轨迹附件、思考内容紧凑排版、性能与非 packages 文件（门禁差异已在 0R 处理） | 每行闭环源码／消费者／决定；保留 User Documents、Workbench、归档、协作及 SDK；新增、删除、替代逐项销账，不能以“其他”整体放行 |
 | 8 | 所有拟发布项完成；Q1–Q4 已决定或入口明确禁用 | 发布／数据／运维：迁移、产物、平台与生产 | 脱敏副本恢复演练、published paths/hygiene/built smoke、必需 CI 和明确 skip；部署前提清单核验；双用户验收、停机窗口与一致备份恢复、版本闭包及健康证据；解除 `master` 部署冻结 |
 
@@ -71,16 +71,20 @@ Phase 1 收口提交为 `6bd418cba3`，原生加载器依赖批次为 `94ea1e1dd
 
 UI 区分空闲、自己／他人占用、排队、停止中、不可用、待确认和未授权；只显示获准的身份信息，不暴露他人任务、标题或截图，遵守无障碍及减少动画。模型可见的队列与拒绝必须入 Session 日志。客户端 pane 的 active 状态不是权限来源；每次操作绑定 Session 与 runtime，恢复布局重新检查可见性，关闭 pane 不终止 Session；终端和预览不得复用错误实例的连接。
 
-## 待用户确认的策略
+## 已确认的策略（2026-09-18）
 
-| 编号 | 未决事项 | 阻塞范围与决定前处理 |
+| 编号 | 已决事项 | 决定与不可放宽的条件 |
 | --- | --- | --- |
-| Q1 | 管理员插件安装允许 registry／版本白名单、绝对路径、git、tarball 中哪些来源？构建脚本授权如何批准？ | 7D 安装入口；管理员身份已确定，来源政策未确定，不默认接受全部来源 |
-| Q2 | 用户与项目终端授权的组合规则、谁可授权、项目成员是否可查看／控制他人创建的终端、管理员接管规则 | 7B 产品准入；D2 默认禁用与独立授权已确认，不以 Session 可见性自动授予终端控制权 |
-| Q3 | 侧栏 Browser 是否本次开放？Web 访问者 localhost 与部署主机 URL 如何呈现？是否允许临时关闭 iframe sandbox？ | 7C Browser 入口；与自动化 browser-use 分开，不承诺远端服务器 localhost 直达，未决定不开放 |
-| Q4 | Office 预览首发平台、原生/WASM 包装范围，以及浏览器／桌面驱动验收设备和 staging/生产窗口 | 7C Office 发布及 6/8 环境验收；源码审查可继续，缺实际平台不得宣称可用 |
+| Q1 | 插件安装来源与构建脚本 | 管理员可用上游全部四种来源（registry、绝对路径、git、tarball）；依赖构建脚本沿用上游批准模型——pnpm 阻断的脚本经 Web 插件页「允许并重试」或工具侧 `approvedBuilds` 批准，按包名持久化；批准动作归管理员审计。安装入口仍由 D1 服务端强制仅管理员 |
+| Q2 | 用户终端授权组合 | 双门：管理员分别为用户和项目开启，两者都开才能创建终端；终端归创建者私有，其他项目成员不可见；管理员可列出与关闭但不接管输入；只读成员完全不可用；不以 Session 可见性授予终端控制权 |
+| Q3 | 侧栏 Browser | 本次开放，行为与上游一致：iframe 载体，允许 loopback，每 tab 可临时关闭沙箱（不持久、带警告），拒绝 DSH 自身 origin；地址栏对 loopback 目标提示「localhost 指你自己的电脑」，不承诺部署主机 localhost 直达 |
+| Q4 | Office 平台与验收 | 首发声明 macOS arm64（原生引擎）与 Linux（WASM）两个平台；Windows 不宣称；需要准备一台 Linux WASM 验收环境（容器可），缺该环境则 Linux 标 unverified；浏览器／桌面驱动验收设备与 staging/生产窗口在 Phase 5 设计定稿时单列 |
 
-以上问题不阻塞 1B、2B 及无依赖的协议／执行迁移。允许明确延期新入口，但需用户批准并更新计划与清单；不能静默削减原批准范围。Phase 8 汇总的是前序实际验证，不是第一次准备 API Key、GUI 权限、双用户环境或备份副本。
+## 1B 启动审计方案（2026-09-18 确认）
+
+`1B` 采用上游 `inactiveEntries` 结构化实现（`failed{error,phase}`／`pending{missing}`）与启动错误分类、诊断日志文件，整体替换本地 `assertEntriesLoaded`／`assertEntriesActivated`；本地 `disabled` 表达式包装诊断与两条守卫测试在上游结构上重写；Agent Note《Consumers audit activation instead of catching transactional rollback》改写为描述上游机制，`vendor/README.md` 第 9 条路径同步更新。
+
+允许明确延期新入口，但需用户批准并更新计划与清单；不能静默削减原批准范围。Phase 8 汇总的是前序实际验证，不是第一次准备 API Key、GUI 权限、双用户环境或备份副本。
 
 ## 数据、二开保护与证据要求
 
