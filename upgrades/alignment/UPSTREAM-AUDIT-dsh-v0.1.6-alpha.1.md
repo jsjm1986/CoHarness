@@ -17,3 +17,7 @@ Lint（oxlint）0 告警 0 错误。
 - 生命周期面全绿：interception 25、scope-lifecycle 38、resume 28、config-session-id 16。
 - `tsc -b packages/core/agent-loop` 通过；局部 oxlint 0 警告 0 错误；`git diff --check` 干净。
 - 未验证：真实 provider e2e、组装快照、TS/Python SDK 输出——本批为私有发布操作，不改公开事件与 Session schema；完整迁移（串行 `agent/created`、首轮输入屏障、消费者与 SDK 输出）仍未实施。
+
+## 实施后全量复跑（c980a7e7b7）
+
+全量单测 1067 个文件、18150 项：4 个文件失败。对比实施前基线：Python 3.9.6 环境性失败不变；`app-boot/tests/hmr-config.spec.ts` 与 `session-persistence-jsonl/tests/lease.spec.ts` 在全量并发下失败、单独重跑全部通过（23 项），属资源争用型不稳定，与本次改动无关。无本次改动引入的失败。
