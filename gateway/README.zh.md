@@ -86,6 +86,8 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 
 ## 项目协作对话
 
+本地 `stopAll()` 的 worker 在单个目标失败后继续处理剩余的已跟踪运行时；各 worker 处理完毕后以自身遇到的第一个错误拒绝。`Promise.allSettled` 等待所有 worker 结束，再按数组顺序报告第一个被拒绝的 worker，而非全局时间上最早的错误。systemd 关闭仍不执行操作；本地进程退出时的强制清理与外层关闭截止时间不变，因此到期可中断剩余处理（[决策](../.agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.zh.md)）。
+
 账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。长时间 HTTP/WebSocket 工作会持有串行 runtime lease；idle 回收会重新检查 lease 准入，若停止操作赢得竞态则使用新 generation 重试，而不会转发过期端口。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
 账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。个人 runtime 暂时不可用时，Gateway 仍会返回已有的 ACL 过滤账户记录，个人启动失败不会隐藏项目对话。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
