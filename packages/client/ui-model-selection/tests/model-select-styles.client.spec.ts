@@ -22,4 +22,10 @@ describe('ModelSelect.module.css', () => {
     expect(tier).toMatch(/\.triggerLabel,\s*\.triggerEffort\s*\{[^}]*display:\s*none/u)
     expect(tier).toMatch(/\.triggerGlyph\s*\{[^}]*display:\s*inline-flex/u)
   })
+
+  it('keeps the model label visible in the compact phone layout', () => {
+    const scope = String.raw`:global\(\[data-viewport='compact'\]\)\s*\.`
+    expect(css).toMatch(new RegExp(`${scope}triggerLabel,\\s*${scope}triggerEffort\\s*\\{[^}]*display:\\s*block`, 'u'))
+    expect(css).toMatch(new RegExp(`${scope}triggerGlyph\\s*\\{[^}]*display:\\s*none`, 'u'))
+  })
 })

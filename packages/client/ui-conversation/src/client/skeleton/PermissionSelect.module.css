@@ -65,6 +65,13 @@
   }
 }
 
+/* The compact phone layout lays the tool row out on its own grid column
+   where the label still fits; the collapse above targets squeezed
+   non-compact columns only. */
+:global([data-viewport='compact']) .triggerLabel {
+  display: block;
+}
+
 .summary {
   display: inline-flex;
   min-width: 0;

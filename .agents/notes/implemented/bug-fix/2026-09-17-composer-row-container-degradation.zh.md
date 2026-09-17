@@ -10,7 +10,7 @@ Composer 工具行承载八个控件（附件、文档库、命令、权限 chip
 
 ## 决策
 
-Composer 的 `.row` 是匿名 inline-size 容器（此前已为模型触发器的 `cqw` 上限声明），chip 按它在响应式 shell 词汇表的共享窄面板档 480px 降级：`PermissionSelect` 保留随级别变化的图标加箭头，`ModelSelect` 把名称和推理等级换成新增的 `IconSparkle16` 图标加箭头，完整身份信息仍由 `aria-label` 和 `title` 承载。300px 以下 trailing 组独占整行——即既有 ≤359px compact 规则的容器版。全部降级是纯 CSS；没有容器祖先的挂载点（会话设置 sheet）永不命中，标签保持完整。
+Composer 的 `.row` 是匿名 inline-size 容器（此前已为模型触发器的 `cqw` 上限声明），chip 按它在响应式 shell 词汇表的共享窄面板档 480px 降级：`PermissionSelect` 保留随级别变化的图标加箭头，`ModelSelect` 把名称和推理等级换成新增的 `IconSparkle16` 图标加箭头，完整身份信息仍由 `aria-label` 和 `title` 承载。300px 以下 trailing 组独占整行——即既有 ≤359px compact 规则的容器版。全部降级是纯 CSS；没有容器祖先的挂载点（会话设置 sheet）永不命中，标签保持完整。compact 视口豁免标签收起：它的 trailing 组已独占一个放得下名称的 grid 单元格，因此 `[data-viewport='compact']` 恢复标签并隐藏图标。
 
 ## 已考虑的替代方案
 
@@ -22,7 +22,7 @@ Composer 的 `.row` 是匿名 inline-size 容器（此前已为模型触发器�
 
 ## 影响
 
-任何窄 composer——手机、窄窗口、任意视口宽度下的工作台列——都会一致降级，因为查询回答的是卡片自身的宽度。图标态下每个 chip 的可见标签区收缩到 44px，但可访问名称和 tooltip 都保留。≤359px 卸载为汇总条的手机路径不受影响，模型菜单的底部 sheet 呈现也不受影响。
+非 compact 框架里的窄 composer——窄窗口、任意宽视口下的工作台列——按卡片自身宽度降级，而 compact 手机保留其 grid 布局本已放得下的可读标签。图标态下每个 chip 的可见标签区收缩到 44px，但可访问名称和 tooltip 都保留。≤359px 卸载为汇总条的手机路径不受影响，模型菜单的底部 sheet 呈现也不受影响。
 
 ## 验证
 

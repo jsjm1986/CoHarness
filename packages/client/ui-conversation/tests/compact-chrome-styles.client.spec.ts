@@ -84,9 +84,11 @@ describe('conversation compact chrome', () => {
     const permission = readFileSync(fileURLToPath(new URL('../src/client/skeleton/PermissionSelect.module.css', import.meta.url)), 'utf8')
     // The row is an anonymous inline-size container so the queries below answer
     // the card's real width — a narrow workbench column inside a wide window
-    // degrades the same as a narrow phone.
+    // degrades there. The compact phone layout exempts the label: its trailing
+    // grid cell already fits the text.
     expect(input).toMatch(/\.row\s*\{[^}]*container-type:\s*inline-size/u)
     expect(permission).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.triggerLabel\s*\{[^}]*display:\s*none/u)
+    expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel\s*\{[^}]*display:\s*block/u)
     expect(input).toMatch(/@container\s*\(max-width:\s*300px\)\s*\{[^@]*\.trailing\s*\{[^}]*flex-basis:\s*100%/u)
   })
 })

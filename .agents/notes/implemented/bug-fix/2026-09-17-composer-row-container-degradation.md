@@ -10,7 +10,7 @@ The composer toolbar holds eight controls (attach, documents, commands, permissi
 
 ## Decision
 
-The composer `.row` is the anonymous inline-size container (already declared for the model trigger's `cqw` cap), and the chips degrade on it at the shared 480px narrow-panel step from the responsive-shell vocabulary: `PermissionSelect` keeps its level-varying glyph and chevron, `ModelSelect` swaps the name and effort for a new `IconSparkle16` glyph plus chevron while `aria-label` and `title` keep the full identity. Below 300px the trailing group takes its own full-width row — the container version of the existing ≤359px compact rule. All degradation is CSS-only; mounts without a container ancestor (the session settings sheet) never match and keep their labels.
+The composer `.row` is the anonymous inline-size container (already declared for the model trigger's `cqw` cap), and the chips degrade on it at the shared 480px narrow-panel step from the responsive-shell vocabulary: `PermissionSelect` keeps its level-varying glyph and chevron, `ModelSelect` swaps the name and effort for a new `IconSparkle16` glyph plus chevron while `aria-label` and `title` keep the full identity. Below 300px the trailing group takes its own full-width row — the container version of the existing ≤359px compact rule. All degradation is CSS-only; mounts without a container ancestor (the session settings sheet) never match and keep their labels. The compact viewport is exempt from the label collapse: its trailing group already owns a grid cell wide enough for the name, so `[data-viewport='compact']` restores the label and hides the glyph.
 
 ## Alternatives considered
 
@@ -22,7 +22,7 @@ The composer `.row` is the anonymous inline-size container (already declared for
 
 ## Consequences
 
-Any narrow composer — phone, narrow window, or a workbench column at any viewport width — degrades identically because the queries answer the card's own width. The visible label area per chip drops to 44px at the icon tier; both keep accessible names and tooltips. The ≤359px unmount-to-summary phone path is untouched, and so is the model menu's bottom-sheet presentation.
+A narrow composer inside a non-compact frame — narrow window or a workbench column at any wide viewport — degrades on the card's own width, while compact phones keep the readable labels their grid layout already affords. The visible label area per chip drops to 44px at the icon tier; both keep accessible names and tooltips. The ≤359px unmount-to-summary phone path is untouched, and so is the model menu's bottom-sheet presentation.
 
 ## Verification
 

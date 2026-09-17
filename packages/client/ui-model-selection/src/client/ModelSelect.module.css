@@ -95,6 +95,22 @@
   }
 }
 
+/* The compact phone layout already seats the trailing group in its own grid
+   cell with room for the name and effort; the collapse above targets
+   squeezed non-compact columns, not the phone row. */
+:global([data-viewport='compact']) .trigger {
+  width: 100%;
+}
+
+:global([data-viewport='compact']) .triggerLabel,
+:global([data-viewport='compact']) .triggerEffort {
+  display: block;
+}
+
+:global([data-viewport='compact']) .triggerGlyph {
+  display: none;
+}
+
 /* Effort value beside the model name (mock's 'High': same 13/20/500, caption tone). */
 .triggerEffort {
   flex: 0 0 auto;
