@@ -62,7 +62,7 @@ async function setupWithTasks() {
  * Build a fake {@link Agent} with the shared agent/session identity, give it a
  * dedicated lifecycle fiber for `Agent.ctx`, and register it in `ctx.agents`.
  */
-function registerFakeAgent(ctx: Context, sessionId: string, inject: (...args: unknown[]) => void = () => {}): Agent {
+async function registerFakeAgent(ctx: Context, sessionId: string, inject: (...args: unknown[]) => void = () => {}): Promise<Agent> {
   const scopeFiber = ctx.plugin(() => {})
   const id = SessionId(sessionId)
   const agent = {
@@ -71,7 +71,7 @@ function registerFakeAgent(ctx: Context, sessionId: string, inject: (...args: un
     inject,
     session: { id, header: { version: 0, id, createdAt: 0 } },
   } as unknown as Agent
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return agent
 }
 let callCounter = 0
@@ -495,7 +495,7 @@ describe('background execution through the job runtime', () => {
   it('a background job started by an agent is registered with that agent as owner', async () => {
     // The producer must forward exec.agent as the job owner.
     const ctx = await setupWithTasks()
-    const agent = registerFakeAgent(ctx, 'sess-owner')
+    const agent = await registerFakeAgent(ctx, 'sess-owner')
     const started = await call(ctx, 'bash', { command: 'sleep 60', description: 'test command', run_in_background: true }, agent)
     expect(text(started)).toBe('started background job bash-1')
 
@@ -664,7 +664,7 @@ describe('sandbox escalation through the generic task producer', () => {
     const { ctx, bash } = await setupSandboxed(true)
     ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
     const agent = sandboxAgent(undefined, ctx)
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     const foreground = await ctx.tools.execute({
       callId: CallId('sandbox-signal'),
       name: 'bash',
@@ -684,7 +684,7 @@ describe('sandbox escalation through the generic task producer', () => {
     const agent = sandboxAgent(undefined, ctx, (type) => {
       if (type === 'approval/decided') controller.abort()
     })
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
     const start = vi.spyOn(bash, 'start')
 
@@ -1146,7 +1146,7 @@ describe('the model-facing bash tool builds its request from named args only (no
 
   it('injects the session id and JSONL target path into a foreground request', async () => {
     const { ctx, bash } = await setupRecording(true)
-    const agent = registerFakeAgent(ctx, 'request-fg', () => undefined)
+    const agent = await registerFakeAgent(ctx, 'request-fg', () => undefined)
     const path = ctx.sessionPersistence.locate(agent.session.header)?.path
 
     await ctx.tools.execute({
@@ -1167,7 +1167,7 @@ describe('the model-facing bash tool builds its request from named args only (no
 
   it('injects the same trusted variables into a background request without forwarding model env', async () => {
     const { ctx, bash } = await setupRecording(true)
-    const agent = registerFakeAgent(ctx, 'request-bg', () => undefined)
+    const agent = await registerFakeAgent(ctx, 'request-bg', () => undefined)
     const path = ctx.sessionPersistence.locate(agent.session.header)?.path
 
     await ctx.tools.execute({
@@ -1194,7 +1194,7 @@ describe('the model-facing bash tool builds its request from named args only (no
 
   it('injects built-ins and the stable session id when no JSONL locator is available', async () => {
     const { ctx, bash } = await setupRecording()
-    const agent = registerFakeAgent(ctx, 'request-id-only', () => undefined)
+    const agent = await registerFakeAgent(ctx, 'request-id-only', () => undefined)
     const ambient = process.env.DSH_SESSION_ID
 
     await ctx.tools.execute({
@@ -1215,8 +1215,8 @@ describe('the model-facing bash tool builds its request from named args only (no
 
   it('keeps parent and child agent session environments isolated', async () => {
     const { ctx, bash } = await setupRecording(true)
-    const parent = registerFakeAgent(ctx, 'request-parent', () => undefined)
-    const child = registerFakeAgent(ctx, 'request-child', () => undefined)
+    const parent = await registerFakeAgent(ctx, 'request-parent', () => undefined)
+    const child = await registerFakeAgent(ctx, 'request-child', () => undefined)
 
     for (const [callId, agent] of [['parent', parent], ['child', child]] as const) {
       await ctx.tools.execute({

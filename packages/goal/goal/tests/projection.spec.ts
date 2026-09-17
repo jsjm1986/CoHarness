@@ -30,7 +30,7 @@ interface Bench {
 }
 
 /** Register a minimal registry-compatible live agent over a store session. */
-function liveAgent(ctx: Context, session: Session): Agent {
+async function liveAgent(ctx: Context, session: Session): Promise<Agent> {
   const status: AgentStatus = 'idle'
   const agent: Agent = {
     id: session.id,
@@ -50,7 +50,7 @@ function liveAgent(ctx: Context, session: Session): Agent {
     whenIdle() { return Promise.resolve() },
   }
   sessionBackedInbox(agent)
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return agent
 }
 
@@ -61,7 +61,7 @@ async function harness(withGoal: boolean): Promise<Bench> {
   await ctx.plugin(SessionProjectionRegistry)
   if (withGoal) await ctx.plugin(GoalService)
   const session = ctx.sessions.create()
-  const agent = liveAgent(ctx, session)
+  const agent = await liveAgent(ctx, session)
   return {
     ctx,
     session,

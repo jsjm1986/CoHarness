@@ -213,7 +213,7 @@ describe('sessions.list cold merge', () => {
         createdAt: meta.createdAt,
       },
     })
-    ctx.agents.register({ id: session.id, session, status: 'running', ctx } as Agent)
+    await ctx.agents.register({ id: session.id, session, status: 'running', ctx } as Agent)
     release.resolve(undefined)
 
     const response = await listing
@@ -251,7 +251,7 @@ describe('attached updatedAt tracks human prompts', () => {
       ],
       meta: { cwd: '/proj', createdAt: 500 },
     })
-    ctx.agents.register({ id: resumed.id, session: resumed, status: 'idle', ctx } as Agent)
+    await ctx.agents.register({ id: resumed.id, session: resumed, status: 'idle', ctx } as Agent)
     const boundary = resumed.snapshotEvents().at(-1)
     expect(boundary?.type).toBe('session/end-seed')
     expect(boundary?.time).toBeGreaterThan(worked)
@@ -805,7 +805,7 @@ describe('Remote Agent and Session lookup policy', () => {
       meta: { cwd: '/proj', parentSession: sid('session-parent'), origin: 'subagent' },
     })
     const liveAgent = { id: liveSession.id, session: liveSession, status: 'idle', ctx } as Agent
-    ctx.agents.register(liveAgent)
+    await ctx.agents.register(liveAgent)
     const resume = vi.spyOn(ctx.agents, 'resume')
     const defaultAgentLookup = ctx.typert.lookups.get('agent')
     const defaultSessionLookup = ctx.typert.lookups.get('session')
@@ -952,7 +952,7 @@ describe('subagent ownership fence', () => {
     await ctx.plugin(UserQuestionService)
     const parentSession = ctx.sessions.create(sid('session-parent'), { meta: { cwd: '/proj' } })
     const parent = { id: parentSession.id, session: parentSession, status: 'idle', ctx } as Agent
-    ctx.agents.register(parent)
+    await ctx.agents.register(parent)
 
     const originSession = ctx.sessions.create(sid('session-origin-child'), {
       meta: { cwd: '/proj', parentSession: parent.id, origin: 'subagent' },
@@ -967,7 +967,7 @@ describe('subagent ownership fence', () => {
       cancel,
       updateInbox,
     } as unknown as Agent
-    ctx.agents.register(originChild)
+    await ctx.agents.register(originChild)
 
     const startingSession = ctx.sessions.create(sid('session-starting-child'), {
       meta: { cwd: '/proj', parentSession: parent.id },
@@ -1020,7 +1020,7 @@ describe('subagent ownership fence', () => {
     })
     const followup = vi.fn()
     const agent = { id: session.id, session, status: 'idle', ctx, followup } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
 
     const response = await api.sessions.prompt(request({
@@ -1040,7 +1040,7 @@ describe('subagent ownership fence', () => {
     const session = ctx.sessions.create(sid('session-browser-zone'), { meta: { cwd: '/proj' } })
     const followup = vi.fn()
     const agent = { id: session.id, session, status: 'idle', ctx, followup } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
       cwd: '/tmp',
@@ -1174,7 +1174,7 @@ describe('sessions.prompt storage service selection', () => {
     } as never)
     const session = ctx.sessions.create(sid('session-document-only'), { meta: { cwd: '/proj' } })
     const followup = vi.fn<Agent['followup']>()
-    ctx.agents.register({ id: session.id, session, status: 'idle', ctx, followup } as unknown as Agent)
+    await ctx.agents.register({ id: session.id, session, status: 'idle', ctx, followup } as unknown as Agent)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
 
     const response = await api.sessions.prompt(request({
@@ -1213,7 +1213,7 @@ describe('sessions.prompt synchronous rejection', () => {
     const session = ctx.sessions.create(sid('session-throwing'))
     // A live structural stub whose delivery verbs throw synchronously, the
     // shape a disposed loop presents at this gateway boundary.
-    ctx.agents.register({
+    await ctx.agents.register({
       id: session.id,
       session,
       status: 'idle',
@@ -1254,7 +1254,7 @@ describe('sessions.prompt synchronous rejection', () => {
     // while the generic cold resume is in flight, so the resume collides.
     const parentSession = ctx.sessions.create(sid('race-parent'), { meta: { cwd: '/proj' } })
     const parent = { id: parentSession.id, session: parentSession, status: 'idle', ctx } as Agent
-    ctx.agents.register(parent)
+    await ctx.agents.register(parent)
     const childSession = ctx.sessions.create(sessionId, {
       meta: { cwd: '/proj', parentSession: parent.id, origin: 'subagent' },
     })
@@ -1262,7 +1262,7 @@ describe('sessions.prompt synchronous rejection', () => {
     vi.spyOn(ctx.agents, 'resume').mockImplementationOnce(async () => {
       // The parent's `enter()` wins the identity between the pre-resume
       // re-check and publication; the generic resume then collides.
-      ctx.agents.register(child)
+      await ctx.agents.register(child)
       throw new Error('session id already published')
     })
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })

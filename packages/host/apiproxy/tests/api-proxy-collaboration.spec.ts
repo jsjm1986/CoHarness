@@ -829,8 +829,8 @@ describe('project collaboration host description', () => {
     const { ctx, api } = await harness(authority)
     const visible = ctx.sessions.create(visibleId)
     const hidden = ctx.sessions.create(SessionId('hidden'))
-    ctx.agents.register(stubAgent(ctx, visible))
-    ctx.agents.register(stubAgent(ctx, hidden))
+    await ctx.agents.register(stubAgent(ctx, visible))
+    await ctx.agents.register(stubAgent(ctx, hidden))
 
     const described = expectOk(await api.host.describe(request({})))
     expect(described.attachedSessions).toBe(1)

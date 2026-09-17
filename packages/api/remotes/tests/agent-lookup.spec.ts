@@ -100,7 +100,7 @@ describe('API Remote Agent resolver races', () => {
       provideSession(ctx, meta, () => Promise.resolve({ meta, events: [] }))
       vi.spyOn(ctx.agents, 'resume').mockImplementationOnce(async () => {
         const session = ctx.sessions.create(sessionId, { meta: { cwd: '/proj', origin: 'subagent' } })
-        if (winner === 'agent') ctx.agents.register(stubAgent(ctx, session))
+        if (winner === 'agent') await ctx.agents.register(stubAgent(ctx, session))
         throw new Error('session id already published')
       })
 
@@ -139,7 +139,7 @@ describe('API Remote Agent resolver races', () => {
     const ctx = await createContext()
     const sessionId = sid('context-owned-subagent')
     const session = ctx.sessions.create(sessionId, { meta: { cwd: '/proj', origin: 'subagent' } })
-    ctx.agents.register(stubAgent(ctx.extend(), session))
+    await ctx.agents.register(stubAgent(ctx.extend(), session))
     const defaultProvider = ctx.typert.contexts.getHost('agent')
     createApiRemoteAgentResolver(ctx, {})
     await vi.waitFor(() => { expect(ctx.typert.contexts.getHost('agent')).not.toBe(defaultProvider) })

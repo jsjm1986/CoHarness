@@ -175,7 +175,7 @@ describe('mux live view computation', () => {
     const session = ctx.sessions.create()
     // history resolves the agent first; a live structural stub is enough (only
     // .session is read on this path).
-    ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+    await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
     session.append('turn/start', { turn: 1 })
     session.append('tool/call', { turn: 1, step: 1, callId: CallId('h-term'), name: 'term', arguments: '{"cmd":"ls"}' })
     // meta rides through to presentResult's ToolResult (the spread arm).
@@ -241,7 +241,7 @@ describe('mux live view computation', () => {
     const { ctx } = await harness()
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
     const session = ctx.sessions.create()
-    ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+    await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
     session.append('turn/start', { turn: 1 })
     const first = appendUserText(session, 'first prompt')
     appendAssistantText(session, 'first reply', 1)
@@ -290,7 +290,7 @@ describe('mux live view computation', () => {
     const { ctx } = await harness()
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
     const session = ctx.sessions.create()
-    ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+    await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
     session.append('turn/start', { turn: 1 })
     const sources = Array.from({ length: 128 }, (_unused, index) => session.append('assistant/chunk', {
       turn: 1,

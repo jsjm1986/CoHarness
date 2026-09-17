@@ -112,9 +112,7 @@ export function apply(ctx: Context, config: Config): void {
 
   const model = config.model ?? ''
 
-  // SessionStart is the one emit-shaped (detached) point Codex has: track its
-  // run chains so disposal aborts a still-running hook process and drains the
-  // continuation (docs/defensive-patterns.md: dispose must reach quiescence).
+  // Track initialization continuations so bridge disposal aborts and drains them.
   const detached = createDetachedRuns()
   ctx.effect(() => () => detached.drain(), 'hooks-codex: drain detached hook runs')
 
@@ -196,16 +194,17 @@ export function apply(ctx: Context, config: Config): void {
     return [ours, ...theirs ?? []]
   }
 
-  // SessionStart injects plain stdout when its detached hook resolves; a slow
-  // hook may miss the first request.
-  // TODO(session-start-gating): add a startup gate before promising first-turn delivery.
-  ctx.on('agent/session-start', ({ agent, source }) => {
-    detached.track(runPoint('SessionStart', source, { ...base(ctx, agent, 'SessionStart', model), source }, { agent, plainStdoutAsContext: true, signal: detached.signal })
+  ctx.on('agent/created', async ({ agent, source, signal }) => {
+    const initializationSignal = signal === undefined ? detached.signal : AbortSignal.any([signal, detached.signal])
+    const run = runPoint('SessionStart', source, { ...base(ctx, agent, 'SessionStart', model), source }, { agent, plainStdoutAsContext: true, signal: initializationSignal })
       .then((merged) => {
+        if (initializationSignal.aborted) return
         const context = contextFrom(merged)
         if (context) agent.inject(context)
       })
-      .catch((error: unknown) => { ctx.logger.warn(`hooks-codex: SessionStart hook failed: ${String(error)}`) }))
+      .catch((error: unknown) => { ctx.logger.warn(`hooks-codex: SessionStart hook failed: ${String(error)}`) })
+    detached.track(run)
+    await run
     /* jscpd:ignore-end */
   })
 

@@ -206,18 +206,20 @@ export interface Agent {
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    // ---- lifecycle (emit) ----
+    // ---- lifecycle ----
     /**
-     * A fully configured agent and live session were published. Setup is
-     * composition-only; `agent/session-start` is the first startup-driving extension point.
-     * Synchronous listener failure vetoes publication, while returned-promise
-     * rejection is reported. Detach requested during dispatch waits until every
-     * creation listener has observed the stable entry.
+     * Initialize a fully configured agent and live session before queued work runs.
+     * Listeners run serially and must return undefined so every listener runs.
+     * A throw or rejection vetoes initialization and skips later listeners. Detach
+     * requested during dispatch waits until the chain settles, including on rejection.
+     * Listeners must not await agent.whenIdle() or their own owner's disposal.
      * @param payload.agent - the newly registered agent with its live session and completed setup.
+     * @param payload.source - why the session started (fresh startup, resume, …).
+     * @param payload.signal - optional factory initialization cancellation signal; listeners must not retain it to control later turns.
      * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
-     * @mode emit
+     * @mode serial
      */
-    'agent/created'(this: Scoped<Agent>, payload: { agent: Agent }): void
+    'agent/created'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource; signal?: AbortSignal }): undefined | Promise<undefined>
     /**
      * An agent left the registry; AgentLoop emits this after driver quiescence
      * and scoped-registration unwind, but before session detachment. Custom
@@ -266,6 +268,7 @@ declare module '@deepseek-ai/cordis' {
     'agent/inbox/discarded'(this: Scoped<Agent>, payload: { agent: Agent; message: UserMessage }): void
     // ---- session lifecycle (emit) ----
     /**
+     * Retained for staged migration; use awaited `agent/created` initialization.
      * The session lifecycle began, once before the first turn. Use
      * `agent.inject()` to seed model-facing context. This is a notification, not
      * a veto; disposal requested by a lifecycle owner is rechecked before the

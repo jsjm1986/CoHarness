@@ -14,7 +14,7 @@ import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
 import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
-function fakeAgent(ctx: Context, rawId: string): Agent {
+async function fakeAgent(ctx: Context, rawId: string): Promise<Agent> {
   const scope = ctx.plugin(() => {})
   const id = SessionId(rawId)
   const session = Session.create(id)
@@ -27,7 +27,7 @@ function fakeAgent(ctx: Context, rawId: string): Agent {
     runMaintenance: job => job(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
   }
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return agent
 }
 
@@ -116,7 +116,7 @@ async function setupBase(jobs: boolean) {
     await ctx.plugin(LocalJobRegistry)
     await ctx.plugin(ToolTasks)
   }
-  return { ctx, stub, agent: fakeAgent(ctx, jobs ? 'with-tasks' : 'foreground') }
+  return { ctx, stub, agent: await fakeAgent(ctx, jobs ? 'with-tasks' : 'foreground') }
 }
 
 let callNumber = 0

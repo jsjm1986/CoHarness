@@ -403,9 +403,13 @@ export function defineCoverageCases(groups: CoverageGroup | readonly CoverageGro
       const adapter = new MockAdapter([textResponse('ok')])
       const ctx = await harness(join(d, 'hooks.json'), adapter)
       const warn = vi.fn(); ctx.logger.warn = warn as never
-      const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
-      agent.inject = (() => { throw new Error('inject boom') })
-      await waitFor(() => warn.mock.calls.some(c => String(c[0]).includes('SessionStart hook failed')))
+      await ctx.agents.create({
+        sessionId: SessionId('a1'),
+        agentOptions: { provider: 'mock', model: 'mock' },
+        setup: (_agentCtx, agent) => {
+          agent.inject = (() => { throw new Error('inject boom') })
+        },
+      })
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('SessionStart hook failed'))
     })
   })

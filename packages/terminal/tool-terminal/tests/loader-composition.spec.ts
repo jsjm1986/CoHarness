@@ -37,7 +37,7 @@ class PassthroughSandbox extends SandboxProvider {
   }
 }
 
-function agent(ctx: Context): Agent {
+async function agent(ctx: Context): Promise<Agent> {
   const scope = ctx.plugin(() => {})
   const id = SessionId('pty-loader-agent')
   const session = Session.create(id)
@@ -50,7 +50,7 @@ function agent(ctx: Context): Agent {
     runMaintenance: job => job(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
   }
-  ctx.agents.register(value)
+  await ctx.agents.register(value)
   return value
 }
 
@@ -112,7 +112,7 @@ suite('terminal real Loader composition through cordis.yml', () => {
     await context.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(configPath).href } })
     await context.loader.await()
 
-    const owner = agent(context)
+    const owner = await agent(context)
     const signal = new AbortController().signal
     const spawn = await context.tools.execute({
       signal, callId: CallId('spawn'), name: 'terminal_open', arguments: { type: 'shell', name: 'main', cwd: root }, agent: owner,

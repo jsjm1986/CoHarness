@@ -63,7 +63,7 @@ async function harness(config: { defaultMaxGoalRounds?: number } = {}) {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(GoalService, config)
   const stub = stubAgent(`goal-test-${Math.random()}`)
-  ctx.agents.register(stub.agent)
+  await ctx.agents.register(stub.agent)
   return { ctx, ...stub }
 }
 
@@ -134,7 +134,7 @@ describe('GoalService creation and replay', () => {
     await ctx.plugin(AgentRegistry)
     const goals = new GoalService(ctx)
     const stub = stubAgent('goal-direct-construction')
-    ctx.agents.register(stub.agent)
+    await ctx.agents.register(stub.agent)
     expect(goals.create(stub.agent, { objective: 'direct' })).toMatchObject({
       objective: 'direct', maxGoalRounds: 256,
     })
@@ -158,7 +158,7 @@ describe('GoalService creation and replay', () => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(GoalService)
     const resumed = stubAgent('seeded-goal', first.session.snapshotEvents())
-    ctx.agents.register(resumed.agent)
+    await ctx.agents.register(resumed.agent)
     expect(ctx.goals.get(resumed.agent)).toMatchObject({
       id: created.id,
       roundsStarted: 2,
@@ -172,12 +172,12 @@ describe('GoalService creation and replay', () => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(GoalService)
     const parent = stubAgentForSession(ctx.sessions.create(SessionId('goal-fork-parent')))
-    ctx.agents.register(parent.agent)
+    await ctx.agents.register(parent.agent)
     const goal = ctx.goals.create(parent.agent, { objective: 'inherit through fork', maxGoalRounds: 5 })
     appendRound(parent.session, goal, 1)
 
     const child = stubAgentForSession(ctx.sessions.fork(parent.session))
-    ctx.agents.register(child.agent)
+    await ctx.agents.register(child.agent)
     expect(ctx.goals.get(child.agent)).toMatchObject({
       id: goal.id,
       objective: goal.objective,
@@ -220,7 +220,7 @@ describe('GoalService creation and replay', () => {
     const fiber = await ctx.plugin(GoalService)
     const first = ctx.goals
     const stub = stubAgent('goal-hmr')
-    ctx.agents.register(stub.agent)
+    await ctx.agents.register(stub.agent)
     const goal = first.create(stub.agent, { objective: 'survive service reload' })
 
     await fiber.dispose()
@@ -427,7 +427,7 @@ describe('GoalService mutations', () => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(GoalService)
     const stub = stubAgentForSession(ctx.sessions.create(SessionId('goal-reentrant-observer')))
-    ctx.agents.register(stub.agent)
+    await ctx.agents.register(stub.agent)
     let observed: ReturnType<GoalService['get']>
     ctx.on('session/event', (session, event) => {
       if (session === stub.session && event.type === 'goal/change') observed = ctx.goals.get(stub.agent)
@@ -446,7 +446,7 @@ describe('GoalService mutations', () => {
     await ctx.plugin(GoalService)
     const stub = stubAgent('goal-independent-injection')
     stub.agent.inject = () => { throw new Error('injection must not be called') }
-    ctx.agents.register(stub.agent)
+    await ctx.agents.register(stub.agent)
 
     expect(ctx.goals.create(stub.agent, { objective: 'persist directly' })).toMatchObject({
       objective: 'persist directly',

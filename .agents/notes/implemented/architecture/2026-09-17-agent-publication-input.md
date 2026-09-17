@@ -20,6 +20,6 @@ AgentLoop runs setup and publication inside the existing maintenance operation. 
 
 ## Consequences
 
-Creation is observable as maintenance activity. Listeners must not await the Agent's own idle state during initialization. Public creation events remain synchronous; returned listener Promises are not awaited. Serial event migration remains incomplete.
+Creation is observable as maintenance activity. Listeners must not await the Agent's own idle state during initialization. Serial `agent/created` listeners are awaited; `agent/session-start` remains a synchronous migration notification. Direct registry users must await registration before using an Agent.
 
 Seven unit regressions cover successful publication, failed publication, retained input after disposed maintenance, repeated cancellation, root unload during replay, and ordinary cancellation with and without a subsequent wake. A driver that cannot enter its closing initiator scope returns to idle and settles its reserved completion without starting a turn. The headless product CLI snapshot pins publication rejection without a started turn; existing TypeScript SDK snapshots retain their expected output. Python packaged-runtime expected-output coverage remains unverified; the broader lifecycle migration is not release-ready.

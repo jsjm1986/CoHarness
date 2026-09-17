@@ -686,14 +686,13 @@ export class AgentLoop extends Service implements AgentFactory {
       return {
         agent,
         signal: abort.signal,
-        // oxlint-disable-next-line typescript/require-await -- async surfaces publication throws as rejections.
         publish: async (source) => {
           assertLive()
           detachSession = agent.ctx.sessions.enter(session)
           detachAgent = loopCtx.agents.enter(agent, parentAgent)
           agent.ctx.sessions.announce(session)
           assertLive()
-          loopCtx.agents.announce(agent)
+          await loopCtx.agents.announce(agent, source, abort.signal)
           assertLive()
           // A synchronous announce/session-start listener may have started
           // teardown; the machine is already live (delivery works from the

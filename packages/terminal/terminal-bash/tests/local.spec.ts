@@ -76,7 +76,7 @@ async function harness(
     maxReadBytes: 16_384,
   })
   const agent = stubAgent(ctx, `agent-${mode}`)
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return { ctx, root, agent, fiber, sandbox: ctx.sandbox as PassthroughSandbox }
 }
 

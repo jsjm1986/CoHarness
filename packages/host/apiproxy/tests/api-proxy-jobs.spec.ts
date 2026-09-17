@@ -63,7 +63,7 @@ async function harness(withRegistry: boolean): Promise<{ ctx: Context; session: 
     ctx,
   } as Agent
   sessionBackedInbox(agent)
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return { ctx, session, agent }
 }
 

@@ -65,8 +65,9 @@ export const inject = ['llm']
 export function apply(ctx: Context): void {
   ctx.llm.registerAdapter(['cli-mock'], new CliMockAdapter())
   if (process.env.DSH_CLI_PUBLICATION_FAILURE === '1') {
-    ctx.on('agent/created', ({ agent }) => {
+    ctx.on('agent/created', async ({ agent }) => {
       agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Do not execute unpublished work.' }], source: { kind: 'user' } }))
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
       const started = agent.session.snapshotEvents().some(event => event.type === 'turn/start')
       process.stdout.write(`publication turn started: ${started}\n`)
       throw new Error('CLI publication rejected')

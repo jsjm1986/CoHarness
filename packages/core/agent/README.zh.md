@@ -16,8 +16,8 @@ Agent 接口、注册表、进程本地发起方作用域，以及 `agent/*` 事
 
 `AgentOptions` 提供初始的提供方／模型路由，以及可选的正数 `maxTokens` 输出上限。具体循环会解析确切模型的适配器默认值，把生效上限记录到请求 header，并应用到每次对话模型请求；显式 Agent 选项优先，省略时由适配器或提供方路由默认值控制。
 
-- `ctx.agents.register(agent: Agent): () => void`：记录一个 **已经构造完成** 的 agent。随调用 fiber dispose。
-- 高级有序生命周期：`enter(agent, owner): () => void` 强制 `agent.id === agent.session.id`，执行权威 ID 冲突检查，并在不通知的情况下插入；`owner` 显式记录实时创建方 agent 关系（根 agent 为 `undefined`），与持久会话谱系无关。`announce(agent)` 恰好发出一次 `agent/created`。创建监听器同步请求的 detach 会延后到该次分发结束；每次 detach 都会检查捕获的条目对象，因此陈旧能力无法删除后续使用同一 ID 的替代项。异步工厂使用这一拆分；普通插件使用 `register()`。
+- `ctx.agents.register(agent: Agent): ReturnType<Context['effect']>`：以 `startup` 来源记录一个 **已经构造完成** 的 agent。返回确切的可等待 Cordis effect disposer：保留它，使用 agent 前执行 `await registration`，释放时执行 `await registration()`。初始化失败会回滚条目。它随调用 fiber dispose；嵌套有序 teardown 时必须 yield 原始 effect，而不是包装函数。
+- 高级有序生命周期：`enter(agent, owner): () => void` 强制 `agent.id === agent.session.id`，执行权威 ID 冲突检查，并在不通知的情况下插入；`owner` 显式记录实时创建方 agent 关系（根 agent 为 `undefined`），与持久会话谱系无关。`await announce(agent, source, signal?)` 恰好执行一次串行 `agent/created` 初始化；source 必填，可选取消信号原样传递。初始化期间请求的 detach 会延后到分发结算，包括拒绝的情况。每次 detach 都会检查捕获的条目对象，因此陈旧能力无法删除后续使用同一 ID 的替代项。异步工厂通过这一拆分负责回滚；普通插件使用 `register()`。
 - `ctx.agents.get(id: SessionId): Agent | undefined`
 - `ctx.agents.isOwnedBy(id: SessionId, owner: Agent): boolean`：该确切实时条目是否通过父 agent 的作用域上下文创建；运行时所有权与持久会话谱系无关。
 - `ctx.agents.list(): Agent[]`
@@ -50,7 +50,9 @@ Agent *创建* 由实现 `AgentFactory` 的插件（`dsh-agent-loop`）提供，
 
 `dsh-agent` 声明实时 `agent/*` 协调词汇，使插件不必依赖具体循环。确切签名、分发 mode、作用域筛选规则与 payload 约定位于 [core.md](../../../docs/subsystems/core.zh.md#cordis-surface) 的生成区块；[架构轮次流](../../../docs/architecture.zh.md#turn-flow) 展示它们与持久会话事件的相对顺序。
 
-生命周期边有两个重要的本地注意事项。`agent/created` 在作用域 setup 之后、会话与 agent 注册表条目都存在之后运行。Setup 是受信任、仅用于组合的代码；紧随其后且不可 veto 的 `agent/session-start` 通知是第一个受支持的启动注入点。`agent/disposed` 始终表示确切 agent 已离开注册表。AgentLoop 在其驱动器完全停稳后发出该事件，而有序 teardown 此时可能仍在分离会话并撤销作用域；直接注册的自定义 agent 自行拥有任何更强的驱动器顺序约定。
+`agent/created` 在作用域 setup 之后、两个注册表条目都存在之后运行。它是可等待的串行初始化：监听器必须返回 `undefined` 或 `Promise<undefined>`，抛出或拒绝会使创建失败并跳过后续监听器。载荷携带启动来源与可选的初始化取消信号。监听器可以注入启动上下文，但不得等待 `agent.whenIdle()` 或自身所有者的 disposal，因为排队工作和 teardown 都在等待初始化。`agent/session-start` 作为不可 veto 的通知保留，用于分阶段迁移；不要在两个事件上重复注册同一初始化逻辑。
+
+`agent/disposed` 始终表示确切 agent 已离开注册表。AgentLoop 在其驱动器完全停稳后发出该事件，而有序 teardown 此时可能仍在分离会话并撤销作用域；直接注册的自定义 agent 自行拥有任何更强的驱动器顺序约定。
 
 大多数拦截点都是协作式 waterfall（瀑布式事件）。`agent/pre-step` 接收一个 payload，携带主体 `agent`、独占的已领取 `UserMessage[]` 以及拟进入的 `turn`、`step` 与取消 `signal`；当工具已经要求继续请求时，该批次可以为空。agent 作用域轮次扩展点在 payload 中携带显式 `AbortSignal`；其余轮次作用域扩展点通过其请求值接收它。监听器可以配合信号，但不得将它保留为控制另一轮次的权限。`agent/request-error` 是失败模型请求的恢复 waterfall：它接收请求坐标、规范化失败事实、可用时提供服务的注册项重试策略以及信号。拥有恢复权的监听器返回 `{ kind: 'retry' }` 且不调用 `next()`。`agent/turn-stopping` 在本可完成的轮次关闭前运行。信号生命周期由[显式取消决策](../../../.agents/notes/implemented/architecture/2026-07-16-explicit-turn-cancellation.zh.md)拥有；作用域分发与终止结算由 [agent 作用域 runtime 设计 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-12-agent-scope-runtime-design.zh.md#three-execution-boundaries-are-deliberately-one-way)拥有。
 
@@ -119,7 +121,7 @@ inbox 的实时通知刻意采用逐消息的最小载荷：`agent/inbox/inserte
 - **发起方作用域只存在于进程内**：worker、子进程、HTTP、持久队列和重启必须显式传递所需身份。
 - **环境身份可能比存活状态更久**：消费方在生命周期敏感工作前，仍要检查 `agent.status`、取消状态和所属能力约定。
 - **委派以外的 agent 间通道**：共享状态、流式子输出和后台／轮询语义仍在当前同步 `ctx.subagents` seam 之外。
-- **`agent/session-start` 不能为启动设置门禁**：它仍是同步且不可 veto 的通知；必须在发布前完成的异步组合属于工厂的 `setup(agentCtx, agent)` 事务。
+- **`agent/session-start` 不能为启动设置门禁**：它仍是同步且不可 veto 的迁移通知。可等待的启动初始化属于 `agent/created`；未发布的组合属于工厂 `setup(agentCtx, agent)`。
 - **`cancel()` 默认清空 inbox**：它会中止正在处理的轮次以及排队和 steering 工作；`cancel(cause, { keepInbox: true })` 只中止轮次并保留待处理项。仍不存在只中止步骤、同时让正在处理的轮次继续运行的操作（[停止 API Agent Note](../../../.agents/notes/implemented/simplification/2026-06-20-public-agent-stop-api.zh.md)）。
 - **每条附加 `UserMessage` 恰好携带一个 `MessageSource`**：多个插件合并到一次工具调用上的贡献会归入同一来源，因此该消息无法列出多个生产者。
 - **`SessionStartSource` 预留 `'clear'`/`'compact'`，但还没有发出方**：在驱动子系统落地前，只会出现 `'startup'`/`'resume'`（`TODO(compaction)`）。

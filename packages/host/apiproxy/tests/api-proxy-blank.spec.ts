@@ -29,7 +29,7 @@ function request<P>(payload: P): RpcRequest<P> {
   return { rpcId: RpcId(`blank-${String(nextRpc++)}`), payload }
 }
 
-async function harness(): Promise<{ ctx: Context; api: ApiProxy; attach: (session: Session) => void }> {
+async function harness(): Promise<{ ctx: Context; api: ApiProxy; attach: (session: Session) => Promise<void> }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(UserQuestionService)
@@ -37,8 +37,8 @@ async function harness(): Promise<{ ctx: Context; api: ApiProxy; attach: (sessio
   return {
     ctx,
     api: createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' }),
-    attach: (session) => {
-      ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+    attach: async (session) => {
+      await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
     },
   }
 }
@@ -69,7 +69,7 @@ describe('summary blank = no visible conversation content', () => {
   it('standalone events (command lifecycle, plan/mode, title) keep the session blank', async () => {
     const { ctx, api, attach } = await harness()
     const session = ctx.sessions.create()
-    attach(session)
+    await attach(session)
     expect(await listBlank(api, session.id)).toBe(true)
     appendStandalone(session)
     expect(await listBlank(api, session.id)).toBe(true)
@@ -78,7 +78,7 @@ describe('summary blank = no visible conversation content', () => {
   it('the first turn clears blank', async () => {
     const { ctx, api, attach } = await harness()
     const session = ctx.sessions.create()
-    attach(session)
+    await attach(session)
     appendStandalone(session)
     session.append('turn/start', { turn: 0 })
     session.append('user/message', createUserMessage({
@@ -90,7 +90,7 @@ describe('summary blank = no visible conversation content', () => {
   it('keeps a turn with no conversation messages blank', async () => {
     const { ctx, api, attach } = await harness()
     const session = ctx.sessions.create()
-    attach(session)
+    await attach(session)
     session.append('turn/start', { turn: 0 })
     session.append('turn/end', { turn: 0, reason: { kind: 'completed' } })
     expect(await listBlank(api, session.id)).toBe(true)

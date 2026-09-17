@@ -66,6 +66,22 @@ async function waitFor(predicate: () => boolean, timeout = 5000, interval = 10):
 }
 
 describe('hooks-codex bridge', () => {
+  it('completes SessionStart before agent creation returns', async () => {
+    const dir = configDir()
+    const marker = join(dir, 'session-start-completed')
+    const hook = script(dir, 'startup.sh', `#!/usr/bin/env bash\nsleep 0.05\necho 'startup context'\ntouch "${marker}"\n`)
+    writeHooks(dir, { SessionStart: [{ hooks: [{ type: 'command', command: hook }] }] })
+    const ctx = await harness(dir, new MockAdapter([]))
+    try {
+      const agent = await ctx.agentLoop.create(SessionId('startup-completion'), { provider: 'mock', model: 'mock' })
+      expect(existsSync(marker)).toBe(true)
+      expect(agent.inbox.nextStep.some(message => message.content.some(block =>
+        block.type === 'text' && block.text.includes('startup context')))).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('a PreToolUse hook (exit 2) denies a tool the regex matcher matches as a substring', async () => {
     const dir = configDir()
     const deny = script(dir, 'deny.sh', '#!/usr/bin/env bash\necho "codex blocked it" >&2\nexit 2\n')
@@ -212,10 +228,11 @@ describe('hooks-codex bridge', () => {
     ctx.llm.registerAdapter(['mock'], new MockAdapter([]))
     const warn = vi.fn()
     ctx.logger.warn = warn as never
-    await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' }) // fires agent/session-start
+    const creating = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
     await waitFor(() => existsSync(marker))
     const pid = Number(readFileSync(pidFile, 'utf8').trim())
     await fiber.dispose()
+    await creating
     // Disposal reaches quiescence only after the aborted run settles and the process is reaped, so
     // `kill(pid, 0)` must report ESRCH. Untracked fire-and-forget work would remain.
     expect(() => process.kill(pid, 0)).toThrow()

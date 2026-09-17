@@ -43,7 +43,7 @@ The hooks themselves run in the agent's session workspace: for the agent-scoped 
 
 | Codex hook | Harness point | Mapping |
 |---|---|---|
-| `SessionStart` | `agent/session-start` (emit) | a plain-stdout hook's output → additionalContext → `agent.inject()` |
+| `SessionStart` | `agent/created` (serial) | a plain-stdout hook's output → additionalContext → `agent.inject()` before creation returns |
 | `UserPromptSubmit` | `agent/pre-step` (waterfall) | `block` (exit 2) → `PreStepDecision.reject`; additionalContext-only → delegate via `next()` then append a separately sourced message to a downstream `enter` decision |
 | `PreToolUse` | `tools/pre-execute` (waterfall) | `block` → `PreToolDecision.deny` (no `allow`/`ask`) |
 | `PostToolUse` | `tools/post-execute` (waterfall) | `block` → `block` with feedback; additionalContext-only → delegate via `next()` then prepend a separately sourced context to the downstream decision; PTC mode defers sub-call contexts until the outer `run_code` result |
@@ -53,7 +53,7 @@ A tool call's payload carries the real `tool_name` (the same value the matcher t
 
 Every agent-scoped stdin payload carries `session_id` and `transcript_path`. The bridge resolves the latter through `ctx.sessionPersistence.locate(session.header)` when available and otherwise sends `null`, preserving the Codex `string | null` shape. Lookup does not create or flush the artifact, so a path can be absent before the first turn-end checkpoint or omit the current open turn.
 
-`SessionStart` — the one emit point — runs detached; each run chain is tracked, and disposing the bridge aborts a still-running hook process, then drains the continuation before the dispose resolves (`createDetachedRuns` in `dsh-hook-protocol`).
+`SessionStart` is awaited during serial `agent/created` initialization, so successful context injection precedes the first request. Creation cancellation or bridge disposal aborts the hook; aborted runs do not inject context. Disposing the bridge drains tracked continuations before returning (`createDetachedRuns` in `dsh-hook-protocol`). Hook and injection failures are logged rather than vetoing creation.
 
 ## Context source
 
@@ -92,7 +92,6 @@ A blocked prompt sends no request and invalidates nothing. Denial, feedback, and
 ## Known Limitations and Deferred Work
 
 - **Unsupported hook events (5 of Codex's current 10):** `PermissionRequest`, `PreCompact`, `PostCompact`, `SubagentStart`, and `SubagentStop`. Config for these events is silently dropped during parsing. The comparison baseline is Codex's [official hook reference](https://learn.chatgpt.com/docs/hooks).
-- **`SessionStart` is partial:** plain stdout and JSON `additionalContext` work, but the hook runs detached, so context can miss the first request (`TODO(session-start-gating)`).
 - **`UserPromptSubmit` is partial:** blocking plus plain-stdout or JSON context work, but the common `systemMessage` and `{"continue": false}` controls are not enforced.
 - **`PreToolUse` is partial:** blocking works, but `additionalContext`, `permissionDecision: "allow"`, and `updatedInput` are ignored. Every tool is represented as `tool_input: { command }`, so non-shell tool arguments are not faithfully exposed to the hook.
 - **`PostToolUse` is partial:** blocking feedback and JSON `additionalContext` work, but `{"continue": false}` is not enforced, non-shell tool arguments are reduced to `{ command }`, and structured tool output is flattened to text in `tool_response`.

@@ -276,7 +276,7 @@ function sandboxAgent(
  * The fake session carries an empty event log (the sandbox-policy resolver
  * folds the log for mode overrides, mirroring a real session).
  */
-function registerFakeAgent(ctx: Context, sessionId: string): Agent {
+async function registerFakeAgent(ctx: Context, sessionId: string): Promise<Agent> {
   const scopeFiber = ctx.plugin(() => {})
   const id = SessionId(sessionId)
   const agent = {
@@ -292,7 +292,7 @@ function registerFakeAgent(ctx: Context, sessionId: string): Agent {
       snapshotEvents: () => [],
     },
   } as unknown as Agent
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return agent
 }
 
@@ -383,7 +383,7 @@ describe('execution through the bash seam', () => {
     const dshHome = mkdtempSync(join(tmpdir(), 'dsh-tool-pwsh-home-'))
     const { ctx, bash } = await setup({}, dshHome)
     bash.handler = () => runResult('hi\n')
-    const agent = registerFakeAgent(ctx, 'session-1')
+    const agent = await registerFakeAgent(ctx, 'session-1')
     Object.assign(agent.session.header, { cwd: '/sessions/s1' })
     const result = await call(ctx, 'pwsh', {
       command: 'Write-Output hi',
@@ -406,7 +406,7 @@ describe('execution through the bash seam', () => {
   it('resolves a relative workdir against the session cwd, absolute ones verbatim', async () => {
     const { ctx, bash } = await setup()
     bash.handler = () => runResult('ok\n')
-    const agent = registerFakeAgent(ctx, 'session-cwd')
+    const agent = await registerFakeAgent(ctx, 'session-cwd')
     Object.assign(agent.session.header, { cwd: '/sessions/s1' })
     await call(ctx, 'pwsh', { command: 'pwd', description: 'cwd', workdir: 'sub/dir' }, agent)
     expect(bash.requests[0]?.workdir).toBe(resolvePath('/sessions/s1', 'sub/dir'))
@@ -531,7 +531,7 @@ describe('per-call sandbox policy resolution', () => {
   it('stamps the CALLING SESSION\'s resolved policy onto the request (session cwd, not the server launch dir)', async () => {
     const { ctx, bash } = await setupSandboxed()
     const sessionCwd = mkdtempSync(join(tmpdir(), 'dsh-tool-pwsh-policy-'))
-    const agent = registerFakeAgent(ctx, 'policy-session')
+    const agent = await registerFakeAgent(ctx, 'policy-session')
     Object.assign(agent.session.header, { cwd: sessionCwd })
     const result = await call(ctx, 'pwsh', { command: 'Write-Output hi', description: 'say hi' }, agent)
     expect(result.isError).toBe(false)
@@ -653,7 +653,7 @@ describe('sandbox escalation through ctx.approval', () => {
     const { ctx, bash } = await setupSandboxed(true)
     ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
     const agent = sandboxAgent(undefined, ctx)
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     const foreground = await ctx.tools.execute({
       callId: CallId('sandbox-signal'),
       name: 'pwsh',
@@ -673,7 +673,7 @@ describe('sandbox escalation through ctx.approval', () => {
     const agent = sandboxAgent(undefined, ctx, (type) => {
       if (type === 'approval/decided') controller.abort()
     })
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
     ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
     const start = vi.spyOn(bash, 'start')
 
@@ -756,7 +756,7 @@ describe('background execution through the job runtime', () => {
 
   it('a background job started by an agent is registered with that agent as owner', async () => {
     const { ctx } = await setupWithTasks()
-    const agent = registerFakeAgent(ctx, 'sess-owner')
+    const agent = await registerFakeAgent(ctx, 'sess-owner')
     const started = await call(ctx, 'pwsh', { command: 'Start-Sleep -Seconds 60', description: 'test command', run_in_background: true }, agent)
     expect(text(started)).toBe('started background job pwsh-1')
 

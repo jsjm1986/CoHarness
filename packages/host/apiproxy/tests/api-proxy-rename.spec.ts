@@ -39,14 +39,14 @@ async function composed(withTitles = true): Promise<Context> {
   // forwarded seed/meta (the store validates the balanced prefix) and
   // registers an idle agent stub over it.
   ctx.agents.setFactory({
-    createAgent: (ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle> => {
+    createAgent: async (ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle> => {
       const session = ctx.sessions.create(options.sessionId, {
         ...options.seed === undefined ? {} : { seed: [...options.seed] },
         ...options.meta === undefined ? {} : { meta: options.meta },
       })
       const agent = { id: session.id, session, status: 'idle', ctx: ownerCtx } as Agent
-      ctx.agents.register(agent)
-      return Promise.resolve({ agent, dispose: () => Promise.resolve() })
+      await ctx.agents.register(agent)
+      return { agent, dispose: () => Promise.resolve() }
     },
     resume: () => Promise.reject(new Error('resume must not run: every source is attached')),
   })
@@ -54,7 +54,7 @@ async function composed(withTitles = true): Promise<Context> {
 }
 
 /** Register one live agent whose log holds `turns` completed turns. */
-function liveAgent(ctx: Context, id: string, turns: number): Session {
+async function liveAgent(ctx: Context, id: string, turns: number): Promise<Session> {
   const session = ctx.sessions.create(sid(id), { meta: { cwd: '/proj' } })
   for (let turn = 1; turn <= turns; turn++) {
     session.append('turn/start', { turn })
@@ -64,7 +64,7 @@ function liveAgent(ctx: Context, id: string, turns: number): Session {
     }), { surfaceOp: 'append' })
     session.append('turn/end', { turn, reason: { kind: 'completed' } })
   }
-  ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+  await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
   return session
 }
 
@@ -73,7 +73,7 @@ const api = (ctx: Context) => createApiProxy(ctx, { defaultModelSelection: () =>
 describe('sessions.rename', () => {
   it('accepts through the composed title service: normalized user-source event, echoed seq', async () => {
     const ctx = await composed()
-    const source = liveAgent(ctx, 'session-rename', 1)
+    const source = await liveAgent(ctx, 'session-rename', 1)
 
     const renamed = await api(ctx).sessions.rename(request({ sessionId: source.id, title: '  new   name  ' }))
     expect(renamed.result.ok).toBe(true)
@@ -86,7 +86,7 @@ describe('sessions.rename', () => {
 
   it('maps only an empty-normalizing title to title-invalid, with a presentable message', async () => {
     const ctx = await composed()
-    const source = liveAgent(ctx, 'session-rename-bad', 1)
+    const source = await liveAgent(ctx, 'session-rename-bad', 1)
 
     // U+200B passes a client-side trim gate but normalizes to empty host-side.
     const response = await api(ctx).sessions.rename(request({ sessionId: source.id, title: ' ​ ' }))
@@ -107,8 +107,8 @@ describe('sessions.rename', () => {
     // title service's liveness check throws a plain Error, which must not
     // read as the user's fault.
     const foreign = await composed(false)
-    const stale = liveAgent(foreign, 'session-rename-stale', 1)
-    ctx.agents.register({ id: stale.id, session: stale, status: 'idle', ctx } as Agent)
+    const stale = await liveAgent(foreign, 'session-rename-stale', 1)
+    await ctx.agents.register({ id: stale.id, session: stale, status: 'idle', ctx } as Agent)
 
     const response = await api(ctx).sessions.rename(request({ sessionId: stale.id, title: 'name' }))
     expect(response.result.ok).toBe(false)
@@ -117,7 +117,7 @@ describe('sessions.rename', () => {
 
   it('answers internal when the composition mounts no session-title service', async () => {
     const ctx = await composed(false)
-    const source = liveAgent(ctx, 'session-no-titles', 1)
+    const source = await liveAgent(ctx, 'session-no-titles', 1)
 
     const response = await api(ctx).sessions.rename(request({ sessionId: source.id, title: 'name' }))
     expect(response.result.ok).toBe(false)

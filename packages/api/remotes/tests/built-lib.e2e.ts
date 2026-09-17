@@ -95,8 +95,8 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       }
       const rootAgent = makeAgent('built-root-agent')
       const scopedAgent = makeAgent('built-scoped-agent')
-      host.agents.register(rootAgent)
-      host.agents.register(scopedAgent)
+      await host.agents.register(rootAgent)
+      await host.agents.register(scopedAgent)
 
       if (routes.length !== 1 || routes[0].path !== '/api') {
         throw new Error('Connection did not register exactly one /api route')

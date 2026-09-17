@@ -43,7 +43,7 @@ hook 本身会在 agent（智能体）的会话工作区中运行：对 agent sc
 
 | Codex hook | Harness 点 | 映射 |
 |---|---|---|
-| `SessionStart` | `agent/session-start`（emit） | 纯 stdout hook 的输出 → additionalContext → `agent.inject()` |
+| `SessionStart` | `agent/created`（serial） | 纯 stdout hook 的输出 → additionalContext → 创建返回前调用 `agent.inject()` |
 | `UserPromptSubmit` | `agent/pre-step`（waterfall，瀑布式事件） | `block`（退出码 2）→ `PreStepDecision.reject`；仅 additionalContext → 通过 `next()` 委托，再向下游 `enter` 决策追加一条单独标记来源的消息 |
 | `PreToolUse` | `tools/pre-execute`（waterfall） | `block` → `PreToolDecision.deny`（没有 `allow`／`ask`） |
 | `PostToolUse` | `tools/post-execute`（waterfall） | `block` → 带反馈的 `block`；仅 additionalContext → 通过 `next()` 委托，再将一个单独标记源的上下文前置到下游决策；PTC mode 将子调用上下文延迟到外层 `run_code` 结果 |
@@ -53,7 +53,7 @@ hook 本身会在 agent（智能体）的会话工作区中运行：对 agent sc
 
 每个 agent scope stdin payload 都携带 `session_id` 和 `transcript_path`。可用时，桥接通过 `ctx.sessionPersistence.locate(session.header)` 解析后者，否则发送 `null`，保留 Codex `string | null` 形状。查找不会创建或 flush 产物，因此在第一个轮次结束检查点之前，路径可能尚不存在，或其指向的 transcript（文本记录）可能尚未包含当前未结束的轮次。
 
-`SessionStart` 是唯一的 emit 点，它会脱离运行。每条运行链都会被跟踪；对桥接执行 dispose（资源释放）会中止仍在运行的 hook 进程，再排空 continuation，之后 dispose 才会完成（`createDetachedRuns`，位于 `dsh-hook-protocol`）。
+串行 `agent/created` 初始化会等待 `SessionStart`，因此成功注入的上下文先于首个请求。创建取消或桥接卸载会中止 hook；已中止的运行不再注入上下文。桥接卸载会在返回前排空已跟踪的 continuation（使用 `dsh-hook-protocol` 中的 `createDetachedRuns`）。Hook 和注入失败会被记录，而不会否决创建。
 
 ## 上下文源
 
@@ -92,7 +92,6 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 ## 已知限制与暂缓事项
 
 - **不支持的 hook 事件（Codex 当前 10 项中的 5 项）：** `PermissionRequest`、`PreCompact`、`PostCompact`、`SubagentStart` 和 `SubagentStop`。这些事件的配置会在解析期间静默丢弃。比较基线是 Codex [官方 hook 参考](https://learn.chatgpt.com/docs/hooks)。
-- **`SessionStart` 只支持部分功能：** 支持纯 stdout 与 JSON `additionalContext`，但 hook 脱离运行，因此上下文可能错过第一个请求（`TODO(session-start-gating)`）。
 - **`UserPromptSubmit` 只支持部分功能：** 支持阻塞加纯 stdout 或 JSON 上下文，但不会强制执行通用 `systemMessage` 和 `{"continue": false}` 控制。
 - **`PreToolUse` 只支持部分功能：** 支持阻塞，但会忽略 `additionalContext`、`permissionDecision: "allow"` 和 `updatedInput`。每个工具都表示为 `tool_input: { command }`，因此非 shell 工具参数不会如实公开给 hook。
 - **`PostToolUse` 只支持部分功能：** 支持阻塞反馈与 JSON `additionalContext`，但不会强制执行 `{"continue": false}`，非 shell 工具参数会缩减为 `{ command }`，结构化工具输出会在 `tool_response` 中展平为文本。

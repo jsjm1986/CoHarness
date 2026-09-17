@@ -28,7 +28,7 @@ afterEach(async () => {
   root = undefined
 })
 
-function agent(ctx: Context): Agent {
+async function agent(ctx: Context): Promise<Agent> {
   const scope = ctx.plugin(() => {})
   const id = SessionId('todo-loader-agent')
   const session = Session.create(id)
@@ -39,7 +39,7 @@ function agent(ctx: Context): Agent {
     runMaintenance: task => task(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
   }
-  ctx.agents.register(value)
+  await ctx.agents.register(value)
   return value
 }
 
@@ -99,7 +99,7 @@ describe('tool-todo real Loader composition through cordis.yml', () => {
     expect(description).toContain('Keep AT MOST ONE todo `in_progress`')
     expect(description).not.toContain('several at once')
 
-    const owner = agent(ctx)
+    const owner = await agent(ctx)
     const result = await ctx.tools.execute({
       signal: new AbortController().signal,
       callId: CallId('parallel'),
@@ -117,7 +117,7 @@ describe('tool-todo real Loader composition through cordis.yml', () => {
     const description = ctx.tools.schemas().find(s => s.name === 'todo_write')?.description ?? ''
     expect(description).toContain('several at once when work genuinely runs in parallel')
 
-    const owner = agent(ctx)
+    const owner = await agent(ctx)
     const result = await ctx.tools.execute({
       signal: new AbortController().signal,
       callId: CallId('parallel-enabled'),

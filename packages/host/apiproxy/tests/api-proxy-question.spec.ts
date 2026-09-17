@@ -18,10 +18,10 @@ async function harness(): Promise<{ ctx: Context; api: ApiProxy }> {
   }
 }
 
-function agent(ctx: Context): Agent {
+async function agent(ctx: Context): Promise<Agent> {
   const session = ctx.sessions.create()
   const value = { id: session.id, session, status: 'idle', ctx } as Agent
-  ctx.agents.register(value)
+  await ctx.agents.register(value)
   return value
 }
 
@@ -75,7 +75,7 @@ describe('question response validation', () => {
     const abort = new AbortController()
     const mux = openMux(api, abort)
     const asked = ctx.userQuestions.ask({
-      agent: agent(ctx),
+      agent: await agent(ctx),
       questions: [{
         id: 'targets',
         question: 'Choose targets and add another',
@@ -99,7 +99,7 @@ describe('question response validation', () => {
     const abort = new AbortController()
     const mux = openMux(api, abort)
     const asked = ctx.userQuestions.ask({
-      agent: agent(ctx),
+      agent: await agent(ctx),
       questions: [{
         id: 'target',
         question: 'Choose one target',

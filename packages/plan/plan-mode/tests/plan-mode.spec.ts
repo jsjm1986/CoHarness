@@ -52,10 +52,10 @@ async function agentWithSession(
   // fold-only benches retain the direct lifecycle event used before it exists.
   const agents = ctx.get('agents')
   if (agents === undefined) {
-    ctx.emit('agent/created', { agent })
+    await ctx.serial('agent/created', { agent, source: 'startup' })
   } else {
     agents.enter(agent, owner)
-    agents.announce(agent)
+    await agents.announce(agent, 'startup')
   }
   return agent
 }

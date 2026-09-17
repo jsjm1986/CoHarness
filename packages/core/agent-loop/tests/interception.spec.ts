@@ -555,6 +555,47 @@ describe('agent/pre-step', () => {
   })
 })
 
+describe('async creation initialization', () => {
+  it('holds creation, legacy startup, and queued input until serial listeners finish', async () => {
+    const adapter = new MockAdapter([textResponse('ready')])
+    const ctx = await harness(adapter)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const order: string[] = []
+    ctx.on('agent/created', async ({ agent, source, signal }) => {
+      expect(source).toBe('startup')
+      expect(signal?.aborted).toBe(false)
+      send(agent, 'queued during initialization')
+      entered.resolve(undefined)
+      await release.promise
+      order.push('initialized')
+    })
+    ctx.on('agent/created', () => { order.push('next initializer') })
+    ctx.on('agent/session-start', () => { order.push('legacy startup') })
+    let settled = false
+    const creating = ctx.agentLoop.create(SessionId('async-initialization'), { provider: 'mock', model: 'mock' })
+    const observed = creating.then(() => { settled = true })
+    try {
+      await entered.promise
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      expect(settled).toBe(false)
+      expect(order).toEqual([])
+      expect(adapter.requests).toHaveLength(0)
+      release.resolve(undefined)
+      const agent = await creating
+      await observed
+      await agent.whenIdle()
+      expect(order).toEqual(['initialized', 'next initializer', 'legacy startup'])
+      expect(adapter.requests).toHaveLength(1)
+    } finally {
+      release.resolve(undefined)
+      await observed
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
+
 describe('publication input gating', () => {
   it('parks retained input cancelled during setup until another waking send', async () => {
     const adapter = new MockAdapter([textResponse('first'), textResponse('second')])

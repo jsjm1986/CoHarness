@@ -216,7 +216,7 @@ describe('DeepSeek plugin package inventory', () => {
     const agentScope = createScope(ctx, agentKey, { parent: standingKey })
     const id = SessionId('preset-agent')
     const agent = { id, ctx: agentScope.ctx, session: { id } } as unknown as Agent
-    ctx.agents.register(agent)
+    await ctx.agents.register(agent)
 
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL, sessionId: id })
     expect(prepared.fields.dsh_plugin_packages?.packages).toEqual([{ name: 'preset-only', version: '4.0.0' }])

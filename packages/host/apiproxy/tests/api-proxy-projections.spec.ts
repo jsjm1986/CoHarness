@@ -73,7 +73,7 @@ async function harness(withRegistry: boolean): Promise<{ ctx: Context; session: 
   // The gateway reads both the session and durable inbox baseline.
   const agent = { id: session.id, session, inbox: unsupportedInbox(), status: 'idle', ctx } as Agent
   sessionBackedInbox(agent)
-  ctx.agents.register(agent)
+  await ctx.agents.register(agent)
   return { ctx, session }
 }
 

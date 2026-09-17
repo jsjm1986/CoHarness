@@ -86,7 +86,7 @@ async function harness(config: toolGoal.Config = {}) {
   await ctx.plugin(GoalService)
   const fiber = await ctx.plugin(toolGoal, config)
   const root = stubAgent(`goal-tool-root-${Math.random()}`)
-  ctx.agents.register(root.agent)
+  await ctx.agents.register(root.agent)
   return { ctx, fiber, root }
 }
 
@@ -241,7 +241,7 @@ describe('goal tool execution authority', () => {
 
     const child = stubAgent('goal-tool-child')
     ctx.agents.enter(child.agent, root.agent)
-    ctx.agents.announce(child.agent)
+    await ctx.agents.announce(child.agent, 'startup')
     openTurn(child, { kind: 'user' })
     const childResult = await execute(ctx, 'create_goal', { objective: 'child goal' }, child.agent)
     expect(childResult.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
@@ -275,7 +275,7 @@ describe('goal tool execution authority', () => {
       isSeeded: true,
     }, SessionLogOffset(root.session.seq))
     const fork = stubAgent(forkId, forkSession)
-    ctx.agents.register(fork.agent)
+    await ctx.agents.register(fork.agent)
     expect(ctx.goals.get(fork.agent)).toMatchObject({ id: created.id, activation: 'disarmed' })
 
     openTurn(fork, { kind: 'user' }, '继续这个目标')
@@ -330,7 +330,7 @@ describe('goal tool execution authority', () => {
   it('rejects an initiator different from exec.agent', async () => {
     const { ctx, root } = await harness()
     const other = stubAgent('goal-tool-other')
-    ctx.agents.register(other.agent)
+    await ctx.agents.register(other.agent)
     openTurn(other, { kind: 'user' })
     const result = await execute(ctx, 'get_goal', {}, other.agent, root.agent)
     expect(result.error?.info?.code).toBe('GOAL_TOOL_DRIVER_REQUIRED')

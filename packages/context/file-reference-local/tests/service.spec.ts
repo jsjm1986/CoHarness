@@ -51,7 +51,9 @@ async function stubAgent(
     cancel() {},
     whenIdle: () => Promise.resolve(),
   } as unknown as Agent
-  return { agent, dispose: ctx.agents.register(agent) }
+  const dispose = ctx.agents.register(agent)
+  await dispose
+  return { agent, dispose }
 }
 
 describe('LocalFileReferenceService', () => {
@@ -95,7 +97,7 @@ describe('LocalFileReferenceService', () => {
     ctx.emit('session/event', orphan, { type: 'tool/result' } as never)
     expect(invalidate).toHaveBeenCalledOnce()
 
-    dispose()
+    await dispose()
     expect(close).toHaveBeenCalledOnce()
     ctx.emit('agent/disposed', { agent })
   })
@@ -131,7 +133,7 @@ describe('LocalFileReferenceService', () => {
     const fiber = ctx.plugin(LocalFileReferenceService)
     await fiber
     const { agent } = await stubAgent(ctx, 'cwd-fallback', false)
-    ctx.emit('agent/created', { agent })
+    await ctx.serial('agent/created', { agent, source: 'startup' })
     const list = vi.spyOn(WorkspaceFileSearch.prototype, 'list').mockResolvedValue([])
     await expect(ctx.fileReferences.list(agent, '', new AbortController().signal)).resolves.toEqual([])
     await expect(ctx.fileReferences.list(agent, 'src', new AbortController().signal)).resolves.toEqual([])

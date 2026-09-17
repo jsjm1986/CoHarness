@@ -584,7 +584,7 @@ describe('terminal-bash plugin shape', () => {
       runMaintenance: task => task(new AbortController().signal),
       whenIdle: () => Promise.resolve(),
     }
-    ctx.agents.register(owner)
+    await ctx.agents.register(owner)
     const providerFiber = await registerStubLocalBackend(ctx, () => stubLocalSession())
     const created = await ctx.terminals.spawn(owner, { type: 'stub' })
 
@@ -633,7 +633,7 @@ describe('terminal-bash plugin shape', () => {
       runMaintenance: task => task(new AbortController().signal),
       whenIdle: () => Promise.resolve(),
     }
-    ctx.agents.register(owner)
+    await ctx.agents.register(owner)
     const gate = Promise.withResolvers<undefined>()
     await registerStubLocalBackend(ctx, () => stubLocalSession(() => gate.promise))
     const spawning = ctx.terminals.spawn(owner, { type: 'stub' })

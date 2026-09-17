@@ -89,6 +89,7 @@ async function harness(
       )
       const agent = stubAgent(session)
       const unregister = ctx.agents.register(agent)
+      await unregister
       return {
         agent,
         dispose: () => {
