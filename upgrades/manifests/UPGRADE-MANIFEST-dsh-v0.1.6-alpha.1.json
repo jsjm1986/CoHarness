@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "reviewDate": "2026-09-17",
+  "reviewDate": "2026-09-18",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness",
     "previousTag": "dsh-v0.1.5-rc.2",
@@ -18,7 +18,7 @@
   },
   "targetVersion": "0.1.6-alpha.1.coharness.1",
   "versionStatus": "proposed-release-families-unverified",
-  "status": "implementation-in-progress-phase-2-complete-phase-1-committed",
+  "status": "implementation-in-progress-phase-1-2-committed-merged-to-master",
   "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md",
   "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
   "verification": [
@@ -244,6 +244,17 @@
       ],
       "reviewState": "pending-cumulative-source-review",
       "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review."
+    },
+    {
+      "id": "webhook",
+      "status": "adapt",
+      "localOwner": "Webhook runtime, workspace session creation and inbound endpoint policy",
+      "commitScope": [
+        "packages/webhook/webhook",
+        "packages/webhook/webhook-github"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Inbound endpoint authentication, signature verification, replay and rate limiting, Session-creation authorization ownership and secret storage; default off until enabled by an administrator."
     },
     {
       "id": "remote-product-and-release",
