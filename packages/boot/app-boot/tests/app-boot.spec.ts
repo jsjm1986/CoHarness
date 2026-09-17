@@ -433,6 +433,15 @@ describe('assertEntriesLoaded', () => {
       { options: { name: 'broken-b' } },
     ]), NAME) }).toThrow(`${NAME}: plugin(s) failed to load: broken-a, broken-b`)
   })
+
+  it('names the entry whose disabled expression throws', () => {
+    const entry = {
+      options: { name: 'bad-expr' },
+      get disabled(): boolean { throw new Error('eval broke') },
+    }
+    expect(() => { assertEntriesLoaded(ctxWith([entry]), NAME) })
+      .toThrow(`${NAME}: entry "bad-expr": disabled expression failed:`)
+  })
 })
 
 describe('assertEntriesActivated', () => {
@@ -523,6 +532,16 @@ describe('assertEntriesActivated', () => {
     await expect(assertEntriesActivated(ctxWith([
       { fiber: fiber(4), options: { name: 'disposed' } },
     ]), NAME)).rejects.toThrow('disposed: fiber state 4')
+  })
+
+  it('reports a throwing disabled expression with the entry name', async () => {
+    const entry = {
+      fiber: fiber(2),
+      options: { name: 'bad-expr' },
+      get disabled(): boolean { throw new Error('eval broke') },
+    }
+    await expect(assertEntriesActivated(ctxWith([entry]), NAME))
+      .rejects.toThrow(`${NAME}: 1 entry did not activate\nbad-expr: disabled expression failed: Error: eval broke`)
   })
 })
 

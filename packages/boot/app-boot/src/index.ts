@@ -503,7 +503,7 @@ function groupedDump(
  * names; relative names continue to resolve beside the configuration file.
  * @returns the created root Include entry, or `undefined` when a surface
  * disposed the whole tree (taking the Loader service with it) while the
- * transactional create was still settling entry lifecycle.
+ * create was still settling entry lifecycle.
  */
 export async function mountRootInclude(
   ctx: Context,
@@ -678,7 +678,14 @@ export function installFailLoud(
  * @param binName - the diagnostic prefix on the thrown error.
  */
 export function assertEntriesLoaded(ctx: Context, binName: string): void {
-  const failed = [...ctx.loader.entries()].filter(entry => entry.fiber === undefined && !entry.disabled)
+  const failed = [...ctx.loader.entries()].filter((entry) => {
+    if (entry.fiber !== undefined) return false
+    try {
+      return !entry.disabled
+    } catch (error) {
+      throw new Error(`${binName}: entry "${entry.options.name}": disabled expression failed: ${formatActivationError(error)}`, { cause: error })
+    }
+  })
   if (failed.length > 0) {
     const names = failed.map(entry => entry.options.name).join(', ')
     throw new Error(`${binName}: plugin(s) failed to load: ${names}; Cordis startup failed because these plugin(s) could not be resolved (see the error(s) logged above)`)
@@ -756,7 +763,12 @@ export async function assertEntriesActivated(ctx: Context, binName: string): Pro
   const rejectionReasons: unknown[] = []
   for (const entry of ctx.loader.entries()) {
     const fiber = entry.fiber
-    if (fiber === undefined || entry.disabled) continue
+    try {
+      if (fiber === undefined || entry.disabled) continue
+    } catch (error) {
+      failures.push(`${entry.options.name}: disabled expression failed: ${formatActivationError(error)}`)
+      continue
+    }
     const state = fiber.state
     if (state === FIBER_ACTIVE) continue
     if (state === FIBER_FAILED) {
@@ -837,9 +849,8 @@ export async function boot(
     // in flight, before the last entry settles. The Loader service goes with
     // it, and the activation audit describes a live tree — reading `ctx.loader`
     // past this point would throw a TypeError over an app that exited exactly
-    // as asked. Transactional group updates settle
-    // lifecycle inside the mount, so the teardown can land before it returns;
-    // re-check after every await.
+    // as asked. Group updates settle entry lifecycle inside the mount, so the
+    // teardown can land before it returns; re-check after every await.
     await ctx.get('loader')?.await()
     if (ctx.get('loader') === undefined) return ctx
     await assertEntriesActivated(ctx, binName)
@@ -850,11 +861,10 @@ export async function boot(
     // result, so this await cannot reject and replace `cause`.
     await ctx.fiber.dispose()
     const detail = cause instanceof Error ? cause.message : String(cause)
-    // The transactional Loader wraps a failing entry apply in one message per
-    // tree layer; every layer's message is folded into `detail` above, and the
-    // deepest cause is the plugin's own thrown error, whose stack names the
-    // real failure site — append it so the startup diagnostic preserves the
-    // original activation error instead of only the wrap chain.
+    // A failure can arrive wrapped in outer causes; the deepest cause is
+    // typically the plugin's own thrown error, whose stack names the real
+    // failure site — append it so the startup diagnostic preserves the
+    // original activation error instead of only the outer message.
     let deepest: unknown = cause
     while (deepest instanceof Error && deepest.cause !== undefined) deepest = deepest.cause
     const stack = deepest instanceof Error && deepest !== cause ? `\n${deepest.stack ?? deepest.message}` : ''
