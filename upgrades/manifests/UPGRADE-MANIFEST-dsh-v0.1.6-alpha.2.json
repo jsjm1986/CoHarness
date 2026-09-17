@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 2,
+  "reviewDate": "2026-09-18",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "previousTag": "dsh-v0.1.5-rc.2",
+    "previousCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+    "targetTags": [
+      {
+        "tag": "dsh-v0.1.6-alpha.2",
+        "commit": "ddefc45fbc7f8e46dd73185e68295696d1297887"
+      }
+    ]
+  },
+  "baseline": {
+    "commit": "a901bff5f44bf9d51b99019b5c8085a0d93f248b",
+    "branch": "fix/release-session-format"
+  },
+  "targetVersion": "0.1.6-alpha.2.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "retargeted-increment-implementation-pending",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.2.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
+  "verification": [],
+  "decisions": [
+    {
+      "id": "foundation",
+      "status": "adapt",
+      "localOwner": "vendor, Typert and workspace build owners",
+      "commitScope": [
+        "vendor",
+        "packages/typert",
+        "packages/boot/app-boot",
+        "packages/client/web",
+        "packages/todo/tool-todo",
+        "packages/extensions/cordis-client-runner",
+        "packages/host/directory-picker-auto",
+        "packages/llm/plugin-package-inventory-deepseek",
+        "packages/typert/loader",
+        "pnpm-lock.yaml"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Vendor procedure, local modifications replay, test/build and compiler consumers; js-yaml dependency review.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "foundation",
+        "reviewState": "implemented-local-tests-passing"
+      },
+      "phases": [
+        "1B"
+      ]
+    },
+    {
+      "id": "agent-session",
+      "status": "adapt",
+      "localOwner": "Agent, Session and Gateway persistence",
+      "commitScope": [
+        "packages/core",
+        "packages/session"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Async initialization, recovery, cancellation, write locks, parent ownership, quotas, immutable-generation migrations and both SDK transcripts.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "agent-session",
+        "reviewState": "local-tests-passing-production-unverified"
+      },
+      "phases": [
+        "2B"
+      ]
+    },
+    {
+      "id": "messages-images-governance",
+      "status": "adapt",
+      "localOwner": "LLM providers, compaction, attachments and model governance",
+      "commitScope": [
+        "packages/llm",
+        "packages/compaction",
+        "packages/attachment"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Both protocols through organization/BYOK routing, real credential attribution and image encoding/pricing/projection/cold recovery; no implicit stored endpoint rewrite.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "messages-images-governance",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "3A",
+        "3B"
+      ]
+    },
+    {
+      "id": "log-upload-default-off",
+      "status": "retain",
+      "localOwner": "Session log upload provider and bundles",
+      "commitScope": [
+        "packages/session/session-log-deepseek",
+        "packages/bundle"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Default off, explicit opt-in, endpoint policy and kill switch across assembled presets; independent from OTel.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "log-upload-default-off",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "2B",
+        "8"
+      ]
+    },
+    {
+      "id": "execution-migration",
+      "status": "adapt",
+      "localOwner": "PTC, workflow, shell, subprocess, sandbox, jobs and directory authorization",
+      "commitScope": [
+        "packages/ptc-runtime",
+        "packages/code-runtime",
+        "packages/workflow",
+        "packages/shell",
+        "packages/subprocess",
+        "packages/sandbox",
+        "packages/jobs",
+        "packages/e2b"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Migrate all consumers, cancel and await quiescence, preserve directory policy. Remove E2B only after deployment inventory and equivalent capability proof.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "execution-migration",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "4A",
+        "4B"
+      ]
+    },
+    {
+      "id": "desktop-coordination-ui",
+      "status": "required",
+      "localOwner": "Proposed Gateway desktop authority, execution adapter and shell.overlay UI",
+      "commitScope": [
+        "packages/computer-use",
+        "packages/experimental/computer-use-cua-driver-native",
+        "packages/experimental/computer-use-cua-driver-mcp"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Cross-runtime node/desktop ownership, execution fencing, revocation, FIFO, cancellation, restart and shutdown failures; private text/icon status, reduced motion, queue and unknown state.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "desktop-coordination-ui",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "5",
+        "6B"
+      ]
+    },
+    {
+      "id": "browser-use",
+      "status": "adapt",
+      "localOwner": "Browser providers, Session initialization and capability policy",
+      "commitScope": [
+        "packages/browser-use",
+        "packages/experimental/browser-use-runtime",
+        "packages/experimental/browser-use-playwright-mcp",
+        "packages/experimental/browser-use-chrome-devtools-mcp",
+        "packages/experimental/browser-use-stagehand-native"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Isolated launch default, explicit attach authorization, resource cleanup, external listeners and screenshot visibility; history recovery does not recover browser state.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "browser-use",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "6A"
+      ]
+    },
+    {
+      "id": "auto-review",
+      "status": "adapt",
+      "localOwner": "Permission presets, pre-execute governance and Web permission UI",
+      "commitScope": [
+        "packages/experimental/auto-review",
+        "packages/interaction"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "auto-review",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "6B"
+      ]
+    },
+    {
+      "id": "webhook",
+      "status": "adapt",
+      "localOwner": "Webhook runtime, workspace session creation and inbound endpoint policy",
+      "commitScope": [
+        "packages/webhook/webhook",
+        "packages/webhook/webhook-github"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Inbound endpoint authentication, signature verification, replay and rate limiting, Session-creation authorization ownership and secret storage; default off until enabled by an administrator.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "webhook",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "7B"
+      ]
+    },
+    {
+      "id": "remote-product-and-release",
+      "status": "adapt",
+      "localOwner": "Gateway, client, SSH, MCP, SDK, Android, native and release owners",
+      "commitScope": [
+        "packages/api",
+        "packages/client",
+        "packages/ssh",
+        "packages/mcp",
+        "packages/sdk",
+        "python",
+        "native",
+        "scripts",
+        "website",
+        "examples"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Preserve collaboration, User Documents, Workbench, archives, Android and LAN/public authorization; terminal lifecycle, source/built consumers, restore and deployment acceptance.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "remote-product-and-release",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "7A",
+        "7B",
+        "7C",
+        "7E",
+        "8"
+      ]
+    },
+    {
+      "id": "plugin-management-admin-only",
+      "status": "adapt",
+      "localOwner": "packages/boot/plugin-manager/",
+      "commitScope": [
+        "packages/boot/plugin-manager/",
+        "packages/client/ui-plugin-manager/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "7D"
+      ],
+      "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 sources and build-script policy unresolved."
+    },
+    {
+      "id": "terminal-user-project-grants",
+      "status": "adapt",
+      "localOwner": "packages/api/terminal-controller/",
+      "commitScope": [
+        "packages/api/terminal-controller/",
+        "packages/client/ui-sidebar-terminal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "7B"
+      ],
+      "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 grant composition and cross-member control unresolved."
+    },
+    {
+      "id": "office-and-sidebar-browser",
+      "status": "adapt",
+      "localOwner": "packages/document/",
+      "commitScope": [
+        "packages/document/",
+        "packages/client/ui-sidebar-browser/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "7C"
+      ],
+      "requiredVerification": "Q3 browser carrier/URL/sandbox policy and Q4 Office platforms unresolved. File authorization, conversion cache isolation, resource limits and native/WASM artifact checks required. Deliverables are owned by the deliverables-workspace-changes decision."
+    },
+    {
+      "id": "deliverables-workspace-changes",
+      "status": "adapt",
+      "localOwner": "Deliverables recorder, present tool, Session event catalog and Web deliverables UI",
+      "commitScope": [
+        "packages/deliverables/",
+        "packages/client/ui-deliverables/",
+        "packages/core/session/src/known-event-types.ts"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "2B",
+        "7C"
+      ],
+      "requiredVerification": "User-confirmed 2026-09-18 (plan D7): adopt deliverables/tool-present (moved from fs/tool-present) and deliverables/workspace-changes, reversing the rc.2 upstreamOnly deferral. Verify workspace/changes required-on-read semantics before enabling the recorder, workspaceFiles authorization, project ACL and read-only member rules for change cards and per-file review; update scripts/upstream-sync.json upstreamOnly when the sync baseline advances."
+    },
+    {
+      "id": "apps-desktop-not-carried",
+      "status": "reject",
+      "localOwner": "CoHarness ships Web, CLI and Android shells only",
+      "commitScope": [
+        "apps/desktop/",
+        "apps/desktop-host/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "0R"
+      ],
+      "requiredVerification": "User-confirmed 2026-09-18: the upstream desktop client application is not carried, consistent with the rejected upstream desktop ui-package tree in scripts/upstream-sync.json. Startup-chain interfaces shared with apps/cli are reviewed through the foundation decision; no implementation or acceptance is owed for these paths."
+    }
+  ],
+  "historicalVerification": {
+    "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+    "targetCommit": "0a15e36e7f82b6ed45af6fa9759f29b40dcd965d",
+    "note": "Reference only. No alpha.1 command results count as alpha.2 validation."
+  },
+  "localPlanningCheckpoint": "6f0ec56328048a1f69f179ebbacb2acd0d40e8b9",
+  "openQuestions": [
+    {
+      "id": "Q1",
+      "state": "awaiting-user-clarification",
+      "blocks": [
+        "7D"
+      ]
+    },
+    {
+      "id": "Q2",
+      "state": "awaiting-user-clarification",
+      "blocks": [
+        "7B"
+      ]
+    },
+    {
+      "id": "Q3",
+      "state": "awaiting-user-clarification",
+      "blocks": [
+        "7C"
+      ]
+    },
+    {
+      "id": "Q4",
+      "state": "awaiting-user-clarification",
+      "blocks": [
+        "6A",
+        "7C",
+        "8"
+      ]
+    }
+  ],
+  "processConstraints": {
+    "deploymentFreeze": {
+      "masterContainsUpgradeSince": "cfb1949958ff97e16ffee4cefefda4b7d54d262a",
+      "productionCommit": "f92068e800692adc6ab53dd1c9c2d0d66c144aec",
+      "liftsAt": "phase-8-acceptance",
+      "hotfixPolicy": "branch from the production commit; never deploy master before Phase 8 acceptance"
+    },
+    "coverageGate": {
+      "state": "never-run-for-phase-1-2-sources",
+      "requiredBefore": [
+        "1B",
+        "2B"
+      ],
+      "command": "pnpm run test:coverage"
+    },
+    "gateDiffReview": {
+      "paths": [
+        ".github/",
+        "scripts/",
+        "lefthook.yml"
+      ],
+      "requiredBefore": [
+        "1B"
+      ],
+      "phase": "0R"
+    },
+    "hostPrerequisites": [
+      "file descriptor limit sufficient for native watchers (EMFILE)",
+      "CPython >= 3.10 for code-runtime-python",
+      "per-platform capability checks recorded in Phase 8"
+    ],
+    "verificationLedger": {
+      "record": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md",
+      "section": "未验证与环境阻塞台账",
+      "items": 23
+    }
+  }
+}
