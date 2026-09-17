@@ -46,3 +46,12 @@ Lint（oxlint）0 告警 0 错误。
 - 本批首次全量 18047 项通过、4 项失败，失败为 ACP 子任务/标题等待诊断和 Python CPU/宽值用例。受控阻塞首次标题日志读取复现通用超时，修复保持原期限与谓词，保留场景诊断和最近观测错误；完整 harness 文件 63/63、包测试 224 项通过及 1 项跳过。
 - 修复后使用 Python 3.12、原并发和超时配置执行 `pnpm test`：1067 文件通过、9 文件跳过；18052 项通过、116 项跳过，退出码 0。子任务诊断与两个 Python 用例未修改实现或放宽断言，本次全量通过不代表既往偶发失败根因全部解决。
 - Python SDK 打包产物、coverage、独立 Gateway/插件业务回归、真实 provider、桌面和 LAN/公网验收尚未由本批完成。同步基线不前移，整次升级仍在进行。
+
+## Phase 1：Node 内部加载器依赖
+
+- CLI 与 vendored Loader 的 `node-addon-require-builtin` 声明对齐上游为 `^0.1.6`；pnpm 锁定主包、原生平台包及 `node-addon-native-custom-loader` 为 `0.1.6`。两处实际解析路径均为新版本，宿主 Node 25.8.1 的内部 ESM loader 读取与兼容测试通过。
+- 锁文件由 pnpm 11.7.0 生成，附带范围内更新：`@testing-library/dom` 10.4.2、`compression` 1.8.2（新增 `destroy` 1.2.0）、`negotiator` 1.1.0、`proxy-addr` 2.0.8，以及 Vite 的 `picomatch` 引用 4.0.7。未修改这些包的 manifest 范围；本批回归覆盖此完整锁文件，而非仅原生扩展。
+- `pnpm install --frozen-lockfile` 通过；未新增安装脚本授权或版本年龄豁免。Include 的 js-yaml 5 适配、Loader API 检测和 HMR 行为保持不变；vendor 源码同步与跨平台原生验证仍待完成，整次升级基线不前移。
+- 本批 `pnpm test`（Python 3.12，原并发及超时）退出码 1：18050 项通过、2 项失败、116 项跳过。失败为 `user-patches.spec.ts` 的默认组合配置未更新，以及 Python runtime 的输出上限预期得到 timeout。`pnpm run build` 退出码 0；构建后的 Loader 在普通 Node 进程中通过原生扩展解析 `node:path`。
+- 原 HMR 失败单项隔离通过，随后完整 app-boot 包为 108 通过、1 失败（同一用例的首次配置添加未生效）；再串行隔离 3 次均通过。未改超时、断言或 watch 实现，尚不能确定依赖变更与失败的因果关系。本批保留为待验收，不以隔离通过替代完整回归。
+- 第三次全量确认运行在 coverage partition 3/3 阶段被主动终止，未产生最终结果；提交时全量套件状态以第二次运行为准（18050 通过、2 失败），批次按待验收提交。
