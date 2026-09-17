@@ -1,12 +1,50 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as yaml from 'js-yaml'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { gatesForMode } from './run-gates.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const runnerPrivatePnpmDestination = '${{ runner.temp }}/setup-pnpm'
 
 describe('CI workflow', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('requires the root-locked plugin suites through both runtime consumer branches', () => {
+    vi.stubEnv('npm_execpath', '/private/pnpm.cjs')
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    if (!isRecord(workflow.jobs)) throw new TypeError('CI workflow must define jobs')
+    const consumer = workflow.jobs['node-24-consumers']
+    const aggregate = workflow.jobs['all-checks-passed']
+    if (!isRecord(consumer) || !Array.isArray(consumer.steps) || !isRecord(aggregate)) {
+      throw new TypeError('CI must define runtime consumers and the required aggregate')
+    }
+    expect(aggregate.needs).toContain('node-24-consumers')
+    expect(consumer['continue-on-error']).not.toBe(true)
+    const steps = consumer.steps.filter(isRecord)
+    expect(steps.some(step => typeof step.run === 'string' && step.run.includes('pnpm install --frozen-lockfile'))).toBe(true)
+    const runtime = steps.find(step => step.name === 'Run keyless compatibility, snapshot, and artifact gates')
+    expect(runtime?.['continue-on-error']).not.toBe(true)
+    expect(runtime?.run).toBe('pnpm run check:ci:consumers:scoped')
+    const sweep = workflow.jobs['web-snapshot-sweep']
+    if (!isRecord(sweep) || !Array.isArray(sweep.steps)) throw new TypeError('CI must define the consumer sweep')
+    expect(sweep.steps.filter(isRecord).some(step => step.run === 'pnpm run check:ci:consumers')).toBe(true)
+    const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+    for (const [script, mode] of [
+      ['check:ci:consumers', 'ci-consumers'],
+      ['check:ci:consumers:scoped', 'ci-consumers-scoped'],
+    ] as const) {
+      expect(manifest.scripts[script]).toBe(`tsx scripts/run-gates.ts ${mode}`)
+      const plugins = gatesForMode(mode).filter(gate => gate.id.startsWith('test-dsh-'))
+      expect(plugins.map(gate => gate.displayCommand)).toEqual([
+        'pnpm exec vitest run --config plugins/dsh-directory-guard/vitest.config.ts',
+        'pnpm exec vitest run --config plugins/dsh-model-governance/vitest.config.ts',
+      ])
+      expect(plugins.every(gate => gate.allowFailure !== true)).toBe(true)
+    }
+    expect(steps.some(step => typeof step.run === 'string' && /(?:npm ci|pnpm install).*plugins\//.test(step.run))).toBe(false)
+  })
+
   it('isolates every pnpm action setup destination per runner', () => {
     const workflow: unknown = yaml.load(readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8'))
     if (!isRecord(workflow) || !isRecord(workflow.jobs)) throw new TypeError('CI workflow must define jobs')

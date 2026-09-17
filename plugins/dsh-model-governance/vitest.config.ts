@@ -1,21 +1,16 @@
 import { resolve } from 'node:path'
+import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
+import { standardDecoratorPlugin } from '../../vitest.shared.ts'
 
 const repo = resolve(import.meta.dirname, '../..')
 
 export default defineConfig({
+  root: import.meta.dirname,
+  plugins: [standardDecoratorPlugin(), tsconfigPaths({ projects: [resolve(repo, 'tsconfig.base.json')] })],
   resolve: {
     alias: {
       '@deepseek-ai/dsh-llm/package.json': resolve(repo, 'packages/llm/llm/package.json'),
-      '@deepseek-ai/cordis': resolve(repo, 'vendor/cordis/src/index.ts'),
-      '@deepseek-ai/dsh-agent': resolve(repo, 'packages/core/agent/src/index.ts'),
-      '@deepseek-ai/dsh-credentials': resolve(repo, 'packages/credentials/credentials/src/index.ts'),
-      '@deepseek-ai/dsh-gateway-runtime': resolve(repo, 'packages/context/gateway-runtime/src/index.ts'),
-      '@deepseek-ai/dsh-llm': resolve(repo, 'packages/llm/llm/src/index.ts'),
-      '@deepseek-ai/dsh-model-access': resolve(repo, 'packages/llm/model-access/src/index.ts'),
-      '@deepseek-ai/dsh-model-provider-config': resolve(repo, 'packages/llm/model-provider-config/src/index.ts'),
-      '@deepseek-ai/dsh-settings': resolve(repo, 'packages/settings/settings/src/index.ts'),
-      '@deepseek-ai/schemastery': resolve(repo, 'vendor/schemastery/src/index.ts'),
     },
   },
   test: { include: ['tests/**/*.spec.ts'] },
