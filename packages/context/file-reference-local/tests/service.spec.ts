@@ -31,7 +31,7 @@ async function stubAgent(
   ctx: Context,
   id = 'file-reference-agent',
   includeCwd = true,
-): Promise<{ agent: Agent; dispose: () => void }> {
+): Promise<{ agent: Agent; dispose: () => Promise<void> }> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-file-reference-service-'))
   roots.push(root)
   await writeFile(join(root, 'README.md'), 'readme')
@@ -153,8 +153,8 @@ describe('LocalFileReferenceService', () => {
     const first = await stubAgent(ctx, 'cleanup-one')
     const second = await stubAgent(ctx, 'cleanup-two')
     expect(inject).toHaveBeenCalledTimes(2)
-    first.dispose()
-    second.dispose()
+    await first.dispose()
+    await second.dispose()
     await vi.waitFor(() => {
       expect(warn).toHaveBeenCalledWith('file-reference-local: prompt cleanup failed: error cleanup')
       expect(warn).toHaveBeenCalledWith('file-reference-local: prompt cleanup failed: string cleanup')

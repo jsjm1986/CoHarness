@@ -128,7 +128,7 @@ async function harness(
       await options.setup?.(agentCtx, agent)
       const unregister = ctx.agents.register(agent)
       await unregister
-      return { agent, dispose: () => { unregister(); return Promise.resolve() } }
+      return { agent, dispose: unregister }
     },
     async resume() {
       throw new Error('test harness has no persisted sessions')

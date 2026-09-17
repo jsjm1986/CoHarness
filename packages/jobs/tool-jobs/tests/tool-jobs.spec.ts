@@ -16,7 +16,7 @@ import { statusLine } from '@deepseek-ai/dsh-tool-jobs'
 
 const testToolSignal = new AbortController().signal
 
-const agentRegistryDisposers = new WeakMap<Agent, () => void>()
+const agentRegistryDisposers = new WeakMap<Agent, () => Promise<void>>()
 const agentScopeFibers = new WeakMap<Agent, { dispose: () => Promise<void> }>()
 
 async function setup(config: ToolTasks.Config = {}) {
@@ -59,10 +59,10 @@ async function fakeAgent(ctx: Context, sessionId: string, delivery: FakeDelivery
   return agent
 }
 
-function detachAgent(agent: Agent): void {
+async function detachAgent(agent: Agent): Promise<void> {
   const dispose = agentRegistryDisposers.get(agent)
   if (dispose === undefined) throw new Error(`missing registry disposer for agent "${agent.id}"`)
-  dispose()
+  await dispose()
 }
 
 /** Dispose the agent's own lifecycle scope, which is what drains its owned jobs. */
@@ -551,7 +551,7 @@ describe('completion notices across scoped mounts', () => {
 
       expect(inject).toHaveBeenCalledTimes(1)
     } finally {
-      dispose()
+      await dispose()
     }
   })
 })
@@ -849,7 +849,7 @@ describe('completion notices', () => {
     const p = producer({ owner: oldOwner })
     ctx.jobs.start(p.spec)
 
-    detachAgent(oldOwner)
+    await detachAgent(oldOwner)
     const replacementInject = vi.fn()
     await fakeAgent(ctx, 'shared', { inject: replacementInject })
     p.settle({ status: 'completed' })

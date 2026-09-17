@@ -92,10 +92,7 @@ async function harness(
       await unregister
       return {
         agent,
-        dispose: () => {
-          unregister()
-          return Promise.resolve()
-        },
+        dispose: unregister,
       }
     },
     async resume() {
