@@ -38,6 +38,14 @@
 - `.github`、`scripts`、`lefthook.yml` 三行门禁面归 0R，在实施批次开工前完成差异比对与新增必需检查登记。
 - 开发阶段姿态：允许破坏性更新，目标为上游全量对齐；全局管理设置经 `/admin`（`gateway/admin-ui`）落地；无生产数据，Phase 8 以合成数据迁移演练替代脱敏副本恢复。
 
+## 源码级事实（2026-09-18 读码确认）
+
+- `api/session-controller` 的"多实例"是引用计数 retain 模型：`sessions.retain(target, {source, signal})` 返回 `SessionReference`（`binding`／`ready`／`release()`），`SessionRetainInfo` 按来源计数，末次释放才拆本地 scope 与历史；`service.ts` 重写 557 行、`manager.ts` 减 250 行、`queue-mirror.ts` 删除。7A 移植的是 retain 模型，`client/runtime` 与 `host/apiproxy` 需要等价的引用计数与 teardown 语义，不是简单支持多个 Session。
+- `webhook-github` 自带签名校验：`x-hub-signature-256` 经 octokit `Webhooks.verify`，无效签名 401、缺密钥 503，强制 `x-github-delivery`／`x-github-event` 头；`webhook` runtime 是 `ctx.webhookRuntime.register(rule)` 信任规则注册表，`run()` 在 Web Workspace 建 root Session。本地补强剩管理员开关、重放防护、限流与 Session 归属策略（7B）。
+- `agent-loop` 本地已有 `turnBoundaryProjectionDefinition` 注册（index.ts:431）；alpha.2 仅在同处新增 `inboxProjectionDefinition` 注册（上游 416–417），与本地 `setupAndPublish`／`runMaintenance` 结构无冲突，2B 增量面小。
+- `llm-deepseek` 的 Messages 修复是新增 `common/messages-api.ts`：`messagesApiRoot()` 统一规范化 endpoint root，files API 与请求路径改用之（替代内联 `/v1` 拼接）。
+- `deliverables/workspace-changes` 的 `TurnRecorder` 在每个 turn 起止对 git 工作树做快照、对非 git 覆盖路径在文件工具编辑前后做整文件捕获，`workspace/changes` 事件只携带 turn 摘要；非 git 目录只列文件工具编辑。
+
 ## 本审计的边界
 
 - 尚未完成 2,641 个变化文件的逐文件语义审查，未完成逐提交归属；矩阵行与清单决定只声明范围与待验证要求，不声明实现完成。矩阵 333 行中只有 `apps/desktop`、`apps/desktop-host` 两行为用户确认路由，其余仍为初始路由。
