@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -1590,6 +1590,23 @@ describe('Team mailbox and waiting', () => {
       delivery: 'quiet',
       content: content('must not dispatch'),
     }, SIGNAL)).resolves.toBe(false)
+  })
+
+  it('schedules recovery during creation without awaiting the mailbox queue', async () => {
+    const { ctx, lead } = await setup([])
+    const release = Promise.withResolvers<undefined>()
+    const recovered: Agent[] = []
+    teamInternals(ctx).recoverFor = async (agent) => {
+      recovered.push(agent)
+      await release.promise
+    }
+    try {
+      await agentEvents(ctx, lead).serial('agent/created', { source: 'resume' })
+      expect(recovered).toHaveLength(1)
+      expect(recovered[0] === lead).toBe(true)
+    } finally {
+      release.resolve(undefined)
+    }
   })
 
   it('contains recovery callback failures and ignores work scheduled after disposal', async () => {

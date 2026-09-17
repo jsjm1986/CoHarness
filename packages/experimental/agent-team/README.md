@@ -29,7 +29,7 @@ Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals
 
 Fresh children have no parent-history seed. Fork children capture the Lead's completed-turn prefix once; the in-flight delegation turn is excluded. Inherited Team records carry the old root's `TeamId` and are ignored when an ordinary fork becomes an independent runtime root. Provider-owned subagents outside the roster do not become nested Team Leads.
 
-The roster reports durable provisioning/failed phases and live `running`/`idle` status. An active but non-resident teammate is `inactive`; later waking delivery cold-resumes it through the continuation owner.
+The roster reports durable provisioning/failed phases and live `running`/`idle` status. An active but non-resident teammate is `inactive`; later waking delivery cold-resumes it through the continuation owner. Member recovery starts on each member's `agent/created` initialization and runs in the background: creation does not wait for a cold-resumed mailbox queue, because mailbox delivery can already hold that member's serial queue and awaiting it from creation would deadlock.
 
 ## Durable mailbox
 
