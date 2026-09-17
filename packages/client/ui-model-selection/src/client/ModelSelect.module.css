@@ -55,6 +55,62 @@
   white-space: nowrap;
 }
 
+/* Hidden until the composer row's inline-size container runs below the
+   width where the name can still render legibly. */
+.triggerGlyph {
+  display: none;
+  flex: 0 0 auto;
+}
+
+.triggerGlyph svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* Composer-row collapse tier: the name and effort give way to the sparkle
+   glyph + chevron so the row keeps a single line before anything must wrap.
+   The nearest container ancestor is the composer row itself (InputBar's
+   anonymous inline-size container); with no container ancestor — the session
+   settings sheet — this never matches. 480 is the shared narrow-panel step. */
+@container (max-width: 480px) {
+  .root {
+    flex: 0 0 auto;
+    max-width: none;
+  }
+
+  .trigger {
+    width: auto;
+    max-width: none;
+    padding-inline: var(--dsw-space-2) var(--dsw-space-1);
+  }
+
+  .triggerLabel,
+  .triggerEffort {
+    display: none;
+  }
+
+  .triggerGlyph {
+    display: inline-flex;
+  }
+}
+
+/* The compact phone layout already seats the trailing group in its own grid
+   cell with room for the name and effort; the collapse above targets
+   squeezed non-compact columns, not the phone row. */
+:global([data-viewport='compact']) .trigger {
+  width: 100%;
+}
+
+:global([data-viewport='compact']) .triggerLabel,
+:global([data-viewport='compact']) .triggerEffort {
+  display: block;
+}
+
+:global([data-viewport='compact']) .triggerGlyph {
+  display: none;
+}
+
 /* Effort value beside the model name (mock's 'High': same 13/20/500, caption tone). */
 .triggerEffort {
   flex: 0 0 auto;

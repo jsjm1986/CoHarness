@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-保留 Workspace 选择的历史优先语义，并把“新建对话”作为独立操作。真实 Workspace 行始终显示加号，Hero 在 Workspace 选择器旁提供同一个操作。两者都调用既有的 `startSession` → `connectWorkspace` 路径：优先复用一个兼容的空白 Session，否则创建一个 reservation。
+保留 Workspace 选择的历史优先语义，并把“新建对话”作为独立操作。真实 Workspace 行始终显示加号，侧边栏入口提供同一操作；Hero 的编辑器本身就是空白草稿界面，其工作区行只保留选择器（见 [Hero 行精简](2026-09-17-hero-workspace-row-simplification.zh.md)）。两者都调用既有的 `startSession` → `connectWorkspace` 路径：优先复用一个兼容的空白 Session，否则创建一个 reservation。
 
 新预留的空白草稿在 Host 报告成员关系或首条可见事件到达前，列表使用仅客户端的 `workspaceId` 提示。该提示只用于分组和当前分组展开；会话进入有效状态或被移除后清掉，绝不序列化、参与搜索或写入 Workspace 成员关系。重复操作仍由既有的 Workspace single-flight 与 draft reservation 合并。
 
@@ -30,7 +30,7 @@ Status: implemented
 
 ## Verification
 
-客户端 runtime、Workspace tree 与 ConversationRoot 测试覆盖空白草稿保留、提示分组、Hero 显式激活和首条消息后的提示清除。GUI 全套测试与 TypeScript typecheck 通过。组装 Web 历史入口场景仍验证历史优先，并覆盖桌面与紧凑布局下的显式新会话路径。
+客户端 runtime、Workspace tree 与 ConversationRoot 测试覆盖空白草稿保留、提示分组、Workspace 行激活和首条消息后的提示清除。GUI 全套测试与 TypeScript typecheck 通过。组装 Web 历史入口场景仍验证历史优先，并覆盖桌面与紧凑布局下的显式新会话路径。
 
 ## Related
 

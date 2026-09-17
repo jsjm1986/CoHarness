@@ -253,4 +253,22 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.queryByRole('button')).toBeNull()
     expect(load).not.toHaveBeenCalled()
   })
+
+  it('keeps the model name reachable when the narrow composer shows only the glyph', () => {
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(state())}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    const trigger = screen.getByRole('button', { name: /选择模型/ })
+    // The glyph seat is decorative — the full model identity stays on the
+    // trigger's accessible name and tooltip for the icon-only collapse tier.
+    expect(trigger.querySelector('[aria-hidden="true"]')).toBeTruthy()
+    expect(trigger.getAttribute('title')).toBe('DeepSeek-V4-Flash · High')
+    expect(trigger.getAttribute('aria-label')).toContain('DeepSeek-V4-Flash')
+  })
 })
