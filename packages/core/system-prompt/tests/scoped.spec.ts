@@ -15,7 +15,7 @@ async function mintScope(ctx: Context, name: string): Promise<Scope> {
   let scope!: Scope
   // The scoped context resolves services through the MINTING plugin's
   // dependency chain — the minter must inject what scope holders will reach.
-  await ctx.plugin(Object.assign(async (inner: Context) => { scope = createScope(inner, { name }) },
+  await ctx.plugin(Object.assign((inner: Context) => { scope = createScope(inner, { name }) },
     { inject: ['systemPrompt'] }))
   return scope
 }

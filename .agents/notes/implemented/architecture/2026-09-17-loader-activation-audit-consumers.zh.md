@@ -16,7 +16,7 @@ vendored Cordis 升级移除了事务性 Loader 承诺：组合过程中某个�
 
 ## 决策
 
-消费者改为观察激活，而非捕获回滚，与 app-boot 的 `inactiveEntries()` 审计一致：
+消费者改为观察激活，而非捕获回滚，与 app-boot 的启动审计一致（自 dsh-v0.1.6-alpha.2 起为 `auditStartupEntries`——上游以 `StartupError` 加结构化 `inactiveEntries` 诊断的形式采纳了同一模型）：
 
 - `packages/client/web/src/boot-client.ts` 将失败路径留在审计内：模块无法导入的行在 Loader 中记录失败，启动页把该行报告为 `failed`，`assertEntriesActive` 以 `N entr… did not activate` 报告拒绝启动。
 - `packages/todo/tool-todo/tests/loader-composition.spec.ts` 钉住无回滚的误配置：`allowParallelInProgress` 缺失或非布尔时，工具条目的 fiber 到达 `FiberState.FAILED` 而树的其余部分照常激活，`todo_write` 永不挂载。

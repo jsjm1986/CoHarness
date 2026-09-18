@@ -1,6 +1,6 @@
 /** Reject maintained references to repository commits and the disallowed organization URL. */
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -12,7 +12,15 @@ const organizationUrl = new RegExp(`\\bgithub\\.com/${organization}(?![a-z0-9-])
 // The independent kit repository owns the engine source and documentation.
 const kitRepositoryUrl = new RegExp(`\\bgithub\\.com/${organization}/libreoffice-kit(?:\\.git)?(?=/|[^a-zA-Z0-9_.-]|$)`, 'g')
 const commitCandidate = /(?<![a-z0-9])[\da-f]{7,40}(?![a-z0-9])/gi
-const excludedPrefixes = ['vendor/', '.agents/notes/', 'upgrades/', 'scripts/upstream-sync.json']
+// `upgrades/` records upstream SHAs as its subject matter, and the sync manifest
+// plus its pinning spec carry the mirrored commit by definition.
+const excludedPrefixes = [
+  'vendor/',
+  '.agents/notes/archived/',
+  'upgrades/',
+  'scripts/upstream-sync.json',
+  'scripts/verify-upstream-sovereignty.spec.ts',
+]
 const gitOutputLimit = 64 * 1024 * 1024
 
 /** One prohibited reference in a maintained source file. */
@@ -84,13 +92,11 @@ function repositoryCommits(repoRoot: string, sources: Iterable<string>): Set<str
   }).trimEnd().split('\n')
   // Git resolves prefixes across all available objects, including unreachable ones.
   // Ambiguous prefixes do not identify one object and cannot establish a commit reference.
-  // Fetched upstream-tag commits are foreign history, not this repository's own:
-  // only ancestors of HEAD count as repository commits a maintained file must not cite.
+  // Git resolves prefixes across all available objects, including unreachable ones.
+  // Ambiguous prefixes do not identify one object and cannot establish a commit reference.
   return new Set(candidates.filter((candidate, index) => {
     const [object, type] = results[index]?.split(' ') ?? []
-    if (type !== 'commit' || object?.startsWith(candidate) !== true) return false
-    const ancestry = spawnSync('git', ['merge-base', '--is-ancestor', object, 'HEAD'], { cwd: repoRoot })
-    return ancestry.status === 0
+    return type === 'commit' && object?.startsWith(candidate) === true
   }))
 }
 

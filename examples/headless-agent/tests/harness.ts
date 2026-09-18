@@ -56,7 +56,7 @@ export interface CodingHarnessOptions {
 export async function codingHarness(workdir: string, options: CodingHarnessOptions = {}): Promise<Context> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, {
-    systemPrompt: { persona: options.persona ?? '' },
+    systemPrompt: { personaPrefix: options.persona ?? '' },
   })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(LlmDeepSeek, options.modelContextWindow === undefined ? {} : {

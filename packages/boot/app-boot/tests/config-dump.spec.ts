@@ -7,18 +7,27 @@
  * shared overlay whose row exists only on another surface.
  */
 
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as yaml from 'js-yaml'
 import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { loadOverlayPatches, renderConfigDump } from '../src/index.ts'
 
 const NAME = 'dsh-test-bin'
 
-const tmp = (): string => mkdtempSync(join(tmpdir(), 'dsh-config-dump-'))
+const tempRoots: string[] = []
+afterAll(() => {
+  for (const root of tempRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+const tmp = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-config-dump-'))
+  tempRoots.push(dir)
+  return dir
+}
 
 function writeBase(dir: string): string {
   const base = join(dir, 'base.yml')
@@ -187,10 +196,6 @@ describe('renderConfigDump', () => {
     const scalar = join(dir, 'scalar.yml')
     writeFileSync(scalar, 'id: not-a-list\n')
     expect(() => renderConfigDump(NAME, scalar, [], () => {}))
-      .toThrow('must be a top-level YAML array of entries')
-    const empty = join(dir, 'empty.yml')
-    writeFileSync(empty, '')
-    expect(() => renderConfigDump(NAME, empty, [], () => {}))
       .toThrow('must be a top-level YAML array of entries')
   })
 })

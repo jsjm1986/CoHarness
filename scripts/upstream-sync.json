@@ -43,10 +43,25 @@
     "boot/cmdline": {
       "sovereignty": "adapted"
     },
+    "boot/hmr": {
+      "sovereignty": "owned"
+    },
+    "boot/plugin-manager": {
+      "sovereignty": "owned"
+    },
+    "bundle/acp-app": {
+      "sovereignty": "adapted"
+    },
     "bundle/base": {
       "sovereignty": "adapted"
     },
     "bundle/headless": {
+      "sovereignty": "adapted"
+    },
+    "bundle/sdk-app": {
+      "sovereignty": "adapted"
+    },
+    "bundle/sdk-minimal": {
       "sovereignty": "adapted"
     },
     "bundle/web-app": {
@@ -478,6 +493,9 @@
     "mcp/mcp-client": {
       "sovereignty": "adapted"
     },
+    "mcp/mcp-resources": {
+      "sovereignty": "owned"
+    },
     "plan/plan-mode": {
       "sovereignty": "adapted"
     },
@@ -748,6 +766,9 @@
     "util/launch-environment": {
       "sovereignty": "adapted"
     },
+    "util/lazy-require": {
+      "sovereignty": "owned"
+    },
     "util/native-command": {
       "sovereignty": "adapted"
     },
@@ -821,18 +842,6 @@
       "package": "api/workspace-files",
       "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
       "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "bundle/acp-app",
-      "reason": "CoHarness ships its own installable bundle profiles; the upstream ACP bundle is not carried"
-    },
-    {
-      "package": "bundle/sdk-app",
-      "reason": "CoHarness ships its own installable bundle profiles; the upstream SDK bundle is not carried"
-    },
-    {
-      "package": "bundle/sdk-minimal",
-      "reason": "CoHarness ships its own installable bundle profiles; the upstream minimal SDK bundle is not carried"
     },
     {
       "package": "client/file-upload",

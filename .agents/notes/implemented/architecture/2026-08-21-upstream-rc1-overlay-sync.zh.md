@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-fork 在所属包边界采用官方 rc.1 契约，并把产品专属行为保留在现有覆盖层中。上游参考为 tag `dsh-v0.1.1-rc.1`，提交 `528c682e061696f5a160f363f236ecbf53cbd006`。
+fork 在所属包边界采用官方 rc.1 契约，并把产品专属行为保留在现有覆盖层中。上游参考为 tag `dsh-v0.1.1-rc.1`。
 
 - DeepSeek 保留路由级 `reasoningEffort`，并增加模型级 `inputModalities`，包括 `deepseek-v4-flash-vision-exp`。pi-ai 使用模型级 `input` 和 `reasoningEfforts`；两套适配器词汇分别校验。
 - 凭据采用 rc.1 记录模型（`CredentialKey`、API key 与 grant 记录、记录修改、枚举、删除、v1 YAML、锁、权限，以及从预发布 flat 文件迁移）。组织 `DSH_*` 提供方仍为只读，并在拥有某个引用时继续优先于个人记录。

@@ -40,7 +40,7 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
   ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
-  await ctx.plugin(SystemPrompt, { persona: 'Answer the user exactly and concisely.' })
+  await ctx.plugin(SystemPrompt, { personaPrefix: 'Answer the user exactly and concisely.' })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(LocalFileSystem, { cwd: '/' })

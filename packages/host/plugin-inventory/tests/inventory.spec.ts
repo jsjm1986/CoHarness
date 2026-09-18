@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context, type Plugin } from '@deepseek-ai/cordis'
+import { Context, FiberState, type Plugin } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
+import type { AgentPresets } from '@deepseek-ai/dsh-agent-presets'
 import PluginInventoryGateway from '../src/index.ts'
 
 const contexts: Context[] = []
@@ -53,6 +54,8 @@ describe('PluginInventoryGateway', () => {
     await ctx.loader.create({ name: 'cordis:active', group: true })
 
     const snapshot = await inventory.list()
+    // No agent-preset roster is composed, so the snapshot carries no presets.
+    expect(snapshot.agentPresets).toBeUndefined()
     expect(snapshot.entries).toHaveLength(3)
     expect(snapshot.entries).toEqual(expect.arrayContaining([
       {
@@ -87,18 +90,37 @@ describe('PluginInventoryGateway', () => {
     expect((await inventory.list()).entries.some(entry => entry.entryId === pendingId)).toBe(false)
   })
 
-  it('includes optional Agent-preset composition rows without changing global entries', async () => {
+  it('carries each composed preset with root-fiber states mapped to phases', async () => {
     const { ctx, inventory } = await harness()
     ctx.provide('agentPresets', {
-      compositionInventory: async () => [{
-        id: 'coding', trust: 'system', isDefault: true,
-        rows: [{ entryId: 'preset-entry', moduleName: 'preset-plugin', enabled: true, fiberState: 2 }],
-      }],
-    } as never)
+      compositionInventory: async () => [
+        {
+          id: 'standard',
+          trust: 'system',
+          name: '标准模式',
+          isDefault: true,
+          rows: [
+            { entryId: 'alpha', moduleName: 'pkg-alpha', enabled: true, fiberState: FiberState.ACTIVE },
+            { entryId: null, moduleName: 'pkg-file', enabled: 'conditional', condition: 'x' },
+          ],
+        },
+        { id: 'damaged', trust: 'user', isDefault: false, broken: 'the composition file is missing', rows: [] },
+      ],
+    } as Partial<AgentPresets> as never)
+
     const snapshot = await inventory.list()
-    expect(snapshot.agentPresets).toEqual([{
-      id: 'coding', trust: 'system', isDefault: true,
-      rows: [{ entryId: 'preset-entry', moduleName: 'preset-plugin', enabled: true, fiberPhase: 'active' }],
-    }])
+    expect(snapshot.agentPresets).toEqual([
+      {
+        id: 'standard',
+        trust: 'system',
+        name: '标准模式',
+        isDefault: true,
+        rows: [
+          { entryId: 'alpha', moduleName: 'pkg-alpha', enabled: true, fiberPhase: 'active' },
+          { entryId: null, moduleName: 'pkg-file', enabled: 'conditional', condition: 'x', fiberPhase: null },
+        ],
+      },
+      { id: 'damaged', trust: 'user', isDefault: false, broken: 'the composition file is missing', rows: [] },
+    ])
   })
 })

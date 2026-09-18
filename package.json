@@ -169,7 +169,6 @@
     "gen-session-format-catalog": "tsx scripts/gen-session-format-catalog.ts",
     "gen-tsconfig-paths": "tsx scripts/gen-tsconfig-paths.ts",
     "gen-workflow-guest": "tsx scripts/gen-workflow-guest.ts",
-    "verify-application-entrypoints": "tsx scripts/verify-application-entrypoints.ts",
     "verify-client-ui-i18n": "tsx scripts/verify-client-ui-i18n.ts",
     "verify-concrete-terms": "tsx scripts/verify-concrete-terms.ts",
     "verify-cordis-inspect-catalog": "tsx scripts/gen-cordis-inspect-catalog.ts --check",

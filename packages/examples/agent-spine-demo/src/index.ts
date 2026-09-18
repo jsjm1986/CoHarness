@@ -102,7 +102,7 @@ export interface Config {
   /** Whether model history includes dynamic runtime-context snapshots (default true). */
   includeRuntimeContext?: SystemPromptConfig['includeRuntimeContext']
   /** The deployment persona (see dsh-system-prompt's `Config`). */
-  persona?: SystemPromptConfig['persona']
+  persona?: SystemPromptConfig['personaPrefix']
   /** Persona prefix forwarded to the system-prompt plugin. */
   personaPrefix?: SystemPromptConfig['personaPrefix']
   /** Persona suffix forwarded to the system-prompt plugin. */
@@ -178,7 +178,8 @@ export const Config = z.intersect([
     toolJobs: z.union([z.const(false), ToolJobsConfigSchema]),
     invariants: InvariantRegistry.Config,
     goals: z.union([z.const(false), GoalConfigSchema]),
-  }) as unknown as z<Pick<Config, 'tools' | 'dshHome' | 'sessionTitle' | 'skills' | 'workspaceContext' | 'toolBash' | 'jobs' | 'toolJobs' | 'invariants' | 'goals'>>,
+    persona: z.string(),
+  }) as unknown as z<Pick<Config, 'tools' | 'dshHome' | 'sessionTitle' | 'skills' | 'workspaceContext' | 'toolBash' | 'jobs' | 'toolJobs' | 'invariants' | 'goals' | 'persona'>>,
 ]) as unknown as z<Config>
 
 /**
@@ -235,9 +236,8 @@ export function apply(ctx: Context, config: Config): void {
   ctx.plugin(SystemPrompt, {
     includeHarnessIdentity: config.includeHarnessIdentity ?? true,
     includeRuntimeContext: config.includeRuntimeContext ?? true,
-    ...config.persona === undefined ? {} : { persona: config.persona },
-    ...config.personaPrefix === undefined ? {} : { personaPrefix: config.personaPrefix },
-    ...config.personaSuffix === undefined ? {} : { personaSuffix: config.personaSuffix },
+    personaPrefix: config.personaPrefix || config.persona || '',
+    personaSuffix: config.personaSuffix ?? '',
     ...config.toolOrder !== undefined ? { toolOrder: config.toolOrder } : {},
   })
   ctx.plugin(ToolRuntime, config.tools ?? {})

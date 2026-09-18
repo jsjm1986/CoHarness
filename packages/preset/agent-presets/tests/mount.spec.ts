@@ -46,7 +46,7 @@ async function harness(roster: Config = { default: 'standard', roots: ROOTS, inc
   ctx.loader.builtins.include = Include
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
-  await ctx.plugin(SystemPrompt, { persona: '' })
+  await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
@@ -416,7 +416,7 @@ describe('the preset file is an input, never a persistence target', () => {
     scoped.loader.builtins.include = Include
     await scoped.plugin(LlmRuntime)
     await scoped.plugin(SessionStore)
-    await scoped.plugin(SystemPrompt, { persona: '' })
+    await scoped.plugin(SystemPrompt, { personaPrefix: '' })
     await scoped.plugin(ToolRuntime)
     await scoped.plugin(AgentRegistry)
     await scoped.plugin(SessionProjectionRegistry)
@@ -582,7 +582,7 @@ describe('replacing a composition', () => {
     scoped.loader.builtins.include = Include
     await scoped.plugin(LlmRuntime)
     await scoped.plugin(SessionStore)
-    await scoped.plugin(SystemPrompt, { persona: '' })
+    await scoped.plugin(SystemPrompt, { personaPrefix: '' })
     await scoped.plugin(ToolRuntime)
     await scoped.plugin(AgentRegistry)
     await scoped.plugin(SessionProjectionRegistry)

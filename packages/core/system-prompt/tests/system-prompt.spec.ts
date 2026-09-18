@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SystemPrompt, { FIRST_PARTY_SECTION_ORDER, AssembleContext, PromptAssembly, renderContextSnapshot, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
+import SystemPrompt, {
+  AssembleContext, PromptAssembly, renderContextSnapshot, renderPrompt,
+} from '@deepseek-ai/dsh-system-prompt'
+import type { PromptContextOrderName, PromptSectionOrderName } from '@deepseek-ai/dsh-system-prompt'
 
 /**
  * Every assembly carries the plugin's own built-ins — `harness:identity`
@@ -19,7 +22,10 @@ const SECTION_ORDER_NAMES = [
   'TOOL_RALPH', 'TOOL_SUBAGENT', 'TOOL_REPORT', 'TOOLS_SDK',
   'DELIVERABLE_FILE_REFERENCES', 'STRUCTURED_OUTPUT',
   'HARNESS_SOURCE', 'WEB_SURFACE', 'DEPLOYMENT_PERSONA_SUFFIX',
-] as const
+] as const satisfies readonly PromptSectionOrderName[]
+const CONTEXT_ORDER_NAMES = [
+  'SANDBOX_POLICY', 'APPROVAL_POLICY', 'SUBAGENT_DELEGATION',
+] as const satisfies readonly PromptContextOrderName[]
 function contributed(assembly: PromptAssembly): PromptAssembly['sections'] {
   return assembly.sections.filter(section => !BUILT_IN.includes(section.name))
 }
@@ -28,7 +34,7 @@ describe('SystemPrompt', () => {
   it('keeps repository section placements unique, integral, and at least ten apart', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt, {})
-    const orders = SECTION_ORDER_NAMES.map(name => FIRST_PARTY_SECTION_ORDER[name])
+    const orders = SECTION_ORDER_NAMES.map(name => ctx.systemPrompt.getSectionOrder(name))
     expect(orders.every(Number.isInteger)).toBe(true)
     expect(new Set(orders).size).toBe(orders.length)
     const sorted = [...orders].sort((a, b) => a - b)
@@ -46,13 +52,13 @@ describe('SystemPrompt', () => {
       const reusable = SECTION_ORDER_NAMES.filter(name =>
         !['HARNESS_IDENTITY', 'DEPLOYMENT_PERSONA_PREFIX', 'HARNESS_SOURCE', 'WEB_SURFACE', 'DEPLOYMENT_PERSONA_SUFFIX'].includes(name))
       for (const name of [...reusable].reverse()) {
-        ctx.systemPrompt.section({ name, order: FIRST_PARTY_SECTION_ORDER[name], text: name })
+        ctx.systemPrompt.section({ name, order: ctx.systemPrompt.getSectionOrder(name), text: name })
       }
       ctx.systemPrompt.section({
-        name: 'source', order: FIRST_PARTY_SECTION_ORDER['HARNESS_SOURCE'], text: () => environment.source,
+        name: 'source', order: ctx.systemPrompt.getSectionOrder('HARNESS_SOURCE'), text: () => environment.source,
       })
       ctx.systemPrompt.section({
-        name: 'web', order: FIRST_PARTY_SECTION_ORDER['WEB_SURFACE'], text: () => environment.url,
+        name: 'web', order: ctx.systemPrompt.getSectionOrder('WEB_SURFACE'), text: () => environment.url,
       })
       const first = renderPrompt(await ctx.systemPrompt.assemble())
       environment = { model: 'model-a', cwd: 'C:/bob/project', platform: 'win32', source: 'C:/bob/dsh', url: 'http://127.0.0.1:4080' }
@@ -68,6 +74,13 @@ describe('SystemPrompt', () => {
     }
   })
 
+  it('keeps repository context placements unique and integral', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt, {})
+    const orders = CONTEXT_ORDER_NAMES.map(name => ctx.systemPrompt.getContextOrder(name))
+    expect(orders.every(Number.isInteger)).toBe(true)
+    expect(new Set(orders).size).toBe(orders.length)
+  })
 
   describe('built-in sections', () => {
     it('renders the environment after guidance and reports its strict interpolation errors', async () => {
@@ -170,6 +183,15 @@ describe('SystemPrompt', () => {
     expect(assembly.variables).toEqual({})
     expect(renderPrompt(assembly)).toBe(`${IDENTITY}\n\nYou are DeepSeek Harness.\n\nBe precise.\n\ncwd: /tmp`)
     expect(renderContextSnapshot(assembly)).toBe('Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\ncontext 1\n\ncontext 2')
+  })
+
+  it('breaks equal section orders by code-unit name regardless of registration order', async () => {
+    for (const names of [['äther', 'zeta'], ['zeta', 'äther']] as const) {
+      const ctx = new Context()
+      await ctx.plugin(SystemPrompt)
+      for (const name of names) ctx.systemPrompt.section({ name, order: 10, text: name })
+      expect(contributed(await ctx.systemPrompt.assemble()).map(section => section.name)).toEqual(['zeta', 'äther'])
+    }
   })
 
   it('resolves section text providers against the assemble context, at each assemble call', async () => {
@@ -319,7 +341,7 @@ describe('SystemPrompt', () => {
   it('composes multiple system-prompt/assemble waterfall listeners in order, with the context', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
-    ctx.systemPrompt.section({ name: 'base', order: 0, text: 'base' })
+    ctx.systemPrompt.section({ name: 'base', order: 10, text: 'base' })
 
     // Listener A appends a section, then delegates.
     const contexts: AssembleContext[] = []
@@ -337,8 +359,8 @@ describe('SystemPrompt', () => {
 
     const passed: AssembleContext = {}
     const assembly = await ctx.systemPrompt.assemble(passed)
-    expect(seen).toEqual([['harness:identity', 'base', 'deployment:persona-prefix', 'deployment:persona-suffix', 'from-a']])
-    expect(assembly.sections.map(s => s.name)).toEqual(['harness:identity', 'base', 'deployment:persona-prefix', 'deployment:persona-suffix', 'from-a'])
+    expect(seen).toEqual([['harness:identity', 'deployment:persona-prefix', 'base', 'deployment:persona-suffix', 'from-a']])
+    expect(assembly.sections.map(s => s.name)).toEqual(['harness:identity', 'deployment:persona-prefix', 'base', 'deployment:persona-suffix', 'from-a'])
     expect(contexts[0]).toBe(passed) // the caller's context reaches listeners
   })
 
@@ -386,7 +408,7 @@ describe('SystemPrompt', () => {
   it('assembles snapshots so one-step mutations do not leak into future assemblies', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
-    ctx.systemPrompt.section({ name: 'base', order: 0, text: 'base' })
+    ctx.systemPrompt.section({ name: 'base', order: 10, text: 'base' })
     ctx.systemPrompt.tools(() => ({ schemas: [{ name: 't', description: 'tool', parameters: { type: 'object', properties: {} } }] }))
 
     const first = await ctx.systemPrompt.assemble()
@@ -398,7 +420,7 @@ describe('SystemPrompt', () => {
     firstParameters.properties['leak'] = { type: 'string' }
 
     const second = await ctx.systemPrompt.assemble()
-    expect(second.sections.map(section => section.name)).toEqual(['harness:identity', 'base', 'deployment:persona-prefix', 'deployment:persona-suffix'])
+    expect(second.sections.map(section => section.name)).toEqual(['harness:identity', 'deployment:persona-prefix', 'base', 'deployment:persona-suffix'])
     expect(second.sections[0]!.text).toBe(IDENTITY)
     expect(second.contexts).toEqual([])
     expect(second.tools).toEqual([{ name: 't', description: 'tool', parameters: { type: 'object', properties: {} } }])
@@ -555,6 +577,25 @@ describe('SystemPrompt', () => {
       ctx.systemPrompt.variable('cwd', () => '/work')
 
       expect(renderPrompt(await ctx.systemPrompt.assemble())).toBe(`${IDENTITY}\n\nYou run on deepseek-v4 in /work.`)
+    })
+
+    it.each([
+      [false, false],
+      [false, true],
+      [true, false],
+      [true, true],
+    ])('preserves literal section text with complete=%s and dynamic=%s', async (complete, dynamic) => {
+      const ctx = new Context()
+      try {
+        await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false, personaPrefix: '{{model}}' })
+        ctx.systemPrompt.variable('model', () => 'actual-model')
+        const text = '{{item}} {{model}} {{ model }} {{nested{{item}}}}'
+        ctx.systemPrompt.section({ name: 'literal', order: 1, text: dynamic ? () => text : text, interpolate: false, complete })
+        expect(renderPrompt(await ctx.systemPrompt.assemble()))
+          .toBe(complete ? text : `actual-model\n\n${text}`)
+      } finally {
+        await ctx.fiber.dispose()
+      }
     })
 
     it('lets a waterfall listener add or override variables before render', async () => {

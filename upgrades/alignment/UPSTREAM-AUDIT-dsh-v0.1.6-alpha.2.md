@@ -103,3 +103,56 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 | L21 | `tool-cordis` api-catalog 的 `agent/created` 参数描述缺 `agent`／`source`，goal `resume` 描述有语法错误 | 观察项 | alpha.1 Phase 2 代码审查 | 7D |
 | L22 | 上游 profile-resolution／required-startup 策略在 alpha.1 推迟至发布闭包 | 推迟项 | alpha.1 审计"非事务 Loader 适配收口" | 1B（alpha.2 runtime 解析直接覆盖） |
 | L23 | Session 迁移链拆为上游 `session-format-*` 独立包的可选结构对齐 | 推迟项 | alpha.1 计划 | 7E 可选 |
+
+## 1B 执行台账（2026-09-18 首批落地）
+
+**已采用（整包/整文件对齐上游 alpha.2）**
+
+- `packages/boot/app-boot` 整换：`readProfilePatches`/`ProfileContext`/`healProfilesModuleFallback`/`healIsolatedProfileModuleFallback`/`resolutionMode` runtime/link/dual/`auditStartupEntries`/`StartupError`/`inactiveEntries` 结构化诊断；本地 `assertEntries*`/`watchUserPatches`/`resolveTelemetryPatch` 旧面退役（telemetry patch 移入 `profile-context.ts`）。
+- `packages/boot/hmr` 新建（`@deepseek-ai/dsh-hmr`）：base bundle `cordis.patch.yml` 以 `dsh-hmr` 替换 vendored `cordis-plugin-hmr`，`root: []` + `disabled: !!js "!ctx.get('profileContext')"`；web-app 移除本地 `disabled:true`+TODO（上游已证明 web 安全）并加宿主面 `tool-plugin-manager` disable 行。
+- `packages/boot/plugin-manager` 新建：base patch 加 `tool-plugin-manager`/`plugin-manager` 行；`pnpm` devDep + `manager.spec` 夹具改用工作区 pnpm（本地无 `apps/desktop` 路径）。
+- `packages/boot/cmdline`、`packages/host/plugin-inventory` 整换；`cmdline` 的 `runDumpConfig` 新增 `fromDefaultProfile` 参并在 `dump-config.ts` 重放 preset 接线。
+- `apps/cli`：上游 src（`args/bin/plugin/profile-boot/startup-diagnostics`/`dump-config`）+ 单测 + `tests/profiles/` 夹具骨架；`package.json` 依赖为本地基与上游可解析集并集（webhook/agent-team/tool-present/ptc 等未携带包正确排除）；`tsconfig` 补 `boot/plugin-manager` 与本地 `apiproxy/http-proxy` 引用；`js-yaml` 升 `^5.2.3` 与 vendored include 对齐（v5 `deficient indentation` 诊断断言已随测）。
+- `packages/util/lazy-require` 新建（上游 1B 行；消费者 terminal-controller/subprocess 属后续阶段，先行落地无消费方）。
+- `packages/preset/persona` src+spec 整换：`getSectionOrder` 服务方法替代 `FIRST_PARTY_SECTION_ORDER` 常量、`text` 别名删除；`tool-subagent` 仅点修同一 API（其整包迁移挂 2B 的 `SubagentRuntime.resolveMaxDepth`）。
+- `SystemPrompt` Config `persona`→`personaPrefix` 全部消费点（examples/demo 的转发键同步；`SubagentCapabilities.persona` 布尔字段保留不动）。
+- 新 bundle：`packages/bundle/{acp-app,sdk-app,sdk-minimal}` 与 `packages/mcp/mcp-resources`（依赖闭包本地齐全）；`tsconfig.base.json` 补 `dsh-plugin-manager/tools` 子路径映射；`tsconfig.host.json` 注册全部新包。
+- vendor 两处重放 + `vendor/README.md` 条目；`snapshots/acp/escalation-approved/` 夹具目录补拷（cordis.yml 符号链接目标）。
+- 全部新包按本地政策补 explained-empty `src/invariant.ts` + `./invariant` 导出 + `lib/invariant.js` + invariants 依赖 + tsconfig 引用（上游弃伴随的包同样恢复）。
+
+**本地特性保留**
+
+- `SHIPPED_PRESET_ROOT`/`resolveShippedPresetPatch`/`composeProfilePatches` 重放进新 `profile-boot.ts`（`readProfilePatches` 结果后追加 derived patch，与 telemetryPatch 同型）；上游 alpha.2 已把等价机制收进 `agent-presets` 包的 `includeShippedRoot`，7E 整包迁移时本地 launcher patch 随之退役。
+- `apps/web/tests/scaffold.ts` 保留本地 gateway/downlink 脚手架（整换会丢 CoHarness 组装），仅点修 `healProfilesModuleFallback` options-object 签名与 `auditStartupEntries`。
+
+**撤下待阶段重拷（e2e 依赖未落地 API，不造假）**
+
+- → 2B（session-format `generationLogFilename`/`JsonlCompression`）：`session-format-guard.expected.e2e.ts`
+- → 3A/2B（`dsh-session-snapshot` 依赖 `llm-replay`/`session-format` 未带导出）：acp 7 件（acp/cleanup+helper/control-surface/escalation/goal/hooks/image-offload）、headless 5 件（headless/semantic-checkpoint/subagent-diagnostic/subagent-inheritance/workspace-context-resume）
+- → 4A（`ptc-runtime-node`）：`ptc.e2e.ts`
+- → 7A（`WebBootGraph.batches`）：`runtime-roster.ts`/`runtime-roster-observer.ts`/`default-web-process.ts`/`web-default-isolation.expected.e2e.ts`
+- → 7B/7D（`@modelcontextprotocol/*@2.0` fixture `calls`）：`creator-plugin-manager.expected.e2e.ts` + fixture mjs
+- → 7E（`agent-presets.SHIPPED_PRESET_ROOT`/`modeSelectionEnabled`/`SettingsNamespace`）：`web-agent-presets.e2e.ts`
+- `packages/test-support/session-snapshot` 包整体不落地（级联缺 `prepareSessionSnapshotFixtureForComparison`/`parseSessionFormatLogFilename`）
+
+**阶段改挂**
+
+- `packages/typert/{generator,loader,protocol,registry}`：矩阵 1B→7A。协议迁移（`TypertLookupFailure`→`TypertLookupWire`、`codec.schema`→`create`、`$dispatch` 移除、`TypertGatewayAuthorizationRequest` 删除）波及 `api/gateway`、`api/remotes`、`host/apiproxy`、`extensions/cordis-host-runner` 与 15+ 个 `ui-*` 测试——属 gateway 面而非 boot 面；1B 试换后回退，不引入新旧并存。
+
+**1B 末态验证**
+
+- `pnpm exec tsc -b --pretty false`：0 错误
+- `verify-package-invariants`：263 伴随全合规
+- `verify-cordis-config`：150 配置全过
+- 聚焦测试 597/601：`app-boot` 82、`hmr` 全量、`cmdline`、`plugin-manager`（manager/operations）、`windows-shell` 6、`profile-hmr` 6、`shipped-preset-root` 3、`resolved-profile-boot` 16、`startup-diagnostics` 6、`persona` 12、`tool-subagent` 全量、`lazy-require` 2
+- 残留 4 失败：`plugin-manager/tests/tools.spec.ts` 权限断言读上游新 sandbox-projection 语义，合法阻塞于 2B/4B（`dsh-sandbox-policy` 未迁），不 hack。
+
+**1B 补登（2026-09-18 第二批：门禁与遗留修复）**
+
+- `apps/cli/tests/fixtures/initialize-profile-from-default.ts` 补拷（race 测试子进程夹具，拷贝 spec 时漏带）；`github-webhook/` 夹具属 7B 不拷。`profile-initialization.spec` 16/16。
+- `packages/examples/agent-spine-demo`：上游 `SystemPrompt.Config` 移除 `persona` 后，demo 自有 `persona` 字段需在自有 z.object 分支显式声明（`persona: z.string()`），且 `personaPrefix` 经 schema 默认 `''` 恒非 undefined——转发优先级改为 `personaPrefix || persona || ''`；`bundle/base/cordis.patch.yml` 漏改的 `persona:` 键同步改为 `personaPrefix:`。agent-core 30/30。
+- `ui-message-feedback` controller：非 Error list 拒绝的稳定消息回退补回 `message feedback list failed`（与 mutation 路径同款）。38/38。
+- `packages/bundle/sdk-minimal`：`@deepseek-ai/dsh-invariants` dependencies/peerDependencies 重复声明移除，`verify-package-dependencies` 过。
+- **撤下三个上游门禁文件**（依赖未携带面，随所属阶段重拷）：`doc-standard.spec.ts`（session-format 发布记录文档树，2B/7E）、`ci-compatible-selfhosted.spec.ts`（断言上游 ci.yml 形状，CI 阶段）、`verify-application-entrypoints.{ts,spec.ts}`+package.json 条目（断言上游 examples→CLI-profile 迁移已完成的清单）。
+- `packages/examples/` 保留为 fork 自有面：上游已整删（迁 CLI profiles），本地 15+ 文档引用与 demo:* 根脚本使其删除爆炸半径超出 1B；登记为独立任务（examples 删除/重分类随 7E 文档面一并处理）。
+- scripts 套件复跑：87 文件 977 测试全绿。

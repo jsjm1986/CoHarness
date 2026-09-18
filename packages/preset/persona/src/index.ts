@@ -16,7 +16,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import { FIRST_PARTY_SECTION_ORDER, PERSONA_PREFIX_SECTION, PERSONA_SUFFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
+import { PERSONA_PREFIX_SECTION, PERSONA_SUFFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
 
 export { PERSONA_PREFIX_SECTION, PERSONA_SUFFIX_SECTION }
 
@@ -33,9 +33,7 @@ export interface Config {
    * complete `{{…}}` groups interpolate strictly against registered prompt
    * variables. Empty text drops the section at render, matching the registry.
    */
-  prefix?: string
-  /** Legacy preset alias for prefix. */
-  text?: string
+  prefix: string
   /**
    * Persona suffix template rendered after first-party guidance. Omitted or empty
    * text shadows the deployment suffix away; interpolation is strict.
@@ -49,8 +47,7 @@ export interface Config {
 
 /** Runtime schema for the persona row. */
 export const Config: z<Config> = z.object({
-  prefix: z.string(),
-  text: z.string(),
+  prefix: z.string().required(),
   suffix: z.string().default(''),
   complete: z.boolean().default(false),
   includeRuntimeContext: z.boolean().default(true),
@@ -63,17 +60,15 @@ export const Config: z<Config> = z.object({
  * @param config - the prefix, suffix, and complete-prompt policy.
  */
 export function apply(ctx: Context, config: Config): void {
-  const prefix = config.prefix ?? config.text
-  if (prefix === undefined) throw new Error('persona requires prefix')
   ctx.effect(() => ctx.systemPrompt.section({
     name: PERSONA_PREFIX_SECTION,
-    order: FIRST_PARTY_SECTION_ORDER.DEPLOYMENT_PERSONA_PREFIX,
-    text: prefix,
+    order: ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),
+    text: config.prefix,
     ...(config.complete ? { complete: true } : {}),
   }), 'persona.section()')
   ctx.effect(() => ctx.systemPrompt.section({
     name: PERSONA_SUFFIX_SECTION,
-    order: FIRST_PARTY_SECTION_ORDER.DEPLOYMENT_PERSONA_SUFFIX,
+    order: ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX'),
     text: config.suffix ?? '',
   }), 'persona.suffix()')
   if (!(config.includeRuntimeContext ?? true)) ctx.systemPrompt.suppressRuntimeContext()

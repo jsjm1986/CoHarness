@@ -1334,7 +1334,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localDisposition": "0R done 2026-09-18: upstream issue-management, preview-sizing, and expanded review-ownership are upstream GitHub automation, not code gates — rejected for local. ci.yml apt-mirror and review-ownership test steps are upstream-runner specific; no local lane needs copying."
+      "localDisposition": "0R done 2026-09-18: upstream issue-management, preview-sizing, and expanded review-ownership are upstream GitHub automation, not code gates \u2014 rejected for local. ci.yml apt-mirror and review-ownership test steps are upstream-runner specific; no local lane needs copying."
     },
     {
       "area": "non-package:.gitignore",
@@ -1491,9 +1491,9 @@
       "commitScope": [
         "apps/cli/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B-e2e-deferred",
       "cumulativeFiles": [
         "apps/cli/README.i18n.yaml",
         "apps/cli/README.md",
@@ -1599,7 +1599,8 @@
         "area": "non-package:apps",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "notes": "src/tests adopted; 21 e2e files withdrawn pending session-snapshot(3A/2B), ptc-runtime(4A), WebBootGraph.batches(7A), mcp fixture(7B), agent-presets(7E)."
     },
     {
       "area": "non-package:apps/web",
@@ -3112,7 +3113,7 @@
         "lefthook.yml"
       ],
       "targetAssessment": "increment-review-required",
-      "localDisposition": "0R done 2026-09-18: upstream glob widening feeds its browser-bundled-externals/desktop-lock notices inputs; local gen consumes none of them and the existing glob already covers every local notices input — no change."
+      "localDisposition": "0R done 2026-09-18: upstream glob widening feeds its browser-bundled-externals/desktop-lock notices inputs; local gen consumes none of them and the existing glob already covers every local notices input \u2014 no change."
     },
     {
       "area": "non-package:native",
@@ -3152,7 +3153,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "inherited-scope-review-required",
-      "localDisposition": "Upstream renamed native/landlock-run to native/system (node-addon-system); adopt with the subprocess/native execution work in 4B — build:native-system wiring follows the port."
+      "localDisposition": "Upstream renamed native/landlock-run to native/system (node-addon-system); adopt with the subprocess/native execution work in 4B \u2014 build:native-system wiring follows the port."
     },
     {
       "area": "non-package:package.json",
@@ -3161,9 +3162,9 @@
       "commitScope": [
         "package.json"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "package.json"
       ],
@@ -3401,9 +3402,9 @@
       "commitScope": [
         "pnpm-lock.yaml"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "pnpm-lock.yaml"
       ],
@@ -3424,9 +3425,9 @@
       "commitScope": [
         "pnpm-workspace.yaml"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "pnpm-workspace.yaml"
       ],
@@ -3684,7 +3685,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localDisposition": "0R done 2026-09-18: adopted+wired verify-dependency-catalog, verify-repository-references (local exemptions for upgrades/ and .agents/notes records plus HEAD-ancestor SHAs), verify-cordis-inspect-catalog — doc-sync 31/31. Phase-wired scripts stay registered but unwired (session-format-catalog 2B, workflow-guest 4A, i18n/readme-summaries/tsconfig-paths/subsystem-pages/application-entrypoints/concrete-terms 7E). persistence-* extractor family, default-product-isolation, benchmark-next, browser-bundled-externals, session-snapshot-corpus*, snapshot-spill-locators pulled back for re-copy at owning phase (upstream couplings not yet migrated). Upstream-only automation scripts rejected."
+      "localDisposition": "0R done 2026-09-18: adopted+wired verify-dependency-catalog, verify-repository-references (local exemptions for upgrades/ and .agents/notes records plus HEAD-ancestor SHAs), verify-cordis-inspect-catalog \u2014 doc-sync 31/31. Phase-wired scripts stay registered but unwired (session-format-catalog 2B, workflow-guest 4A, i18n/readme-summaries/tsconfig-paths/subsystem-pages/application-entrypoints/concrete-terms 7E). persistence-* extractor family, default-product-isolation, benchmark-next, browser-bundled-externals, session-snapshot-corpus*, snapshot-spill-locators pulled back for re-copy at owning phase (upstream couplings not yet migrated). Upstream-only automation scripts rejected."
     },
     {
       "area": "non-package:snapshots",
@@ -4382,9 +4383,9 @@
       "commitScope": [
         "vendor/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "vendor/README.md",
         "vendor/cordis/src/events.ts",
@@ -4748,7 +4749,7 @@
         "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the desktop session controller is not carried",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only BFF. Source-verified: the multi-instance change is a reference-counted retain model — sessions.retain(target,{source,signal}) returns SessionReference{binding,ready,release}, SessionRetainInfo counts per source, last release tears down local scope/history; service.ts rewritten (557 lines), manager.ts −250, queue-mirror.ts deleted. Port target: an equivalent retain verb on host/apiproxy plus per-consumer references in client/runtime (current ISessions is an open/additionalStaged selection model, not reference counting)."
+      "localDisposition": "Upstream-only BFF. Source-verified: the multi-instance change is a reference-counted retain model \u2014 sessions.retain(target,{source,signal}) returns SessionReference{binding,ready,release}, SessionRetainInfo counts per source, last release tears down local scope/history; service.ts rewritten (557 lines), manager.ts \u2212250, queue-mirror.ts deleted. Port target: an equivalent retain verb on host/apiproxy plus per-consumer references in client/runtime (current ISessions is an open/additionalStaged selection model, not reference counting)."
     },
     {
       "area": "packages/api/settings-controller",
@@ -4779,7 +4780,7 @@
         "reason": "settings flow through host/apiproxy under the same principal/ACL dispatch",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only; settings flow through host/apiproxy — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; settings flow through host/apiproxy \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/api/terminal-controller",
@@ -4851,7 +4852,7 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "unmanifested",
-      "localDisposition": "Source-verified: client/retention.ts holds a terminal window by remote.retain(sessionId, id, signal) — the session-retain Remote verb 7A ports is a 7B prerequisite for sidebar-terminal window holds."
+      "localDisposition": "Source-verified: client/retention.ts holds a terminal window by remote.retain(sessionId, id, signal) \u2014 the session-retain Remote verb 7A ports is a 7B prerequisite for sidebar-terminal window holds."
     },
     {
       "area": "packages/api/workspace-controller",
@@ -4892,7 +4893,7 @@
         "reason": "workspace operations are served by host/apiproxy and the Workbench runtime targets",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only; workspace operations are served by host/apiproxy and Workbench runtime targets — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; workspace operations are served by host/apiproxy and Workbench runtime targets \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/api/workspace-files",
@@ -4931,7 +4932,7 @@
         "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only; workspace file reads are served by the host/apiproxy workspaceFiles RPC — review delta under the 7C authorization work."
+      "localDisposition": "Upstream-only; workspace file reads are served by the host/apiproxy workspaceFiles RPC \u2014 review delta under the 7C authorization work."
     },
     {
       "area": "packages/attachment/attachment",
@@ -5015,9 +5016,9 @@
       "commitScope": [
         "packages/boot/app-boot/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "packages/boot/app-boot/README.i18n.yaml",
         "packages/boot/app-boot/README.md",
@@ -5080,9 +5081,9 @@
       "commitScope": [
         "packages/boot/cmdline/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "packages/boot/cmdline/README.i18n.yaml",
         "packages/boot/cmdline/README.zh.md",
@@ -5106,9 +5107,9 @@
       "commitScope": [
         "packages/boot/hmr/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "packages/boot/hmr/LICENSE",
         "packages/boot/hmr/README.i18n.yaml",
@@ -5683,7 +5684,7 @@
         "reason": "cloud runtime resources live in client/runtime WorkspaceResourceRegistry bound to bootstrap/project runtimes; the upstream single-session registry is not carried",
         "replacedBy": "client/runtime"
       },
-      "localDisposition": "Upstream-only; cloud runtime resources live in client/runtime WorkspaceResourceRegistry — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; cloud runtime resources live in client/runtime WorkspaceResourceRegistry \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/client/store",
@@ -5716,7 +5717,7 @@
         "reason": "Workbench multi-runtime client state replaces the single-session upstream store",
         "replacedBy": "client/runtime"
       },
-      "localDisposition": "Upstream-only; the Workbench multi-runtime client state replaces the single-session store — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; the Workbench multi-runtime client state replaces the single-session store \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-agent-preset",
@@ -5794,7 +5795,7 @@
       "upstreamOnly": {
         "reason": "approval surfaces live inside the CoHarness Workbench conversation UI"
       },
-      "localDisposition": "Upstream-only; approval surfaces live inside the Workbench conversation UI — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; approval surfaces live inside the Workbench conversation UI \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-attachment",
@@ -5946,7 +5947,7 @@
         "reason": "client/ui-conversation owns the chat surface for the cloud product",
         "replacedBy": "client/ui-conversation"
       },
-      "localDisposition": "Upstream-only; client/ui-conversation owns the chat surface — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; client/ui-conversation owns the chat surface \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-commands",
@@ -7007,7 +7008,7 @@
         "reason": "client/ui-conversation and ui-workbench own the session surface",
         "replacedBy": "client/ui-conversation"
       },
-      "localDisposition": "Upstream-only; client/ui-conversation and ui-workbench own the session surface — review delta for the replacement owner."
+      "localDisposition": "Upstream-only; client/ui-conversation and ui-workbench own the session surface \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-settings",
@@ -7599,7 +7600,7 @@
       "upstreamOnly": {
         "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews"
       },
-      "localDisposition": "Upstream-only package, but its 58-file delta is the upstream Office/PDF preview surface — review as reference for the Workbench document surface under 7C."
+      "localDisposition": "Upstream-only package, but its 58-file delta is the upstream Office/PDF preview surface \u2014 review as reference for the Workbench document surface under 7C."
     },
     {
       "area": "packages/client/ui-sidebar-files",
@@ -7709,7 +7710,7 @@
       "upstreamOnly": {
         "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
       },
-      "localDisposition": "Upstream-only dock tree; the Workbench right-sidebar slots (client/ui-slots) own the cloud panel layout — review delta for the replacement owner."
+      "localDisposition": "Upstream-only dock tree; the Workbench right-sidebar slots (client/ui-slots) own the cloud panel layout \u2014 review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-sidebar-terminal",
@@ -12297,7 +12298,7 @@
         "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the catalog is inlined in session/session-format (catalog-default.ts) — review delta for drift only."
+      "localDisposition": "Not carried as a package: the catalog is inlined in session/session-format (catalog-default.ts) \u2014 review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v0-to-v1",
@@ -12337,7 +12338,7 @@
         "reason": "real v0 normalization inlines into session/session-format; empty bump() shells are replaced under the rc.2 Session-correctness work",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format \u2014 review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v1-to-v2",
@@ -12374,7 +12375,7 @@
         "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format \u2014 review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v2-to-v3",
@@ -12405,10 +12406,10 @@
       "targetAssessment": "increment-review-required",
       "localSovereignty": "upstreamOnly",
       "upstreamOnly": {
-        "reason": "v2→v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
+        "reason": "v2\u2192v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format \u2014 review delta for drift only."
     },
     {
       "area": "packages/session/session-log-deepseek",
@@ -14524,8 +14525,8 @@
         "packages/typert/generator/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "7A",
+      "phaseAssignment": "deferred-with-consumers",
       "cumulativeFiles": [
         "packages/typert/generator/README.i18n.yaml",
         "packages/typert/generator/README.md",
@@ -14560,7 +14561,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "adapted"
+      "localSovereignty": "adapted",
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/typert/loader",
@@ -14570,8 +14572,8 @@
         "packages/typert/loader/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "7A",
+      "phaseAssignment": "deferred-with-consumers",
       "cumulativeFiles": [
         "packages/typert/loader/README.i18n.yaml",
         "packages/typert/loader/README.md",
@@ -14595,7 +14597,8 @@
         "reviewState": "implemented-local-tests-passing"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "adapted"
+      "localSovereignty": "adapted",
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/typert/protocol",
@@ -14605,8 +14608,8 @@
         "packages/typert/protocol/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "7A",
+      "phaseAssignment": "deferred-with-consumers",
       "cumulativeFiles": [
         "packages/typert/protocol/README.i18n.yaml",
         "packages/typert/protocol/README.md",
@@ -14633,7 +14636,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "adapted"
+      "localSovereignty": "adapted",
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/typert/registry",
@@ -14643,8 +14647,8 @@
         "packages/typert/registry/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phase": "7A",
+      "phaseAssignment": "deferred-with-consumers",
       "cumulativeFiles": [
         "packages/typert/registry/README.i18n.yaml",
         "packages/typert/registry/README.md",
@@ -14669,7 +14673,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "adapted"
+      "localSovereignty": "adapted",
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/util/atomic-write",
@@ -14903,9 +14908,9 @@
       "commitScope": [
         "packages/util/lazy-require/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phase": "1B",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
+      "phaseAssignment": "applied-1B",
       "cumulativeFiles": [
         "packages/util/lazy-require/README.i18n.yaml",
         "packages/util/lazy-require/README.md",
