@@ -48,6 +48,28 @@
 - `apps/cli/src/profile-boot.ts` 是重写：补丁分层栈（bundlePatches/homePatches/overlays、`allPatches`）由 `readProfilePatches`/`ProfileContext`（新文件 `app-boot/src/profile-context.ts`）取代；`resolveTelemetryPatch` 是**移动**非删除；新增 `healIsolatedProfileModuleFallback` 与 `resolutionMode` runtime/link/dual 三态（`dual` 走 `behavior:'verify'`）；上游 `inactiveEntries` 同样以 phase 标注包装 disabled 表达式错误，与本地 `assertEntries*` 守卫同型，1B 采用上游实现时本地守卫语义可直接映射。新增 `resolved-profile-boot.spec.ts`／`startup-diagnostics.spec.ts` 两份行为测试。
 - retain 模型的真实消费点：`terminal-controller/src/client/retention.ts` 以 `remote.retain(sessionId, id, signal)` 持有终端窗口——retain 同时是 Typert Remote 动词，7A 移植的 retain Remote 是 7B 侧栏终端窗口持有的前置依赖（与阶段排序一致）。本地 `client/runtime` 的 `ISessions` 是 `open`/`setAdditionalStaged` 选择模型，非引用计数，移植需新增 per-consumer 引用而非改名。
 
+## 0R 门禁收编登记（2026-09-18 执行）
+
+上游 `scripts/` 新增约 70 个门禁／生成脚本，`run-gates.ts` 引用者按当前本地可执行性分三类收编；`lefthook.yml` 的上游 glob 拓宽对应其 `browser-bundled-externals` 与 desktop lock 输入，本地 gen 不消费这些输入，现有 glob 已覆盖本地 gen 全部输入，无需改。
+
+**0R 收编并接入 `docSyncLeafGates`（当前全绿）**：
+
+- `verify-dependency-catalog`（＋`gen-dependency-catalog`）：生成 `docs/dependency-catalog.json` 并入库。
+- `verify-repository-references`：本地适配三处——`upgrades/` 与 `.agents/notes/` 为记录本体豁免 commit-hash 检查、SHA 允许指向本地 HEAD 祖先（上游 tag 提交非祖先仍合法）、`kitRepositoryUrl` 白名单；配套修复陈旧 `github.com/deepseek-harness/deepseek-harness` 链接、`docs/user/develop/basic/publish*.md` 删 turtle-ui 链接（与上游同改）、`gen-third-party-notices.ts` vendored 行改本地 `vendor/` 路径并把 `node-addon-system` 族列入 first-party，`THIRD_PARTY_NOTICES.md` 已重生成。
+- `verify-cordis-inspect-catalog`（＋`gen-cordis-inspect-catalog`）：`sessions.ts:146` `ensureSession` 缺 JSDoc 已修。
+
+**随阶段收编（脚本在树并 `package.json` 登记、未接车道，阶段放行前必须接绿）**：
+
+- 2B：`verify-session-format-catalog`（＋`gen-session-format-catalog`）。上游 `persistence-*` 提取器族（`persistence-schema`、`persistence-formats`、`persistence-releases`、`persistence-changes`、`render-persistence-schema` 及配套 facts/source 模块与规格）依赖 `types.ts` 的 `SurfaceIntent<K>` 别名重构（alpha.2 事件面变更），本地旧内联交叉形式渲染出 `& object` 被拒；0R 保留本地旧版 `gen-persistence-catalog.ts`（其 `--check` 当前绿），该族文件与 `verify-persistence-*` 条目已撤下，随 `SurfaceIntent` 迁移在 2B 一并重拷接入。
+- 4A：`verify-workflow-guest`（＋`gen-workflow-guest`）。
+- 7E：`verify-client-ui-i18n`（332 处违规是全客户端本地化改造，ui-trajectory 130+、ui-primitives 40+；`ui-message-feedback` 的诊断码字面量已按修法修正）、`verify-package-readme-summaries`（295 处缺 `## Summary`）、`verify-tsconfig-paths`（＋gen）、`verify-subsystem-pages`（5 个新包缺归属链接）、`verify-application-entrypoints`（4 处入口分类）、`verify-concrete-terms`（43 处 `provenance` 与上游术语重命名同源，随 2B/7E 对齐清除）。
+
+**拷贝后评估为耦合过早、已撤下待阶段重拷**：`verify-default-product-isolation`（依赖上游 `verify-client-packages.ts` 新增导出，7E 随该文件上游变化一并带入）、`benchmark-next-package-dependency`（同上）、`browser-bundled-externals`（依赖上游 `apps/web/product-isolation.ts`，7E）、`session-snapshot-corpus*`（依赖未携带的 `dsh-session-snapshot` 包，随该包进入阶段）、`snapshot-spill-locators`（依赖上游 `SpillSource.kind`，随 spill 包升级阶段）、`test:expected`／`test:docs`（依赖上游 `doc-quick` 车道与 expected 语料，7E 评估与本地 `test:snapshot` 对应关系后定）。
+
+**不适用（上游专属，不拷贝）**：`issue-management`、`preview-sizing`、`review-ownership` blame 权重、`e2b-e2e.yml`（上游已删）、desktop/inspector 门禁、`apps/desktop` 相关 CI 步骤。
+
+doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency catalog、repository references、cordis inspect catalog）。
+
 ## 本审计的边界
 
 - 尚未完成 2,641 个变化文件的逐文件语义审查，未完成逐提交归属；矩阵行与清单决定只声明范围与待验证要求，不声明实现完成。矩阵 333 行中只有 `apps/desktop`、`apps/desktop-host` 两行为用户确认路由，其余仍为初始路由。

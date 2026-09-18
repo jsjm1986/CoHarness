@@ -44,6 +44,11 @@ const FIRST_PARTY = new Set([
   '@deepseek-ai/node-addon-landlock-run',
   '@deepseek-ai/node-addon-landlock-run-linux-arm64',
   '@deepseek-ai/node-addon-landlock-run-linux-x64',
+  '@deepseek-ai/node-addon-system',
+  '@deepseek-ai/node-addon-system-darwin-arm64',
+  '@deepseek-ai/node-addon-system-darwin-x64',
+  '@deepseek-ai/node-addon-system-linux-arm64',
+  '@deepseek-ai/node-addon-system-linux-x64',
 ])
 
 /** Official SDK identity covered by the project's narrow owner authorization. */
@@ -390,6 +395,8 @@ export interface VendoredRow {
   /** The name this package carries upstream; MIT attribution names the fork's origin, not our scope. */
   upstreamName: string
   upstream: string
+  /** The checked-in `vendor/` directory disclosed by the notices row. */
+  sourceDirectory: string
 }
 
 /**
@@ -397,8 +404,8 @@ export interface VendoredRow {
  * @param text - the complete `vendor/README.md` contents.
  * @returns one row per manifest-table entry, in table order.
  */
-export function parseVendoredRows(text: string): VendoredRow[] {
-  const rows: VendoredRow[] = []
+export function parseVendoredRows(text: string): Array<Omit<VendoredRow, 'sourceDirectory'>> {
+  const rows: Array<Omit<VendoredRow, 'sourceDirectory'>> = []
   for (const line of text.split('\n')) {
     const match = new RegExp(String.raw`^\| \x60\S+\/\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \S+ \| `
       + String.raw`(https:\/\/\S+?)(?: \([^)]*\))? \| \x60[0-9a-f]+\x60 \|$`).exec(line)
@@ -430,15 +437,15 @@ function collectVendored(): VendoredRow[] {
   if (missing.length > 0) {
     throw new Error(`gen-third-party-notices: vendor/README.md has no manifest-table row for ${missing.join(', ')}; its table format changed or the sync is incomplete.`)
   }
-  for (const row of rows) {
+  return rows.map((row) => {
     const dir = onDisk.get(row.npmName)
     if (dir === undefined) throw new Error(`gen-third-party-notices: vendored package ${row.npmName} from vendor/README.md has no vendor/ directory.`)
     const license = readManifest(`vendor/${dir}/package.json`).license
     if (license !== 'MIT') {
       throw new Error(`gen-third-party-notices: vendored ${row.npmName} declares license ${JSON.stringify(license)}; the vendored section assumes MIT throughout.`)
     }
-  }
-  return rows
+    return { ...row, sourceDirectory: `vendor/${dir}` }
+  })
 }
 
 /** Whether a parsed TOML value is a table rather than an array or scalar. */
@@ -702,7 +709,7 @@ The Cordis framework and its foundation libraries are source-vendored into this 
 
 | Package | Upstream name | Upstream | License |
 | --- | --- | --- | --- |
-${vendored.map(row => `| \`${row.npmName}\` | \`${row.upstreamName}\` | [${row.upstream.replace('https://', '')}](${row.upstream}) | MIT |`).join('\n')}
+${vendored.map(row => `| \`${row.npmName}\` | \`${row.upstreamName}\` | [${row.sourceDirectory}](${row.sourceDirectory}/) | MIT |`).join('\n')}
 
 ## Runtime npm dependencies
 

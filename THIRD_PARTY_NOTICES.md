@@ -15,15 +15,15 @@ The Cordis framework and its foundation libraries are source-vendored into this 
 
 | Package | Upstream name | Upstream | License |
 | --- | --- | --- | --- |
-| `@deepseek-ai/cosmokit` | `cosmokit` | [github.com/deepseek-harness/cosmokit](https://github.com/deepseek-harness/cosmokit) | MIT |
-| `@deepseek-ai/schemastery` | `schemastery` | [github.com/deepseek-harness/schemastery](https://github.com/deepseek-harness/schemastery) | MIT |
-| `@deepseek-ai/cordis` | `cordis` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
+| `@deepseek-ai/cosmokit` | `cosmokit` | [vendor/cosmokit](vendor/cosmokit/) | MIT |
+| `@deepseek-ai/schemastery` | `schemastery` | [vendor/schemastery](vendor/schemastery/) | MIT |
+| `@deepseek-ai/cordis` | `cordis` | [vendor/cordis](vendor/cordis/) | MIT |
+| `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | [vendor/loader](vendor/loader/) | MIT |
+| `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | [vendor/include](vendor/include/) | MIT |
+| `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | [vendor/group](vendor/group/) | MIT |
+| `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | [vendor/timer](vendor/timer/) | MIT |
+| `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | [vendor/hmr](vendor/hmr/) | MIT |
+| `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | [vendor/logger-console](vendor/logger-console/) | MIT |
 
 ## Runtime npm dependencies
 
@@ -38,7 +38,6 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/push-notifications`](https://github.com/ionic-team/capacitor-plugins) | MIT |
-| [`@deepseek-ai/node-addon-system`](https://github.com/deepseek-harness/deepseek-harness) | BSD-3-Clause |
 | [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi) | MIT |
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |

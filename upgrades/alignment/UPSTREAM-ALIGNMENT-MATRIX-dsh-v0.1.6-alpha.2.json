@@ -1334,7 +1334,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localDisposition": "Gate surface: cumulative diff is compared and new required checks registered during 0R before implementation batches start."
+      "localDisposition": "0R done 2026-09-18: upstream issue-management, preview-sizing, and expanded review-ownership are upstream GitHub automation, not code gates — rejected for local. ci.yml apt-mirror and review-ownership test steps are upstream-runner specific; no local lane needs copying."
     },
     {
       "area": "non-package:.gitignore",
@@ -3112,7 +3112,7 @@
         "lefthook.yml"
       ],
       "targetAssessment": "increment-review-required",
-      "localDisposition": "Gate surface: cumulative diff is compared and new required checks registered during 0R before implementation batches start."
+      "localDisposition": "0R done 2026-09-18: upstream glob widening feeds its browser-bundled-externals/desktop-lock notices inputs; local gen consumes none of them and the existing glob already covers every local notices input — no change."
     },
     {
       "area": "non-package:native",
@@ -3122,7 +3122,7 @@
         "native/"
       ],
       "reviewState": "pending-cumulative-source-review",
-      "phase": "8",
+      "phase": "4B",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
         "native/system/README.i18n.yaml",
@@ -3151,7 +3151,8 @@
         "area": "non-package:native",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required"
+      "targetAssessment": "inherited-scope-review-required",
+      "localDisposition": "Upstream renamed native/landlock-run to native/system (node-addon-system); adopt with the subprocess/native execution work in 4B — build:native-system wiring follows the port."
     },
     {
       "area": "non-package:package.json",
@@ -3683,7 +3684,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localDisposition": "Gate surface: cumulative diff is compared and new required checks registered during 0R before implementation batches start."
+      "localDisposition": "0R done 2026-09-18: adopted+wired verify-dependency-catalog, verify-repository-references (local exemptions for upgrades/ and .agents/notes records plus HEAD-ancestor SHAs), verify-cordis-inspect-catalog — doc-sync 31/31. Phase-wired scripts stay registered but unwired (session-format-catalog 2B, workflow-guest 4A, i18n/readme-summaries/tsconfig-paths/subsystem-pages/application-entrypoints/concrete-terms 7E). persistence-* extractor family, default-product-isolation, benchmark-next, browser-bundled-externals, session-snapshot-corpus*, snapshot-spill-locators pulled back for re-copy at owning phase (upstream couplings not yet migrated). Upstream-only automation scripts rejected."
     },
     {
       "area": "non-package:snapshots",

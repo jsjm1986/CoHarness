@@ -164,7 +164,22 @@
     "mock:llm": "node --import tsx packages/test-support/llm-mock-server/src/bin.ts",
     "dev:web": "tsx scripts/dev-web.ts --poll",
     "postinstall": "node scripts/install-lefthook.mjs",
-    "gen-upstream-commit-inventory": "tsx scripts/gen-upstream-commit-inventory.ts"
+    "gen-upstream-commit-inventory": "tsx scripts/gen-upstream-commit-inventory.ts",
+    "gen-dependency-catalog": "tsx scripts/gen-dependency-catalog.ts",
+    "gen-session-format-catalog": "tsx scripts/gen-session-format-catalog.ts",
+    "gen-tsconfig-paths": "tsx scripts/gen-tsconfig-paths.ts",
+    "gen-workflow-guest": "tsx scripts/gen-workflow-guest.ts",
+    "verify-application-entrypoints": "tsx scripts/verify-application-entrypoints.ts",
+    "verify-client-ui-i18n": "tsx scripts/verify-client-ui-i18n.ts",
+    "verify-concrete-terms": "tsx scripts/verify-concrete-terms.ts",
+    "verify-cordis-inspect-catalog": "tsx scripts/gen-cordis-inspect-catalog.ts --check",
+    "verify-dependency-catalog": "tsx scripts/gen-dependency-catalog.ts --check",
+    "verify-package-readme-summaries": "tsx scripts/verify-package-readme-summaries.ts",
+    "verify-repository-references": "tsx scripts/verify-repository-references.ts",
+    "verify-session-format-catalog": "tsx scripts/gen-session-format-catalog.ts --check",
+    "verify-subsystem-pages": "tsx scripts/verify-subsystem-pages.ts",
+    "verify-tsconfig-paths": "tsx scripts/gen-tsconfig-paths.ts --check",
+    "verify-workflow-guest": "tsx scripts/gen-workflow-guest.ts --check"
   },
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.4.0",

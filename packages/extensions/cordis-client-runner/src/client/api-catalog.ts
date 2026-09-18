@@ -92,14 +92,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
-        signature: 'openDetails(): void',
-        description: 'Open the details panel (no-op when already open).',
-        parameters: [],
+        signature: 'openDetails(sessionId?: SessionId): void',
+        description: 'Open details, optionally pinned to an explicit Session.',
+        parameters: [{ name: 'sessionId', description: 'fixed target; omission follows current selection.' }],
       },
       {
-        signature: 'closeDetails(): void',
-        description: 'Close the details panel.',
-        parameters: [],
+        signature: 'closeDetails(sessionId?: SessionId): void',
+        description: 'Close details, optionally only when pinned to a given Session.',
+        parameters: [{ name: 'sessionId', description: 'target to release; omission closes unconditionally.' }],
       },
     ],
   },
@@ -610,7 +610,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
   },
   {
     name: 'KeyedHooksSources',
@@ -726,7 +726,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptError',
-    declaration: 'export interface PromptError {\n    op: \'send\' | \'stop\';\n    error: RpcError;\n}',
+    declaration: 'export interface PromptError {\n    op: \'send\' | \'stop\';\n    error: RpcError | RemoteFailure;\n}',
   },
   {
     name: 'PropsHooks',
@@ -770,7 +770,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionAreaProps',
-    declaration: 'export interface SessionAreaProps {\n    empty?: (() => ReactNode) | undefined;\n    children: (sessionId: SessionIdOf) => ReactNode;\n}',
+    declaration: 'export interface SessionAreaProps {\n    empty?: (() => ReactNode) | undefined;\n    sessionId?: SessionIdOf;\n    children: (sessionId: SessionIdOf) => ReactNode;\n}',
   },
   {
     name: 'SessionBinding',
@@ -967,7 +967,7 @@ function referencedTypeClosure(seeds: readonly string[]): TypeApiEntry[] {
     const next: string[] = []
     for (const entry of TYPE_API) {
       if (included.has(entry.name)) continue
-      const pattern = new RegExp(`\b${entry.name}\b`)
+      const pattern = new RegExp(`\\b${entry.name}\\b`)
       if (!frontier.some(text => pattern.test(text))) continue
       included.add(entry.name)
       next.push(entry.declaration)
