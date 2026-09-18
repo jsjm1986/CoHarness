@@ -122,7 +122,7 @@ The package-level contract is enough for most consumers; read these when you nee
 - [System-prompt subsystem](../../../docs/subsystems/system-prompt.md) — the exact cross-package types and generated service API.
 - [tools package](../tools/README.md) — the tool registry whose schemas flow into assembly.
 - [Prompt variables Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-prompt-variables-and-tool-guidance-ownership.md) — who owns which prompt facts.
-- [First-party prompt order Agent Note](../../../.agents/notes/archived/architecture/2026-08-25-sparse-first-party-prompt-section-orders.md) — the sparse named order allocation.
+- First-party prompt order Agent Note — the sparse named order allocation.
 - [Core group map](../README.md) — how the core packages compose.
 
 -----
@@ -148,7 +148,7 @@ Identity is a fixed per-request cost when enabled. Persona prefixes, suffixes, a
 
 #### KV Cache effect
 
-Prefix-stable while identity, persona, variables, section text, and order render identically: an unchanged rendering leaves the system nodes untouched unless an incapable route or a new request series must consolidate retained in-history prompts. Without `systemPromptUpdate`, non-empty prompt text is consolidated at the first system node through logged per-node replacements, so a head rewrite loses prefix reuse from its first changed token; when the prepared call declares `systemPromptUpdate: 'in-history'`, the agent loop appends a non-empty changed prompt after the cached history inside a continuing request series, so the prefix through that history stays reusable ([decision rule](../agent-loop/README.md#understand-the-implementation)). With the same model, persona prefix, tools, and preceding instructions, different source paths, local Web URLs, or persona suffix values leave the reusable first-party prefix unchanged. Persona prefix changes can alter the early prefix. Any change may invalidate reuse from the first changed token; provider cache sharing and measured hit rates are not guaranteed.
+Prefix-stable while identity, persona, variables, section text, and order render identically: an unchanged rendering leaves the system nodes untouched unless an incapable route or a new request series must consolidate retained in-history prompts. Without `systemPromptUpdate`, non-empty prompt text is consolidated at the first system node through logged per-node replacements, so a head rewrite loses prefix reuse from its first changed token; when the prepared call declares `systemPromptUpdate: 'in-history'`, the agent loop appends a non-empty changed prompt after the cached history inside a continuing request series, so the prefix through that history stays reusable ([decision rule](../agent-loop/README.md)). With the same model, persona prefix, tools, and preceding instructions, different source paths, local Web URLs, or persona suffix values leave the reusable first-party prefix unchanged. Persona prefix changes can alter the early prefix. Any change may invalidate reuse from the first changed token; provider cache sharing and measured hit rates are not guaranteed.
 
 ### Tool schemas
 

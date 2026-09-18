@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-upstream-rc1-overlay-sync.md
-2026-08-21-upstream-rc1-overlay-sync.md: d0dae0808168b08c414b81d507a7036d4793e7c4
-2026-08-21-upstream-rc1-overlay-sync.zh.md: 2526d6986a8379ab41129dcaec07ea801f1e4f21
+2026-08-21-upstream-rc1-overlay-sync.md: 467c328d4e701ea04dfb240596fd58ed39b53d56
+2026-08-21-upstream-rc1-overlay-sync.zh.md: 7d8c0be86f47bd0b38b714c054df0f8faf17f95b

@@ -110,6 +110,20 @@ Registry service for the prompt inputs assembled before each model step.
 section(section: PromptSection): () => void
 
 /**
+ * Resolve the centrally owned placement of a repository prompt section.
+ * @param name - stable section placement name.
+ * @returns the section's numeric sort order.
+ */
+getSectionOrder(name: PromptSectionOrderName): number
+
+/**
+ * Resolve the centrally owned placement of a repository runtime context.
+ * @param name - stable context placement name.
+ * @returns the context's numeric sort order.
+ */
+getContextOrder(name: PromptContextOrderName): number
+
+/**
  * Register ordered dynamic context in the calling context's scope. Scoped
  * entries shadow global entries with the same name.
  * @param context - the context contribution to register.

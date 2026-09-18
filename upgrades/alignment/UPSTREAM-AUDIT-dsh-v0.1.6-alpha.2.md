@@ -156,3 +156,11 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - **撤下三个上游门禁文件**（依赖未携带面，随所属阶段重拷）：`doc-standard.spec.ts`（session-format 发布记录文档树，2B/7E）、`ci-compatible-selfhosted.spec.ts`（断言上游 ci.yml 形状，CI 阶段）、`verify-application-entrypoints.{ts,spec.ts}`+package.json 条目（断言上游 examples→CLI-profile 迁移已完成的清单）。
 - `packages/examples/` 保留为 fork 自有面：上游已整删（迁 CLI profiles），本地 15+ 文档引用与 demo:* 根脚本使其删除爆炸半径超出 1B；登记为独立任务（examples 删除/重分类随 7E 文档面一并处理）。
 - scripts 套件复跑：87 文件 977 测试全绿。
+
+**1B 补登（2026-09-18 第三批：目录生成物与子系统页集成）**
+
+- `gen-cordis-catalog.ts` 补新包分区映射：`hmr`/`pluginManager`/`profileContext`→`boot.md`，`mcpResources`→`mcp.md`，事件域 `hmr`/`plugin-manager`→`boot.md`；`pluginPackages`/`appReady` 不可见 Context merge 键入 `SERVICE_WALK_EXEMPTIONS`（归属文档随条目）；`PromptSectionOrderName`/`PromptContextOrderName`→`system-prompt.md` 类型映射恢复。生成 101 artifact、3 件写入（`tool-cordis/src/api-catalog.ts` 获 hmr/mcpResources/pluginManager/profileContext 服务条目，system-prompt 页获 `getSectionOrder`/`getContextOrder` 生成区）。
+- 上游子系统页整拷：`docs/subsystems/{boot,mcp}.{md,zh.md,i18n.yaml}`，`README.md`/`README.zh.md` 索引行补齐；上游 `website/docs.ts` 未投影这两页，本地保持一致不注册。
+- `gen-tool-catalog.ts` 补 `dsh-plugin-manager`（`ctx.provide('pluginManager')`+`SandboxPolicy` mount）与 `dsh-mcp-resources`（`mcpResources.register('catalog')`）两个 TOOL_PACKAGES recipe（上游原样移植）；en 目录重生含 `plugin_manager` 与 3 个 mcp 资源工具节；zh 目录移植上游对应章节与映射表行，`来源：` 格式归一到本地约定。
+- 死链修复（`verify-md-links` 语义）：`mcp-client` 的 `#use-this-package` 锚对齐本地实际节 `#config`（zh README 补 `<a id="config">` shim，双语链接统一英文锚——配对门禁要求两侧锚一致）；`acp` 的 `#standard-acp-v1-surface`→本地 `#protocol-contract`（zh shim 已存在）；`base`/`agent-loop` 缺失节锚去 fragment 降为文件链；未携带目标（`computer-use` 页、`computer-use-cua-driver-native`、`mcp-memory` 指南、两份 9 月 Agent Note、`sparse-first-party` 归档 note）按惯例转纯文本，随所属阶段重拷时恢复链接。
+- 配对重录 15 条 `.i18n.yaml`；`verify-md-links` 2532 文件全过、`verify-translation-pairing` 1264 对全一致、`verify-tool-catalog`/`verify-cordis-catalog` 生成物同步、`verify-doc-budgets` 9、`verify-subsystem-pages` 7/7、`doc-typecheck` 92 块编译过、oxlint 与 `git diff --check` 干净。

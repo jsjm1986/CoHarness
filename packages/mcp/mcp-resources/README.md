@@ -29,7 +29,7 @@ Shipped profiles already mount this package once. Configure only the [MCP client
 
 ### Server configuration
 
-Use the [client configuration](../mcp-client/README.md#use-this-package) to add a server in the intended scope. This package has no configuration fields.
+Use the [client configuration](../mcp-client/README.md#config) to add a server in the intended scope. This package has no configuration fields.
 
 A caller with no configured MCP server sees no MCP prompt text or resource tools in native or PTC mode. A configured server enables the three shared resource tools, including when another provider mounts its client or the server has no tools or instructions. Connection failures do not remove the shared tools while the client entry remains active; resource calls report the connection error.
 
