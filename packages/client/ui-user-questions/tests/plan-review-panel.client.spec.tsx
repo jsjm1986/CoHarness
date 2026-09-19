@@ -224,6 +224,6 @@ describe('PlanReviewPanel', () => {
     expect(screen.getByText('Plan review')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Refuse' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Chat about it' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeTruthy()
   })
 })
