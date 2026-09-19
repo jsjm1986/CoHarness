@@ -319,6 +319,7 @@
     { "path": "./packages/jobs/jobs-local" },
     { "path": "./packages/jobs/tool-jobs" },
     { "path": "./packages/experimental/agent-team" },
+    { "path": "./packages/experimental/agent-team-profile" },
     { "path": "./packages/experimental/auto-review" },
     { "path": "./packages/experimental/browser-use-chrome-devtools-mcp" },
     { "path": "./packages/experimental/browser-use-playwright-mcp" },
