@@ -16,6 +16,8 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 通用行把已知工具名称归类为 search、read、shell、write、edit、code 或 generic 变体。运行中、成功、失败和中断状态只来自冻结的 call/result slice。只有用户调用 Host 打开文件回调时，文件路径才相对会话 `cwd` 解析；展示代码不读取会话服务。
 
+携带 `AUTO_REVIEW_DENIED` 的原生或 PTC 分发失败优先于 keyed 专用视图：通用行在折叠摘要中标识 Auto review，省略从未执行的参数，展开后显示一条归一化的未执行原因——去除首尾空白并把行分隔符折叠为空格，缺失或全空白时使用本地化回退文案。Session 与 SDK 中的结构化错误仍保留原始 reason。
+
 通用行保留原始参数载荷，只在用户展开可展开行时格式化。这样大体积的文件修改或代码参数不会在折叠列表构造期间产生额外格式化副本，展开后的正文仍保持原有格式。
 
 ## 原子工具视图

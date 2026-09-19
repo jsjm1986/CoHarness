@@ -1334,10 +1334,13 @@ function SystemPromptDiff({
 function ToolOutputBlocks({
   blocks,
   error,
+  errorDetail,
   preview,
 }: {
   blocks: readonly TrajectorySourceBlock[]
   error: boolean
+  /** Failure name and code preserved beside the result's own content. */
+  errorDetail?: string | undefined
   preview: boolean
 }) {
   return (
@@ -1347,6 +1350,8 @@ function ToolOutputBlocks({
       error ? css.errorPayload : undefined,
     ].filter((value): value is string => value !== undefined).join(' ')}
     >
+      {error && errorDetail !== undefined && errorDetail !== ''
+        && <pre className={css.resultBlockText}>{errorDetail}</pre>}
       {blocks.map((block, index) => (
         block.imageSrc !== undefined
           ? <PanelImage block={block} preview={preview} key={index} />
@@ -1547,6 +1552,7 @@ function RecordPayload({
       <ToolOutputBlocks
         blocks={record.cell.outputBlocks}
         error={error}
+        errorDetail={error ? value : undefined}
         preview={preview}
       />
     )

@@ -24,6 +24,7 @@ interface DispatchData {
   readonly name: string
   readonly arguments: unknown
   readonly isError?: boolean
+  readonly error?: ToolResultNode['error']
   readonly content?: ToolResultNode['content']
 }
 
@@ -103,6 +104,7 @@ function childResult(
     callTime: previous === undefined || 'kind' in previous ? null : previous.time,
     content: data.content ?? [],
     isError: data.isError === true,
+    ...(data.error === undefined ? {} : { error: data.error }),
     callView: null,
     resultView: null,
     subCalls: [],

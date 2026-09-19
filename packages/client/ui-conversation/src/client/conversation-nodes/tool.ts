@@ -76,6 +76,7 @@ interface DispatchData {
   readonly name: string
   readonly arguments: unknown
   readonly isError?: boolean
+  readonly error?: { name: string; code: string; reason?: string }
   readonly content?: ToolResultNode['content']
 }
 
@@ -102,6 +103,7 @@ function childResult(match: ConversationMatch, data: DispatchData, previous?: To
     callTime: previous?.time ?? null,
     content: data.content ?? [],
     isError: data.isError === true,
+    ...data.error === undefined ? {} : { error: data.error },
     callView: null,
     resultView: null,
     subCalls: [],

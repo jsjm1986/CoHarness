@@ -110,7 +110,9 @@
     "tests/pwsh-terminal.e2e.ts",
     "tests/workflow-run.e2e.ts",
     "tests/workbench.e2e.ts",
-    "tests/workspace-files.e2e.ts"
+    "tests/workspace-files.e2e.ts",
+    "tests/auto-review-fixture.ts",
+    "tests/auto-review-denial.e2e.ts"
   ],
   "references": [
     {
