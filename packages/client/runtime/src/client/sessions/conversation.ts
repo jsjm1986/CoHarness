@@ -228,7 +228,7 @@ export interface ToolResultNode {
   callTime: number | null
   content: readonly ContentBlock[]
   isError: boolean
-  error?: { name: string; code: string }
+  error?: { name: string; code: string; reason?: string }
   meta?: unknown
   /** Host-computed render intent from the paired tool/call's wire view; null = generic JSON card (documented default). */
   callView: ToolCallView | null

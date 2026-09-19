@@ -6,6 +6,7 @@ import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-ru
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { classifyTool, formatToolBody, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
+import { localizeAutoReviewDenial, normalizeAutoReviewReason } from '../src/client/tool/models/auto-review-denial.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
@@ -197,6 +198,45 @@ describe('tool-call-model', () => {
     expect(toolRowModel('bash', result({ content: [{ type: 'text', text: 'boom' }] })).errorSummary).toBeNull()
     expect(toolRowModel('bash', result({ content: [], isError: true })).errorSummary).toBeNull()
     expect(toolRowModel('bash', running()).errorSummary).toBeNull()
+  })
+
+  it('derives Auto-review denial only from the exact structured error identity', () => {
+    const denied = result({
+      isError: true,
+      error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED', reason: ' raw\nreason ' },
+    })
+    expect(toolRowModel('bash', denied).autoReviewDenial).toEqual({ reason: ' raw\nreason ' })
+    expect(toolRowModel('bash', result({
+      isError: true,
+      error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED' },
+    })).autoReviewDenial).toEqual({ reason: null })
+    expect(toolRowModel('bash', result({
+      isError: true,
+      error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED', reason: 42 },
+    } as never)).autoReviewDenial).toEqual({ reason: null })
+    expect(toolRowModel('bash', result({
+      isError: true,
+      error: { name: 'AutoReviewDeniedError', code: 'OTHER' },
+    })).autoReviewDenial).toBeNull()
+    expect(toolRowModel('bash', result({
+      isError: true,
+      error: { name: 'OtherError', code: 'AUTO_REVIEW_DENIED' },
+    })).autoReviewDenial).toBeNull()
+    expect(toolRowModel('bash', result({
+      isError: false,
+      error: { name: 'AutoReviewDeniedError', code: 'AUTO_REVIEW_DENIED' },
+    })).autoReviewDenial).toBeNull()
+    expect(toolRowModel('bash', running()).autoReviewDenial).toBeNull()
+  })
+
+  it('normalizes Auto-review reasons only for localized display and falls back when blank', () => {
+    expect(normalizeAutoReviewReason('  first\r\n\nsecond\u2028\u2029third  ')).toBe('first second third')
+    expect(normalizeAutoReviewReason(' \r\n\u2028 ')).toBeNull()
+    expect(normalizeAutoReviewReason(null)).toBeNull()
+    expect(localizeAutoReviewDenial({ reason: null }, t)).toEqual({
+      summary: 'Auto review 已拒绝',
+      output: '工具未执行。原因：Auto review 未授权此次操作',
+    })
   })
 
   it('gives Cordis lifecycle tools action titles over their generic variants', () => {

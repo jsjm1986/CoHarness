@@ -20,6 +20,12 @@ export type ToolRowVariant = 'search' | 'read' | 'bash' | 'write' | 'edit' | 'co
 /** Row state semantic; colors self-supplied via StateDot (design gives none). */
 export type ToolRowState = 'running' | 'ok' | 'error' | 'stopped'
 
+/** Locale-neutral structured fact consumed only by the user-facing Tool row. */
+export interface AutoReviewDenial {
+  /** Raw persisted reviewer reason; display normalization happens at render time. */
+  reason: string | null
+}
+
 /** Figma row titles per variant (design literals, not translatable copy). */
 export const VARIANT_TITLES: Record<ToolRowVariant, string> = {
   search: 'Search', read: 'Read', bash: 'Bash',
@@ -95,6 +101,8 @@ export interface ToolRowModel {
   output: string | null
   /** First line of the result text on an error row; null for every other state. */
   errorSummary: string | null
+  /** Structured Auto-review denial identity; null for every ordinary result. */
+  autoReviewDenial: AutoReviewDenial | null
   state: ToolRowState
 }
 
@@ -115,6 +123,15 @@ export function resultText(node: ToolResultNode): string {
     parts.push(`${node.error.name}: ${node.error.code}`)
   }
   return parts.join('\n')
+}
+
+function deriveAutoReviewDenial(block: ToolCallBlock): AutoReviewDenial | null {
+  if (!('kind' in block) || !block.isError) return null
+  const error = block.error
+  if (error?.name !== 'AutoReviewDeniedError' || error.code !== 'AUTO_REVIEW_DENIED') return null
+  // A durable record reaches this renderer without a type check on `reason`, so
+  // a non-string value degrades to the no-reason copy exactly as a missing one.
+  return { reason: typeof error.reason === 'string' ? error.reason : null }
 }
 
 function parseArgs(argsRaw: string): unknown {
@@ -249,6 +266,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     bodyRaw: argsRaw === '' ? null : argsRaw,
     output,
     errorSummary,
+    autoReviewDenial: deriveAutoReviewDenial(block),
     state,
   }
 }
