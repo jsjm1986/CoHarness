@@ -28,6 +28,8 @@ import z from '@deepseek-ai/schemastery'
 import { bindScopeParent, createScope, scopeOf, type Scope, type ScopeKey, type ScopeParentBinding } from '@deepseek-ai/dsh-scope'
 // Type-only: resolves the `agent/created` lifecycle event this service watches.
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Type-only: resolves ctx.pluginPackages for the resolution-generation package lookup.
+import type {} from '@deepseek-ai/dsh-app-boot'
 import { collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { hasConversationContent } from '@deepseek-ai/dsh-session/surface'
@@ -244,7 +246,14 @@ export class AgentPresets extends TypertRemoteService {
    * @returns the presets, first-root-wins per id.
    */
   async list(): Promise<AgentPreset[]> {
-    return await discoverPresets(this.resolvedRoots, this.harnessBase)
+    const packages = this.ctx.get('pluginPackages')
+    return packages === undefined
+      ? await discoverPresets(this.resolvedRoots, this.harnessBase)
+      : await discoverPresets(
+        this.resolvedRoots,
+        this.harnessBase,
+        (specifier, base) => packages.packageOf(specifier, base) !== undefined,
+      )
   }
 
   /**
