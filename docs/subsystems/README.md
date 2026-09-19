@@ -53,9 +53,15 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |
 | [workspace.md](workspace.md) | the workspace registry: `Workspace`/`WorkspaceId`, registration and resolution, the session `cwd` relationship |
 | [client-modules.md](client-modules.md) | the web plugin table: `dsh.client` declarations, `WebBootGraph` wire composition, the bundle route and index tap |
+| [web-client.md](web-client.md) | the browser Cordis application: its four foundations (Client Modules, API Gateway, Slots, Conversation) and where Client models and feature packages belong |
+| [slots.md](slots.md) | the Web Client's typed React composition system: `ctx.slots.register()`, the React-free registry and type algebra, and the renderer's observable-source bindings |
+| [conversation.md](conversation.md) | the target-neutral assembly layer between a Client Session event window and browser views: per-binding registries, Turn/Step locations, and incremental Context assembly |
+| [sidebar-right.md](sidebar-right.md) | the per-Session right docking surface: panes and tabs, the tab-type registry, the navigation service, and its dockkit layout engine |
+| [client-resources.md](client-resources.md) | the client resource model: address protocols, one provider per kind, `ctx.resources` and the `useResource` hook |
 | [session-projection.md](session-projection.md) | the projection seam: `SessionProjectionMap`, the pure `ProjectionDefinition` unit, `ProjectionSnapshot`'s consistent cut, the change feed |
 | [session-telemetry.md](session-telemetry.md) | the outbound session-reporting capability seam: `SessionTelemetryRecord`/`SessionTelemetrySeverity`, the `SessionTelemetrySink` contract, and the `session-telemetry/record` redact waterfall |
 | [boot.md](boot.md) | current-profile plugin management and launcher reload coordination |
 | [mcp.md](mcp.md) | external MCP connections, scoped tools and resources, server instructions, protocol results, and configuration ownership |
+| [office-to-pdf.md](office-to-pdf.md) | Office-to-PDF conversion on the Node Host: authorized source reads, bounded admission, and transient PDF reuse |
 
 > Type declarations and their JSDoc on these pages are source-equivalent and drift-checked by `pnpm run verify-type-equiv` (see [development.md](../development.md#documenting-types-verbatim-ts-type-equiv)). Ordinary blocks preserve complete declarations; `public-api` blocks preserve body-stripped public class declarations. Cordis services and events use each page's generated **Cordis API** section.

@@ -95,6 +95,7 @@ const testIncludes = [
   'apps/*/tests/**/*.spec.ts',
   'examples/*/tests/**/*.spec.ts',
   'scripts/**/*.spec.ts',
+  'website/tests/**/*.spec.ts',
 ]
 
 // The instrumented coverage gate sets this env; the exempt heavy suites then

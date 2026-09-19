@@ -11057,6 +11057,9 @@ importers:
       '@braintree/sanitize-url':
         specifier: 7.1.2
         version: 7.1.2
+      '@panzoom/panzoom':
+        specifier: 4.6.2
+        version: 4.6.2
       cytoscape:
         specifier: 3.34.1
         version: 3.34.1
@@ -11081,6 +11084,9 @@ importers:
       vitepress-plugin-mermaid:
         specifier: ^2.0.17
         version: 2.0.17(mermaid@11.16.0)(vitepress@1.6.4(@algolia/client-search@5.55.2)(@types/node@25.9.3)(@types/react@18.3.31)(lightningcss@1.32.0)(postcss@8.5.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@6.0.3))
+      vue:
+        specifier: 3.5.39
+        version: 3.5.39(typescript@6.0.3)
 
 packages:
 
@@ -13127,6 +13133,9 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
+
+  '@panzoom/panzoom@4.6.2':
+    resolution: {integrity: sha512-Zn3B5/hwa6eYIPRSKX0xf2clv8nviTX8AnAU5kU/EugiTDhG41ya2wlBqYrZJYCWQROr/5XkWObZhIkepi89qw==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -19357,6 +19366,8 @@ snapshots:
 
   '@oxlint/binding-win32-x64-msvc@1.76.0':
     optional: true
+
+  '@panzoom/panzoom@4.6.2': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
