@@ -2,6 +2,8 @@
 
 Status: proposed
 
+English | [中文](2026-09-18-session-independent-automation-triggers.zh.md)
+
 ## Problem
 
 `packages/schedule/schedule/src/types.ts:111` pins `ScheduleDeliveryMode` to `'session-local'` — the comment states "Fixed v1 delivery boundary: the original session must be live." A reminder created inside a conversation dies with that conversation. That is correct for "remind me in twenty minutes while I keep working" and fatal for automation, which by definition has to outlive the conversation that defined it.
