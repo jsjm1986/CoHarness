@@ -552,7 +552,8 @@ describe('web e2e: lossless history wire pagination', () => {
     // Every host-written session carries a projection-cache row; a seeded log
     // has none, so its cold tail page would serve no projections block. One
     // cold read writes the row back, as the fuller read ladder does.
-    await scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(SessionId(SEED_ID))
+    const seededLog = await scaffold.ctx.sessionPersistence.load(SessionId(SEED_ID))
+    await scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(seededLog.meta, seededLog.inheritedEventCount, seededLog.events)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)

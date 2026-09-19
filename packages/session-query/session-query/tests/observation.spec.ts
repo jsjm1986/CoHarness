@@ -489,25 +489,25 @@ describe('SessionObservationReader cold path', () => {
     class SwapPersistence extends SessionPersistence {
       static readCalls = 0
 
-      create(): Promise<SessionHandle> {
+      override create(): Promise<SessionHandle> {
         return Promise.reject(new Error('not used'))
       }
 
       // Appends are durable on resolution here; nothing buffers, so the service-wide flush is a no-op.
-      async flush(): Promise<void> {}
+      override async flush(): Promise<void> {}
 
-      open(id: SessionIdType, access: SessionAccess): Promise<SessionHandle> {
+      override open(id: SessionIdType, access: SessionAccess): Promise<SessionHandle> {
         return Promise.resolve(new SwapHandle(id, structuredClone(meta), access))
       }
 
-      stat(): Promise<SessionPersistenceSnapshot | undefined> {
+      override stat(): Promise<SessionPersistenceSnapshot | undefined> {
         return Promise.resolve({
           header: structuredClone(meta),
           revision: SessionPersistenceRevision('constant'),
         })
       }
 
-      list(): Promise<readonly SessionPersistenceSnapshot[]> {
+      override list(): Promise<readonly SessionPersistenceSnapshot[]> {
         return Promise.resolve([])
       }
     }

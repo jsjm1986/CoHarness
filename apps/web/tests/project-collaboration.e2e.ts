@@ -157,7 +157,8 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
         data: { turn: 1, reason: { kind: 'completed' } },
       },
     ] as SessionEvent[])
-    await scaffold.ctx.sessionProjectionCache.coldSnapshot(childId)
+    const childLog = await scaffold.ctx.sessionPersistence.load(childId)
+    await scaffold.ctx.sessionProjectionCache.coldSnapshot(childLog.meta, childLog.inheritedEventCount, childLog.events)
   }
 }
 
