@@ -21,7 +21,13 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../fs/fs"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session-query/session-query"
     },
     {
       "path": "../../../vendor/cordis"

@@ -216,6 +216,40 @@ export class SessionProjectionCache extends Service {
     return restored.snapshot
   }
 
+  /**
+   * Hydrate projection cells for an already-prepared Session without another
+   * persistence read. The cache seeds matching rows; the supplied exact log
+   * advances every unit to the observation cut. No checkpoint is written
+   * because the logical observation may contain recovery events not yet durable.
+   * @param session - exact unpublished Session retained by persistence.
+   * @param events - exact logical event prefix represented by the observation.
+   * @returns all projection values at the event cut.
+   */
+  hydratePrepared(
+    session: Session,
+    events: readonly SessionEvent[],
+  ): ProjectionSnapshot {
+    const record = this.recordFor(
+      session.id,
+      identityOf(session.header, session.inheritedEventCount),
+    )
+    if (record === undefined) {
+      return this.ctx.sessionProjections.hydrate(session, {}, events, SessionLogOffset(0))
+    }
+    try {
+      return this.ctx.sessionProjections.hydrate(
+        session,
+        record.rows,
+        events,
+        SessionLogOffset(0),
+      )
+    } catch {
+      // Cached rows are disposable derived data. Retry from the exact log so a
+      // stale schema cannot make a valid Session unreadable.
+      return this.ctx.sessionProjections.hydrate(session, {}, events, SessionLogOffset(0))
+    }
+  }
+
   // --- write-behind (throttle + mandatory points) ---
 
   private installWritePath(): void {

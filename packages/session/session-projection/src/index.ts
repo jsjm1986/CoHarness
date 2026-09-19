@@ -517,6 +517,61 @@ export class SessionProjectionRegistry extends Service {
     }
   }
 
+  /**
+   * Restore an exact cut and install its states on the supplied prepared Session.
+   * A later publication reuses these cells; ordinary live reads and event drive
+   * advance any constructor-owned suffix exactly once.
+   * @param session - exact prepared Session that owns the restored log prefix.
+   * @param checkpoint - persisted rows for this Session lifecycle.
+   * @param events - exact events at the observation cut.
+   * @param baseSeq - first supplied event sequence.
+   * @returns all projection values at the supplied cut.
+   */
+  hydrate(
+    session: Session,
+    checkpoint: ProjectionCheckpoint,
+    events: readonly SessionEvent[],
+    baseSeq: SessionLogOffset,
+  ): ProjectionSnapshot {
+    const endSeq: SessionSeqCursor = events.at(-1)?.seq ?? cursorBefore(baseSeq)
+    let complete = true
+    for (const registration of this.registrations.values()) {
+      const current = registration.cells.get(session)
+      if (current?.observedSeq !== endSeq) {
+        complete = false
+        break
+      }
+    }
+    if (complete) {
+      const values: Record<string, unknown> = {}
+      for (const registration of this.registrations.values()) {
+        if (registration.def.wire === undefined) continue
+        const current = registration.cells.get(session) as UnitCell
+        values[registration.def.key] = this.viewCell(registration, current)
+      }
+      return { asOfSeq: endSeq, values }
+    }
+    const restored = this.restore(
+      checkpoint,
+      events,
+      baseSeq,
+      session.header,
+      session.inheritedEventCount,
+    )
+    for (const registration of this.registrations.values()) {
+      const row = restored.checkpoint[registration.def.key]
+      if (row === undefined) continue
+      const current = registration.cells.get(session)
+      if (current !== undefined && current.observedSeq > row.seq) continue
+      registration.cells.set(session, {
+        state: row.val,
+        observedSeq: row.seq,
+        views: [undefined, undefined],
+      })
+    }
+    return restored.snapshot
+  }
+
   /** Fold one unit from init over `events`, producing a cell watermarked at the last folded event. */
   private buildCell(
     def: ErasedDefinition,
