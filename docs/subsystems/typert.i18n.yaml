@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/typert.md
-typert.md: 488095e64766fdd064798f499cfd07297912f3e8
-typert.zh.md: 2503c74af74f9b0c0aead2750bb2a16096ec961f
+typert.md: b01c90f954c6a9f89f320fc869cda404f4c5dba1
+typert.zh.md: b65878959370d0bf829b39e35d88464654421937

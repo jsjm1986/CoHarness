@@ -2,12 +2,14 @@
 
 English | [中文](README.zh.md)
 
-JSON backend for the [storage hub](../storage/README.md): one human-readable `<unit>.json` file per unit under a configured root, registered as backend `json`. Design: [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md).
+JSON backend for the [storage hub](../storage/README.md): human-readable JSON under a configured root, registered as backend `json`. The domain spec selects the layout: `single` keeps one complete `<unit>.json` file per unit; `per-record` keeps one version-stamped document per record at `<unit>/<table>/<key>.json` plus a `global.json`. Design: [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md).
 
 ## Model
 
-- The in-memory unit state is authoritative; every write primitive republishes the whole file via temp-write + fsync + atomic `rename()` replace. A unit file is always the complete current net state — legibility is this backend's reason to exist; scale is the SQLite backend's job.
-- A missing file opens as an empty unit and materializes on the first write. A foreign or unparsable file rejects with `malformed-medium`; a stored version differing from the descriptor rejects with `version-mismatch` (no migration, pre-release stance).
+- In the `single` layout the in-memory unit state is authoritative; every write primitive republishes the whole file via temp-write + fsync + atomic `rename()` replace. A unit file is always the complete current net state — legibility is this backend's reason to exist; scale is the SQLite backend's job. In `per-record` the directory tree is authoritative: each `put`/`delete` rewrites one document and `loadAll()` rereads the tree, so one write never touches sibling records.
+- A missing `single` file or `per-record` directory opens as an empty unit and materializes on the first write. A foreign or unparsable `single` file rejects with `malformed-medium`; a stored version differing from the descriptor rejects with `version-mismatch` (no migration, pre-release stance). In `per-record`, a malformed, unreadable, or out-of-version-set document reads as an absent record instead — one bad document never bricks the unit — and `backupRecord` moves a record's document aside as `<key>.json.bak.<stamp>` for the domain's `backup-and-skip` policy.
+- `per-record` reads accept documents stamped with the current version or a declared `compatibleVersions` entry; writes always stamp the current version. An empty per-record tree bootstraps once from a legacy whole-unit `<unit>.json` only when that file's unit name matches and its version is in the accepted set; any existing document in the tree suppresses the bootstrap.
+- `per-record` record keys must match `[a-zA-Z0-9_-]+` (a key becomes a path segment); an unsafe key rejects before any file operation. `single` keys stay opaque.
 - Write ordering across calls belongs to the caller (the domain layer's write chain); the rename commits each call's content atomically, and the post-commit directory fsync is best-effort — a failure there weakens crash durability without rejecting the write.
 
 ## Config

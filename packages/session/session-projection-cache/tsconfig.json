@@ -12,9 +12,6 @@
       "path": "../../core/session"
     },
     {
-      "path": "../session-persistence"
-    },
-    {
       "path": "../session-projection"
     },
     {
@@ -22,6 +19,9 @@
     },
     {
       "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../storage/storage-json"
     },
     {
       "path": "../../../vendor/cordis"

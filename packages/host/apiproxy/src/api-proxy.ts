@@ -1429,6 +1429,7 @@ function listProjectionsFor(
       : meta.isSeeded
         ? undefined
         : ctx.get('sessionProjectionCache')?.cachedSnapshot(meta, SessionLogOffset(0))
+          ?? ctx.get('sessionProjectionCache')?.cachedPredecessorTitle(meta, SessionLogOffset(0))
     if (block === undefined) return undefined
     if (includeInbox) return block
     const { queuedInbox: _queuedInbox, ...values } = block.values
@@ -2807,14 +2808,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (!source.hasMore && !source.header.isSeeded && source.events[0]?.seq === 0) {
       return detachedProjectionsFor(ctx, source.header, SessionLogOffset(0), source.events)
     }
-    const cache = ctx.get('sessionProjectionCache')
-    if (cache === undefined) return undefined
-    const baseline = await cache.coldSnapshot(source.header.id, signal)
-    signal?.throwIfAborted()
-    if (baseline.asOfSeq !== lastSeq) {
-      throw new SessionPersistenceReadError('dependency', 'session persistence changed during projection read')
+    const query = ctx.get('sessionQuery')
+    if (query === undefined) return undefined
+    const observation = await query.observeSession(
+      source.header.id,
+      signal === undefined ? {} : { signal },
+    )
+    try {
+      const baseline = observation.projections
+      if (baseline === undefined) return undefined
+      if (observation.cursor !== lastSeq) {
+        throw new SessionPersistenceReadError('dependency', 'session persistence changed during projection read')
+      }
+      return baseline
+    } finally {
+      observation[Symbol.dispose]()
     }
-    return baseline
   }
 
   /**

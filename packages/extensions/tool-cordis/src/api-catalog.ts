@@ -1533,6 +1533,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'readonly derivePatches?: (rows: ReadonlyMap<string, EntryOptions>) => readonly PatchOptions[]',
+        description: 'Derive launch-time patches from the composed row set, re-run on every read. Launchers inject deployment-derived config here (e.g. the shipped agent-preset root): deriving per read rather than storing a resolved patch keeps the result current when a live reload re-reads edited patch files.',
+        parameters: [{ name: 'rows', description: 'id → composed row of the current patch generation.' }],
+        returns: 'patches appended after every file and overlay layer.',
+      },
+      {
         signature: 'readonly telemetryDisabledEnv: string | undefined',
         description: 'Launch-time DSH_TELEMETRY_DISABLED value; any non-empty value opts out.',
         parameters: [],
@@ -1840,25 +1846,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'sessionProjectionCache',
     summary: 'The persisted projection cache service.',
-    description: 'The persisted projection cache service. Opens the `session_projcache` domain at init, checkpoints live sessions on a throttled write-behind (count/interval triggers from Config) plus three mandatory points — session creation, `turn/end`, and session disposal (the live-to-cold moment) — and serves the cold-read ladder: cached row, persistence `readFrom` tail, registry `restore`, durable write-back. Every durable write is fail-soft: failures log a warning and the cache self-heals on the next write or cold read.',
+    description: 'The persisted projection cache service. Opens the `session_projcache` domain at init, checkpoints live sessions on a throttled write-behind (count/interval triggers from Config) plus three mandatory points — session creation, `turn/end`, and session disposal (the live-to-cold moment) — and serves the cached rows for a session header. Every durable write is fail-soft: failures log a warning and the cache self-heals on the next write.',
     methods: [
       {
-        signature: 'cachedSnapshot(meta: SessionHeader, inheritedEventCount: SessionLogOffset): ProjectionSnapshot | undefined',
-        description: 'The zero-I/O listing read: whole values viewed straight from the stored rows (version-matching keys only), each cut carried with its watermark so a client value store can seed under its higher-seq-wins rule — as stale as the last durable checkpoint but never wrong, and never from an unrelated log (the caller\'s header is the identity witness). Fresher paths (the history tail baseline, coldSnapshot) supersede these values whenever a session is actually opened.',
-        parameters: [{ name: 'meta', description: 'the listed session\'s header (identity witness; no log read).' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length that completes the checkpoint identity.' }],
+        signature: 'cachedSnapshot( meta: SessionHeader, inheritedEventCount: SessionLogOffset, keys?: readonly Extract<keyof SessionProjectionMap, string>[], ): ProjectionSnapshot | undefined',
+        description: 'The zero-I/O listing read: whole values viewed straight from the stored rows (version-matching keys only), each cut carried with its watermark so a client value store can seed under its higher-seq-wins rule — as stale as the last durable checkpoint but never wrong, and never from an unrelated log (the caller\'s header is the identity witness). Fresher paths (the history tail baseline) supersede these values whenever a session is actually opened.',
+        parameters: [{ name: 'meta', description: 'the listed session\'s header (identity witness; no log read).' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length that completes the checkpoint identity.' }, { name: 'keys', description: 'optional projection keys required by the caller\'s audience.' }],
         returns: 'the cut (`asOfSeq` = lowest served-row watermark), or `undefined` when no usable row exists for this lifecycle.',
       },
       {
+        signature: 'cachedPredecessorTitle( meta: SessionHeader, inheritedEventCount: SessionLogOffset, ): ProjectionSnapshot | undefined',
+        description: 'Read only a predecessor checkpoint\'s title as a zero-I/O listing hint.\n\nThe authoritative Session header supplies the lifecycle identity. A cache checkpoint can lag that log but cannot lead it because writes flush the log first, so a matching predecessor title is a genuine (possibly stale) fact from this Session. The registry still requires the current title projection\'s row version and schema. No other predecessor projection is exposed: format normalization can change their current meaning, and the strict cachedSnapshot / hydration paths continue to reject them.',
+        parameters: [{ name: 'meta', description: 'authoritative listed Session header.' }, { name: 'inheritedEventCount', description: 'exact inherited cut completing the lifecycle identity.' }],
+        returns: 'a title-only checkpoint view with `asOfSeq: -1`, or `undefined` when the record is current, newer, unrelated, missing, or incompatible with the title unit. The sentinel avoids reusing a sequence that a cardinality-changing Session migration may have remapped.',
+      },
+      {
+        signature: 'hydratePrepared( session: Session, events: readonly SessionEvent[], ): ProjectionSnapshot',
+        description: 'Hydrate projection cells for an already-prepared Session without another persistence read. The cache seeds matching rows; the supplied exact log advances every unit to the observation cut. No checkpoint is written because the logical observation may contain recovery events not yet durable.',
+        parameters: [{ name: 'session', description: 'exact unpublished Session retained by persistence.' }, { name: 'events', description: 'exact logical event prefix represented by the observation.' }],
+        returns: 'all projection values at the event cut.',
+      },
+      {
         signature: 'async write(session: Session): Promise<void>',
-        description: 'Durably checkpoint one live session NOW (all mandatory points call this; tests and carriers may too). The registry cut is snapshotted at this boundary (states are live references), then the whole record is replaced. NOT fail-soft — callers on the fail-soft paths contain it.',
+        description: 'Durably checkpoint one live session NOW (all mandatory points call this; tests and carriers may too). The registry cut is snapshotted at this boundary (states are live references), then the session\'s record is replaced on the domain\'s write chain. NOT fail-soft — callers on the fail-soft paths contain it.',
         parameters: [{ name: 'session', description: 'the live session to checkpoint.' }],
         returns: 'resolution after durability and event emission.',
       },
       {
-        signature: 'async coldSnapshot(id: SessionId, signal?: AbortSignal): Promise<ProjectionSnapshot>',
-        description: 'Cold-read one persisted session\'s projections with zero full-log load: cached rows + a persistence `readFrom` tail from the registry\'s restore floor, refolded by the registry and written back (fail-soft) so the next cold read starts closer. A cache row invalidated by a shrunk log (crash-repair truncation) triggers one full re-read from seq 0 — the ladder\'s slow rung, still no crash. Rejects when the session has no persisted log (`not found` from the persistence seam).',
-        parameters: [{ name: 'id', description: 'the persisted session to read.' }, { name: 'signal', description: 'optional cancellation for the persistence reads.' }],
-        returns: 'the snapshot cut at the stored log end.',
+        signature: 'coldSnapshot( meta: SessionHeader, inheritedEventCount: SessionLogOffset, events: readonly SessionEvent[], ): ProjectionSnapshot',
+        description: 'Cold-read one session\'s projections from its complete log. Each unit is seeded from the identity-checked cached rows — the registry skips `apply` for the already-folded prefix (events at or below the row\'s `seq`) — and the refreshed checkpoint is written back (fail-soft, fire-and-forget), so the first cold read creates the cache row and later ones seed from it. The caller supplies the complete log in seq order: this service never consults the persistence layer.',
+        parameters: [{ name: 'meta', description: 'the stored session header (identity witness).' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length for projection initialization and identity.' }, { name: 'events', description: 'the session\'s complete log, in seq order.' }],
+        returns: 'the projection cut at the log end.',
       },
     ],
   },
@@ -1910,9 +1928,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the seq to hand the persistence `readFrom`, or `undefined` when no unit is registered (no read needed — {@link restore} would serve empty values regardless).',
       },
       {
-        signature: 'viewCheckpoint(checkpoint: ProjectionCheckpoint): Partial<SessionProjectionMap>',
+        signature: 'viewCheckpoint( checkpoint: ProjectionCheckpoint, keys?: readonly Extract<keyof SessionProjectionMap, string>[], ): Partial<SessionProjectionMap>',
         description: 'View a checkpoint\'s rows without any log read: for every registered client-visible unit whose row\'s `ver` matches, serve the schema-validated `view` of the schema-validated stored state; mismatched, malformed, or absent rows leave their key absent (a cold or listing consumer treats it as not-yet-available and a fuller read path refolds it). The zero-I/O rung of the read ladder — values are as stale as their rows, never wrong.',
-        parameters: [{ name: 'checkpoint', description: 'persisted rows for one session (possibly stale or empty).' }],
+        parameters: [{ name: 'checkpoint', description: 'persisted rows for one session (possibly stale or empty).' }, { name: 'keys', description: 'optional wire keys to view.' }],
         returns: 'whole values per key with a usable row; empty when none.',
       },
       {
@@ -1921,6 +1939,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'checkpoint', description: 'persisted rows for one session (possibly stale or empty).' }, { name: 'events', description: 'the stored events with `seq >= baseSeq`, in seq order.' }, { name: 'baseSeq', description: 'the seq `events` starts at (its first event\'s seq when non-empty).' }, { name: 'header', description: 'immutable metadata for the Session being restored.' }, { name: 'inheritedEventCount', description: 'exact fork-inherited prefix length supplied to unit initialization.' }],
         returns: 'the snapshot cut at the supplied log end (`asOfSeq` is the last supplied event\'s seq, `baseSeq - 1` for an empty tail) plus the refreshed checkpoint rows at that cut, ready for a durable write-back.',
       },
+      {
+        signature: 'hydrate( session: Session, checkpoint: ProjectionCheckpoint, events: readonly SessionEvent[], baseSeq: SessionLogOffset, ): ProjectionSnapshot',
+        description: 'Restore an exact cut and install its states on the supplied prepared Session. A later publication reuses these cells; ordinary live reads and event drive advance any constructor-owned suffix exactly once.',
+        parameters: [{ name: 'session', description: 'exact prepared Session that owns the restored log prefix.' }, { name: 'checkpoint', description: 'persisted rows for this Session lifecycle.' }, { name: 'events', description: 'exact events at the observation cut.' }, { name: 'baseSeq', description: 'first supplied event sequence.' }],
+        returns: 'all projection values at the supplied cut.',
+      },
     ],
   },
   {
@@ -1928,6 +1952,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'Unified live-preferred session query service.',
     description: 'Unified live-preferred session query service.\n\nExact reads, filters, and traces are backend-independent concrete behavior. A backend implements full-text observation, reconciliation, ranking, cursor generations, and query execution on the same `ctx.sessionQuery` service.',
     methods: [
+      {
+        signature: 'observeSession( sessionId: SessionId, options: SessionObservationOptions = {}, ): Promise<SessionObservation>',
+        description: 'Observe one exact live or prepared Session without a persistence listing preflight.',
+        parameters: [{ name: 'sessionId', description: 'logical Session identity.' }, { name: 'options', description: 'cancellation and projection selection for this read.' }],
+        returns: 'a caller-owned observation lease.',
+      },
       {
         signature: 'abstract searchSessions( request: SessionSearchRequest, exec?: SessionSearchExecContext, ): Promise<SessionSearchPage<SessionSearchHit>>',
         description: 'Search the live-preferred logical corpus and group by session.',
@@ -2363,7 +2393,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'async open<S extends DomainSpec>(spec: S): Promise<Domain<S>>',
-        description: 'Open one declared domain. Steps, each failing the whole call: reject a name that is already open (`already-open`); resolve the backend route (`backend-not-found` passes through from the hub); require its `kv` facet (`facet-unsupported`); open the unit projected from the spec (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record against the spec\'s zod schemas (`invalid-record` with the offending table and key); construct the domain.\n\nLifecycle: the CALLER owns the returned handle and closes it via `Domain.close()` (typically as its own `ctx.effect` disposer) — the facility does not tie the domain to any consumer fiber. Domains still open when the facility unmounts are closed by the plugin disposer.',
+        description: 'Open one declared domain. Steps, each failing the whole call: reject a name that is already open (`already-open`); resolve the backend route (`backend-not-found` passes through from the hub); require its `kv` facet (`facet-unsupported`); open the unit projected from the spec (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record against the spec\'s zod schemas (`invalid-record` with the offending table and key — unless the spec declares `invalidRecords: \'backup-and-skip\'` and the unit can move documents aside, in which case the failing record is backed up, logged, and skipped); construct the domain.\n\nLifecycle: the CALLER owns the returned handle and closes it via `Domain.close()` (typically as its own `ctx.effect` disposer) — the facility does not tie the domain to any consumer fiber. Domains still open when the facility unmounts are closed by the plugin disposer.',
         parameters: [{ name: 'spec', description: 'The domain declaration, typically from `defineDomain`.' }],
         returns: 'the opened domain handle, typed by the spec.',
       },
@@ -2805,20 +2835,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'get(key: string): TypertSchemaRecord | undefined',
         description: 'Look up one schema by `<package>#<name>`.',
         parameters: [{ name: 'key', description: 'global schema key.' }],
-        returns: 'the live schema record, or `undefined` when absent.',
+        returns: 'a record containing the cached schema, or `undefined` when absent.',
       },
       {
         signature: 'resolve(key: string): TypertSchemaRecord',
         description: 'Resolve one required schema.',
         parameters: [{ name: 'key', description: 'global schema key.' }],
-        returns: 'the live schema record.',
+        returns: 'a record containing the cached schema.',
         throws: ['when the key is malformed, the package face is absent, or the schema is not contributed.'],
       },
       {
         signature: 'list(filter: TypertSchemaFilter = {}): TypertSchemaRecord[]',
         description: 'Enumerate live schemas in registration order.',
         parameters: [{ name: 'filter', description: 'optional package and face restriction.' }],
-        returns: 'matching schema records.',
+        returns: 'matching records containing the cached schemas.',
       },
       {
         signature: 'getPackage(packageName: string, face: TypertFace = \'host\'): TypertPackageRecord | undefined',
@@ -3117,7 +3147,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
-    description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
+    description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
     methods: [
       {
         signature: 'abstract start(request: WorkflowStartRequest): WorkflowRun',
@@ -3778,7 +3808,7 @@ export const EVENT_API: readonly EventApiEntry[] = [
     mode: 'emit',
     signature: '\'workflow/agent-end\'(info: WorkflowRunInfo, agent: WorkflowAgentEndInfo): void',
     summary: 'One `agent()` call settled (clean result, child failure, or run cancellation).',
-    description: 'One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events[\'workflow/agent-start\'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path (a worker killed past its grace) the end is engine-synthesized with outcome `\'cancelled\'`.',
+    description: 'One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events[\'workflow/agent-start\'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path the end is engine-synthesized with outcome `\'cancelled\'`.',
     parameters: [{ name: 'info', description: 'the run\'s identity snapshot.' }, { name: 'agent', description: 'the call identity plus its outcome.' }],
   },
   {
@@ -4395,7 +4425,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DomainSpec',
-    declaration: 'export interface DomainSpec {\n    readonly name: string;\n    readonly version: number;\n    readonly global?: DomainGlobalSpec<unknown>;\n    readonly tables: Record<string, DomainTableSpec>;\n}',
+    declaration: 'export interface DomainSpec {\n    readonly name: string;\n    readonly version: number;\n    readonly layout?: \'single\' | \'per-record\';\n    readonly compatibleVersions?: readonly number[];\n    readonly invalidRecords?: \'backup-and-skip\';\n    readonly global?: DomainGlobalSpec<unknown>;\n    readonly tables: Record<string, DomainTableSpec>;\n}',
   },
   {
     name: 'DomainTableSpec',
@@ -4444,10 +4474,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    tools?: ToolSchema[];\n}',
-  },
-  {
-    name: 'FiberState',
-    declaration: 'export type FiberState = FiberStateEnum;',
   },
   {
     name: 'FileAttachmentRef',
@@ -4727,11 +4753,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'KvUnit',
-    declaration: 'export interface KvUnit {\n    loadAll(): Promise<{\n        tables: Record<string, Record<string, unknown>>;\n        global: unknown;\n    }>;\n    putRecord(table: string, key: string, value: unknown): Promise<void>;\n    deleteRecord(table: string, key: string): Promise<void>;\n    setGlobal(value: unknown): Promise<void>;\n    close(): Promise<void>;\n}',
+    declaration: 'export interface KvUnit {\n    loadAll(): Promise<{\n        tables: Record<string, Record<string, unknown>>;\n        global: unknown;\n    }>;\n    putRecord(table: string, key: string, value: unknown): Promise<void>;\n    deleteRecord(table: string, key: string): Promise<void>;\n    backupRecord?(table: string, key: string): Promise<string>;\n    setGlobal(value: unknown): Promise<void>;\n    close(): Promise<void>;\n}',
   },
   {
     name: 'KvUnitDescriptor',
-    declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n}',
+    declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n    readonly layout?: \'single\' | \'per-record\';\n    readonly compatibleVersions?: readonly number[];\n}',
   },
   {
     name: 'LegacySessionHandle',
@@ -5570,6 +5596,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionMessageProjectionContext {\n    nodes: readonly SessionSeq[];\n    events: readonly SessionEvent[];\n    baseSeq: SessionLogOffset;\n    messages: ReadonlyMap<SessionSeq, Message>;\n}',
   },
   {
+    name: 'SessionObservation',
+    declaration: 'export interface SessionObservation extends Disposable {\n    readonly source: \'live\' | \'prepared\';\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffsetType;\n    readonly events: readonly SessionEvent[];\n    readonly cursor: SessionSeqCursor;\n    readonly revision?: SessionPersistenceRevision;\n    readonly projections?: ProjectionSnapshot;\n    retain(): SessionObservation;\n}',
+  },
+  {
+    name: 'SessionObservationOptions',
+    declaration: 'export interface SessionObservationOptions {\n    readonly signal?: AbortSignal;\n    readonly projectionMode?: \'all\' | \'none\';\n}',
+  },
+  {
     name: 'SessionPersistence',
     declaration: 'export abstract class SessionPersistence extends Service {\n    constructor(ctx: Context);\n    async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandleType>;\n    async open(id: SessionId, access: SessionAccessType, options?: SessionPersistenceOpenOptions): Promise<SessionHandleType>;\n    async flush(): Promise<void>;\n    async stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<SessionPersistenceSnapshot | undefined>;\n    async list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>;\n    releaseContractHandle(id: SessionId, handle: ContractSessionHandle): void;\n    materializeDetached(_id: SessionId): Promise<void>;\n    discardDetached(_id: SessionId): Promise<void>;\n    isPending(id: SessionId): boolean;\n    liveStorage(_id: SessionId): Promise<SessionStorageMetadata | undefined>;\n    listPending(): readonly SessionStorageMetadata[];\n    listStored(signal?: AbortSignal): Promise<SessionHeader[]>;\n    listHeaders(signal?: AbortSignal): Promise<SessionHeader[]>;\n    async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<LegacySessionHandle>;\n    async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<LegacySessionHandle>;\n    openHandle(id: SessionId, mode: SessionHandleMode): LegacySessionHandle;\n    releaseHandle(id: SessionId, handle: LegacySessionHandle): void;\n    locate(_meta: SessionHeader): SessionLocation | undefined;\n    /* …truncated — full shape in source */',
   },
@@ -6383,11 +6417,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TypertCodec',
-    declaration: 'export type TypertCodec = {\n    readonly mode: \'strict\';\n    readonly typeSymbol: string;\n    readonly schema: TypertSchema;\n} | {\n    readonly mode: \'src-json\';\n};',
+    declaration: 'export type TypertCodec = {\n    readonly mode: \'strict\';\n    readonly typeSymbol: string;\n    readonly create: () => TypertSchema;\n} | {\n    readonly mode: \'src-json\';\n};',
   },
   {
     name: 'TypertContribution',
-    declaration: 'export interface TypertContribution {\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly schemas: readonly TypertSchema[];\n    readonly model: TypertPackageModel;\n    readonly invocations: readonly InvocationDescriptor[];\n}',
+    declaration: 'export interface TypertContribution {\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly schemas: readonly TypertSchemaFactory[];\n    readonly model: TypertPackageModel;\n    readonly invocations: readonly InvocationDescriptor[];\n}',
   },
   {
     name: 'TypertDisposer',
@@ -6438,12 +6472,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export abstract class TypertRemoteService<out T = never> extends Service<T> {\n    readonly typertRemote: TypertGatewayBinding<this>;\n}',
   },
   {
+    name: 'TypertSchema',
+    declaration: 'export interface TypertSchema<Output = unknown> {\n    parse(value: unknown): Output;\n}',
+  },
+  {
+    name: 'TypertSchemaFactory',
+    declaration: 'export interface TypertSchemaFactory {\n    readonly name: string;\n    readonly create: () => z.ZodType;\n}',
+  },
+  {
     name: 'TypertSchemaFilter',
     declaration: 'export interface TypertSchemaFilter {\n    readonly package?: string;\n    readonly face?: TypertFace;\n}',
   },
   {
     name: 'TypertSchemaRecord',
-    declaration: 'export interface TypertSchemaRecord extends TypertSchema {\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly key: string;\n}',
+    declaration: 'export interface TypertSchemaRecord {\n    readonly name: string;\n    readonly schema: z.ZodType;\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly key: string;\n}',
   },
   {
     name: 'TypertServiceModel',

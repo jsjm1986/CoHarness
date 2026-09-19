@@ -172,7 +172,10 @@ The mounted domain facility. Opens declared domains over routed backends; one fa
  * (`facet-unsupported`); open the unit projected from the spec (backend
  * `version-mismatch`/`malformed-medium` pass through); load and validate
  * every stored record against the spec's zod schemas (`invalid-record`
- * with the offending table and key); construct the domain.
+ * with the offending table and key — unless the spec declares
+ * `invalidRecords: 'backup-and-skip'` and the unit can move documents aside, in
+ * which case the failing record is backed up, logged, and skipped);
+ * construct the domain.
  *
  * Lifecycle: the CALLER owns the returned handle and closes it via
  * `Domain.close()` (typically as its own `ctx.effect` disposer) — the

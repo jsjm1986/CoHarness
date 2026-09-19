@@ -426,13 +426,19 @@ export class SessionProjectionRegistry extends Service {
    * fuller read path refolds it). The zero-I/O rung of the read ladder —
    * values are as stale as their rows, never wrong.
    * @param checkpoint - persisted rows for one session (possibly stale or empty).
+   * @param keys - optional wire keys to view.
    * @returns whole values per key with a usable row; empty when none.
    */
-  viewCheckpoint(checkpoint: ProjectionCheckpoint): Partial<SessionProjectionMap> {
+  viewCheckpoint(
+    checkpoint: ProjectionCheckpoint,
+    keys?: readonly Extract<keyof SessionProjectionMap, string>[],
+  ): Partial<SessionProjectionMap> {
     const values: Record<string, unknown> = {}
+    const selected = keys === undefined ? undefined : new Set<string>(keys)
     for (const registration of this.registrations.values()) {
       const def = registration.def
       if (def.wire === undefined) continue
+      if (selected !== undefined && !selected.has(def.key)) continue
       const row = checkpoint[def.key]
       if (row === undefined || row.ver !== def.stateVersion) continue
       let state: unknown

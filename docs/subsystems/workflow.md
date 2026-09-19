@@ -139,7 +139,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.workflowEngine` — `WorkflowEngine` (abstract seam)
 
-Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.
+Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.
 
 ```ts cordis-catalog
 /**
@@ -161,14 +161,14 @@ Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/work
 
 #### `workflow/agent-end` — emit
 
-One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events['workflow/agent-start'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path (a worker killed past its grace) the end is engine-synthesized with outcome `'cancelled'`.
+One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events['workflow/agent-start'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path the end is engine-synthesized with outcome `'cancelled'`.
 
 ```ts cordis-catalog
 /**
  * One `agent()` call settled (clean result, child failure, or run
  * cancellation). Paired with {@link Events['workflow/agent-start']} by
  * `agent.seq`, exactly once per started call on every stop path — on an
- * engine termination path (a worker killed past its grace) the end is
+ * engine termination path the end is
  * engine-synthesized with outcome `'cancelled'`.
  * @param info - the run's identity snapshot.
  * @param agent - the call identity plus its outcome.

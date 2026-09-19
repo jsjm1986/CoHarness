@@ -8224,9 +8224,6 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
-      '@deepseek-ai/dsh-session-persistence':
-        specifier: workspace:^
-        version: link:../session-persistence
       '@deepseek-ai/dsh-session-projection':
         specifier: workspace:^
         version: link:../session-projection
@@ -8236,6 +8233,9 @@ importers:
       '@deepseek-ai/dsh-storage-domain':
         specifier: workspace:^
         version: link:../../storage/storage-domain
+      '@deepseek-ai/dsh-storage-json':
+        specifier: workspace:^
+        version: link:../../storage/storage-json
 
   packages/session/session-stats:
     dependencies:

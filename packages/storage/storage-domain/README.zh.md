@@ -2,7 +2,9 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness 存储中心的领域数据形式：在所有已配置的后端注册后，公开可注入的 `ctx.storageDomain` 服务及对应的 `ctx.storage.domain` 投影。一个领域通过 `defineDomain`（zod 记录 schema、从 `z.infer` 派生的类型）声明一次，通过 `DomainFacility.open` 打开，并由具有最终决定权的内存状态提供服务：读取同步执行；写入在每个领域各自的一条链上串行化，先在已路由后端达到持久状态，再更新内存并发出 `domain/changed`。打开领域的消费方负责管理句柄的生命周期，并通过 `Domain.close()` 释放它（幂等；通常作为其自身的 `ctx.effect` 资源释放函数）；插件卸载时，该设施会关闭仍处于打开状态的领域。
+DeepSeek Harness 存储中心的领域数据形式：在所有已配置的后端注册后，公开可注入的 `ctx.storageDomain` 服务及对应的 `ctx.storage.domain` 投影。一个领域通过 `defineDomain`（zod 记录 schema、从 `z.infer`-派生的类型）声明一次，通过 `DomainFacility.open` 打开，并由具有最终决定权的内存状态提供服务：读取同步执行；写入在每个领域各自的一条链上串行化，先在已路由后端达到持久状态，再更新内存并发出 `domain/changed`。打开领域的消费方负责管理句柄的生命周期，并通过 `Domain.close()` 释放它（幂等；通常作为其自身的 `ctx.effect` 资源释放函数）；插件卸载时，该设施会关闭仍处于打开状态的领域。
+
+除名称、版本和表 schema 外，规范还可声明存储 `layout`（默认 `single`，或已路由后端支持时的 `per-record`）、`compatibleVersions` 集合（列出当前 schema 仍可接受的旧存储版本），以及 `invalidRecords` 策略——默认为响亮失败，`backup-and-skip` 则经后端的 `backupRecord` 把 schema 校验失败的记录移存到一边，并在缺失该记录的情况下继续打开。
 
 设计原理、打开语义和存储／领域分层见 [Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)。
 

@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-session-projection-cache",
-  "description": "Persisted projection cache (ctx.sessionProjectionCache): durable per-session projection checkpoints over the domain data form, throttled write-behind, and the cold-read ladder (cache row + persistence tail replay)",
+  "description": "Persisted projection cache (ctx.sessionProjectionCache): durable per-session projection checkpoints in the per-record `session_projcache` domain, throttled write-behind, and caller-supplied cold folding",
   "version": "0.1.5-alpha.1.coharness.1",
   "publishConfig": {
     "access": "public"
@@ -32,17 +32,16 @@
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-session-projection": "workspace:^",
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-session-projection": "workspace:^",
     "@deepseek-ai/dsh-storage": "workspace:^",
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
+    "@deepseek-ai/dsh-storage-json": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   }
 }
