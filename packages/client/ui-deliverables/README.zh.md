@@ -28,6 +28,8 @@ Node 侧注册静态系统提示词段落 `ui:deliverable-file-references`。它
 
 该段落在本包加载期间始终以顺序 190 保持静态，因此留在可复用的提示词前缀中，不会随 Turn 改变。
 
+**运行时不变式：** 不发布伴生入口。提示词、slot、dictionary、文件操作路由与可选 service 注册归 effect 所有；Session 日志拥有声明，文件系统拥有文件内容。
+
 ## 已知限制与暂缓事项
 
 - **提及匹配只认精确路径或唯一 basename。**后缀式提及（`out/index.html` 写作 `index.html` 可解析；`deep/out/index.html` 写作 `out/index.html` 则不行）保持不可点击；等真实的收尾消息形态产生需求后再放宽匹配规则。

@@ -18,7 +18,7 @@
 
 ## 威胁模型：策略围栏，而非内核边界
 
-围栏是在可信代码中检查模型控制的路径。操作本身属于 seam（open、rename），只有目标路径不可信，因此「规范化后检查包含关系」就是该接口的完整答案。这与 `code-runtime` 的立场相同：提供约束，但不是安全边界。不可信代码的内核级隔离仍由 `ctx.shell` 负责（[`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)）。剩余 TOCTOU（在包含关系复查与系统调用之间替换祖先符号链接）会通过写入前立即重新规范化来缩小，并为该威胁模型所接受；内核严密边界需要 `openat2` 一类原语，其可移植性成本在此不值得。
+围栏是在可信代码中检查模型控制的路径。操作本身属于 seam（open、rename），只有目标路径不可信，因此「规范化后检查包含关系」就是该接口的完整答案。这与 `ptc-runtime` 的立场相同：提供约束，但不是安全边界。不可信代码的内核级隔离仍由 `ctx.shell` 负责（[`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)）。剩余 TOCTOU（在包含关系复查与系统调用之间替换祖先符号链接）会通过写入前立即重新规范化来缩小，并为该威胁模型所接受；内核严密边界需要 `openat2` 一类原语，其可移植性成本在此不值得。
 
 拒绝是结构化 `FsError`（`FS_SANDBOX_DENIED`，携带有效模式），不通过 stderr 文本推断（不同于 bash 的内核拒绝），因为进程内围栏准确知道自己拒绝了什么。面向模型的 `[sandbox: file access denied under <mode> mode]` 标记以及唯一一次获批的更宽权限重试位于工具层（`dsh-tool-fs`），与 bash 完全相同。见[跨能力族 fs 沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md)。
 
@@ -37,6 +37,8 @@
 #### KV Cache 影响
 
 常驻策略发生变化时，会在保留的历史之后追加一份由归属方渲染、取代先前状态的运行时上下文快照；操作结果保持仅追加。
+
+**运行时不变式：** 不发布伴生入口。这个无状态适配器把策略与文件系统关系委托给各自所属的 seam。
 
 ## 已知限制与暂缓事项
 

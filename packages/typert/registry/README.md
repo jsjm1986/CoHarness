@@ -27,6 +27,8 @@ None, as the registry contributes no prompt, tool, or session event; consumers s
 
 No direct effect. A consumer that places reflection in a request owns the resulting prefix change.
 
+**Runtime invariant:** No companion is published. Schema and package-reflection records mutate together inside register/dispose, with no independent event or second data source to cross-check; duplicate identities fail at the owning operation boundary.
+
 ## Known Limitations and Deferred Work
 
 - The registry stores generated reflection but does not merge host and client graphs or resolve TypeScript references. Those are analyzer and emitter concerns.

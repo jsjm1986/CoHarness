@@ -12,7 +12,7 @@ preset 能拥有的是这份注册表的**呈现方式**。`ctx.tools.presentAs(
 
 ## 它做什么
 
-`native` 立即生效。PTC mode 则等待 `ctx.codeRuntime`——这是一个宿主平面服务（[`dsh-code-runtime-worker-thread`](../../code-runtime/code-runtime-worker-thread/README.zh.md)）：若某个 preset 在未组装运行时的部署上选择 PTC mode，本行就停在 pending，`dsh-agent-presets` 会指名此 id 拒绝挂载。另一种做法——先乐观应用——会把失败推迟到该会话的第一次请求，那时操作者对 preset 和组装都已无从下手。
+`native` 立即生效。PTC mode 则等待 `ctx.ptcRuntime`——这是一个宿主平面服务（[`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.zh.md)）：若某个 preset 在未组装运行时的部署上选择 PTC mode，本行就停在 pending，`dsh-agent-presets` 会指名此 id 拒绝挂载。另一种做法——先乐观应用——会把失败推迟到该会话的第一次请求，那时操作者对 preset 和组装都已无从下手。
 
 `mode` 是必填而非有默认值：不带这一行的 preset 本来就会拿到部署默认值，省略它等于这一行白组装了。
 
@@ -25,6 +25,8 @@ preset 能拥有的是这份注册表的**呈现方式**。`ctx.tools.presentAs(
 #### KV Cache effect
 
 没有直接的失效影响；呈现方式在 agent 组装时即固定，因此其请求前缀在该会话的整个生命周期内保持稳定。
+
+**运行时不变式：** 不发布伴生入口。本包只对 `ctx.tools` 发起一次 scoped 调用，不持有自己的事件或快照；它建立的是「某个 agent 的组装采用哪种呈现方式」这一关系，该关系由工具注册表持有，`dsh-tools` 会在工具注册表中观察该关系。
 
 ## 已知限制与暂缓事项
 

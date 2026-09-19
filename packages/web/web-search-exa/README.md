@@ -36,6 +36,8 @@ Indirectly, through [`dsh-tool-web`](../tool-web/README.md), which retains this 
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **A result with no non-blank highlight is dropped entirely** — no portable snippet to map, so fewer sources than the requested count can return.

@@ -12,7 +12,7 @@ The model history must contain assistant content that remains visible to the use
 
 ## Decision
 
-`ReactLoopAgent.step()` catches cancellation while consuming a model stream, when its `BlockAssembler`, logged chunk seqs, and provider route identify the delivered prefix. It appends that prefix as the step's `assistant/message` with `interrupted: true`, `surfaceOp: 'append'`, and `sourceEventSeqs` containing exactly the logged chunks. The append precedes `step/end` and the aborted `turn/end`.
+`ReactLoopAgent.step()` catches cancellation while consuming a model stream, when its `BlockAssembler`, accumulated stream records, and provider route identify the delivered prefix. It appends that prefix as the step's `assistant/message` with `interrupted: true`, `surfaceOp: 'append'`, and `data.stream` containing exactly the delivered stream. The append precedes `step/end` and the aborted `turn/end`.
 
 `BlockAssembler.interruptedBlocks()` returns closed and open `text` and `reasoning` blocks with non-whitespace content in stream order. It omits tool calls because interruption precedes dispatch and no real result exists; it also omits empty blocks and open unknown block types. An empty result appends no assistant message. Provider `error` and `aborted` finishes leave the stream-consumption scope before `agent/request-error`, so provider failures and cancellation during recovery commit no content from the failed request.
 

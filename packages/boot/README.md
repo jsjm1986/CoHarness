@@ -10,3 +10,5 @@ The channel-neutral boot library shared by `apps/cli` and the [`examples/`](../e
 | `cmdline/` | Launcher-to-app command-line handoff and app-owned startup parsing | `cmdlineArgs`, `appExit` |
 
 The boot sequence and personal-config contract are documented in [`app-boot/README.md`](app-boot/README.md); app-owned command lines are documented in [`cmdline/README.md`](cmdline/README.md).
+
+The [boot subsystem page](../../docs/subsystems/boot.md) records the profile-management service methods and result records.

@@ -18,6 +18,8 @@ None, as the test harness submits only the consuming test's ordinary user task a
 
 None beyond the loaded tree; the helper neither changes the request prefix nor retains state across runs.
 
+**Runtime invariant:** No companion is published. This test-support package owns no production event stream or mutable data; consuming test suites exercise its behavior.
+
 ## Known Limitations and Deferred Work
 
 - **Built mode requires a prior build** — the config must also resolve every named package upward through `examples/node_modules`.

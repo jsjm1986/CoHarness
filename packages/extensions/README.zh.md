@@ -10,3 +10,5 @@ agent 修改自身运行时：检查已加载的插件与服务接口、定义�
 | [`cordis-host-runner/`](cordis-host-runner/README.zh.md) | 定义注册表、host 半的 `node:vm` 沙箱，以及 request-run 往返 | 提供 `ctx.dynamicCordisRunner` |
 | [`cordis-client-runner/`](cordis-client-runner/README.zh.md) | 双半包的浏览器半：把定义求值成活的浏览器插件，并应答运行请求 | client 面；提供浏览器侧 `ctx.dynamicCordisRunner` |
 | [`ui-cordis/`](ui-cordis/README.zh.md) | 浏览器面：操作全部定义的全局面板，与只读的 define 卡片 | client 面；注册 slot |
+
+[extensions 子系统页](../../docs/subsystems/extensions.zh.md)记录生成的 `ctx.cordisInspect` 与 `ctx.dynamicCordisRunner` 服务 API。

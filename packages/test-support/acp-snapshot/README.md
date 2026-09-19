@@ -74,6 +74,8 @@ None, as this test-only harness records, normalizes, and compares ACP transcript
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This test-support package owns no production event stream or mutable data; consuming test suites exercise its behavior.
+
 ## Known Limitations and Deferred Work
 
 - **Session harvest requires raw JSONL mode** — `runScenario` collects persisted `.jsonl` logs, so snapshot configs set `persistenceCompression: 'none'`; compressed JSONL and SQLite compositions have no snapshot-harvest path.

@@ -159,6 +159,8 @@ Each confirmed change or removal is one retained history message bounded by `max
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. Replay intentionally tolerates unknown or malformed workspace sources, while focused pipeline tests own its private pending/cache state transitions.
+
 ## Known Limitations and Deferred Work
 
 - **Discovery follows structured fs tools, not shell navigation** — a `bash` command that changes directories does not trigger nested instruction discovery because shell syntax and per-call shell state are not a reliable filesystem seam.

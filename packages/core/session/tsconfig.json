@@ -9,31 +9,31 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../util/brand"
+      "path": "../scope"
     },
     {
       "path": "../../llm/llm"
     },
     {
+      "path": "../../runtime-diagnostics/invariants"
+    },
+    {
       "path": "../../session/session-format"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/brand"
     },
     {
       "path": "../../util/values"
     },
     {
-      "path": "../../core/scope"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../typert/protocol"
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

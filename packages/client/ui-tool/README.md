@@ -44,6 +44,8 @@ None, as this package renders already logged Tool calls and results without alte
 
 None. The package is client-only presentation.
 
+**Runtime invariant:** No companion is published. Tool composition is browser-only and contributes no events or cross-plugin mutable state; slot ownership is checked by ui-slots.
+
 ## Known Limitations and Deferred Work
 
 - The Host excludes `run_code` from PTC mode program bindings, so production events produce one dispatch level; the recursive Runtime/UI contract supports nesting.

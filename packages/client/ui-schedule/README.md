@@ -42,6 +42,8 @@ None; the package never assembles or sends a provider request.
 
 None; the package never assembles or sends a provider request.
 
+**Runtime invariant:** No companion is published. This read-only client catalog owns no mutable cross-plugin state.
+
 ## Known Limitations and Deferred Work
 
 - The catalog is read-only; Schedule creation and cancellation remain model/tool operations.

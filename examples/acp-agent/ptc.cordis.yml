@@ -1,4 +1,4 @@
-# PTC adds `ctx.codeRuntime` and changes the registry to one wire tool,
+# PTC adds `ctx.ptcRuntime` and changes the registry to one wire tool,
 # `run_code`, plus its generated TypeScript SDK prompt. The app bin selects this
 # overlay for `demo:ptc` and snapshot recording, and selects the sibling
 # replay overlay for `DSH_SNAPSHOT=replay`. A config patch replaces the whole app
@@ -24,5 +24,5 @@
 
             Verify your work by running the code or tests. Keep answers brief and factual.
       - insert:
-          - id: code-runtime
-            name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+          - id: ptc-runtime
+            name: '@deepseek-ai/dsh-ptc-runtime-node'

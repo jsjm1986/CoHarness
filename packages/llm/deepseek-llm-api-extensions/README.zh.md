@@ -48,6 +48,8 @@ kind: "package-reference"
 
 无；注册表字段是模型不可见的提供方元数据，不改变已序列化的模型输入前缀。
 
+**运行时不变式：** 不发布伴生入口。重复所有权、detached output 与单次 acceptance settlement 都在拥有该决策的注册表操作中强制。
+
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>

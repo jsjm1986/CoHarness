@@ -13,3 +13,5 @@
 | `tool-userdoc/` | 面向模型的个人文档发现与读取工具 | （消费 `ctx.userDocs`） |
 
 未发送的浏览器草稿刻意位于这项能力之外。只有用户提交提示词，或提供方适配器提交结构化模型输出时，字节才进入持久存储。
+
+[Attachment 子系统参考](../../docs/subsystems/attachment.zh.md)负责服务契约、载荷类型与 `ctx.attachments` Cordis 面。

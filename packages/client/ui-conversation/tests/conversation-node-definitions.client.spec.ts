@@ -135,13 +135,13 @@ describe('built-in conversation node Definitions', () => {
       [2, 'block-start'],
       [3, 'block-end'],
     ] as const) {
-      const chunk = match(at(seq, 'assistant/chunk', { chunk: { type: chunkType } }))
+      const chunk = match(at(seq, 'assistant/live-chunk', { chunk: { type: chunkType } }))
       expect(assistantDefinition.publication?.(chunk)).toBe('animation-frame')
       expect(turnProcessDefinition.publication?.(chunk)).toBe('animation-frame')
     }
 
     for (const [seq, chunkType] of [[4, 'usage'], [5, 'finish']] as const) {
-      const chunk = match(at(seq, 'assistant/chunk', { chunk: { type: chunkType } }))
+      const chunk = match(at(seq, 'assistant/live-chunk', { chunk: { type: chunkType } }))
       expect(assistantDefinition.publication?.(chunk)).toBe('none')
       expect(turnProcessDefinition.publication?.(chunk)).toBe('none')
     }
@@ -211,6 +211,7 @@ describe('built-in conversation node Definitions', () => {
         failure: { code: 'TRANSPORT', message: 'temporary' },
       }),
       at(18, 'assistant/message', {
+        stream: [],
         turn: 2,
         step: 2,
         message: assistantMessage('process-answer', 'done'),
@@ -321,7 +322,8 @@ describe('built-in conversation node Definitions', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'assistant/chunk', {
+      at(3, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: 'streaming' },
@@ -333,6 +335,7 @@ describe('built-in conversation node Definitions', () => {
     const order = runningSnapshot.order
 
     value.append(at(4, 'assistant/message', {
+      stream: [],
       turn: 1,
       step: 1,
       message: assistantMessage('assistant-1', 'settled'),
@@ -348,7 +351,8 @@ describe('built-in conversation node Definitions', () => {
     const interruptedValue = assembler([
       at(10, 'turn/start', { turn: 2 }),
       at(11, 'step/start', { turn: 2, step: 1 }),
-      at(12, 'assistant/chunk', {
+      at(12, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 2,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: 'partial' },
@@ -363,6 +367,7 @@ describe('built-in conversation node Definitions', () => {
       at(20, 'turn/start', { turn: 3 }),
       at(21, 'step/start', { turn: 3, step: 1 }),
       at(22, 'assistant/message', {
+        stream: [],
         turn: 3,
         step: 1,
         message: assistantMessage('assistant-3', 'cut short'),
@@ -394,12 +399,14 @@ describe('built-in conversation node Definitions', () => {
     const toolOnlyValue = assembler([
       at(30, 'turn/start', { turn: 4 }),
       at(31, 'step/start', { turn: 4, step: 1 }),
-      at(32, 'assistant/chunk', {
+      at(32, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 4,
         step: 1,
         chunk: { type: 'tool-call-delta', index: 0, id: 'call-1', name: 'read', argumentsDelta: '' },
       }),
       at(33, 'assistant/message', {
+        stream: [],
         turn: 4,
         step: 1,
         message: {
@@ -420,7 +427,8 @@ describe('built-in conversation node Definitions', () => {
     const interruptedToolOnlyValue = assembler([
       at(35, 'turn/start', { turn: 5 }),
       at(36, 'step/start', { turn: 5, step: 1 }),
-      at(37, 'assistant/chunk', {
+      at(37, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 5,
         step: 1,
         chunk: { type: 'tool-call-delta', index: 0, id: 'call-2', name: 'read', argumentsDelta: '' },
@@ -434,7 +442,8 @@ describe('built-in conversation node Definitions', () => {
     const retryTimingValue = assembler([
       at(50, 'turn/start', { turn: 6 }),
       at(51, 'step/start', { turn: 6, step: 1 }),
-      at(52, 'assistant/chunk', {
+      at(52, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 6,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: 'first attempt' },
@@ -444,12 +453,14 @@ describe('built-in conversation node Definitions', () => {
         policyKey: 'fake-normal', retry: 1, maxRetries: 2, delayMs: 10,
         failure: { code: 'TRANSPORT', message: 'temporary' },
       }),
-      at(54, 'assistant/chunk', {
+      at(54, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 6,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: 'second attempt' },
       }),
       at(55, 'assistant/message', {
+        stream: [],
         turn: 6,
         step: 1,
         message: assistantMessage('assistant-retried', 'done'),
@@ -459,7 +470,8 @@ describe('built-in conversation node Definitions', () => {
     expect(retryTiming?.timing?.firstTokenTime).toBe(1_700_000_000_052)
 
     const partialWindow = assembler([
-      at(40, 'assistant/chunk', {
+      at(40, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 5,
         step: 2,
         chunk: { type: 'text-delta', index: 0, text: 'loaded partial' },
@@ -477,12 +489,14 @@ describe('built-in conversation node Definitions', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'assistant/chunk', {
+      at(3, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'block-start', index: 0, blockType: 'text' },
       }),
-      at(4, 'assistant/chunk', {
+      at(4, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: '<thi' },
@@ -490,7 +504,8 @@ describe('built-in conversation node Definitions', () => {
     ])
     expect(node(snapshot(value), 'assistant-step')).toBeUndefined()
 
-    value.append(at(5, 'assistant/chunk', {
+    value.append(at(5, 'assistant/live-chunk', {
+      attemptId: 'a1',
       turn: 1,
       step: 1,
       chunk: { type: 'text-delta', index: 0, text: 'nking>private</thinking>answer' },
@@ -589,6 +604,7 @@ describe('built-in conversation node Definitions', () => {
       at(21, 'user/message', textMessage('newer-user', 'newer'), { surfaceOp: 'append' }),
       at(22, 'step/start', { turn: 2, step: 1 }),
       at(23, 'assistant/message', {
+        stream: [],
         turn: 2,
         step: 1,
         message: assistantMessage('newer-assistant', 'newer answer'),
@@ -605,6 +621,7 @@ describe('built-in conversation node Definitions', () => {
       at(11, 'user/message', textMessage('older-user', 'older'), { surfaceOp: 'append' }),
       at(12, 'step/start', { turn: 1, step: 1 }),
       at(13, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('older-assistant', 'older answer'),
@@ -630,6 +647,7 @@ describe('built-in conversation node Definitions', () => {
       at(2, 'user/message', textMessage('first-user', 'first'), { surfaceOp: 'append' }),
       at(3, 'step/start', { turn: 1, step: 1 }),
       at(4, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('first-assistant', 'first answer'),
@@ -659,6 +677,7 @@ describe('built-in conversation node Definitions', () => {
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
       at(3, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('assistant-before-tool', 'running a tool'),
@@ -712,6 +731,7 @@ describe('built-in conversation node Definitions', () => {
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
       at(3, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('assistant-before-steering', 'initial answer'),
@@ -856,6 +876,7 @@ describe('built-in conversation node Definitions', () => {
         source: { kind: 'plugin', plugin: 'foreign' },
       }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 1 } }),
       at(4, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('replacement-assistant', 'rewritten answer'),
@@ -1169,6 +1190,7 @@ describe('built-in conversation node Definitions', () => {
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
       at(3, 'assistant/message', {
+        stream: [],
         turn: 1, step: 1, message: assistantMessage('a1', 'truncated answer'),
       }, { surfaceOp: 'append' }),
       at(4, 'step/end', { turn: 1, step: 1 }),

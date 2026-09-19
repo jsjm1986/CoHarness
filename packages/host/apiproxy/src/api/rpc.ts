@@ -38,6 +38,11 @@ export interface RpcErrorDetailsMap {
     reason: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked' | 'gateway-unavailable'
   }
   'session-not-found': { sessionId: SessionId }
+  /**
+   * Cold resume found the session's write lease held by another live Host
+   * process; the caller should surface the contention instead of retrying.
+   */
+  'session-writer-held': { sessionId: SessionId }
   'model-unavailable': { provider: string; model: string }
   'model-forbidden': { provider: string; model: string }
   'session-conflict': { sessionId: SessionId; requestedCwd: string; existingCwd?: string }

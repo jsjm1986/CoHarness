@@ -71,6 +71,8 @@ Fixed schema cost plus one compact result per call. The durable mutation adds no
 
 Schemas are prefix-stable while their definitions and visibility are unchanged. Calls and results append after the reusable request prefix without invalidating earlier entries.
 
+**Runtime invariant:** No companion is published. This model-facing adapter owns no independent state or event protocol; accepted mutations are checked by the goal domain and authority behavior is package-tested.
+
 ## Known Limitations and Deferred Work
 
 - **Semantic intent remains model judgment** — execution can prove that the current turn contains a direct human message, not whether the request is substantial enough to merit a goal.

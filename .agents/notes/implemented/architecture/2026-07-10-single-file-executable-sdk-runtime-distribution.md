@@ -60,7 +60,7 @@ The exe's "must be explicitly configured" hard semantic is unchanged; the zero-c
 
 ## Disposition of worker-style plugins
 
-`dsh-workflow-worker-thread` and `dsh-code-runtime-worker-thread` are supported inside the exe. Their built hosts convert the sibling `lib/worker.cjs` URL with `fileURLToPath()` and pass the resulting filesystem string to `Worker`, which is the form pkg's Worker hook resolves inside the VFS. The worker entries are CommonJS because that hook compiles VFS worker files as CommonJS. The workflow engine keeps its data-URL bootstrap for unbuilt source execution; only its built sibling entry uses the filesystem string. The custom-config executable smoke loads both backends, invokes a real `run_code` call and a zero-agent `workflow` call, and requires each worker to return `42` from inside pkg's VFS.
+`dsh-workflow-ptc` and `dsh-ptc-runtime-node` are supported inside the exe. Their built hosts convert the sibling `lib/worker.cjs` URL with `fileURLToPath()` and pass the resulting filesystem string to `Worker`, which is the form pkg's Worker hook resolves inside the VFS. The worker entries are CommonJS because that hook compiles VFS worker files as CommonJS. The workflow engine keeps its data-URL bootstrap for unbuilt source execution; only its built sibling entry uses the filesystem string. The custom-config executable smoke loads both backends, invokes a real `run_code` call and a zero-agent `workflow` call, and requires each worker to return `42` from inside pkg's VFS.
 
 ## Testing
 

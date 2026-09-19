@@ -9,7 +9,7 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import type { CommandResult } from '@deepseek-ai/dsh-commands/types'
+import type { CommandResult, CommandSubmitAttachment } from '@deepseek-ai/dsh-commands/types'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import { createScope, scopeOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -68,7 +68,7 @@ async function bench(opts: BenchOptions = {}) {
   const ctx = new Context()
   const registered = new Map<string, InputTriggerSource>()
   const listCalls: Array<{ sessionId: SessionId }> = []
-  const executeCalls: Array<{ sessionId: SessionId; line: string; images: readonly SubmitImageAttachment[] }> = []
+  const executeCalls: Array<{ sessionId: SessionId; line: string; images: readonly CommandSubmitAttachment[] }> = []
   // The service reads the generated commands Remote, which delivers the
   // carrier's outcome, so a programmed failure answers the error branch.
   const commandsRemote = {
@@ -81,7 +81,7 @@ async function bench(opts: BenchOptions = {}) {
         return value.commands
       })
     },
-    execute: async (sessionId: SessionId, line: string, images: readonly SubmitImageAttachment[] = []) => {
+    execute: async (sessionId: SessionId, line: string, images: readonly CommandSubmitAttachment[] = []) => {
       executeCalls.push({ sessionId, line, images })
       return await carried(async () => {
         const fallback = (): Promise<ExecuteValue> => Promise.resolve({ matched: true })
@@ -538,7 +538,7 @@ describe('matchEnter envelope policy (images)', () => {
   const signal = () => new AbortController().signal
   const IMG_CMDS: CommandDescriptor[] = [
     ...S1_CMDS,
-    { name: 'vision', description: 'image-accepting leadingInput', input: { hint: 'describe', images: true } },
+    { name: 'vision', description: 'image-accepting leadingInput', input: { hint: 'describe', attachments: true } },
   ]
   const png: SubmitImageAttachment = { mediaType: 'image/png', data: 'AA==' }
 
@@ -586,7 +586,7 @@ describe('matchEnter envelope policy (images)', () => {
     // Handler error: the error outcome keeps draft and images in the composer.
     await expect(outcome.claim.submit('x', new Context(), [png]))
       .resolves.toEqual({ kind: 'error', text: 'handler refused' })
-    expect(executeCalls).toEqual([{ sessionId: sid('s1'), line: '/vision x', images: [png] }])
+    expect(executeCalls).toEqual([{ sessionId: sid('s1'), line: '/vision x', images: [{ type: 'image', ...png }] }])
     result = { kind: 'success', text: 'described' }
     await expect(outcome.claim.submit('x', new Context(), [png])).resolves.toEqual({ kind: 'success' })
   })

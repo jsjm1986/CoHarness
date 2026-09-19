@@ -52,6 +52,8 @@ Reading status, mutating a goal, or receiving a direct command error adds no mod
 
 Command discovery, mutations, and direct output do not affect the cache. Later continuation prompts follow the driver's ordinary request history.
 
+**Runtime invariant:** No companion is published. This command adapter owns no event stream or state projection; accepted mutations are checked by the goal domain and command dispatch behavior is covered by package tests.
+
 ## Known Limitations and Deferred Work
 
 - **Plain-text interaction only** — the generic command registry has no modal edit form or replacement-confirmation callback; inline edit and explicit clear keep destructive intent deterministic across adapters.

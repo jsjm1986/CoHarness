@@ -26,6 +26,8 @@ Indirectly, through the host prompt-assembly consumer that either inlines a smal
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This stateless seam owns types while providers enforce root containment and byte limits.
+
 ## Known Limitations and Deferred Work
 
 - **No business quota accounting** — providers may leave the per-file limit unlimited, while a concrete provider remains responsible for disk-availability and temporary-session safety.

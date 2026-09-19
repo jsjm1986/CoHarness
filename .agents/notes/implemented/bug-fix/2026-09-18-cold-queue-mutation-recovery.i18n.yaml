@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-cold-queue-mutation-recovery.md
+2026-09-18-cold-queue-mutation-recovery.md: b0f39a63478108fc0ccb980339bcba199a4f546f
+2026-09-18-cold-queue-mutation-recovery.zh.md: 8f0a101183928efcb8a8f55595f20850fb90dd5b

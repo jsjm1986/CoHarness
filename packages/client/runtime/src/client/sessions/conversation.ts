@@ -612,7 +612,7 @@ export interface ConversationSnapshot {
    */
   historyWindowMode: HistoryWindowMode
   /**
-   * Whether historical `assistant/chunk` events for the installed window
+   * Whether historical `assistant/attempt` events for the installed window
    * have been downloaded. Chat stays on `'conversation'`; Trajectory fill
    * is `'filling'` then `'full'`.
    */

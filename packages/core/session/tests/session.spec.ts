@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, CallId, createMessage, createToolResultMessage, MessageId, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, createMessage, createToolResultMessage, MessageId, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import SessionStore, {
   adoptSessionEvent,
   SESSION_FORMAT_VERSION,
@@ -31,14 +31,17 @@ describe('Session', () => {
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
-    session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'hi' } })
+    session.append('assistant/attempt', { turn: 1, step: 1, stream: [
+      { type: 'chunk', time: 0, chunk: { type: 'text-delta', index: 0, text: 'hi' } },
+    ] })
     session.append('assistant/message', {
+      stream: [],
       turn: 1, step: 1,
       message: createMessage({
         role: 'assistant',
         content: [
           { type: 'text', text: 'let me check' },
-          { type: 'tool-call', id: CallId('c1'), name: 'echo', arguments: '{}' },
+          { type: 'tool-call', id: ToolCallId('c1'), name: 'echo', arguments: '{}' },
         ],
         source: {
           kind: 'model',
@@ -49,7 +52,7 @@ describe('Session', () => {
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('c1'),
+        callId: ToolCallId('c1'),
         content: [{ type: 'text', text: 'ok' }],
         isError: false,
       }),
@@ -60,7 +63,7 @@ describe('Session', () => {
     expect(messages.map(m => m.role)).toEqual(['user', 'assistant', 'user'])
     // raw chunks must NOT appear in derived history
     expect(messages[1]!.content).toHaveLength(2)
-    expect(messages[2]!.content[0]).toMatchObject({ type: 'tool-result', toolCallId: CallId('c1') })
+    expect(messages[2]!.content[0]).toMatchObject({ type: 'tool-result', toolCallId: ToolCallId('c1') })
   })
 
   it('accepts and round-trips a max-tokens turn/end reason', () => {
@@ -125,6 +128,7 @@ describe('Session', () => {
       content: [{ type: 'text', text: 'q' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     original.append('assistant/message', {
+      stream: [],
       turn: 1, step: 1,
       message: createMessage({
         role: 'assistant',
@@ -418,15 +422,13 @@ describe('Session', () => {
     for (const data of [null, 'bad', {}, { stream: 'bad' }, { stream: [{ type: 'unrecognized' }] }]) {
       expect(() => Session.create(SessionId('invalid-attempt'), [{
         type: 'assistant/attempt', seq: 0, time: 1, data,
-      } as unknown as SessionEvent])).toThrow(/has invalid (?:assistant )?stream/)
+      } as unknown as SessionEvent])).toThrow(/has invalid (?:settlement fields|assistant stream|stream)/)
     }
     const message = { id: 'a', role: 'assistant', content: [], source: { kind: 'model', provider: 'p', model: 'm' } }
-    for (const stream of ['not-an-array', [{ type: 'unrecognized' }]]) {
-      expect(() => Session.create(SessionId('invalid-settlement-stream'), [{
-        type: 'assistant/message', seq: 0, time: 1, surfaceOp: 'append',
-        data: { turn: 1, step: 1, message, stream },
-      } as unknown as SessionEvent])).toThrow('invalid assistant stream')
-    }
+    expect(() => Session.create(SessionId('invalid-settlement-stream'), [{
+      type: 'assistant/message', seq: 0, time: 1, surfaceOp: 'append',
+      data: { turn: 1, step: 1, message, stream: 'not-an-array' },
+    } as unknown as SessionEvent])).toThrow('invalid settlement fields')
   })
 
   it('round-trips a non-empty reasoning effort and rejects invalid durable values', () => {
@@ -500,7 +502,7 @@ describe('Session', () => {
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('c1'),
+        callId: ToolCallId('c1'),
         content: [{ type: 'text', text: 'tool out' }],
         isError: false,
       }),
@@ -1000,7 +1002,7 @@ describe('Session', () => {
       id: SessionId('deep-restore'),
       createdAt: 1,
       isSeeded: false,
-    }, SessionLogOffset(0))).not.toThrow()
+    }, SessionLogOffset(0), 'detached')).not.toThrow()
 
     let current: unknown = event
     let frozenNodes = 0
@@ -1058,7 +1060,7 @@ describe('Session', () => {
       cwd: '/accepted',
       parentSession: SessionId('parent'),
       isSeeded: true,
-    }
+    } satisfies SessionHeader
 
     const session = Session.create(SessionId('header-owned'), [], input, SessionLogOffset(0))
     input.cwd = '/caller-mutated'
@@ -1078,6 +1080,21 @@ describe('Session', () => {
     expect(session.header.cwd).toBe('/accepted')
   })
 
+  it('migrates a supplied legacy-version header to the current format version', () => {
+    const session = Session.create(SessionId('header-legacy'), undefined, {
+      version: 0,
+      id: SessionId('header-legacy'),
+      createdAt: 123,
+      isSeeded: false,
+    } as unknown as SessionHeader, SessionLogOffset(0))
+    expect(session.header).toEqual({
+      version: SESSION_FORMAT_VERSION,
+      id: 'header-legacy',
+      createdAt: 123,
+      isSeeded: false,
+    })
+  })
+
   it('rejects an exotic, non-JSON, or mismatched supplied header', () => {
     class ExoticHeader implements SessionHeader {
       readonly version = SESSION_FORMAT_VERSION
@@ -1088,7 +1105,7 @@ describe('Session', () => {
 
     expect(() => Session.create(SessionId('header-invalid'), undefined, new ExoticHeader()))
       .toThrow(/not losslessly JSON-serializable/)
-    expect(() => Session.fromRestore(SessionId('header-invalid'), [], new ExoticHeader(), SessionLogOffset(0)))
+    expect(() => Session.fromRestore(SessionId('header-invalid'), [], new ExoticHeader(), SessionLogOffset(0), 'detached'))
       .toThrow(/not a plain JSON record/)
     for (const header of [null, 1, []]) {
       expect(() => Session.fromRestore(
@@ -1096,6 +1113,7 @@ describe('Session', () => {
         [],
         header as unknown as SessionHeader,
         SessionLogOffset(0),
+        'detached',
       )).toThrow(/not a plain JSON record/)
     }
     expect(() => Session.create(SessionId('header-invalid'), undefined, {
@@ -1235,7 +1253,7 @@ describe('SessionStore', () => {
     const seed = [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }] as unknown as SessionEvent[]
     const restored = ctx.sessions.prepare(SessionId('restored'), {
       seed,
-      seedSource: 'persistence',
+      eventState: 'detached',
       meta: { version: SESSION_FORMAT_VERSION, id: SessionId('restored'), createdAt: 1, isSeeded: false },
       inheritedEventCount: SessionLogOffset(0),
     })
@@ -1589,18 +1607,10 @@ describe('SessionStore', () => {
       }
     })
 
-    expect(() => session.append('assistant/message', {
-      turn: 1,
-      step: 1,
-      message: createMessage({
-        role: 'assistant',
-        content: [{ type: 'text', text: 'replacement' }],
-        source: {
-          kind: 'model',
-          ...{ provider: 'mock', model: 'mock' },
-        },
-      }),
-    }, {
+    expect(() => session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'replacement' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    }), {
       surfaceOp: { op: 'replace', startSeq: SessionSeq(2), endSeq: SessionSeq(2) },
       sourceEventSeqs: [SessionSeq(2)],
     })).toThrow('reject surface candidate')

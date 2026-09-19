@@ -18,6 +18,8 @@ None, as the loader only feeds [`ctx.typert`](../registry/README.md); consumers 
 
 No direct effect.
 
+**Runtime invariant:** No companion is published. The Loader entry lifecycle directly owns each exact registry disposer, and integration tests observe registration and removal.
+
 ## Known Limitations and Deferred Work
 
 - Discovery imports only the host face; client runtimes need a separate composition owner before equivalent discovery is added.

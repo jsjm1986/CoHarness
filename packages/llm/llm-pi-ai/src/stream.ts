@@ -8,9 +8,9 @@
  * @module dsh-llm-pi-ai/stream
  */
 
-import { CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, isContextWindowExceededError, isQuotaExceededError, LlmError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, isContextWindowExceededError, isQuotaExceededError, LlmError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
 import type { FinishReason, LlmFailure, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
-import { isContextOverflow } from '@earendil-works/pi-ai'
+import { isContextOverflow } from '@earendil-works/pi-ai/utils/overflow'
 import type { AssistantMessage, AssistantMessageEvent, ProviderResponse, Usage as PiUsage } from '@earendil-works/pi-ai'
 import { toPiReplayState } from './replay.ts'
 import { TextThinkingParser } from './text-thinking.ts'
@@ -291,8 +291,11 @@ export function mapStopReason(
  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
  * @param parseTextThinkingOrCallerSignal - legacy text-thinking switch or the
  *   canonical caller cancellation signal.
- * @param response - read the HTTP response metadata captured for this stream.
+ * @param response - read the HTTP response metadata captured for this stream
+ *   (legacy fourth argument); the canonical form passes the request model here.
  * @param callerSignal - caller cancellation signal for the legacy argument form.
+ * @param requestedModel - request model identity recorded for durable replay
+ *   (canonical fourth argument; legacy form uses the sixth).
  * @returns the harness chunks, ending with `usage` then `finish`; throws
  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event.
  */
@@ -300,18 +303,24 @@ export async function* toStreamChunks(
   events: AsyncIterable<AssistantMessageEvent>,
   contextWindow?: number,
   parseTextThinkingOrCallerSignal: boolean | AbortSignal = false,
-  response?: () => ProviderResponse | undefined,
+  responseOrRequestedModel?: (() => ProviderResponse | undefined) | string,
   callerSignal?: AbortSignal,
+  requestedModel?: string,
 ): AsyncGenerator<StreamChunk> {
-  // The upstream API uses the third argument for caller cancellation. Keep the
-  // CoHarness text-thinking probe and response hook available through the
-  // legacy boolean/fourth-argument form while accepting that canonical call.
+  // The upstream API uses the third argument for caller cancellation and the
+  // fourth for the request's durable model identity. Keep the CoHarness
+  // text-thinking probe and response hook available through the legacy
+  // boolean/fourth-argument form while accepting that canonical call.
   const parseTextThinking = typeof parseTextThinkingOrCallerSignal === 'boolean'
     ? parseTextThinkingOrCallerSignal
     : false
+  const response = typeof responseOrRequestedModel === 'function' ? responseOrRequestedModel : undefined
   const effectiveCallerSignal = typeof parseTextThinkingOrCallerSignal === 'boolean'
     ? callerSignal
     : parseTextThinkingOrCallerSignal
+  const effectiveRequestedModel = typeof responseOrRequestedModel === 'string'
+    ? responseOrRequestedModel
+    : requestedModel
   // pi-ai contentIndex ↔ our block index map is 1:1 until a text block is
   // actually split. A transformed block consumes one extra logical slot, and
   // later native indexes are shifted by that one slot. Ordinary text keeps its
@@ -501,7 +510,7 @@ export async function* toStreamChunks(
         yield {
           type: 'tool-call-delta',
           index,
-          id: CallId(known?.id ?? ''),
+          id: ToolCallId(known?.id ?? ''),
           ...known?.name !== undefined && known.name.length > 0 ? { name: known.name } : {},
           argumentsDelta: event.delta,
         }
@@ -513,7 +522,7 @@ export async function* toStreamChunks(
           index: indexOf(event.contentIndex),
           block: {
             type: 'tool-call',
-            id: CallId(event.toolCall.id),
+            id: ToolCallId(event.toolCall.id),
             name: event.toolCall.name,
             // pi-ai hands back the PARSED arguments; the harness vocabulary
             // keeps the raw string.
@@ -558,7 +567,7 @@ export async function* toStreamChunks(
           contextWindow,
           response?.(),
         ),
-        ...transformedTextThinking ? {} : { replayState: toPiReplayState(event.message) },
+        ...transformedTextThinking ? {} : { replayState: toPiReplayState(event.message, effectiveRequestedModel) },
       }
       return
     }

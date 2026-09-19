@@ -9,10 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../attachment/attachment"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
     },
     {
       "path": "../../llm/llm"
@@ -21,19 +27,16 @@
       "path": "../../llm/llm-deepseek"
     },
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
       "path": "../protocol"
     },
     {
       "path": "../../subagent/subagent"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

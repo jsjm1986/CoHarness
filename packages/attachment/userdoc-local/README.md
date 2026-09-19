@@ -28,6 +28,8 @@ Indirectly, through the host prompt-assembly consumer that turns a stored refere
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Upload-root containment is enforced inside each filesystem operation, where a bypassing caller cannot reach around it.
+
 ## Known Limitations and Deferred Work
 
 - **No business storage quota** — the default has no per-document or per-user byte quota. The provider still protects the host with a configurable minimum free-space reserve, concurrent-session limit, and cleanup of abandoned upload sessions.

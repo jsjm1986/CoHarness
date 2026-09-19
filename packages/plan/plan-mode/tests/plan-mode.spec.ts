@@ -1,21 +1,32 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { RUN_CODE_NAME, defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
+import { Session, SessionId, type SessionEvent, type UserMessage } from '@deepseek-ai/dsh-session'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import UserQuestionService, {
-  UserQuestionError, type AskUserQuestionRequest,
+  UserQuestionError, type AskUserQuestionAnswer, type AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
-import { CodeRuntime, type CodeRunRequest, type CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
-import PlanModeController, { EXIT_PLAN_MODE, foldPlanMode, resolveConfig } from '../src/index.ts'
+import { PtcRuntime, type PtcRunRequest, type PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { turnBoundaryProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
+import PlanModeController, { EXIT_PLAN_MODE, planProjectionDefinition, resolveConfig } from '../src/index.ts'
 import type { PlanModeConfig } from '../src/index.ts'
+import type { PlanUnitState } from '../src/types.ts'
 
 const TEST_PLAN_SECTION = 'Test plan mode instructions.'
 const PLAN_CONFIG = { section: TEST_PLAN_SECTION } satisfies PlanModeConfig
+
+interface QuestionAnswerer {
+  ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
+}
+
+function registerQuestionAnswerer(ctx: Context, answerer: QuestionAnswerer): () => void {
+  return ctx.on('user-questions/request', request => answerer.ask(request))
+}
 
 /**
  * Drives the REAL plugin: mounts `dsh-plan-mode` beside real `SystemPrompt` and
@@ -42,7 +53,7 @@ async function agentWithSession(
     },
   } as unknown as Agent & { session: Session }
   let scoped!: Context
-  await ctx.plugin(Object.assign(async (inner: Context) => { scoped = createScope(inner, agent).ctx }, {
+  await ctx.plugin(Object.assign((inner: Context) => { scoped = createScope(inner, agent).ctx }, {
     inject: ['tools'],
   }))
   ;(agent as { ctx?: Context }).ctx = scoped
@@ -60,13 +71,29 @@ async function agentWithSession(
   return agent
 }
 
-/** Assemble exactly as the loop does: the agent is both subject and scope. */
 function assembleFor(ctx: Context, agent: Agent) {
   return ctx.systemPrompt.assemble({ agent, scope: agent })
 }
 
+function foldPlanMode(events: readonly SessionEvent[], end = events.length): boolean {
+  let state: PlanUnitState = planProjectionDefinition.init()
+  let index = 0
+  for (const event of events) {
+    if (index >= end) break
+    index++
+    state = planProjectionDefinition.apply(state, event)
+  }
+  return state.active
+}
+
+async function mountProjectionSeam(ctx: Context): Promise<void> {
+  await ctx.plugin(SessionProjectionRegistry)
+  ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
+}
+
 async function setup(config: PlanModeConfig = PLAN_CONFIG): Promise<Context> {
   const ctx = new Context()
+  await mountProjectionSeam(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(PlanModeController, config)
@@ -132,7 +159,7 @@ function registerNamedTools(ctx: Context, names: string[]): void {
 }
 
 /** Assert the mapped PTC mode SDK includes the stable plan exit binding and test tools. */
-function expectPlanCodeSdkBindings(sdk: string): void {
+function expectPlanPtcSdkBindings(sdk: string): void {
   expect(sdk).toContain('interface ToolArgsMap {')
   expect(sdk).toContain('read: Record<string, JsonValue>;')
   expect(sdk).toContain('write: Record<string, JsonValue>;')
@@ -144,7 +171,7 @@ function expectPlanCodeSdkBindings(sdk: string): void {
 let callCounter = 0
 function execute(ctx: Context, name: string, agent?: Agent) {
   return ctx.tools.execute({
-    callId: CallId(`call-${++callCounter}`),
+    callId: ToolCallId(`call-${++callCounter}`),
     name,
     arguments: {},
     signal: new AbortController().signal,
@@ -195,6 +222,33 @@ describe('foldPlanMode', () => {
 })
 
 describe('ctx.planMode: get/set', () => {
+  it('does not activate without the required projection registry', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(PlanModeController, PLAN_CONFIG)
+    expect(ctx.get('planMode')).toBeUndefined()
+  })
+
+  it('fails when the required plan projection key is absent', async () => {
+    const ctx = await setup()
+    const agent = await agentWithSession(ctx, 'missing-plan-projection')
+    vi.spyOn(ctx.sessionProjections, 'stateOf').mockReturnValue(undefined)
+    expect(() => ctx.planMode.get(agent)).toThrow('plan-mode requires the plan session projection')
+  })
+
+  it('registers plan state directly but requires turnBoundary state', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    const agent = await agentWithSession(ctx, 'missing-plan-projection-keys')
+    const planMode = new PlanModeController(ctx, PLAN_CONFIG)
+    await new Promise(resolve => setImmediate(resolve))
+    expect(planMode.get(agent)).toEqual({ active: false })
+    expect(() => planMode.set(agent, true)).toThrow('plan-mode requires the turnBoundary session projection')
+  })
+
   it('reads the folded state', async () => {
     const ctx = await setup()
     const agent = await agentWithSession(ctx)
@@ -282,6 +336,7 @@ describe('the boundary flush', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await mountProjectionSeam(ctx)
     const fiber = await ctx.plugin(PlanModeController, PLAN_CONFIG)
     const agent = await agentWithSession(ctx)
     openTurn(agent.session)
@@ -434,6 +489,7 @@ describe('the soft layer', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await mountProjectionSeam(ctx)
     ctx.on('system-prompt/assemble', async (_assembly, _context, next) => {
       const final = await next()
       final.tools = [...final.tools, { name: 'added-later', description: 'added after next()', parameters: {} }]
@@ -450,17 +506,20 @@ describe('the soft layer', () => {
   })
 
   it('keeps run_code the only wire tool in plan mode under the registry PTC mode; the SDK gains the exit binding', async () => {
-    // Minimal scriptable runtime: the SDK section resolves ctx.codeRuntime at
+    // Minimal scriptable runtime: the SDK section resolves ctx.ptcRuntime at
     // assembly time (the ptc.spec fake's shape).
-    class FakeRuntime extends CodeRuntime {
+    class FakeRuntime extends PtcRuntime {
+      resolve(request: import('@deepseek-ai/dsh-ptc-runtime').PtcRunRequest): import('@deepseek-ai/dsh-ptc-runtime').PtcRunSpec { return { ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: request.timeoutMs ?? 120_000 } }
+
       readonly language = 'typescript'
       readonly isolation = 'fake'
-      run(_request: CodeRunRequest): Promise<CodeRunResult> { return Promise.resolve({ logs: [] }) }
+      run(_request: PtcRunRequest): Promise<PtcRunResult> { return Promise.resolve({ logs: [] }) }
     }
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime, { mode: 'ptc' })
     await ctx.plugin(FakeRuntime)
+    await mountProjectionSeam(ctx)
     await ctx.plugin(PlanModeController, PLAN_CONFIG)
     registerNamedTools(ctx, ['read', 'write'])
     const agent = await agentWithSession(ctx, 'agent-1', { active: true })
@@ -469,19 +528,22 @@ describe('the soft layer', () => {
     // The SDK documents the full binding set plus the exit; plan mode never
     // prunes capabilities and restrains through guidance alone.
     const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
-    expectPlanCodeSdkBindings(sdk)
+    expectPlanPtcSdkBindings(sdk)
   })
 
   it('keeps native wire schemas and the SDK in step under mode both', async () => {
-    class FakeRuntime extends CodeRuntime {
+    class FakeRuntime extends PtcRuntime {
+      resolve(request: import('@deepseek-ai/dsh-ptc-runtime').PtcRunRequest): import('@deepseek-ai/dsh-ptc-runtime').PtcRunSpec { return { ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: request.timeoutMs ?? 120_000 } }
+
       readonly language = 'typescript'
       readonly isolation = 'fake'
-      run(_request: CodeRunRequest): Promise<CodeRunResult> { return Promise.resolve({ logs: [] }) }
+      run(_request: PtcRunRequest): Promise<PtcRunResult> { return Promise.resolve({ logs: [] }) }
     }
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime, { mode: 'both' })
     await ctx.plugin(FakeRuntime)
+    await mountProjectionSeam(ctx)
     await ctx.plugin(PlanModeController, PLAN_CONFIG)
     registerNamedTools(ctx, ['read', 'write'])
     const agent = await agentWithSession(ctx, 'agent-1', { active: true })
@@ -490,24 +552,27 @@ describe('the soft layer', () => {
     // is present on the wire AND in the SDK alongside the untouched toolset.
     expect(assembly.tools.map(tool => tool.name).sort()).toEqual(['exit_plan_mode', 'read', 'run_code', 'write'])
     const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
-    expectPlanCodeSdkBindings(sdk)
+    expectPlanPtcSdkBindings(sdk)
   })
 
   it('keeps the PTC mode SDK byte-identical across mode switches', async () => {
-    class FakeRuntime extends CodeRuntime {
+    class FakeRuntime extends PtcRuntime {
+      resolve(request: import('@deepseek-ai/dsh-ptc-runtime').PtcRunRequest): import('@deepseek-ai/dsh-ptc-runtime').PtcRunSpec { return { ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: request.timeoutMs ?? 120_000 } }
+
       readonly language = 'typescript'
       readonly isolation = 'fake'
-      run(_request: CodeRunRequest): Promise<CodeRunResult> { return Promise.resolve({ logs: [] }) }
+      run(_request: PtcRunRequest): Promise<PtcRunResult> { return Promise.resolve({ logs: [] }) }
     }
     const withPlanMode = new Context()
     await withPlanMode.plugin(SystemPrompt)
     await withPlanMode.plugin(ToolRuntime, { mode: 'ptc' })
     await withPlanMode.plugin(FakeRuntime)
+    await mountProjectionSeam(withPlanMode)
     await withPlanMode.plugin(PlanModeController, PLAN_CONFIG)
     registerNamedTools(withPlanMode, ['read', 'write'])
     const agent = await agentWithSession(withPlanMode)
     const defaultSdk = (await assembleFor(withPlanMode, agent)).sections.find(section => section.name === 'tools:sdk')?.text ?? ''
-    expectPlanCodeSdkBindings(defaultSdk)
+    expectPlanPtcSdkBindings(defaultSdk)
     agent.session.append('plan/mode', { active: true })
     const planSdk = (await assembleFor(withPlanMode, agent)).sections.find(section => section.name === 'tools:sdk')?.text ?? ''
     expect(planSdk).toBe(defaultSdk)
@@ -561,7 +626,7 @@ describe('/plan', () => {
     const plainSteer = vi.fn()
     ;(plainAgent as unknown as { steer: typeof plainSteer }).steer = plainSteer
     expect(ctx.commands.list(plainAgent)).toEqual([
-      { definitionId: '@deepseek-ai/dsh-plan-mode', name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', images: true } },
+      { definitionId: '@deepseek-ai/dsh-plan-mode', name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', attachments: true } },
     ])
 
     const signal = new AbortController().signal
@@ -645,7 +710,7 @@ describe('/plan', () => {
     expect(foldPlanMode(agent.session.snapshotEvents())).toBe(false)
   })
 
-  it('steers image attachments with or without text and refuses them on /plan off', async () => {
+  it('steers mixed attachments with or without text and refuses them on /plan off', async () => {
     const ctx = await setup()
     await ctx.plugin(CommandRuntime)
     await new Promise(resolve => setImmediate(resolve))
@@ -668,21 +733,34 @@ describe('/plan', () => {
         for (const input of inputs) refs.push(await saveImage(input))
         return refs
       },
+      saveFile(input: { data: Uint8Array; name?: string }) {
+        saved += 1
+        return Promise.resolve({
+          attachmentId: `att-${saved}`, bytes: input.data.byteLength, name: input.name ?? 'attachment',
+        })
+      },
     })
+    ctx.commands.registerFileReceiptResolver((agent, receiptId) => receiptId === 'receipt-notes'
+      ? { attachmentId: `file-${agent.id}` as never, bytes: 5, name: 'notes.txt' }
+      : undefined)
     const signal = new AbortController().signal
-    const images = [{ mediaType: 'image/png' as const, data: 'AAAA' }]
+    const attachments = [
+      { type: 'image' as const, mediaType: 'image/png' as const, data: 'AAAA', name: 'diagram.png' },
+      { type: 'file' as const, receiptId: 'receipt-notes' },
+    ]
 
     const agent = await agentWithSession(ctx, 'imaged-plan-command')
     openTurn(agent.session)
     const steer = vi.fn()
     ;(agent as unknown as { steer: typeof steer }).steer = steer
-    const withMessage = await ctx.commands.execute(agent, '/plan sketch the layout', images, signal)
+    const withMessage = await ctx.commands.execute(agent, '/plan sketch the layout', attachments, signal)
     expect(withMessage?.result.kind).toBe('success')
     expect(steer).toHaveBeenCalledExactlyOnceWith({
       id: expect.any(String) as unknown,
       role: 'user',
       content: [
         { type: 'image', attachment: expect.objectContaining({ attachmentId: 'att-1' }) as unknown },
+        { type: 'file', attachment: expect.objectContaining({ attachmentId: 'file-imaged-plan-command', name: 'notes.txt' }) as unknown },
         { type: 'text', text: 'sketch the layout' },
       ],
       source: { kind: 'user' },
@@ -692,12 +770,15 @@ describe('/plan', () => {
     openTurn(bareAgent.session)
     const bareSteer = vi.fn()
     ;(bareAgent as unknown as { steer: typeof bareSteer }).steer = bareSteer
-    expect((await ctx.commands.execute(bareAgent, '/plan', images, signal))?.result)
+    expect((await ctx.commands.execute(bareAgent, '/plan', attachments, signal))?.result)
       .toEqual({ kind: 'success', text: 'Entering plan mode (applies from the next step). Use /plan off to leave.' })
     expect(bareSteer).toHaveBeenCalledExactlyOnceWith({
       id: expect.any(String) as unknown,
       role: 'user',
-      content: [{ type: 'image', attachment: expect.objectContaining({ attachmentId: 'att-2' }) as unknown }],
+      content: [
+        { type: 'image', attachment: expect.objectContaining({ attachmentId: 'att-2' }) as unknown },
+        { type: 'file', attachment: expect.objectContaining({ attachmentId: 'file-imaged-bare-plan-command', name: 'notes.txt' }) as unknown },
+      ],
       source: { kind: 'user' },
     })
     expect(ctx.planMode.get(bareAgent)).toEqual({ active: false, pending: true })
@@ -705,8 +786,8 @@ describe('/plan', () => {
     const activeAgent = await agentWithSession(ctx, 'imaged-off-plan-command', { active: true })
     const offSteer = vi.fn()
     ;(activeAgent as unknown as { steer: typeof offSteer }).steer = offSteer
-    expect((await ctx.commands.execute(activeAgent, '/plan off', images, signal))?.result)
-      .toEqual({ kind: 'error', text: 'Image attachments cannot accompany /plan off.' })
+    expect((await ctx.commands.execute(activeAgent, '/plan off', attachments, signal))?.result)
+      .toEqual({ kind: 'error', text: 'Attachments cannot accompany /plan off.' })
     expect(offSteer).not.toHaveBeenCalled()
     expect(ctx.planMode.get(activeAgent)).toEqual({ active: true })
   })
@@ -716,6 +797,7 @@ describe('/plan', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(CommandRuntime)
+    await mountProjectionSeam(ctx)
     const fiber = await ctx.plugin(PlanModeController, PLAN_CONFIG)
     await new Promise(resolve => setImmediate(resolve))
     const agent = await agentWithSession(ctx)
@@ -734,7 +816,7 @@ describe('exit_plan_mode', () => {
     await ctx.plugin(UserQuestionService)
     const asked: AskUserQuestionRequest[] = []
     if (answer !== undefined) {
-      ctx.userQuestions.registerProvider({
+      registerQuestionAnswerer(ctx, {
         ask: (request) => {
           asked.push(request)
           return Promise.resolve({ answers: [{ id: 'plan-review', ...answer }] })
@@ -747,7 +829,7 @@ describe('exit_plan_mode', () => {
 
   function callExit(ctx: Context, agent: Agent | undefined, plan = '# The plan\n\ndo things') {
     return ctx.tools.execute({
-      callId: CallId(`call-exit-${++callCounter}`),
+      callId: ToolCallId(`call-exit-${++callCounter}`),
       name: EXIT_PLAN_MODE,
       arguments: { plan },
       signal: new AbortController().signal,
@@ -804,7 +886,7 @@ describe('exit_plan_mode', () => {
     const { ctx, agent } = await setupWithReview()
     const result = await callExit(ctx, agent)
     expect(result.isError).toBe(true)
-    expect(result.content).toEqual([{ type: 'text', text: 'Error: no user-questions provider is registered' }])
+    expect(result.content).toEqual([{ type: 'text', text: 'Error: no user-questions answerer accepted the request' }])
     expect(foldPlanMode(agent.session.snapshotEvents())).toBe(true)
   })
 
@@ -813,7 +895,7 @@ describe('exit_plan_mode', () => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(UserQuestionService)
     const ask = vi.fn(async () => ({ answers: [{ id: 'plan-review', selected: ['Approve'] }] }))
-    ctx.userQuestions.registerProvider({ ask })
+    registerQuestionAnswerer(ctx, { ask })
     const root = await agentWithSession(ctx, 'review-root')
     const child = await agentWithSession(ctx, 'review-child', { active: true, owner: root })
 
@@ -849,10 +931,12 @@ describe('exit_plan_mode', () => {
 
   it('carries the exact plan through a PTC mode review and logs the nested dispatch', async () => {
     const plan = '# PTC mode plan\n\nUse the existing seam.'
-    class ExitRuntime extends CodeRuntime {
+    class ExitRuntime extends PtcRuntime {
+      resolve(request: import('@deepseek-ai/dsh-ptc-runtime').PtcRunRequest): import('@deepseek-ai/dsh-ptc-runtime').PtcRunSpec { return { ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: request.timeoutMs ?? 120_000 } }
+
       readonly language = 'typescript'
       readonly isolation = 'fake'
-      async run(request: CodeRunRequest): Promise<CodeRunResult> {
+      async run(request: PtcRunRequest): Promise<PtcRunResult> {
         const exit = request.bindings[0]?.functions[EXIT_PLAN_MODE]
         if (exit === undefined) throw new Error('missing exit_plan_mode binding')
         return { logs: [], value: await exit({ plan }) }
@@ -862,11 +946,12 @@ describe('exit_plan_mode', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime, { mode: 'ptc' })
     await ctx.plugin(ExitRuntime)
+    await mountProjectionSeam(ctx)
     await ctx.plugin(PlanModeController, PLAN_CONFIG)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(UserQuestionService)
     const asked: AskUserQuestionRequest[] = []
-    ctx.userQuestions.registerProvider({
+    registerQuestionAnswerer(ctx, {
       ask: (request) => {
         asked.push(request)
         return Promise.resolve({ answers: [{ id: 'plan-review', selected: ['Approve'] }] })
@@ -875,7 +960,7 @@ describe('exit_plan_mode', () => {
     const agent = await agentWithSession(ctx, 'ptc-exit', { active: true })
 
     const result = await ctx.tools.execute({
-      callId: CallId(`call-exit-${++callCounter}`),
+      callId: ToolCallId(`call-exit-${++callCounter}`),
       name: RUN_CODE_NAME,
       arguments: { code: `return await tools.${EXIT_PLAN_MODE}({ plan: ${JSON.stringify(plan)} })`, description: 'Submit the plan for review' },
       signal: new AbortController().signal,
@@ -965,7 +1050,7 @@ describe('exit_plan_mode', () => {
 
   it('treats duplicate review answer items as non-consent', async () => {
     const { ctx, agent } = await setupWithReview()
-    ctx.userQuestions.registerProvider({
+    registerQuestionAnswerer(ctx, {
       ask: () => Promise.resolve({ answers: [
         { id: 'plan-review', selected: ['Approve'] },
         { id: 'plan-review', selected: ['Keep planning'] },
@@ -979,7 +1064,7 @@ describe('exit_plan_mode', () => {
 
   it('a missing answer item reads as keep-planning', async () => {
     const { ctx, agent } = await setupWithReview()
-    ctx.userQuestions.registerProvider({ ask: () => Promise.resolve({ answers: [] }) })
+    registerQuestionAnswerer(ctx, { ask: () => Promise.resolve({ answers: [] }) })
     const result = await callExit(ctx, agent)
     expect(result.isError).toBe(true)
     expect(result.content).toEqual([{ type: 'text', text: 'Error: The user chose to keep planning; revise the plan and present it again.' }])
@@ -989,7 +1074,7 @@ describe('exit_plan_mode', () => {
     const { ctx, agent, asked } = await setupWithReview({ selected: ['Approve'] })
     await callExit(ctx, agent)
     const question = asked[0]?.questions[0]
-    expect(question?.intent).toEqual({ kind: 'plan-review', approve: 'Approve' })
+    expect(question?.intent).toEqual({ kind: 'plan-review', approve: 'Approve', callId: `call-exit-${callCounter}` })
     // The named label is one this same question offers, so a UI honouring the
     // intent answers a choice this tool accepts.
     expect(question?.options?.map(option => option.label)).toContain(question?.intent?.approve)
@@ -997,9 +1082,11 @@ describe('exit_plan_mode', () => {
 
   it('reads a dismissed review as the user taking the turn back, not as a failure', async () => {
     const { ctx, agent } = await setupWithReview()
-    ctx.userQuestions.registerProvider({
-      ask: () => Promise.reject(new UserQuestionError(
-        'the user cancelled ask_user_question', 'ASK_CANCELLED')),
+    registerQuestionAnswerer(ctx, {
+      ask: () => Promise.reject(Object.assign(
+        new Error('the user cancelled ask_user_question'),
+        { name: 'UserQuestionError', code: 'ASK_CANCELLED' },
+      )),
     })
     const result = await callExit(ctx, agent)
     expect(result.isError).toBe(true)
@@ -1009,7 +1096,7 @@ describe('exit_plan_mode', () => {
 
   it('leaves every other review failure its own message', async () => {
     const { ctx, agent } = await setupWithReview()
-    ctx.userQuestions.registerProvider({
+    registerQuestionAnswerer(ctx, {
       ask: () => Promise.reject(new UserQuestionError(
         'ask_user_question was aborted before the user answered', 'ASK_ABORTED')),
     })
@@ -1023,7 +1110,7 @@ describe('exit_plan_mode', () => {
     const { ctx, agent, asked } = await setupWithReview({ selected: ['Approve'] })
     const controller = new AbortController()
     const result = await ctx.tools.execute({
-      callId: CallId(`call-exit-${++callCounter}`),
+      callId: ToolCallId(`call-exit-${++callCounter}`),
       name: EXIT_PLAN_MODE,
       arguments: { plan: '# P' },
       agent,
@@ -1037,11 +1124,12 @@ describe('exit_plan_mode', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await mountProjectionSeam(ctx)
     const fiber = await ctx.plugin(PlanModeController, PLAN_CONFIG)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(UserQuestionService)
     let answer!: (value: { answers: { id: string; selected: string[] }[] }) => void
-    ctx.userQuestions.registerProvider({
+    registerQuestionAnswerer(ctx, {
       ask: () => new Promise((resolve) => { answer = resolve }),
     })
     const agent = await agentWithSession(ctx, 'agent-1', { active: true })
@@ -1060,7 +1148,7 @@ describe('exit_plan_mode', () => {
 
   it('a throwing provider surfaces as the corrective isError and the mode stays plan', async () => {
     const { ctx, agent } = await setupWithReview()
-    ctx.userQuestions.registerProvider({ ask: () => { throw new Error('review aborted') } })
+    registerQuestionAnswerer(ctx, { ask: () => { throw new Error('review aborted') } })
     const result = await callExit(ctx, agent)
     expect(result.isError).toBe(true)
     expect(result.content).toEqual([{ type: 'text', text: 'Error: review aborted' }])
@@ -1101,6 +1189,7 @@ describe('HMR disposal', () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await mountProjectionSeam(ctx)
     const fiber = await ctx.plugin(PlanModeController, PLAN_CONFIG)
     const agent = await agentWithSession(ctx, 'disposed-recovery')
     openTurn(agent.session)

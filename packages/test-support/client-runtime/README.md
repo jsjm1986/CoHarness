@@ -18,6 +18,8 @@ None, as this package is browser-side test infrastructure; nothing here reaches 
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This test-support package owns no production event stream or mutable data — it assembles the runtime SlotRegistry and renderer (whose packages own their invariants) around test doubles; its own behavior is exercised by its package tests.
+
 ## Known Limitations and Deferred Work
 
 - **Consumed through repository source aliases only.** Specs resolve the package through tsconfig `paths` to `src`; the built `lib/` artifact re-exports `@deepseek-ai/dsh-client-runtime/client`, whose bundle is a browser loader script with no Node ESM exports, so `lib/index.js` is not importable under plain Node. Every consumer is an in-repository Vitest suite; there is no Node-compatible runtime entry.

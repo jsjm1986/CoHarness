@@ -9,28 +9,31 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
       "path": "../app-boot"
     },
     {
-      "path": "../../util/atomic-write"
+      "path": "../hmr"
     },
     {
       "path": "../../core/agent"
     },
     {
+      "path": "../../core/tools"
+    },
+    {
       "path": "../../host/plugin-inventory"
     },
     {
+      "path": "../../interaction/user-approval"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../sandbox/sandbox"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
     },
     {
       "path": "../../subprocess/subprocess"
@@ -39,31 +42,28 @@
       "path": "../../typert/protocol"
     },
     {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../util/values"
-    },
-    {
-      "path": "../hmr"
-    },
-    {
-      "path": "../../../vendor/timer"
+      "path": "../../util/atomic-write"
     },
     {
       "path": "../../util/brand"
     },
     {
-      "path": "../../sandbox/sandbox-policy"
+      "path": "../../util/values"
     },
     {
-      "path": "../../sandbox/sandbox"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../interaction/user-approval"
+      "path": "../../../vendor/include"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../../vendor/timer"
     }
   ]
 }

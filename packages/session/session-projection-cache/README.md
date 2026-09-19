@@ -57,6 +57,8 @@ None, as the cache only persists and restores host-side read models of already-l
 
 None; the cache never assembles or sends provider requests.
 
+**Runtime invariant:** No companion is published. The cache's correctness relation (a stored row equals the registry fold at its `seq` watermark) is only checkable by re-running the fold over the persisted log — duplicating the implementation rather than detecting drift — and its staleness is by design (fail-soft writes). The durable boundary is schema-validated by the cache's own zod parse on every read, and the read ladder's version/watermark guards are proven by the package spec.
+
 ## Known Limitations and Deferred Work
 
 - **No eviction or retention surface** — records accumulate per session; pruning stored checkpoints is out-of-band maintenance, same stance as session persistence itself.

@@ -26,6 +26,8 @@ None, as this plugin arranges existing conversation views and contributes no pro
 
 None; the plugin does not assemble or send a model request.
 
+**Runtime invariant:** No companion is published. Ownership and lifecycle are enforced by Cordis slots and the viewport capability.
+
 ## Known Limitations and Deferred Work
 
 - The workbench is limited to four root Sessions and does not yet expose nested split trees or cross-session context sharing.

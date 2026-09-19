@@ -9,22 +9,22 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../boot/app-boot"
+    },
+    {
+      "path": "../registry"
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
     },
     {
       "path": "../../../vendor/loader"
     },
     {
       "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../registry"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

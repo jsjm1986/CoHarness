@@ -86,6 +86,8 @@ Listing results are bounded by `maxListResults` and `maxOutputBytes`. Read resul
 
 Each call and result is an append-only tool exchange after the reusable prompt prefix. A later list or read does not invalidate earlier KV-cache entries.
 
+**Runtime invariant:** No companion is published. The package owns only tool and prompt registrations; execution results and storage containment are validated by their owning seams.
+
 ## Known Limitations and Deferred Work
 
 - The Consumer exposes the current runtime's personal store only; reading a private document from a shared project runtime requires a separate authenticated Gateway Provider and an explicit privacy policy.

@@ -73,6 +73,8 @@ Zero. No request, result, rating, note, timestamp, or failure from this package 
 
 Independent. Listing or mutating message feedback does not touch a model request prefix and cannot invalidate an otherwise reusable provider cache entry.
 
+**Runtime invariant:** No companion is published. The service derives feedback directly from validated canonical events and owns no independently mutable projection.
+
 ## Known Limitations and Deferred Work
 
 - **Client aggregate and UI are absent** — the Host Remote contract ships, but the Client Remote aggregate contribution and any UI consumer are separately owned and deferred.

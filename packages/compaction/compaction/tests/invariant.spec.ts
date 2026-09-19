@@ -58,7 +58,11 @@ describe('compaction invariants', () => {
       content: [{ type: 'text', text: 'checkpoint' }],
       source: compactCheckpointSource(TEST_COMPACTION_ID),
     }), {
-      surfaceOp: { op: 'replace', startSeq: summaryData.shadowedRange.start, endSeq: summaryData.shadowedRange.end },
+      surfaceOp: {
+        op: 'replace',
+        startSeq: summaryData.shadowedRange.start,
+        endSeq: summaryData.shadowedRange.end,
+      },
       sourceEventSeqs: summaryData.shadowedSeqs,
     })
     success.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 1 })
@@ -330,7 +334,7 @@ describe('compaction invariants', () => {
     })).toThrow(/compaction checkpoint id .* does not match compaction\/start id/)
   })
 
-  it('requires checkpoint provenance to name an open transaction', async () => {
+  it('requires a checkpoint source to name an open transaction', async () => {
     const ctx = await setup()
     const withoutStart = ctx.sessions.create()
     const original = withoutStart.append('user/message', createUserMessage({

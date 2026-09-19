@@ -139,7 +139,7 @@ describe('organization model discovery', () => {
       baseURL: 'https://gateway.example.test/openai/v1/',
       api: 'openai-completions',
       apiKey: 'openai-key',
-    })).resolves.toEqual([{ id: 'gpt-acme', contextWindow: 32_768 }])
+    })).resolves.toEqual([{ id: 'gpt-acme', name: 'gpt-acme', contextWindow: 32_768 }])
 
     expect(requests).toHaveLength(1)
     expect(requests[0]?.url).toBe('https://gateway.example.test/openai/v1/models')
@@ -164,7 +164,7 @@ describe('organization model discovery', () => {
     })).resolves.toEqual([{ id: 'claude-acme', name: 'Claude Acme' }])
 
     expect(requests).toHaveLength(1)
-    expect(requests[0]?.url).toBe('https://gateway.example.test/v1/models')
+    expect(requests[0]?.url).toBe('https://gateway.example.test/v1/models?limit=1000')
     expect(requests[0]?.headers.get('x-api-key')).toBe('anthropic-key')
     expect(requests[0]?.headers.get('anthropic-version')).toBe('2023-06-01')
     expect(requests[0]?.headers.get('authorization')).toBeNull()
@@ -185,6 +185,6 @@ describe('organization model discovery', () => {
       api: 'anthropic-messages',
     })
 
-    expect(urls).toEqual(['https://gateway.example.test/v1/models'])
+    expect(urls).toEqual(['https://gateway.example.test/v1/models?limit=1000'])
   })
 })

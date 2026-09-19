@@ -32,6 +32,8 @@ None, as this package only stores and transfers files; a separate session consum
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Connection owns registration disposal; real-composition coverage probes removal.
+
 ## Known Limitations and Deferred Work
 
 - **No authentication of its own** — the route inherits Connection's reachability and same-origin policy; deployments that expose the Web server beyond loopback must provide authentication at the gateway.

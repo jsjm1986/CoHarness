@@ -12,3 +12,5 @@
 command feedback 评价仅写入日志：它绝不会进入模型上下文或派生历史。挂载后，[`dsh-session-telemetry-otel`](../session/session-telemetry-otel) 会观察 `feedback/record`，以释放待处理的遥测前缀，或在遥测已禁用时警告反馈将留在本地；采集本身与该策略相互独立。
 
 message feedback 不是 Session 事件或投影。它只保留在 storage-domain 伴随记录中，不触发任何遥测交接。服务随附 Host Remote 契约；客户端 Remote 聚合挂载与 UI 消费方由各自边界负责，并保持延后。
+
+[feedback 子系统页](../../docs/subsystems/feedback.zh.md)负责消息反馈类型、服务契约与 Web 消费方。

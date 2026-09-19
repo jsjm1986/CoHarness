@@ -32,6 +32,8 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 无直接影响；被调用的业务服务负责产生任何模型可见结果。
 
+**运行时不变式：** 不发布伴生入口。Host 调用会重新读取权威的 Cordis 与 Typert 状态，Client 方法、描述符与 `$on` 订阅的变更则统一归属同一个 effect。
+
 ## 已知限制与延期工作
 
 - Connection 适配器将普通分发故障和业务异常映射为 RPC 的 `internal` 代码，且不附带详细信息；`TypertLookupFailure` 携带的 lookup 策略错误会原样返回。结构化的 `TypertGatewayError` 类别仅供同进程调用方使用。

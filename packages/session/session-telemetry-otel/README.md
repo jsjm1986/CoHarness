@@ -49,6 +49,8 @@ None, as the backend only forwards the seam's redacted records into the OTel SDK
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Mode selection changes capture handoff, SDK setup, and local diagnostics without mutating session or service state an independent companion can compare. Export remains inside the SDK past the backend boundary.
+
 ## Known Limitations and Deferred Work
 
 - **Upstream experimental tree** — `@opentelemetry/sdk-logs` is still published from the upstream experimental tree; SDK API churn lands here and only here — the seam contract does not move.

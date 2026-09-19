@@ -121,7 +121,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     oneShotId = sessionId('recorded-one-shot')
     const oneShotDurationMs = 192 * 24 * 60 * 60 * 1_000
     const oneShotAt = Date.now() - oneShotDurationMs
-    await scaffold.ctx.sessionPersistence.create({
+    await scaffold.ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: oneShotId,
       createdAt: oneShotAt,
@@ -168,7 +168,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     await scaffold.ctx.sessionProjectionCache.coldSnapshot(oneShotId)
     grandchildId = sessionId('recorded-grandchild')
     const authoredAt = Date.now()
-    await scaffold.ctx.sessionPersistence.create({
+    await scaffold.ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: grandchildId,
       createdAt: authoredAt,

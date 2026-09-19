@@ -56,6 +56,7 @@ const IMAGE_OFFLOAD_CONFIG = fileURLToPath(new URL('./fixtures/image-offload.cor
 const IMAGE_TEXT_ROUTE_CONFIG = fileURLToPath(new URL('../image-text-route.cordis.yml', import.meta.url))
 const PTY_CONFIG = fileURLToPath(new URL('../pty.cordis.yml', import.meta.url))
 const DEPTH_TWO_CONFIG = fileURLToPath(new URL('../depth-two.cordis.yml', import.meta.url))
+const ACTIVATION_LIMIT_CONFIG = fileURLToPath(new URL('../subagent-activation-limit.cordis.yml', import.meta.url))
 const CHILD_QUESTION_CONFIG = fileURLToPath(new URL('../child-question.cordis.yml', import.meta.url))
 const SESSION_SANDBOX_ROOT_CONFIG = fileURLToPath(new URL('../session-sandbox-root.cordis.yml', import.meta.url))
 const RETRY_CONFIG = fileURLToPath(new URL('../retry.cordis.yml', import.meta.url))
@@ -566,6 +567,16 @@ const SCENARIOS: Scenario[] = [
     overridden: true,
     configPath: DEPTH_TWO_CONFIG,
   },
+  // Authored keyless replay: one live continuable child fills the configured
+  // one-slot pool, so the second continuable start is refused by the tool while
+  // the first stays resident.
+  {
+    name: 'subagent-activation-limit',
+    hasModelTurn: true,
+    recorded: false,
+    overridden: true,
+    configPath: ACTIVATION_LIMIT_CONFIG,
+  },
   // Authored keyless replay through the assembled app: a one-shot child calls
   // the real ask_user_question tool, the runtime-ownership guard rejects before
   // the tripwire provider, and the child carries the unresolved decision in its
@@ -692,6 +703,11 @@ const SCENARIOS: Scenario[] = [
     recorded: true,
     headerClass: 'sandbox',
     env: { DSH_PERMISSION_MODE: 'workspace-write' },
+  },
+  {
+    name: 'fs-same-mode',
+    hasModelTurn: true,
+    recorded: false,
   },
   // Unlike ordinary snapshots, this session cwd is outside the platform temp
   // roots that workspace-write always grants. The overlay points the
@@ -927,7 +943,7 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
       || cloned.type === 'tool/result') {
       delete cloned.data?.message?.id
     }
-    // The decoded assistant/chunk events above retain the sequence under test;
+    // The migrated durable events above retain the sequence under test;
     // settlement streams additionally carry the replay run's volatile clocks.
     if (cloned.type === 'assistant/message' || cloned.type === 'assistant/attempt') delete cloned.data?.stream
     if (cloned.type === 'hook/result') delete cloned.data?.durationMs

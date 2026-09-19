@@ -17,6 +17,8 @@ None, as the settings domain base serves browser preference storage and slot dec
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. A presentation shell projecting the settings.section ledger into navigation — it emits no cordis events and owns no cross-plugin mutable relation; slot declaration/registration conflicts already fail loud in the slot core at load time.
+
 ## Known Limitations and Deferred Work
 
 - **A failed or refused settings describe stays unavailable** — the binder always uses Host persistence; a throw or non-ok `settings.describe` publishes `unavailable` so plugin cards hide instead of hanging on `loading`. The Host privileged-method fence still requires a loopback `Host` header; a gateway that rewrites `Host`/`Origin` to the instance loopback is what makes a public page succeed. `settings.openDocument` remains a loopback-page action because it opens a file on the host desktop.

@@ -116,7 +116,7 @@
       "localOwner": "PTC, workflow, shell, subprocess, sandbox, jobs and directory authorization",
       "commitScope": [
         "packages/ptc-runtime",
-        "packages/code-runtime",
+        "packages/ptc-runtime",
         "packages/workflow",
         "packages/shell",
         "packages/subprocess",
@@ -399,7 +399,7 @@
     },
     "hostPrerequisites": [
       "file descriptor limit sufficient for native watchers (EMFILE)",
-      "CPython >= 3.10 for code-runtime-python",
+      "CPython >= 3.10 for ptc-runtime-python",
       "per-platform capability checks recorded in Phase 8"
     ],
     "verificationLedger": {

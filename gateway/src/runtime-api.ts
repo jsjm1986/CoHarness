@@ -6,6 +6,7 @@ import {
   isSessionSurfaceOp,
 } from '@deepseek-ai/dsh-session-format/surface'
 import { CollaborationDeniedError } from './collaboration.ts'
+import { DesktopCoordinationError, type DesktopCoordinator } from './desktop-coordinator.ts'
 import type { RuntimeTarget } from './instances.ts'
 import {
   PRINCIPAL_HEADER,
@@ -114,6 +115,8 @@ interface RuntimeApiDependencies {
   documentCatalogAuthorize?: RuntimeDocumentCatalogAuthorizeHandler
   documentCatalogOverview?: RuntimeDocumentCatalogOverviewHandler
   documentCatalogHistory?: RuntimeDocumentCatalogHistoryHandler
+  /** Optional interactive-desktop coordinator; absent where desktop driving is disabled. */
+  desktops?: DesktopCoordinator
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -1471,6 +1474,53 @@ export function createRuntimeApiHandler(
         return true
       }
 
+      if (pathname.startsWith('/internal/runtime/desktop/') && req.method === 'POST') {
+        if (deps.desktops === undefined) {
+          send(res, 503, { error: 'desktop-coordination-unavailable' })
+          return true
+        }
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        const payload = record(JSON.parse(body))
+        const action = pathname.slice('/internal/runtime/desktop/'.length)
+        if (action === 'acquire' || action === 'status' || action === 'cancel') {
+          if (typeof payload?.node !== 'string' || payload.node.length === 0 || payload.node.length > 256
+            || typeof payload.desktop !== 'string' || payload.desktop.length === 0 || payload.desktop.length > 256
+            || typeof payload.requestId !== 'string' || payload.requestId.length === 0 || payload.requestId.length > 256
+            || (payload.runId !== undefined && (typeof payload.runId !== 'string' || payload.runId.length > 256))) {
+            throw new Error('invalid desktop request')
+          }
+          const resource = { node: payload.node, desktop: payload.desktop }
+          if (action === 'acquire') {
+            send(res, 200, await deps.desktops.acquire(claims, {
+              ...resource,
+              requestId: payload.requestId,
+              ...(payload.runId === undefined ? {} : { runId: payload.runId }),
+            }))
+          } else if (action === 'status') {
+            send(res, 200, await deps.desktops.status(claims, { ...resource, requestId: payload.requestId }))
+          } else {
+            send(res, 200, { cancelled: await deps.desktops.cancel(claims, { ...resource, requestId: payload.requestId }) })
+          }
+          return true
+        }
+        if (action === 'heartbeat' || action === 'release' || action === 'confirm-stopped') {
+          if (typeof payload?.grantId !== 'string' || payload.grantId.length === 0 || payload.grantId.length > 256) {
+            throw new Error('invalid desktop request')
+          }
+          if (action === 'heartbeat') {
+            send(res, 200, { status: await deps.desktops.heartbeat(claims, payload.grantId) })
+          } else if (action === 'release') {
+            await deps.desktops.release(claims, payload.grantId)
+            send(res, 200, { released: true })
+          } else {
+            await deps.desktops.confirmStopped(claims, payload.grantId)
+            send(res, 200, { confirmed: true })
+          }
+          return true
+        }
+        return false
+      }
+
       return false
     } catch (error) {
       if (error instanceof DocumentCatalogError) {
@@ -1491,6 +1541,12 @@ export function createRuntimeApiHandler(
         const status = error.code === 'conversation-not-found' ? 404
           : error.code === 'visibility-locked' ? 409 : 403
         send(res, status, { error: error.code })
+        return true
+      }
+      if (error instanceof DesktopCoordinationError) {
+        const status = error.code === 'not-found' ? 404 : error.code === 'forbidden' ? 403
+          : error.code === 'queue-full' ? 429 : 409
+        send(res, status, { error: `desktop-${error.code}`, code: error.code, message: error.message })
         return true
       }
       if (error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('invalid '))) {

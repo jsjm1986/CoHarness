@@ -120,15 +120,15 @@ function directDescriptor(): InvocationDescriptor {
       wire: 'agentId',
       source: 'lookup',
       lookup: 'fixture',
-      codec: { mode: 'strict', typeSymbol: '@fixture#AgentId', schema: idSchema },
+      codec: { mode: 'strict', typeSymbol: '@fixture#AgentId', create: () => idSchema },
     }, {
       name: 'request',
       wire: 'request',
       source: 'json',
-      codec: { mode: 'strict', typeSymbol: '@fixture#CreateRequest', schema: requestSchema },
+      codec: { mode: 'strict', typeSymbol: '@fixture#CreateRequest', create: () => requestSchema },
     }],
     cancellation: { parameter: 'signal' },
-    result: { mode: 'strict', typeSymbol: '@fixture#CreateResult', schema: createResultSchema },
+    result: { mode: 'strict', typeSymbol: '@fixture#CreateResult', create: () => createResultSchema },
   }
 }
 
@@ -142,15 +142,15 @@ function contextDescriptor(): InvocationDescriptor {
       kind: 'context',
       context: 'fixture',
       wire: 'agentId',
-      codec: { mode: 'strict', typeSymbol: '@fixture#AgentId', schema: idSchema },
+      codec: { mode: 'strict', typeSymbol: '@fixture#AgentId', create: () => idSchema },
     },
     parameters: [{
       name: 'request',
       wire: 'request',
       source: 'json',
-      codec: { mode: 'strict', typeSymbol: '@fixture#RenameRequest', schema: requestSchema },
+      codec: { mode: 'strict', typeSymbol: '@fixture#RenameRequest', create: () => requestSchema },
     }],
-    result: { mode: 'strict', typeSymbol: '@fixture#RenameResult', schema: renameResultSchema },
+    result: { mode: 'strict', typeSymbol: '@fixture#RenameResult', create: () => renameResultSchema },
   }
 }
 
@@ -167,9 +167,9 @@ function maybeDescriptor(): InvocationDescriptor {
       wire: 'value',
       source: 'json',
       acceptsUndefined: true,
-      codec: { mode: 'strict', typeSymbol: '@fixture#MaybeValue', schema },
+      codec: { mode: 'strict', typeSymbol: '@fixture#MaybeValue', create: () => schema },
     }],
-    result: { mode: 'strict', typeSymbol: '@fixture#MaybeValue', schema },
+    result: { mode: 'strict', typeSymbol: '@fixture#MaybeValue', create: () => schema },
   }
 }
 
@@ -214,7 +214,7 @@ describe('Client Typert API', () => {
     expect(fallback).not.toHaveBeenCalled()
   })
 
-  it('mounts concrete direct methods, validates both boundaries, and withdraws retained handles', async () => {
+  it('mounts concrete direct methods, forwards inputs, and withdraws retained handles', async () => {
     const call = vi.fn<ConnectionHandle['rpc']['call']>()
       .mockResolvedValue({ ok: true, value: { ref: 'goal-1' } })
     const ctx = await bench(call)
@@ -248,16 +248,19 @@ describe('Client Typert API', () => {
     callerAbort.abort(cancellation)
     expect(combinedSignal?.aborted).toBe(true)
     expect(combinedSignal?.reason).toBe(cancellation)
-    await expect(ctx.remote.probe.create('', { objective: 'ship' })).rejects.toThrow('rejected "agentId"')
+    await expect(ctx.remote.probe.create('', { objective: 'ship' }))
+      .resolves.toEqual({ ok: true, value: { ref: 'goal-1' } })
+    expect(call).toHaveBeenLastCalledWith(
+      '/api',
+      'probe/create',
+      { args: { agentId: '', request: { objective: 'ship' } } },
+      expect.any(AbortSignal),
+    )
 
     call.mockResolvedValueOnce({ ok: true, value: { ref: 1 } })
-    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toMatchObject({
-      ok: false,
-      error: {
-        code: 'gateway/internal',
-        message: 'client api: probe/create failed: client api: probe/create rejected "result"',
-        details: {},
-      },
+    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toEqual({
+      ok: true,
+      value: { ref: 1 },
     })
 
     await assembly.dispose()
@@ -365,15 +368,15 @@ describe('Client Typert API', () => {
     expect(ctx.get('remote.probe')).toBeUndefined()
   })
 
-  it('rejects weak descriptors and namespace collisions before registration', async () => {
+  it('accepts weak result codecs and rejects namespace collisions before registration', async () => {
     const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
     const weak: InvocationDescriptor = {
       ...directDescriptor(),
       result: { mode: 'src-json' },
     }
 
-    await expect(ctx.remote.$mount({ package: '@fixture/weak', descriptors: [weak] }))
-      .rejects.toThrow('has no strict codec')
+    const disposeWeak = await ctx.remote.$mount({ package: '@fixture/weak', descriptors: [weak] })
+    await disposeWeak()
     await expect(ctx.remote.$mount({
       package: '@fixture/conflict',
       descriptors: [{ ...directDescriptor(), namespace: '$mount' }],
@@ -560,7 +563,7 @@ describe('Client Typert API', () => {
         ...direct,
         parameters: [...direct.parameters, {
           name: 'other', wire: 'otherId', source: 'lookup', lookup: 'fixture',
-          codec: { mode: 'strict', typeSymbol: '@fixture#AgentId', schema: idSchema },
+          codec: { mode: 'strict', typeSymbol: '@fixture#AgentId', create: () => idSchema },
         }],
       }],
     })).rejects.toThrow('scope must select its only lookup parameter')
@@ -587,10 +590,6 @@ describe('Client Typert API', () => {
       .rejects.toThrow('expected 2 business argument(s)')
     await expect((ctx as FixtureContext).remote.probe.rename({ objective: 'ship' }))
       .rejects.toThrow('no Client Context binder')
-
-    ;(descriptor.parameters[0] as { codec: { mode: string } }).codec.mode = 'src-json'
-    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).rejects.toThrow('has no strict codec')
-    ;(descriptor.parameters[0] as { codec: { mode: string } }).codec.mode = 'strict'
 
     ctx.set('connection', undefined)
     await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).rejects.toThrow('no active Connection')
@@ -654,7 +653,7 @@ describe('Client Typert API', () => {
         name: 'value',
         wire: '__proto__',
         source: 'json',
-        codec: { mode: 'strict', typeSymbol: '@fixture#PrototypeValue', schema: z.string() },
+        codec: { mode: 'strict', typeSymbol: '@fixture#PrototypeValue', create: () => z.string() },
       }],
     }
     const dispose = await ctx.remote.$mount({ package: '@fixture/prototype', descriptors: [descriptor] })

@@ -52,6 +52,8 @@ Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized re
 
 No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
 
+**Runtime invariant:** No companion is published. Process pools and per-workspace queues are private implementation state, and this provider publishes no independent lifecycle event stream or enumerable snapshot.
+
 ## Known Limitations and Deferred Work
 
 - **No confinement policy** — this package trusts the configured server and does not sandbox its process; a restricted deployment must supply appropriate process/filesystem providers or a same-world sandbox wrapper.

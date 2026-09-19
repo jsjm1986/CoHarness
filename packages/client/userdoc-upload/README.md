@@ -16,6 +16,8 @@ None, as this browser transport only moves document bytes and returns a stored r
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The uploader is a browser-only functional state machine; it owns no Cordis service, event stream, or cross-plugin mutable relation, so its behavior is covered by protocol and cancellation tests.
+
 ## Known Limitations and Deferred Work
 
 - **One active file per call** — the host UI owns multi-file sequencing and cancellation; this package deliberately keeps one resumable state machine per selected file.

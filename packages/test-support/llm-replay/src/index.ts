@@ -1,7 +1,8 @@
 /**
  * Keyless snapshot-test LLM replay. It derives one model-call script per
- * recorded session from `assistant/chunk` events and explicitly marked local
- * compaction calls, then binds fresh live sessions to parent/child scripts by
+ * recorded session from the embedded Assistant streams of durable
+ * `assistant/message` and `assistant/attempt` events plus explicitly marked
+ * local compaction calls, then binds fresh live sessions to parent/child scripts by
  * first-call order. Throw and hang cases require an explicit override because
  * a session log cannot reconstruct them alone.
  * @module @deepseek-ai/dsh-llm-replay
@@ -11,7 +12,13 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter as pathDelimiter } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
-import { decodeSeqRanges, decodeStorageRecord, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { decodeSeqRanges, decodeStorageRecord, isChunkRow, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
+import {
+  sessionFormatCatalog,
+  type SessionFormatHeader,
+  type SessionFormatMigrationStream,
+} from '@deepseek-ai/dsh-session-format/legacy'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import type {
   ContentBlock,
@@ -25,9 +32,7 @@ import type {
   StreamChunk,
   TokenUsage,
 } from '@deepseek-ai/dsh-llm'
-import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
-
-const PACKED_CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
+import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantStream, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 
 /**
  * One recorded model call. `throw` may replay prefix chunks before failing;
@@ -93,8 +98,8 @@ export interface ReplayConfig {
   /**
    * Optional sidecar for the PRIMARY session: a bare `ReplayEntry[]` replaces
    * the derived script; `{ patches }` keeps it and swaps the named call
-   * indexes ({@link ReplayOverrideDoc}). Used by single-session scenarios not
-   * expressible as `assistant/chunk` (throw-before-chunk, cancel/hang,
+   * indexes ({@link ReplayOverrideDoc}). Used by single-session scenarios the
+   * durable stream cannot express (throw-before-chunk, cancel/hang,
    * injected transient failures). Absent for normal and nested scenarios.
    */
   overrideFile?: string
@@ -157,97 +162,164 @@ export interface SessionScript {
   primary: boolean
 }
 
-/**
- * Parse a session `.jsonl` buffer into its event list. Line 0 is the session
- * header (a `{type:'session',…}` record), every subsequent non-empty line is a
- * {@link SessionEvent} or a packed chunk row (expanded back into its events, so
- * a fixture recorded with `packChunks` on derives the same script). Storage
- * range-encoded `sourceEventSeqs` values are expanded as well. The header is
- * skipped; malformed lines fail loud.
- * @param text - the raw `.jsonl` file contents.
- * @returns every event after the header, in log order.
- */
-export function parseSessionLog(text: string): SessionEvent[] {
-  const events: SessionEvent[] = []
-  let nextSeq: SessionLogOffsetType = SessionLogOffset(0)
-  let headerSkipped = false
-  // Projected fixtures omit persistence envelopes; synthesize them while
-  // decoding so replay still receives complete SessionEvent values.
-  for (const [index, line] of text.split(/\r?\n/).entries()) {
-    if (line.trim().length === 0) continue
-    if (!headerSkipped) {
-      headerSkipped = true
-      continue
-    }
-    let value: unknown
-    try {
-      value = JSON.parse(line) as unknown
-    } catch (error) {
-      throw new Error(`session snapshot line ${index + 1} contains invalid JSON`, { cause: error })
-    }
-    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-      throw new Error(`session snapshot line ${index + 1} must be a JSON object`)
-    }
-    const record = value as Record<string, unknown>
-    const packed = PACKED_CHUNK_ROW_TYPES.has(record.type as string)
-    const seqKey = packed ? 'seq0' : 'seq'
-    const timeKey = packed ? 'time0' : 'time'
-    if (!Object.hasOwn(record, seqKey)) record[seqKey] = nextSeq
-    if (!Object.hasOwn(record, timeKey)) record[timeKey] = 0
-    let decoded: SessionEvent[]
-    try {
-      if (Object.hasOwn(record, 'sourceEventSeqs')) {
-        record.sourceEventSeqs = decodeSeqRanges(record.sourceEventSeqs)
-      }
-      decoded = decodeStorageRecord(record)
-    } catch (error) {
-      /* v8 ignore next -- decodeStorageRecord throws Error instances. */
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`session snapshot line ${index + 1}: ${detail}`, { cause: error })
-    }
-    events.push(...decoded)
-    nextSeq = SessionLogOffset(nextSeq + decoded.length)
-  }
-  return events
+/** Header facts and migrated events decoded from one session `.jsonl` buffer. */
+interface ParsedSessionFixture {
+  readonly header: SessionFormatHeader
+  readonly id: string
+  readonly createdAt: number
+  readonly inheritedEventCount: SessionLogOffsetType
+  readonly events: SessionEvent[]
 }
 
 /**
- * Read replay identity, ordering, and fork-seed facts from the JSONL header.
- *
- * @param text - the raw `.jsonl` file contents (only the header line is read).
- * @returns the header's `id`, `createdAt`, and inherited-event count, defaulted when absent.
+ * Parse a session `.jsonl` buffer into current events. The first non-empty
+ * line is the physical header; every subsequent non-empty line is one stored
+ * row — a plain event or, in released (≤v3) bodies, a packed chunk row.
+ * Projected rows that omit the `seq`/`time` envelope receive deterministic
+ * dense sequences and zero timestamps. The decoded events then pass through
+ * the build-static format catalog, so replay always consumes the current
+ * generation. Malformed lines fail loud with their 1-based line number.
+ * @param text - the raw `.jsonl` file contents.
+ * @returns every migrated current event, in log order.
+ */
+export function parseSessionLog(text: string): SessionEvent[] {
+  return parseSessionFixture(text).events
+}
+
+/**
+ * Read replay identity, ordering, and fork-seed facts from a session `.jsonl`
+ * buffer. The complete artifact is decoded and migrated, so the returned
+ * inherited-event count indexes into {@link parseSessionLog}'s output.
+ * @param text - the raw `.jsonl` file contents.
+ * @returns the migrated header's `id`, `createdAt`, and inherited-event count.
  */
 export function parseSessionHeader(text: string): {
   id: string
   createdAt: number
   inheritedEventCount: SessionLogOffsetType
 } {
-  const firstLine = text.split('\n').find(line => line.trim().length > 0) ?? '{}'
-  const parsed = JSON.parse(firstLine) as { id?: unknown; createdAt?: unknown; seedLength?: unknown }
-  return {
-    id: typeof parsed.id === 'string' ? parsed.id : '',
-    createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : 0,
-    inheritedEventCount: SessionLogOffset(typeof parsed.seedLength === 'number' ? parsed.seedLength : 0),
+  const { id, createdAt, inheritedEventCount } = parseSessionFixture(text)
+  return { id, createdAt, inheritedEventCount }
+}
+
+/** Parse, decode, and migrate one session `.jsonl` buffer without writing its source. */
+function parseSessionFixture(text: string): ParsedSessionFixture {
+  const events: SessionEvent[] = []
+  let stream: SessionFormatMigrationStream | undefined
+  let sourceVersion = 0
+  let nextSeq = 0
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    if (line.trim().length === 0) continue
+    const lineNumber = index + 1
+    let value: unknown
+    try {
+      value = JSON.parse(line) as unknown
+    } catch (error) {
+      throw new Error(`session snapshot line ${lineNumber} contains invalid JSON`, { cause: error })
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`session snapshot line ${lineNumber} must be a JSON object`)
+    }
+    const record = value as Record<string, unknown>
+    if (stream === undefined) {
+      sourceVersion = typeof record['version'] === 'number' ? record['version'] : 0
+      const seedLength = record['seedLength']
+      if (seedLength !== undefined && typeof seedLength !== 'number') {
+        throw fixtureFormatError(new Error('session header seedLength must be a number'), lineNumber)
+      }
+      const seeded = seedLength !== undefined || record['isSeeded'] === true
+      const cut = seedLength === undefined ? undefined : SessionLogOffset(seedLength)
+      const header = { ...record, version: sourceVersion, isSeeded: seeded }
+      try {
+        stream = sessionFormatCatalog.createStream(header as unknown as SessionFormatHeader, cut, {
+          emitEvent: (event) => { events.push(event as unknown as SessionEvent) },
+        })
+      } catch (error) {
+        throw fixtureFormatError(error, lineNumber)
+      }
+      continue
+    }
+    const packed = isChunkRow(record)
+    if (!Object.hasOwn(record, packed ? 'seq0' : 'seq')) record[packed ? 'seq0' : 'seq'] = nextSeq
+    if (!Object.hasOwn(record, packed ? 'time0' : 'time')) record[packed ? 'time0' : 'time'] = 0
+    let decoded: SessionEvent[]
+    try {
+      if (Object.hasOwn(record, 'sourceEventSeqs')) {
+        record['sourceEventSeqs'] = decodeSeqRanges(record['sourceEventSeqs'])
+      }
+      decoded = sourceVersion < sessionFormatCatalog.currentVersion
+        ? decodeStorageRecord(record)
+        : [record as unknown as SessionEvent]
+    } catch (error) {
+      throw fixtureFormatError(error, lineNumber)
+    }
+    nextSeq += decoded.length
+    for (const event of decoded) {
+      try {
+        stream.emitEvent(event as Parameters<SessionFormatMigrationStream['emitEvent']>[0])
+      } catch (error) {
+        throw fixtureFormatError(error, lineNumber)
+      }
+    }
   }
+  if (stream === undefined) throw new Error('session snapshot must start with a session header')
+  let inheritedEventCount: number
+  try {
+    inheritedEventCount = stream.finish()
+  } catch (error) {
+    throw fixtureFormatError(error, 1)
+  }
+  const header = stream.header
+  return {
+    header,
+    id: header.id,
+    createdAt: header.createdAt,
+    inheritedEventCount: SessionLogOffset(inheritedEventCount),
+    events,
+  }
+}
+
+/**
+ * Re-encode one committed session fixture at the current format generation for
+ * snapshot comparison. The fixture parses through the same migration catalog
+ * as {@link parseSessionLog}, so an older-generation file projects to the same
+ * logical event stream a live run persists; the migrated header and events
+ * serialize one JSON object per line with dense envelopes.
+ * @param text - the raw `.jsonl` fixture contents.
+ * @returns the fixture rewritten at the current Session format generation.
+ */
+export function prepareSessionSnapshotFixtureForComparison(text: string): string {
+  const { header, events } = parseSessionFixture(text)
+  const output = [JSON.stringify(header), ...events.map(event => JSON.stringify(event))]
+  return `${output.join('\n')}\n`
+}
+
+/** Attach the fixture's 1-based line while preserving unsupported-migration classification. */
+function fixtureFormatError(error: unknown, line: number): Error {
+  const detail = error instanceof Error ? error.message : String(error)
+  const message = `session snapshot line ${line}: ${detail}`
+  if (error instanceof SessionFormatUnsupportedMigrationError) {
+    return new SessionFormatUnsupportedMigrationError(message, { cause: error })
+  }
+  return new Error(message, { cause: error })
 }
 
 /**
  * Reconstruct the per-`stream()` replay script from a recorded session log.
  *
- * Splits `assistant/chunk` events at every `finish`, using turn and step changes
- * to detect an unterminated prior call. A `compaction/summary` explicitly marked
- * as one local LLM-stream call becomes a canonical successful stream from its
- * complete `rawOutput` at the summary's log position. A
- * missing assistant terminator means the live stream threw, so derivation
- * rejects and the scenario must provide an explicit override. Multiple calls
- * may share one turn and step when the loop retries.
+ * Each durable `assistant/message` or `assistant/attempt` event carries one
+ * complete model call in its embedded `stream` records; expansion yields the
+ * exact chunk sequence including the `finish` terminator. A `compaction/summary`
+ * explicitly marked as one local LLM-stream call becomes a canonical successful
+ * stream from its complete `rawOutput` at the summary's log position. A
+ * stream without a `finish` chunk means the live call threw or was abandoned,
+ * so derivation rejects and the scenario must provide an explicit override.
+ * Multiple calls may share one turn and step when the loop retries.
  * @param events - the recorded session's events.
  * @returns one `chunks` entry per recorded model call, in call order.
  */
 export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
   const script: ReplayEntry[] = []
-  let currentKey: string | undefined
-  let current: StreamChunk[] = []
   const close = (key: string | undefined, chunks: StreamChunk[]): void => {
     if (chunks.length === 0) return
     if (chunks[chunks.length - 1]?.type !== 'finish') {
@@ -260,9 +332,6 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
   }
   for (const event of events) {
     if (event.type === 'compaction/summary') {
-      close(currentKey, current)
-      currentKey = undefined
-      current = []
       // JSONL decoding crosses an untyped durable boundary, so retain its wider
       // shape even though current in-process producers enforce this correlation.
       const persisted: {
@@ -285,21 +354,10 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
       }
       continue
     }
-    if (event.type !== 'assistant/chunk') continue
-    const { turn, step, chunk } = event.data
-    const key = `${turn}/${step}`
-    if (current.length > 0 && key !== currentKey) {
-      close(currentKey, current)
-    }
-    if (current.length === 0) currentKey = key
-    current.push(chunk)
-    if (chunk.type === 'finish') {
-      close(currentKey, current)
-      currentKey = undefined
-      current = []
-    }
+    if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') continue
+    const chunks = expandAssistantStream(event.data.stream).map(member => member.chunk)
+    close(`${String(event.data.turn)}/${String(event.data.step)}`, chunks)
   }
-  close(currentKey, current)
   return script
 }
 

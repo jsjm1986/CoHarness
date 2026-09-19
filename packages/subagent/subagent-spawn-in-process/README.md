@@ -50,6 +50,8 @@ Parent input grows by one data-dependent result retained until compaction.
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **Fresh means no parent transcript** — the child inherits cwd, lineage, the latest logged route, and explicitly configured persona/tool restrictions, but none of the parent's conversation; use the fork provider when completed-turn context is required.

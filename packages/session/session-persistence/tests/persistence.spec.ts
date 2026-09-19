@@ -22,7 +22,7 @@ import {
   type SessionStorageMetadata, type StoredPrefix, type StoredSuffix,
   sessionContentMetadata,
 } from '../src/index.ts'
-import { runPersistenceContract, meta, oneTurnLog } from './contract.ts'
+import { runPersistenceContract, meta, oneTurnLog } from './legacy-contract.ts'
 import { runCoordinatorContract, type CoordinatorFixture } from './coordinator-contract.ts'
 
 /** The durable store shape: materialized sessions only (no lazy entries). */
@@ -93,6 +93,10 @@ interface CoordinatorInternals {
 class MemoryPersistence extends SessionPersistence implements PersistenceBackend<never> {
   override readonly supportsRawArtifacts = false
 
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
+
   static inject = ['sessions']
 
   override readonly name = 'session-persistence-memory'
@@ -112,15 +116,15 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
 
   // --- Service API (delegated to the coordinator) ---
 
-  locate(_meta: SessionHeader): undefined {
+  override locate(_meta: SessionHeader): undefined {
     return undefined
   }
 
-  create(m: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
+  override createStored(m: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
     return this.coordinator.create(m, inheritedEventCount)
   }
 
-  append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+  override append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }
 
@@ -128,7 +132,7 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     return this.coordinator.prepare(id, signal)
   }
 
-  load(id: SessionId): Promise<SessionInspection> {
+  override load(id: SessionId): Promise<SessionInspection> {
     return this.coordinator.load(id).then(loaded => ({
       meta: loaded.meta,
       inheritedEventCount: loaded.inheritedEventCount,
@@ -136,7 +140,7 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     }))
   }
 
-  inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
+  override inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
     return this.coordinator.inspect(id, signal)
       .then(loaded => ({
         meta: loaded.meta,
@@ -146,7 +150,7 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
   }
 
 
-  readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
+  override readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
@@ -213,12 +217,12 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     if (closers.length > 0) entry.events.push(...structuredClone(closers) as SessionEvent[])
   }
 
-  async list(signal?: AbortSignal): Promise<SessionHeader[]> {
+  override async listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
     signal?.throwIfAborted()
     return [...this.store.values()].map(e => structuredClone(e.meta))
   }
 
-  async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+  override async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     signal?.throwIfAborted()
     return [...this.store.values()].map(entry => ({
       header: structuredClone(entry.meta),
@@ -304,7 +308,7 @@ class ControlledBackend implements PersistenceBackend<never> {
     if (entry !== undefined) entry.events.push(...structuredClone(closers) as SessionEvent[])
   }
 
-  async list(): Promise<SessionHeader[]> {
+  async listStored(): Promise<SessionHeader[]> {
     return [...this.store.values()].map(entry => structuredClone(entry.meta))
   }
 
@@ -913,7 +917,7 @@ describe('PersistenceCoordinator session preparations', () => {
       readStoredRevision: medium.readStoredRevision.bind(medium),
       appendBatch: medium.appendBatch.bind(medium),
       commitRepair: medium.commitRepair.bind(medium),
-      list: medium.list.bind(medium),
+      listStored: medium.listStored.bind(medium),
       close: medium.close.bind(medium),
       ...withMigration ? { migrateStored } : {},
     }
@@ -923,7 +927,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(3)
+      expect(suffix.meta.version).toBe(4)
       expect(suffix.events.map(event => event.type)).toEqual([
         'step/start', 'system/message', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
@@ -946,7 +950,7 @@ describe('PersistenceCoordinator session preparations', () => {
     // without step/start migrates with an identical body, so the coordinator
     // can publish a current-version successor in place.
     const storedFor = (id: string): { meta: SessionHeader; events: SessionEvent[] } => ({
-      meta: { ...meta(id), version: 0 },
+      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
       events: [
         { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
         { type: 'user/message', seq: SessionSeq(1), time: 2, data: freezeMessage({
@@ -975,7 +979,7 @@ describe('PersistenceCoordinator session preparations', () => {
       readStoredRevision: medium.readStoredRevision.bind(medium),
       appendBatch: medium.appendBatch.bind(medium),
       commitRepair: medium.commitRepair.bind(medium),
-      list: medium.list.bind(medium),
+      listStored: medium.listStored.bind(medium),
       close: medium.close.bind(medium),
       migrateStored,
     }
@@ -986,13 +990,13 @@ describe('PersistenceCoordinator session preparations', () => {
     try {
       // The sequential readFrom path publishes the successor through its prefix read.
       const suffix = await coordinator.readFrom(readId, SessionLogOffset(0))
-      expect(suffix.meta.version).toBe(3)
+      expect(suffix.meta.version).toBe(4)
       expect(suffix.events.map(event => event.type)).toEqual(['turn/start', 'user/message', 'turn/end'])
-      expect(medium.store.get(readId)?.meta.version).toBe(3)
+      expect(medium.store.get(readId)?.meta.version).toBe(4)
       // The cold load path publishes through its preparation pass.
       const loaded = await coordinator.load(loadId)
-      expect(loaded.meta.version).toBe(3)
-      expect(medium.store.get(loadId)?.meta.version).toBe(3)
+      expect(loaded.meta.version).toBe(4)
+      expect(medium.store.get(loadId)?.meta.version).toBe(4)
       expect(migrateStored).toHaveBeenCalledTimes(2)
       // Re-running a load over the already-published log is a no-op.
       await coordinator.load(readId)
@@ -1012,7 +1016,7 @@ describe('PersistenceCoordinator session preparations', () => {
     // coordinator migrates only its in-memory view — including the ownerless
     // claim's seed-vs-stored comparison.
     backend.store.set(id, {
-      meta: { ...meta(id), version: 0 },
+      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
       events: oneTurnLog(),
     })
     let coordinator!: PersistenceCoordinator<never>
@@ -1021,7 +1025,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const loaded = await coordinator.load(id)
-      expect(loaded.meta.version).toBe(3)
+      expect(loaded.meta.version).toBe(4)
       expect(backend.store.get(id)?.meta.version).toBe(0)
 
       const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })
@@ -2395,7 +2399,7 @@ describe('SessionPersistence service registration', () => {
     await ctx.plugin(SessionStore)
     const fiber = await ctx.plugin(MemoryPersistence)
     const m = meta('default-preparation')
-    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.createStored(m)
     await ctx.sessionPersistence.append(m.id, oneTurnLog())
     const defaultPrepare = SessionPersistence.prototype.prepare.bind(ctx.sessionPersistence)
 
@@ -2449,7 +2453,7 @@ describe('SessionPersistence service registration', () => {
     await ctx.plugin(SessionStore)
     const fiber = await ctx.plugin(MemoryPersistence)
     const m = meta('reg')
-    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.createStored(m)
     await ctx.sessionPersistence.append(m.id, oneTurnLog())
     const loaded = await ctx.sessionPersistence.load(m.id)
     expect(loaded.events).toHaveLength(6)
@@ -2462,7 +2466,7 @@ describe('SessionPersistence service registration', () => {
     const fiber = await ctx.plugin(MemoryPersistence)
     const invalid = { ...meta('invalid-meta'), createdAt: 1n as unknown as number }
 
-    await expect(ctx.sessionPersistence.create(invalid))
+    await expect(ctx.sessionPersistence.createStored(invalid))
       .rejects.toThrow('session metadata must be losslessly JSON-serializable')
     await fiber.dispose()
   })
@@ -2540,7 +2544,7 @@ describe('SessionPersistence service registration', () => {
 
   it('surfaces a migration refusal unwrapped instead of as stored corruption', async () => {
     const id = SessionId('legacy-mode-migration')
-    const m = { ...meta(id, '/legacy'), version: 0 }
+    const m = { ...meta(id, '/legacy'), version: 0 } as unknown as SessionHeader
     const store: MemoryStore = new Map([[id, { meta: m, events: [legacyModeSet()] }]])
     const ctx = new Context()
     await ctx.plugin(SessionStore)

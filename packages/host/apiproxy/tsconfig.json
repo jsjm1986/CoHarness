@@ -9,25 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../goal/goal"
-    },
-    {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../../credentials/credentials"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
       "path": "../../api/remotes/tsconfig.host.json"
-    },
-    {
-      "path": "../../util/brand"
     },
     {
       "path": "../../attachment/attachment"
@@ -36,19 +18,10 @@
       "path": "../../attachment/userdoc"
     },
     {
-      "path": "../../context/userdoc-context"
-    },
-    {
       "path": "../../context/collaboration"
     },
     {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../llm/model-access"
-    },
-    {
-      "path": "../../llm/model-provider-config"
+      "path": "../../context/userdoc-context"
     },
     {
       "path": "../../core/agent"
@@ -57,7 +30,7 @@
       "path": "../../core/agent-default-model"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../core/scope"
     },
     {
       "path": "../../core/session"
@@ -66,31 +39,19 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../session/session-persistence"
+      "path": "../../credentials/credentials"
     },
     {
-      "path": "../../session/session-projection"
+      "path": "../../extensions/cordis-host-runner"
     },
     {
-      "path": "../../session/session-projection-cache"
+      "path": "../../fs/fs"
     },
     {
-      "path": "../../session-query/session-query"
+      "path": "../../goal/goal"
     },
     {
-      "path": "../../session/session-title"
-    },
-    {
-      "path": "../../session-query/session-query"
-    },
-    {
-      "path": "../../subagent/subagent"
-    },
-    {
-      "path": "../../skill/skill"
-    },
-    {
-      "path": "../../jobs/jobs"
+      "path": "../directory-picker"
     },
     {
       "path": "../../interaction/commands"
@@ -105,28 +66,67 @@
       "path": "../../interaction/user-questions"
     },
     {
-      "path": "../../workspace/workspace"
+      "path": "../../jobs/jobs"
     },
     {
-      "path": "../../fs/fs"
+      "path": "../../llm/llm"
     },
     {
-      "path": "../directory-picker"
+      "path": "../../llm/model-access"
     },
     {
-      "path": "../../extensions/cordis-host-runner"
+      "path": "../../llm/model-provider-config"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../preset/agent-presets"
     },
     {
-      "path": "../../util/native-command"
+      "path": "../../session-query/session-query"
+    },
+    {
+      "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/session-projection-cache"
+    },
+    {
+      "path": "../../session/session-title"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../skill/skill"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/brand"
     },
     {
       "path": "../../util/crypto"
     },
     {
+      "path": "../../util/native-command"
+    },
+    {
       "path": "../../util/time"
+    },
+    {
+      "path": "../../workspace/workspace"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

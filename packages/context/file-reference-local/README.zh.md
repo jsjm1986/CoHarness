@@ -38,6 +38,8 @@ Paths prefixed with @ are files explicitly referenced by the user. Use the read 
 
 该稳定句子会加入系统提示词前缀。挂载或移除此提供方，或者改变 `read` 是否可见，都会改变该前缀；查询、候选项和索引失效不会改变前缀。
 
+**运行时不变式：** 不发布伴生入口。按 agent 的 index 是私有 advisory cache，其失效与 dispose 行为通过服务测试直接观察。
+
 ## 已知限制与暂缓事项
 
 - **宿主本地命名空间**：提供方扫描 Harness 宿主的文件系统，因此远程或虚拟 `read` 实现需要使用命名空间与该工具一致的提供方。

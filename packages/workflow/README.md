@@ -7,7 +7,7 @@ This family runs model-authored orchestration workflows over subagents and expos
 | Package | Role | ctx key |
 |---|---|---|
 | [`workflow/`](workflow/README.md) | Defines workflow execution and lifecycle events | `ctx.workflowEngine` |
-| [`workflow-worker-thread/`](workflow-worker-thread/README.md) | Runs workflow scripts in worker threads | registers on `ctx.workflowEngine` |
+| [`workflow-ptc/`](workflow-ptc/README.md) | Runs workflow scripts in worker threads | registers on `ctx.workflowEngine` |
 | [`tool-workflow/`](tool-workflow/README.md) | Exposes general workflow execution to the model | registers on `ctx.tools` |
 | [`tool-ralph/`](tool-ralph/README.md) | Exposes the fixed fresh-agent Ralph workflow | registers on `ctx.tools` |
 

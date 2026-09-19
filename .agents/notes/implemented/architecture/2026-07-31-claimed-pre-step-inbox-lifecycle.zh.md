@@ -18,9 +18,9 @@ Status: implemented
 
 持久 inbox 仍是两份通过 `MessageId` 寻址的 `UserMessage[]` 列表。`append`、`prepend` 与 `splice` 接受 target；`replace(messageId, newMessage)` 与 `remove(messageId)` 则在提交规范化 splice 前，通过 `MessageId` 跨两份列表定位待处理消息。替换可以改变标识，并先将旧消息作为 discarded 发布，再将新消息作为 inserted 发布。每次插入发出 `agent/inbox/inserted { message }`；普通删除记录 `outcome: 'canceled'` 并发出 `agent/inbox/discarded { message }`。领取记录不带 outcome 的纯删除，并由 `ReactLoopInbox` 发出 claimed 事件。这些实时事件不增加 placement、outcome 或批次字段。
 
-`Agent.inbox` 只暴露用于读取和变更待处理工作的结构化 `Inbox` 接口；仅供循环使用的 `hasPending` 与领取操作不在该公开接口上。dsh-agent-loop 只构造一个 `ReactLoopInbox`，同时用于结构化命令与驱动器操作。具体构造函数直接接收 `SessionProjectionRegistry`，而不是更宽泛的 Cordis `Context`，在首次读取前从 agent 作用域注册 `agentInbox` 投影定义，并在每次持久提交前应用所配置的 `InboxLimits` 准入配额（`maxMessages`、`maxBytes`）。`AgentLoop` 激活时要求该注册表服务存在，注册表则对多个 live agent 作用域贡献的定义进行引用计数。
+`Agent.inbox` 只暴露用于读取和变更待处理工作的结构化 `Inbox` 接口；仅供循环使用的 `hasPending` 与领取操作不在该公开接口上。dsh-agent-loop 只构造一个 `ReactLoopInbox`，同时用于结构化命令与驱动器操作。具体构造函数直接接收 `SessionProjectionRegistry`，而不是更宽泛的 Cordis `Context`，并在每次持久提交前应用所配置的 `InboxLimits` 准入配额（`maxMessages`、`maxBytes`）。`AgentLoop` 激活时要求该注册表服务存在，并为其自身服务生命周期注册 `agentInbox` 投影定义，使冷读取在 Agent 存在之前与全部卸载之后均可用。
 
-两类事件接口服务不同消费方。跟踪单条消息的观察方使用 `agent/inbox/inserted`、`claimed` 与 `discarded`。每个 `ReactLoopInbox` 都从其 agent 作用域在持久 `agent/inbox/spliced` 流上贡献仅限宿主的 `agentInbox` 投影；UI 编辑与移除通过 Inbox 变更方法处理，从而让同一投影记录所有变化。该投影重建持久历史时，会拒绝不安全或越界的坐标，以及跨两份列表重复的 `MessageId`，并报告出错事件的 seq。浏览器队列视图通过 ApiProxy 独立的 `inbox` 投影与客户端投影存储读取同一持久流；subagent 准入路径读取 agent 作用域的 `agentInbox` 状态以获得 `hasPending`。
+两类事件接口服务不同消费方。跟踪单条消息的观察方使用 `agent/inbox/inserted`、`claimed` 与 `discarded`。每个 `ReactLoopInbox` 读取在持久 `agent/inbox/spliced` 流上折叠的仅限宿主 `agentInbox` 投影；UI 编辑与移除通过 Inbox 变更方法处理，从而让同一投影记录所有变化。该投影重建持久历史时，会拒绝不安全或越界的坐标，以及跨两份列表重复的 `MessageId`，并报告出错事件的 seq。浏览器队列视图通过 ApiProxy 独立的 `inbox` 投影与客户端投影存储读取同一持久流；subagent 准入路径读取 agent 作用域的 `agentInbox` 状态以获得 `hasPending`。
 
 必须对当前步骤进行原子改写的插件从 `agent/pre-step` 返回消息。只需要稍后上下文的插件可以直接修改 `agent.inbox`。Workspace context 同时使用两条路径：异步文件系统投影会暂存一条可替换的 `next-step` 消息，而下一次进入步骤的 pre-step 会把该消息或新组合的基线折入最终批次，并移除仍待处理的副本。reject 会让该条目继续排队。
 

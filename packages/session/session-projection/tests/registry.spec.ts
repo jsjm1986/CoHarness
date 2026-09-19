@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import SessionStore, {
+  SESSION_FORMAT_VERSION,
   Session,
   SessionId,
   SessionLogOffset,
@@ -48,7 +49,7 @@ interface StableViewState {
   value: MarksView
 }
 const RESTORE_HEADER: SessionHeader = {
-  version: 0,
+  version: SESSION_FORMAT_VERSION,
   id: SessionId('projection-restore'),
   createdAt: 0,
   isSeeded: false,

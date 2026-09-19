@@ -20,6 +20,8 @@ Indirectly, through durable replay of historical user images and structured mode
 
 Normalization and request projection are deterministic. An unchanged attachment and route policy reuse identical cached request bytes on later turns.
 
+**Runtime invariant:** No companion is published. Immutable writes and verified reads are enforced directly at the backend boundary.
+
 ## Known Limitations and Deferred Work
 
 - Normalized attachment objects are retained indefinitely; derived request-image files are bounded by `requestImageCacheMaxBytes`, `requestImageCacheMaxEntries`, and `requestImageCacheTtlMs` and are reclaimed by a best-effort timer.

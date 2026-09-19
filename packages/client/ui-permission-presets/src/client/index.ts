@@ -24,7 +24,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ClientContext, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
 import type { CommandUiContract, SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import type { PermissionSelect } from '@deepseek-ai/dsh-permission-presets/client'
+import type { PermissionCatalog, PermissionSelection } from '@deepseek-ai/dsh-permission-presets/client'
 import { PermissionRow } from './PermissionRow.tsx'
 import type { PermissionRowInjected } from './PermissionRow.tsx'
 import {
@@ -46,13 +46,13 @@ export const inject = ['commandUi', 'sessions', 'slots', 'locale', 'connection',
 const ACCESS_NS = 'permission.access'
 
 /** Read one session's current permissions projection value (undefined = capability absent). */
-function selectOf(session: SessionFace | undefined): PermissionSelect | undefined {
-  return session?.projections.faceOf('permissions').getSnapshot() as PermissionSelect | undefined
+function selectOf(session: SessionFace | undefined): PermissionSelection | undefined {
+  return session?.projections.faceOf('permissions').getSnapshot() as PermissionSelection | undefined
 }
 
-/** Flatten the projection select into popup rows; `custom` is display state, never a target. */
-function optionsOf(value: PermissionSelect, t: (key: string) => string): SelectOption[] {
-  return value.options
+/** Flatten the catalog + current selection into popup rows; `custom` is display state, never a target. */
+function optionsOf(value: PermissionSelection, catalog: PermissionCatalog, t: (key: string) => string): SelectOption[] {
+  return catalog.options
     .filter(option => option.value !== 'custom')
     .map(option => ({
       id: option.value,
@@ -114,6 +114,19 @@ export function apply(ctx: ClientContext): void {
   const sessionFor = (session: ClientSessionContext): SessionFace | undefined =>
     sessions.binding(session.sessionId)?.session
 
+  // The option table is process-wide: fetch it once and drop the cache only
+  // on the host's catalog-changed signal, which the allowlist forwards.
+  let catalogCache: PermissionCatalog | undefined
+  const catalog = async (): Promise<PermissionCatalog> => {
+    if (catalogCache === undefined) {
+      const result = await ctx.remote.permissionPresets.catalog()
+      if (!result.ok) throw new Error(`permission catalog read failed: ${result.error.code}: ${result.error.message}`)
+      catalogCache = result.value
+    }
+    return catalogCache
+  }
+  ctx.remote.$on('permission-presets/catalog-changed', () => { catalogCache = undefined })
+
   ctx.effect(() => ctx.locale.register('settings.permission', { zh, en }), 'ui-permission: settings row dictionaries')
 
   const connection = ctx.get('connection') as ConnectionHandle
@@ -147,10 +160,10 @@ export function apply(ctx: ClientContext): void {
     available: session => selectOf(sessionFor(session)) !== undefined,
     ui: {
       kind: 'popupSelect',
-      options: (session) => {
+      options: async (session) => {
         const value = selectOf(sessionFor(session))
         if (value === undefined) throw new Error('permission presets are not available on this host')
-        return Promise.resolve(optionsOf(value, t))
+        return optionsOf(value, await catalog(), t)
       },
       onSelect: async (option, session) => {
         const live = sessionFor(session)

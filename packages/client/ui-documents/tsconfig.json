@@ -9,7 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../attachment/userdoc"
     },
     {
       "path": "../locale"
@@ -33,10 +33,7 @@
       "path": "../userdoc-upload"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../attachment/userdoc"
+      "path": "../../../vendor/cordis"
     }
   ]
 }

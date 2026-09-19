@@ -9,31 +9,61 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../context/agent-instructions"
     },
     {
-      "path": "../../../vendor/timer"
+      "path": "../../core/agent"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../core/agent-loop"
     },
     {
-      "path": "../../../native/landlock-run/packages/entry"
-    },
-    {
-      "path": "../../llm/llm"
+      "path": "../../core/scope"
     },
     {
       "path": "../../core/session"
-    },
-    {
-      "path": "../../session/session-title"
     },
     {
       "path": "../../core/system-prompt"
     },
     {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../../goal/goal"
+    },
+    {
+      "path": "../../goal/goal-round-driver"
+    },
+    {
+      "path": "../../goal/tool-goal"
+    },
+    {
+      "path": "../../jobs/jobs"
+    },
+    {
+      "path": "../../jobs/jobs-local"
+    },
+    {
+      "path": "../../jobs/tool-jobs"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/llm-retry"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/session-title"
+    },
+    {
+      "path": "../../shell/shell-env"
+    },
+    {
+      "path": "../../shell/tool-bash"
     },
     {
       "path": "../../skill/skill"
@@ -45,46 +75,16 @@
       "path": "../../skill/tool-skill"
     },
     {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../goal/goal"
-    },
-    {
-      "path": "../../goal/tool-goal"
-    },
-    {
-      "path": "../../goal/goal-round-driver"
-    },
-    {
-      "path": "../../context/agent-instructions"
-    },
-    {
-      "path": "../../core/agent-loop"
-    },
-    {
-      "path": "../../llm/llm-retry"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../util/home-paths"
     },
     {
-      "path": "../../shell/shell-env"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../shell/tool-bash"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../jobs/jobs"
-    },
-    {
-      "path": "../../jobs/jobs-local"
-    },
-    {
-      "path": "../../jobs/tool-jobs"
+      "path": "../../../vendor/timer"
     }
   ]
 }

@@ -32,7 +32,7 @@ async function seedSession(root: string, cwd: string, version: number, events: S
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
-  const meta: SessionHeader = { version, id: sessionId, createdAt: 1, cwd, isSeeded: false }
+  const meta: SessionHeader = { version: version as SessionHeader['version'], id: sessionId, createdAt: 1, cwd, isSeeded: false }
   try {
     await ctx.sessionPersistence.create(meta)
     await ctx.sessionPersistence.append(sessionId, events)
@@ -63,7 +63,9 @@ describe('session format guard through the assembled app', () => {
       binArgs: [configPath, 'Try to resume.'],
       tsconfigPath,
       env: { DSH_SNAPSHOT_FILE: replayFixture },
-      expectedExitCode: 1,
+      // The refusal is an optional-entry warning, so boot continues; with no
+      // agent ever publishing, Node aborts the unsettled top-level await (13).
+      expectedExitCode: 13,
       prepare: async (runCwd) => {
         sessionPath = await seedSession(join(runCwd, '.sessions'), runCwd, SESSION_FORMAT_VERSION + 99, closedTurn())
       },
@@ -88,7 +90,9 @@ describe('session format guard through the assembled app', () => {
       binArgs: [configPath, 'Try to resume.'],
       tsconfigPath,
       env: { DSH_SNAPSHOT_FILE: replayFixture },
-      expectedExitCode: 1,
+      // The refusal is an optional-entry warning, so boot continues; with no
+      // agent ever publishing, Node aborts the unsettled top-level await (13).
+      expectedExitCode: 13,
       prepare: async (runCwd) => {
         sessionPath = await seedSession(join(runCwd, '.sessions'), runCwd, SESSION_FORMAT_VERSION, [
           ...closedTurn(),
@@ -129,8 +133,9 @@ describe('activation audit through the assembled app', () => {
     })
     expect(result.stdout).toBe('')
     expect(result.stderr).toMatchInlineSnapshot(`
-      "headless-test-driver: plugin tree failed to load: headless-test-driver: 1 entry did not activate
-      cordis:group: pending (waiting for service: neverProvided)
+      "headless-test-driver: warning: 1 entry did not activate
+      waiting (cordis:group): pending (waiting for service: neverProvided)
+      fixture turn requires exactly one top-level agent, found 0
       "
     `)
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)

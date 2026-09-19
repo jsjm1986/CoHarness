@@ -1,16 +1,21 @@
-/** Lossless compact representation of one model-stream attempt. */
+/**
+ * Lossless compact representation of one model-stream attempt, plus record-level
+ * readers that answer common consumer questions without materializing members.
+ * Readers trust the static record type; expandAssistantStream is the validating
+ * path for records read at a durable boundary.
+ */
 
 import { assertNever, deepFreeze, snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
 import { BlockAssembler } from './assembler.ts'
 import type { ToolCallId } from './brand.ts'
 import type { ContentBlock, StreamChunk } from './types.ts'
-import { isTokenDelta } from './message.ts'
 
 /** One model chunk paired with its original Session timestamp. */
 export interface TimedStreamChunk {
   readonly time: number
   readonly chunk: StreamChunk
 }
+
 /** Lossless compact records embedded in durable Assistant attempt events. */
 export type AssistantStreamRecord =
   | {
@@ -38,10 +43,13 @@ export type AssistantStreamRecord =
   }
   | { readonly type: 'chunk'; readonly time: number; readonly chunk: StreamChunk }
 
-/** One packed delta run: every compact record except a raw chunk. */
+/** One packed delta run: every compact record except a raw `chunk`. */
 export type AssistantStreamRun = Exclude<AssistantStreamRecord, { type: 'chunk' }>
 
-/** Chunk types that remain raw records and cannot be packed. */
+/**
+ * Chunk types the accumulator never packs into runs, so every occurrence is a raw
+ * `chunk` record. Delta types are excluded because their packed members are not raw chunks.
+ */
 export type RawStreamChunkType = Exclude<StreamChunk['type'], 'text-delta' | 'reasoning-delta' | 'tool-call-delta'>
 
 type MutableRecord =
@@ -231,6 +239,24 @@ function blockIsVisible(block: ContentBlock): boolean {
   if (block.type === 'tool-call') return false
   if (block.type === 'text' || block.type === 'reasoning') return hasNonWhitespace(block.text)
   return true
+}
+
+/**
+ * Whether one chunk carries the model's first output token for latency measurement.
+ * @param chunk - any stream chunk.
+ * @returns true for a non-empty text, reasoning, or Tool-call arguments fragment and for
+ *   every name-bearing Tool-call delta; false for block, usage, and finish chunks.
+ */
+export function isTokenDelta(chunk: StreamChunk): boolean {
+  switch (chunk.type) {
+    case 'text-delta':
+    case 'reasoning-delta':
+      return chunk.text !== ''
+    case 'tool-call-delta':
+      return chunk.argumentsDelta !== '' || chunk.name !== undefined
+    default:
+      return false
+  }
 }
 
 /**

@@ -22,6 +22,8 @@ None, as the trigger pipeline is browser presentation only — picks produce `Co
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The trigger pipeline is a browser-side pure core (detect/reduce/match) plus a registry whose disposal is proven by the HMR-safety spec; it emits no cordis events and owns no cross-plugin mutable state.
+
 ## Known Limitations and Deferred Work
 
 - **Global source layer only** — session-scope source registration (per-session shadowing, ScopedLayers-alike) is designed but not enabled; the ledger tracks the trigger condition (a real per-session source need).

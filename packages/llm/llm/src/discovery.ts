@@ -25,6 +25,8 @@ export type ModelListingProtocol = (typeof MODEL_LISTING_PROTOCOLS)[number]
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 /** Keep provider error text useful without allowing a diagnostic to grow with the reply. */
 const MAX_ERROR_DETAIL_CHARS = 240
+/** Largest model-list page accepted by Anthropic's public endpoint; discovery reads one page and does not follow `has_more`. */
+const ANTHROPIC_MODEL_LIMIT = 1000
 
 /** Response facts used to decide whether an endpoint path is mismatched. */
 export interface LlmEndpointResponseMetadata {
@@ -206,16 +208,34 @@ export function supportsModelListing(api: string): api is ModelListingProtocol {
   return (MODEL_LISTING_PROTOCOLS as readonly string[]).includes(api)
 }
 
-/** One entry of an OpenAI-compatible or Anthropic-compatible listing reply. */
+/** Capacity fields nested by enriched model-directory replies. */
+interface ListingLimit {
+  context?: unknown
+  output?: unknown
+}
+
+/** Per-route capacities OpenRouter nests under each entry. */
+interface ListingTopProvider {
+  max_completion_tokens?: unknown
+}
+
+/** One entry of a supported `GET /models` reply. */
 interface ListingEntry {
   id?: unknown
   /** Common gateway extensions; absent from the official listings. */
   name?: unknown
   display_name?: unknown
+  displayName?: unknown
+  contextWindow?: unknown
   context_window?: unknown
   context_length?: unknown
+  max_input_tokens?: unknown
+  maxOutputTokens?: unknown
   max_tokens?: unknown
   max_output_tokens?: unknown
+  maxTokens?: unknown
+  limit?: ListingLimit | null
+  top_provider?: ListingTopProvider | null
 }
 
 /** A positive safe integer field of a listing entry, or `undefined`. */
@@ -243,6 +263,9 @@ function listingUrl(
   const endpoint = new URL(candidate)
   const path = endpoint.pathname.replace(/\/+$/, '')
   endpoint.pathname = `${path}${api === 'anthropic-messages' && variant === 'versioned' ? '/v1' : ''}/models`
+  if (api === 'anthropic-messages' && variant === 'versioned') {
+    endpoint.search = `limit=${String(ANTHROPIC_MODEL_LIMIT)}`
+  }
   return endpoint.toString()
 }
 
@@ -314,30 +337,65 @@ async function readBounded(response: Response, url: string): Promise<string> {
   return new TextDecoder().decode(body)
 }
 
-/** Parse one model-listing JSON document and discard unusable or duplicate rows. */
+/**
+ * Read one supported model-listing reply. The standard `data` array takes
+ * precedence when both supported formats are present. An enriched `models`
+ * map uses each property key as the endpoint-facing id; its nested `id` is
+ * only a fallback for an empty key because gateways may put a canonical model
+ * identity there instead of the alias they accept on requests. Only
+ * object-valued map entries are models; primitive properties are ignored
+ * because they may be directory metadata rather than model records.
+ *
+ * Entries without a usable id are skipped rather than failing the whole
+ * interrogation: a single malformed row should not deny the user the rest of
+ * a working endpoint's catalog. Missing names fall back to the adopted id so
+ * the Web form receives a complete human-readable row.
+ */
 function readListing(body: unknown): LlmDiscoveredModel[] {
-  const data = (body as { data?: unknown } | null)?.data
-  if (!Array.isArray(data)) {
-    throw new LlmError(
-      'the endpoint model listing has no "data" array; enter this provider\'s models by hand',
-      'DISCOVERY_FAILED',
-    )
+  const listing = body as { data?: unknown; models?: unknown } | null
+  const data = listing?.data
+  let listed: { readonly key?: string; readonly raw: unknown }[]
+  if (Array.isArray(data)) {
+    listed = data.map((raw: unknown) => ({ raw }))
+  } else {
+    const models = listing?.models
+    if (models === null || typeof models !== 'object' || Array.isArray(models)) {
+      throw new LlmError(
+        'the endpoint\'s model listing has neither a "data" array nor a "models" object; '
+        + 'enter this provider\'s models by hand',
+        'DISCOVERY_FAILED',
+      )
+    }
+    listed = Object.entries(models as Record<string, unknown>)
+      .filter(([, raw]) => raw !== null && typeof raw === 'object' && !Array.isArray(raw))
+      .map(([key, raw]) => ({ key, raw }))
   }
   const models: LlmDiscoveredModel[] = []
-  const seen = new Set<string>()
-  for (const raw of data) {
+  for (const { key, raw } of listed) {
     const entry = raw as ListingEntry | null
-    const id = label(entry?.id)
-    if (id === undefined || seen.has(id)) continue
-    seen.add(id)
-    const name = label(entry?.name, entry?.display_name)
-    const contextWindow = capacity(entry?.context_window, entry?.context_length)
-    const maxTokens = capacity(entry?.max_output_tokens, entry?.max_tokens)
+    const id = label(key, entry?.id)
+    if (id === undefined) continue
+    const name = label(entry?.name, entry?.display_name, entry?.displayName) ?? id
+    const contextWindow = capacity(
+      entry?.contextWindow,
+      entry?.context_window,
+      entry?.context_length,
+      entry?.max_input_tokens,
+      entry?.limit?.context,
+    )
+    const maxTokens = capacity(
+      entry?.maxOutputTokens,
+      entry?.max_output_tokens,
+      entry?.maxTokens,
+      entry?.max_tokens,
+      entry?.limit?.output,
+      entry?.top_provider?.max_completion_tokens,
+    )
     models.push({
       id,
-      ...(name === undefined ? {} : { name }),
-      ...(contextWindow === undefined ? {} : { contextWindow }),
-      ...(maxTokens === undefined ? {} : { maxTokens }),
+      name,
+      ...contextWindow === undefined ? {} : { contextWindow },
+      ...maxTokens === undefined ? {} : { maxTokens },
     })
   }
   return models

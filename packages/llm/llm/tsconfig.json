@@ -10,31 +10,34 @@
   ],
   "references": [
     {
-      "path": "../../util/values"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../util/brand"
-    },
-    {
       "path": "../../attachment/attachment"
     },
     {
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../util/timeout"
-    },
-    {
       "path": "../../typert/protocol"
     },
     {
+      "path": "../../util/brand"
+    },
+    {
       "path": "../../util/crypto"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

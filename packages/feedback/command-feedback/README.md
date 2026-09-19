@@ -63,6 +63,8 @@ Zero direct token effect. Neither an accepted entry nor a usage error adds model
 
 Independent of the model request path. Recording appends to the session log only, leaving an already-reusable request prefix untouched. Nothing this package contributes can invalidate cache reuse.
 
+**Runtime invariant:** No companion is published. Each `feedback/record` is an independent append-only fact with no cross-event or mutable-data relationship.
+
 ## Known Limitations and Deferred Work
 
 - **No feedback retrieval or management surface** — the optional OTel plugin uses the event only as a sharing trigger. There is no retrieval, aggregation, categorization, or model-facing tool for `feedback/record`.

@@ -85,6 +85,8 @@ Indirectly, through the consuming LLM adapters: stored values authorize their pr
 
 No direct invalidation; credentials never enter a request prefix.
 
+**Runtime invariant:** No companion is published. The Service Definition companion (`dsh-credentials/invariant`) owns the `credentials/reference-updated` lifecycle contract; this provider's file/environment layering is asynchronous I/O pinned by its unit suite.
+
 ## Known Limitations and Deferred Work
 
 - **Same-reference concurrent writes are last-write-wins** — the writer lock and the read-modify-write keep concurrent writers from dropping each other's entries, but two writers editing one reference still resolve to the later write; there is no revision check.

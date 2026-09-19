@@ -2,9 +2,7 @@
 // Client apply wiring under the terminal register form: ctx.layout provided,
 // ONE register() call declares the three child slots + seats the store factory
 // + wires the panel actions through the inject hook; teardown cascades
-// (service unprovided + declarations gone + registration cleared). Node half
-// and the invariant companion ride along — one line exposes the aggregate
-// coverage gate still requires exercised.
+// (service unprovided + declarations gone + registration cleared).
 
 import { Context } from '@deepseek-ai/cordis'
 import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
@@ -14,7 +12,6 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
-import * as invariant from '@deepseek-ai/dsh-client-ui-layout/invariant'
 
 beforeEach(() => {
   document.head.querySelectorAll('meta[name="theme-color"]').forEach((node) => { node.remove() })
@@ -139,21 +136,9 @@ describe('ui-layout client apply', () => {
   })
 })
 
-describe('node half + invariant companion', () => {
+describe('node half', () => {
   it('node apply is an intentional no-op (loader-managed lifecycle only)', () => {
     nodeApply()
     expect(true).toBe(true) // reaching here without throw is the contract
-  })
-
-  it('invariant companion registers under the package name', async () => {
-    const register = vi.fn().mockReturnValue(() => {})
-    const ctx = { invariants: { register } } as never
-    // The /invariant subpath types live in lib/types (build product); assert
-    // the API so the call stays typed where lint runs without a build.
-    const dispose = await (invariant as { apply: (ctx: never) => Promise<() => void> }).apply(ctx)
-    expect(register).toHaveBeenCalledWith('@deepseek-ai/dsh-client-ui-layout', expect.any(Function))
-    // The installer is the declared no-op — calling it must not throw.
-    expect(() => { (register.mock.calls[0]![1] as (c: never) => void)(undefined as never) }).not.toThrow()
-    expect(dispose).toBeTypeOf('function')
   })
 })

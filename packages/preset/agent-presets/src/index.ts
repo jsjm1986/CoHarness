@@ -574,6 +574,7 @@ export class AgentPresets extends TypertRemoteService {
     // Re-read inside the queue: an earlier switch may have run, and visible
     // content may have arrived, since this call was queued. Standalone plugin
     // events and empty turns keep a fresh session blank.
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     if (agent.session.snapshotEvents().some(hasConversationContent)) {
       throw new RemoteError(
         'agent-preset/locked',

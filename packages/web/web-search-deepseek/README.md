@@ -79,6 +79,8 @@ Zero direct conversation tokens from registration. Result tokens scale with retu
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. The package emits a pre-dispatch log event but owns no later authoritative dispatch event to relate it to. Exact envelope equality is pinned at the provider boundary instead.
+
 ## Known Limitations and Deferred Work
 
 - **One search costs a full Messages model turn** — latency plus generated tokens, with up to `maxUses` server-side searches; DeepSeek exposes no dedicated retrieval endpoint.

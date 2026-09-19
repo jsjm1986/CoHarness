@@ -99,7 +99,7 @@ describe('@deepseek-ai/dsh-command-goal registration', () => {
       definitionId: '@deepseek-ai/dsh-command-goal',
       name: 'goal',
       description: 'set or view the goal for a long-running task',
-      input: { hint: '[<objective>|clear|edit <objective>|pause|resume]', images: true },
+      input: { hint: '[<objective>|clear|edit <objective>|pause|resume]', attachments: true },
     })
     expect(test.ctx.commands.find(test.agent, 'goal')).toBeDefined()
 
@@ -267,7 +267,7 @@ describe('/goal image attachments', () => {
   /** Run /goal with `count` composer images through the executor boundary. */
   async function runWithImages(test: Harness, suffix: string, count: number) {
     const images = Array.from({ length: count }, (_, index) => ({
-      mediaType: 'image/png' as const, data: PNG, name: `ref-${index + 1}.png`,
+      type: 'image' as const, mediaType: 'image/png' as const, data: PNG, name: `ref-${index + 1}.png`,
     }))
     const execution = await test.ctx.commands.execute(test.agent, `/goal${suffix}`, images, new AbortController().signal)
     if (execution === undefined) throw new Error('goal command was not registered')

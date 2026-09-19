@@ -38,6 +38,8 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。浏览器会话验证会在请求授权工作时异步读取凭据记录，而记录的 commit-event 生命周期由 credentials 伴生入口负责；流与重连的时序及 rpcId 往返约束由行为规范直接验证，路由注册与 dispose（资源释放）的对称性由 webserver 伴生入口审计。
+
 ## 已知限制与暂缓事项
 
 - **History 可用性由 Host 决定**：该 carrier 只传输有界的 `session.history` 响应；部署能否在不恢复 Agent 的情况下读取冷日志，属于 Host 持久化提供方的职责。

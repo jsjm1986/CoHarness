@@ -5,11 +5,11 @@ import type { SessionProjectionStateMap } from '@deepseek-ai/dsh-session-project
 import type { QueuedInboxItem } from './api/events.ts'
 import { queuedInboxItemsSchema } from './api/events.schema.ts'
 
-type State = SessionProjectionStateMap['inbox']
+type State = SessionProjectionStateMap['queuedInbox']
 
 /** Reconstruct only the Session's own inbox; inherited messages belong to its parent. */
 export const inboxProjectionDefinition = {
-  key: 'inbox',
+  key: 'queuedInbox',
   stateVersion: 1,
   stateSchema: z.object({
     inheritedEventCount: z.number().int().nonnegative(),
@@ -43,4 +43,4 @@ export const inboxProjectionDefinition = {
     return next
   },
   wire: { viewSchema: queuedInboxItemsSchema, view: (state): QueuedInboxItem[] => state.items },
-} satisfies ProjectionDefinition<'inbox'>
+} satisfies ProjectionDefinition<'queuedInbox'>

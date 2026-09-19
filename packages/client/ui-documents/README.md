@@ -65,6 +65,8 @@ The manager is a client-only surface; it adds no conversation context and no tok
 
 The manager reads and writes the same durable `/api/documents` store that conversation attachments use, so previously uploaded documents remain available across sessions without re-upload. Its short-lived browser metadata cache affects only list rendering and has no model KV-cache effect.
 
+**Runtime invariant:** No companion is published. Document UI state is owned by the client session and has no independent event or mutable-data relation for this package to assert.
+
 ## Known Limitations and Deferred Work
 
 - Preview is limited to images, PDFs, and text-based files; other media types show a download fallback.

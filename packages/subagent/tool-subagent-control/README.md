@@ -68,6 +68,8 @@ Grows linearly with the listed continuable children — the whole tree under the
 
 Append-only; each result follows the reusable request prefix.
 
+**Runtime invariant:** No companion is published. This model-facing adapter has no independent lifecycle stream; delivery and activation relations are owned by the subagent service it calls.
+
 ## Known Limitations and Deferred Work
 
 - **A delivered message has no independent result** — acceptance returns only its inbox `messageId`; later target work lands in that target's durable Session and is never collected through this tool. A reply is another explicitly addressed `send_message`, not this call's result.

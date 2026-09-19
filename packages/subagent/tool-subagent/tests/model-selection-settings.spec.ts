@@ -12,7 +12,7 @@ import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { SUBAGENT_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as tool from '../src/index.ts'
 import * as ToolInvariant from '../src/invariant.ts'
@@ -23,7 +23,7 @@ import {
   subagentModelSelectionPolicy,
   subagentModelSelectionProjectionDefinition,
 } from '../src/model-selection-state.ts'
-import { text } from './harness.ts'
+import { callSubagent, text } from './harness.ts'
 
 const ALLOWED_MODELS = [{ provider: 'alpha', model: 'fast-model' }]
 
@@ -460,4 +460,31 @@ describe('SubagentModelSelectionConfig', () => {
       .rejects.toThrow('require a durable policy, route fields, and list_subagent_models')
     await ctx.fiber.dispose()
   })
+})
+
+
+it('reads the saved default depth at each delegation without remounting the tool', async () => {
+  const ctx = await boot(false)
+  const depths: Array<number | undefined> = []
+  try {
+    ctx.subagents.registerProvider({
+      name: 'capture-depth',
+      capabilities: { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
+      inheritsParentContext: false,
+      start: async (request) => {
+        depths.push(request.maxDepth)
+        return { id: SessionId(`depth-${depths.length}`), localAgent: undefined,
+          result: Promise.resolve({ output: [], stopReason: 'completed' as const }), dispose: async () => {} }
+      },
+    })
+    await ctx.plugin(tool, { provider: 'capture-depth' })
+    await callSubagent(ctx, { description: 'first', prompt: 'work' })
+    await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 5 })
+    await callSubagent(ctx, { description: 'second', prompt: 'work' })
+    await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 0 })
+    await callSubagent(ctx, { description: 'disabled', prompt: 'work' })
+    expect(depths).toEqual([1, 5, 0])
+  } finally {
+    await ctx.fiber.dispose()
+  }
 })

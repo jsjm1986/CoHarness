@@ -14,6 +14,8 @@ None, as the seam serves the GUI host's directory selection; nothing here reache
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This stateless Service Definition owns the capability vocabulary, while backends and the Remote controller own observations.
+
 ## Known Limitations and Deferred Work
 
 - **No multi-root support** — the browse contract exposes one ancestry chain per listing; per-deployment root scoping (and Windows drive-root enumeration above a drive) waits for a consumer that needs it, per the DirectoryPicker Agent Note.

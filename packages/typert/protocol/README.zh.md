@@ -32,6 +32,8 @@ Host 装配以转发给消费端的 Host 事件扩展 `TypertRemoteEventSelectio
 
 无直接影响。
 
+**运行时不变式：** 不发布伴生入口。decorator 只保留私有不可变声明，binding 也是冻结值，没有可供交叉核对的独立事件流。
+
 ## 已知限制与暂缓事项
 
 - 装饰器标记仅包含方法名，以及直接调用或 Context 调用模式。参数、结果、查找和 schema 反射需要 Typert 构建流水线。

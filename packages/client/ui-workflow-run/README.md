@@ -28,6 +28,8 @@ None, as this package renders durable Session facts for humans and adds no promp
 
 None.
 
+**Runtime invariant:** No companion is published. The browser plugin contributes one effect-owned Conversation Definition, keyed renderer, and dictionary; tests prove their disposal and the Host tool package owns the durable event invariant.
+
 ## Known Limitations and Deferred Work
 
 - Only top-level calls through `dsh-tool-workflow` produce these records; nested PTC mode calls and direct `WorkflowEngine` consumers do not.

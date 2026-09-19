@@ -50,6 +50,8 @@ None, as the package renders pure React atoms in the browser; nothing here reach
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Pure props-in React atoms with no Cordis API — no events, no services, no mutable cross-plugin state; rendering contracts are asserted directly by this package's component specs.
+
 ## Known Limitations and Deferred Work
 
 - **Streaming defers cross-boundary reference resolution** — a reference-style link or footnote whose definition sits on the other side of the incremental freeze boundary renders as literal text while the reply streams; the settled full parse at finalize resolves it. Inline links and references resolved within one parse are unaffected.

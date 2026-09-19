@@ -1,11 +1,12 @@
 /**
- * Physical history-record codec: packed chunk runs, complete-envelope UTF-8
- * byte targeting at append-origin message boundaries, and lossless expansion.
+ * Physical history-record codec: ordinary `{ event, view? }` records,
+ * complete-envelope UTF-8 byte targeting at append-origin message boundaries,
+ * and lossless expansion.
  */
 
 import { describe, expect, it } from 'vitest'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
-import { CallId, MessageId } from '@deepseek-ai/dsh-llm/brand'
+import { ToolCallId, MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { RpcId } from '../src/api/rpc.ts'
 import type { Wire } from '../src/api/rpc.schema.ts'
@@ -51,7 +52,6 @@ function assistantEntry(
   seq: number,
   time: number,
   text: string,
-  sourceEventSeqs: number[],
   usage?: { inputTokens: number; outputTokens: number },
 ): HistoryEntry {
   return {
@@ -60,6 +60,7 @@ function assistantEntry(
       seq: SessionSeq(seq),
       time,
       data: {
+        stream: [],
         turn: 1,
         step: 1,
         message: {
@@ -71,7 +72,6 @@ function assistantEntry(
         ...usage === undefined ? {} : { usage },
       },
       surfaceOp: 'append',
-      sourceEventSeqs: sourceEventSeqs.map(SessionSeq),
     },
   }
 }
@@ -122,13 +122,17 @@ function requireEvents(decoded: Wire<HistoryValue>): HistoryEntry[] {
   return decoded.events as HistoryEntry[]
 }
 
-function textDeltaEntries(seq0: number, time0: number, texts: readonly string[]): HistoryEntry[] {
+function attemptEntries(seq0: number, time0: number, texts: readonly string[]): HistoryEntry[] {
   return texts.map((text, k) => ({
     event: {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: SessionSeq(seq0 + k),
       time: time0 + 10 * k,
-      data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text } },
+      data: {
+        turn: 1,
+        step: 1,
+        stream: [{ type: 'chunk', time: time0 + 10 * k, chunk: { type: 'text-delta', index: 0, text } }],
+      },
     } satisfies SessionEvent,
   }))
 }
@@ -158,14 +162,14 @@ function conversation(): HistoryValue {
   const events: HistoryEntry[] = [
     { event: { type: 'turn/start', seq: SessionSeq(0), time: 1000, data: { turn: 1 } } },
     userEntry(1, 1010, 'first prompt'),
-    ...textDeltaEntries(2, 1020, unicodeTexts),
-    assistantEntry(6, 1060, '你好🙂世界', [2, 3, 4, 5], { inputTokens: 8, outputTokens: 4 }),
+    ...attemptEntries(2, 1020, unicodeTexts),
+    assistantEntry(6, 1060, '你好🙂世界', { inputTokens: 8, outputTokens: 4 }),
     {
       event: {
         type: 'tool/call',
         seq: SessionSeq(7),
         time: 1070,
-        data: { turn: 1, step: 1, callId: CallId('c-term'), name: 'term', arguments: '{"cmd":"ls"}' },
+        data: { turn: 1, step: 1, callId: ToolCallId('c-term'), name: 'term', arguments: '{"cmd":"ls"}' },
       },
       view: toolView,
     },
@@ -187,7 +191,7 @@ function conversation(): HistoryValue {
       },
     },
     userEntry(11, 1110, 'second prompt'),
-    assistantEntry(12, 1120, 'second reply', []),
+    assistantEntry(12, 1120, 'second reply'),
     userEntry(13, 1130, 'third prompt'),
     {
       event: {
@@ -197,7 +201,7 @@ function conversation(): HistoryValue {
         data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } },
       },
     },
-    ...textDeltaEntries(15, 1150, ['in', '-', 'flight']),
+    ...attemptEntries(15, 1150, ['in', '-', 'flight']),
   ]
   return { events, hasMore: false, projections }
 }
@@ -214,8 +218,9 @@ describe('history wire codec', () => {
     expect(decoded.projections).toStrictEqual(value.projections)
     expect(decoded.hasMore).toBe(false)
     expect(decoded.omittedSpans).toBeUndefined()
-    const records = (wire as { records: Array<{ chunks?: unknown }> }).records
-    expect(records.some(record => record.chunks !== undefined)).toBe(true)
+    const records = (wire as { records: Array<{ event?: SessionEvent }> }).records
+    expect(records.length).toBe(value.events.length)
+    expect(records.every(record => record.event !== undefined)).toBe(true)
     expect(utf8Bytes(encoded)).toBe(new TextEncoder().encode(JSON.stringify(encoded)).byteLength)
   })
 
@@ -223,11 +228,11 @@ describe('history wire codec', () => {
     const value: HistoryValue = {
       events: [
         userEntry(0, 1000, 'alpha'),
-        assistantEntry(1, 1010, 'one', []),
+        assistantEntry(1, 1010, 'one'),
         userEntry(2, 1020, 'beta'),
-        assistantEntry(3, 1030, 'two', []),
+        assistantEntry(3, 1030, 'two'),
         userEntry(4, 1040, 'gamma'),
-        assistantEntry(5, 1050, 'three', []),
+        assistantEntry(5, 1050, 'three'),
       ],
       hasMore: false,
     }
@@ -256,8 +261,8 @@ describe('history wire codec', () => {
     const value: HistoryValue = {
       events: [
         userEntry(0, 1000, 'older'),
-        ...textDeltaEntries(1, 1010, texts),
-        assistantEntry(9, 1100, texts.join(''), [1, 2, 3, 4, 5, 6, 7, 8]),
+        ...attemptEntries(1, 1010, texts),
+        assistantEntry(9, 1100, texts.join('')),
       ],
       hasMore: false,
     }
@@ -288,11 +293,11 @@ describe('history wire codec', () => {
     expect(utf8Bytes(encoded)).toBeGreaterThan(1)
   })
 
-  it('rejects a malformed packed record before expanding events', () => {
+  it('rejects malformed records before expanding events', () => {
     expect(() => historyWireValueSchema.parse({
       records: [{ chunks: { type: 'text-chunks' } }],
       hasMore: false,
-    })).toThrow(/malformed text-chunks storage row/)
+    })).toThrow(/history wire record must be exactly \{ event, view\? \}/)
     expect(() => historyWireValueSchema.parse({
       records: [null],
       hasMore: false,
@@ -303,11 +308,11 @@ describe('history wire codec', () => {
     const value: HistoryValue = {
       events: [
         userEntry(0, 1000, 'alpha'),
-        assistantEntry(1, 1010, 'one', []),
+        assistantEntry(1, 1010, 'one'),
         userEntry(2, 1020, 'beta'),
-        assistantEntry(3, 1030, 'two', []),
+        assistantEntry(3, 1030, 'two'),
         userEntry(4, 1040, 'gamma'),
-        assistantEntry(5, 1050, 'three', []),
+        assistantEntry(5, 1050, 'three'),
       ],
       hasMore: false,
     }
@@ -327,13 +332,32 @@ describe('history wire codec', () => {
         summaryEntry(1, 1010, '你'.repeat(400), [1]),
         userEntry(2, 1020, 'first'),
         userEntry(5, 1050, 'second'),
-        assistantEntry(6, 1060, 'cites seq 1', [1]),
+        {
+          event: {
+            type: 'assistant/message',
+            seq: SessionSeq(6),
+            time: 1060,
+            data: {
+              stream: [],
+              turn: 1,
+              step: 1,
+              message: {
+                id: messageId(6),
+                role: 'assistant',
+                content: [{ type: 'text', text: 'cites seq 1' }],
+                source: { kind: 'model', provider: 'p', model: 'm' },
+              },
+            },
+            surfaceOp: 'append',
+            sourceEventSeqs: [SessionSeq(1)],
+          } as unknown as SessionEvent,
+        },
       ],
       hasMore: false,
     }
     expect(value.events.filter(entry => entry.event.type === 'user/message' || entry.event.type === 'assistant/message')
       .map((entry) => {
-        const sources = (entry.event as SessionEvent & { sourceEventSeqs?: number[] }).sourceEventSeqs
+        const sources = entry.event.sourceEventSeqs
         return sources !== undefined && sources.length > 0 ? Math.min(entry.event.seq, ...sources) : entry.event.seq
       })).toStrictEqual([2, 5, 1])
 
@@ -351,51 +375,43 @@ describe('history wire codec', () => {
     expect(decoded.hasMore).toBe(true)
   })
 
-  it('rejects mixed packed records that carry event or view beside chunks', () => {
-    const packed = encodeHistoryServerResponse(RPC, {
-      events: textDeltaEntries(0, 1000, ['a', 'b', 'c']),
-      hasMore: false,
-    }, DEFAULT_HISTORY_PAGE_TARGET_BYTES)
-    if (!packed.result.ok) throw new Error('unreachable')
-    const records = (JSON.parse(JSON.stringify(packed.result.value)) as { records: Array<{ chunks?: unknown }> }).records
-    const row = records.find(record => record.chunks !== undefined)
-    expect(row?.chunks).toBeDefined()
+  it('rejects records that carry keys beside event or view', () => {
     const view = { for: 'call' as const, view: { card: 'generic', title: 'x' } }
     expect(() => historyWireValueSchema.parse({
-      records: [{ chunks: row!.chunks, event: userEntry(9, 1, 'extra').event }],
+      records: [{ event: userEntry(9, 1, 'extra').event, chunks: { type: 'text-chunks' } }],
       hasMore: false,
     })).toThrow()
     expect(() => historyWireValueSchema.parse({
-      records: [{ chunks: row!.chunks, view }],
+      records: [{ event: userEntry(9, 1, 'extra').event, view, extra: true }],
       hasMore: false,
     })).toThrow()
   })
 
-  it('passes unknown chunk fields through as ordinary events', () => {
+  it('passes unknown attempt stream fields through as ordinary events', () => {
     const extra: HistoryEntry = {
       event: {
-        type: 'assistant/chunk',
+        type: 'assistant/attempt',
         seq: 0,
         time: 1,
-        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'x', extra: true } },
-      } as SessionEvent,
+        data: { turn: 1, step: 1, stream: [{ type: 'novel-record', extra: true }] },
+      } as unknown as SessionEvent,
     }
     const value: HistoryValue = { events: [userEntry(1, 2, 'hi'), extra], hasMore: false }
     const { decoded, wire } = roundTrip(value, DEFAULT_HISTORY_PAGE_TARGET_BYTES)
     expect(decoded.events).toStrictEqual(value.events)
-    const records = (wire as { records: Array<{ chunks?: unknown; event?: SessionEvent }> }).records
-    expect(records.some(record => record.chunks !== undefined)).toBe(false)
+    const records = (wire as { records: Array<{ event?: SessionEvent }> }).records
+    expect(records.length).toBe(2)
     expect(records.some(record => record.event?.data !== undefined
-      && (record.event.data as { chunk?: { extra?: unknown } }).chunk?.extra === true)).toBe(true)
+      && (record.event.data as { stream?: Array<{ extra?: unknown }> }).stream?.[0]?.extra === true)).toBe(true)
   })
 
   it('round-trips omittedSpans and clips them to a byte-target suffix', () => {
     const value: HistoryValue = {
       events: [
         userEntry(0, 1000, 'older'),
-        assistantEntry(1, 1010, 'kept', []),
+        assistantEntry(1, 1010, 'kept'),
         userEntry(10, 1100, 'newer'),
-        assistantEntry(11, 1110, 'tail', []),
+        assistantEntry(11, 1110, 'tail'),
       ],
       hasMore: false,
       omittedSpans: [

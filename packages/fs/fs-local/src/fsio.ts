@@ -456,7 +456,7 @@ export async function readByteRange(
   signal?: AbortSignal,
 ): Promise<Uint8Array> {
   /* jscpd:ignore-start -- sibling FS providers enforce the same capability
-   * range contract locally; fs-e2b keeps the symmetric check. */
+   * range contract locally. */
   if (!Number.isSafeInteger(range.offset) || range.offset < 0
     || !Number.isSafeInteger(range.length) || range.length < 0) {
     throw new FsError('invalid byte range', 'FS_IO_ERROR')

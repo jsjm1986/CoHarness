@@ -813,22 +813,22 @@
       "evidence": "Phase 1 activation-audit consumers adapted with local tests; see UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md Phase 1 sections."
     },
     {
-      "area": "packages/code-runtime/code-runtime",
+      "area": "packages/ptc-runtime/ptc-runtime",
       "status": "adapt",
-      "localOwner": "packages/code-runtime/code-runtime",
+      "localOwner": "packages/ptc-runtime/ptc-runtime",
       "commitScope": [
-        "packages/code-runtime/code-runtime/"
+        "packages/ptc-runtime/ptc-runtime/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "changeKind": "removed",
       "currentSovereignty": "adapted"
     },
     {
-      "area": "packages/code-runtime/code-runtime-worker-thread",
+      "area": "packages/ptc-runtime/ptc-runtime-node",
       "status": "adapt",
-      "localOwner": "packages/code-runtime/code-runtime-worker-thread",
+      "localOwner": "packages/ptc-runtime/ptc-runtime-node",
       "commitScope": [
-        "packages/code-runtime/code-runtime-worker-thread/"
+        "packages/ptc-runtime/ptc-runtime-node/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "changeKind": "removed",
@@ -1223,11 +1223,11 @@
       "currentSovereignty": "unmanifested"
     },
     {
-      "area": "packages/experimental/code-runtime-python",
+      "area": "packages/experimental/ptc-runtime-python",
       "status": "adapt",
-      "localOwner": "packages/experimental/code-runtime-python",
+      "localOwner": "packages/experimental/ptc-runtime-python",
       "commitScope": [
-        "packages/experimental/code-runtime-python/"
+        "packages/experimental/ptc-runtime-python/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "changeKind": "removed",
@@ -3198,11 +3198,11 @@
       "currentSovereignty": "unmanifested"
     },
     {
-      "area": "packages/workflow/workflow-worker-thread",
+      "area": "packages/workflow/workflow-ptc",
       "status": "adapt",
-      "localOwner": "packages/workflow/workflow-worker-thread",
+      "localOwner": "packages/workflow/workflow-ptc",
       "commitScope": [
-        "packages/workflow/workflow-worker-thread/"
+        "packages/workflow/workflow-ptc/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "changeKind": "removed",

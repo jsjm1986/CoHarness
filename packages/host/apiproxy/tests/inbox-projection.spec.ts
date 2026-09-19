@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import { inboxProjectionDefinition as projection } from '../src/inbox-projection.ts'
 
-const header = { version: 2, id: SessionId('inbox-projection'), createdAt: 1, isSeeded: false }
+const header: SessionHeader = { version: SESSION_FORMAT_VERSION, id: SessionId('inbox-projection'), createdAt: 1, isSeeded: false }
 const message = createUserMessage({ content: [{ type: 'text', text: 'queued' }], source: { kind: 'user' } })
 const splice = (start = 0, removedCount = 0): SessionEvent => ({
   type: 'agent/inbox/spliced', seq: SessionSeq(0), time: 1,

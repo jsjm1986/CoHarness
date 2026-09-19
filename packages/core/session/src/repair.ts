@@ -5,7 +5,7 @@
  * @module @deepseek-ai/dsh-session/repair
  */
 
-import { MessageId, freezeMessage, type CallId } from '@deepseek-ai/dsh-llm'
+import { MessageId, freezeMessage, type ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ToolResultMessage } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from './types.ts'
 import type { SessionEvent, SessionSeq as SessionSeqType } from './types.ts'
@@ -30,7 +30,7 @@ export function interruptedTurnClosers(events: readonly SessionEvent[]): Session
   let openStep: number | null = null
   // Reset at each turn boundary so earlier calls cannot leak into tail repair.
   // Assistant blocks register calls; later `tool/call` events add their seqs to `sourceEventSeqs`.
-  const pendingCalls = new Map<CallId, { step: number; callSeq?: SessionSeqType }>()
+  const pendingCalls = new Map<ToolCallId, { step: number; callSeq?: SessionSeqType }>()
   for (const event of events) {
     switch (event.type) {
       case 'turn/start':

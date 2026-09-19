@@ -22,6 +22,8 @@ None, as this is host-side subprocess plumbing; nothing here reaches a model req
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Each run is one stateless child-process round trip with no owned event stream or mutable runtime data; behavior is enforced by unit tests.
+
 ## Known Limitations and Deferred Work
 
 - **No output bounding** — both streams buffer unbounded in memory; every current caller invokes small native tools whose output is a path or an error line. Adopt `dsh-output-retention` bounding before pointing this at commands with meaningful output volume.

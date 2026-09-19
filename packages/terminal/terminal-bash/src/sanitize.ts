@@ -37,15 +37,14 @@ export class TerminalSanitizer {
    */
   push(chunk: string): SanitizedChunk {
     this.pending += this.discardPrefix(chunk)
-    const textParts: string[] = []
+    let text = ''
     let prompt = false
     let includePromptTail = this.trackingPromptTail
-    const promptParts: string[] = []
+    let promptTail = ''
     let index = 0
     const appendText = (value: string): void => {
-      if (value.length === 0) return
-      textParts.push(value)
-      if (this.trackingPromptTail) promptParts.push(value)
+      text += value
+      if (this.trackingPromptTail) promptTail += value
     }
     while (index < this.pending.length) {
       const escape = this.pending.indexOf('\x1b', index)
@@ -77,7 +76,7 @@ export class TerminalSanitizer {
           prompt = true
           this.trackingPromptTail = true
           includePromptTail = true
-          promptParts.length = 0
+          promptTail = ''
         }
         index = end
         continue
@@ -102,9 +101,9 @@ export class TerminalSanitizer {
     this.pending = this.pending.slice(index)
     this.enforcePendingBound()
     return {
-      text: this.normalizeText(textParts.join('')),
+      text: this.normalizeText(text),
       prompt,
-      ...includePromptTail ? { promptTail: promptParts.join('') } : {},
+      ...includePromptTail ? { promptTail } : {},
     }
   }
 

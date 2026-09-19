@@ -125,9 +125,9 @@
   - img
   - text: Think WIRE_REASONING_TOOL_CALL
 - paragraph: WIRE_ASSISTANT_TOOL_CALL
-- button "Bash Verify packed history carrier" [expanded]:
+- button "Bash Verify history wire pagination" [expanded]:
   - img
-  - text: Bash Verify packed history carrier
+  - text: Bash Verify history wire pagination
 - text: Done {{workspace}} printf 'WIRE_TOOL_OUTPUT\n'
 - button "Copy"
 - text: WIRE_TOOL_OUTPUT

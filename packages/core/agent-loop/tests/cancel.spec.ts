@@ -1,4 +1,4 @@
-import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createUserMessage, expandAssistantStream } from '@deepseek-ai/dsh-llm'
 /**
  * Tests for the queue-aware `Agent.cancel()` primitive. The default clears
  * queued and steering work, while `keepInbox` preserves pending input for a
@@ -492,14 +492,17 @@ describe('Agent.cancel()', () => {
     await waitForIdle(ctx, agent)
 
     // The prefix the user watched stream is committed as the step's message,
-    // carrying the truncation marker and citing exactly the chunk events that
-    // delivered it.
+    // carrying the truncation marker and exact embedded stream that delivered it.
     const message = agent.session.snapshotEvents().find(e => e.type === 'assistant/message')
     expect(message?.type === 'assistant/message' ? message.data.message.content : undefined)
       .toEqual([{ type: 'text', text: 'partial' }])
     expect(message?.type === 'assistant/message' ? message.data.interrupted : undefined).toBe(true)
-    const chunkSeqs = agent.session.snapshotEvents().filter(e => e.type === 'assistant/chunk').map(e => e.seq)
-    expect(message?.sourceEventSeqs).toEqual(chunkSeqs)
+    expect(message?.type === 'assistant/message'
+      ? expandAssistantStream(message.data.stream ?? []).some(member => (
+        member.chunk.type === 'text-delta' && member.chunk.text === 'partial'
+      ))
+      : false).toBe(true)
+    expect(message?.sourceEventSeqs).toBeUndefined()
     const types = agent.session.snapshotEvents().map(e => e.type)
     expect(types.indexOf('assistant/message')).toBeLessThan(types.indexOf('step/end'))
     expect(types.indexOf('step/end')).toBeLessThan(types.indexOf('turn/end'))
@@ -545,7 +548,7 @@ describe('Agent.cancel()', () => {
         { type: 'text-delta', index: 0, text: 'reading the file' },
         { type: 'block-end', index: 0, block: { type: 'text', text: 'reading the file' } },
         { type: 'block-start', index: 1, blockType: 'tool-call' },
-        { type: 'tool-call-delta', index: 1, id: CallId('c1'), name: 'read', argumentsDelta: '{"pa' },
+        { type: 'tool-call-delta', index: 1, id: ToolCallId('c1'), name: 'read', argumentsDelta: '{"pa' },
       ],
     }])
     const ctx = await harness(adapter)
@@ -587,7 +590,7 @@ describe('Agent.cancel()', () => {
     expect(end?.type === 'turn/end' ? end.data.reason.kind : undefined).toBe('aborted')
   })
 
-  it('retry discards the failed attempt; the final message cites only its own chunks', async () => {
+  it('retry retains the failed attempt while the final message embeds only its own stream', async () => {
     const adapter = new MockAdapter([
       [
         { type: 'block-start', index: 0, blockType: 'text' },
@@ -609,20 +612,24 @@ describe('Agent.cancel()', () => {
     expect(message.type === 'assistant/message' ? message.data.message.content : undefined)
       .toEqual([{ type: 'text', text: 'recovered' }])
     expect(message.type === 'assistant/message' ? message.data.interrupted : undefined).toBeUndefined()
-    // The abandoned attempt's chunks stay out of the completion's source set.
-    const doomedSeqs = agent.session.snapshotEvents()
-      .filter(e => e.type === 'assistant/chunk'
-        && e.data.chunk.type === 'text-delta' && e.data.chunk.text === 'doomed partial')
-      .map(e => e.seq)
-    expect(doomedSeqs).toHaveLength(1)
-    expect(message.sourceEventSeqs).not.toContain(doomedSeqs[0])
+    const failed = agent.session.snapshotEvents().find(e => e.type === 'assistant/attempt')
+    expect(failed?.type === 'assistant/attempt'
+      ? expandAssistantStream(failed.data.stream).some(member => (
+        member.chunk.type === 'text-delta' && member.chunk.text === 'doomed partial'
+      ))
+      : false).toBe(true)
+    expect(message.type === 'assistant/message'
+      ? expandAssistantStream(message.data.stream ?? []).some(member => (
+        member.chunk.type === 'text-delta' && member.chunk.text === 'doomed partial'
+      ))
+      : true).toBe(false)
   })
 
   it('cancel before any visible content finalizes nothing', async () => {
     const adapter = new MockAdapter([{
       hangAfter: [
         { type: 'block-start', index: 0, blockType: 'tool-call' },
-        { type: 'tool-call-delta', index: 0, id: CallId('c1'), name: 'read', argumentsDelta: '{"pa' },
+        { type: 'tool-call-delta', index: 0, id: ToolCallId('c1'), name: 'read', argumentsDelta: '{"pa' },
       ],
     }])
     const ctx = await harness(adapter)
@@ -646,7 +653,7 @@ describe('Agent.cancel()', () => {
     // cancel check (the one that must closeStep() to balance the already-open
     // step) — distinct from a turn-start cancel, caught before the step opens.
     let streamed = false
-    ctx.on('session/event', (_s, event) => { if (event.type === 'assistant/chunk') streamed = true })
+    ctx.on('session/event', (_s, event) => { if (event.type === 'assistant/attempt' || event.type === 'assistant/message') streamed = true })
     const dispose = ctx.on('session/event', (session, event) => {
       if (session === agent.session && event.type === 'step/start') agent.cancel({ kind: 'user' })
     })
@@ -686,7 +693,7 @@ describe('Agent.cancel()', () => {
 
     let disposalDone: Promise<void> | undefined
     let streamed = false
-    ctx.on('session/event', (_s, event) => { if (event.type === 'assistant/chunk') streamed = true })
+    ctx.on('session/event', (_s, event) => { if (event.type === 'assistant/attempt' || event.type === 'assistant/message') streamed = true })
     ctx.on('session/event', (session, event) => {
       if (session === agent.session && event.type === 'step/start') disposalDone = handle.dispose()
     })
@@ -739,7 +746,7 @@ describe('Agent.cancel()', () => {
     // `agent/status` is synchronous, so cancellation can land before the
     // durable turn-start commit and must drop the reserved work.
     let streamed = false
-    ctx.on('session/event', (_s, event) => { if (event.type === 'assistant/chunk') streamed = true })
+    ctx.on('session/event', (_s, event) => { if (event.type === 'assistant/attempt' || event.type === 'assistant/message') streamed = true })
     const dispose = ctx.on('agent/status', ({ agent: subject, status }) => {
       if (subject === agent && status === 'running') agent.cancel({ kind: 'user' })
     })

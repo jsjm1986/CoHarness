@@ -40,6 +40,8 @@ Zero live-request tokens beyond the retained history and any shared persistence 
 
 The provider does not rewrite valid history. Resume can reuse provider cache when the reconstructed prefix, current envelope, and route match; newly committed events append to the suffix.
 
+**Runtime invariant:** No companion is published. Backend correctness is covered by the shared persistence contract.
+
 ## Known Limitations and Deferred Work
 
 - **Gateway dependency** — cold reads, writes, flushes, and recovery require the loopback Gateway and PostgreSQL; there is no local fallback.

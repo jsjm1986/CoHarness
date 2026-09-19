@@ -12,8 +12,8 @@ import { isPromise } from 'node:util/types'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
-import type { TypertContext, TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
-import type { Agent, AgentOptions, SessionStartSource } from './runtime-types.ts'
+import type { Agent } from './types.ts'
+import type { AgentOptions, SessionStartSource } from './runtime-types.ts'
 
 export * from './runtime-types.ts'
 export * from './types.ts'
@@ -22,16 +22,6 @@ export * from './consumed-work.ts'
 export * from './model-selection.ts'
 export { agentCarrier, agentEvents, assembleContextFor, emitAgentEvent } from './dispatch.ts'
 export type { AgentEventDispatch, AgentSubjectEvent } from './dispatch.ts'
-
-declare module '@deepseek-ai/dsh-typert-protocol' {
-  interface TypertLookupMap {
-    agent: TypertLookup<Agent, SessionId>
-  }
-
-  interface TypertContextMap {
-    agent: TypertContext<SessionId>
-  }
-}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -54,6 +44,7 @@ export interface AgentSetupCommit {
 /**
  * Compose an unpublished Agent scope and optionally return its publication commit.
  * @param agentCtx - unpublished Agent scope.
+ * @param agent - unpublished Agent being composed.
  * @returns an optional synchronous commit invoked after setup awaits settle and immediately before publication.
  */
 export type AgentSetup = (
@@ -71,6 +62,8 @@ export type AgentSetup = (
 export interface CreateAgentOptions {
   /** The live agent/session identity. */
   readonly sessionId: SessionId
+  /** Live parent Agent for runtime ownership; omit for a root Agent. */
+  readonly parentAgent?: Agent
   /**
    * Session creation metadata: validated absolute `cwd`, `parentSession`
    * fork lineage, the `isSeeded` fork marker, the coarse `origin`
@@ -102,8 +95,6 @@ export interface CreateAgentOptions {
   readonly seed?: readonly SessionEvent[]
   /** Per-agent options (model, …). */
   readonly agentOptions?: AgentOptions
-  /** Live parent Agent for runtime ownership; omit for a root Agent. */
-  readonly parentAgent?: Agent
   /** Optional creation-only cancellation signal; detached before the returned handle becomes visible. */
   readonly signal?: AbortSignal
   /**
@@ -134,10 +125,10 @@ export interface CreateAgentOptions {
 export interface ResumeAgentOptions {
   /** The persisted session id to load and use as the live agent/session identity. */
   readonly resumeSessionId: SessionId
-  /** Per-agent options (model, …). */
-  readonly agentOptions?: AgentOptions
   /** Live parent Agent for runtime ownership; omit for a root Agent. */
   readonly parentAgent?: Agent
+  /** Per-agent options (model, …). */
+  readonly agentOptions?: AgentOptions
   /** Optional creation-only cancellation signal for persistence load/setup; detached before return. */
   readonly signal?: AbortSignal
   /**
@@ -181,8 +172,8 @@ export interface AgentFactory {
   /**
    * Create a new agent on a caller-supplied session id. Async because creation
    * awaits unpublished setup, invokes its optional synchronous commit, inserts
-   * both session and agent, announces session creation, awaits serial
-   * `agent/created` initialization, and only then starts the loop. The sequence is
+   * both session and agent, announces session creation, and awaits serial
+   * `agent/created` listeners before releasing queued work. The sequence is
    * rollback-covered, but notifications delivered before a later listener
    * failure remain observable; every agent or session creation announcement
    * that began is paired by `agent/disposed` or `session/disposed` during
@@ -193,18 +184,19 @@ export interface AgentFactory {
    * transaction and resulting lifecycle to that owner; it must not infer
    * ownership from the factory object's registration context.
    * @param ownerCtx - caller-bound context that owns the transaction and live handle.
-   * @param options - agent/session identity, configuration, and optional setup.
-   * @returns the owned handle after setup, both announcements, and loop start complete.
+   * @param options - agent/session identity, configuration, optional live parent, and setup.
+   * @returns the owned handle after setup and both creation announcements complete.
    */
   createAgent(ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle>
   /**
-   * Prepare a persisted session and resume an agent on it. Async because it awaits
-   * both `ctx.sessionPersistence.prepare` and the optional unpublished setup
-   * transaction; must be called after that service exists (consumers inject
-   * `sessionPersistence`). Publication follows the same setup-commit and
-   * ordered boundary as {@link createAgent}.
+   * Resume an agent on a persisted session. Async because it opens the
+   * persisted session for write, reads and repairs the log, publishes it, and
+   * awaits the optional unpublished setup transaction; must be called after
+   * `ctx.sessionPersistence` exists (consumers inject `sessionPersistence`).
+   * Publication follows the same setup-commit and ordered boundary as
+   * {@link createAgent}.
    * @param ownerCtx - caller-bound context that owns load, setup, and the live handle.
-   * @param options - persisted identity, configuration, and optional setup.
+   * @param options - persisted identity, configuration, optional live parent, and setup.
    * @returns the owned handle after setup, both announcements, and loop start complete.
    */
   resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandle>
@@ -291,8 +283,8 @@ export class AgentRegistry extends Service {
    * Read the Agent that initiated the inherited asynchronous driver chain.
    * Use this optional form for logging, tracing, metrics, or host attribution
    * that also supports agentless calls. When a parent creates a child, setup
-   * reports the causal parent while the setup callback's explicit `agent`
-   * parameter identifies the child.
+   * reports the causal parent while the setup callback's Agent parameter
+   * identifies the child.
    * @returns the inherited Agent, or `undefined` outside an initiator boundary
    *   and inside an explicit clearing boundary.
    * @throws when this service instance has been disposed.
@@ -390,7 +382,7 @@ export class AgentRegistry extends Service {
    * agent): this constructs the agent and its session. Rejects if no factory is
    * registered or creation/setup fails. The resolved {@link AgentHandle} lets
    * the owner tear down exactly this agent.
-   * @param options - shared identity, session seed/metadata, and agent options.
+   * @param options - shared identity, optional live parent, session seed/metadata, and agent options.
    * @returns the handle after setup, rollback-covered publication, and loop start complete.
    */
   async create(options: CreateAgentOptions): Promise<AgentHandle> {
@@ -409,7 +401,7 @@ export class AgentRegistry extends Service {
    * Load a persisted session and resume an agent on it through the registered
    * factory. Rejects if no factory is registered; the factory rejects if
    * session persistence is not configured or persistence/setup fails.
-   * @param options - persisted identity, configuration, and optional setup.
+   * @param options - persisted identity, optional live parent, configuration, and setup.
    * @returns the handle after setup, rollback-covered publication, and loop start complete.
    */
   async resume(options: ResumeAgentOptions): Promise<AgentHandle> {
@@ -421,15 +413,16 @@ export class AgentRegistry extends Service {
   }
 
   /**
-   * Register a live agent with source `startup`. Rejects if the id is already
-   * registered or a serial `agent/created` listener fails. Emits `agent/disposed`
+   * Register a live agent with source `startup`. Rejects if the id is already registered or a
+   * serial `agent/created` listener fails. Emits `agent/disposed`
    * when the calling fiber is disposed — both with the agent's scope carrier
    * (`scopeTarget(agent, agent)`): the subject is the agent in hand, so the
    * emits are scope-filtered regardless of which context invoked `register`
    * (calling through `agent.ctx` scopes EFFECTS; dispatch scoping always
-   * requires passing the carrier). Await registration before using the agent.
+   * requires passing the carrier). The entry is a runtime root; factory-backed
+   * creation uses `options.parentAgent` for child ownership. Await the registration before using the agent.
    * @param agent - the already-constructed agent to record in the store.
-   * @returns the exact awaitable Cordis effect disposer (single-shot; a repeat call
+   * @returns the awaitable Cordis effect disposer (single-shot; a repeat call
    *   returns undefined without awaiting an in-flight teardown). Exact
    *   identity is load-bearing: a composite (generator) effect that owns a
    *   teardown ORDER — the agent factory's lifecycle chain — must yield THIS
@@ -452,13 +445,13 @@ export class AgentRegistry extends Service {
    * returned detach closure into its pre-installed composite teardown before
    * calling {@link announce}. Ordinary callers use {@link register}.
    * @param agent - the prepared, unpublished agent.
-   * @param owner - live agent whose scoped context created this agent, or
+   * @param owner - explicitly supplied live runtime owner, or
    *   undefined for a top-level runtime root. This is runtime ownership, not
    *   the resumed session's durable parent lineage.
    * @returns an idempotent closure that removes this exact entry and emits
    *   `agent/disposed` with listener failures contained. When called from a
-   *   `agent/created` listener, removal and disposal wait until
-   *   the serial dispatch settles.
+   *   `agent/created` listener, removal and disposal wait until the serial
+   *   creation dispatch settles.
    */
   enter(agent: Agent, owner: Agent | undefined): () => void {
     const id = agent.id
@@ -533,8 +526,7 @@ export class AgentRegistry extends Service {
    * @param agent - the live inserted agent to announce.
    * @param source - fresh creation, resume, clear, or compaction source.
    * @param signal - optional factory initialization cancellation signal passed to listeners.
-   * @returns completion of serial initialization; a listener failure rejects.
-   *   The caller owns rollback through the detach closure from enter().
+   * @returns completion of the serial creation listeners; a listener failure rejects.
    * @throws if `agent` is not the exact live registry entry for its id, or its
    *   creation announcement already began (including a reentrant call from a
    *   creation listener).

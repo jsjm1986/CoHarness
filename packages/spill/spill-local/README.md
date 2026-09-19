@@ -35,6 +35,8 @@ Indirectly, through spill consumers that render the local path and `read`/`grep`
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **No session-lifecycle deletion** — a spill file survives its session's end until the age-based startup sweep reclaims it, because persisted, resumed, and forked sessions may still reference a path; a process that never restarts never sweeps.

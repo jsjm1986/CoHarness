@@ -44,7 +44,8 @@ function appendEmptyAssistantMessage(session: Session, turn: number, step: numbe
       content: [],
       source: { kind: 'model', provider: 'mock', model: 'mock' },
     }),
-  }, { surfaceOp: 'append', sourceEventSeqs: [] })
+    stream: [],
+  }, { surfaceOp: 'append' })
 }
 
 /** The all-zero projection value plus overrides, for exact fold expectations. */
@@ -172,14 +173,16 @@ describe('sessionStats projection unit (registry drive)', () => {
       { type: 'chunk', time: 12, chunk: { type: 'finish', reason: { kind: 'stop' } } },
     ]))
     expect(tokenless).toBe(started)
-    // A text chunk already pinned the first-token boundary; a later attempt's
+    // A text token already pinned the first-token boundary; a later attempt's
     // earlier-looking marker must not move it.
     const marked = sessionStatsProjectionDefinition.apply(started, {
       seq: 1 as SessionEvent['seq'],
       time: 20,
-      type: 'assistant/chunk',
-      data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'x' } },
-    })
+      type: 'assistant/attempt',
+      data: { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 20, chunk: { type: 'text-delta', index: 0, text: 'x' } },
+      ] },
+    } as unknown as SessionEvent)
     const late = sessionStatsProjectionDefinition.apply(marked, attempt(1, 1, [
       { type: 'chunk', time: 11, chunk: { type: 'text-delta', index: 0, text: 'earlier' } },
     ]))
@@ -234,8 +237,10 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
   it('accrues model, first-token, and decode time from one fully recorded step', () => {
     expect(fold([
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_800, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' } }),
-      at(4_800, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 10, outputTokens: 60 } }),
+      at(1_800, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 1_800, chunk: { type: 'text-delta', index: 0, text: 'a' } },
+      ] }),
+      at(4_800, 'assistant/message', { turn: 1, step: 1, message, stream: [], usage: { inputTokens: 10, outputTokens: 60 } }),
       at(4_900, 'step/end', { turn: 1, step: 1 }),
     ])).toEqual(totals({
       turns: 1, steps: 1, llmMs: 3_800, ttftMs: 800, ttftSteps: 1, decodeMs: 3_000, decodeTokens: 60,
@@ -245,24 +250,39 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
   it('keeps the first attempt token boundary across an in-step retry (window resetForRetry parity)', () => {
     expect(fold([
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_200, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'reasoning-delta', index: 0, text: 'x' } }),
-      at(2_000, 'llm/retry', { turn: 1, step: 1 }),
-      at(3_000, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'y' } }),
-      at(5_000, 'assistant/message', { turn: 1, step: 1, message }),
+      // The abandoned attempt's stream holds the reasoning token that pins
+      // first-token; the retried message's own later stream must not move it.
+      at(2_000, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 1_200, chunk: { type: 'reasoning-delta', index: 0, text: 'x' } },
+        { type: 'chunk', time: 2_000, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } },
+      ] }),
+      at(5_000, 'assistant/message', { turn: 1, step: 1, message, stream: [
+        { type: 'chunk', time: 3_000, chunk: { type: 'text-delta', index: 0, text: 'y' } },
+      ] }),
       at(5_100, 'step/end', { turn: 1, step: 1 }),
     ])).toEqual(totals({ turns: 1, steps: 1, llmMs: 4_000, ttftMs: 200, ttftSteps: 1 }))
   })
 
-  it('ignores empty deltas, non-token chunks, and chunks outside the open step', () => {
+  it('ignores empty deltas, non-token records, and attempts outside the open step', () => {
     expect(fold([
-      // Chunk before any step/start: no open boundary.
-      at(500, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'stray' } }),
+      // Attempt before any step/start: no open boundary.
+      at(500, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 500, chunk: { type: 'text-delta', index: 0, text: 'stray' } },
+      ] }),
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_100, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'block-start', index: 0, blockType: 'text' } }),
-      at(1_200, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: '' } }),
-      at(1_300, 'assistant/chunk', { turn: 2, step: 9, chunk: { type: 'text-delta', index: 0, text: 'other' } }),
-      at(1_400, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'first' } }),
-      at(2_000, 'assistant/message', { turn: 1, step: 1, message }),
+      // A block-start and an empty delta carry no token.
+      at(1_200, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 1_100, chunk: { type: 'block-start', index: 0, blockType: 'text' } },
+        { type: 'chunk', time: 1_200, chunk: { type: 'text-delta', index: 0, text: '' } },
+      ] }),
+      // A different turn/step's attempt is outside the open boundary.
+      at(1_300, 'assistant/attempt', { turn: 2, step: 9, stream: [
+        { type: 'chunk', time: 1_300, chunk: { type: 'text-delta', index: 0, text: 'other' } },
+      ] }),
+      at(1_400, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 1_400, chunk: { type: 'text-delta', index: 0, text: 'first' } },
+      ] }),
+      at(2_000, 'assistant/message', { turn: 1, step: 1, message, stream: [] }),
       at(2_100, 'step/end', { turn: 1, step: 1 }),
     ])).toEqual(totals({ turns: 1, steps: 1, llmMs: 1_000, ttftMs: 400, ttftSteps: 1 }))
   })
@@ -270,7 +290,10 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
   it('leaves a cancelled step untimed: counted by step/end, no assembled message to accrue from', () => {
     expect(fold([
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_500, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'partial' } }),
+      at(1_500, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 1_500, chunk: { type: 'text-delta', index: 0, text: 'partial' } },
+        { type: 'chunk', time: 1_600, chunk: { type: 'finish', reason: { kind: 'aborted', failure: { code: 'CANCELLED', message: 'cancelled' } } } },
+      ] }),
       at(2_000, 'step/end', { turn: 1, step: 1 }),
     ])).toEqual(totals({ turns: 1, steps: 1 }))
   })
@@ -324,9 +347,11 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
   it('skips decode for an invalid usage report and ignores a duplicate assembled message', () => {
     const events = [
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_400, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' } }),
+      at(1_400, 'assistant/attempt', { turn: 1, step: 1, stream: [
+        { type: 'chunk', time: 1_400, chunk: { type: 'text-delta', index: 0, text: 'a' } },
+      ] }),
       // A malformed provider report: guarded like the window fold guards node usage.
-      at(2_000, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 1, outputTokens: -5 } }),
+      at(2_000, 'assistant/message', { turn: 1, step: 1, message, stream: [], usage: { inputTokens: 1, outputTokens: -5 } }),
     ]
     expect(fold([...events, at(2_100, 'step/end', { turn: 1, step: 1 })]))
       .toEqual(totals({ turns: 1, steps: 1, llmMs: 1_000, ttftMs: 400, ttftSteps: 1 }))
@@ -338,7 +363,7 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
     )
     expect(sessionStatsProjectionDefinition.apply(
       state,
-      at(2_050, 'assistant/message', { turn: 1, step: 1, message }),
+      at(2_050, 'assistant/message', { turn: 1, step: 1, message, stream: [] }),
     )).toBe(state)
   })
 
@@ -348,7 +373,7 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
     expect(untouched).toBe(state)
     expect(fold([
       at(2_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_000, 'assistant/message', { turn: 1, step: 1, message }),
+      at(1_000, 'assistant/message', { turn: 1, step: 1, message, stream: [] }),
       at(2_100, 'step/end', { turn: 1, step: 1 }),
     ])).toEqual(totals({ turns: 1, steps: 1 }))
   })

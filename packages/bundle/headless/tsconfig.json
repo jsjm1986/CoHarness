@@ -9,13 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../../boot/cmdline"
     },
     {
       "path": "../../core/agent"
@@ -24,16 +18,19 @@
       "path": "../../core/agent-default-model"
     },
     {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../core/session"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../llm/llm"
     },
     {
-      "path": "../../boot/cmdline"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

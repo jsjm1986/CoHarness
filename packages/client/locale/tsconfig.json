@@ -15,19 +15,19 @@
       "path": "../ui-primitives"
     },
     {
-      "path": "../ui-slots"
+      "path": "../ui-settings"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../ui-slots"
     },
     {
       "path": "../../settings/settings"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ui-settings"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

@@ -36,8 +36,16 @@ Same-process requests, descriptors, results, and event payloads are trusted type
 |---|---|
 | `maxContinuableActivations` | Positive safe-integer limit for resident plus materializing continuable Activations in one runtime; default `128`. |
 | `maxContinuableActivationsPerParent` | Positive safe-integer limit for resident plus materializing continuable Activations with one direct parent Session; default `32`. |
+| `maxActiveSubagents` | Positive safe-integer limit for live continuable children sharing uninterrupted continuable parent links; default `8`. |
+| `maxDepth` | Non-negative safe-integer delegation depth supplied to delegation tools that omit their own; default `1`. |
 
-Materialization reserves both slots before creating or resuming an Agent. Exceeding either limit rejects with `ACTIVATION_CAPACITY_EXCEEDED`; rollback or final Activation disposal releases the slot, while durable inactive child Sessions consume no slot.
+The plugin registers the `subagent` settings section with this same `Config` schema and its `cordis.yml` entry as the composition `base`; a field present in the user layer overrides that entry and a reset clears the override. `maxDepth` defaults to `1` and supplies the delegation tools' depth when their own configuration omits it. An explicit tool depth, including `provider-managed`, takes precedence. Depth `0` disables delegation through tools inheriting this setting; depth `1` permits direct children only. Changes apply on the next delegation attempt. Direct service callers continue to supply their own optional request depth.
+
+Materialization reserves both residency slots before creating or resuming an Agent. Exceeding either residency limit rejects with `ACTIVATION_CAPACITY_EXCEEDED`; rollback or final Activation disposal releases the slot, while durable inactive child Sessions consume no slot.
+
+`maxActiveSubagents` limits live continuable children sharing uninterrupted continuable parent links — a separate axis from the residency quotas above. A non-continuable parent starts a separate pool and does not consume a slot; continuable descendants inherit that pool. Fresh creation and cold resume reserve before reconstructing the Agent, and cleanup returns the slot after handle disposal. A waiting parent, pending inbox work, and an Activation being stopped still occupy slots. Messages to a resident child reuse its slot. One-shot and external-provider runs are outside this limit. Pool inheritance does not cross a one-shot parent; its continuable children share a separate pool. Depth remains the delegation tool's separate policy.
+
+The current `maxActiveSubagents` value is sampled before every new or cold-resumed Activation. Raising it admits more children in existing trees; lowering it leaves resident children running and refuses further admissions until usage is below the limit. At capacity, creation or cold resume rejects with `ACTIVATION_LIMIT_REACHED` (browser prompts receive `subagent/delivery-unavailable`): wait for a child to finish or continue using the existing agents. Admission does not queue, because a parent waiting for descendants must not wait for its own occupied slot. Slots are process-local and do not constrain cumulative Session history or token usage.
 
 ## Capabilities
 

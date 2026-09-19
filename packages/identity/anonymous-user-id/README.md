@@ -22,6 +22,8 @@ None, as the identifier reaches DeepSeek only as model-hidden HTTP transport met
 
 None; the transport header changes neither tokens nor the model-visible prefix.
 
+**Runtime invariant:** No companion is published. The API owns one private memo and one best-effort file, with no independent event stream or public mutable relation for a companion to compare without creating the identity as a side effect.
+
 ## Known Limitations and Deferred Work
 
 - **No recovery after deletion** — loss mints a new anonymous identity by design; recovery would require stable derivation material that weakens anonymity.

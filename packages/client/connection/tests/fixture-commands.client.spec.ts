@@ -28,7 +28,7 @@ const req = <P>(payload: P): RpcRequest<P> => ({ rpcId: RpcId(`t-${reqCount++}`)
 describe('createFixtureApi commands/skills', () => {
   it('serves the addressed session catalog', async () => {
     const { rpc } = createFixtureFaces()
-    const commands = await callRemote<{ name: string; input?: { hint: string; images?: boolean } }[]>(
+    const commands = await callRemote<{ name: string; input?: { hint: string; attachments?: boolean } }[]>(
       rpc, 'commands/list', { agentId: sid('fx-alpha') })
     expect(commands.map(c => c.name)).toEqual(['compact', 'echo', 'goal', 'permission', 'plan'])
     // input hint rides only the commands declaring it.
@@ -36,7 +36,7 @@ describe('createFixtureApi commands/skills', () => {
     expect(echo?.input?.hint).toBeTruthy()
     expect(commands.find(c => c.name === 'compact')?.input).toBeUndefined()
     // Image acceptance is declared per descriptor; only goal and plan carry it.
-    expect(commands.filter(c => c.input?.images === true).map(c => c.name)).toEqual(['goal', 'plan'])
+    expect(commands.filter(c => c.input?.attachments === true).map(c => c.name)).toEqual(['goal', 'plan'])
   })
 
   it('rejects a catalog request for an unknown session', async () => {

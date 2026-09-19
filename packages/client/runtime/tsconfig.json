@@ -9,34 +9,34 @@
   ],
   "references": [
     {
+      "path": "../../api/remotes/tsconfig.client.json"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../connection/tsconfig.client.json"
     },
     {
       "path": "../ui-slots"
+    },
+    {
+      "path": "../../compaction/compaction"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tools"
     },
     {
       "path": "../../host/apiproxy"
     },
     {
       "path": "../../interaction/commands"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../compaction/compaction"
-    },
-    {
-      "path": "../../session/session-projection"
-    },
-    {
-      "path": "../../session/session-title"
     },
     {
       "path": "../../llm/llm"
@@ -48,7 +48,10 @@
       "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../util/crypto"
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/session-title"
     },
     {
       "path": "../../typert/protocol"
@@ -57,7 +60,10 @@
       "path": "../../typert/registry"
     },
     {
-      "path": "../../api/remotes/tsconfig.client.json"
+      "path": "../../util/crypto"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ],
   "exclude": [

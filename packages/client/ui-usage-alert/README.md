@@ -12,6 +12,8 @@ None, as this package renders account usage metadata and contributes no model in
 
 No direct effect.
 
+**Runtime invariant:** No companion is published. The gateway owns alert threshold and idempotency semantics.
+
 ## Known Limitations and Deferred Work
 
 - **Mount-time refresh only** — a threshold crossed while one tab remains open appears after the next page load; the gateway remains the durable alert owner.

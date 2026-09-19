@@ -1,7 +1,7 @@
 /**
  * AST helpers for the client slot surface: the `SlotMap` declaration merges
- * that type every slot, and the `slots.register` call sites that say who
- * already occupies one. Both readings are lexical (no type-checker program):
+ * that type every slot, and the `slots.register` / `slots.registerFactory`
+ * call sites that say who occupies or declares one. Both readings are lexical:
  * the client catalog generator consumes them, and the same scan doubles as its
  * own exhaustiveness backstop because it reads every source file rather than a
  * reachable-export closure.
@@ -17,8 +17,8 @@ const SLOTS_MODULE = '@deepseek-ai/dsh-client-ui-slots'
 /** Cheap textual prefilter for a slot-contract merge, quote-style agnostic. */
 const MERGE_HEAD = /declare module ['"]@deepseek-ai\/dsh-client-ui-slots['"]/
 
-/** Cheap textual prefilter for a registration call site. */
-const REGISTER_HEAD = /\.register\(/
+/** Cheap textual prefilter for a Slot or Factory registration call site. */
+const REGISTER_HEAD = /\.(?:register|registerFactory)\(/
 
 /** One `SlotMap` member: the slot's contract as its owning package declares it. */
 export interface SlotDeclaration {
@@ -44,7 +44,7 @@ export interface SlotDeclaration {
   source: string
 }
 
-/** One `slots.register({ name, … }, Component)` call site. */
+/** One `slots.register()` or `slots.registerFactory()` call site. */
 export interface SlotRegistration {
   /** Target SlotMap key the entry contributes into. */
   key: string
@@ -58,6 +58,8 @@ export interface SlotRegistration {
   entryKey?: string
   /** SlotMap keys this registration declares as children (they exist while it is mounted). */
   children: string[]
+  /** Whether this call installs a Factory definition instead of occupying an ordinary Slot. */
+  factory?: boolean
   /** Source pointer `packages/…/file.ts:line`. */
   source: string
 }
@@ -196,7 +198,7 @@ export function slotRegistrations(file: ScannedFile): SlotRegistration[] {
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)
       && ts.isPropertyAccessExpression(node.expression)
-      && node.expression.name.text === 'register'
+      && (node.expression.name.text === 'register' || node.expression.name.text === 'registerFactory')
       && isSlotsReceiver(node.expression.expression, file.sf)
       && node.arguments.length >= 1) {
       const options = node.arguments[0]
@@ -211,6 +213,7 @@ export function slotRegistrations(file: ScannedFile): SlotRegistration[] {
             component: componentText(node.arguments[1], file.sf),
             ...id === undefined ? {} : { id },
             ...entryKey === undefined ? {} : { entryKey },
+            ...node.expression.name.text === 'registerFactory' ? { factory: true } : {},
             children: childKeys(options),
             source: `${file.rel}:${String(lineOf(file.sf, node))}`,
           })

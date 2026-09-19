@@ -31,6 +31,8 @@ Indirectly, through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md) and
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **Windows ACL enforcement is partial** — the restricted token must retain Everyone for process initialization, so external objects granting Everyone write access remain writable; NTFS hard links also alias one file object across workspace and external paths. The provider reports `enforcement: 'partial'` rather than overstating that boundary as full.

@@ -26,6 +26,8 @@ Indirectly, through the plugins loaded from the external `cordis.yml`, which own
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This composition package owns no independent event stream or mutable data; Loader and built-entry tests cover its wiring.
+
 ## Known Limitations and Deferred Work
 
 - **The bin cannot prove that the config serves JSON-RPC** — a valid config with no `dsh-sdk-jsonrpc-server` entry boots successfully and serves nothing.

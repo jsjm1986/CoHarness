@@ -19,6 +19,8 @@ Indirectly, through authorization Consumers whose durable participant attributio
 
 The Service Definition contributes no request tokens and does not alter an already-reusable prefix.
 
+**Runtime invariant:** No companion is published. Authorization is verified at each provider request.
+
 ## Known Limitations and Deferred Work
 
 - **Root-owned visibility** — descendants cannot carry independent visibility; every read, write, manage, and approval decision resolves through the root conversation.

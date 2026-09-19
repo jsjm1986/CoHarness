@@ -7,8 +7,8 @@ import type {
   GatewaySessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
 import SessionStore, { SessionDraftId, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
-import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format/legacy'
+import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format/legacy'
 import { describe, expect, it, vi } from 'vitest'
 import {
   decodeSessionPersistenceCursor,
@@ -20,6 +20,9 @@ import {
   appendLog,
   oneTurnLog,
   runPersistenceContract,
+} from '../../session-persistence/tests/legacy-contract.ts'
+import {
+  runPersistenceContract as runHandleContract,
 } from '../../session-persistence/tests/contract.ts'
 import {
   runCoordinatorContract,
@@ -132,16 +135,20 @@ class GatewayTransport {
       }
       // Mirror the Gateway transaction: recompute the successor body through
       // the Session format catalog and commit it under the bumped revision.
+      // The wire header carries `seedLength`; the catalog reads `isSeeded`.
       const source = stored.header as SessionFormatHeader & { seedLength?: number }
       const emitted: SessionFormatEvent[] = []
-      const stream = sessionFormatCatalog.createStream(source, source.seedLength ?? 0, {
-        emitEvent: (event) => { emitted.push(event) },
-      })
+      const stream = sessionFormatCatalog.createStream(
+        { ...source, isSeeded: source.seedLength !== undefined },
+        source.seedLength ?? 0,
+        { emitEvent: (event) => { emitted.push(event) } },
+      )
       for (const event of stored.events) stream.emitEvent(event as SessionFormatEvent)
       const inheritedEventCount = stream.finish()
       stored.events = emitted
-      const seedLength = typeof stream.header.seedLength === 'number' ? inheritedEventCount : null
-      stored.header = { ...stream.header, ...(seedLength === null ? {} : { seedLength }) }
+      const { isSeeded: _isSeeded, ...targetWire } = stream.header as SessionFormatHeader & { isSeeded?: boolean }
+      const seedLength = _isSeeded === true ? inheritedEventCount : null
+      stored.header = { ...targetWire, ...(seedLength === null ? {} : { seedLength }) }
       stored.revision += 1
       return json(200, {
         result: 'committed',
@@ -304,7 +311,8 @@ class GatewayTransport {
         this.sessions.set(id, stored)
       }
       const first = events[0] as { seq?: unknown } | undefined
-      if (typeof first?.seq !== 'number' || first.seq !== stored.events.length) {
+      // An empty batch is the header-only materialization write.
+      if (events.length > 0 && (typeof first?.seq !== 'number' || first.seq !== stored.events.length)) {
         throw new Error('non-contiguous append in test transport')
       }
       stored.events.push(...events)
@@ -353,6 +361,26 @@ runPersistenceContract('gateway-http', async () => {
   }
 })
 
+runHandleContract('gateway-http-handles', async () => {
+  const transport = new GatewayTransport()
+  const ctx = new Context()
+  await ctx.plugin(SessionStore)
+  const fiber = await mountBackend(ctx, transport)
+  return {
+    persistence: ctx.sessionPersistence,
+    dispose: async () => { await fiber.dispose() },
+    reopen: async () => {
+      const second = new Context()
+      await second.plugin(SessionStore)
+      const secondFiber = await mountBackend(second, transport)
+      return {
+        persistence: second.sessionPersistence,
+        dispose: async () => { await secondFiber.dispose() },
+      }
+    },
+  }
+})
+
 runCoordinatorContract('gateway-http', async (): Promise<CoordinatorFixture> => {
   const transport = new GatewayTransport()
   return {
@@ -390,7 +418,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     const fiber = await mountBackend(ctx, transport)
 
     const loaded = await ctx.sessionPersistence.load(id)
-    expect(loaded.meta.version).toBe(3)
+    expect(loaded.meta.version).toBe(4)
     expect(transport.migrations).toHaveLength(1)
     await fiber.dispose()
   })
@@ -405,7 +433,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     const fiber = await mountBackend(ctx, transport)
     try {
       const loaded = await ctx.sessionPersistence.load(id)
-      expect(loaded.meta).toMatchObject({ version: 3, isSeeded: true, parentSession: 'parent' })
+      expect(loaded.meta).toMatchObject({ version: 4, isSeeded: true, parentSession: 'parent' })
       expect(loaded.inheritedEventCount).toBe(events.length + 1)
       expect(transport.migrations).toHaveLength(1)
       const reloaded = await (ctx.sessionPersistence as GatewaySessionPersistence).loadStored(id)
@@ -423,7 +451,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     transport.seed(String(id), oneTurnLog())
     const fiber = await mountBackend(ctx, transport)
 
-    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 3 } })
+    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 4 } })
     expect(transport.migrations).toHaveLength(0)
     await fiber.dispose()
   })

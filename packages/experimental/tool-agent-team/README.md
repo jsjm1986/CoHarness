@@ -42,6 +42,8 @@ Fixed policy and schema cost on every Team member request. Tool calls add compac
 
 Prefix-stable while the Team plugin generation, configuration, member role/name, and schemas remain unchanged. The per-member identity line differs across Agents. Tool results and peer messages append after the reusable request prefix.
 
+**Runtime invariant:** No companion is published. The Team service owns durable and authorization relations.
+
 ## Known Limitations and Deferred Work
 
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.

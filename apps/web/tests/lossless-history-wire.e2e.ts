@@ -1,13 +1,16 @@
-// Web e2e scenario: conversation-tier history omits completed chunk runs on
-// the first browser download, then Trajectory fill requests detail=full and
-// reconstructs the same logical window the lossless packed carrier already
-// paginates. Direct API callers that omit `detail` still receive every event.
+// Web e2e scenario: conversation-tier history omits settled assistant
+// attempts on the first browser download, then Trajectory fill requests
+// detail=full and reconstructs the same logical window the physical records
+// page already paginates. Direct API callers that omit `detail` still receive
+// every event.
 
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page, Response as PlaywrightResponse } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { DEFAULT_HISTORY_PAGE_TARGET_BYTES, RpcId } from '@deepseek-ai/dsh-host-apiproxy'
+import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm'
+import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses,
@@ -24,7 +27,7 @@ const LARGE_TURNS = 6
 const DELTA_REPETITIONS = 1_600
 const FULL_COUNTS = '8 turns · 9 steps'
 const TOOL_CALL_ID = 'lossless-history-wire-bash'
-const TOOL_DESCRIPTION = 'Verify packed history carrier'
+const TOOL_DESCRIPTION = 'Verify history wire pagination'
 const TOOL_OUTPUT = 'WIRE_TOOL_OUTPUT'
 const INTERRUPTED_REASONING = 'WIRE_INTERRUPTED_REASONING'
 const INTERRUPTED_TEXT = 'WIRE_INTERRUPTED_TEXT'
@@ -66,7 +69,7 @@ interface WirePageEvidence {
   detail?: 'conversation' | 'full'
   bytes: number
   recordCount: number
-  packedRecordCount: number
+  attemptRecordCount: number
   hasMore: boolean
   hasProjections: boolean
   omittedSpanCount: number
@@ -134,12 +137,13 @@ function buildSeed(): SeedEvidence {
     repetitions: number,
     tool?: { id: string; name: string; arguments: string },
   ): void => {
-    const sourceEventSeqs: number[] = []
+    const stream = new AssistantStreamAccumulator()
     const chunk = (value: Record<string, unknown>): void => {
-      sourceEventSeqs.push(at({
+      stream.push({ time, chunk: value as never })
+      at({
         type: 'assistant/chunk',
         data: { turn, step, chunk: value },
-      }))
+      })
     }
 
     chunk({ type: 'block-start', index: 0, blockType: 'reasoning' })
@@ -217,8 +221,8 @@ function buildSeed(): SeedEvidence {
           source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
         },
         usage,
+        stream: stream.snapshot(),
       },
-      sourceEventSeqs,
       surfaceOp: 'append',
     })
   }
@@ -286,6 +290,24 @@ function buildSeed(): SeedEvidence {
   })
   at({ type: 'step/end', data: { turn: toolTurn, step: 1 } })
   at({ type: 'step/start', data: { turn: toolTurn, step: 2 } })
+  // The first call in the step failed, so its stream settles as an
+  // `assistant/attempt`; the retry's message completes the same step and
+  // conversation detail reports the attempt as an omitted span.
+  const failedChunk = (value: Record<string, unknown>): void => {
+    at({ type: 'assistant/chunk', data: { turn: toolTurn, step: 2, chunk: value } })
+  }
+  failedChunk({ type: 'block-start', index: 0, blockType: 'reasoning' })
+  failedChunk({ type: 'reasoning-delta', index: 0, text: 'WIRE_FAILED_ATTEMPT' })
+  reasoningDeltaEvents += 1
+  failedChunk({
+    type: 'block-end',
+    index: 0,
+    block: { type: 'reasoning', text: 'WIRE_FAILED_ATTEMPT' },
+  })
+  failedChunk({
+    type: 'finish',
+    reason: { kind: 'error', failure: { message: 'first call failed', code: 'UNKNOWN' } },
+  })
   appendAssistant(toolTurn, 2, TOOL_DONE_MARKER, 'WIRE_REASONING_TOOL_DONE', 0)
   at({ type: 'step/end', data: { turn: toolTurn, step: 2 } })
   at({ type: 'turn/end', data: { turn: toolTurn, reason: { kind: 'completed' } } })
@@ -362,9 +384,10 @@ function buildSeed(): SeedEvidence {
   at({ type: 'step/end', data: { turn: interruptedTurn, step: 1 } })
   at({ type: 'turn/end', data: { turn: interruptedTurn, reason: { kind: 'aborted' } } })
 
+  const jsonl = `${lines.join('\n')}\n`
   return {
-    jsonl: `${lines.join('\n')}\n`,
-    eventCount: seq,
+    jsonl,
+    eventCount: parseSessionLog(jsonl).length,
     appendMessageCount,
     reasoningDeltaEvents,
     textDeltaEvents,
@@ -399,8 +422,9 @@ function parseWirePage(
     ...(detail === undefined ? {} : { detail }),
     bytes: new TextEncoder().encode(text).byteLength,
     recordCount: body.result.value.records.length,
-    packedRecordCount: body.result.value.records.filter(record =>
-      typeof record === 'object' && record !== null && 'chunks' in record).length,
+    attemptRecordCount: body.result.value.records.filter(record =>
+      typeof record === 'object' && record !== null
+        && (record as { event?: { type?: unknown } }).event?.type === 'assistant/attempt').length,
     hasMore: body.result.value.hasMore,
     hasProjections: body.result.value.projections !== undefined,
     omittedSpanCount: Array.isArray(body.result.value.omittedSpans)
@@ -437,7 +461,7 @@ function observeHistoryPages(page: Page, reads: Array<Promise<WirePageEvidence>>
             ...envelope.payload?.detail === undefined ? {} : { detail: envelope.payload.detail },
             bytes: 0,
             recordCount: 0,
-            packedRecordCount: 0,
+            attemptRecordCount: 0,
             hasMore: false,
             hasProjections: false,
             omittedSpanCount: 0,
@@ -577,7 +601,7 @@ describe('web e2e: lossless history wire pagination', () => {
     const physical = parseWirePage(await response.text())
     expect(physical.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
     expect(physical.recordCount).toBeGreaterThan(0)
-    expect(physical.packedRecordCount).toBeGreaterThan(0)
+    expect(physical.attemptRecordCount).toBeGreaterThan(0)
     expect(physical.hasMore).toBe(true)
     expect(physical.hasProjections).toBe(true)
 
@@ -603,11 +627,11 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(conversationResponse.ok).toBe(true)
     const conversationPhysical = parseWirePage(await conversationResponse.text(), undefined, 'conversation')
     expect(conversationPhysical.omittedSpanCount).toBeGreaterThan(0)
-    expect(conversationPhysical.packedRecordCount).toBeLessThan(physical.packedRecordCount)
+    expect(conversationPhysical.attemptRecordCount).toBeLessThan(physical.attemptRecordCount)
     expect(conversationPhysical.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
   }, 60_000)
 
-  it('renders the conversation-tier Chat without historical packed chunks', async () => {
+  it('renders the conversation-tier Chat without settled assistant attempts', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lossless-history-initial'))
     const groupRow = page.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })
@@ -636,7 +660,7 @@ describe('web e2e: lossless history wire pagination', () => {
       detail: 'conversation',
     })
     expect(firstBrowserPage?.omittedSpanCount).toBeGreaterThan(0)
-    expect(firstBrowserPage?.packedRecordCount).toBeGreaterThan(0)
+    expect(firstBrowserPage?.attemptRecordCount).toBeGreaterThan(0)
     expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
     expect(firstBrowserPage?.hasMore).toBe(true)
 
@@ -769,7 +793,7 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(fullPages.length).toBeGreaterThanOrEqual(1)
     expect(fullPages.every(current =>
       current.bytes <= DEFAULT_HISTORY_PAGE_TARGET_BYTES)).toBe(true)
-    expect(pages.reduce((total, current) => total + current.packedRecordCount, 0))
+    expect(pages.reduce((total, current) => total + current.attemptRecordCount, 0))
       .toBeGreaterThanOrEqual(2)
 
     const snapshot = await captureHistoryAria(page, scaffold)

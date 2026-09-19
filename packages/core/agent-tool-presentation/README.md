@@ -12,7 +12,7 @@ What a preset can own is the **presentation** of that registry. `ctx.tools.prese
 
 ## What it does
 
-`native` applies immediately. A PTC mode instead waits for `ctx.codeRuntime`, which is a host-plane service ([`dsh-code-runtime-worker-thread`](../../code-runtime/code-runtime-worker-thread/README.md)): a preset selecting PTC mode against a deployment composing no runtime then holds this row pending, and `dsh-agent-presets` refuses the mount naming this id. The alternative — applying optimistically — moves the failure to the session's first request, where the operator can act on neither the preset nor the composition.
+`native` applies immediately. A PTC mode instead waits for `ctx.ptcRuntime`, which is a host-plane service ([`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.md)): a preset selecting PTC mode against a deployment composing no runtime then holds this row pending, and `dsh-agent-presets` refuses the mount naming this id. The alternative — applying optimistically — moves the failure to the session's first request, where the operator can act on neither the preset nor the composition.
 
 `mode` is required rather than defaulted, because a preset without this row already gets the deployment default; an omitted value would mean the row was composed for nothing.
 
@@ -25,6 +25,8 @@ Indirectly, through the projection it selects in `dsh-tools`: `ptc` presents `ru
 #### KV Cache effect
 
 No direct invalidation; the presentation is fixed when the agent is composed, so its request prefix is stable for the session's life.
+
+**Runtime invariant:** No companion is published. This package makes exactly one scoped call into `ctx.tools` and owns no event or snapshot of its own; the relation it establishes — which presentation one agent's assembly uses — is the tool registry's to hold, and `dsh-tools` observes it there.
 
 ## Known Limitations and Deferred Work
 

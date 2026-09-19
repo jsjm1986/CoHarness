@@ -61,7 +61,6 @@ function buildSeed(turns: number): string {
           source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
         },
       },
-      sourceEventSeqs: [],
       surfaceOp: 'append',
     })
     at({ type: 'step/end', data: { turn, step: 1 } })

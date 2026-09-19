@@ -15,8 +15,10 @@ describe('conversation safety', () => {
       data: { message: { content: [{ type: 'text', text: '<think>private</think>answer' }] } },
     })).toThrow('unnormalized tagged thinking')
     expect(() => assertSafeAssistantEvent({
-      type: 'assistant/chunk',
-      data: { chunk: { type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>private</thinking>' } } },
+      type: 'assistant/attempt',
+      data: {
+        stream: [{ type: 'chunk', time: 0, chunk: { type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>private</thinking>' } } }],
+      },
     })).toThrow('unnormalized tagged thinking')
   })
 

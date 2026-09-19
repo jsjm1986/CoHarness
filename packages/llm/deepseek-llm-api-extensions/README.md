@@ -48,6 +48,8 @@ Zero model-input tokens; registered fields add only provider request bytes.
 
 None; registry fields are model-hidden provider metadata and do not alter the serialized model-input prefix.
 
+**Runtime invariant:** No companion is published. Duplicate ownership, detached output, and one acceptance settlement are enforced inside the registry operation that owns each decision.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

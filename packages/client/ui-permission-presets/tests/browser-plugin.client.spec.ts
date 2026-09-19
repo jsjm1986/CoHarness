@@ -15,7 +15,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { CommandDecoration } from '@deepseek-ai/dsh-client-ui-commands/client'
-import type { PermissionSelect } from '@deepseek-ai/dsh-permission-presets/client'
+import type { PermissionCatalog, PermissionSelection } from '@deepseek-ai/dsh-permission-presets/client'
 import {
   PermissionRow, type PermissionRowInjected,
 } from '../src/client/PermissionRow.tsx'
@@ -24,12 +24,15 @@ import { accessEn } from '../src/client/locales.ts'
 
 const sid = (k: string): SessionId => k as SessionId
 
-const SELECT: PermissionSelect = {
+const CATALOG: PermissionCatalog = {
   options: [
     { value: 'read-only', name: 'read-only', description: 'Reads only.' },
     { value: 'workspace-write', name: 'workspace-write' },
     { value: 'danger-full-access', name: 'danger-full-access' },
   ],
+}
+
+const SELECT: PermissionSelection = {
   currentValue: 'workspace-write',
 }
 
@@ -40,8 +43,15 @@ async function bench() {
   locale.setLocale('en')
   ctx.provide('locale', locale)
   // The plugin injects `remote`; forwarded events reach it through the same
-  // `$dispatch` handoff the connection sink makes.
-  new TestRemote(ctx)
+  // `$dispatch` handoff the connection sink makes. The catalog namespace is a
+  // mutable stub so a spec can republish the host's option table.
+  const remote = new TestRemote(ctx)
+  let catalog: PermissionCatalog = CATALOG
+  Object.assign(remote, {
+    permissionPresets: {
+      catalog: () => Promise.resolve({ ok: true as const, value: catalog }),
+    },
+  })
   ctx.slots.register({
     name: 'root',
     children: {
@@ -67,7 +77,7 @@ async function bench() {
       return () => { decoration = undefined }
     },
   })
-  const values = new Map<SessionId, PermissionSelect>()
+  const values = new Map<SessionId, PermissionSelection>()
   const commands: string[] = []
   let commandResult: { ok: boolean; matched?: boolean } = { ok: true, matched: true }
   const session = (id: SessionId) => ({
@@ -92,6 +102,10 @@ async function bench() {
   return {
     ctx, fiber, values, commands,
     setResult: (r: { ok: boolean; matched?: boolean }) => { commandResult = r },
+    setCatalog: (next: PermissionCatalog) => {
+      catalog = next
+      remote.$dispatch('permission-presets/catalog-changed', [])
+    },
     decoration: () => decoration,
     permissionRow: () => ctx.slots.entries('settings.general.item')
       .find(entry => entry.component === PermissionRow),
@@ -119,7 +133,8 @@ describe('ui-permission browser plugin', () => {
     const c = b.decoration()!
     const proj = { sessionId: sid('s1') }
     expect(c.available(proj)).toBe(false)
-    b.values.set(sid('s1'), { ...SELECT, options: [...SELECT.options, { value: 'custom', name: 'Custom' }], currentValue: 'custom' })
+    b.setCatalog({ options: [...CATALOG.options, { value: 'custom', name: 'Custom' }] })
+    b.values.set(sid('s1'), { currentValue: 'custom' })
     expect(c.available(proj)).toBe(true)
     const options = await c.ui.options(proj, new AbortController().signal)
     expect(options.map(option => option.id)).toEqual(['read-only', 'workspace-write', 'danger-full-access'])
@@ -137,12 +152,12 @@ describe('ui-permission browser plugin', () => {
       cancelLabel: 'Cancel',
       confirmLabel: 'Enable Full access',
     })
-    b.values.set(sid('s1'), { ...SELECT, options: [{ value: 'plain', name: 'Ask Every Time' }] })
+    b.setCatalog({ options: [{ value: 'plain', name: 'Ask Every Time' }] })
     const passthrough = await c.ui.options(proj, new AbortController().signal)
     expect(passthrough[0]?.label).toBe('Ask Every Time')
-    // A projection that vanished between availability and open throws.
-    expect(() => c.ui.options({ sessionId: sid('ghost') }, new AbortController().signal))
-      .toThrow(/not available on this host/)
+    // A projection that vanished between availability and open rejects.
+    await expect(c.ui.options({ sessionId: sid('ghost') }, new AbortController().signal))
+      .rejects.toThrow(/not available on this host/)
   })
 
   it('a pick submits the /permission line; rejection and unmatched throw', async () => {

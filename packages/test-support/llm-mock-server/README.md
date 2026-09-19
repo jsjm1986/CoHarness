@@ -79,6 +79,8 @@ None, as this test server substitutes provider wire behavior without invoking a 
 
 None; requests terminate locally and never reach a provider cache.
 
+**Runtime invariant:** No companion is published. This standalone test server owns no Cordis event stream or shared data; its wire behavior and lifecycle are exercised through direct HTTP and assembled-loop tests.
+
 ## Known Limitations and Deferred Work
 
 - **Random weights model test pressure, not production incidence** — callers that want an environment-specific distribution must provide measured weights and record the emitted seed.

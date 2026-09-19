@@ -20,6 +20,8 @@
 
 规范化和请求投影都是确定性的。附件和路由策略不变时，之后各轮会复用相同的缓存请求字节。
 
+**运行时不变式：** 不发布伴生入口。不可变写入与校验读取在后端边界直接强制。
+
 ## 已知限制与待完成工作
 
 - 规范化附件对象会无限期保留；派生请求图片文件受 `requestImageCacheMaxBytes`、`requestImageCacheMaxEntries` 和 `requestImageCacheTtlMs` 限制，并由尽力而为的定时器回收。

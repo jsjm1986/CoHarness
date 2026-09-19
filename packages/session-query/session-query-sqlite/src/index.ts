@@ -869,6 +869,7 @@ function selectedDocumentsParams(query: string, persistenceVisible: boolean): Ar
 }
 
 function observeLive(session: Session): ObservedSession {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return observeSession(session.header, session.inheritedEventCount, session.snapshotEvents())
 }
 
@@ -935,7 +936,7 @@ function sameSessionIds(
 }
 
 function sameHeader(a: SessionHeader, b: SessionHeader): boolean {
-  return a.version === b.version
+  return (a.version as number) === b.version
     && a.id === b.id
     && a.createdAt === b.createdAt
     && a.cwd === b.cwd
@@ -947,7 +948,7 @@ function sameHeader(a: SessionHeader, b: SessionHeader): boolean {
 
 function rowHeader(row: SessionHeaderRow): SessionHeader {
   return {
-    version: row.version,
+    version: row.version as SessionHeader['version'],
     id: row.session_id as SessionId,
     createdAt: row.created_at,
     ...row.cwd === null ? {} : { cwd: row.cwd },

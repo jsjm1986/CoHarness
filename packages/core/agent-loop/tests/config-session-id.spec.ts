@@ -232,7 +232,7 @@ describe('config-driven session id', () => {
     ctx.on('agent-loop/config-start-failed', ({ sessionId, error }) => {
       failures.push({ sessionId, error })
     })
-    vi.spyOn(ctx.sessionPersistence, 'list').mockRejectedValue(failure)
+    vi.spyOn(ctx.sessionPersistence, 'open').mockRejectedValue(failure)
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
 
     await ctx.plugin(AgentLoop, {
@@ -270,7 +270,7 @@ describe('config-driven session id', () => {
     // oxlint-disable-next-line typescript/prefer-promise-reject-errors
     ctx.on('agent-loop/config-start-failed', () => Promise.reject(unrenderable) as never)
     ctx.on('agent-loop/config-start-failed', ({ error }) => { failures.push(error) })
-    vi.spyOn(ctx.sessionPersistence, 'list').mockRejectedValue(unrenderable)
+    vi.spyOn(ctx.sessionPersistence, 'open').mockRejectedValue(unrenderable)
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
 
     await ctx.plugin(AgentLoop, {
@@ -298,7 +298,7 @@ describe('config-driven session id', () => {
       const ctx = await makeCoreContext()
       await ctx.plugin(JsonlSessionPersistence, { root })
       const opening = Promise.withResolvers<SessionHandle>()
-      vi.spyOn(ctx.sessionPersistence, 'openHandleAsync').mockReturnValue(opening.promise)
+      vi.spyOn(ctx.sessionPersistence, 'open').mockReturnValue(opening.promise)
       const closed = vi.fn(async () => {})
       const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
       const failures: unknown[] = []
@@ -476,7 +476,7 @@ describe('startup reporting after factory teardown', () => {
     const gate = Promise.withResolvers<never>()
     // The teardown path may drop the pending lookup without awaiting it.
     gate.promise.catch(() => undefined)
-    vi.spyOn(ctx.sessionPersistence, 'list').mockReturnValue(gate.promise)
+    vi.spyOn(ctx.sessionPersistence, 'listHeaders').mockReturnValue(gate.promise)
     const failures: unknown[] = []
     ctx.on('agent-loop/config-start-failed', ({ error }) => { failures.push(error) })
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)

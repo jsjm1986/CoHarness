@@ -13,7 +13,7 @@
 | 提供方约定 | `@deepseek-ai/dsh-fs`（本包） | `ctx.fs`：执行世界路径、文本 I/O 与原子变更原语（可选版本防护）；拥有 `fs/*` 事件词汇 |
 | 提供方 | `@deepseek-ai/dsh-fs-local` | 宿主文件系统实现 |
 
-`fs-sandbox` 与 `fs-e2b` 实现该接口，无需更改政策层和工具层。
+`fs-sandbox` 实现该接口，无需更改政策层和工具层。
 
 ## 服务 API（`ctx.fs`）
 

@@ -16,6 +16,8 @@ None, as the directory chooser is browser chrome; nothing here reaches a model r
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The plugin registers a renderless flow occupant into two workspace holes as one transactional effect, whose disposal the HMR-safety spec proves, and it retains no state between picks.
+
 ## Known Limitations and Deferred Work
 
 - **No cancellation of an open chooser** — the wire has no per-request abort, so a chooser already on the host display cannot be closed from the browser; a discarded settlement is simply ignored.

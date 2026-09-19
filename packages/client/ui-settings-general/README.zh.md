@@ -18,6 +18,8 @@
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。settings seam 校验并发布持久 onboarding section，slot core 会拒绝冲突；本地 document action 由 store 与组件测试覆盖。
+
 ## 已知限制与暂缓事项
 
 - 「通用」分区没有内置行；每一行仅在其所属功能插件挂载时出现。

@@ -22,6 +22,8 @@
 import { Zip, ZipDeflate } from 'fflate'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { SessionLineageNode, SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 import type { SessionId, SessionStore } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence, SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
@@ -135,7 +137,8 @@ function collectImageRefs(content: unknown, refs: Map<string, ImageAttachmentRef
 /**
  * Collect every image reference one session event carries, across the same
  * carriers the live attachment route scans (direct content, message content,
- * inserted messages, and completed assistant chunk blocks).
+ * inserted messages, assistant stream records, and the released
+ * `assistant/chunk` carrier kept for unversioned artifacts).
  * @param event - one parsed JSONL event object.
  * @param refs - the dedupe map being filled (keyed by attachment id).
  */
@@ -146,12 +149,18 @@ function collectEventImageRefs(event: unknown, refs: Map<string, ImageAttachment
     content?: unknown
     message?: { content?: unknown }
     inserted?: Array<{ content?: unknown }>
+    stream?: AssistantStreamRecord[]
     chunk?: { type?: unknown; block?: unknown }
   }
   collectImageRefs(carrier.content, refs)
   if (carrier.message !== undefined) collectImageRefs(carrier.message.content, refs)
   if (carrier.inserted !== undefined) {
     for (const message of carrier.inserted) collectImageRefs(message.content, refs)
+  }
+  if (carrier.stream !== undefined) {
+    for (const timed of expandAssistantStream(carrier.stream)) {
+      if (timed.chunk.type === 'block-end') collectImageRefs([timed.chunk.block], refs)
+    }
   }
   if (carrier.chunk?.type === 'block-end') collectImageRefs([carrier.chunk.block], refs)
 }

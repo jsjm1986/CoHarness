@@ -132,15 +132,15 @@ describe('ConversationRepository bounded pages', () => {
     expect(fixture.calls.some(call => call.text.includes('ORDER BY e.seq DESC LIMIT $3'))).toBe(true)
   })
 
-  it('keeps one model step in one page group instead of paging every stream chunk', async () => {
+  it('keeps one model step in one page group instead of paging every stream event', async () => {
     const header = { ...headerRow, version: '7', next_seq: '5' }
     const rows = Array.from({ length: 5 }, (_, seq) => ({
       seq,
       event: {
-        type: 'assistant/chunk',
+        type: 'assistant/attempt',
         seq,
         time: seq,
-        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: seq, text: 'x' } },
+        data: { turn: 1, step: 1, stream: [] },
       },
       payload_bytes: 60,
     }))

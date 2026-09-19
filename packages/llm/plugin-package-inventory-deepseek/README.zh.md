@@ -58,6 +58,8 @@ kind: "package-reference"
 
 无；包生命周期变化不会改变模型可见前缀。
 
+**运行时不变式：** 不发布伴生入口。每次请求直接读取权威 Loader fiber 状态与 package manifest，插件不保留独立可变 inventory。
+
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>

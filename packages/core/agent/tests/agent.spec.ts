@@ -1,9 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry, {
-  agentEvents,
-} from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 
 import type {
@@ -14,18 +12,20 @@ import type {
   CreateAgentOptions,
   ResumeAgentOptions,
 } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
   const id = SessionId(rawId)
-  const session = Session.create(id)
+  const session = overrides.session ?? Session.create(id)
+  const ctx = overrides.ctx ?? new Context()
   const agent: Agent = {
     id,
     options: {},
     session,
-    inbox: unsupportedInbox(),
+    inbox: {
+      nextTurn: [], nextStep: [],
+    } as never,
     status: 'idle',
-    ctx: new Context(),
+    ctx,
     send: () => {},
     followup: () => {},
     steer: () => ({ outcome: Promise.resolve({ status: 'rejected' as const }) }),
@@ -33,8 +33,9 @@ function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
     cancel() {},
     runMaintenance: task => task(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
+    ...overrides,
   }
-  return Object.assign(agent, overrides)
+  return agent
 }
 
 describe('AgentRegistry', () => {
@@ -44,8 +45,7 @@ describe('AgentRegistry', () => {
     await agentFiber
     await ctx.plugin(TypertRegistry)
     const agent = stubAgent('remote-agent')
-    const disposeAgent = ctx.agents.register(agent)
-    await disposeAgent
+    const disposeAgent = await ctx.agents.register(agent)
 
     const lookup = ctx.typert.lookups.get('agent')
     expect(lookup).toMatchObject({
@@ -55,7 +55,8 @@ describe('AgentRegistry', () => {
       wireTypeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
     })
     expect(lookup?.resolve(agent.id)).toBe(agent)
-    expect(ctx.typert.contexts.getHost('agent')?.resolve(agent.id)).toBe(agent.ctx)
+    const context = ctx.typert.contexts.getHost('agent')
+    expect(context?.resolve(agent.id)).toBe(agent.ctx)
 
     await disposeAgent()
     expect(lookup?.resolve(agent.id)).toBeUndefined()
@@ -72,8 +73,7 @@ describe('AgentRegistry', () => {
     ctx.on('agent/disposed', ({ agent }) => void lifecycle.push(`disposed:${agent.id}`))
 
     const agent = stubAgent('a1')
-    const dispose = ctx.agents.register(agent)
-    await dispose
+    const dispose = await ctx.agents.register(agent)
     expect(ctx.agents.get(agent.id)).toBe(agent)
     expect(ctx.agents.list()).toEqual([agent])
     expect(ctx.agents.roots()).toEqual([agent])
@@ -134,20 +134,51 @@ describe('AgentRegistry', () => {
     const warnings: string[] = []
     const heard: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
-    ctx.on('agent/created', async () => { throw new Error('created async') })
+    ctx.on('agent/created', () => Promise.reject(new Error('created async')))
+    ctx.on('agent/created', () => { heard.push('unreachable') })
     ctx.on('agent/disposed', () => { throw new Error('disposed sync') })
     ctx.on('agent/disposed', () => Promise.reject(new Error('disposed async')) as never)
     ctx.on('agent/disposed', ({ agent }) => void heard.push(agent.id))
 
     await expect(Promise.resolve(ctx.agents.register(stubAgent('contained')))).rejects.toThrow('created async')
-    expect(ctx.agents.get(SessionId('contained'))).toBeUndefined()
     await Promise.resolve()
 
     expect(heard).toEqual(['contained'])
+    expect(ctx.agents.list()).toEqual([])
     expect(warnings).toEqual([
       'agent "contained": agent/disposed listener threw: Error: disposed sync',
       'agent "contained": agent/disposed listener rejected: Error: disposed async',
     ])
+  })
+
+  it('awaits each creation listener before the next listener and registration completion', async () => {
+    const ctx = new Context()
+    await ctx.plugin(AgentRegistry)
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const order: string[] = []
+    ctx.on('agent/created', async () => {
+      order.push('first:start')
+      entered.resolve(undefined)
+      await release.promise
+      order.push('first:end')
+    })
+    ctx.on('agent/created', () => { order.push('second') })
+    const agent = stubAgent('serial')
+    const registration = ctx.agents.register(agent)
+    const ready = Promise.resolve(registration).then(() => { order.push('ready') })
+    try {
+      await entered.promise
+      expect(order).toEqual(['first:start'])
+      await expect(ctx.agents.announce(agent, 'startup')).rejects.toThrow('already announced')
+      release.resolve(undefined)
+      await ready
+      expect(order).toEqual(['first:start', 'first:end', 'second', 'ready'])
+    } finally {
+      release.resolve(undefined)
+      await registration()
+      await ctx.fiber.dispose()
+    }
   })
 
   it('separates entry from announcement and stale/idempotent detach cannot remove a replacement', async () => {
@@ -172,125 +203,6 @@ describe('AgentRegistry', () => {
     await expect(ctx.agents.announce(first, 'startup')).rejects.toThrow(/not live/)
     detachReplacement()
     expect(lifecycle).toEqual(['created:split', 'disposed:split'])
-  })
-
-  it('awaits serial initialization with the exact source and cancellation signal', async () => {
-    const ctx = new Context()
-    await ctx.plugin(AgentRegistry)
-    const agent = stubAgent('serial')
-    const controller = new AbortController()
-    const entered = Promise.withResolvers<undefined>()
-    const release = Promise.withResolvers<undefined>()
-    const order: string[] = []
-    ctx.on('agent/created', async (payload) => {
-      expect(payload).toEqual({ agent, source: 'resume', signal: controller.signal })
-      order.push('first')
-      entered.resolve(undefined)
-      await release.promise
-      expect(payload.signal?.aborted).toBe(true)
-      order.push('first-done')
-    })
-    ctx.on('agent/created', () => void order.push('second'))
-    const detach = ctx.agents.enter(agent, undefined)
-    const announcement = ctx.agents.announce(agent, 'resume', controller.signal)
-    await entered.promise
-    expect(order).toEqual(['first'])
-    await expect(ctx.agents.announce(agent, 'resume')).rejects.toThrow(/already announced/)
-    controller.abort()
-    release.resolve(undefined)
-    await announcement
-    expect(order).toEqual(['first', 'first-done', 'second'])
-    detach()
-  })
-
-  it('drains pending registration before completing single-shot disposal', async () => {
-    const ctx = new Context()
-    await ctx.plugin(AgentRegistry)
-    const agent = stubAgent('pending-registration')
-    const entered = Promise.withResolvers<undefined>()
-    const release = Promise.withResolvers<undefined>()
-    const order: string[] = []
-    ctx.on('agent/created', async () => {
-      entered.resolve(undefined)
-      await release.promise
-      order.push('initialized')
-    })
-    ctx.on('agent/disposed', () => void order.push('disposed'))
-    const registration = ctx.agents.register(agent)
-    await entered.promise
-    const disposal = registration()
-    expect(registration()).toBeUndefined()
-    expect(ctx.agents.get(agent.id)).toBe(agent)
-    expect(order).toEqual([])
-    release.resolve(undefined)
-    await registration
-    await disposal
-    expect(order).toEqual(['initialized', 'disposed'])
-    expect(ctx.agents.get(agent.id)).toBeUndefined()
-  })
-
-  it('keeps the exact effect disposer nested in its owning teardown order', async () => {
-    const ctx = new Context()
-    await ctx.plugin(AgentRegistry)
-    const agent = stubAgent('nested')
-    const draining = Promise.withResolvers<undefined>()
-    const release = Promise.withResolvers<undefined>()
-    const order: string[] = []
-    ctx.on('agent/created', (payload) => {
-      expect(payload).toEqual({ agent, source: 'startup' })
-    })
-    ctx.on('agent/disposed', () => void order.push('disposed'))
-    const owner = await ctx.plugin(Object.assign(async (inner: Context) => {
-      const registration = inner.agents.register(agent)
-      await registration
-      inner.effect(function* () {
-        yield registration
-        yield async () => {
-          draining.resolve(undefined)
-          await release.promise
-          order.push('drained')
-        }
-      })
-    }, { inject: ['agents'] }))
-    const disposal = owner.dispose()
-    await draining.promise
-    expect(ctx.agents.get(agent.id)).toBe(agent)
-    expect(order).toEqual([])
-    release.resolve(undefined)
-    await disposal
-    expect(order).toEqual(['drained', 'disposed'])
-    expect(ctx.agents.get(agent.id)).toBeUndefined()
-  })
-
-  it.each([false, true])('defers in-flight detach until serial settlement (reject=%s)', async (rejects) => {
-    const ctx = new Context()
-    await ctx.plugin(AgentRegistry)
-    const agent = stubAgent('pending-detach')
-    const entered = Promise.withResolvers<undefined>()
-    const release = Promise.withResolvers<undefined>()
-    const order: string[] = []
-    ctx.on('agent/created', async () => {
-      entered.resolve(undefined)
-      await release.promise
-      detach()
-      expect(ctx.agents.get(agent.id)).toBe(agent)
-      if (rejects) throw new Error('initialization rejected')
-    })
-    ctx.on('agent/created', () => {
-      expect(ctx.agents.get(agent.id)).toBe(agent)
-      order.push('second')
-    })
-    ctx.on('agent/disposed', () => void order.push('disposed'))
-    const detach = ctx.agents.enter(agent, undefined)
-    const announcement = ctx.agents.announce(agent, 'startup')
-    await entered.promise
-    detach()
-    expect(ctx.agents.get(agent.id)).toBe(agent)
-    release.resolve(undefined)
-    if (rejects) await expect(announcement).rejects.toThrow('initialization rejected')
-    else await announcement
-    expect(order).toEqual(rejects ? ['disposed'] : ['second', 'disposed'])
-    expect(ctx.agents.get(agent.id)).toBeUndefined()
   })
 
   it('defers detach requested by a creation listener until that dispatch unwinds', async () => {
@@ -403,6 +315,22 @@ describe('AgentRegistry factory seam', () => {
     }, { inject: ['agents'] }))
     expect(calls.create[0]?.ownerCtx.fiber).toBe(callerFiber)
     expect(calls.resume[0]?.ownerCtx.fiber).toBe(callerFiber)
+    expect(calls.create[0]?.options.parentAgent).toBeUndefined()
+    expect(calls.resume[0]?.options.parentAgent).toBeUndefined()
+  })
+
+  it('keeps the runtime parent in options separately from the caller context', async () => {
+    const ctx = new Context()
+    await ctx.plugin(AgentRegistry)
+    const { factory, calls } = stubFactory()
+    ctx.agents.setFactory(factory)
+    const parent = stubAgent('parent')
+    const unregister = await ctx.agents.register(parent)
+
+    await ctx.agents.create({ sessionId: SessionId('child'), parentAgent: parent })
+
+    expect(calls.create[0]?.options.parentAgent).toBe(parent)
+    await unregister()
   })
 
   it('rejects a second factory and clears the slot with its owner (HMR)', async () => {

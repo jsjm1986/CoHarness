@@ -30,6 +30,8 @@ Conditional and append-only: the literal `@label` or a human follow-up adds toke
 
 Append-only. This package never edits earlier request tokens.
 
+**Runtime invariant:** No companion is published. The plugin registers a single slash source whose disposal is proven by the HMR-safety spec; it emits no Cordis events and owns no cross-plugin mutable state.
+
 ## Known Limitations and Deferred Work
 
 - **The catalog has no durable outcome** — activity and timing do not distinguish completion, failure, or cancellation, and the UI exposes no Activation identity; stopping is limited to the composer's current-turn Stop for a running continuable child.

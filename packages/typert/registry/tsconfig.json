@@ -9,16 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../protocol"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../protocol"
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

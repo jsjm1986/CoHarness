@@ -322,11 +322,11 @@ describe('sessions domain schemas', () => {
 })
 
 describe('history wire schema', () => {
-  it('rejects malformed packed records', () => {
+  it('rejects records outside the { event, view? } shape', () => {
     expect(() => historyWireValueSchema.parse({
       records: [{ chunks: { type: 'text-chunks' } }],
       hasMore: false,
-    })).toThrow(/malformed text-chunks storage row/)
+    })).toThrow(/history wire record must be exactly \{ event, view\? \}/)
   })
 
   it('passes an unknown ordinary event through the expanded logical value', () => {

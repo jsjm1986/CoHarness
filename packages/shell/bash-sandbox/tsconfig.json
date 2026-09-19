@@ -9,18 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../native/landlock-run/packages/entry"
-    },
-    {
-      "path": "../../util/brand"
-    },
-    {
       "path": "../../llm/llm"
     },
     {
@@ -30,13 +18,19 @@
       "path": "../../sandbox/sandbox-policy"
     },
     {
-      "path": "../../shell/shell"
+      "path": "../bash-local"
     },
     {
-      "path": "../../shell/bash-local"
+      "path": "../shell"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

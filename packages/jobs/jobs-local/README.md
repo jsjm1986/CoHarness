@@ -30,6 +30,8 @@ Indirectly, through producer plugins and [`dsh-tool-jobs`](../tool-jobs/README.m
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. `@deepseek-ai/dsh-jobs/invariant` owns per-snapshot identity, status, timestamp, and owner checks. This provider's admission decision uses private configuration and must fail before a backend starter runs; `LocalJobRegistry.start()` enforces it synchronously for current producers. Repeating an aggregate after publication would expose private configuration solely to this companion and would not verify the fail-closed pre-start guarantee.
+
 ## Known Limitations and Deferred Work
 
 - **Jobs are process-local** — records die with the harness process; durable or cross-restart execution needs a separate backend implementing the seam.

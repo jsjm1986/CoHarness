@@ -156,11 +156,11 @@ export class WorkspaceRegistry extends Service {
     await this.recoverPendingMutation()
     this.validateStoredState(this.state)
     if (!this.state.initialized) {
-      const headers = await this.ctx.sessionPersistence.list()
+      const headers = await this.ctx.sessionPersistence.listHeaders()
       await this.replaceHeaderIndex(headers)
       await this.bootstrap(headers)
     } else if (this.table.size > 0) {
-      await this.replaceHeaderIndex(await this.ctx.sessionPersistence.list())
+      await this.replaceHeaderIndex(await this.ctx.sessionPersistence.listHeaders())
     }
 
     await this.indexLiveSessions()
@@ -284,7 +284,7 @@ export class WorkspaceRegistry extends Service {
    */
   async archivedEntries(): Promise<readonly ArchivedSessionEntry[]> {
     const state = this.requireState()
-    const headers = await this.ctx.sessionPersistence.list()
+    const headers = await this.ctx.sessionPersistence.listHeaders()
     const liveHeaders = this.ctx.get('sessions')?.list().map(session => session.header) ?? []
     const persistedIds = new Set(headers.map(header => header.id))
     const allHeaders = [...headers, ...liveHeaders.filter(live => !persistedIds.has(live.id))]
@@ -378,13 +378,13 @@ export class WorkspaceRegistry extends Service {
   /**
    * Whether a session is live, header-indexed, or present in a fresh
    * persistence listing. Only a definite miss returns false — a failing
-   * `sessionPersistence.list()` propagates so storage faults never
+   * `sessionPersistence.listHeaders()` propagates so storage faults never
    * masquerade as an unknown session.
    */
   private async sessionKnown(id: SessionId): Promise<boolean> {
     if (this.ctx.get('sessions')?.get(id) !== undefined) return true
     if (this.headers.has(id)) return true
-    await this.indexHeaders(await this.ctx.sessionPersistence.list())
+    await this.indexHeaders(await this.ctx.sessionPersistence.listHeaders())
     return this.headers.has(id)
   }
 
@@ -751,7 +751,7 @@ export class WorkspaceRegistry extends Service {
     const cached = this.headers.get(id)
     if (cached !== undefined) return cached
 
-    const headers = await this.ctx.sessionPersistence.list()
+    const headers = await this.ctx.sessionPersistence.listHeaders()
     await this.indexHeaders(headers)
     const header = this.headers.get(id)
     if (header === undefined) {

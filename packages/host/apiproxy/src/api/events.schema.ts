@@ -50,7 +50,15 @@ export const queuedInboxItemsSchema = z.array(z.object({
 /** MuxFrame union (payload slot of a mux-stream ServerRequest). */
 export const muxFrameSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session/event'), sessionId: sessionIdSchema, event: sessionEventSchema, view: toolEventViewSchema.optional() }),
-  z.object({ type: z.literal('session/subscribed'), sessionId: sessionIdSchema, lastSeq: z.number().int() }),
+  // assistantStream stays wide for the same reason projection values do: the
+  // host already produced a typed baseline, and deep-validating here would
+  // copy the provider chunk vocabulary into the carrier schema.
+  z.object({
+    type: z.literal('session/subscribed'),
+    sessionId: sessionIdSchema,
+    lastSeq: z.number().int(),
+    assistantStream: z.unknown().optional(),
+  }),
   z.object({ type: z.literal('approval/requested'), sessionId: sessionIdSchema, approvalId: approvalRequestIdSchema, toolName: z.string(), callId: z.string().optional(), reason: z.string().optional() }),
   z.object({ type: z.literal('approval/resolved'), sessionId: sessionIdSchema, approvalId: approvalRequestIdSchema, outcome: z.union([z.literal('allowed-once'), z.literal('rejected'), z.literal('cancelled'), z.literal('unavailable')]) }),
   // Non-empty by wire contract: the user-questions service rejects empty
@@ -67,6 +75,10 @@ export const muxFrameSchema = z.discriminatedUnion('type', [
   // value stays wide: it already passed its unit's own schema on the host,
   // and deep-validating here would import every domain's schema into the carrier.
   z.object({ type: z.literal('session/projection'), sessionId: sessionIdSchema, key: z.string().min(1), value: z.unknown(), seq: z.number().int().nonnegative() }),
+  // Stream payloads stay wide for the same reason projection values do: the
+  // host already produced a typed frame, and deep-validating here would copy
+  // the provider chunk vocabulary into the carrier schema.
+  z.object({ type: z.literal('session/assistant-stream'), sessionId: sessionIdSchema, frame: z.unknown() }),
   z.object({ type: z.literal('stream/error'), error: rpcErrorSchema }),
 ]) as unknown as z.ZodType<MuxFrame>
 

@@ -36,6 +36,8 @@ Fixed for a given preset: the persona's own tokens on every request that agent m
 
 Prefix-stable for the life of an agent — the row mounts once, before the agent is published and therefore before its first request, and its text never changes while the agent runs. Two agents on different presets establish different prefixes from this section onward; neither can invalidate the other's reuse.
 
+**Runtime invariant:** No companion is published. This row owns no event stream or mutable runtime data — it registers prompt sections and the prompt registry owns identity, complete-prompt enforcement, shadowing, and disposal.
+
 ## Known Limitations and Deferred Work
 
 - **No global mount** — the prompt registry owns the unscoped persona slot, so this row is usable only from a scoped composition. A deployment-wide persona change belongs in the `system-prompt` row's own config.

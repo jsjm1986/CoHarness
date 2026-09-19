@@ -27,13 +27,19 @@ import type {
   SessionSeq as SessionSeqType,
 } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { sessionFormatCatalog, SessionFormatUnsupportedMigrationError, type SessionFormatEvent, type SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog, SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
+import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format/legacy'
 import type {
   SessionEventSuffix,
   SessionInspection,
-  SessionLocation,
   SessionStorageMetadata,
 } from './index.ts'
+import type { SessionLocation } from './errors.ts'
+import {
+  SessionFormatUnsupportedError,
+  SessionPersistenceCorruptionError,
+  sessionFormatVersionRefusal,
+} from './errors.ts'
 import { SessionPersistenceReadError } from './page.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import { observeQueuedAbort, SessionPreparations } from './preparations.ts'
@@ -54,53 +60,6 @@ export const DEFAULT_MAX_PENDING_BYTES_PER_SESSION = DEFAULT_MAX_PENDING_BYTES
 /** Largest write batching delay accepted by Node's timer implementation. */
 export const MAX_WRITE_BATCH_DELAY_MS = MAX_TIMER_DELAY_MS
 
-/** Durable session contents failed validation after a successful backend read. */
-export class SessionPersistenceCorruptionError extends Error {
-  /**
-   * @param message - stable corruption context.
-   * @param options - original validation failure.
-   */
-  constructor(message: string, options: ErrorOptions) {
-    super(message, options)
-    this.name = 'SessionPersistenceCorruptionError'
-  }
-}
-
-/**
- * The stored log is intact but this runtime cannot faithfully interpret it:
- * the header carries an unsupported format version, or an event's type is
- * unknown to this build and the event is not marked ignorable. Distinct from
- * {@link SessionPersistenceCorruptionError} — nothing is damaged; the raw log
- * remains readable at {@link location} when the backend keeps one artifact
- * per session.
- */
-export class SessionFormatUnsupportedError extends Error {
-  /**
-   * @param message - stable reason the log cannot be interpreted, already
-   *   including the raw-log path when one exists.
-   * @param location - the backend's artifact location, when one exists.
-   */
-  constructor(message: string, readonly location?: SessionLocation) {
-    super(message)
-    this.name = 'SessionFormatUnsupportedError'
-  }
-}
-
-/**
- * Direction-aware refusal text for a stored session whose format version this
- * build does not read. Shared by the coordinator's load-time check and by
- * backends that must refuse BEFORE decoding version-dependent structure (a
- * future format may not satisfy today's structural checks at all, and the
- * user must see "upgrade the harness", never "corrupt").
- * @param id - the stored session id, for message context.
- * @param version - the stored format version.
- * @returns the stable refusal text, without a raw-log path suffix.
- */
-export function sessionFormatVersionRefusal(id: string, version: number): string {
-  return version > sessionFormatCatalog.currentVersion
-    ? `session "${id}" uses log format v${version}, but this harness reads only v${sessionFormatCatalog.currentVersion}: the log was written by a newer harness — upgrade the harness to open it`
-    : `session "${id}" uses log format v${version}, older than the supported v${sessionFormatCatalog.currentVersion}, and this build ships no upgrade path for it`
-}
 
 /** Transform a legacy event sequence through the format chain without intermediate artifacts. */
 function migrateFormatEvents(
@@ -279,7 +238,7 @@ export interface PersistenceBackend<TornMarker = unknown> {
    * List all stored (materialized) sessions' metadata.
    * @param signal - optional cancellation for backend listing work.
    */
-  list(signal?: AbortSignal): Promise<SessionHeader[]>
+  listStored(signal?: AbortSignal): Promise<SessionHeader[]>
 
   /**
    * Optional side-effect-free artifact locator, used to point refusal
@@ -427,7 +386,7 @@ function legacyMessageId(id: SessionId, seq: SessionSeqType): PersistedMessageId
 
 /** Read a replacement target while leaving malformed surface metadata to the session validator. */
 function replacementStart(event: SessionEvent): SessionSeqType | undefined {
-  const op = asRecord((event as SessionEvent & { surfaceOp?: unknown }).surfaceOp)
+  const op = asRecord(event.surfaceOp)
   if (op?.['op'] !== 'replace') return undefined
   const start = typeof op['startSeq'] === 'number' ? op['startSeq'] : op['start']
   if (typeof start !== 'number') return undefined
@@ -467,7 +426,7 @@ function migrateLegacySteeringEvent(event: SessionEvent, id: SessionId): Session
   const wrapped = asRecord(data['message'])
   if (wrapped !== undefined && Number.isSafeInteger(data['turn'])
     && hasOnlyKeys(data, ['turn', 'message'])) {
-    return { ...event, type: 'user/message', data: wrapped } as SessionEvent
+    return { ...event, type: 'user/message', data: wrapped } as unknown as SessionEvent
   }
   if (!Number.isSafeInteger(data['turn']) || !hasOnlyKeys(data, ['turn', 'content', 'source'])) {
     throw new Error(`session "${id}" contains malformed pre-react-loop steering/message at seq ${event.seq}`)
@@ -481,7 +440,7 @@ function migrateLegacySteeringEvent(event: SessionEvent, id: SessionId): Session
       id: legacyMessageId(id, event.seq),
       role: 'user',
     },
-  } as SessionEvent
+  } as unknown as SessionEvent
 }
 
 /** Remove the obsolete trigger after verifying the complete old turn-start envelope. */
@@ -495,7 +454,7 @@ function migrateLegacyTurnStartEvent(event: SessionEvent, id: SessionId): Sessio
     || trigger === undefined || typeof trigger['kind'] !== 'string' || trigger['kind'].length === 0) {
     throw new Error(`session "${id}" contains malformed pre-react-loop turn/start at seq ${event.seq}`)
   }
-  return { ...event, data: { turn: data['turn'] } } as SessionEvent
+  return { ...event, data: { turn: data['turn'] } } as unknown as SessionEvent
 }
 
 /** Upgrade an obsolete turn ending while preserving the latest-master envelope. */
@@ -567,7 +526,7 @@ function migrateLegacyTurnEndEvent(event: SessionEvent, id: SessionId): SessionE
       ...data,
       reason: currentReason,
     },
-  } as SessionEvent
+  } as unknown as SessionEvent
 }
 
 /**
@@ -597,7 +556,7 @@ function migrateLegacyMessageEvent(
           id: legacyMessageId(id, event.seq),
           role: 'user',
         },
-      } as SessionEvent
+      } as unknown as SessionEvent
     }
     case 'assistant/message': {
       if (Object.hasOwn(data, 'message')
@@ -617,7 +576,7 @@ function migrateLegacyMessageEvent(
             },
           },
         },
-      } as SessionEvent
+      } as unknown as SessionEvent
     }
     case 'tool/result': {
       if (Object.hasOwn(data, 'message')
@@ -646,7 +605,7 @@ function migrateLegacyMessageEvent(
             },
           },
         },
-      } as SessionEvent
+      } as unknown as SessionEvent
     }
     default:
       return event
@@ -658,8 +617,8 @@ function migrateLegacyMessageEvent(
 function migrateLegacyDispatchEvent(event: SessionEvent): SessionEvent {
   const legacyStart: string = 'tool/code-dispatch-start'
   const legacySettled: string = 'tool/code-dispatch'
-  if (event.type === legacyStart) return { ...event, type: 'tool/ptc-dispatch-start' } as SessionEvent
-  if (event.type === legacySettled) return { ...event, type: 'tool/ptc-dispatch' } as SessionEvent
+  if (event.type === legacyStart) return { ...event, type: 'tool/ptc-dispatch-start' } as unknown as SessionEvent
+  if (event.type === legacySettled) return { ...event, type: 'tool/ptc-dispatch' } as unknown as SessionEvent
   return event
 }
 
@@ -669,7 +628,7 @@ function migrateLegacyPresetEvent(event: SessionEvent): SessionEvent {
   if (event.type !== selectedType) return event
   const data = asRecord(event.data)
   if (data?.['agentPreset'] !== 'code') return event
-  return { ...event, data: { ...data, agentPreset: 'ptc' } } as SessionEvent
+  return { ...event, data: { ...data, agentPreset: 'ptc' } } as unknown as SessionEvent
 }
 
 /** Rewrite a pre-PTC `tools-code-mode` plugin attribution on one message record. */
@@ -691,12 +650,12 @@ function migrateLegacyPtcSources(event: SessionEvent): SessionEvent {
   const titleRequestType: string = 'session/title-llm-request'
   switch (event.type) {
     case 'user/message':
-      return { ...event, data: migrateLegacyPtcSource(data) } as SessionEvent
+      return { ...event, data: migrateLegacyPtcSource(data) } as unknown as SessionEvent
     case 'assistant/message':
     case 'tool/result': {
       const message = asRecord(data['message'])
       if (message === undefined) return event
-      return { ...event, data: { ...data, message: migrateLegacyPtcSource(message) } } as SessionEvent
+      return { ...event, data: { ...data, message: migrateLegacyPtcSource(message) } } as unknown as SessionEvent
     }
     case splicedType: {
       const inserted = data['inserted']
@@ -710,7 +669,7 @@ function migrateLegacyPtcSources(event: SessionEvent): SessionEvent {
             return message === undefined ? item : migrateLegacyPtcSource(message)
           }),
         },
-      } as SessionEvent
+      } as unknown as SessionEvent
     }
     case titleRequestType: {
       const messages = data['messages']
@@ -724,7 +683,7 @@ function migrateLegacyPtcSources(event: SessionEvent): SessionEvent {
             return message === undefined ? item : migrateLegacyPtcSource(message)
           }),
         },
-      } as SessionEvent
+      } as unknown as SessionEvent
     }
     default:
       return event
@@ -898,6 +857,94 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     // for that retirement before reserving the id so immediate replacement
     // creation cannot race the old lifecycle's cleanup.
     return this.waitForRetirement(snapshot.id).then(() => this.serialize(snapshot.id, () => this.createCore(storage)))
+  }
+
+  /**
+   * Durably materialize one detached pending session created through
+   * {@link create}: a pending log with buffered events appends them atomically,
+   * an empty one writes the header-only artifact. Materialized sessions and
+   * live-owned states are not detached pendings and are rejected.
+   * @param id - the pending session to materialize.
+   * @returns after the artifact is durable.
+   */
+  async materializeDetached(id: SessionId): Promise<void> {
+    await this.serialize(id, async () => {
+      const state = this.states.get(id)
+      if (state === undefined || state.owner !== undefined || state.materialized) {
+        throw new Error(`session "${id}" has no detached pending state to materialize`)
+      }
+      if (state.pendingEvents.length === 0) {
+        if (this.backend.materializeHeader === undefined) {
+          throw new Error('session persistence backend cannot materialize an empty session')
+        }
+        await this.backend.materializeHeader(state.storage)
+      } else {
+        const durableEvents = state.pendingEvents
+        const nextCursor = SessionLogOffset(state.cursor + durableEvents.length)
+        if (nextCursor < state.storage.inheritedEventCount) {
+          throw new Error(`session "${id}" cannot materialize before its inherited prefix is complete`)
+        }
+        await this.backend.appendBatch(state.storage, durableEvents, false)
+        state.cursor = nextCursor
+        state.pendingEvents = []
+      }
+      state.materialized = true
+      this.preparations.invalidate(id)
+    })
+  }
+
+  /**
+   * Drop one detached pending create that never materialized: the id returns
+   * to availability exactly as if the create had never happened.
+   * @param id - the pending session to discard.
+   * @returns after the reservation is released.
+   */
+  async discardDetached(id: SessionId): Promise<void> {
+    await this.serialize(id, () => {
+      const state = this.states.get(id)
+      if (state !== undefined && state.owner === undefined && !state.materialized) {
+        this.states.delete(id)
+        this.preparations.invalidate(id)
+      }
+    })
+  }
+
+  /**
+   * Whether the id names a detached pending create.
+   * @param id - the session to check.
+   * @returns true while the session exists only as an in-process reservation.
+   */
+  isPending(id: SessionId): boolean {
+    const state = this.states.get(id)
+    return state !== undefined && state.owner === undefined && !state.materialized
+  }
+
+  /**
+   * Storage metadata for a session bound to a live Session through
+   * `session/created`, or `undefined` for untracked and detached ids. Awaits
+   * any in-flight registration for the id so a concurrent `create` observes
+   * the settled owner.
+   * @param id - the session to look up.
+   * @returns the tracked storage record while a live Session owns it.
+   */
+  async liveStorage(id: SessionId): Promise<SessionStorageMetadata | undefined> {
+    const inits = [...this.live]
+      .filter(([session]) => session.header.id === id)
+      .map(([, live]) => live.init)
+    if (inits.length > 0) await Promise.allSettled(inits)
+    const state = this.states.get(id)
+    return state !== undefined && state.owner !== undefined ? state.storage : undefined
+  }
+
+  /**
+   * List this instance's detached pending creates: sessions observable through
+   * `stat`/`list`/`open` in this process before their first durable write.
+   * @returns one storage metadata record per pending detached session.
+   */
+  listPending(): readonly SessionStorageMetadata[] {
+    return [...this.states.values()]
+      .filter(state => state.owner === undefined && !state.materialized)
+      .map(state => state.storage)
   }
 
   /**
@@ -1177,7 +1224,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       if (suffix === undefined) throw new Error(`session "${id}" not found`)
       this.assertStoredId(id, suffix.meta)
       const currentMeta = this.assertVersion(suffix.meta)
-      if (suffix.meta.version !== currentMeta.version || suffix.events.some(needsLegacyPrefix)) {
+      if ((suffix.meta.version as number) !== currentMeta.version || suffix.events.some(needsLegacyPrefix)) {
         const whole = await this.readStoredPrefix(id, signal)
         return {
           meta: whole.meta,
@@ -1218,7 +1265,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const currentMeta = this.assertVersion(stored.meta)
     let events = normalizeStoredEvents(stored.events, id)
     let inheritedEventCount = SessionLogOffset(stored.inheritedEventCount)
-    if (stored.meta.version !== currentMeta.version) {
+    if ((stored.meta.version as number) !== currentMeta.version) {
       const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
       if (this.backend.migrateStored !== undefined
         && (this.backend.supportsBodyMigration === true || canPublishMetadataOnlyMigration(events, migrated.events))) {
@@ -1252,7 +1299,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const currentMeta = this.assertVersion(meta)
       let storedEvents = normalizeStoredEvents(events, id)
       let currentInheritedEventCount = SessionLogOffset(inheritedEventCount)
-      if (meta.version !== currentMeta.version) {
+      if ((meta.version as number) !== currentMeta.version) {
         const migrated = migrateFormatEvents(meta, inheritedEventCount, storedEvents)
         if (this.backend.migrateStored !== undefined
           && (this.backend.supportsBodyMigration === true || canPublishMetadataOnlyMigration(storedEvents, migrated.events))) {
@@ -1279,7 +1326,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         seed: balanced,
         meta: currentMeta,
         inheritedEventCount: currentInheritedEventCount,
-        seedSource: 'persistence',
+        eventState: 'detached',
       })
       const inspection: SessionInspection = Object.freeze({
         meta: session.header,
@@ -1353,6 +1400,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
 
   /** Return one durable immutable view of an already-live Session. */
   private async loadLiveSnapshot(session: Session): Promise<SessionInspection> {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const events = session.snapshotEvents()
     await this.flush(session)
     const state = this.states.get(session.id)
@@ -1374,6 +1422,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     return Object.freeze({
       meta: session.header,
       inheritedEventCount: session.inheritedEventCount,
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       events: session.snapshotEvents(),
     })
   }
@@ -1433,8 +1482,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   }
 
   private assertVersion(meta: SessionHeader): SessionHeader {
-    if (meta.version === sessionFormatCatalog.currentVersion) return migrateLegacyPtcMeta(meta)
-    if (meta.version === 0 || meta.version === 1 || meta.version === 2) {
+    const version: number = meta.version
+    if (version === sessionFormatCatalog.currentVersion) return migrateLegacyPtcMeta(meta)
+    if (version === 0 || version === 1 || version === 2 || version === 3) {
       const migrated = sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
       return migrateLegacyPtcMeta(migrated)
     }
@@ -1564,6 +1614,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       return restored
     }
     // Session owns this stable deep-frozen snapshot; backends only serialize it.
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const seed = session.snapshotEvents()
     const live: LiveSessionState = {
       init: Promise.resolve(),
@@ -1586,6 +1637,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       || session.firstLiveSeq !== state.cursor) {
       throw new Error(`session "${session.id}" preparation no longer matches its persistence state`)
     }
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const suffix = session.snapshotEvents(state.cursor).map(event => structuredClone(event))
     this.preparations.attach(reservation)
     state.owner = session

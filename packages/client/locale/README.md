@@ -37,6 +37,8 @@ None, as the locale registry serves browser UI copy; nothing here reaches a mode
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The locale catalog and dictionaries have no independent runtime source to compare against; registration disposal, preference resolution, and fallback lookup are asserted by behavior specs.
+
 ## Known Limitations and Deferred Work
 
 - **Some surfaces keep inline copy** — Settings rows, the sidebar, question composer, and model select use locale seats; other packages still own static text directly.

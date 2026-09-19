@@ -14,6 +14,8 @@ None, as the chooser only composes the GUI host's directory selection; nothing h
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The sole effect is one boot-time Loader-entry mount owned by the plugin fiber; the store is authoritative.
+
 ## Known Limitations and Deferred Work
 
 - **Detection infers operator location from launch context, which no launch-side signal can prove** — a tmux session detached from its SSH launch loses the `SSH_*` markers; a Darwin process outside an Aqua session still counts as displayed; and a workstation-local launch later reached through `ssh -L` arrives from `127.0.0.1`, resolves `native`, and opens the chooser on the unattended workstation. A wrong `native` choice degrades to the backend's existing retryable failure dialog, and composing `-browse` directly selects the safe interaction for such deployments.

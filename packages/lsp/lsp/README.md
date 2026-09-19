@@ -37,6 +37,8 @@ Indirectly, through `dsh-tool-lsp`, which owns the model-facing `lsp` schema, pr
 
 No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
 
+**Runtime invariant:** No companion is published. Provider ids and extension routes are private, atomically updated state; the seam exposes neither an enumerable snapshot nor lifecycle events to compare independently.
+
 ## Known Limitations and Deferred Work
 
 - **Exclusive extension ownership within one runtime** — two providers cannot both claim `.ts`, even with different language ids; overlaps fail registration. The intended extension is a deployment-configured selector above registrations, which can relax exclusive reservation without adding provider choice to model input ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md)).

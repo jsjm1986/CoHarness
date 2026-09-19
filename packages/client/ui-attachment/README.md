@@ -26,6 +26,8 @@ None, as the plugin only renders attachment state supplied by the conversation U
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The package contributes only effect-owned slot entries; the slot registry owns their lifecycle and validates their declarations.
+
 ## Known Limitations and Deferred Work
 
 - **Images only** — non-image files have no rail card or history renderer yet; DeepSeek Chat-style file cards and upload-progress states wait until the composer accepts non-image attachments.

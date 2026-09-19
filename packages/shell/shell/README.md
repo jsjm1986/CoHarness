@@ -47,6 +47,8 @@ Indirectly, through `dsh-tool-bash`, which turns executor output and sandbox fac
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This stateless Service Definition owns request/result types, while executors and policy own observations.
+
 ## Known Limitations and Deferred Work
 
 - **No interactive-input vocabulary** — `stdin` is written once at spawn and closed; the seam has no channel to feed a running task and no PTY session concept.

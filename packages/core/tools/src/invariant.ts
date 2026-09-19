@@ -29,7 +29,7 @@ function validateResult(
   }
 }
 
-/** Install monotonic pipeline, final-snapshot, and ptc-dispatch enclosure checks. */
+/** Install monotonic pipeline, final-snapshot, and PTC dispatch enclosure checks. */
 const install: InvariantInstaller = Object.assign((ctx: Context, fail: InvariantFailure) => {
   const stages = new WeakMap<object, ToolStage>()
   const openTurns = new WeakMap<Session, number | null>()
@@ -58,6 +58,7 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
   const seed = (session: Session): number | null => {
     let openTurn: number | null = null
     dispatchRoots.set(session, new Map())
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     for (const event of session.snapshotEvents()) {
       validateDispatch(session, event)
       commitDispatch(session, event)

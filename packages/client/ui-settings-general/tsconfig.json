@@ -9,34 +9,37 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../api/remotes/tsconfig.client.json"
     },
     {
-      "path": "../ui-slots"
-    },
-    {
-      "path": "../ui-primitives"
-    },
-    {
-      "path": "../runtime"
-    },
-    {
-      "path": "../ui-settings"
+      "path": "../connection/tsconfig.client.json"
     },
     {
       "path": "../locale"
     },
     {
-      "path": "../../settings/settings"
+      "path": "../runtime"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../ui-primitives"
     },
     {
-      "path": "../../api/remotes/tsconfig.client.json"
+      "path": "../ui-settings"
     },
     {
       "path": "../ui-sidebar"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

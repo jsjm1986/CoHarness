@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { SessionAlreadyOwnedError } from '@deepseek-ai/dsh-session-persistence'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 
@@ -44,24 +44,23 @@ describe('two-process write lock (built lib)', () => {
 
       const ctx = new Context()
       contexts.push(ctx)
-      await ctx.plugin(SessionStore)
       await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
       const mine = ctx.sessionPersistence
 
       // Excluded while the other process's descriptor holds the kernel lock.
-      await expect(mine.openHandleAsync(SessionId(SESSION), 'write')).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
+      await expect(mine.open(SessionId(SESSION), 'write')).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
       // Reads are unaffected across processes.
-      const reader = mine.openHandle(SessionId(SESSION), 'read')
-      expect((await reader.read()).map(event => event.seq)).toEqual([SessionSeq(0), SessionSeq(1)])
+      const reader = await mine.open(SessionId(SESSION), 'read')
+      expect((await reader.read()).events.map(event => event.seq)).toEqual([0, 1])
       await reader.close()
 
       // Crash the holder: no release runs, but the kernel drops the lock with
       // the process, so takeover succeeds without any waiting period.
       holder.kill('SIGKILL')
       await exited
-      const taken = await mine.openHandleAsync(SessionId(SESSION), 'write')
+      const taken = await mine.open(SessionId(SESSION), 'write')
       await taken.append([{ type: 'turn/start', seq: SessionSeq(2), time: 3, data: { turn: 2 } }])
-      expect((await taken.read()).map(event => event.seq)).toEqual([SessionSeq(0), SessionSeq(1), SessionSeq(2)])
+      expect((await taken.read()).events.map(event => event.seq)).toEqual([0, 1, 2])
       await taken.close()
     } finally {
       if (holder.exitCode === null) holder.kill('SIGKILL')

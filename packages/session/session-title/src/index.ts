@@ -386,6 +386,7 @@ export class SessionTitleService extends Service {
     // fresh session would have minted. Sessions entered empty are live
     // creates; their first human message drives the ordinary path.
     ctx.on('session/created', (session) => {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       if (session.snapshotEvents().length === 0) return
       this.defer(async () => {
         try {
@@ -426,6 +427,7 @@ export class SessionTitleService extends Service {
    * @returns latest title snapshot, or `undefined` before eligible input.
    */
   get(session: Session): SessionTitleSnapshot | undefined {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return foldSessionTitle(session.snapshotEvents())
   }
 
@@ -476,6 +478,7 @@ export class SessionTitleService extends Service {
       throw new Error(`session "${session.id}" is not live in this store`)
     }
     const registration = this.registration
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const messages = eligibleTitleMessages(session.snapshotEvents())
     const latest = messages.at(-1)
     if (registration === undefined || registration.closing || latest === undefined) {
@@ -546,6 +549,7 @@ export class SessionTitleService extends Service {
     if (this.get(session)?.source.kind === 'user') return
     const registration = this.registration
     if (registration !== undefined && !registration.closing) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const messages = eligibleTitleMessages(session.snapshotEvents(), event.seq)
       const shouldSchedule = registration.provider.automatic === 'all-prompts'
         || (session.header.parentSession === undefined && messages.length === 1 && this.get(session) === undefined)
@@ -585,6 +589,7 @@ export class SessionTitleService extends Service {
     const state = session === undefined ? undefined : this.work.get(session)
     const pending = state?.pending
     if (session === undefined || state === undefined || pending === undefined) return
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const boundary = session.snapshotEvents().findLast(event => event.type === 'step/start' || event.type === 'step/end')
     const route = session.requestHeader()?.config
     if (boundary?.type !== 'step/start'
@@ -637,6 +642,7 @@ export class SessionTitleService extends Service {
       this.assertCurrent(session, work)
       await this.ensureFallback(session)
       this.assertCurrent(session, work)
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const messages = eligibleTitleMessages(session.snapshotEvents(), work.throughSeq)
       const result = await work.registration.provider.generate({
         session,
@@ -837,6 +843,7 @@ export class SessionTitleService extends Service {
     this.assertServiceActive()
     const current = this.get(session)
     if (current !== undefined) return current
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const [first] = eligibleTitleMessages(session.snapshotEvents())
     if (first === undefined) return undefined
     const title = fallbackSessionTitle(

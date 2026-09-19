@@ -30,6 +30,8 @@ const endpoint = launchEnvironmentOf(ctx).get('DEEPSEEK_BASE_URL')?.value
 
 当产品 CLI（命令行界面）启动了这棵树时，`launchEnvironmentOf(ctx)` 返回启动器的快照；否则返回只含继承环境的那一层。该回退并不削弱规则：SDK 宿主或裸 `cordis.yml` 从未发现过任何文件，因此它拥有的一切确实就是它被启动时的环境。
 
+**运行时不变式：** 不发布伴生入口。快照在任何 fiber 启动前即已冻结，并且本包不拥有任何事件流或可变运行时数据；单元测试会强制检查其查找与拒绝规则。
+
 ## 已知限制与暂缓事项
 
 - **快照不是子进程边界**：每一层同样会被物化进 `process.env`，因此项目里的普通变量会按 [`dsh-subprocess`](../../subprocess/subprocess/README.zh.md) 的清洗规则抵达子进程。产品启动器的 [`.env` 约定](../../boot/app-boot/README.zh.md#profiles) 会在物化之前拒绝 bootstrap 变量。

@@ -6,14 +6,14 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { BlockAssembler, deepFreeze } from '@deepseek-ai/dsh-llm'
+import { assembleAssistantStream, deepFreeze } from '@deepseek-ai/dsh-llm'
 import type { Message, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type {
   EpochHeader,
   Session,
   SessionEvent,
   SessionLogOffset as SessionLogOffsetType,
-  SessionSeq as SessionSeqType,
 } from '@deepseek-ai/dsh-session'
 import { canonicalHeader, headerEquals, isSurfaceEvent, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 // Type-only: resolves the optional projection registry Context declaration.
@@ -206,9 +206,10 @@ export class TokenMeter extends Service {
     }
 
     while (state.consumedEvents < session.seq) {
-      // oxlint-disable-next-line typescript/no-non-null-assertion -- contiguous session seqs index the durable log
+      // Contiguous session seqs index the durable log; existing Session history read, migration deferred.
+      // oxlint-disable-next-line typescript/no-non-null-assertion, typescript/no-deprecated
       const event = session.eventAt(SessionSeq(state.consumedEvents))!
-      this._foldEvent(session, state, event)
+      this._foldEvent(state, event)
       state.consumedEvents = SessionLogOffset(state.consumedEvents + 1)
     }
     return state
@@ -219,7 +220,7 @@ export class TokenMeter extends Service {
    * A malformed event remains unread on every retry instead of partially
    * applying the same mutation more than once.
    */
-  private _foldEvent(session: Session, state: ReplayState, event: SessionEvent): void {
+  private _foldEvent(state: ReplayState, event: SessionEvent): void {
     let nextHeader = state.header
     let nextStepStart = state.stepStart
     let nextAnchor = state.anchor
@@ -271,7 +272,7 @@ export class TokenMeter extends Service {
       // replace them before succeeding. Only the pre-assistant surface is priced
       // by this call. Provider output stays separate from durable output rewrites.
       if (event.data.usage !== undefined && nextHeader !== undefined) {
-        const providerAssistant = this._providerAssistantMessage(session, event)
+        const providerAssistant = this._providerAssistantMessage(event)
         const providerAssistantTokens = providerAssistant.message === null
           ? 0
           : estimateMessage(providerAssistant.message)
@@ -300,43 +301,16 @@ export class TokenMeter extends Service {
   }
 
   /**
-   * Reassemble provider output from the exact cited chunk seqs for a usage anchor.
-   * Missing legacy source seqs conservatively treat the durable output as the
-   * provider output; an explicit empty list prices a known empty stream.
+   * Reassemble provider output from the message's exact embedded stream for a
+   * usage anchor. A missing legacy stream conservatively treats the durable
+   * output as the provider output.
    */
   private _providerAssistantMessage(
-    session: Session,
     event: SessionEvent<'assistant/message'>,
   ): { readonly message: Message | null } {
-    const sourceSeqs = event.sourceEventSeqs
-    if (sourceSeqs === undefined) return { message: event.data.message }
-
-    const assembler = new BlockAssembler()
-    const seen = new Set<SessionSeqType>()
-    for (const seq of sourceSeqs) {
-      /* v8 ignore start -- provenance validation already guarantees earlier, unique cited seqs */
-      if (seq >= event.seq) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} is not earlier`)
-      }
-      if (seen.has(seq)) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} repeats source seq ${seq}`)
-      }
-      /* v8 ignore stop */
-      seen.add(seq)
-      // Session construction validates contiguous seqs, and the explicit
-      // earlier-than-assistant check above therefore guarantees existence.
-      const source = session.eventAt(seq)
-      // oxlint-disable-next-line typescript/no-non-null-assertion
-      const sourceEvent = source!
-      if (sourceEvent.type !== 'assistant/chunk') {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} is not assistant/chunk`)
-      }
-      if (sourceEvent.data.turn !== event.data.turn || sourceEvent.data.step !== event.data.step) {
-        throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} belongs to another step`)
-      }
-      assembler.push(sourceEvent.data.chunk)
-    }
-    const providerContent = assembler.blocks()
+    const stream = (event.data as { stream?: readonly AssistantStreamRecord[] }).stream
+    if (stream === undefined) return { message: event.data.message }
+    const providerContent = assembleAssistantStream(stream).blocks()
     if (providerContent.length === 0) return { message: null }
     return { message: { ...event.data.message, content: providerContent } }
   }

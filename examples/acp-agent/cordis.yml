@@ -135,8 +135,8 @@
 
 # The worker-thread workflow engine fans a model-written JavaScript script's
 # `agent()` calls out through the spawn backend; the adjacent tool exposes it to the model.
-- id: workflow-worker-thread
-  name: '@deepseek-ai/dsh-workflow-worker-thread'
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
   config:
     provider: spawn
 

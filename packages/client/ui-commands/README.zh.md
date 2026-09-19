@@ -30,6 +30,8 @@
 
 无直接影响；该包既不组装也不发送提供方请求。它触发的命令 handler 可能改变归属 host 包对下一个请求系统提示词的贡献（某个 section 的出现或消失会替换较早的请求 token，并使提供方前缀从该点起失效），但这一影响由各命令的 host 包拥有并记录。
 
+**运行时不变式：** 不发布伴生入口。这是基于 wire 命令目录的浏览器侧 source，不发出 Cordis 事件，也不持有跨插件可变状态；dispatch 与 cache 行为由包测试覆盖。
+
 ## 已知限制与暂缓事项
 
 - **脱离会话后，detached result 的 notice 回退到 console**：fire-and-forget 路径经 `SessionInput.notify` 把结果送到触发会话的 composer；会话销毁后，console 输出行是仅剩的呈现面。

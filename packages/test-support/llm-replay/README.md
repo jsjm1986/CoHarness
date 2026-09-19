@@ -76,6 +76,8 @@ None, as this keyless test adapter sends no request to a provider model; it only
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This test-only adapter consumes a fixed replay script; its stream grammar is checked by the LLM companion and fixture derivation tests.
+
 ## Known Limitations and Deferred Work
 
 - **First-call-order script binding assumes sequential delegation** — a cut that runs sibling subagents concurrently would bind live sessions to recorded scripts non-deterministically; a stronger keying is deferred until such a scenario exists (`XXX(concurrent-subagents)`).

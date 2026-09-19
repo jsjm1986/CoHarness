@@ -87,6 +87,8 @@ Track every background job id you start. You are notified in-session when a job 
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
+**运行时不变式：** 不发布伴生入口。这个面向模型的适配器没有独立的生命周期流；执行关系归其调用的能力 seam 所有。
+
 ## 已知限制与暂缓事项
 
 - **落在 driver 退休窗口内的结算仍会让通知搁浅**：在轮次循环最后一次检查 inbox 与 driver 提交 idle 相位之间，所有者读起来仍是繁忙，因此通知走注入且无人唤醒。steer 有同样的洞；堵上它属于 `agent-loop`。

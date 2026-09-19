@@ -86,8 +86,10 @@ function validateAttached(history: readonly SessionEvent[], event: SessionEvent<
 
 function validateSession(session: Session, fail: InvariantFailure): void {
   const attachedByMessage = new Set<string>()
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const [index, event] of session.snapshotEvents().entries()) {
     if (event.type === 'userdoc/attached') {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       validateAttached(session.snapshotEvents().slice(0, index), event, fail)
       const data = event.data
       const key = `${data.messageId}:${String(data.index)}`
@@ -95,6 +97,7 @@ function validateSession(session: Session, fail: InvariantFailure): void {
       attachedByMessage.add(key)
     }
   }
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of session.snapshotEvents()) {
     if (event.type !== 'user/message' || event.data.source.kind !== SOURCE_KIND
       || !('documents' in event.data.source) || !Array.isArray(event.data.source.documents)) continue
@@ -118,6 +121,7 @@ function installAttachedEventCheck(ctx: Context, fail: InvariantFailure): void {
   ctx.on('internal/dispatch', (_mode, eventName, args) => {
     if (eventName !== 'session/event') return
     const [session, event] = args as [Session, SessionEvent]
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     if (event.type === 'userdoc/attached') validateAttached(session.snapshotEvents(), event, fail)
   }, { global: true })
 }

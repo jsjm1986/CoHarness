@@ -24,6 +24,8 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 
 This package is intentionally small and harness-dep-free so product packages can share user-data path conventions without depending on one another.
 
+**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its resolution rules and value algebra are enforced by unit tests.
+
 ## Known Limitations and Deferred Work
 
 - **Expansion is deliberately narrow** — only bare `~`, `~/...`, and `~\...` use the current operating-system home; named-user forms such as `~alice/...`, environment variables, and shell expressions remain unchanged.

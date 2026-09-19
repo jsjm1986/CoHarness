@@ -118,6 +118,8 @@ ack 是固定短行；任务输出按读取有界。
 
 仅追加；新出现的内容跟随可复用的请求前缀，不会使既有 KV Cache 条目失效。
 
+**运行时不变式：** 不发布伴生入口。除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。
+
 ## 已知限制与暂缓事项
 
 - **Windows 沙箱下的语言模式与 named-pipe 捕获** — 在 [Windows ACL 沙箱](../../sandbox/sandbox-windows-acl/README.zh.md) 下，read-only pwsh 会以 ConstrainedLanguage 启动，因为临时目录写入被拒绝，导致 PowerShell 的 AppLocker 探针失败并按 fail-closed 处理：`Add-Type`、非核心 .NET 静态调用（`[System.IO.*]::`、`[math]::`）、COM 对象与反射都会以“only core types”错误失败，且该模式无法从内部解除。workspace-write 的私有临时目录使探针得以完成，因此除非主机策略另有规定，否则它保持 FullLanguage。两种受限模式都拒绝 named-pipe 打开，因此受限命令内的管道 stdio spawn 以 EPERM 失败。工具描述把这两个约定教给模型；后端 README 负责完整的限制说明。

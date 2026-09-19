@@ -40,8 +40,9 @@ describe('session-log invariants', () => {
         content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
       }), { surfaceOp: 'append' })
       session.append('step/start', { turn: 1, step: 1 })
-      session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'h' } })
+      session.append('assistant/attempt', { turn: 1, step: 1, stream: [] })
       session.append('assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: createMessage({
@@ -182,6 +183,7 @@ describe('session-log invariants', () => {
       .toThrow(/while step 1 is still open/)
     expect(() => nested.append('step/end', { turn: 1, step: 2 })).toThrow(/open is turn 1\/step 1/)
     expect(() => nested.append('assistant/message', {
+      stream: [],
       turn: 1,
       step: 2,
       message: createMessage({
@@ -208,12 +210,12 @@ describe('session-log invariants', () => {
   })
 
   it('requires step-scoped stream and tool events to name the open step', async () => {
-    const chunk = (await setup()).ctx.sessions.create()
-    chunk.append('turn/start', { turn: 1 })
-    expect(() => chunk.append('assistant/chunk', {
+    const attempt = (await setup()).ctx.sessions.create()
+    attempt.append('turn/start', { turn: 1 })
+    expect(() => attempt.append('assistant/attempt', {
       turn: 1,
       step: 1,
-      chunk: { type: 'text-delta', index: 0, text: 'x' },
+      stream: [],
     })).toThrow(/open is turn 1\/step null/)
 
     const tool = (await setup()).ctx.sessions.create()
@@ -394,10 +396,10 @@ describe('session-log invariants', () => {
     session.append('step/start', { turn: 1, step: 1 })
     await fiber.dispose()
     await ctx.plugin(SessionInvariant)
-    expect(() => session.append('assistant/chunk', {
+    expect(() => session.append('assistant/attempt', {
       turn: 1,
       step: 1,
-      chunk: { type: 'text-delta', index: 0, text: 'h' },
+      stream: [],
     })).not.toThrow()
     expect(() => session.append('turn/start', { turn: 2 }))
       .toThrow(/turn 1 is still open/)

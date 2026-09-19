@@ -10,7 +10,8 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { createChatScrollFixture, type ChatScrollFixture } from './chat-scroll-fixture.ts'
@@ -39,7 +40,7 @@ const LIVE_TEXT_PROMPT = 'CHAT_SCROLL_LIVE_USER Continue this long conversation 
 const LIVE_TEXT_FIRST = 'CHAT_SCROLL_LIVE_FIRST'
 const LIVE_TEXT_DONE = 'CHAT_SCROLL_LIVE_DONE'
 const LIVE_TOOL_PROMPT = 'CHAT_SCROLL_TOOL_USER Run the requested diagnostic and then summarize it.'
-const LIVE_TOOL_CALL_ID = CallId('chat-scroll-live-tool-call')
+const LIVE_TOOL_CALL_ID = ToolCallId('chat-scroll-live-tool-call')
 const LIVE_TOOL_RESULT = 'CHAT_SCROLL_LIVE_TOOL_RESULT'
 const LIVE_TOOL_FIRST = 'CHAT_SCROLL_TOOL_STREAM_FIRST'
 const LIVE_TOOL_DONE = 'CHAT_SCROLL_TOOL_STREAM_DONE'
@@ -84,6 +85,7 @@ interface FlowAnchor {
 }
 
 interface ScrollWorld {
+  readonly assistantFrames: AssistantStreamFrame[]
   readonly events: SessionEvent[]
   readonly page: Page
   readonly replayDir?: string
@@ -167,7 +169,9 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     }
     for (const seed of options.seeds) await seedSession(scaffold, seed.fixture.log, seed.id)
     const events: SessionEvent[] = []
+    const assistantFrames: AssistantStreamFrame[] = []
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
+    scaffold.ctx.on('agent/assistant-stream', ({ frame }) => { assistantFrames.push(frame) })
     page = await newEnglishPage(browser, 900)
     const tripwire = watchConsole(page)
     await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
@@ -178,6 +182,7 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     // row is the barrier).
     await page.getByText('Independent sessions', { exact: true }).waitFor({ timeout: 30_000 })
     return {
+      assistantFrames,
       events,
       page,
       scaffold,
@@ -536,9 +541,9 @@ describe('web e2e: long Chat scroll contract', () => {
         await wheelToHistoryStart(world.page)
         await wheelTranscript(world.page, 420)
         const readerAnchor = await visibleFlowAnchor(world.page)
-        const chunksAfterAnchor = world.events.filter(event => event.type === 'assistant/chunk').length
+        const chunksAfterAnchor = world.assistantFrames.filter(frame => frame.type === 'chunk').length
         await expect.poll(
-          () => world.events.filter(event => event.type === 'assistant/chunk').length,
+          () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 10_000 },
         ).toBeGreaterThan(chunksAfterAnchor + 5)
 
@@ -600,7 +605,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await wheelTranscript(world.page, -1_200)
         await world.page.getByRole('button', { name: 'Back to bottom', exact: true }).waitFor({ timeout: 10_000 })
         const awayAnchor = await visibleFlowAnchor(world.page)
-        const chunksBeforeRelease = world.events.filter(event => event.type === 'assistant/chunk').length
+        const chunksBeforeRelease = world.assistantFrames.filter(frame => frame.type === 'chunk').length
         await writeFile(releasePath, 'release\n')
         released = true
         await expect.poll(
@@ -612,16 +617,16 @@ describe('web e2e: long Chat scroll contract', () => {
           { timeout: 15_000 },
         ).toBe(true)
         await expect.poll(
-          () => world.events.filter(event => event.type === 'assistant/chunk').length,
+          () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 15_000 },
         ).toBeGreaterThan(chunksBeforeRelease + 5)
         await expectSameFlowTop(world.page, awayAnchor)
 
-        const chunksAtRepin = world.events.filter(event => event.type === 'assistant/chunk').length
+        const chunksAtRepin = world.assistantFrames.filter(frame => frame.type === 'chunk').length
         await world.page.getByRole('button', { name: 'Back to bottom', exact: true }).click()
         await expectBottom(world.page)
         await expect.poll(
-          () => world.events.filter(event => event.type === 'assistant/chunk').length,
+          () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 15_000 },
         ).toBeGreaterThan(chunksAtRepin + 5)
         await expectBottom(world.page)
@@ -850,7 +855,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await flingTranscript(world.page, -900)
         await backToBottom.waitFor({ timeout: 10_000 })
         const awayAnchor = await visibleFlowAnchor(world.page)
-        const chunksBeforeRelease = world.events.filter(event => event.type === 'assistant/chunk').length
+        const chunksBeforeRelease = world.assistantFrames.filter(frame => frame.type === 'chunk').length
         await writeFile(releasePath, 'release\n')
         released = true
         await expect.poll(
@@ -858,7 +863,7 @@ describe('web e2e: long Chat scroll contract', () => {
           { timeout: 15_000 },
         ).toBe(true)
         await expect.poll(
-          () => world.events.filter(event => event.type === 'assistant/chunk').length,
+          () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 15_000 },
         ).toBeGreaterThan(chunksBeforeRelease + 5)
         await expectSameFlowTop(world.page, awayAnchor)
@@ -872,9 +877,9 @@ describe('web e2e: long Chat scroll contract', () => {
         }
         await expectBottom(world.page)
         await expect.poll(() => backToBottom.count(), { timeout: 10_000 }).toBe(0)
-        const chunksAtRepin = world.events.filter(event => event.type === 'assistant/chunk').length
+        const chunksAtRepin = world.assistantFrames.filter(frame => frame.type === 'chunk').length
         await expect.poll(
-          () => world.events.filter(event => event.type === 'assistant/chunk').length,
+          () => world.assistantFrames.filter(frame => frame.type === 'chunk').length,
           { timeout: 15_000 },
         ).toBeGreaterThan(chunksAtRepin + 5)
         await expectBottom(world.page)

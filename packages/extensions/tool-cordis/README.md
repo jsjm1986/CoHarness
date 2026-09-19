@@ -97,6 +97,8 @@ Indirect token impact equals the running package's contributions and lasts only 
 
 Running or stopping a prompt or tool contribution changes later request prefixes and may invalidate reuse from the first changed contribution; an unchanged running set remains prefix-stable.
 
+**Runtime invariant:** No companion is published. Inspection reads its providers directly and maintains no independent runtime projection.
+
 ## Known Limitations and Deferred Work
 
 - **The sandbox is containment for honest code, not a security boundary** — host-realm helpers on the sandbox global are reachable, so package code can reach Node; load this plugin as deliberately as you would grant a bash tool (see § Trust stance).

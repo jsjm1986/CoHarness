@@ -9,15 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
       "path": "../../core/session"
     },
     {
@@ -27,16 +18,22 @@
       "path": "../../feedback/message-feedback"
     },
     {
+      "path": "../../identity/anonymous-user-id"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
       "path": "../session-telemetry"
     },
     {
-      "path": "../../identity/anonymous-user-id"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

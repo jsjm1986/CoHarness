@@ -58,6 +58,8 @@ Zero model-input tokens; the complete inventory adds only HTTP request bytes.
 
 None; package lifecycle changes do not alter the model-visible prefix.
 
+**Runtime invariant:** No companion is published. Each request reads authoritative Loader fiber state and package manifests directly; the plugin retains no independently mutable inventory.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

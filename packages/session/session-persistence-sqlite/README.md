@@ -64,6 +64,8 @@ Zero live-request tokens. Resume pays only for the retained logical history and 
 
 Physical packing does not mutate request prefixes. Provider cache reuse depends on the reconstructed history, current envelope, and model route exactly as with other persistence backends.
 
+**Runtime invariant:** No companion is published. Physical packing is observable only by database round-trip and row-count checks, not a continuous in-process relation.
+
 ## Known Limitations and Deferred Work
 
 - **Interim SQLite-specific design** — This efficiency-focused implementation is informed by [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb). A unified relational-database design with multiple backends and configurable schemas is deferred; schema 20 is the current CoHarness format and later changes require another offline migration.

@@ -6,9 +6,23 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import {
+  SessionAlreadyExistsError,
+  SessionAlreadyOwnedError,
+  SessionHandleClosedError,
+  SessionPersistenceNotFoundError,
+  SessionReadOnlyError,
+} from './errors.ts'
+import type { SessionLocation } from './errors.ts'
+import { assertVersion, materializeCreateHeader } from './storage-contract.ts'
+import { ContractSessionHandle } from './contract-handle.ts'
+import type {
+  SessionAccess as SessionAccessType,
+  SessionHandle as SessionHandleType,
+} from './handle.ts'
 import { hasConversationContent, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
 import type { Session, SessionDraftId, SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
-import type { SessionPersistenceRevision } from './revision.ts'
+import { SessionPersistenceRevision } from './revision.ts'
 
 export {
   SessionPersistencePageTooLargeError,
@@ -91,6 +105,10 @@ export interface SessionPersistenceSnapshot {
   revision: SessionPersistenceRevision
   /** Optional backend-authoritative content metadata for cold list projections. */
   content?: SessionContentMetadata
+  /** Logical event count, when the backend can provide it cheaply from metadata; otherwise absent. */
+  readonly eventCount?: number
+  /** Physical artifact byte size, when the backend can provide it cheaply (JSONL); otherwise absent. */
+  readonly sizeBytes?: number
 }
 
 /** Logical Session header paired with its exact inherited cut for body-bearing storage operations. */
@@ -161,29 +179,36 @@ export interface SessionRawArtifact extends SessionStorageMetadata {
   readonly content: string
 }
 
-/** Error raised when one persistence instance already owns a Session for writing. */
-export class SessionAlreadyOwnedError extends Error {
-  /** Stable machine-readable error code. */
-  readonly code = 'SESSION_ALREADY_OWNED' as const
+export {
+  SessionAlreadyExistsError,
+  SessionAlreadyOwnedError,
+  SessionFormatUnsupportedError,
+  SessionHandleClosedError,
+  SessionOwnershipLostError,
+  SessionPersistenceCorruptionError,
+  SessionPersistenceNotFoundError,
+  SessionReadOnlyError,
+  sessionFormatVersionRefusal,
+} from './errors.ts'
+export type { SessionLocation } from './errors.ts'
+export {
+  assertContiguous,
+  assertStoredId,
+  assertVersion,
+  materializeAppendBatch,
+  materializeCreateHeader,
+  validateStoredEvents,
+} from './storage-contract.ts'
+export type {
+  SessionAccess,
+  SessionHandle,
+  SessionHandleAppendOptions,
+  SessionHandleFlushOptions,
+  SessionHandleReadOptions,
+  SessionHandleReadResult,
+} from './handle.ts'
 
-  constructor(id: SessionId) {
-    super(`session "${id}" is already owned for writing`)
-    this.name = 'SessionAlreadyOwnedError'
-  }
-}
-
-/** Error raised when a read-only SessionHandle receives a mutation. */
-export class SessionReadOnlyError extends Error {
-  /** Stable machine-readable error code. */
-  readonly code = 'SESSION_READ_ONLY' as const
-
-  constructor(id: SessionId) {
-    super(`session "${id}" is open for reading only`)
-    this.name = 'SessionReadOnlyError'
-  }
-}
-
-/** Access mode for one persistence-owned SessionHandle. */
+/** Access mode for one persistence-owned legacy SessionHandle. */
 export type SessionHandleMode = 'read' | 'write'
 
 /**
@@ -191,7 +216,7 @@ export type SessionHandleMode = 'read' | 'write'
  * by the v2 migration; legacy service methods remain available until callers
  * move to handle ownership.
  */
-export interface SessionHandle {
+export interface LegacySessionHandle {
   readonly id: SessionId
   readonly mode: SessionHandleMode
   read(offset?: number): Promise<readonly SessionEvent[]>
@@ -200,41 +225,43 @@ export interface SessionHandle {
   close(): Promise<void>
 }
 
-class PersistenceSessionHandle implements SessionHandle {
+class PersistenceSessionHandle implements LegacySessionHandle {
   private closed = false
+  private readonly inner: Promise<SessionHandleType>
 
   constructor(
     private readonly owner: SessionPersistence,
     readonly id: SessionId,
     readonly mode: SessionHandleMode,
-    private readonly releaseExternal: () => Promise<void>,
-  ) {}
+    inner: SessionHandleType | Promise<SessionHandleType>,
+  ) {
+    this.inner = Promise.resolve(inner)
+  }
 
   async read(offset: number = 0): Promise<readonly SessionEvent[]> {
     this.assertOpen()
     if (!Number.isSafeInteger(offset) || offset < 0) throw new TypeError('session handle offset must be non-negative')
-    return (await this.owner.readFrom(this.id, SessionLogOffset(offset))).events
+    return (await (await this.inner).read(offset)).events
   }
 
   async append(events: readonly SessionEvent[]): Promise<void> {
     this.assertOpen()
-    if (this.mode === 'read') throw new SessionReadOnlyError(this.id)
-    await this.owner.append(this.id, events)
+    if (this.mode === 'read') throw new SessionReadOnlyError(this.id, 'append')
+    await (await this.inner).append(events)
   }
 
-  flush(): Promise<void> {
+  async flush(): Promise<void> {
     this.assertOpen()
-    // Legacy append is already durable at resolution. The lifecycle event is
-    // emitted when a live Session exists, so this additive handle remains safe
-    // for detached provider tests without inventing a second flush protocol.
-    return Promise.resolve()
+    if (this.mode === 'read') return
+    await (await this.inner).flush()
   }
 
   async close(): Promise<void> {
     if (this.closed) return
     this.closed = true
     try {
-      await this.releaseExternal()
+      const handle = await this.inner.catch(() => undefined)
+      await handle?.close()
     } finally {
       this.owner.releaseHandle(this.id, this)
     }
@@ -253,9 +280,6 @@ export {
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
   MAX_WRITE_BATCH_DELAY_MS,
   PersistenceCoordinator,
-  SessionFormatUnsupportedError,
-  SessionPersistenceCorruptionError,
-  sessionFormatVersionRefusal,
 } from './coordinator.ts'
 export type {
   PersistenceBackend,
@@ -264,22 +288,40 @@ export type {
   StoredSuffix,
 } from './coordinator.ts'
 
+/** Options for {@link SessionPersistence.create}. */
+export interface SessionPersistenceCreateOptions {
+  /** Optional cancellation observed before backend work starts. */
+  readonly signal?: AbortSignal
+  /**
+   * Exact fork-inherited prefix length. Required when `header.isSeeded` is
+   * true and must be omitted (or `0`) otherwise; the backend refuses a
+   * mismatch at create.
+   */
+  readonly inheritedEventCount?: SessionLogOffset
+}
+
+/** Options for {@link SessionPersistence.open}. */
+export interface SessionPersistenceOpenOptions {
+  /** Optional cancellation observed before backend work starts. */
+  readonly signal?: AbortSignal
+}
+
+/** Options for {@link SessionPersistence.stat}. */
+export interface SessionPersistenceStatOptions {
+  /** Optional cancellation for backend metadata reads. */
+  readonly signal?: AbortSignal
+}
+
+/** Options for {@link SessionPersistence.list}. */
+export interface SessionPersistenceListOptions {
+  /** Optional cancellation for backend listing work. */
+  readonly signal?: AbortSignal
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     sessionPersistence: SessionPersistence
   }
-}
-
-/**
- * A backend-resolved, per-session local artifact location. The path is an
- * absolute target path and can name an artifact that has not materialized yet.
- * Consumers must treat it as a location hint, never as an authorization token.
- */
-export interface SessionLocation {
-  /** Backend-specific artifact kind, for example `jsonl`. */
-  readonly kind: string
-  /** Absolute path to this session's backend-owned artifact. */
-  readonly path: string
 }
 
 /**
@@ -289,10 +331,257 @@ export interface SessionLocation {
  * rewriting committed events.
  */
 export abstract class SessionPersistence extends Service {
-  private readonly writeHandles = new Map<SessionId, PersistenceSessionHandle>()
+  private readonly writeHandles = new Map<SessionId, PersistenceSessionHandle | ContractSessionHandle>()
+  /** Synchronously claimed write ids, held until the lazy `open` resolves. */
+  private readonly syncWriteClaims = new Set<SessionId>()
 
   constructor(ctx: Context) {
     super(ctx, 'sessionPersistence')
+  }
+
+  // --- upstream handle contract (coordinator-adapted) ---
+
+  /**
+   * Create a new stored session and take its write ownership. The create is
+   * lazy: the session is observable through `stat`/`list`/`open` in this
+   * process immediately, but no durable artifact exists until the handle's
+   * first `append` or `flush`.
+   * @param header - the immutable header (id, version, cwd, lineage) to store.
+   * @param options - optional cancellation and the exact fork-inherited cut.
+   * @returns a `write` handle owned by the caller; close it to release ownership.
+   * @throws {SessionAlreadyExistsError} when the id already exists.
+   */
+  async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandleType> {
+    options?.signal?.throwIfAborted()
+    assertVersion(header, this.locate(header))
+    const inherited = options?.inheritedEventCount
+    if (header.isSeeded && inherited === undefined) {
+      throw new TypeError(`seeded session "${header.id}" requires an exact inheritedEventCount`)
+    }
+    if (!header.isSeeded && inherited !== undefined && inherited !== 0) {
+      throw new TypeError(`unseeded session "${header.id}" must not carry inheritedEventCount`)
+    }
+    if (this.writeHandles.has(header.id)) throw new SessionAlreadyExistsError(header.id)
+    if ((await this.stat(header.id, options)) !== undefined) {
+      throw new SessionAlreadyExistsError(header.id)
+    }
+    const stored = materializeCreateHeader(header)
+    // A Session registered through session/created already owns this id in the
+    // coordinator; create then claims write ownership of that live state
+    // instead of duplicating the registration.
+    const live = await this.liveStorage(stored.id)
+    if (live !== undefined) {
+      const adopted = new ContractSessionHandle(this, stored.id, live.meta, live.inheritedEventCount, 'write')
+      this.writeHandles.set(stored.id, adopted)
+      return adopted
+    }
+    const handle = new ContractSessionHandle(this, stored.id, stored, inherited ?? (0 as SessionLogOffset), 'write')
+    this.writeHandles.set(stored.id, handle)
+    try {
+      await this.createStored(stored, inherited)
+    } catch (error: unknown) {
+      this.writeHandles.delete(stored.id)
+      // The coordinator's serialized createCore is the second dup gate for
+      // concurrent creates racing past the stat check above.
+      if (error instanceof Error && error.message.includes('already')) {
+        throw new SessionAlreadyExistsError(header.id)
+      }
+      throw error
+    }
+    return handle
+  }
+
+  /**
+   * Open an existing stored session. `read` never takes ownership and works
+   * while another handle or process holds `write`; `write` atomically claims
+   * single-writer ownership.
+   * @param id - the stored session to open.
+   * @param access - `read` or `write`.
+   * @param options - optional cancellation.
+   * @returns the open handle.
+   * @throws {SessionPersistenceNotFoundError} when the session does not exist.
+   * @throws {SessionAlreadyOwnedError} for `write` when ownership is taken.
+   */
+  async open(id: SessionId, access: SessionAccessType, options?: SessionPersistenceOpenOptions): Promise<SessionHandleType> {
+    options?.signal?.throwIfAborted()
+    if (access === 'write' && (this.writeHandles.has(id) || this.syncWriteClaims.has(id))) {
+      throw new SessionAlreadyOwnedError(id)
+    }
+    return this.openInner(id, access, options)
+  }
+
+  /**
+   * Open an existing stored session without the ownership pre-check; internal
+   * path shared by {@link open} and the synchronously-claiming legacy
+   * {@link openHandle}.
+   */
+  protected async openInner(id: SessionId, access: SessionAccessType, options?: SessionPersistenceOpenOptions): Promise<SessionHandleType> {
+    const pending = this.listPending().find(storage => storage.meta.id === id)
+    if (pending !== undefined) {
+      const handle = new ContractSessionHandle(this, id, pending.meta, pending.inheritedEventCount, access)
+      if (access === 'write') this.writeHandles.set(id, handle)
+      return handle
+    }
+    const snapshot = await this.stat(id, options)
+    if (snapshot === undefined) throw new SessionPersistenceNotFoundError(id)
+    const inspection = await this.inspectStored(id, options?.signal)
+    if (inspection === undefined) throw new SessionPersistenceNotFoundError(id)
+    const handle = new ContractSessionHandle(this, id, inspection.meta, inspection.inheritedEventCount, access)
+    if (access === 'write') this.writeHandles.set(id, handle)
+    return handle
+  }
+
+  /**
+   * Flush every active write handle owned by this service instance: pending
+   * creates materialize and routed events drain durably. A handle closed
+   * concurrently counts as flushed — close itself drains durably.
+   * @returns resolution once every write handle active at the call has flushed.
+   * @throws {AggregateError} naming each session whose flush failed.
+   */
+  async flush(): Promise<void> {
+    const handles = [...this.writeHandles.values()]
+      .filter((handle): handle is ContractSessionHandle => handle instanceof ContractSessionHandle)
+    const errors: unknown[] = []
+    for (const handle of handles) {
+      try {
+        await handle.flush()
+      } catch (error: unknown) {
+        // A handle whose close raced the barrier already drained durably.
+        if (!(error instanceof SessionHandleClosedError)) errors.push(error)
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `session persistence flush failed for ${errors.length} handle(s)`)
+    }
+  }
+
+  /**
+   * Observe one stored session without reading its event log or taking
+   * ownership; pending creates count before they materialize.
+   * @param id - the stored session to observe.
+   * @param options - optional cancellation.
+   * @returns the snapshot, or `undefined` when the session does not exist.
+   */
+  async stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<SessionPersistenceSnapshot | undefined> {
+    options?.signal?.throwIfAborted()
+    const pending = this.listPending().find(storage => storage.meta.id === id)
+    if (pending !== undefined) {
+      return { header: pending.meta, revision: SessionPersistenceRevision(`pending:${id}`) }
+    }
+    return (await this.listSnapshots(options?.signal)).find(snapshot => snapshot.header.id === id)
+  }
+
+  /**
+   * List every stored session visible to this process, in no promised order,
+   * including pending creates that have not materialized yet.
+   * @param options - optional cancellation.
+   * @returns one snapshot per stored session.
+   */
+  async list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]> {
+    options?.signal?.throwIfAborted()
+    const pending: SessionPersistenceSnapshot[] = this.listPending().map(storage => ({
+      header: storage.meta,
+      revision: SessionPersistenceRevision(`pending:${storage.meta.id}`),
+    }))
+    return [...pending, ...await this.listSnapshots(options?.signal)]
+  }
+
+  /**
+   * Release one contract handle's write ownership at close.
+   * @param id - the session whose write handle is released.
+   * @param handle - the closing contract handle.
+   */
+  releaseContractHandle(id: SessionId, handle: ContractSessionHandle): void {
+    if (this.writeHandles.get(id) === handle) this.writeHandles.delete(id)
+  }
+
+  /**
+   * Durably materialize one detached pending session created through
+   * {@link create}. Coordinator-backed backends implement; direct backends
+   * materialize through their own write handles and never reach this hook.
+   * @param _id - the pending session to materialize.
+   * @returns after the artifact is durable.
+   */
+  materializeDetached(_id: SessionId): Promise<void> {
+    return Promise.reject(new Error('this session persistence backend does not defer materialization'))
+  }
+
+  /**
+   * Drop one detached pending create that never materialized, returning its
+   * id to availability.
+   * @param _id - the pending session to discard.
+   * @returns after the reservation is released.
+   */
+  discardDetached(_id: SessionId): Promise<void> {
+    return Promise.reject(new Error('this session persistence backend does not defer materialization'))
+  }
+
+  /**
+   * Whether the id names a detached pending create (created through
+   * {@link create} but not yet materialized). Backends with coordinator
+   * pending-state override; a backend without deferred materialization never
+   * holds a pending session.
+   * @param id - the session to check.
+   * @returns true while the session exists only as an in-process reservation.
+   */
+  isPending(id: SessionId): boolean {
+    void id
+    return false
+  }
+
+  /**
+   * Storage metadata for a session already bound to a live Session through the
+   * coordinator's `session/created` path, or `undefined`. Backends without
+   * live-session tracking never override this hook.
+   * @param _id - the session to look up.
+   * @returns the tracked storage record while a live Session owns it.
+   */
+  liveStorage(_id: SessionId): Promise<SessionStorageMetadata | undefined> {
+    return Promise.resolve(undefined)
+  }
+
+  /**
+   * List this instance's detached pending creates.
+   * @returns one storage metadata record per pending detached session.
+   */
+  listPending(): readonly SessionStorageMetadata[] {
+    return []
+  }
+
+  /**
+   * List all stored (materialized) sessions' metadata; the backend storage hook.
+   * @param signal - optional cancellation for backend listing work.
+   * @returns one header per materialized session.
+   */
+  listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
+    return this.list(signal === undefined ? undefined : { signal })
+      .then(snapshots => snapshots.map(snapshot => snapshot.header))
+  }
+
+  /**
+   * Header-only listing for consumers that predate the snapshot contract.
+   * @param signal - optional cancellation for backend listing work.
+   * @returns one header per materialized session.
+   */
+  listHeaders(signal?: AbortSignal): Promise<SessionHeader[]> {
+    return this.listStored(signal)
+  }
+
+  /**
+   * Read one stored session's storage metadata without ownership. The default
+   * goes through {@link inspect}; backends may override with a cheaper lookup.
+   * @param id - the stored session to inspect.
+   * @param signal - optional cancellation.
+   * @returns the storage metadata, or `undefined` when absent.
+   */
+  protected async inspectStored(id: SessionId, signal?: AbortSignal): Promise<SessionStorageMetadata | undefined> {
+    try {
+      const inspection = await this.inspect(id, signal)
+      return { meta: inspection.meta, inheritedEventCount: inspection.inheritedEventCount }
+    } catch (error: unknown) {
+      if (error instanceof SessionPersistenceNotFoundError) return undefined
+      throw error
+    }
   }
 
   /**
@@ -301,15 +590,9 @@ export abstract class SessionPersistence extends Service {
    * @param inheritedEventCount - exact inherited prefix length for a seeded Session.
    * @returns an owned write handle.
    */
-  async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle> {
-    const handle = await this.openHandleAsync(meta.id, 'write')
-    try {
-      await this.create(meta, inheritedEventCount)
-      return handle
-    } catch (error: unknown) {
-      await handle.close()
-      throw error
-    }
+  async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<LegacySessionHandle> {
+    const handle = await this.create(meta, inheritedEventCount === undefined ? undefined : { inheritedEventCount })
+    return new PersistenceSessionHandle(this, meta.id, 'write', handle)
   }
 
   /**
@@ -318,18 +601,9 @@ export abstract class SessionPersistence extends Service {
    * @param mode - read or write access.
    * @returns a handle whose close releases local and provider ownership.
    */
-  async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHandle> {
-    if (mode === 'read') return this.openHandle(id, mode)
-    if (this.writeHandles.has(id)) throw new SessionAlreadyOwnedError(id)
-    const releaseExternal = await this.acquireWriteLock(id)
-    try {
-      const handle = new PersistenceSessionHandle(this, id, mode, releaseExternal)
-      this.writeHandles.set(id, handle)
-      return handle
-    } catch (error: unknown) {
-      await releaseExternal()
-      throw error
-    }
+  async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<LegacySessionHandle> {
+    const handle = await this.open(id, mode)
+    return new PersistenceSessionHandle(this, id, mode, handle)
   }
 
   /**
@@ -338,26 +612,24 @@ export abstract class SessionPersistence extends Service {
    * @param mode - read allows inspection; write reserves the local writer.
    * @returns an explicit SessionHandle.
    */
-  openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle {
-    if (mode === 'write') {
-      if (this.writeHandles.has(id)) throw new SessionAlreadyOwnedError(id)
-      const handle = new PersistenceSessionHandle(this, id, mode, async () => {})
-      this.writeHandles.set(id, handle)
-      return handle
+  openHandle(id: SessionId, mode: SessionHandleMode ): LegacySessionHandle {
+    if (mode === 'write' && (this.writeHandles.has(id) || this.syncWriteClaims.has(id))) {
+      throw new SessionAlreadyOwnedError(id)
     }
-    return new PersistenceSessionHandle(this, id, mode, async () => {})
-  }
-
-  /** Acquire a provider-specific cross-process writer lock, when available. */
-  protected acquireWriteLock(_id: SessionId): Promise<() => Promise<void>> {
-    return Promise.resolve(async () => {})
+    if (mode === 'write') this.syncWriteClaims.add(id)
+    const opening = this.openInner(id, mode).catch((error: unknown) => {
+      this.syncWriteClaims.delete(id)
+      throw error
+    })
+    return new PersistenceSessionHandle(this, id, mode, opening)
   }
 
   /** Release a process-local writer reservation held by one handle.
    * @param id - session identity whose reservation is released.
    * @param handle - handle that owns the reservation.
    */
-  releaseHandle(id: SessionId, handle: SessionHandle): void {
+  releaseHandle(id: SessionId, handle: LegacySessionHandle): void {
+    this.syncWriteClaims.delete(id)
     if (this.writeHandles.get(id) === handle) this.writeHandles.delete(id)
   }
 
@@ -365,16 +637,18 @@ export abstract class SessionPersistence extends Service {
    * Resolve this backend's independent local artifact for a session without
    * reading, creating, flushing, or otherwise materializing it. Backends such
    * as SQLite that do not own one artifact per session return `undefined`.
-   * @param meta - the immutable session header whose artifact is requested.
+   * @param _meta - the immutable session header whose artifact is requested.
    * @returns the backend-specific absolute location, when one exists.
    */
-  abstract locate(meta: SessionHeader): SessionLocation | undefined
+  locate(_meta: SessionHeader): SessionLocation | undefined {
+    return undefined
+  }
 
   /**
    * Whether this backend exposes one verbatim raw artifact per session.
    * A backend that declares `true` must override {@link readRaw}.
    */
-  abstract readonly supportsRawArtifacts: boolean
+  readonly supportsRawArtifacts: boolean = false
 
   /**
    * Read a session's backend-owned artifact text verbatim — the exact durable
@@ -407,7 +681,14 @@ export abstract class SessionPersistence extends Service {
    * @param inheritedEventCount - exact fork-inherited prefix length. Required
    * for a seeded header and omitted only for an unseeded header.
    */
-  abstract create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void>
+  async createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
+    const handle = await this.create(meta, inheritedEventCount === undefined ? undefined : { inheritedEventCount })
+    try {
+      await handle.flush()
+    } finally {
+      await handle.close()
+    }
+  }
 
   /**
    * Durably materialize an empty live session without adding a synthetic event.
@@ -430,7 +711,19 @@ export abstract class SessionPersistence extends Service {
    * @param id - the session the batch belongs to.
    * @param events - the contiguous batch to persist, in seq order.
    */
-  abstract append(id: SessionId, events: readonly SessionEvent[]): Promise<void>
+  async append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+    const owned = this.writeHandles.get(id)
+    if (owned instanceof ContractSessionHandle) {
+      await owned.append(events)
+      return
+    }
+    const handle = await this.open(id, 'write')
+    try {
+      await handle.append(events)
+    } finally {
+      await handle.close()
+    }
+  }
 
   /**
    * Remove one complete persisted session tree when the deployment exposes a
@@ -468,7 +761,7 @@ export abstract class SessionPersistence extends Service {
       seed: loaded.events.map(event => structuredClone(event)),
       meta: structuredClone(loaded.meta),
       inheritedEventCount: SessionLogOffset(loaded.inheritedEventCount),
-      seedSource: 'persistence',
+      eventState: 'detached',
     }))
   }
 
@@ -485,7 +778,9 @@ export abstract class SessionPersistence extends Service {
    * @param id - the persisted session to reload.
    * @returns the header and a log ending on a balanced `turn/end`.
    */
-  abstract load(id: SessionId): Promise<SessionInspection>
+  load(id: SessionId): Promise<SessionInspection> {
+    return this.inspect(id)
+  }
 
   /**
    * Inspect an immutable logical session without committing recovery or
@@ -502,7 +797,16 @@ export abstract class SessionPersistence extends Service {
    * @param signal - optional cancellation for queued and backend read work.
    * @returns the validated header and current logical event log.
    */
-  abstract inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>
+  async inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
+    signal?.throwIfAborted()
+    const handle = await this.open(id, 'read', signal === undefined ? undefined : { signal })
+    try {
+      const { events } = await handle.read(0, undefined, signal === undefined ? undefined : { signal })
+      return { meta: handle.header, inheritedEventCount: handle.inheritedEventCount, events }
+    } finally {
+      await handle.close()
+    }
+  }
 
   /**
    * Read the stored events from `fromSeq` onward — the read-from-seq
@@ -522,8 +826,17 @@ export abstract class SessionPersistence extends Service {
    * @param signal - optional cancellation for queued and backend read work.
    * @returns storage metadata, the requested offset, and stored events with `seq >= fromSeq`.
    */
-  abstract readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal):
-  Promise<SessionEventSuffix>
+  async readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal):
+  Promise<SessionEventSuffix> {
+    signal?.throwIfAborted()
+    const handle = await this.open(id, 'read', signal === undefined ? undefined : { signal })
+    try {
+      const { events } = await handle.read(fromSeq, undefined, signal === undefined ? undefined : { signal })
+      return { meta: handle.header, inheritedEventCount: handle.inheritedEventCount, fromSeq, events }
+    } finally {
+      await handle.close()
+    }
+  }
 
   /**
    * Read one session header without loading its event log. First-party
@@ -537,13 +850,6 @@ export abstract class SessionPersistence extends Service {
     signal?.throwIfAborted()
     return (await this.listSnapshots(signal)).find(snapshot => snapshot.header.id === id)?.header
   }
-
-  /**
-   * Lightweight listing from metadata, without a full-log parse.
-   * @param signal - optional cancellation for backend listing work.
-   * @returns one header per materialized session.
-   */
-  abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
 
   /**
    * Read one materialized session's opaque source revision without loading its event log.
@@ -705,7 +1011,9 @@ export abstract class SessionPersistence extends Service {
    * @param signal - optional cancellation for backend snapshot-listing work.
    * @returns one header and opaque revision per materialized session without loading full logs.
    */
-  abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
+  async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+    return [...await this.list(signal === undefined ? undefined : { signal })]
+  }
 
   /**
    * Reserve a browser draft before an Agent is created. Local providers return

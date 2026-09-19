@@ -4,14 +4,27 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cosmokit" },
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../../fs/fs" },
-    { "path": "../../util/home-paths" },
-    { "path": "../skill" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    {
+      "path": "../../fs/fs"
+    },
+    {
+      "path": "../skill"
+    },
+    {
+      "path": "../../util/home-paths"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    }
   ]
 }

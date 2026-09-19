@@ -9,31 +9,28 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../llm/llm-retry"
+      "path": "../../compaction/compaction"
     },
     {
       "path": "../../core/session"
     },
     {
-      "path": "../../compaction/compaction"
+      "path": "../llm"
+    },
+    {
+      "path": "../llm-retry"
     },
     {
       "path": "../../session/session-projection"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

@@ -38,6 +38,8 @@ None, as the wire consumer layer moves already-composed messages between browser
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Browser-session verification reads the credential record asynchronously at the request that authorizes work, while the credentials companion owns record commit-event lifetime. Stream/reconnect sequencing and rpcId round-trip discipline are exercised directly by behavior specs, and route register/dispose symmetry is audited by the webserver companion.
+
 ## Known Limitations and Deferred Work
 
 - **History availability follows the Host** — this carrier only transports the bounded `session.history` response; whether a deployment can read a cold log without resuming an Agent belongs to the Host persistence provider.

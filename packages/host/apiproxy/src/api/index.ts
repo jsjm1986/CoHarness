@@ -65,7 +65,7 @@ export type {
 } from './workspace-files.ts'
 export type { SkillsApi, SkillEntry } from './skills.ts'
 export type { AgentPresetsApi } from './agent-presets.ts'
-export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, ToolCallView, ToolEventView, ToolResultView } from './events.ts'
+export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, SessionAssistantStreamBaseline, SessionAssistantStreamFrame, ToolCallView, ToolEventView, ToolResultView } from './events.ts'
 export type { GoalId, GoalRef } from '@deepseek-ai/dsh-goal/client'
 export type {
   SettingsApi, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsSecretView, SettingsWritableReason,

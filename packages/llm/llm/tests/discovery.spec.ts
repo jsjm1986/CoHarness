@@ -125,7 +125,8 @@ describe('discoverModelsAtEndpoint', () => {
       apiKey: '  probe-key  ',
     })).resolves.toEqual([
       { id: 'large', name: 'Large', contextWindow: 32_768, maxTokens: 4096 },
-      { id: 'small' },
+      { id: 'large', name: 'duplicate' },
+      { id: 'small', name: 'small' },
     ])
 
     expect(requests).toHaveLength(1)
@@ -147,7 +148,7 @@ describe('discoverModelsAtEndpoint', () => {
       apiKey: 'anthropic-key',
     })).resolves.toEqual([{ id: 'claude-4', name: 'Claude 4' }])
 
-    expect(requests[0]?.url).toBe('https://gateway.example/anthropic/v1/models')
+    expect(requests[0]?.url).toBe('https://gateway.example/anthropic/v1/models?limit=1000')
     const headers = new Headers(requests[0]?.init.headers)
     expect(headers.get('x-api-key')).toBe('anthropic-key')
     expect(headers.get('anthropic-version')).toBe('2023-06-01')
@@ -165,17 +166,17 @@ describe('discoverModelsAtEndpoint', () => {
           headers: { 'content-type': 'text/html; charset=utf-8' },
         })
       }
-      return jsonResponse({ data: [{ id: 'relay-model' }] })
+      return jsonResponse({ data: [{ id: 'relay-model', name: 'relay-model' }] })
     })
     const cache = new LlmEndpointResolutionCache()
     const request = { baseURL: 'https://gateway.example', api: 'openai-completions' }
 
     await expect(discoverModelListingAtEndpoint(request, cache)).resolves.toEqual({
-      models: [{ id: 'relay-model' }],
+      models: [{ id: 'relay-model', name: 'relay-model' }],
       baseURL: 'https://gateway.example/v1',
     })
     await expect(discoverModelListingAtEndpoint(request, cache)).resolves.toEqual({
-      models: [{ id: 'relay-model' }],
+      models: [{ id: 'relay-model', name: 'relay-model' }],
       baseURL: 'https://gateway.example/v1',
     })
     expect(requests).toEqual([
@@ -191,12 +192,12 @@ describe('discoverModelsAtEndpoint', () => {
       const url = String(input)
       requests.push(url)
       if (url.includes('/v1/')) return jsonResponse({ error: 'missing' }, 404)
-      return jsonResponse({ data: [{ id: 'relay-model' }] })
+      return jsonResponse({ data: [{ id: 'relay-model', name: 'relay-model' }] })
     })
     await expect(discoverModelsAtEndpoint({
       baseURL: 'https://gateway.example/v1',
       api: 'openai-completions',
-    })).resolves.toEqual([{ id: 'relay-model' }])
+    })).resolves.toEqual([{ id: 'relay-model', name: 'relay-model' }])
     expect(requests).toEqual([
       'https://gateway.example/v1/models',
       'https://gateway.example/models',
@@ -270,7 +271,7 @@ describe('discoverModelsAtEndpoint', () => {
     const requests: string[] = []
     vi.stubGlobal('fetch', async (input: string | URL) => {
       requests.push(String(input))
-      return jsonResponse({ data: [{ id: 'relay-model' }] })
+      return jsonResponse({ data: [{ id: 'relay-model', name: 'relay-model' }] })
     })
     const cache = new LlmEndpointResolutionCache()
     cache.set('openai-completions', 'https://gateway.example', 'https://other.example/v1')
@@ -286,7 +287,7 @@ describe('discoverModelsAtEndpoint', () => {
     const cache = new LlmEndpointResolutionCache()
     const fetch = vi.fn(async () => {
       cache.clear()
-      return jsonResponse({ data: [{ id: 'relay-model' }] })
+      return jsonResponse({ data: [{ id: 'relay-model', name: 'relay-model' }] })
     })
     vi.stubGlobal('fetch', fetch)
 
@@ -402,7 +403,7 @@ describe('discoverModelsAtEndpoint', () => {
       api: 'anthropic-messages',
     })
 
-    expect(requests[0]?.url).toBe('https://gateway.example/v1/models')
+    expect(requests[0]?.url).toBe('https://gateway.example/v1/models?limit=1000')
     const headers = new Headers(requests[0]?.init.headers)
     expect(headers.has('x-api-key')).toBe(false)
     expect(headers.get('anthropic-version')).toBe('2023-06-01')
@@ -414,15 +415,15 @@ describe('discoverModelsAtEndpoint', () => {
       requests.push(String(input))
       return requests.length === 1
         ? new Response('', { status: 404 })
-        : jsonResponse({ data: [{ id: 'claude-relay' }] })
+        : jsonResponse({ data: [{ id: 'claude-relay', name: 'claude-relay' }] })
     })
 
     await expect(discoverModelsAtEndpoint({
       baseURL: 'https://gateway.example/v1',
       api: 'anthropic-messages',
-    })).resolves.toEqual([{ id: 'claude-relay' }])
+    })).resolves.toEqual([{ id: 'claude-relay', name: 'claude-relay' }])
     expect(requests).toEqual([
-      'https://gateway.example/v1/models',
+      'https://gateway.example/v1/models?limit=1000',
       'https://gateway.example/models',
     ])
   })
@@ -495,7 +496,7 @@ describe('discoverModelsAtEndpoint', () => {
     vi.unstubAllGlobals()
     stubResponse(jsonResponse({ models: [] }))
     await expect(discoverModelsAtEndpoint({ baseURL: 'https://gateway.example' }))
-      .rejects.toThrow(/no "data" array/)
+      .rejects.toThrow(/neither a "data" array nor a "models" object/)
   })
 
   it('enforces the four-megabyte limit for declared and streamed responses', async () => {

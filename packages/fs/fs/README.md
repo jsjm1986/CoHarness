@@ -13,7 +13,7 @@ This package owns the Service Definition and provider contract layer of the four
 | provider contract | `@deepseek-ai/dsh-fs` (this) | `ctx.fs`: execution-world paths, text IO, and atomic mutation primitives (optional version guard); owns the `fs/*` event vocabulary |
 | provider | `@deepseek-ai/dsh-fs-local` | the host-filesystem implementation |
 
-`fs-sandbox` and `fs-e2b` implement this interface without touching the policy/tool layers.
+`fs-sandbox` implements this interface without touching the policy/tool layers.
 
 ## Service API (`ctx.fs`)
 

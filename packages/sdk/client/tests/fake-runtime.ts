@@ -95,8 +95,12 @@ function runTurn(sessionId: string): void {
     return
   }
   event(sessionId, 'turn/start', { turn: 0 })
-  event(sessionId, 'assistant/chunk', { turn: 0, step: 0, chunk: { type: 'text-delta', index: 0, text } })
   if (env.FAKE_MALFORMED_MESSAGE !== undefined) {
+    event(sessionId, 'assistant/attempt', {
+      turn: 0,
+      step: 0,
+      stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
+    })
     event(sessionId, 'assistant/message', {
       turn: 0,
       step: 0,
@@ -113,6 +117,13 @@ function runTurn(sessionId: string): void {
     notify('session.event', { sessionId, event: { type: 'assistant/message', seq: seq++, time: 0 } })
     return
   }
+  if (env.FAKE_EMPTY_MESSAGE !== undefined) {
+    event(sessionId, 'assistant/attempt', {
+      turn: 0,
+      step: 0,
+      stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
+    })
+  }
   event(sessionId, 'assistant/message', {
     turn: 0,
     step: 0,
@@ -124,6 +135,9 @@ function runTurn(sessionId: string): void {
       content: env.FAKE_EMPTY_MESSAGE !== undefined ? [] : [{ type: 'text', text }],
       source: { kind: 'model', provider: 'fake', model: 'fake' },
     },
+    stream: env.FAKE_EMPTY_MESSAGE !== undefined
+      ? []
+      : [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
   })
   const reasonKind = env.FAKE_REASON_KIND ?? 'completed'
   event(sessionId, 'turn/end', { turn: 0, reason: { kind: reasonKind } })
@@ -208,7 +222,11 @@ reader.on('line', (line) => {
       })
       notify('session.status', { sessionId, status: 'running' })
       if (env.FAKE_STREAM_THEN_MALFORMED !== undefined) {
-        event(sessionId, 'assistant/chunk', { turn: 0, step: 0, chunk: { type: 'text-delta', index: 0, text: 'streamed then cut short' } })
+        event(sessionId, 'assistant/attempt', {
+          turn: 0,
+          step: 0,
+          stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: ['streamed then cut short'] }],
+        })
         respond({})
         return
       }

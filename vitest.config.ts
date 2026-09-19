@@ -33,7 +33,7 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/shell/tool-bash',
       'packages/hooks/*',
       'packages/terminal/terminal-bash',
-      'packages/experimental/code-runtime-python',
+      'packages/experimental/ptc-runtime-python',
       'packages/sandbox/sandbox-local',
     ]
   : []
@@ -137,7 +137,7 @@ const processBoundTests = [
   'packages/context/time-context/tests/time-context.spec.ts',
   'packages/llm/llm-pi-ai/tests/adapter.spec.ts',
   'packages/boot/app-boot/tests/app-boot.spec.ts',
-  'packages/workflow/workflow-worker-thread/tests/session.spec.ts',
+  'packages/workflow/workflow-ptc/tests/session.spec.ts',
 ]
 
 export default defineConfig({

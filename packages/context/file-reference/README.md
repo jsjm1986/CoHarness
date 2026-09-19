@@ -16,6 +16,8 @@ Indirectly, through `@deepseek-ai/dsh-file-reference-local`, which conditionally
 
 The interface and grammar add no request tokens themselves; a provider-owned prompt section determines cache behavior.
 
+**Runtime invariant:** No companion is published. The interface retains no candidate or lifecycle state; concrete providers own their cache and invalidation relationships.
+
 ## Known Limitations and Deferred Work
 
 - **Path candidates are advisory** — the seam does not prove that a later model-facing filesystem tool can access the same namespace; deployments must align the provider with the effective `read` implementation.

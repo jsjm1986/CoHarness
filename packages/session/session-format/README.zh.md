@@ -29,6 +29,8 @@ catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原�
 
 不会直接失效：本包不贡献请求 token，也不修改模型请求前缀。
 
+**运行时不变式：** 不发布伴生入口。每个已完成操作都会校验其结果；decoder 与 transformer 状态只属于一次尚未完成的流式还原，绝不在多次还原间共享。
+
 ## 已知限制与延期工作
 
 - v3 之前的步骤会归一化历史事件词汇（旧版消息载荷、`start`/`end` replace 键、turn 级 surface 事件），各 provider 仍独立负责物理 codec 和发布规则。

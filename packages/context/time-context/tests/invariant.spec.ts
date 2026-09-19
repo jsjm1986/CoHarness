@@ -37,6 +37,7 @@ function event(
         }
         : { kind: 'plugin', plugin },
     }),
+    surfaceOp: 'append',
   }
 }
 

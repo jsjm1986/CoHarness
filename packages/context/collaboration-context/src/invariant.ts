@@ -74,10 +74,12 @@ function validatePair(
 
 /** Validate every complete package-owned notice relation in one durable session. */
 function validateSession(session: Session, fail: InvariantFailure): void {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const [index, candidate] of session.snapshotEvents().entries()) {
     if (noticeSource(candidate) === undefined) continue
     const notice = candidate as SessionEvent<'user/message'>
     validateNotice(notice, fail)
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const following = session.snapshotEvents().slice(index + 1).find(event =>
       event.type === 'user/message' || event.type === 'step/end' || event.type === 'turn/end')
     if (following?.type !== 'user/message') {
@@ -100,6 +102,7 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
       return
     }
     if (event.type !== 'user/message' || projectParticipantFromSource(event.data.source) === undefined) return
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const previous = [...session.snapshotEvents()].reverse().find(candidate => candidate.type === 'user/message')
     if (previous?.type === 'user/message' && noticeSource(previous) !== undefined) {
       validatePair(previous, event, fail)

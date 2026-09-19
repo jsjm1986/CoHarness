@@ -42,6 +42,8 @@ Each referenced message adds the fixed warning plus up to three serialized snaps
 
 The request and snapshot are consecutive append-only target messages and preserve earlier cacheable history. Different references or source capture contents change the new suffix only; later target compaction may invalidate reuse from its replacement boundary.
 
+**Runtime invariant:** No companion is published. Preparation returns immutable per-call snapshots validated while they are built, and the agent/session layers own durable context admission, freezing, and replay.
+
 ## Known Limitations and Deferred Work
 
 - **No body discovery** — candidate queries inspect projected titles (or the compatibility log-backed fallback) but do not search message bodies. Sessions without a projection are discoverable by id/cwd until opened once; a dedicated title index may replace that path without changing URI, snapshot, or persistence contracts.

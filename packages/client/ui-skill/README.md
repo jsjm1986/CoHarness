@@ -30,6 +30,8 @@ One invocation adds the rendered skill body to that turn as injected context —
 
 Append-only: the injected message lands after the reusable history prefix. This package never edits earlier request tokens.
 
+**Runtime invariant:** No companion is published. The slash source, locale dictionaries, and keyed toolview are registry-owned registrations whose disposal is proven by the HMR-safety spec. They emit no Cordis events and own no cross-plugin mutable state.
+
 ## Known Limitations and Deferred Work
 
 - **Result-only history pages use the generic row** — keyed dispatch needs the paired call in the runtime window; pagination that leaves the call outside has no tool identity. This client presentation feature does not extend the history wire contract to recover it.

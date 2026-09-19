@@ -38,6 +38,8 @@ Successful checkpoints add no tokens and do not change the request. Recovery add
 
 The repair result is appended after the reusable prefix, so it does not invalidate earlier cache entries.
 
+**Runtime invariant:** No companion is published. Checkpoint ordering is enforced at the intercepted waterfall and persistence seams; this stateless policy owns no independent mutable relation.
+
 ## Known Limitations and Deferred Work
 
 - The policy durably records execution intent, not generic exactly-once effects. Side-effecting tools should forward `exec.callId` as an idempotency key when their provider supports one.

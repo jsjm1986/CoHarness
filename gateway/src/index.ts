@@ -19,7 +19,9 @@ import {
   withDatabaseStartupRetry,
 } from './postgres/database.ts'
 import { ConversationRepository } from './postgres/conversation-repository.ts'
+import { DesktopCoordinator } from './desktop-coordinator.ts'
 import { ConversationArchiveService, type ConversationArchiveRuntimeRead } from './postgres/conversation-archive-service.ts'
+import { PostgresDesktopCoordinatorRepository } from './postgres/desktop-coordinator-repository.ts'
 import { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import { PostgresModelGovernanceService } from './postgres/model-governance-service.ts'
 import {
@@ -170,6 +172,8 @@ const launcher = selectLauncher(cfg, () => ({
 const instances = new InstanceManager(instanceRepository, cfg, launcher, {
   principalPublicKey: principalKeys.publicKeyPem,
 })
+const desktops = new DesktopCoordinator(new PostgresDesktopCoordinatorRepository(context), instances, cfg.desktop, audit)
+await desktops.initialize()
 const archives = new ConversationArchiveService(context, cfg.archiveRetentionDays)
 archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
   let subject: Awaited<ReturnType<PostgresUserService['getById']>> | {
@@ -246,6 +250,7 @@ const deps: GatewayDeps = {
   archives,
   push,
   instances,
+  desktops,
   readiness: signal => checkPostgresReadiness(context, signal),
 }
 
@@ -415,6 +420,7 @@ const server = createGatewayServer(deps, {
     documentCatalogPurge: documentCatalogHandlers.purge,
     documentCatalogOverview: documentCatalogHandlers.overview,
     documentCatalogHistory: documentCatalogHandlers.history,
+    desktops,
   }),
 })
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
@@ -460,12 +466,17 @@ const archiveRetentionTask = singleFlightTask('archive retention sweep', async (
 const documentRetentionTask = singleFlightTask('document retention sweep', async () => {
   await documentCatalog.purgeDue?.()
 })
+const desktopSweepTask = singleFlightTask('desktop grant sweep', async () => {
+  await desktops.sweep()
+})
 const reaper = setInterval(reaperTask.run, 60_000)
 const archiveRetentionSweep = setInterval(archiveRetentionTask.run, 60 * 60_000)
 const documentRetentionSweep = setInterval(documentRetentionTask.run, 60 * 60_000)
+const desktopSweep = setInterval(desktopSweepTask.run, Math.max(1_000, cfg.desktop.grantTtlMs / 2))
 reaper.unref()
 archiveRetentionSweep.unref()
 documentRetentionSweep.unref()
+desktopSweep.unref()
 
 const CONNECTION_DRAIN_MS = 3000
 const SHUTDOWN_TIMEOUT_MS = 10_000
@@ -495,11 +506,13 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   clearInterval(reaper)
   clearInterval(archiveRetentionSweep)
   clearInterval(documentRetentionSweep)
+  clearInterval(desktopSweep)
   try {
     await Promise.all([
       reaperTask.wait(),
       archiveRetentionTask.wait(),
       documentRetentionTask.wait(),
+      desktopSweepTask.wait(),
     ])
     proxyHandlers.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])

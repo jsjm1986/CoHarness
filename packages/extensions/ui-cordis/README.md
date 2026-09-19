@@ -24,6 +24,8 @@ Indirectly, through the run and stop verbs these surfaces drive — the browser-
 
 None: no prompt input originates here, and answering a run request neither extends nor rewrites the history tail.
 
+**Runtime invariant:** No companion is published. A single keyed toolview registration whose disposal is proven by the HMR-safety spec. The one mutable relation this package owns — the per-definition run-state observable — lives in the browser process, out of reach of the host invariant service, and the node half emits no cordis events and holds no cross-plugin state.
+
 ## Known Limitations and Deferred Work
 
 - **An open panel does not see registry changes that announce nothing** — `cordis_define`, and an undefine of a definition that was not running, change the registry without a dispatch announcement, so a panel left open across one of them keeps its rows until it is closed and opened again (opening re-reads). A run request is the exception, because it blocks the model: it both renders its own row and triggers a read. Acting on a row the host no longer holds is still honest: the call answers `definition-missing` and the row goes terminal. Polling while open was considered and rejected as the wrong price for it.

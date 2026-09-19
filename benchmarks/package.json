@@ -1,0 +1,14 @@
+{
+  "name": "@deepseek-ai/dsh-benchmarks",
+  "version": "0.1.5-alpha.1.coharness.1",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:^"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^"
+  }
+}

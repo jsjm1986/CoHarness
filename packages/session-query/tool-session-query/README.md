@@ -69,6 +69,8 @@ Results are data-dependent and remain in logged tool history until compaction; `
 
 Append-only result text follows the reusable request prefix and does not invalidate earlier cache entries.
 
+**Runtime invariant:** No companion is published. This read-only model adapter owns no event or mutable data relationship beyond the registries that already validate registration.
+
 ## Known Limitations and Deferred Work
 
 - Search returns at most the deployment cap and asks the model to narrow its query when more matches exist; it offers no continuation token.

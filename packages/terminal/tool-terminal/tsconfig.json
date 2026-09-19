@@ -9,22 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../util/output-retention"
-    },
-    {
-      "path": "../terminal"
-    },
-    {
       "path": "../../core/agent"
-    },
-    {
-      "path": "../../llm/llm"
     },
     {
       "path": "../../core/system-prompt"
@@ -36,7 +21,22 @@
       "path": "../../jobs/jobs"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../terminal"
+    },
+    {
+      "path": "../../util/output-retention"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

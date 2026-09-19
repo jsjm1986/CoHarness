@@ -1,1 +1,25 @@
+dsh: warning: 1 entry did not activate
+typert-loader (@deepseek-ai/dsh-typert-loader): AggregateError: typert-loader: 4 typert contributor(s) failed to register:
+  - typert-loader: @deepseek-ai/dsh-plugin-manager exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+  - typert-loader: @deepseek-ai/dsh-llm exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+  - typert-loader: @deepseek-ai/dsh-commands exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+  - typert-loader: @deepseek-ai/dsh-command-feedback exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+    at Object.apply (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/loader/lib/index.js:337:33)
+    at async Fiber._reload (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/vendor/cordis/src/fiber.ts:656:9)
+Error: typert-loader: @deepseek-ai/dsh-plugin-manager exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/loader/lib/index.js:267:11)
+Error: typert-loader: @deepseek-ai/dsh-llm exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/loader/lib/index.js:267:11)
+Error: typert-loader: @deepseek-ai/dsh-commands exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/loader/lib/index.js:267:11)
+Error: typert-loader: @deepseek-ai/dsh-command-feedback exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js
+Did you mean to import "zod/index.cjs"?
+    at <anonymous> (/Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/typert/loader/lib/index.js:267:11)
 dsh: SERVER: CLI mock provider failed

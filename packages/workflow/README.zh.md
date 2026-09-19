@@ -7,7 +7,7 @@
 | 包 | 职责 | ctx 键 |
 |---|---|---|
 | [`workflow/`](workflow/README.zh.md) | 定义工作流执行和生命周期事件 | `ctx.workflowEngine` |
-| [`workflow-worker-thread/`](workflow-worker-thread/README.zh.md) | 在线程中运行工作流脚本 | 注册到 `ctx.workflowEngine` |
+| [`workflow-ptc/`](workflow-ptc/README.zh.md) | 在线程中运行工作流脚本 | 注册到 `ctx.workflowEngine` |
 | [`tool-workflow/`](tool-workflow/README.zh.md) | 向模型公开通用工作流执行 | 注册到 `ctx.tools` |
 | [`tool-ralph/`](tool-ralph/README.zh.md) | 公开使用全新 agent（智能体）的固定 Ralph 工作流 | 注册到 `ctx.tools` |
 

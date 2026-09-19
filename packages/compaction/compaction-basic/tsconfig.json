@@ -4,16 +4,24 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../compaction"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../compaction-tool-result-pruner"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../interaction/commands"
     },
     {
       "path": "../../llm/llm"
@@ -22,22 +30,16 @@
       "path": "../../llm/token-meter"
     },
     {
-      "path": "../../core/session"
+      "path": "../../util/values"
     },
     {
-      "path": "../../core/agent"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../interaction/commands"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../compaction"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../compaction-tool-result-pruner"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

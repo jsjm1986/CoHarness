@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-typert-registry'
 export type ApiRemoteLookupError =
   | { readonly code: 'agent-busy'; readonly message: string; readonly details: { readonly reason: string } }
   | { readonly code: 'session-not-found'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
+  | { readonly code: 'session-writer-held'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
   | { readonly code: 'internal'; readonly message: string; readonly details: Record<never, never> }
 
 /** Result of resolving one session identity to its live Agent. */
@@ -102,8 +103,8 @@ export async function inspectApiRemoteSession(
   if (persistence === undefined) {
     throw new Error('session persistence is not configured (load a dsh-session-persistence backend)')
   }
-  const listed = signal === undefined ? await persistence.list() : await persistence.list(signal)
-  const meta = listed.find(candidate => candidate.id === sessionId)
+  const listed = await persistence.list(signal === undefined ? undefined : { signal })
+  const meta = listed.find(candidate => candidate.header.id === sessionId)?.header
   if (meta === undefined || meta.cwd === undefined) {
     throw new ApiRemoteSessionNotFound(`session "${sessionId}" not found`)
   }
@@ -179,7 +180,11 @@ export function createApiRemoteAgentResolver(
       resumes.set(sessionId, resume)
     }
     try {
-      return { agent: await resume }
+      const agent = await resume
+      // A shared resume can publish an identity that subagent routing adopts
+      // before every waiter observes it; apply the live ownership policy again.
+      const published = fencedLiveAgent(sessionId)
+      return published ?? { agent }
     } catch (error: unknown) {
       if (error instanceof ApiRemoteSessionNotFound) {
         return { error: { code: 'session-not-found', message: error.message, details: { sessionId } } }
@@ -192,6 +197,11 @@ export function createApiRemoteAgentResolver(
       const attached = ctx.sessions.get(sessionId)
       if (attached !== undefined && hasApiRemoteSubagentOwner(ctx, attached, undefined)) {
         return { error: apiRemoteSubagentOwnershipError(sessionId) }
+      }
+      // Name check, not instanceof: the thrown class crosses provider module
+      // copies, so identity by constructor is not guaranteed.
+      if (error instanceof Error && error.name === 'SessionAlreadyOwnedError') {
+        return { error: { code: 'session-writer-held', message: error.message, details: { sessionId } } }
       }
       return {
         error: {

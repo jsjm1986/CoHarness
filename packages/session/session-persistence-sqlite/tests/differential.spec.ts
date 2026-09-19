@@ -5,12 +5,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { CallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { freezeMessage, MessageId, ToolCallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { type SessionEvent, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import SessionPersistenceJsonl from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionPersistenceSqlite from '@deepseek-ai/dsh-session-persistence-sqlite'
-import { meta } from '../../session-persistence/tests/contract.ts'
+import { meta } from '../../session-persistence/tests/legacy-contract.ts'
 import { testSql } from './test-sql.ts'
 
 type BackendName = 'jsonl-zstd' | 'sqlite'
@@ -48,66 +48,79 @@ async function mount(name: BackendName, root: string): Promise<MountedBackend> {
   }
 }
 
-function closedChunkLog(
+function closedAttemptLog(
   entries: readonly { readonly chunk: StreamChunk; readonly time: number; readonly ignorable?: true }[],
 ): SessionEvent[] {
-  const chunks = entries.map(({ chunk, time, ignorable }, index): SessionEvent => ({
-    type: 'assistant/chunk',
+  const attempts = entries.map(({ chunk, time, ignorable }, index): SessionEvent => ({
+    type: 'assistant/attempt',
     seq: SessionSeq(index + 2),
     time,
-    data: { turn: 1, step: 1, chunk },
+    data: { turn: 1, step: 1, stream: [{ type: 'chunk', time, chunk }] },
     ...ignorable === true ? { ignorable } : {},
   }))
   return [
     { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
     { type: 'step/start', seq: SessionSeq(1), time: 2, data: { turn: 1, step: 1 } },
-    ...chunks,
-    { type: 'step/end', seq: SessionSeq(chunks.length + 2), time: 3, data: { turn: 1, step: 1 } },
+    ...attempts,
+    { type: 'step/end', seq: SessionSeq(attempts.length + 2), time: 3, data: { turn: 1, step: 1 } },
     {
       type: 'turn/end',
-      seq: SessionSeq(chunks.length + 3),
+      seq: SessionSeq(attempts.length + 3),
       time: 4,
       data: { turn: 1, reason: { kind: 'completed' } },
     },
   ]
 }
 
-function packingMatrixLog(): SessionEvent[] {
-  const entries: { chunk: StreamChunk; time: number; ignorable?: true }[] = [
-    ...Array.from({ length: 5 }, (_, index) => ({
-      chunk: { type: 'text-delta' as const, index: 0, text: `text-${index}` },
-      time: 1_000 + index,
-    })),
-    ...Array.from({ length: 4 }, (_, index) => ({
-      chunk: { type: 'reasoning-delta' as const, index: 1, text: `reason-${index}` },
-      time: 990 - index,
-    })),
-    ...Array.from({ length: 4 }, (_, index) => ({
-      chunk: {
-        type: 'tool-call-delta' as const,
-        index: 2,
-        id: CallId('named-call'),
-        name: 'write',
-        argumentsDelta: `{${index}`,
+function streamMatrixLog(): SessionEvent[] {
+  return [
+    { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+    { type: 'step/start', seq: SessionSeq(1), time: 2, data: { turn: 1, step: 1 } },
+    // An abandoned attempt retaining every packed stream-record kind.
+    { type: 'assistant/attempt', seq: SessionSeq(2), time: 3, data: {
+      turn: 1,
+      step: 1,
+      stream: [
+        { type: 'text-chunks', time0: 1_000, index: 0, dt: [1, 1, 1], texts: ['text-0', 'text-1', 'text-2', 'text-3'] },
+        { type: 'reasoning-chunks', time0: 990, index: 1, dt: [-1, -1], texts: ['reason-0', 'reason-1', 'reason-2'] },
+        { type: 'tool-call-chunks', time0: 2_000, index: 2, dt: [1, 1], id: ToolCallId('named-call'), name: 'write', args: ['{0', '{1', '{2'] },
+        { type: 'tool-call-chunks', time0: 3_000, index: 3, dt: [1], id: ToolCallId('unnamed-call'), args: ['0}', '1}'] },
+        { type: 'chunk', time: 4_000, chunk: { type: 'block-start', index: 4, blockType: 'text' } },
+        { type: 'text-chunks', time0: 4_001, index: 4, dt: [1], texts: ['short-a', 'short-b'] },
+        { type: 'chunk', time: 4_004, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } },
+      ],
+    } },
+    {
+      type: 'assistant/message',
+      seq: SessionSeq(3),
+      time: 5,
+      data: {
+        turn: 1,
+        step: 1,
+        message: freezeMessage({
+          id: MessageId('matrix-assistant'),
+          role: 'assistant',
+          content: [{ type: 'text', text: 'done' }],
+          source: { kind: 'model', provider: 'mock', model: 'mock' },
+        }),
+        stream: [
+          { type: 'text-chunks', time0: 4, index: 0, dt: [], texts: ['done'] },
+          { type: 'chunk', time: 5, chunk: { type: 'finish', reason: { kind: 'stop' } } },
+        ],
       },
-      time: 2_000 + index,
-    })),
-    ...Array.from({ length: 3 }, (_, index) => ({
-      chunk: {
-        type: 'tool-call-delta' as const,
-        index: 3,
-        id: CallId('unnamed-call'),
-        argumentsDelta: `${index}}`,
-      },
-      time: 3_000 + index,
-    })),
-    { chunk: { type: 'block-start', index: 4, blockType: 'text' }, time: 4_000 },
-    { chunk: { type: 'text-delta', index: 4, text: 'short-a' }, time: 4_001 },
-    { chunk: { type: 'text-delta', index: 4, text: 'short-b' }, time: 4_002 },
-    { chunk: { type: 'text-delta', index: 5, text: 'scalar-envelope' }, time: 4_003, ignorable: true },
-    { chunk: { type: 'finish', reason: { kind: 'stop' } }, time: 4_004 },
+      surfaceOp: 'append',
+    },
+    // An ignorable foreign event riding the same scalar row path.
+    {
+      type: 'future/event',
+      seq: SessionSeq(4),
+      time: 6,
+      data: { scalar: true },
+      ignorable: true,
+    } as unknown as SessionEvent,
+    { type: 'step/end', seq: SessionSeq(5), time: 7, data: { turn: 1, step: 1 } },
+    { type: 'turn/end', seq: SessionSeq(6), time: 8, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
-  return closedChunkLog(entries)
 }
 
 function storageTagCollisionLog(): SessionEvent[] {
@@ -152,7 +165,7 @@ async function verifyBackend(
     }
     expect(await mounted.persistence.inspect(header.id), name)
       .toEqual({ meta: header, inheritedEventCount: SessionLogOffset(0), events })
-    expect(await mounted.persistence.list(), name).toEqual([header])
+    expect(await mounted.persistence.listHeaders(), name).toEqual([header])
     const revision = (await mounted.persistence.listSnapshots())[0]?.revision
     for (let fromSeq = 0; fromSeq <= events.length + 1; fromSeq += 1) {
       expect((await mounted.persistence.readFrom(header.id, SessionLogOffset(fromSeq))).events, `${name} seq ${fromSeq}`)
@@ -178,13 +191,13 @@ const streamChunkArbitrary: fc.Arbitrary<StreamChunk> = fc.oneof(
   fc.record({
     type: fc.constant<'tool-call-delta'>('tool-call-delta'),
     index: fc.nat(2),
-    id: fc.constantFrom(CallId('call-1'), CallId('call-2')),
+    id: fc.constantFrom(ToolCallId('call-1'), ToolCallId('call-2')),
     argumentsDelta: fc.string(),
   }),
   fc.record({
     type: fc.constant<'tool-call-delta'>('tool-call-delta'),
     index: fc.nat(2),
-    id: fc.constantFrom(CallId('call-1'), CallId('call-2')),
+    id: fc.constantFrom(ToolCallId('call-1'), ToolCallId('call-2')),
     name: fc.constantFrom('read', 'write'),
     argumentsDelta: fc.string(),
   }),
@@ -207,7 +220,7 @@ const randomWorkload = fc.record({
   }), { maxLength: 30 }),
   batchSizes: fc.array(fc.integer({ min: 1, max: 8 }), { minLength: 1, maxLength: 8 }),
 }).map(({ entries, batchSizes }) => ({
-  events: JSON.parse(JSON.stringify(closedChunkLog(entries.map(({ chunk, time, ignorable }) => ({
+  events: JSON.parse(JSON.stringify(closedAttemptLog(entries.map(({ chunk, time, ignorable }) => ({
     chunk,
     time,
     ...ignorable === true ? { ignorable } : {},
@@ -230,8 +243,8 @@ describe('SQLite cross-backend differential behavior', () => {
     }
   })
 
-  it('matches JSONL/Zstandard for every packed kind, scalar fallback, suffix, partition, and reopen', async () => {
-    const events = packingMatrixLog()
+  it('matches JSONL/Zstandard for every stream record kind, ignorable events, partitions, and reopen', async () => {
+    const events = streamMatrixLog()
     for (const [partitionIndex, sizes] of [[events.length], [1], [2, 1, 5, 3]].entries()) {
       const directory = await freshDirectory(`dsh-sqlite-matrix-${partitionIndex}-`)
       for (const name of ['jsonl-zstd', 'sqlite'] as const) {
@@ -240,19 +253,10 @@ describe('SQLite cross-backend differential behavior', () => {
         if (name === 'sqlite') {
           const db = new DatabaseSync(join(root, 'sessions.db'), { readOnly: true })
           try {
-            expect(db.prepare(testSql('count-physical-types')).all()).toEqual([
-              [
-                { type: 'reasoning-chunks', count: 1 },
-                { type: 'text-chunks', count: 1 },
-                { type: 'tool-call-chunks', count: 2 },
-              ],
-              [],
-              [
-                { type: 'reasoning-chunks', count: 1 },
-                { type: 'text-chunks', count: 1 },
-                { type: 'tool-call-chunks', count: 1 },
-              ],
-            ][partitionIndex])
+            // Scalar rows only: no packed physical rows exist at schema 21.
+            expect(db.prepare(testSql('count-physical-types')).all()).toEqual([])
+            expect(db.prepare(testSql('count-events')).get())
+              .toEqual({ count: events.length })
             expect(db.prepare(testSql('count-ignorable-events')).get())
               .toEqual({ count: 1 })
           } finally {

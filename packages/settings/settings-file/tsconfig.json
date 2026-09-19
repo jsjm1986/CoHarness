@@ -9,13 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../settings"
     },
     {
       "path": "../../util/atomic-write"
@@ -24,10 +18,16 @@
       "path": "../../util/home-paths"
     },
     {
-      "path": "../settings"
+      "path": "../../util/values"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

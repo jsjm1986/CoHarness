@@ -29,6 +29,8 @@ Indirectly, through consumers that mint request, session, and attachment identif
 
 No direct effect; identifier consumers own any request changes.
 
+**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its value algebra is enforced by unit tests.
+
 ## Known Limitations and Deferred Work
 
 - **v4 only** — namespaces and other UUID versions are outside this utility.

@@ -22,6 +22,8 @@ None, as the provider reads and synchronizes already-logged session state withou
 
 None. It does not assemble model requests or alter a reusable prefix.
 
+**Runtime invariant:** No companion is published. The provider synchronizes authoritative persistence and the registry snapshot directly.
+
 ## Known Limitations and Deferred Work
 
 - Gateway synchronization is available only to runtimes launched with the Gateway credential; standalone local compositions keep their existing archive behavior.

@@ -179,6 +179,7 @@ function renderReading(location: TmuxLocation, turn: number): string {
  * cache state.
  */
 function latestInjectedState(agent: Agent): { state: string; time: number } | undefined {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'user/message'
       && event.data.source.kind === 'plugin'

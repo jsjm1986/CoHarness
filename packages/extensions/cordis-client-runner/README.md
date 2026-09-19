@@ -60,6 +60,8 @@ Conditional and bounded by the host's retention, not by this page: one report pe
 
 None of its own. Reports travel over RPC and are stored, not appended to the conversation; the model reads them through an inspection it chose to make, which extends the tail like any other tool result.
 
+**Runtime invariant:** No companion is published. The owned relation (a live Plugin's loader entry exists exactly while one Plugin Run ID is live) is browser-only state reachable through the client half's service, which the node-plane companion cannot observe. The relation is asserted by the package's own load/teardown coverage instead.
+
 ## Known Limitations and Deferred Work
 
 - **A refused resolution is not retried.** The acknowledgement of `resolveRequestRun` is not read, so when the host declines a stale success (`accepted: false`, because the definition's revision moved on while this page was loading) the page keeps what it loaded and does not orchestrate again. The request stays answerable — another page's answer or the caller's cancellation settles it — and the stop that bumped the revision retracts the stale load. Retrying was evaluated and deferred: the window is one revision bump inside a single round trip.

@@ -100,7 +100,7 @@ CUSTOM_CORDIS = """\
     root: !!js process.env.DSH_SESSION_ROOT
     compression: 'none'
 - id: code-runtime
-  name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+  name: '@deepseek-ai/dsh-ptc-runtime-node'
 - id: subagents
   name: '@deepseek-ai/dsh-subagent'
 - id: subagent-spawn-in-process
@@ -112,7 +112,7 @@ CUSTOM_CORDIS = """\
   config:
     provider: spawn
 - id: workflow-engine
-  name: '@deepseek-ai/dsh-workflow-worker-thread'
+  name: '@deepseek-ai/dsh-workflow-ptc'
   config:
     provider: spawn
 - id: workflow-tool

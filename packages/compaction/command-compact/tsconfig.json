@@ -9,19 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
+      "path": "../compaction"
     },
     {
       "path": "../../interaction/commands"
     },
     {
-      "path": "../compaction"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

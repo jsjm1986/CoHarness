@@ -98,7 +98,7 @@ export function attachStructuredRuntime(childCtx: Context, schema: ObjectJsonSch
 
   childCtx.systemPrompt.section({
     name: `tool:${STRUCTURED_OUTPUT_TOOL}`,
-    order: 190,
+    order: childCtx.systemPrompt.getSectionOrder('STRUCTURED_OUTPUT'),
     text: STRUCTURED_OUTPUT_INSTRUCTION,
   })
 

@@ -32,6 +32,12 @@
 - `enter(session)` 执行冲突检查，在不通知的情况下发布，并返回一个绑定到该条目的幂等脱离函数。允许并发准备相同 id，但只有一个条目能够成功进入；陈旧的脱离函数无法移除其替代项。
 - `announce(session)` 发出唯一一次创建边，并拒绝重复或重入通知。该次分发期间请求的脱离操作会延后，之后再发出成对的释放边；未通知的条目不会发出任何生命周期边。
 
+插件用 `@messageProjection` 声明修改内容的事件，并通过 `ctx.sessions.registerMessageProjection()` 注册纯处理器。Session 在接受事件前调用处理器，并缓存其不可变消息更新。缺少处理器时拒绝追加和恢复，卸载已经使用的处理器后也会拒绝读取缓存。独立构造函数和 `foldSurface(events, projections)` 必须显式接收处理器。重建函数将折叠结果的 `projectedMessages` 传给 `deriveEventMessage()`，实时实例方法自动应用相同的投影。[会话消息投影](../../../.agents/notes/implemented/architecture/2026-09-18-session-message-projections.zh.md)说明职责划分和离线装配。
+
+追加、seed/restore 与事件 adoption/snapshot 会拒绝任何 `header.system` 及恰好为空的可选请求头字段（`tools: []`、`adapterDefaults: {}`），而不规范化输入。工具结果的 `data.error` 仅在 `message.content[0].isError === true` 时允许存在；失败标识仍是可选的。被拒绝的追加不会改变日志、派生状态或事件流。Adoption 校验事件局部元数据，但不校验所引用的历史或替换端点是否属于 surface。
+
+`system/message` 承载渲染后的系统提示词：第一条是 surface 第 0 号节点，准入依据已准备调用的能力，不具备能力的路由将非空渲染文本归并到首个系统节点，延续中的 `in-history` 序列则在缓存历史之后追加；空系统节点不投影为消息，因此清除提示词必须为所有生效的系统节点记录空内容替换，而非仅替换最新节点；当第 0 号节点是 `system/message` 时，surface 折叠拒绝覆盖它的替换，除非替换事件本身是恰好覆盖该节点的 `system/message`，而后续系统节点不受保护，压缩范围可以遮蔽它们（决策：system prompt as surface node）。
+
 `dsh-agent-loop` 使用这一拆分，以保证循环的最终刷新先于会话脱离；详见[所有权 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-agent-lifecycle-and-ownership-contracts.zh.md)。
 
 ### 实时服务事件
@@ -46,8 +52,8 @@
 - `session.deriveMessages()` 对每个新的 surface 条目只做一次增量投影，并返回一个新数组，其中包含这些条目存储的完整、带标识且冻结的消息。assistant 消息的模型来源会保留生成该消息的提供方和模型，以及适配器私有回放状态。surface 重写会重建投影；不存在原始日志回退。
 - `session.deriveEventMessage(event)` 是重建和请求检查使用的规范逐事件投影。
 - `session.surface` 暴露只读 `SessionSurface` 视图，由会话唯一的增量 surface 管理器所有；每次提交重写，`replaceGeneration` 都会变化。
-- `session.seq` 读取当前日志长度（`SessionLogOffset`）而不物化数组；`session.eventAt(seq)` 按 `SessionSeq` 读取一条已接受、深冻结的事件。`session.snapshotEvents(fromSeq?, toSeqExclusive?)` 物化一段半开区间的冻结稳定快照；完整的当前快照会缓存到下一次追加。只需要长度或单条事件的调用方使用 `seq` 或 `eventAt()`。
-- `session.inheritedEventCount` 保留经校验的精确 fork 切点；`session.ownEvents()` 返回该切点及其后的事件，`session.isOwnSeq(seq)` 只接受已存在的子级自有位置。`session.header.isSeeded` 只报告是否存在 fork 历史，不暴露位置整数。
+- `session.seq` 读取当前日志长度（`SessionLogOffset`）而不物化数组。`session.eventAt(seq)` 按 `SessionSeq` 读取一条已接受、深冻结的事件，`session.snapshotEvents(fromSeq?, toSeqExclusive?)` 物化一段半开区间的冻结稳定快照（完整的当前快照会缓存到下一次追加）。`eventAt()`、`snapshotEvents()` 与 `ownEvents()` 已弃用：现有逻辑可以暂不迁移，但禁止新增生产调用；仓库测试文件可在限定范围的 lint 豁免下使用这三个读取方法。只需要长度的调用方使用 `seq`。
+- `session.inheritedEventCount` 保留经校验的精确 fork 切点；已弃用的 `session.ownEvents()` 返回该切点及其后的事件，`session.isOwnSeq(seq)` 只接受已存在的子级自有位置。`session.header.isSeeded` 只报告是否存在 fork 历史，不暴露位置整数。
 - `session.events` 是覆盖在缓存完整快照之上的 `@deprecated` 兼容 getter，为树外插件保留；树内代码通过 `snapshotEvents()`、`eventAt()` 或 `seq` 读取。
 - 会话日志位置使用两种数字品牌类型。`SessionSeq` 标识一条已存在的事件或含端点的水位；`SessionLogOffset` 标识间隙、前缀长度或读取边界，可以等于事件总数。`SessionSeqCursor` 额外允许 `-1` 表示“尚无事件”，`OptionalSessionSeq` 则在缺失本身是数据时使用 `null`。构造函数校验非负安全整数，品牌在运行时消失，因此持久化 JSON 与线上值仍是普通数字。
 - `session.id`：只读类型化身份。
@@ -69,6 +75,10 @@
 
 此包拥有有序 surface 投影、替换校验、回放，以及区分追加来源事件与替换事件的类型守卫。[surface 类型目录](../../../docs/subsystems/session.zh.md#surface-types)拥有精确形状与字段语义。面向人的 transcript（文本记录）必须投影追加来源事件，而不是 `session.surface`，因为已落地的替换会遮蔽读者已经看到的历史；面向模型的消费方继续读取 `session.surface`。
 
+### 设计概念
+
+该包建立在事件溯源之上：`Session` 是类型化 `SessionEvent` 的仅追加日志，其他一切——模型历史、transcript（文本记录）、遥测、标题、持久化——都从这条流派生。surface 是派生投影：一个增量管理器校验追加候选、根据已提交事件推进有序视图，通过 `replaceGeneration` 跟踪位置替换，通过 `contentGeneration` 跟踪位置替换和插件拥有的消息变更。模型可见即已记录：任何到达模型请求的内容都必须能从日志重建。每个完成结算的模型尝试都会提交一个事件：`assistant/message` 携带组装后的模型可见 message 及其紧凑带时间 stream，`assistant/attempt` 则保留失败、重试、取消或 stream error attempt，且不添加模型历史。如果进程在 settlement 前硬中断，则不会留下持久 attempt stream。
+
 ### 请求头重建（`request-header.ts`）
 
 `request/header` 记录非历史请求封装的完整规范快照，其原因为 `initial`、`resume` 或 `change`。其可选 `adapterDefaults` 映射会标记由精确模型解析填入的生效 `reasoningEffort` 或 `maxTokens` 值，使下一次请求提议能够将它们与显式对话设置区分开。`foldRequestHeader()` 选择最新快照；旧版增量事件和已移除的 `fallback` 原因会被拒绝。详见[可重建请求 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.zh.md)。
@@ -87,9 +97,11 @@
 
 被中断的实时轮次以 `{ kind: 'aborted', reason: AgentCancelCause }` 结束，在持久 transcript 中保留类型化取消原因。持久化会将受支持旧格式中的粗粒度中止结果导入为 `{ kind: 'aborted', reason: { kind: 'legacy' } }`，因为该记录没有保留调用方。轮次失败携带 `{ kind: 'error', error }`；只有崩溃恢复会合成 `{ kind: 'interrupted' }`。
 
+`deriveMessages()` 缓存深度冻结的派生消息，每次调用返回新数组。四种 surface 事件类型（`system/message`、`user/message`、`assistant/message`、`tool/result`）提供记录的消息身份和内容，空内容的系统节点不派生消息。插件拥有的投影修改派生内容，不修改记录的消息。替换和投影决策使缓存失效。嵌入式 Assistant stream 与 `assistant/attempt` 事件只保留回放和诊断数据。
+
 每个 `SessionEvent` 都有三个可选顶层字段（结构元数据）：
 
-- `sourceEventSeqs?: number[]`：被引用为来源的较早事件 seq（例如 `assistant/message` 引用的 `assistant/chunk` seq，或压缩替换条目引用的已遮蔽条目）。对于 `assistant/message`，存在的 `[]` 表示已知提供方流为空；省略则表示旧版或外部事件没有记录源流。其他 surface 事件若有此字段，则要求非空列表。
+- `sourceEventSeqs?: number[]`：被引用为来源的较早事件 seq（例如 `tool/result` 引用的 `tool/call`，或压缩替换条目引用的已遮蔽条目）。`assistant/message` 在 `data.stream` 中嵌入精确的紧凑提供方流，禁止携带此字段；其他 surface 事件若有此字段，则要求非空列表。
 - `surfaceOp?: SurfaceOp`：事件进入 surface 的方式。非 surface 事件（边界、分片、用量、错误）不含该字段。
 - `ignorable?: true`：标记读取器在不认识事件类型时可以安全跳过该事件；缺失表示必需，不认识的事件类型会使会话重建被拒绝（[机制](../../../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.zh.md)）。
 
@@ -109,7 +121,7 @@
 
 #### 模型看到的内容
 
-模型会原样接收 `user/message`、`assistant/message` 和 `tool/result` surface 条目中的完整消息。其标识、角色、来源和内容块都与创建时确定的值相同；投影不会生成标识。直接提示词与注入上下文仍是彼此独立的 `user/message` 事件，各事件的来源会保留其出处。提示词封装只改变面向人的呈现；其前缀上下文和请求分隔符已经位于事件内容中。工具调用包含在 assistant 消息内。分片、边界、用量、钩子记录、todo 记录以及其他仅日志事件不会添加消息。
+模型会接收 `system/message`、`user/message`、`assistant/message` 与 `tool/result` surface 条目中的消息，并应用日志中的投影，系统提示词在先。消息标识、角色、来源及未修改的内容块保持不变，投影不生成标识。直接提示词与注入上下文仍是独立的 `user/message` 事件，各事件的来源保留其出处。工具调用包含在 assistant 消息内。分片、嵌入式 stream、`assistant/attempt`、边界、用量、钩子记录、todo 记录以及其他仅日志事实不添加消息。
 
 #### Token 影响
 
@@ -147,9 +159,12 @@
 
 记录日志不会导致失效，精确重建会保持请求前缀一致。后续请求头若更改前缀、提示词或 schema，可能从第一处差异开始使复用失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
+
+这些限制说明何时需要特别关心会话存储。它们是当前包约束，不是任务清单。
 
 - **会话分支／树结构**（pi 风格条目树）：除非需要超越基于边界的 `fork()` 能力，否则暂缓。
 - **`fork()` 仅在实时会话的稳定边界处切分**：所选前缀结束时不得有开放轮次，且源会话必须位于存储中；[fork API](../../../.agents/notes/implemented/feature/2026-06-30-session-store-fork-api.zh.md) 不支持对已持久化但未加载的会话进行 fork。
-- **`SESSION_FORMAT_VERSION` 为 `3`**：持久化 provider 会通过相邻 format 软件包迁移受支持的 v0/v1/v2 历史 generation，然后再构造当前 `Session`；v2 请求头中的系统提示会提升为持久化的 `system/message` surface 节点，旧 generation 保持不可变。Assistant 结算事件可携带紧凑且无损的流，失败 attempt 单独记录。更新的版本会以说明方向的错误拒绝。不认识的事件类型同样被拒绝，除非信封带 `ignorable` 标记；版本机制由 [Session format 软件包](../../session/session-format/README.zh.md)负责。
+- **`SESSION_FORMAT_VERSION` 为 `3`**：当前读取器拒绝已退役的 `header.system`，并校验 `system/message` 载荷与受保护头节点的重写。持久化 provider 会通过相邻 format 软件包迁移受支持的 v0/v1/v2 历史 generation，然后再构造当前 `Session`；v2 请求头中的系统提示会提升为持久化的 `system/message` surface 节点，旧 generation 保持不可变。Assistant 结算事件可携带紧凑且无损的流，失败 attempt 单独记录。更新的版本会以说明方向的错误拒绝。不认识的事件类型同样被拒绝，除非信封带 `ignorable` 标记；版本机制由 [Session format 软件包](../../session/session-format/README.zh.md)负责。
 - **`TurnEndReasonMap` 不含 ACP（Agent Client Protocol）命名的 `refusal`／`max_turn_requests` 变体**：受生产方约束；只有当适配器或循环首次产生这些变体时才加入。

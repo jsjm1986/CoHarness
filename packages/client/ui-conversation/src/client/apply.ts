@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
 import type { ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
@@ -87,6 +88,11 @@ const ABSENT_DOCUMENTS = {
   getSnapshot: () => EMPTY_DOCUMENTS,
   subscribe: () => () => {},
 }
+/** No session, therefore no host catalog read; same one-identity rule as above. */
+const ABSENT_PERMISSION_CATALOG = {
+  getSnapshot: (): PermissionCatalog | undefined => undefined,
+  subscribe: () => () => {},
+}
 
 const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
   hooks: {
@@ -133,6 +139,43 @@ export function apply(ctx: Context): void {
   const connection = ctx.get('connection') as ConnectionHandle
 
   const viewportStore = createConversationViewportStore()
+
+  // Process-wide permission catalog: fetched lazily on first subscription and
+  // republished on the host's catalog-changed forward. The snapshot keeps its
+  // identity until the host answers with a different value.
+  const permissionCatalogSource = (() => {
+    let value: PermissionCatalog | undefined
+    let loading: Promise<void> | undefined
+    const listeners = new Set<() => void>()
+    const load = (): void => {
+      // The deferred call keeps a missing/absent catalog namespace (a host
+      // composition without permission presets, or a test double) on the same
+      // `undefined` capability path as a failed remote read instead of
+      // crashing the subscribing render.
+      loading ??= Promise.resolve()
+        .then(() => ctx.remote.permissionPresets.catalog())
+        .then((result) => {
+          if (!result.ok) return
+          if (value !== result.value) {
+            value = result.value
+            for (const listener of listeners) listener()
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => { loading = undefined })
+    }
+    return {
+      getSnapshot: () => value,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener)
+        load()
+        return () => { listeners.delete(listener) }
+      },
+      invalidate: load,
+    }
+  })()
+  ctx.remote.$on('permission-presets/catalog-changed', () => { permissionCatalogSource.invalidate() })
+  ctx.on('connection/reset', () => { permissionCatalogSource.invalidate() })
   const viewportAvailable = {
     getSnapshot: () => slots.entries('conversation.workbench.toolbar').length > 0,
     subscribe: (listener: () => void) => slots.subscribe('conversation.workbench.toolbar', listener),
@@ -381,6 +424,7 @@ export function apply(ctx: Context): void {
             lexicon: ABSENT_LEXICON,
             menuLauncher: ABSENT_MENU_LAUNCHER,
             documents: ABSENT_DOCUMENTS,
+            permissionCatalog: ABSENT_PERMISSION_CATALOG,
           },
         }
       }
@@ -456,6 +500,7 @@ export function apply(ctx: Context): void {
           lexicon: shell.lexicon,
           menuLauncher: inputTriggers?.launcher ?? ABSENT_MENU_LAUNCHER,
           documents: conversation.documentStore(sessionId),
+          permissionCatalog: permissionCatalogSource,
         },
       }
     },

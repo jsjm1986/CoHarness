@@ -74,6 +74,8 @@ composer 统计 pill 的 token 账目来自经标准套件 `useProjection` 读�
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。Conversation Definition、target builder 与 View 已由其所属注册表和 Slot ledger 校验。
+
 ## 已知限制与暂缓事项
 
 - **单轮次用量采用 fail-closed**——只有已加载窗口包含完整生命周期且每个已开始 attempt 都有安全、精确用量时，完成轮次才显示 disclosure；缺失 bucket 或矛盾总量会隐藏该 disclosure。

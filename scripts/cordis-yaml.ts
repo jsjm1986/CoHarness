@@ -21,11 +21,15 @@ const schema = yaml.JSON_SCHEMA.withTags(jsExprType)
  * Parse a Cordis config while preserving Loader `!!js` expressions as data.
  * An empty document parses to `undefined` (js-yaml 4 returned undefined where
  * v5 throws), keeping the caller's handling of an absent YAML value unchanged.
+ * Value-position `{{placeholder}}` scalars in test templates are quoted before
+ * parsing: js-yaml 5 reads `{{token}}` as a flow mapping with a complex key,
+ * which every schema rejects, while js-yaml 4 tolerated the shape.
  * @param source - Cordis YAML source text.
  * @returns the parsed YAML value.
  */
 export function loadCordisYaml(source: string): unknown {
-  return source.trim() === '' ? undefined : yaml.load(source, { schema })
+  const normalized = source.replace(/(:\s*)\{\{([^{}]+)\}\}/g, '$1"{{$2}}"')
+  return normalized.trim() === '' ? undefined : yaml.load(normalized, { schema })
 }
 
 /**

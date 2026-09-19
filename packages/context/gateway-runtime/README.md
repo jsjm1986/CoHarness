@@ -21,6 +21,8 @@ None, as this package authenticates Host operations and contributes no model inp
 
 The package does not assemble model requests or alter an already-reusable prefix.
 
+**Runtime invariant:** No companion is published. The credential and every request assertion are validated at their process or HTTP entry point, and no durable relationship remains after request disposal.
+
 ## Known Limitations and Deferred Work
 
 - **Gateway-launched runtimes only** — loading the plugin without a valid private launch credential fails startup.

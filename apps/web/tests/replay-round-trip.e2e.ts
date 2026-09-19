@@ -4,8 +4,8 @@
 // or the live adapter (record). Drive steps run in every mode and wait only
 // on generic completion (whenTurnSettled — never model-content selectors, so
 // record cannot hang on a live model answering differently); assertion steps
-// run in replay/refresh only. Settled states only — streaming incrementality
-// is asserted from the persisted assistant/chunk events, not transient DOM.
+// run in replay/refresh only. Settled states only — streaming fidelity is
+// asserted from the durable embedded Assistant stream, not transient DOM.
 // Record: DSH_SNAPSHOT=record rewrites session.jsonl, then a keyless
 // DSH_SNAPSHOT=refresh regenerates ui.expected.md.
 import { readFile } from 'node:fs/promises'
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { expandAssistantStream, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
@@ -108,7 +108,7 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     if (agent === undefined) throw new Error(`the settled Web agent ${settledSessionId} is no longer live`)
     const result = await scaffold.ctx.tools.execute({
       signal: AbortSignal.timeout(5_000),
-      callId: CallId('web-url-probe'),
+      callId: ToolCallId('web-url-probe'),
       name: 'bash',
       arguments: {
         command: 'printf \'%s\\n\' "$DSH_WEB_URL"',
@@ -142,8 +142,10 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     const turnEnds = sessionEvents.filter(e => e.type === 'turn/end')
     expect(turnEnds.length).toBe(1)
     expect((turnEnds[0] as SessionEvent & { data: { reason: { kind: string } } }).data.reason.kind).toBe('completed')
-    // The persisted chunk events are the authoritative incrementality proof.
-    expect(sessionEvents.filter(e => e.type === 'assistant/chunk').length).toBeGreaterThan(10)
+    // Embedded stream members are the authoritative incrementality proof.
+    expect(sessionEvents.flatMap(e => e.type === 'assistant/message' || e.type === 'assistant/attempt'
+      ? expandAssistantStream(e.data.stream)
+      : []).length).toBeGreaterThan(10)
   }, 60_000)
 
   it.skipIf(MODE === 'record')('matches the conversation aria golden with stable anchors', async () => {

@@ -92,3 +92,5 @@ Personal documents are a persistent user-owned workspace. When a user refers to 
 - 搜索只匹配名称和根相对 id，不搜索文档内容。定义好范围、字节预算和授权语义后，可以在同一 Consumer 后增加内容索引。
 - `userdoc_read` 只接受 UTF-8 文本。PDF、Office、图片和其他二进制读取应由可选的格式专用 Consumer 提供，而不是由通用存储包承担。
 - 该包只读。保存、编辑、版本管理和本机打开需要独立的模型侧或 Host Consumer，并各自定义审批与并发约定。
+
+**运行时不变式：** 不发布伴生入口。本包只拥有工具与提示词注册；执行结果与存储约束由其所属接缝验证。

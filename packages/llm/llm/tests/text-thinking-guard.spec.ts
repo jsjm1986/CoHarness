@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CallId } from '../src/brand.ts'
+import { ToolCallId } from '../src/brand.ts'
 import { HarnessError, UNSAFE_MODEL_OUTPUT_CODE } from '../src/error.ts'
 import { guardTextThinkingStream } from '../src/text-thinking-guard.ts'
 import type { StreamChunk } from '../src/types.ts'
@@ -66,8 +66,8 @@ describe('guardTextThinkingStream', () => {
       { type: 'block-start', index: 0, blockType: 'text' },
       { type: 'text-delta', index: 0, text: '<thi' },
       { type: 'block-start', index: 1, blockType: 'tool-call' },
-      { type: 'tool-call-delta', index: 1, id: CallId('call-1'), name: 'noop', argumentsDelta: '{}' },
-      { type: 'block-end', index: 1, block: { type: 'tool-call', id: CallId('call-1'), name: 'noop', arguments: '{}' } },
+      { type: 'tool-call-delta', index: 1, id: ToolCallId('call-1'), name: 'noop', argumentsDelta: '{}' },
+      { type: 'block-end', index: 1, block: { type: 'tool-call', id: ToolCallId('call-1'), name: 'noop', arguments: '{}' } },
       { type: 'text-delta', index: 0, text: 'nking>private</thinking>answer' },
       { type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>private</thinking>answer' } },
       finish(),
@@ -146,7 +146,7 @@ describe('guardTextThinkingStream', () => {
       ...Array.from({ length: 4_097 }, (_, index) => ({
         type: 'tool-call-delta' as const,
         index: 1,
-        id: CallId(`call-${String(index)}`),
+        id: ToolCallId(`call-${String(index)}`),
         name: 'noop',
         argumentsDelta: '{}',
       })),
@@ -183,8 +183,8 @@ describe('guardTextThinkingStream', () => {
       { type: 'block-start', index: 0, blockType: 'reasoning' },
       { type: 'reasoning-delta', index: 0, text: 'native' },
       { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'native' } },
-      { type: 'tool-call-delta', index: 1, id: CallId('call-1'), name: 'noop', argumentsDelta: '{}' },
-      { type: 'block-end', index: 1, block: { type: 'tool-call', id: CallId('call-1'), name: 'noop', arguments: '{}' } },
+      { type: 'tool-call-delta', index: 1, id: ToolCallId('call-1'), name: 'noop', argumentsDelta: '{}' },
+      { type: 'block-end', index: 1, block: { type: 'tool-call', id: ToolCallId('call-1'), name: 'noop', arguments: '{}' } },
       { type: 'usage', usage: { inputTokens: 1, outputTokens: 2 } },
       { type: 'block-end', index: 2, block: { type: 'text', text: 'terminal text' } },
       finish(),

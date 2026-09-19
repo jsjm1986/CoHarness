@@ -9,22 +9,25 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../attachment/attachment"
     },
     {
+      "path": "../../credentials/credentials"
+    },
+    {
       "path": "../../fs/fs"
+    },
+    {
+      "path": "../../identity/anonymous-user-id"
+    },
+    {
+      "path": "../deepseek-llm-api-extensions"
+    },
+    {
+      "path": "../llm"
+    },
+    {
+      "path": "../../settings/settings"
     },
     {
       "path": "../../util/atomic-write"
@@ -36,25 +39,22 @@
       "path": "../../util/home-paths"
     },
     {
-      "path": "../../credentials/credentials"
-    },
-    {
       "path": "../../util/launch-environment"
-    },
-    {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     },
     {
       "path": "../../util/timeout"
     },
     {
-      "path": "../../identity/anonymous-user-id"
+      "path": "../../util/values"
     },
     {
-      "path": "../deepseek-llm-api-extensions"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

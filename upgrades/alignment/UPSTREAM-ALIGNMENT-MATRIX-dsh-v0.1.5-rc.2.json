@@ -385,12 +385,12 @@
    "upstreamAction": "adapt",
    "status": "defer",
    "reviewState": "deferred-platform-review",
-   "coHarnessSurface": "persistent bash, terminal, code-runtime workers",
+   "coHarnessSurface": "persistent bash, terminal, ptc-runtime workers",
    "upstreamCommits": [],
    "commitScope": [
     "packages/shell",
     "packages/terminal",
-    "packages/code-runtime",
+    "packages/ptc-runtime",
     "packages/subprocess"
    ],
    "notes": "PR-11 cumulative source review complete: upstream rebuilt subprocess-local around a private runner (bin.ts, runner-launch/runner-protocol/spawn-runner, managed-owner) whose only net-new containment is linux-scope (deferred in linux-process-cancellation pending Linux-host verification) and windows-job (requires the new @deepseek-ai/dsh-win32-process package plus Windows verification CI owns). Local already carries upstream fallback-owner semantics verbatim-equivalent: detached process-group owner, negative-pgid signalling, linuxProcessGroupHasLiveMembers zombie-group refinement, whole-range waitForExit, synchronous host-exit finalization, TERM-trap ownership, PID-reuse fencing, and the settleExitIfGone taskkill-settle fix. Ported the host-verifiable remainder: windowsHide on the main spawn and both taskkill helpers, plus the lazy Toolhelp32-enumeration spec assertion. Runner machinery (spawn seam, managed-owner dispatch, terminal managedOutcome/raceWithDelay/running) stays deferred with its containment owners; local keeps the deliberate inspector compat surface (processTree/processSession, optional snapshot) for the public terminalInspector seam.",

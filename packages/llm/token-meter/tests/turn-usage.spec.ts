@@ -18,6 +18,7 @@ function message(seq: number, value?: TokenUsage, provider = 'deepseek', model =
   return event(seq, 'assistant/message', {
     turn: 1, step,
     message: { id: `message-${seq}`, role: 'assistant', content: [{ type: 'text', text: 'done' }], source: { kind: 'model', provider, model } },
+    stream: [],
     ...value === undefined ? {} : { usage: value },
   })
 }
@@ -37,8 +38,13 @@ describe('deriveTurnTokenUsage', () => {
 
   it('replaces a streaming sample and adds a retried attempt once', () => {
     const result = deriveTurnTokenUsage(complete(
-      event(3, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: usage() } }),
-      event(4, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } }),
+      event(3, 'assistant/attempt', {
+        turn: 1, step: 1,
+        stream: [
+          { type: 'chunk', time: 3, chunk: { type: 'usage', usage: usage() } },
+          { type: 'chunk', time: 4, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } },
+        ],
+      }),
       event(5, 'llm/retry', { turn: 1, step: 1 }),
       event(6, 'llm/retry-started', { turn: 1, step: 1, retry: 1 }),
       message(7, usage({ inputTokens: 40, outputTokens: 10, totalTokens: 70, cacheReadTokens: 20 })),

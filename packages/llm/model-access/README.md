@@ -12,6 +12,8 @@ None, as this package defines a policy interface and contributes no model input 
 
 No direct effect.
 
+**Runtime invariant:** No companion is published. Every decision is a pure read from the mounted provider.
+
 ## Known Limitations and Deferred Work
 
 - **No policy storage** — deployments must mount a provider that owns policy persistence and refresh semantics.

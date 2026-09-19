@@ -47,9 +47,8 @@
     "use-sync-external-store": "1.6.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-runtime": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-client-runtime": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-runtime": "workspace:^",

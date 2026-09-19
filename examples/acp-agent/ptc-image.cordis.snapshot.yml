@@ -27,8 +27,8 @@
       - insert:
           - id: attachment-local
             name: '@deepseek-ai/dsh-attachment-local'
-          - id: code-runtime
-            name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+          - id: ptc-runtime
+            name: '@deepseek-ai/dsh-ptc-runtime-node'
           - id: llm-replay
             name: '@deepseek-ai/dsh-llm-replay'
             config:

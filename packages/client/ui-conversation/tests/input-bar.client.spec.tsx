@@ -186,7 +186,7 @@ function bench(over?: BenchOptions) {
     })),
     useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
       (selector ?? (v => v))(key === 'permissions'
-        ? over?.permissions
+        ? (over?.permissions === undefined ? undefined : { currentValue: over.permissions.currentValue })
         : key === 'plan' ? over?.plan : key === 'imageLimits' ? over?.imageLimits : undefined)),
     useInput: bindSnapshotSelector(shell.state),
     inputActions: shell.actions,
@@ -210,6 +210,8 @@ function bench(over?: BenchOptions) {
     useLexicon: bindSnapshotSelector(shell.lexicon),
     useMenuLauncher: bindSnapshotSelector(menuLauncher),
     useDocuments: bindSnapshotSelector(documentStore),
+    usePermissionCatalog: bindSnapshotSelector(createSnapshotStore(
+      over?.permissions === undefined ? undefined : { options: over.permissions.options })),
     stop,
     command: over?.command ?? (() => Promise.resolve(true)),
     // Mirrors the real lookup chain (conversation namespace, then common).

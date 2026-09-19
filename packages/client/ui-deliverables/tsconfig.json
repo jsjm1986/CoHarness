@@ -9,7 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../connection/tsconfig.client.json"
     },
     {
       "path": "../locale"
@@ -21,13 +21,16 @@
       "path": "../ui-conversation"
     },
     {
+      "path": "../ui-primitives"
+    },
+    {
       "path": "../ui-slots"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../core/system-prompt"
     },
     {
-      "path": "../../core/system-prompt"
+      "path": "../../../vendor/cordis"
     }
   ]
 }

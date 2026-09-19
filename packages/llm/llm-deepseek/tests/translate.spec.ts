@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { BlockAssembler, EMPTY_RESPONSE_CODE, LlmError } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
-import { DONE } from '../src/sse.ts'
-import {
-  MAX_FINISH_REASON_BYTES,
-  MAX_TOOL_CALL_BLOCKS,
-  MAX_TOOL_CALL_DELTAS_PER_CHUNK,
-  mapFinishReason,
-  mapUsage,
-  translate,
-} from '../src/translate.ts'
+import { DONE } from '../src/protocols/chat-completions/sse.ts'
+import { mapFinishReason, mapUsage, translate } from '../src/protocols/chat-completions/translate.ts'
 
 async function* feed(...payloads: (string | object)[]): AsyncGenerator<string> {
   for (const payload of payloads) {
@@ -266,46 +259,6 @@ describe('translate: errors', () => {
   it('throws STREAM_CLOSED when the payload source ends without DONE', async () => {
     await expect(collect(translate(feed(firstChunk)))).rejects.toThrow(/without \[DONE\]/)
   })
-
-  it.each([
-    [null, 'chunk must be an object'],
-    [{ choices: {} }, 'choices must be a bounded array'],
-    [{ choices: [null] }, 'choice must be an object'],
-    [{ choices: [{ delta: 1 }] }, 'delta must be an object'],
-    [{ choices: [{ delta: { content: 1 } }] }, 'delta.content must be a string or null'],
-    [{ choices: [{ delta: { tool_calls: {} } }] }, 'delta.tool_calls must be a bounded array'],
-    [{ choices: [{ delta: { tool_calls: [null] } }] }, 'tool call must be an object'],
-    [{ choices: [{ delta: { tool_calls: [{ index: -1 }] } }] }, 'tool-call index is invalid'],
-    [{ choices: [{ delta: { tool_calls: [{ index: 0, type: 'text' }] } }] }, 'tool-call type is invalid'],
-    [{ choices: [{ delta: { tool_calls: [{ index: 0, id: '\u0000' }] } }] }, 'tool-call id is invalid'],
-    [{ choices: [{ delta: { tool_calls: [{ index: 0, function: 1 }] } }] }, 'tool-call function must be an object'],
-    [{ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: '\u0000' } }] } }] }, 'tool-call name is invalid'],
-    [{ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 1 } }] } }] }, 'tool-call arguments is invalid'],
-    [{ choices: [{ finish_reason: 1 }] }, 'finish_reason is invalid'],
-    [{ usage: [] }, 'usage must be an object or null'],
-    [{ usage: { prompt_tokens: 1, completion_tokens: 1, prompt_tokens_details: [] } }, 'usage.prompt_tokens_details must be an object'],
-  ])('rejects malformed wire shape (%s)', async (payload, message) => {
-    await expect(collect(translate(feed(payload as object, DONE)))).rejects.toThrow(message)
-  })
-
-  it('rejects oversized choice and tool-call arrays before iterating them', async () => {
-    await expect(collect(translate(feed({ choices: Array.from({ length: 17 }, () => ({ delta: {} })) }, DONE))))
-      .rejects.toThrow(/choices must be a bounded array/)
-    const oversizedCalls = Array.from(
-      { length: MAX_TOOL_CALL_DELTAS_PER_CHUNK + 1 },
-      () => ({ index: 0 }),
-    )
-    await expect(collect(translate(feed({ choices: [{ delta: { tool_calls: oversizedCalls } }] }, DONE))))
-      .rejects.toThrow(/tool_calls must be a bounded array/)
-  })
-
-  it('bounds distinct tool-call blocks and finish-reason metadata', async () => {
-    const calls = Array.from({ length: MAX_TOOL_CALL_BLOCKS + 1 }, (_, index) => ({ index }))
-    await expect(collect(translate(feed({ choices: [{ delta: { tool_calls: calls } }] }, DONE))))
-      .rejects.toThrow(/block count exceeds/)
-    await expect(collect(translate(feed({ choices: [{ finish_reason: 'x'.repeat(MAX_FINISH_REASON_BYTES + 1) }] }, DONE))))
-      .rejects.toThrow(/finish_reason is invalid/)
-  })
 })
 
 describe('mapFinishReason', () => {
@@ -361,20 +314,16 @@ describe('mapUsage', () => {
 
   it.each([
     ['contradictory total', { prompt_tokens: 10, completion_tokens: 2, total_tokens: 99 }],
+    ['negative prompt', { prompt_tokens: -1, completion_tokens: 2 }],
+    ['fractional prompt', { prompt_tokens: 1.5, completion_tokens: 2 }],
+    ['negative completion', { prompt_tokens: 2, completion_tokens: -1 }],
+    ['fractional completion', { prompt_tokens: 2, completion_tokens: 1.5 }],
     ['unsafe aggregate', { prompt_tokens: Number.MAX_SAFE_INTEGER, completion_tokens: 1 }],
   ])('omits the exact total for %s without changing existing buckets', (_name, wire) => {
-    const expected = { inputTokens: wire.prompt_tokens, outputTokens: wire.completion_tokens }
-    expect(mapUsage(wire)).toEqual(expected)
-  })
-
-  it.each([
-    [{ prompt_tokens: -1, completion_tokens: 1 }, 'prompt_tokens'],
-    [{ prompt_tokens: 1, completion_tokens: Number.POSITIVE_INFINITY }, 'completion_tokens'],
-    [{ prompt_tokens: 1, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 2 } }, 'cached tokens exceed'],
-    [{ prompt_tokens: 1, completion_tokens: 1, prompt_cache_miss_tokens: -1 }, 'prompt_cache_miss_tokens'],
-    [{ prompt_tokens: 1, completion_tokens: 1, completion_tokens_details: { reasoning_tokens: 2 } }, 'reasoning tokens exceed'],
-  ])('rejects invalid usage (%s)', (usage, message) => {
-    expect(() => mapUsage(usage as never)).toThrow(message)
+    expect(mapUsage(wire)).toEqual({
+      inputTokens: wire.prompt_tokens,
+      outputTokens: wire.completion_tokens,
+    })
   })
 })
 
@@ -413,5 +362,85 @@ describe('translate: defensive tool-call branches', () => {
       DONE,
     )))
     expect(chunks[1]).toEqual({ type: 'tool-call-delta', index: 0, id: 'c', argumentsDelta: '' })
+  })
+})
+
+describe('translate: tool-call identity across deltas', () => {
+  it('keeps the established identity when continuation deltas re-send it empty', async () => {
+    const chunks = await collect(translate(feed(
+      firstChunk,
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_00_x', type: 'function', function: { name: 'get_weather', arguments: '' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: '', type: 'function', function: { name: '', arguments: '{"city"' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: '', type: 'function', function: { name: '', arguments: ': "Paris"}' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+      DONE,
+    )))
+    expect(chunks.filter(chunk => chunk.type === 'block-end')).toEqual([{
+      type: 'block-end',
+      index: 0,
+      block: { type: 'tool-call', id: 'call_00_x', name: 'get_weather', arguments: '{"city": "Paris"}' },
+    }])
+  })
+
+  it('keeps the established identity when continuation deltas re-send it null', async () => {
+    const chunks = await collect(translate(feed(
+      firstChunk,
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'Glob', arguments: '' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: null, function: { name: null, arguments: '{}' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+      DONE,
+    )))
+    expect(chunks.filter(chunk => chunk.type === 'block-end')).toEqual([{
+      type: 'block-end',
+      index: 0,
+      block: { type: 'tool-call', id: 'call_1', name: 'Glob', arguments: '{}' },
+    }])
+  })
+
+  it('re-sending the same non-empty identity does not duplicate it', async () => {
+    const chunks = await collect(translate(feed(
+      firstChunk,
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'Glob', arguments: '' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'Glob', arguments: '{}' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+      DONE,
+    )))
+    expect(chunks.filter(chunk => chunk.type === 'block-end')).toEqual([{
+      type: 'block-end',
+      index: 0,
+      block: { type: 'tool-call', id: 'call_1', name: 'Glob', arguments: '{}' },
+    }])
+  })
+
+  it('maintains each parallel call identity separately under empty continuation deltas', async () => {
+    const chunks = await collect(translate(feed(
+      firstChunk,
+      {
+        choices: [{
+          delta: {
+            tool_calls: [
+              { index: 0, id: 'a', type: 'function', function: { name: 'one', arguments: '' } },
+              { index: 1, id: 'b', type: 'function', function: { name: 'two', arguments: '' } },
+            ],
+          },
+        }],
+      },
+      {
+        choices: [{
+          delta: {
+            tool_calls: [
+              { index: 1, id: '', function: { name: '', arguments: '{"b":1}' } },
+              { index: 0, id: '', function: { name: '', arguments: '{"a":1}' } },
+            ],
+          },
+        }],
+      },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+      DONE,
+    )))
+    expect(chunks.filter(chunk => chunk.type === 'block-end')).toEqual([
+      { type: 'block-end', index: 0, block: { type: 'tool-call', id: 'a', name: 'one', arguments: '{"a":1}' } },
+      { type: 'block-end', index: 1, block: { type: 'tool-call', id: 'b', name: 'two', arguments: '{"b":1}' } },
+    ])
   })
 })

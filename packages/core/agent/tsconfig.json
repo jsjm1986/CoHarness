@@ -9,22 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../scope"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../session"
     },
     {
-      "path": "../../core/scope"
+      "path": "../system-prompt"
     },
     {
       "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../core/system-prompt"
     },
     {
       "path": "../../runtime-diagnostics/invariants"
@@ -34,6 +28,15 @@
     },
     {
       "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

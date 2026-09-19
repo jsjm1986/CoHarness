@@ -84,6 +84,8 @@ None, as this package provides JSON-safe value operations and registers no promp
 
 No direct invalidation: value utilities do not enter model request prefixes.
 
+**Runtime invariant:** No companion is published. These value operations have no shared runtime state; unit tests cover their algebra.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

@@ -18,6 +18,8 @@ None, as the directory browser is browser chrome; nothing here reaches a model r
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The plugin registers one workspace directory-flow owner whose disposal the HMR-safety spec proves, and every listing it shows is re-read from the Host on demand rather than held here.
+
 ## Known Limitations and Deferred Work
 
 - **No search, no multi-select, and no rename or delete** — the dialog lists and creates directories; a target is reached by navigating, editing the path, or filtering the last pane by prefix.

@@ -161,6 +161,8 @@ The previously loaded instructions from this file no longer apply.
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
+**运行时不变式：** 不发布伴生入口。回放会容忍未知或格式错误的 workspace source，私有 pending/cache 状态转换由针对性流水线测试覆盖。
+
 ## 已知限制与暂缓事项
 
 - **发现跟随结构化 fs 工具，而非 shell 导航**：更改目录的 `bash` 命令不会触发嵌套指令发现，因为 shell 语法与每次调用 shell 状态不是可靠的文件系统 seam。

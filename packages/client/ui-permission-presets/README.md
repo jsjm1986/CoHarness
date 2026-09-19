@@ -16,6 +16,8 @@ Indirectly, through the permission facts written by its two surfaces: the Settin
 
 No direct invalidation; the knob consumers own any request-prefix changes.
 
+**Runtime invariant:** No companion is published. The command and slot contribution lifecycles are proven by the HMR-safety spec, while the browser-only Settings controller owns no host events or cross-plugin mutable state.
+
 ## Known Limitations and Deferred Work
 
 - **The Settings row is Web-only** — non-Web clients may still switch the current session through `/permission`, but do not receive this browser contribution.

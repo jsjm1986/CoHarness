@@ -13,7 +13,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
-import { AttachmentError, admitEncodedImages, admitPromptContent } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   DOCUMENT_STORE_UNAVAILABLE_CODE,
@@ -76,7 +76,8 @@ import type {
   ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
-  ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionHistoryIndex, SessionListMetadata,
+  ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionAssistantStreamBaseline, SessionHistoryIndex,
+  SessionListMetadata,
   SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
   WorkspaceId, WorkspaceView,
@@ -91,6 +92,9 @@ import {
   type SessionLogCompressionLevel,
 } from './session-export.ts'
 import { applyHistoryDetail } from './fetch/history-detail.ts'
+import { AssistantStreamRegistry, streamDurableCursor, wireStreamFrame } from './assistant-stream.ts'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
 import { historyIndexFromEvents } from './history-index.ts'
 import {
@@ -134,7 +138,7 @@ import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@dee
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 // Value edge: the rename impl narrows the title service's validation failure; the import also resolves `ctx.get('sessionTitle')`.
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
-import type { CallId } from '@deepseek-ai/dsh-llm/brand'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 // Side-effect type import: resolves the `approval/request` waterfall and
@@ -148,7 +152,7 @@ import { questionResponsePayloadSchema } from './api/questions.schema.ts'
 import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
 import { RpcId, serverRequestJson } from './api/rpc.ts'
 import type {
-  AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest,
+  AskUserQuestionAnswer, AskUserQuestionItem,
 } from '@deepseek-ai/dsh-user-questions'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { DirectoryPickerError } from '@deepseek-ai/dsh-host-directory-picker'
@@ -406,7 +410,7 @@ function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => b
     content?: unknown
     message?: { content?: unknown }
     inserted?: Array<{ content?: unknown }>
-    chunk?: { type?: unknown; block?: unknown }
+    stream?: readonly AssistantStreamRecord[]
   }
   const direct = imageBlockIn(data.content, match)
   if (direct !== undefined) return direct
@@ -420,8 +424,13 @@ function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => b
       if (inserted !== undefined) return inserted
     }
   }
-  if (event.type === 'assistant/chunk' && data.chunk?.type === 'block-end') {
-    return imageBlockIn([data.chunk.block], match)
+  if (data.stream !== undefined) {
+    for (const timed of expandAssistantStream(data.stream)) {
+      if (timed.chunk.type === 'block-end') {
+        const found = imageBlockIn([timed.chunk.block], match)
+        if (found !== undefined) return found
+      }
+    }
   }
   return undefined
 }
@@ -456,8 +465,8 @@ function isAborted(signal: AbortSignal): boolean {
  * conversation a reader sees — they restate a shadowed range for the model
  * alone — so they consume no quota; the page stays one contiguous raw range,
  * which keeps a compaction's log-only `compaction/summary` record on the same page as its
- * replacement. The cut is the starting seq of the oldest message group (chunks
- * group via sourceEventSeqs — never cut mid-message). The tail page naturally
+ * replacement. The cut is the starting seq of the oldest message group —
+ * never mid-message. The tail page naturally
  * includes the in-progress partial.
  */
 function paginate(
@@ -477,6 +486,15 @@ function paginate(
     if (sources !== undefined) {
       for (const source of sources) {
         if (source < groupStart) groupStart = source
+      }
+    } else if (event.type === 'assistant/message') {
+      // assistant/message groups with its same-step frame: step/start,
+      // retries, and superseded attempts stay on the message's page.
+      for (let j = i - 1; j >= 0; j -= 1) {
+        const prior = window[j] as SessionEvent
+        const data = prior.data as { turn?: number; step?: number }
+        if (data.turn !== event.data.turn || data.step !== event.data.step) break
+        groupStart = prior.seq
       }
     }
     if (count >= maxMessages) {
@@ -502,7 +520,7 @@ function historyNeedsEarlierSources(events: readonly SessionEvent[]): boolean {
   const first = events[0]?.seq
   if (first === undefined) return false
   return events.some((event) => {
-    const sources = (event as SessionEvent & { sourceEventSeqs?: readonly number[] }).sourceEventSeqs
+    const sources = event.sourceEventSeqs
     return sources?.some(seq => seq < first) === true
   })
 }
@@ -858,8 +876,14 @@ function subscribeSession(
   queue: FrameQueue<RpcRequest<MuxFrame>>,
   session: Session,
   lastSeq: number = session.seq - 1,
+  assistantStream?: SessionAssistantStreamBaseline,
 ): void {
-  queue.push(frame({ type: 'session/subscribed', sessionId: session.id, lastSeq }))
+  queue.push(frame({
+    type: 'session/subscribed',
+    sessionId: session.id,
+    lastSeq,
+    ...assistantStream === undefined ? {} : { assistantStream },
+  }))
 }
 
 /**
@@ -897,6 +921,7 @@ function isConversationContentEvent(event: SessionEvent): boolean {
  * @returns true while no visible conversation event has been recorded.
  */
 function sessionBlank(session: Session): boolean {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return !session.snapshotEvents().some(isConversationContentEvent)
 }
 
@@ -947,6 +972,7 @@ function sessionListFields(header: SessionHeader, events: readonly SessionEvent[
 
 /** SessionSummary projection for attached (in-memory) sessions. */
 function summarize(session: Session, running: boolean): SessionSummary {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const metadata = sessionListMetadata(session.snapshotEvents())
   return {
     sessionId: session.id,
@@ -954,6 +980,7 @@ function summarize(session: Session, running: boolean): SessionSummary {
     running,
     blank: metadata.blank,
     ...(metadata.visibleContentSeq === null ? {} : { visibleContentSeq: metadata.visibleContentSeq }),
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     ...sessionListFields(session.header, session.snapshotEvents()),
   }
 }
@@ -1094,7 +1121,7 @@ interface PendingApproval {
   sessionId: SessionId
   approvalId: ApprovalRequestId
   toolName: string
-  callId?: CallId
+  callId?: ToolCallId
   reason?: string
   resolve(outcome: ApprovalOutcome): void
 }
@@ -1359,6 +1386,7 @@ const HISTORY_TAIL_CACHE_MAX_ENTRIES = 16
 const HISTORY_TAIL_CACHE_MAX_BYTES = 2 * 1024 * 1024
 
 function historySourceEvents(source: HistorySource): readonly SessionEvent[] {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return source.kind === 'attached' ? source.session.snapshotEvents() : source.events
 }
 
@@ -1403,7 +1431,7 @@ function listProjectionsFor(
         : ctx.get('sessionProjectionCache')?.cachedSnapshot(meta, SessionLogOffset(0))
     if (block === undefined) return undefined
     if (includeInbox) return block
-    const { inbox: _inbox, ...values } = block.values
+    const { queuedInbox: _queuedInbox, ...values } = block.values
     return Object.keys(values).length > 0 ? { ...block, values } : undefined
   } catch (error) {
     ctx.logger.warn(`session.list: projection column for "${meta.id}" failed (serving the row without it): ${String(error)}`)
@@ -2006,7 +2034,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ctx.on('subagent/prompt-admission', (agent, content) => {
     const attachments = ctx.get('attachments')
     if (attachments === undefined) return undefined
-    return serializeImageAdmission(agent, () => admitPromptContent(attachments, content))
+    return serializeImageAdmission(agent, () => attachments.admitPromptContent(content))
   })
 
   /**
@@ -2324,38 +2352,36 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     })
   }
 
-  const disposeProvider = ctx.userQuestions.registerProvider({
-    ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer> {
-      const sessionId = request.agent?.id
-      if (sessionId === undefined) {
-        return Promise.reject(new UserQuestionError(
-          'web user interaction requires an agent-owned session', 'ASK_MISSING_AGENT'))
+  const disposeProvider = ctx.on('user-questions/request', (request, _next) => {
+    const sessionId = request.agent?.id
+    if (sessionId === undefined) {
+      return Promise.reject(new UserQuestionError(
+        'web user interaction requires an agent-owned session', 'ASK_MISSING_AGENT'))
+    }
+    return new Promise<AskUserQuestionAnswer>((resolve, reject) => {
+      const rpcId = RpcId(randomUUID())
+      const pending: PendingQuestion = {
+        rpcId, sessionId, questions: request.questions, resolve, reject,
+        ...(request.signal === undefined ? {} : { signal: request.signal }),
       }
-      return new Promise<AskUserQuestionAnswer>((resolve, reject) => {
-        const rpcId = RpcId(randomUUID())
-        const pending: PendingQuestion = {
-          rpcId, sessionId, questions: request.questions, resolve, reject,
-          ...(request.signal === undefined ? {} : { signal: request.signal }),
-        }
-        const onAbort = (): void => {
-          claimQuestion(pending, 'cancelled')
-          reject(new UserQuestionError(
-            'ask_user_question was aborted before the user answered', 'ASK_ABORTED'))
-        }
-        pending.onAbort = onAbort
-        pendingQuestions.set(rpcId, pending)
-        request.signal?.addEventListener('abort', onAbort, { once: true })
-        if (request.signal?.aborted === true) {
-          onAbort()
-          return
-        }
-        const envelope: RpcRequest<MuxFrame> = {
-          rpcId,
-          payload: { type: 'question/requested', sessionId, questions: request.questions },
-        }
-        broadcastEnvelope(envelope)
-      })
-    },
+      const onAbort = (): void => {
+        claimQuestion(pending, 'cancelled')
+        reject(new UserQuestionError(
+          'ask_user_question was aborted before the user answered', 'ASK_ABORTED'))
+      }
+      pending.onAbort = onAbort
+      pendingQuestions.set(rpcId, pending)
+      request.signal?.addEventListener('abort', onAbort, { once: true })
+      if (request.signal?.aborted === true) {
+        onAbort()
+        return
+      }
+      const envelope: RpcRequest<MuxFrame> = {
+        rpcId,
+        payload: { type: 'question/requested', sessionId, questions: request.questions },
+      }
+      broadcastEnvelope(envelope)
+    })
   })
   ctx.effect(() => () => {
     disposeProvider()
@@ -2393,6 +2419,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // request's event is therefore the newest asked event that is still
       // undecided, unclaimed by another pending entry, and — when the ask
       // names a call — carries the same callId.
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const events = req.agent.session.snapshotEvents()
       const claimed = new Set<ApprovalRequestId>()
       for (const entry of pendingApprovals.values()) claimed.add(entry.approvalId)
@@ -2466,6 +2493,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return {
         id: attached.id,
         header: attached.header,
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
         events: [...attached.snapshotEvents()],
       }
     }
@@ -2742,6 +2770,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ): Promise<SessionHistoryIndex | undefined> {
     const attached = ctx.sessions.get(sessionId)
     if (attached !== undefined) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const events = attached.snapshotEvents()
       const index = historyIndexFromEvents(events, `attached:${String(events.at(-1)?.seq ?? -1)}`, maxItems)
       return {
@@ -2798,6 +2827,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (source.kind === 'detached') {
       return { header: source.header, events: source.presenterEvents ?? source.events }
     }
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return { header: source.session.header, events: source.session.snapshotEvents() }
   }
 
@@ -2829,6 +2859,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         : undefined
       return { events: source.events, ...projections === undefined ? {} : { projections } }
     }
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const events = [...source.session.snapshotEvents()]
     const projections = includeProjections ? projectionsFor(ctx, source.session) : undefined
     return { events, ...projections === undefined ? {} : { projections } }
@@ -2901,7 +2932,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           ? undefined
           : typeof persistence.readHeader === 'function'
             ? await persistence.readHeader(sessionId)
-            : (await persistence.list()).find(header => header.id === sessionId)
+            : (await persistence.listHeaders()).find(header => header.id === sessionId)
         if (persistence !== undefined && stored !== undefined) {
           // The indexed header is authoritative for ownership and cwd. These
           // checks must not trigger a full event-log read just to reject an
@@ -3021,7 +3052,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (persistence !== undefined) {
       const snapshots: Array<{ header: SessionHeader; content?: SessionListMetadata }> = typeof persistence.listSnapshots === 'function'
         ? await persistence.listSnapshots(signal)
-        : (await persistence.list(signal)).map(header => ({ header }))
+        : (await persistence.listHeaders(signal)).map(header => ({ header }))
       const cold = snapshots
         .filter(snapshot => !attached.has(snapshot.header.id)
           && snapshot.header.cwd !== undefined
@@ -3735,6 +3766,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           if (error instanceof SubagentSessionOwnership) {
             return err(request, subagentOwnershipError(error.sessionId))
           }
+          // Name check, not instanceof: the thrown class crosses provider
+          // module copies, so identity by constructor is not guaranteed.
+          if (error instanceof Error && error.name === 'SessionAlreadyOwnedError') {
+            return err(request, { code: 'session-writer-held', message: error.message, details: { sessionId } })
+          }
           return err(request, {
             code: 'internal',
             message: `failed to create session "${sessionId}": ${String(error)}`,
@@ -4335,19 +4371,33 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { issues: [] },
           })
         }
-        const agent = ctx.agents.get(sessionId)
-        if (agent !== undefined && hasSubagentOwner(agent.session, agent)) {
+        let agent = ctx.agents.get(sessionId)
+        if (agent === undefined) {
+          // A restored Session's pending Inbox rows live in its durable
+          // projection, so the shared resolver rebuilds the Agent before the
+          // row can be read or mutated. Without a persistence backend no
+          // restored row can exist, so the command answers the same not-found
+          // shape as a missing Session.
+          const found = ctx.get('sessionPersistence') === undefined
+            ? undefined
+            : await agentFor(sessionId)
+          if (found === undefined || 'error' in found) {
+            if (found !== undefined && found.error.code !== 'session-not-found') {
+              return err(request, found.error)
+            }
+            return err(request, {
+              code: 'queue-item-not-found',
+              message: 'queued item is no longer pending',
+              details: { itemId },
+            })
+          }
+          agent = found.agent
+        }
+        if (hasSubagentOwner(agent.session, agent)) {
           const identity = ctx.get('sessionProjections')?.snapshot(agent.session).values.subagent
           if (identity?.mode !== 'continuable' || !agent.session.isOwnSeq(identity.seq)) {
             return err(request, subagentOwnershipError(sessionId))
           }
-        }
-        if (agent === undefined) {
-          return err(request, {
-            code: 'queue-item-not-found',
-            message: 'queued item is no longer pending',
-            details: { itemId },
-          })
         }
         const target = agent.inbox.nextTurn.some(message => message.id === itemId)
           ? 'next-turn'
@@ -5185,6 +5235,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const initializationDeliveries: Array<{ sessionId: SessionId; deliver: () => void }> = []
           const jobs = ctx.get('jobs')
           const openCalls = new Map<SessionId, Map<string, { name: string; args: unknown }>>()
+          const assistantStreams = new AssistantStreamRegistry()
+          /** Per-session count of stream frames covered by the pushed baseline. */
+          const streamBaseOrdinals = new Map<SessionId, number>()
           let initializing = true
           const fail = createReadStreamFailure(queue, streamErrorFrame)
           const { readable, ensureReadable } = createSessionReadTracker(authority, fail)
@@ -5234,7 +5287,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const subscribe = (session: Session, lastSeq?: number): void => {
             if (subscribed.has(session.id)) return
             subscribed.add(session.id)
-            subscribeSession(queue, session, lastSeq)
+            const stream = assistantStreams.snapshot(session.id)
+            streamBaseOrdinals.set(session.id, stream.ordinal)
+            subscribeSession(queue, session, lastSeq, stream.baseline)
             pushJobs(session)
           }
 
@@ -5253,6 +5308,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
             const view = viewFor(
               ctx, event,
+              // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
               callId => openCalls.get(session.id)?.get(callId) ?? backscanArgs(session.snapshotEvents(), callId),
               ctx.agents.get(session.id),
             )
@@ -5275,6 +5331,25 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               subscribed.delete(session.id)
               readable.delete(session.id)
               pendingDeliveries.delete(session.id)
+              assistantStreams.forget(session.id)
+              streamBaseOrdinals.delete(session.id)
+            }),
+            ctx.on('agent/assistant-stream', ({ agent, frame: streamFrame }) => {
+              const session = agent.session
+              const cursor = streamDurableCursor(session)
+              const ordinal = assistantStreams.accept(agent, streamFrame)
+              publishFor(session.id, () => {
+                subscribe(session)
+                // Frames at or below the pushed baseline's coverage are
+                // already represented by it; only newer frames go live.
+                if (ordinal > (streamBaseOrdinals.get(session.id) ?? 0)) {
+                  queue.push(frame({
+                    type: 'session/assistant-stream',
+                    sessionId: session.id,
+                    frame: wireStreamFrame(streamFrame, cursor),
+                  }))
+                }
+              })
             }),
             ...jobs === undefined ? [] : [jobs.onJobsChanged((owner) => {
               if (owner !== undefined) {
@@ -5398,6 +5473,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               type: 'host/session-added',
               sessionId: session.id,
               blank: sessionBlank(session),
+              // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
               ...sessionListFields(session.header, session.snapshotEvents()),
             }))
           }

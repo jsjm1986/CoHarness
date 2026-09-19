@@ -14,6 +14,8 @@ None, as this package only visualizes a Host-owned deployment snapshot in browse
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This package owns a read-only Settings contribution.
+
 ## Known Limitations and Deferred Work
 
 - **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.

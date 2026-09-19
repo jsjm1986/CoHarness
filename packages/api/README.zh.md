@@ -15,3 +15,5 @@
 
 - Connection 与 WebServer 仍位于 [`client/connection`](../client/connection/README.zh.md) 和 [`host/webserver`](../host/webserver/README.zh.md)；后续可以只移动包，将它们放到 `api/connection` 和 `api/webserver` 下，而无需改变服务约定。
 - 旧 API Proxy 仍位于 [`host/apiproxy`](../host/apiproxy/README.zh.md)，作为尚未迁移到 Remote 的方法的回退路径。它使用由 `api-remotes` 持有的 Host resolver，使已迁移与旧方法共用同一套 Agent/Session 身份策略。
+
+[Typert 子系统参考](../../docs/subsystems/typert.zh.md)记录了协议、Gateway 与消费方装配共享的公共契约。

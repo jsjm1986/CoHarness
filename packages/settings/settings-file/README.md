@@ -37,6 +37,8 @@ Indirectly, through consumers of `ctx.settings`: this provider only stores and p
 
 No direct invalidation; the consuming plugin owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This provider's contracts are file round-trip, watcher timing, and atomic-write behavior — IO effects proven by package tests; the in-process commit relation is owned by `@deepseek-ai/dsh-settings`.
+
 ## Known Limitations and Deferred Work
 
 - **Same-namespace conflicts stay last-write-wins** — the writer lock and read-modify-write keep concurrent writers from dropping each other's namespaces, but two writers editing one namespace still resolve to the later write; there is no per-value merge or revision check.

@@ -90,7 +90,7 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 | L8 | LAN/公网真实双用户验收 | 未验证／缺环境 | alpha.1 审计多批 | 6B、7B、8 |
 | L9 | 生产迁移演练、一致备份恢复、发布闭包与健康证据 | 未验证 | alpha.1 审计各收口 | 8 |
 | L10 | 原生 watcher `EMFILE`（errno -24，软／硬限额 unlimited 仍复现） | 环境阻塞 | alpha.1 审计"非事务 Loader 适配（过程批次）" | 1B 迁移后复测；8 部署前提 |
-| L11 | 宿主 Python 3.9.6 低于 3.10，`code-runtime-python` 两个测试文件失败，测试以 3.12 绕过 | 环境阻塞 | alpha.1 审计"干净基线测试" | 8 部署前提 |
+| L11 | 宿主 Python 3.9.6 低于 3.10，`ptc-runtime-python` 两个测试文件失败，测试以 3.12 绕过 | 环境阻塞 | alpha.1 审计"干净基线测试" | 8 部署前提 |
 | L12 | `session-persistence-jsonl/tests/lease.spec.ts` 全量并发下失败、隔离通过 | 不稳定 | alpha.1 审计"实施后全量复跑" | 2B |
 | L13 | ACP 子任务／标题等待超时偶发，修复保持原期限 | 不稳定 | alpha.1 审计"旧启动事件移除与全量验收" | 2B、7A |
 | L14 | Python runtime 清理耗时 4074ms 超过 4000ms 偶发；输出上限预期得到 timeout | 不稳定 | alpha.1 审计"串行创建与启动 hooks"、"Node 内部加载器依赖" | 4B |

@@ -431,8 +431,10 @@ describe('request stability across the loop', () => {
     const second = adapter.requests[1]!
     // The rewritten history: summary replaces turn 1's user+assistant pair.
     expect(second.messages[1]!.content.some(b => b.type === 'text' && b.text.includes('[summary of turn 1]'))).toBe(true)
-    // No header event beyond the anchor: the replace is itself in the log.
-    expect(agent.session.snapshotEvents().filter(e => e.type === 'request/header')).toHaveLength(1)
+    // The surface replace begins a distinct message series: the unchanged
+    // header is re-logged with the series reason.
+    const headers = agent.session.snapshotEvents().filter(e => e.type === 'request/header')
+    expect(headers.map(e => e.data.reason)).toEqual(['initial', 'series'])
   })
 
   it('a real system-prompt change appends a durable system message while the request header stays stable', async () => {
@@ -452,7 +454,10 @@ describe('request stability across the loop', () => {
     await waitForIdle(ctx, agent)
 
     const snapshots = agent.session.snapshotEvents().filter(e => e.type === 'request/header')
-    expect(snapshots).toHaveLength(1)
+    // The system-message replace begins a distinct series: the header content
+    // is stable and the boundary is logged with the series reason.
+    expect(snapshots.map(e => e.data.reason)).toEqual(['initial', 'series'])
+    expect(snapshots[0]?.data.header).toEqual(snapshots[1]?.data.header)
     expect(adapter.requests[2]!.messages.some(message =>
       message.role === 'system' && message.content.some(block => block.type === 'text' && block.text.includes('new guidance')),
     )).toBe(true)
@@ -595,19 +600,19 @@ describe('request stability across the loop', () => {
 
     adapter.requests.forEach((request, index) => {
       const stepStart = stepStarts[index]!
-      const firstChunk = events.find(e =>
-        e.type === 'assistant/chunk'
+      const settlement = events.find(e =>
+        (e.type === 'assistant/message' || e.type === 'assistant/attempt')
         && e.data.turn === stepStart.data.turn
         && e.data.step === stepStart.data.step,
       )!
       // Messages: the entered batch is logged after step/start, so rebuild the
       // complete dispatch prefix through a completely fresh Session.
-      const rebuilt = Session.create(SessionId(`rebuild-${index}`), structuredClone(events.slice(0, firstChunk.seq)))
+      const rebuilt = Session.create(SessionId(`rebuild-${index}`), structuredClone(events.slice(0, settlement.seq)))
       expect(structuredClone(request.messages)).toEqual(rebuilt.deriveMessages())
 
       // Header: the latest request/header snapshot up to this step's dispatch
-      // (its header event sits between step/start and the first chunk).
-      const header = foldRequestHeader(events.slice(0, firstChunk.seq))!
+      // (its header event sits between step/start and the Assistant settlement).
+      const header = foldRequestHeader(events.slice(0, settlement.seq))!
       expect(request.model).toBe(header.config.model)
       expect(request.reasoningEffort).toBe(header.config.reasoningEffort)
       expect(structuredClone(request.tools ?? [])).toEqual(structuredClone(header.tools ?? []))

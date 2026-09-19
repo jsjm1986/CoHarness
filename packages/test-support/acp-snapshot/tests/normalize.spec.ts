@@ -506,7 +506,7 @@ describe('normalizeSessionLog', () => {
 describe('normalizeSessionSnapshot', () => {
   const header = JSON.stringify({ type: 'session', version: 0, id: 's', createdAt: 123 })
 
-  it('projects envelopes and re-packs adjacent chunk rows', () => {
+  it('projects envelopes and folds a versioned fixture\'s chunk rows into a durable stream', () => {
     const raw = [
       header,
       JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [9, 8], texts: ['a', 'b', 'c'] } }),
@@ -514,8 +514,11 @@ describe('normalizeSessionSnapshot', () => {
       '',
     ].join('\n')
     expect(normalizeSessionSnapshot(raw, ctx)).toBe([
-      JSON.stringify({ type: 'session', version: 0, id: 's', createdAt: 0 }),
-      JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [0, 0, 0, 0, 0], texts: ['a', 'b', 'c', 'd', 'e', 'f'] } }),
+      JSON.stringify({ type: 'session', version: 4, id: 's', createdAt: 0, isSeeded: false }),
+      JSON.stringify({
+        type: 'assistant/attempt',
+        data: { turn: 1, step: 1, stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [0, 0, 0, 0, 0], texts: ['a', 'b', 'c', 'd', 'e', 'f'] }] },
+      }),
       '',
     ].join('\n'))
   })
@@ -673,7 +676,7 @@ describe('scrubRequestHeaders', () => {
   })
 
   it('passes every other line through byte-for-byte and is idempotent', () => {
-    const other = JSON.stringify({ type: 'assistant/chunk', seq: 4, time: 9, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'hi' } } })
+    const other = JSON.stringify({ type: 'assistant/attempt', seq: 4, time: 9, data: { turn: 1, step: 1, stream: [{ type: 'text-chunks', time0: 9, index: 0, dt: [], texts: ['hi'] }] } })
     const raw = `${headerLine}\n${headerEvent({ config: { model: 'm' }, system: 's', tools: [] })}\n${other}\n`
     const once = scrubRequestHeaders(raw)
     expect(once.split('\n')[0]).toBe(headerLine)

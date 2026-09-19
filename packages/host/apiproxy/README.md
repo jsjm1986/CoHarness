@@ -92,6 +92,8 @@ None, as the package defines the client↔host wire contract and carriers; nothi
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This package is the wire contract layer plus the host-side gateway over services owned elsewhere — it emits no cordis events of its own; the session/agent event streams it projects are asserted by their owning packages' companions; rpcId round-trip and schema acceptance are enforced at the carrier boundary and exercised by the protocol-isomorphism suite.
+
 ## Known Limitations and Deferred Work
 
 - **Forwarded Remote events are parasitic on this legacy frame union** — `host/remote-event` lives in `HostFrame` so the delivery path could reuse the existing host stream instead of opening a third downlink, which makes it read as if this package owned the Remote event contract. It does not: the allowlist is `dsh-api-remotes`' and the consumer verb is `ctx.remote.$on`. When the host stream moves off this package, the frame moves with it and the consumer contract is unaffected ([rationale](../../../.agents/notes/implemented/architecture/2026-08-10-remote-event-delivery.md)).

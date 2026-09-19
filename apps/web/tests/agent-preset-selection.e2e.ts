@@ -92,7 +92,7 @@ function seedLog(): string {
 async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise<void> {
   const childId = sessionId('agent-preset-selection-child')
   const createdAt = 1784974100100
-  await scaffold.ctx.sessionPersistence.create({
+  await scaffold.ctx.sessionPersistence.createStored({
     version: SESSION_FORMAT_VERSION,
     id: childId,
     createdAt,

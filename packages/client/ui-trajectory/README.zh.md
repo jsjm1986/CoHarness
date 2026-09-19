@@ -20,6 +20,8 @@ Trajectory 的 next-step 消息分类器折叠持久的 inbox splice 链和当�
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。这是纯消费插件，不发出 Cordis 事件，也不持有跨插件可变状态；其 view-slot 注册是普通 effect，slot ledger 自身的规格测试与本包的行为规格测试会直接观察其释放。
+
 ## 已知限制与暂缓事项
 
 - **进行中时，Time 保持空白**：`partial` 与 `runningCalls` 行会显示运行状态，但不会虚构耗时，因此 Overview 区域只渲染开始标记，而不会杜撰实时跨度。记录选择与时间线选择位于 Trajectory 内部，不提供锚点深链接。

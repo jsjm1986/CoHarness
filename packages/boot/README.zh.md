@@ -10,3 +10,5 @@
 | `cmdline/` | 启动器到应用的命令行交接，以及由应用持有的启动解析 | `cmdlineArgs`、`appExit` |
 
 启动序列与个人配置约定见 [`app-boot/README.md`](app-boot/README.zh.md)；由应用持有的命令行见 [`cmdline/README.md`](cmdline/README.zh.md)。
+
+[boot 子系统页](../../docs/subsystems/boot.zh.md)记录 profile 管理的服务方法与结果记录。

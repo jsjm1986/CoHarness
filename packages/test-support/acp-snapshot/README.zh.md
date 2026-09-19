@@ -74,6 +74,8 @@ defineAcpSnapshotSuite({
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。该测试支持包不拥有生产事件流或可变数据；其行为由消费方测试套件检验。
+
 ## 已知限制与暂缓事项
 
 - **会话收集需要原始 JSONL mode**：`runScenario` 收集持久化 `.jsonl` 日志，因此快照配置使用 `persistenceCompression: 'none'`；压缩 JSONL 和 SQLite 组合没有快照收集路径。

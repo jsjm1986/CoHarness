@@ -23,6 +23,8 @@ Indirectly, through scope, visibility, and submission choices that Host collabor
 
 The UI does not assemble model requests; the owning Host Consumers determine whether new participant context appends to a request suffix.
 
+**Runtime invariant:** No companion is published. Gateway responses are validated at the HTTP parser, while slot ownership and teardown are enforced by the shared slot ledger.
+
 ## Known Limitations and Deferred Work
 
 - **Full reload on scope change** — personal and project runtimes use independent Host connections and process state, so switching does not preserve the current page draft. While the Gateway prepares the target runtime, the client shows a non-dismissible status layer with the target name, startup stage, and elapsed wait; the reload still occurs after the scope mutation succeeds.

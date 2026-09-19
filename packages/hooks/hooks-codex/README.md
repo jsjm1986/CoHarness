@@ -89,6 +89,8 @@ Blocking a prompt removes its request tokens; denial or feedback adds the retain
 
 A blocked prompt sends no request and invalidates nothing. Denial, feedback, and forced-continuation context append after the reusable prefix without rewriting it.
 
+**Runtime invariant:** No companion is published. This bridge publishes hook-protocol session events, whose companion owns which invocation event each result cites.
+
 ## Known Limitations and Deferred Work
 
 - **Unsupported hook events (5 of Codex's current 10):** `PermissionRequest`, `PreCompact`, `PostCompact`, `SubagentStart`, and `SubagentStop`. Config for these events is silently dropped during parsing. The comparison baseline is Codex's [official hook reference](https://learn.chatgpt.com/docs/hooks).

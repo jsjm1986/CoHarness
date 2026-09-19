@@ -9,15 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../core/agent"
     },
     {
@@ -30,10 +21,16 @@
       "path": "../../fs/fs"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
       "path": "../../util/home-paths"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

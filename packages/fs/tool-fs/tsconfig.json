@@ -4,25 +4,18 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/tools"
+      "path": "../../attachment/attachment"
     },
     {
       "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tools"
     },
     {
       "path": "../fs"
@@ -31,7 +24,10 @@
       "path": "../fs-observation-policy"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../interaction/user-approval"
+    },
+    {
+      "path": "../../llm/llm"
     },
     {
       "path": "../../sandbox/sandbox"
@@ -40,10 +36,13 @@
       "path": "../../sandbox/sandbox-policy"
     },
     {
-      "path": "../../interaction/user-approval"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../attachment/attachment"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

@@ -63,6 +63,8 @@ export interface GatewayDeps {
   archives?: ConversationArchiveService
   /** Optional persistent device registry and multi-provider push delivery service. */
   push?: GatewayPushService
+  /** Optional interactive-desktop coordinator; absent where desktop driving is disabled. */
+  desktops?: import('./desktop-coordinator.ts').DesktopCoordinator
   readiness?: (signal?: AbortSignal) => Awaitable<void>
 }
 

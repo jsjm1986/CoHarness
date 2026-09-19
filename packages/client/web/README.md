@@ -22,6 +22,8 @@ None, as the entry shell boots the browser plugin tree; nothing here reaches a m
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The Vite entry shell provides boot glue and module-table seeding, emits no Cordis events, and holds no cross-plugin mutable state; the boot chain (loading page → settled → one-flip UI) is verified by the web smoke e2e against the real carrier.
+
 ## Known Limitations and Deferred Work
 
 - **The application waits for the full roster** — one failed entry keeps the framework-free boot page visible with a per-entry report; partial UI availability is not supported.

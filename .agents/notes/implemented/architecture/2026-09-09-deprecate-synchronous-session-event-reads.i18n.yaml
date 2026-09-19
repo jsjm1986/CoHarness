@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md
+2026-09-09-deprecate-synchronous-session-event-reads.md: 98f85555f1139cb87a7b2b9f24764e1ca962e484
+2026-09-09-deprecate-synchronous-session-event-reads.zh.md: 25ca75e5116d7c7b769929bdf349ef5bd09a1d95

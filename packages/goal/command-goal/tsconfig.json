@@ -9,10 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
+      "path": "../goal"
     },
     {
       "path": "../../interaction/commands"
@@ -21,10 +18,10 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../goal"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

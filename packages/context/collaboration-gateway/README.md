@@ -20,6 +20,8 @@ Indirectly, through authorization of model-facing operations whose participant a
 
 Authorization contributes no request tokens and does not alter an already-reusable prefix.
 
+**Runtime invariant:** No companion is published. The Gateway is authoritative for every authorization decision.
+
 ## Known Limitations and Deferred Work
 
 - **Gateway availability is authoritative** — a project operation is denied when the internal authorization request fails or returns invalid JSON; there is no stale local ACL cache.

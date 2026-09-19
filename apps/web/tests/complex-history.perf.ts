@@ -10,8 +10,9 @@ import type { Browser, CDPSession, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import {
-  CallId,
+  ToolCallId,
   createAssistantMessage,
   createMessage,
   createToolResultMessage,
@@ -223,6 +224,7 @@ function appendAssistant(
   body: string,
 ): void {
   session.append('assistant/message', {
+    stream: [],
     turn,
     step,
     message: createAssistantMessage({
@@ -244,7 +246,7 @@ function appendToolStep(
   toolCount: number,
 ): void {
   const calls = Array.from({ length: toolCount }, (_, index) => {
-    const callId = CallId(`perf-call-${String(turn)}-${String(index)}`)
+    const callId = ToolCallId(`perf-call-${String(turn)}-${String(index)}`)
     const args = JSON.stringify({
       turn,
       index,
@@ -254,6 +256,7 @@ function appendToolStep(
   })
 
   session.append('assistant/message', {
+    stream: [],
     turn,
     step,
     message: createAssistantMessage({
@@ -478,7 +481,7 @@ function soakTurn(index: number): ConversationTurnSpec {
 }
 
 function toolStream(index: number, marker: string): StreamChunk[] {
-  const callId = CallId(`performance-tool-${marker.toLowerCase()}-${String(index)}`)
+  const callId = ToolCallId(`performance-tool-${marker.toLowerCase()}-${String(index)}`)
   const args = JSON.stringify({
     command: `printf '${marker}\\n'`,
     description: `Emit performance marker ${String(index)}`,
@@ -1046,7 +1049,9 @@ async function continueConversation(
     const streamAfter = await chromiumMetrics(cdp)
     const mutations = await stopMutationProbe(world.page)
     const turnEvents = world.sessionEvents.slice(eventStart)
-    const chunks = turnEvents.filter(event => event.type === 'assistant/chunk')
+    const chunks = turnEvents.flatMap(event => event.type === 'assistant/message' || event.type === 'assistant/attempt'
+      ? expandAssistantStream(event.data.stream)
+      : [])
     const toolCalls = turnEvents.filter(event => event.type === 'tool/call')
     const toolResults = turnEvents.filter(event => event.type === 'tool/result')
     const toolTurn = spec.toolResultMarker !== undefined
@@ -1168,7 +1173,9 @@ async function measurePostSoakUserRender(
   const fullTurnMs = performance.now() - fullTurnStarted
 
   const turnEvents = world.sessionEvents.slice(eventStart)
-  const chunks = turnEvents.filter(event => event.type === 'assistant/chunk')
+  const chunks = turnEvents.flatMap(event => event.type === 'assistant/message' || event.type === 'assistant/attempt'
+    ? expandAssistantStream(event.data.stream)
+    : [])
   const user = turnEvents.find(
     event => event.type === 'user/message' && event.data.source.kind === 'user',
   )

@@ -13,3 +13,5 @@ The durable binary attachment and named user-document capability families, with 
 | `tool-userdoc/` | Model-facing personal document discovery and read tools | (consumes `ctx.userDocs`) |
 
 Unsent browser drafts are intentionally outside this capability. Bytes enter durable storage only when a user prompt is submitted or when a provider adapter commits structured model output.
+
+The [Attachment subsystem reference](../../docs/subsystems/attachment.md) owns the service contract, payload types, and the `ctx.attachments` Cordis surface.

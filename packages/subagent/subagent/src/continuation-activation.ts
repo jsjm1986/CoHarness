@@ -37,12 +37,35 @@ import { SubagentInbox } from './inbox.ts'
 import type { SubagentDelivery } from './inbox.ts'
 import type { ActivationObserver, ActivationTerminal } from './lifecycle.ts'
 
+/** Process-local slots shared through uninterrupted continuable parent links. */
+class ActivationPool {
+  private readonly slots = new Set<symbol>()
+
+  /** Reserve before reconstruction; the returned release also tolerates unpublished rollback. */
+  reserve(capacity: number): () => void {
+    if (this.slots.size >= capacity) {
+      throw new SubagentError(
+        `subagent limit reached (active child limit: ${capacity}); wait for an existing child to finish `
+        + 'or complete this work with the current agents',
+        'ACTIVATION_LIMIT_REACHED',
+      )
+    }
+    const slot = Symbol()
+    this.slots.add(slot)
+    return () => { this.slots.delete(slot) }
+  }
+}
+
 /**
  * One residency epoch for a reconstructed continuable child Agent. It directly
  * owns the published `AgentHandle`; the registry's private activation-owner
  * scope is its structural Cordis owner.
  */
 export interface Activation {
+  /** Shared capacity for this Activation and all its continuable descendants. */
+  readonly pool: ActivationPool
+  /** Return this epoch's slot after its handle has finished disposal. */
+  readonly releaseSlot: () => void
   /** The durable child this Activation is an epoch of. */
   readonly childId: SessionId
   /**
@@ -165,6 +188,8 @@ export class ContinuableActivationRegistry {
   private pendingActivations = 0
   private readonly pendingActivationsByParent = new Map<SessionId, number>()
   private readonly activationsByParent = new Map<SessionId, number>()
+  /** Root identities retain their pool across child settlement without retaining dead roots. */
+  private readonly rootPools = new WeakMap<Agent, ActivationPool>()
   /** Per-child serializer shared by delivery, release, and disposal. */
   readonly locks = new ChildLock()
   /** Structural Cordis owner of every Activation handle. */
@@ -182,6 +207,8 @@ export class ContinuableActivationRegistry {
    * Build one registry inside the service's Agent-injected context.
    * @param ctx - context providing Agents, Sessions, and teardown ownership.
    * @param observeActivation - build the lifecycle observer for one residency epoch.
+   * @param limits - read the current residency quotas at each admission.
+   * @param maxActiveSubagents - read the current shared-pool capacity at each admission.
    */
   constructor(
     private readonly ctx: Context,
@@ -190,7 +217,8 @@ export class ContinuableActivationRegistry {
       childId: SessionId,
       parent: Agent,
     ) => ActivationObserver,
-    private readonly limits: { maxActivations: number; maxActivationsPerParent: number },
+    private readonly limits: () => { maxActivations: number; maxActivationsPerParent: number },
+    private readonly maxActiveSubagents: () => number,
   ) {
     // Ordinary Cordis owner effects unwind in reverse registration order, which
     // cannot express the dynamic child graph. Register the private scope's
@@ -468,15 +496,27 @@ export class ContinuableActivationRegistry {
    */
   materialize(inputs: MaterializeInputs): Promise<Activation> {
     this.assertAdmitting(inputs.parent)
-    const quota = this.reserveActivation(inputs.parent.id)
-    const settled = Promise.withResolvers<void>()
+    inputs.signal.throwIfAborted()
     const lineage = this.liveLineage(inputs.parent)
+    const pool = this.resident.get(inputs.parent.id)?.pool ?? this.rootPool(inputs.parent)
+    const releaseSlot = pool.reserve(this.maxActiveSubagents())
+    let quota: ActivationQuotaReservation
+    try {
+      quota = this.reserveActivation(inputs.parent.id)
+    } catch (error: unknown) {
+      releaseSlot()
+      throw error
+    }
+    const settled = Promise.withResolvers<void>()
     const materialization: Materialization = {
       lineage,
       settled: settled.promise,
     }
     this.materializations.add(materialization)
-    return this.materializeTracked(inputs, lineage, quota).finally(() => {
+    return this.materializeTracked(inputs, lineage, quota, pool, releaseSlot).catch((error: unknown) => {
+      releaseSlot()
+      throw error
+    }).finally(() => {
       this.materializations.delete(materialization)
       quota.release()
       settled.resolve()
@@ -582,20 +622,31 @@ export class ContinuableActivationRegistry {
     return undefined
   }
 
+  /** Resolve a root's pool once; descendants inherit their resident parent's pool directly. */
+  private rootPool(parent: Agent): ActivationPool {
+    let pool = this.rootPools.get(parent)
+    if (pool === undefined) {
+      pool = new ActivationPool()
+      this.rootPools.set(parent, pool)
+    }
+    return pool
+  }
+
   /** Reserve one global and direct-parent Activation slot across asynchronous materialization. */
   private reserveActivation(parentSession: SessionId): ActivationQuotaReservation {
-    if (this.resident.size + this.pendingActivations >= this.limits.maxActivations) {
+    const limits = this.limits()
+    if (this.resident.size + this.pendingActivations >= limits.maxActivations) {
       throw new SubagentError(
-        `continuable subagent Activation limit reached (limit: ${String(this.limits.maxActivations)})`,
+        `continuable subagent Activation limit reached (limit: ${String(limits.maxActivations)})`,
         'ACTIVATION_CAPACITY_EXCEEDED',
       )
     }
     const parentCount = (this.activationsByParent.get(parentSession) ?? 0)
       + (this.pendingActivationsByParent.get(parentSession) ?? 0)
-    if (parentCount >= this.limits.maxActivationsPerParent) {
+    if (parentCount >= limits.maxActivationsPerParent) {
       throw new SubagentError(
         `continuable subagent Activation limit for parent "${parentSession}" reached `
-        + `(limit: ${String(this.limits.maxActivationsPerParent)})`,
+        + `(limit: ${String(limits.maxActivationsPerParent)})`,
         'ACTIVATION_CAPACITY_EXCEEDED',
       )
     }
@@ -631,6 +682,7 @@ export class ContinuableActivationRegistry {
   private removeActivation(activation: Activation): void {
     if (this.resident.get(activation.childId) !== activation) return
     this.resident.delete(activation.childId)
+    activation.releaseSlot()
     this.decrementCount(this.activationsByParent, activation.parentSession)
   }
 
@@ -639,6 +691,8 @@ export class ContinuableActivationRegistry {
     inputs: MaterializeInputs,
     parentLineage: readonly Agent[],
     quota: ActivationQuotaReservation,
+    pool: ActivationPool,
+    releaseSlot: () => void,
   ): Promise<Activation> {
     const { childId, provider, parent, create } = inputs
     inputs.signal.throwIfAborted()
@@ -672,6 +726,8 @@ export class ContinuableActivationRegistry {
       })
 
     const activation: Activation = {
+      pool,
+      releaseSlot,
       childId,
       parentSession: parent.id,
       provider,

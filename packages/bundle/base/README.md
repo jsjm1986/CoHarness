@@ -16,6 +16,8 @@ Indirectly, through the inserted rows: this bundle selects the shipped persona-l
 
 None directly; each inserted row's package owns its effect.
 
+**Runtime invariant:** No companion is published. The package is a static patch-list carrier (a YAML document of loader rows owned by other packages); it mounts no service, emits no events, and owns no mutable relation to check. Each inserted row's own package carries that row's invariants.
+
 ## Known Limitations and Deferred Work
 
 - **A patch replaces whole row configs** — profile overrides must restate every field a row keeps; there is no deep-merge layer.

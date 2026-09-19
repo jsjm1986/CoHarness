@@ -19,6 +19,8 @@ Indirectly, through the provider/model selection supplied to an entry point; req
 
 Changing the default affects only Agents that subsequently resolve from it. An existing session whose request log already names a selection keeps that selection, so this service does not invalidate its established prefix.
 
+**Runtime invariant:** No companion is published. Settings validation owns the only mutable-value relationship.
+
 ## Known Limitations and Deferred Work
 
 - The service owns one process-wide default; per-session selection remains the entry point's responsibility.

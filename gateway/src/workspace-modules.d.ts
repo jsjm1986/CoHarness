@@ -6,6 +6,8 @@
 // are declared here. tsconfig.build.json excludes this file, so production
 // builds resolve the real packages through node_modules links and their
 // emitted declarations.
+export {}
+
 declare module '@deepseek-ai/cordis' {
   export interface Events {}
 }

@@ -173,6 +173,13 @@ export function collectSessionFormatMigrations(
  * @param currentVersion - writer version reached by the final declaration.
  * @returns complete generated TypeScript source.
  */
+/** Emit `key: [a, b]` inline, or one element per line once the line exceeds the lint width. */
+function inlineList(key: string, elements: readonly string[]): string[] {
+  const inline = `  ${key}: [${elements.join(', ')}],`
+  if (inline.length <= 140) return [inline]
+  return [`  ${key}: [`, ...elements.map(element => `    ${element},`), '  ],']
+}
+
 export function renderSessionFormatCatalog(
   declarations: readonly SessionFormatMigrationManifest[],
   currentVersion: number,
@@ -209,9 +216,9 @@ export function renderSessionFormatCatalog(
     '/** Physical codec dispatch and complete adjacent chain, independent of mounted plugins. */',
     'export const sessionFormatCatalog = createSessionFormatCatalog({',
     `  currentVersion: ${currentVersion},`,
-    `  codecs: [${codecs.join(', ')}],`,
+    ...inlineList('codecs', codecs),
     `  currentEncoder: ${currentCodec},`,
-    `  migrations: [${declarations.map(item => item.migration).join(', ')}],`,
+    ...inlineList('migrations', declarations.map(item => item.migration)),
     '  restoreCurrent(artifact) {',
     `    const restored = ${restorer}(artifact, KNOWN_SESSION_EVENT_TYPES)`,
     '    validateInstalledCurrentSessionArtifact(restored)',

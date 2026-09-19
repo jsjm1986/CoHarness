@@ -32,6 +32,8 @@ None, as this package runs at build or test time and never contributes to a mode
 
 None.
 
+**Runtime invariant:** No companion is published. The source-project analyzer and build-time emitter run outside any Cordis runtime; model snapshots, executable artifacts, and consuming-package typechecks enforce the output contract.
+
 ## Known Limitations and Deferred Work
 
 - Package export patterns are skipped; contributing packages need concrete export targets.

@@ -40,6 +40,8 @@ Data-dependent user-message tokens enter retained session history and are resent
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. This presentation adapter owns no durable package-local event stream; boundary and replay tests cover its protocol mapping.
+
 ## Known Limitations and Deferred Work
 
 - **The wire has no per-session close or prompt-cancel method** — SDK-created agents remain live until process shutdown.

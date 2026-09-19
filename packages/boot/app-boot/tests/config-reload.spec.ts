@@ -3,7 +3,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Include } from '@deepseek-ai/cordis-plugin-include'
 import { boot } from '../src/index.ts'
@@ -140,6 +140,31 @@ describe('include refresh with overlay patches', () => {
       await entry.update({ config: { path: './base.yml', patches: [] } })
       await ctx.loader.await()
       expect(entryConfig(ctx, 'noop')).toEqual({ value: 'edited-2' })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('logs a downstream internal/update rejection instead of surfacing an unhandled rejection', async () => {
+    // boot()'s global internal/update observer wraps the remaining waterfall
+    // in a tracked promise: a fiber-local hook that vetoes the restart by
+    // rejecting must reach its logger rather than escape as unhandled.
+    const { ctx } = await bootTree('- id: hooky\n  name: ./hooky.mjs\n', {
+      'hooky.mjs': [
+        'export function apply(ctx) {',
+        "  ctx.on('internal/update', () => Promise.reject(new Error('hook veto')))",
+        '}',
+        '',
+      ].join('\n'),
+    })
+    try {
+      const errors: unknown[][] = []
+      const spy = vi.spyOn(ctx.logger, 'error').mockImplementation((...args: unknown[]) => { errors.push(args) })
+      const entry = [...ctx.loader.entries()].find(candidate => candidate.options.id === 'hooky')!
+      await entry.update({ config: { touched: true } })
+      await vi.waitFor(() => { expect(errors.length).toBeGreaterThan(0) })
+      expect(String(errors[0]?.[0])).toContain('hook veto')
+      spy.mockRestore()
     } finally {
       await ctx.fiber.dispose()
     }

@@ -1,6 +1,6 @@
 /**
  * Opt-in SQLite persistence provider. Logical sessions remain unchanged;
- * the physical backend packs eligible chunk runs into schema-20 rows.
+ * the physical backend stores one scalar row per event under schema 21.
  * @module @deepseek-ai/dsh-session-persistence-sqlite
  */
 
@@ -106,13 +106,33 @@ export class SqliteSessionPersistence extends SessionPersistence {
   }
 
   /** SQLite has one database, not an independent per-session artifact. */
-  locate(_meta: SessionHeader): SessionLocation | undefined {
+  override locate(_meta: SessionHeader): SessionLocation | undefined {
     return undefined
   }
 
   /* jscpd:ignore-start -- each persistence provider repeats the narrow Service Definition adapter. */
-  create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
+  override createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
     return this.coordinator.create(meta, inheritedEventCount)
+  }
+
+  override materializeDetached(id: SessionId): Promise<void> {
+    return this.coordinator.materializeDetached(id)
+  }
+
+  override discardDetached(id: SessionId): Promise<void> {
+    return this.coordinator.discardDetached(id)
+  }
+
+  override listPending(): readonly SessionStorageMetadata[] {
+    return this.coordinator.listPending()
+  }
+
+  override isPending(id: SessionId): boolean {
+    return this.coordinator.isPending(id)
+  }
+
+  override liveStorage(id: SessionId): Promise<SessionStorageMetadata | undefined> {
+    return this.coordinator.liveStorage(id)
   }
 
   /** Persist an empty session as a metadata row without an event row. */
@@ -120,7 +140,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     return this.coordinator.ensureMaterialized(session)
   }
 
-  append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+  override append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }
 
@@ -128,15 +148,15 @@ export class SqliteSessionPersistence extends SessionPersistence {
     return this.coordinator.prepare(id, signal)
   }
 
-  load(id: SessionId): Promise<SessionInspection> {
+  override load(id: SessionId): Promise<SessionInspection> {
     return this.coordinator.load(id)
   }
 
-  inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
+  override inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
     return this.coordinator.inspect(id, signal)
   }
 
-  readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix> {
+  override readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
@@ -159,15 +179,15 @@ export class SqliteSessionPersistence extends SessionPersistence {
   }
   /* jscpd:ignore-end */
 
-  list(signal?: AbortSignal): Promise<SessionHeader[]> {
-    return this.store.list(signal)
+  override listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
+    return this.store.listStored(signal)
   }
 
   override revision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
     return this.store.readStoredRevision(id, signal)
   }
 
-  listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+  override listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     return this.store.listSnapshots(signal)
   }
 }

@@ -30,6 +30,8 @@ Indirectly, through the host `command.execute` RPC this package's dispatch and `
 
 None directly; this package neither assembles nor sends a provider request. Command handlers it triggers may change what the owning host packages contribute to the next request's system prompt (a section appearing or disappearing replaces earlier request tokens and invalidates the provider prefix from that point), but that effect is owned and documented by each command's host package.
 
+**Runtime invariant:** No companion is published. This browser-side source uses the wire command directory; it emits no Cordis events and owns no cross-plugin mutable state. Its dispatch and cache behavior are asserted by this package's specs.
+
 ## Known Limitations and Deferred Work
 
 - **Detached-result notices fall back to the console off-session** — the fire-and-forget paths route results to the triggering session's composer via `SessionInput.notify`; after session teardown the console line is the only remaining surface.

@@ -32,6 +32,8 @@ None, as the package dispatches application calls and registers no prompt, tool,
 
 No direct effect; invoked business Services own any model-visible result.
 
+**Runtime invariant:** No companion is published. Host calls re-read authoritative Cordis and Typert state, while Client methods, descriptors, and `$on` subscriptions mutate in one owned effect.
+
 ## Known Limitations and Deferred Work
 
 - The Connection adapter maps ordinary dispatch failures and business exceptions to the RPC `internal` code with empty details; lookup-policy errors carried by `TypertLookupFailure` are returned unchanged. Structured `TypertGatewayError` categories remain available only to same-process callers.

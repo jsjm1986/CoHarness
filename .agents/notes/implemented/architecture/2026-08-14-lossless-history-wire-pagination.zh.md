@@ -14,7 +14,7 @@ Status: implemented
 
 编解码复用 `@deepseek-ai/dsh-session/chunk-rows` 的 `packChunkRuns()` / `decodeChunkRow()`。打包行是物理记录，不是 `SessionEventMap` 成员，绝不会进入 `Session.events` 或触发 `session/event`。未知或扩展的 chunk 事件字段按普通事件透传。畸形打包记录会在运行时状态变更前失败。
 
-截断点取每个追加来源 `user/message` 或 `assistant/message` 的 seq 与其 `sourceEventSeqs` 的最小值。编码器至少返回一个不可分割的消息组，或一整页仅含事件的页。当单个消息组超过目标时，整组原样返回并带 `hasMore: true`，客户端仍能继续前进。物理编码器省略了任何逻辑前缀时，`hasMore` 为 true。
+截断点取每个追加来源消息组的首 seq：`user/message` 组始于其 `sourceEventSeqs` 的最早引用，`assistant/message` 组始于紧邻其前的同 step `assistant/chunk` 连续段。编码器至少返回一个不可分割的消息组，或一整页仅含事件的页。当单个消息组超过目标时，整组原样返回并带 `hasMore: true`，客户端仍能继续前进。物理编码器省略了任何逻辑前缀时，`hasMore` 为 true。
 
 `dsh-client-connection` 持有 `historyPageTargetBytes`（默认 131,072）。该值是目标，不是硬拒绝上限。持久化、`SESSION_FORMAT_VERSION` 与 Conversation 组装保持不变。
 
@@ -40,4 +40,4 @@ Status: implemented
 
 浏览器历史页靠近配置目标，展开后的逻辑事件流、投影、工具视图与 Conversation 节点保持相同。直接 API 与实时帧继续遵守透传纪律。操作方可以从 connection 配置升降目标，而不改持久化。单个超大消息组仍整组发送，因此一条工具密集或很长的流式消息可以超过目标。Host 必须为每次历史请求编码并计量候选后缀；该 CPU 成本用来换公网传输下降。
 
-相关所有者：[打包 chunk 行](2026-07-26-packed-chunk-rows-by-default.zh.md)、[GUI 分层与 RPC 协议](2026-07-19-gui-layering-and-rpc-protocol.zh.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.zh.md)、[Conversation 组装](2026-08-09-client-conversation-node-assembly.zh.md)、[子代理历史来源](2026-08-06-subagent-list-identity-projection.zh.md)，以及 [两档会话历史传输](2026-08-18-conversation-history-tier.zh.md)。
+相关所有者：[打包 chunk 行](../../archived/architecture/2026-07-26-packed-chunk-rows-by-default.md)、[GUI 分层与 RPC 协议](2026-07-19-gui-layering-and-rpc-protocol.zh.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.zh.md)、[Conversation 组装](2026-08-09-client-conversation-node-assembly.zh.md)、[子代理历史来源](2026-08-06-subagent-list-identity-projection.zh.md)，以及 [两档会话历史传输](2026-08-18-conversation-history-tier.zh.md)。

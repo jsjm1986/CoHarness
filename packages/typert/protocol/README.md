@@ -32,6 +32,8 @@ None, as this protocol package declares application reflection and registers not
 
 No direct effect.
 
+**Runtime invariant:** No companion is published. Decorators retain private immutable declarations and bindings are frozen values with no independent event stream to cross-check.
+
 ## Known Limitations and Deferred Work
 
 - Decorator markers contain only the method name and direct or Context invocation mode. Parameter, result, lookup, and schema reflection require the Typert build pipeline.

@@ -9,13 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../../core/agent"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

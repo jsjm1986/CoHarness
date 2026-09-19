@@ -537,6 +537,7 @@ export class SessionProjectionRegistry extends Service {
         registration.def,
         session.header,
         session.inheritedEventCount,
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
         session.snapshotEvents(),
       )
       registration.cells.set(session, cell)
@@ -555,6 +556,7 @@ export class SessionProjectionRegistry extends Service {
   ): void {
     if (cell.observedSeq >= throughSeq) return
     for (let seq = cell.observedSeq + 1; seq <= throughSeq; seq += 1) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const event = session.eventAt(SessionSeq(seq))
       if (event === undefined || event.seq !== seq) {
         throw new Error(`session projection ${JSON.stringify(def.key)} cannot advance across missing seq ${String(seq)}`)
@@ -586,6 +588,7 @@ export class SessionProjectionRegistry extends Service {
           registration.def,
           session.header,
           session.inheritedEventCount,
+          // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
           session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(event.seq)),
         )
         registration.cells.set(session, cell)

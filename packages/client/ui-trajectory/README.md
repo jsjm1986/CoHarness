@@ -20,6 +20,8 @@ None, as the trajectory views render session data in the browser; nothing here r
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. It is a pure-consumer plugin: it emits no Cordis events and owns no mutable cross-plugin state; its view-slot registration is a plain effect whose disposal the slot ledger's own specs and this package's behavior specs observe directly.
+
 ## Known Limitations and Deferred Work
 
 - **In-flight Time stays blank** — `partial` and `runningCalls` rows show their running state without a fabricated duration, so the Overview renders a start marker rather than inventing a live span. Record and timeline selection are local to Trajectory, with no anchor deep links.

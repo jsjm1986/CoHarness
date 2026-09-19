@@ -43,6 +43,8 @@ None, as this is a client-process library; the model runs in the spawned runtime
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This client library runs outside any harness context (its peer is a separate runtime process); the runtime's own packages own the event-stream relations.
+
 ## Known Limitations and Deferred Work
 
 - **No bundled-runtime resolution** — callers name the runtime executable explicitly; packaged-executable discovery stays Python-side until a TypeScript distribution consumer exists.

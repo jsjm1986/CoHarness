@@ -48,7 +48,7 @@
         "commits": [
           "9d15938073"
         ],
-        "topic": "experimental CPython code-runtime backend moved to packages/experimental"
+        "topic": "experimental CPython ptc-runtime backend moved to packages/experimental"
       },
       {
         "tag": "alpha.4",
@@ -201,7 +201,7 @@
       "location-data-identity-reuse-and-flush-published-flag",
       "inject-keyed-hooks-compartment",
       "css-produced-file-layout",
-      "experimental-code-runtime-python-whole-package-replacement",
+      "experimental-ptc-runtime-python-whole-package-replacement",
       "list-children-seq-gate-and-lifecycle-witness-keys-restored",
       "persistence-load-live-snapshot-materialized-guard-restored",
       "permission-presets-fold-knobs-approval",
@@ -287,11 +287,11 @@
       "packages/client/ui-renderer/src/client/session-provider.tsx"
     ],
     "experimentalPython": [
-      "packages/experimental/code-runtime-python/src/index.ts",
-      "packages/experimental/code-runtime-python/src/protocol.ts",
-      "packages/experimental/code-runtime-python/src/invariant.ts",
-      "packages/experimental/code-runtime-python/py/bootstrap.py",
-      "packages/experimental/code-runtime-python/py/protocol.py",
+      "packages/experimental/ptc-runtime-python/src/index.ts",
+      "packages/experimental/ptc-runtime-python/src/protocol.ts",
+      "packages/experimental/ptc-runtime-python/src/invariant.ts",
+      "packages/experimental/ptc-runtime-python/py/bootstrap.py",
+      "packages/experimental/ptc-runtime-python/py/protocol.py",
       "tsconfig.host.json",
       "vitest.config.ts",
       "knip.json",
@@ -309,10 +309,10 @@
       ".agents/notes/implemented/feature/2026-09-01-web-superellipse-corner-smoothing.md",
       ".agents/notes/implemented/simplification/2026-09-01-css-produced-file-layout.md",
       ".agents/notes/implemented/simplification/2026-09-01-ptc-omits-workflow-tool.md",
-      ".agents/notes/implemented/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md",
-      ".agents/notes/implemented/bug-fix/2026-08-29-code-runtime-python-call-backlog-and-binding-metadata-snapshot.md",
-      ".agents/notes/implemented/bug-fix/2026-08-29-code-runtime-python-load-and-dispatch-hardening.md",
-      ".agents/notes/implemented/bug-fix/2026-08-29-code-runtime-python-reply-backlog-and-surrogate-count.md"
+      ".agents/notes/implemented/bug-fix/2026-07-31-ptc-runtime-python-settlement-fixes.md",
+      ".agents/notes/implemented/bug-fix/2026-08-29-ptc-runtime-python-call-backlog-and-binding-metadata-snapshot.md",
+      ".agents/notes/implemented/bug-fix/2026-08-29-ptc-runtime-python-load-and-dispatch-hardening.md",
+      ".agents/notes/implemented/bug-fix/2026-08-29-ptc-runtime-python-reply-backlog-and-surrogate-count.md"
     ],
     "agentNotesDeleted": [
       ".agents/notes/implemented/feature/2026-07-30-continuable-subagent-report-tool.md",
@@ -384,7 +384,7 @@
       "result": "passed"
     },
     "experimentalPythonTests": {
-      "command": "npx vitest run packages/experimental/code-runtime-python",
+      "command": "npx vitest run packages/experimental/ptc-runtime-python",
       "testsPassed": 283,
       "testsSkipped": 2,
       "pythonRequirement": "CPython >= 3.10 on PATH (macOS system 3.9.6 fails every test)"

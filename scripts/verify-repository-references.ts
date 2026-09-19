@@ -92,8 +92,6 @@ function repositoryCommits(repoRoot: string, sources: Iterable<string>): Set<str
   }).trimEnd().split('\n')
   // Git resolves prefixes across all available objects, including unreachable ones.
   // Ambiguous prefixes do not identify one object and cannot establish a commit reference.
-  // Git resolves prefixes across all available objects, including unreachable ones.
-  // Ambiguous prefixes do not identify one object and cannot establish a commit reference.
   return new Set(candidates.filter((candidate, index) => {
     const [object, type] = results[index]?.split(' ') ?? []
     return type === 'commit' && object?.startsWith(candidate) === true

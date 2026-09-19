@@ -49,3 +49,5 @@ export function apply(ctx: Context): void {
 ## Known Limitations and Deferred Work
 
 - **`list()` 只枚举 contributor 声明的变量** — 注册表自有的内置键（`DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`）不包含在内，因此诊断、prompt 或 UI 代码不得把 `list()` 当作完整的环境目录。
+
+**运行时不变式：** 不发布伴生入口。环境注册表会在每次注册和收集时校验所有权与收集值，也不发布可供伴生入口交叉检查的独立快照。

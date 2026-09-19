@@ -36,8 +36,16 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 |---|---|
 | `maxContinuableActivations` | 单个运行时中驻留及正在物化的可继续 Activation 正数安全整数上限；默认 `128`。 |
 | `maxContinuableActivationsPerParent` | 同一个直接 parent 会话所拥有的驻留及正在物化的可继续 Activation 正数安全整数上限；默认 `32`。 |
+| `maxActiveSubagents` | 经由不间断可继续 parent 链共享的存活可继续 child 正数安全整数上限；默认 `8`。 |
+| `maxDepth` | 提供给未自行配置深度的委派工具的非负安全整数委派深度；默认 `1`。 |
 
-物化会在创建或恢复 Agent 前预留两个配额。超过任一上限都会以 `ACTIVATION_CAPACITY_EXCEEDED` 拒绝；回滚或 Activation 最终 dispose 会释放配额，持久化但不活跃的 child 会话不占用配额。
+插件以同一 `Config` schema 注册 `subagent` 设置段，并将其 `cordis.yml` 条目作为组合 `base`；user 层中出现的字段覆盖该条目，重置则清除覆盖。`maxDepth` 默认 `1`，在委派工具自身配置省略深度时为其提供深度。显式工具深度（包括 `provider-managed`）优先。深度 `0` 禁止经继承此设置的工具委派；深度 `1` 只允许直接 child。变更在下一次委派尝试时生效。直接调用服务的调用方仍自行提供可选的请求深度。
+
+物化会在创建或恢复 Agent 前预留两个驻留配额。超过任一上限都会以 `ACTIVATION_CAPACITY_EXCEEDED` 拒绝；回滚或 Activation 最终 dispose 会释放配额，持久化但不活跃的 child 会话不占用配额。
+
+`maxActiveSubagents` 限制经由不间断可继续 parent 链共享的存活可继续 child——与上述驻留配额是独立的轴。不可继续的 parent 开启独立配额池且不占用槽位；可继续后代继承该池。新建与冷恢复在重建 Agent 前预留槽位，清理在句柄 dispose 后归还槽位。等待中的 parent、待处理 inbox 工作和正在停止的 Activation 仍占用槽位。发往驻留 child 的消息复用其槽位。一次性和外部提供方运行不受此限。池继承不跨越一次性 parent：其可继续 child 共享另一个独立池。深度仍是委派工具的独立策略。
+
+每次新建或冷恢复 Activation 前都会采样当前 `maxActiveSubagents` 值。调大后既有树可准入更多 child；调小则驻留 child 继续运行，并在用量低于上限前拒绝新的准入。容量满时，新建或冷恢复以 `ACTIVATION_LIMIT_REACHED` 拒绝（浏览器 prompt 收到 `subagent/delivery-unavailable`）：等待某个 child 结束，或继续使用现有 agent。准入不排队，因为等待后代的 parent 不得等待自身占用的槽位。槽位是进程本地的，不约束累计会话历史或 token 用量。
 
 ## 能力
 

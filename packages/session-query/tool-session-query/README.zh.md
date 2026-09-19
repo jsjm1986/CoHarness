@@ -69,6 +69,8 @@ Use session_search to find relevant work from prior sessions, or session_event_s
 
 仅追加的结果文本位于可重用请求前缀之后，不会使较早的缓存条目失效。
 
+**运行时不变式：** 不发布伴生入口。这个只读模型适配器不拥有任何超出注册表范围的事件关系或可变数据关系；这些注册表已经负责校验注册。
+
 ## 已知限制与暂缓事项
 
 - 搜索最多返回部署上限，匹配更多时会请模型缩小查询；不提供延续 token。

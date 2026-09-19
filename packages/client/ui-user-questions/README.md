@@ -22,6 +22,8 @@ Indirectly, through `dsh-tool-ask-user`; that package owns the model-visible too
 
 No direct invalidation; `dsh-tool-ask-user` owns the model-visible tool call and result.
 
+**Runtime invariant:** No companion is published. Tool and slot registrations are effects owned and observed by their respective registries; the host pending table is exercised through the public wire protocol.
+
 ## Known Limitations and Deferred Work
 
 - **Unsubmitted drafts are not durable** — reconnect resync or a full page reload restores the host-owned pending request with the same rpcId, but a composer unmount resets local option and custom-text drafts.

@@ -45,6 +45,8 @@ Data-dependent and bounded by `maxOutputChars` plus the fixed clipping notice.
 
 Append-only tool results follow the reusable request prefix.
 
+**Runtime invariant:** No companion is published. The tool adapter owns no independent durable state; filesystem mutation relations stay with the provider and policy plugins.
+
 ## Known Limitations and Deferred Work
 
 - Operations target UTF-8 text; binary files are unsupported.

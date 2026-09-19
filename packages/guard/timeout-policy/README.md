@@ -51,6 +51,8 @@ Zero tokens on non-timeout calls. A timeout adds one small retained error result
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. This stateless policy plugin owns no package-local event history or mutable data relation beyond the seam it intercepts.
+
 ## Known Limitations and Deferred Work
 
 - **Cooperative, never a hard kill** — the deadline only notifies via `exec.signal`; a tool that ignores the signal does not stop on timeout (see § Cooperative, not a hard kill).

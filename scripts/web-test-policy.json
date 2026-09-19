@@ -159,6 +159,7 @@
     "schedule/schedule": "conversation",
     "session/session-stats": "workbench",
     "session/session-title": "workbench",
+    "session/session-turn-outline": "workbench",
     "session-query/session-log-export": "workbench",
     "subagent/subagent": "subagent",
     "todo/tool-todo": "conversation"

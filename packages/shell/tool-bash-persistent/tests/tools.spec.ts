@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
@@ -18,7 +18,7 @@ import type {
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as ToolBashPersistent from '@deepseek-ai/dsh-tool-bash-persistent'
-import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
+import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const contexts: Context[] = []
 let callNumber = 0
@@ -31,7 +31,7 @@ async function agent(ctx: Context, cwd: string | undefined): Promise<Agent> {
   const id = SessionId(`persistent-bash-owner-${callNumber}`)
   const scope = ctx.plugin(() => {})
   const session = Session.create(id, [], {
-    version: 0,
+    version: SESSION_FORMAT_VERSION,
     id,
     createdAt: 0,
     isSeeded: false,
@@ -68,7 +68,7 @@ function call(
 ) {
   return ctx.tools.execute({
     signal,
-    callId: CallId(`persistent-bash-${++callNumber}`),
+    callId: ToolCallId(`persistent-bash-${++callNumber}`),
     name: 'bash',
     arguments: { command },
     ...owner === undefined ? {} : { agent: owner },
@@ -496,6 +496,7 @@ describe('tool-bash-persistent', () => {
     const result = await call(ctx, owner, 'hang')
     expect(text(result)).toContain('timed out after 0 seconds or experienced an OOM error')
     expect(text(result)).toContain('partial output')
+    expect(text(result)).toContain('[Command timed out or OOM]')
     expect(text(result)).toContain('next bash call starts from the workspace')
     expect(stub.sessions[0]?.closed).toContain('persistent bash command timed out')
   })

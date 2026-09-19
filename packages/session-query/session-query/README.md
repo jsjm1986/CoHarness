@@ -50,6 +50,8 @@ None, as this trusted query service returns cloned session records only to its c
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Query results are immutable per-call projections whose lineage and event relations are validated while they are built; the service retains no observable result state.
+
 ## Known Limitations and Deferred Work
 
 - **No caller authorization** — this is trusted context-wide infrastructure; a future model tool or UI must constrain which sessions its caller may inspect.

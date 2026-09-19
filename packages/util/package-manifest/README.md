@@ -83,6 +83,8 @@ None, as this package only exports types.
 
 Type declarations add no model input, so provider cache reuse is unaffected.
 
+**Runtime invariant:** No companion is published. The package has no runtime state or independently observable relationships.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

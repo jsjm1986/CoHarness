@@ -29,7 +29,7 @@ kind: "package-reference"
 
 ### 服务器配置
 
-通过[客户端配置](../mcp-client/README.zh.md#config)在目标作用域中添加服务器。本包没有配置字段。
+通过[客户端配置](../mcp-client/README.zh.md#use-this-package)在目标作用域中添加服务器。本包没有配置字段。
 
 调用方没有已配置 MCP 服务器时，在 native 或 PTC 模式下都看不到 MCP 提示词文本或资源工具。配置服务器后会启用三个共享资源工具，包括由其他提供方挂载客户端的服务器，以及没有工具或指令的服务器。只要客户端条目保持激活，连接失败就不会移除共享工具；资源调用会报告连接错误。
 
@@ -77,8 +77,8 @@ kind: "package-reference"
 
 - [MCP 客户端](../mcp-client/README.zh.md)——服务器传输、指令与连接生命周期。
 - [工具子系统](../../../docs/subsystems/tools.zh.md)——规范值与模型可见结果。
-- 资源可见性决策：profile 统一挂载及由已配置服务器决定的可见性。
-- 资源与指令决策：作用域、按需访问及未纳入的机制。
+- [资源可见性决策](../../../.agents/notes/implemented/feature/2026-09-13-mcp-resources-in-profiles.zh.md)——profile 统一挂载及由已配置服务器决定的可见性。
+- [资源与指令决策](../../../.agents/notes/implemented/feature/2026-09-12-mcp-resources-and-instructions.zh.md)——作用域、按需访问及未纳入的机制。
 
 -----
 

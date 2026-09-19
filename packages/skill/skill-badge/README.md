@@ -16,6 +16,8 @@ Indirectly, through `@deepseek-ai/dsh-tool-skill`, which renders the catalog ent
 
 Disabled by default, the plugin changes no request. When enabled, its catalog entry and any loaded body change the provider KV prefix at their insertion points.
 
+**Runtime invariant:** No companion is published. The package owns one immutable provider registration, while the skill registry owns registration uniqueness and lifecycle checks.
+
 ## Known Limitations and Deferred Work
 
 - The provider contributes one fixed skill and has no runtime customization.

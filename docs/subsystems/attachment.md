@@ -125,12 +125,27 @@ async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly Image
 
 /**
  * Admit one Host prompt and replace each uploaded image with its durable reference.
- * Text parts pass through unchanged. A prompt without image parts performs no storage operation.
- * @param content - prompt parts in message order.
+ * Text and durable file references pass through unchanged. A prompt without image parts performs no storage operation.
+ * @param content - prompt parts in message order after file receipt resolution.
  * @returns admitted prompt parts in the same order as `content`.
  * @throws AttachmentError when the image batch is refused.
  */
 async admitPromptContent( content: readonly AttachmentAdmissionPart[], ): Promise<AdmittedPromptContentPart[]>
+
+/**
+ * Decode and durably commit one canonical base64 file upload.
+ * @param input - canonical base64 bytes and optional display name.
+ * @returns the durable content-addressed file reference.
+ * @throws AttachmentError when the encoding or storage operation is refused.
+ */
+admitEncodedFile(input: EncodedFileAttachment): Promise<FileAttachmentRef>
+
+/**
+ * Identify a failure emitted by this attachment capability by its stable code.
+ * @param error - value caught from an attachment operation.
+ * @returns whether the value is an attachment failure.
+ */
+isAttachmentError(error: unknown): error is AttachmentError
 
 /**
  * Validate and durably commit one image before its owning session event is appended.
@@ -152,21 +167,58 @@ abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
 abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
 
 /**
- * Locate the provider-owned normalized image in the host filesystem.
- * Providers that are not host-file-backed return `undefined`.
- * @param _ref - durable normalized attachment reference.
- * @returns an absolute host path, or `undefined` when no path is exposed.
+ * Locate the provider-owned normalized object in the harness host filesystem.
+ * @param ref - durable normalized attachment reference.
+ * @returns an absolute host path, or undefined when this backend is not host-file-backed.
+ * @throws an AttachmentError when the durable reference is invalid.
  */
-imageHostPath(_ref: ImageAttachmentRef): string | undefined
+imageHostPath(ref: ImageAttachmentRef): string | undefined
+
+/**
+ * Durably commit one file byte-for-byte before its owning session event is
+ * appended. Files carry no admission limits: any byte content and length is
+ * accepted, and the stored object is the exact submitted bytes. Backends
+ * without verbatim file storage keep this default rejection.
+ * @param input - exact bytes and optional display name.
+ * @returns the durable content-addressed file reference.
+ */
+saveFile(input: SaveFileAttachment): Promise<FileAttachmentRef>
+
+/**
+ * Durably commit one file byte-for-byte from bounded chunks. Providers must
+ * apply backpressure and must not collect the complete file in memory.
+ * Backends without streamed verbatim storage keep this default rejection.
+ * @param input - ordered exact bytes, optional cancellation, and display name.
+ * @returns the durable content-addressed file reference.
+ */
+saveFileStream(input: SaveFileStreamAttachment): Promise<FileAttachmentRef>
+
+/**
+ * Read and verify one verbatim stored file as bounded chunks. Providers must
+ * not collect the complete file in memory. Backends without verbatim file
+ * reads keep this default rejection.
+ * @param ref - durable reference from the session log.
+ * @param signal - optional cancellation for backend reads and verification work.
+ * @returns exact file bytes in order; integrity failures reject the iteration.
+ */
+async *readFileStream( ref: FileAttachmentRef, signal?: AbortSignal, ): AsyncIterable<Uint8Array>
+
+/**
+ * Locate the verbatim stored file object in the harness host filesystem.
+ * @param ref - durable file reference.
+ * @returns an absolute host path, or undefined when this backend is not host-file-backed.
+ * @throws an AttachmentError when the durable reference is invalid.
+ */
+fileHostPath(ref: FileAttachmentRef): string | undefined
 
 /**
  * Generate or read one deterministic model-request version from the stored normalized image.
  * @param ref - durable provider-independent normalized attachment reference.
- * @param policy - exact route pixel and encoded-byte budget.
+ * @param target - route-chosen dimensions and byte target; an unmet byte target yields the smallest ladder output.
  * @param signal - optional cancellation.
  * @returns request bytes and the cache/upload identity covering every transform input.
  */
-readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
+readImageRequest( ref: ImageAttachmentRef, target: ImageRequestTarget, signal?: AbortSignal, ): Promise<RequestImageAttachment>
 ```
 
 Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)

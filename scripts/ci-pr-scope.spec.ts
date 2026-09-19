@@ -48,11 +48,11 @@ describe('classifyCiPrScope', () => {
   })
 
   it('keeps expensive lanes for source and dependency changes', () => {
-    expect(classifyCiPrScope(['packages/e2b/e2b/package.json', 'pnpm-lock.yaml'], '')).toMatchObject({
+    expect(classifyCiPrScope(['packages/subprocess/subprocess/package.json', 'pnpm-lock.yaml'], '')).toMatchObject({
       runExpensive: true,
       reason: 'full',
       changedSourceFiles: [],
-      changedPackageFiles: ['packages/e2b/e2b/package.json', 'pnpm-lock.yaml'],
+      changedPackageFiles: ['packages/subprocess/subprocess/package.json', 'pnpm-lock.yaml'],
       changedDocsOnly: false,
       coverageMode: 'full',
       snapshotMode: 'full',

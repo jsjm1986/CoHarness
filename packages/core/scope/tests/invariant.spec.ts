@@ -55,6 +55,12 @@ describe('scoped-dispatch invariants', () => {
       'agent/pre-step': [{ agent, messages: [message], turn: 1, step: 1, signal }, () => Promise.resolve({ kind: 'enter', messages: [message] })],
       'agent/message-entered': [{ agent, event: { type: 'user/message', seq: SessionSeq(0), time: 1, data: message, surfaceOp: 'append' }, turn: 1, step: 1, signal }],
       'agent/request': [{ agent, turn: 1, step: 1, signal }, () => Promise.resolve(config)],
+      'agent/assistant-stream': [{
+        agent,
+        frame: {
+          type: 'start', attemptId: 'attempt-1' as never, revision: 1, turn: 1, step: 1,
+        },
+      }],
       'agent/request-error': [
         {
           agent,

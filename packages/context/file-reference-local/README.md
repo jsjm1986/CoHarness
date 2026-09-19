@@ -38,6 +38,8 @@ Conditional and fixed: the one sentence is present while `read` is visible to th
 
 The stable sentence joins the system-prompt prefix. Mounting or removing this provider, or changing whether `read` is visible, changes that prefix; queries, candidates, and index invalidations do not.
 
+**Runtime invariant:** No companion is published. Per-agent indexes are private advisory caches whose invalidation and disposal are observed directly through service tests.
+
 ## Known Limitations and Deferred Work
 
 - **Host-local namespace** — the provider scans the Harness host filesystem, so remote or virtual `read` implementations require a provider whose namespace matches the tool.

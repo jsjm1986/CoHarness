@@ -4,13 +4,24 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../collaboration" },
-    { "path": "../gateway-runtime" },
-    { "path": "../../interaction/permission-presets" },
-    { "path": "../../core/session" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    {
+      "path": "../collaboration"
+    },
+    {
+      "path": "../gateway-runtime"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    }
   ]
 }

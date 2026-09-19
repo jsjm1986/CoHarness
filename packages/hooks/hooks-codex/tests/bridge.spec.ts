@@ -82,6 +82,23 @@ describe('hooks-codex bridge', () => {
     }
   })
 
+  it('runs SessionStart on the detached signal when agent/created carries none', async () => {
+    const dir = configDir()
+    const marker = join(dir, 'session-start-detached')
+    writeHooks(dir, { SessionStart: [{ hooks: [{ type: 'command', command: script(dir, 'detached.sh', `#!/usr/bin/env bash\ntouch "${marker}"\n`) }] }] })
+    const ctx = await harness(dir, new MockAdapter([]))
+    try {
+      const agent = {
+        id: SessionId('detached-signal'),
+        session: { id: SessionId('detached-signal'), header: { id: SessionId('detached-signal') } },
+      } as unknown as Agent
+      await ctx.serial('agent/created', { agent, source: 'startup' })
+      await waitFor(() => existsSync(marker))
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('a PreToolUse hook (exit 2) denies a tool the regex matcher matches as a substring', async () => {
     const dir = configDir()
     const deny = script(dir, 'deny.sh', '#!/usr/bin/env bash\necho "codex blocked it" >&2\nexit 2\n')

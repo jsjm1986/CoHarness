@@ -34,6 +34,8 @@ Conditional error text is visible for that call and retained in history until co
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **File effects are the whole policy vocabulary** — the seam expresses no network, process, syscall, device, or credential restrictions.

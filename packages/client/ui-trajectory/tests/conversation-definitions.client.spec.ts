@@ -111,12 +111,14 @@ describe('Trajectory conversation Definitions', () => {
     const current = snapshot(assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'assistant/chunk', {
+      at(3, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'block-start', index: 0, blockType: 'text' },
       }),
-      at(4, 'assistant/chunk', {
+      at(4, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: '<thinking>private</thinking>answer' },
@@ -129,12 +131,14 @@ describe('Trajectory conversation Definitions', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'assistant/chunk', {
+      at(3, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: 'first attempt' },
       }),
-      at(4, 'assistant/chunk', {
+      at(4, 'assistant/live-chunk', {
+        attemptId: 'a1',
         turn: 1,
         step: 1,
         chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 3 } },
@@ -160,7 +164,8 @@ describe('Trajectory conversation Definitions', () => {
       delayMs: 25,
       failure: { code: 'TRANSPORT', message: 'temporary failure' },
     }))
-    value.append(at(6, 'assistant/chunk', {
+    value.append(at(6, 'assistant/live-chunk', {
+      attemptId: 'a1',
       turn: 1,
       step: 1,
       chunk: { type: 'text-delta', index: 0, text: 'second attempt' },
@@ -191,6 +196,7 @@ describe('Trajectory conversation Definitions', () => {
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
       at(3, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('interrupted-message', 'cut short'),
@@ -318,6 +324,7 @@ describe('Trajectory conversation Definitions', () => {
       }),
       at(4, 'step/start', { turn: 1, step: 1 }),
       at(5, 'assistant/message', {
+        stream: [],
         turn: 1,
         step: 1,
         message: assistantMessage('assistant-1', 'first'),
@@ -348,6 +355,7 @@ describe('Trajectory conversation Definitions', () => {
     })
 
     value.append(at(11, 'assistant/message', {
+      stream: [],
       turn: 1,
       step: 2,
       message: assistantMessage('assistant-2', 'second'),

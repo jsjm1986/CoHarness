@@ -22,6 +22,8 @@ At most one automatic auxiliary request is made for a fresh session, bounded by 
 
 No main-request invalidation. The auxiliary request uses the configured or logged route and has provider-specific cache behavior.
 
+**Runtime invariant:** No companion is published. This thin provider delegates request and result validation to the shared title service and LLM helper and retains no independent mutable state.
+
 ## Known Limitations and Deferred Work
 
 - The first message alone may cease to represent a long-running session; use the all-messages provider when later prompts should retitle it.

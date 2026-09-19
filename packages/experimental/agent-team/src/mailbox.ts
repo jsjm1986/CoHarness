@@ -307,6 +307,7 @@ export class TeamMailbox {
 
   /** Whether a target Session already contains the durable message identity. */
   private targetRecorded(session: Session, messageId: TeamMessageId): boolean {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return messageAccepted(session.ownEvents(), message => message.source.kind === 'team-message'
       && message.source.messageId === messageId)
   }

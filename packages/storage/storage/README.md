@@ -26,6 +26,8 @@ Zero direct tokens on every request.
 
 Independent of live requests: the hub never touches a request prefix, so it cannot invalidate provider cache reuse.
 
+**Runtime invariant:** No companion is published. The hub is a pure registration table (names → backends, forms → facilities) whose consistency is fully enforced at the call sites (duplicate/missing entries fail loud synchronously); it owns no event stream or mutable medium to cross-check.
+
 ## Known Limitations and Deferred Work
 
 - **`kv` is the only data shape** — backends currently have one facet to implement.

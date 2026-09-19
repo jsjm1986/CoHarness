@@ -35,6 +35,8 @@ Zero live-request tokens.
 
 None — the backend never touches live request prefixes.
 
+**Runtime invariant:** No companion is published. Schema-version and unit-version consistency are open-time checks that reject before a unit exists, and durability needs the backend round-trip tests in the shared KV conformance suite; this package exposes no continuously observable in-process relation.
+
 ## Known Limitations and Deferred Work
 
 - **`DatabaseSync` is synchronous** — each write blocks the event loop for its (single-statement) duration; acceptable at domain-data scale.

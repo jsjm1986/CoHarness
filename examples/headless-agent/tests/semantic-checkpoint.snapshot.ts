@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
-import { createUserMessage, CallId , createMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId , createMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
@@ -46,12 +46,13 @@ async function seedInterruptedSession(root: string, cwd: string): Promise<string
         step: 1,
         message: createMessage({
           role: 'assistant',
-          content: [{ type: 'tool-call', id: CallId('unknown-outcome-call'), name: 'write_remote', arguments: '{"value":1}' }],
+          content: [{ type: 'tool-call', id: ToolCallId('unknown-outcome-call'), name: 'write_remote', arguments: '{"value":1}' }],
           source: {
             kind: 'model',
             ...{ provider: 'deepseek-official', model: 'deepseek-v4-flash' },
           },
         }),
+        stream: [],
       },
       surfaceOp: 'append',
     },
@@ -62,7 +63,7 @@ async function seedInterruptedSession(root: string, cwd: string): Promise<string
       data: {
         turn: 1,
         step: 1,
-        callId: CallId('unknown-outcome-call'),
+        callId: ToolCallId('unknown-outcome-call'),
         name: 'write_remote',
         arguments: '{"value":1}',
       },

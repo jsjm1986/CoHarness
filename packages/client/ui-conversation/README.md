@@ -76,6 +76,8 @@ None, as the conversation UI renders session history and streams in the browser;
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Conversation Definitions, target builders, and Views are already validated by their owning registries and the Slot ledger.
+
 ## Known Limitations and Deferred Work
 
 - **Per-turn usage is fail-closed** — a completed turn shows its disclosure only when the loaded window contains a complete lifecycle and every started attempt has safe exact usage; missing buckets or contradictory totals hide the disclosure.

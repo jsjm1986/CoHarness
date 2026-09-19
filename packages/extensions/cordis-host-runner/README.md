@@ -59,6 +59,8 @@ None of its own: every message above is carried by the calling tool's result.
 
 A host half that registers tools changes the next request's tool view, which invalidates prefix reuse from the first changed schema token; running or stopping a package with no tool registrations is prefix-neutral.
 
+**Runtime invariant:** No companion is published. The definition registry is process memory with no event stream to observe, and its one owned relation (a running definition owns a settled host-half fiber and its handler table) is established and unwound inside single awaited verbs, so package tests assert it directly.
+
 ## Known Limitations and Deferred Work
 
 - **A successful run does not mean the UI rendered.** `run` returns once the answering page has LOADED the browser half; React renders afterwards, so a component that throws cannot possibly appear in the run receipt. The failure surfaces through `reportRenderFailure` and is read back with `cordis_inspect what:"temporary"`; the run result says so rather than implying success.

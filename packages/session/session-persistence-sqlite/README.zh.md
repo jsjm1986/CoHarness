@@ -64,6 +64,8 @@ interface Config {
 
 物理打包不会改变请求前缀。与其他持久化后端相同，提供方 cache 复用取决于重建历史、当前 envelope 和模型路由。
 
+**运行时不变式：** 不发布伴生入口。物理打包只能通过数据库往返与行数检查观察，并非持续的进程内关系。
+
 ## 已知限制与延期工作
 
 - **过渡性的 SQLite 专用设计**——这一以效率为重点的实现参考了 [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb)。支持多种后端与可配置 schema 的统一关系数据库设计尚待后续完善；schema 20 是当前 CoHarness 格式，后续变更必须再次通过离线迁移。

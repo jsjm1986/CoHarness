@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod'
-import { lastAssistantStreamChunk } from '@deepseek-ai/dsh-llm/assistant-stream'
-import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
+import { lastAssistantStreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
@@ -78,14 +78,11 @@ const pressureSchema: z.ZodType<ContextPressureProjection> = z.object({
 const pressureFrom = (usage: TokenUsage): number =>
   usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
 
-/** The usage a streamed chunk or durable Assistant settlement reports. */
+/** The usage one durable Assistant settlement reports for its attempt, if any. */
 function usageOf(event: SessionEvent): TokenUsage | undefined {
-  if (event.type === 'assistant/chunk' && event.data.chunk.type === 'usage') return event.data.chunk.usage
   if (event.type === 'assistant/message' && event.data.usage !== undefined) return event.data.usage
   if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') return undefined
-  return event.data.stream === undefined
-    ? undefined
-    : lastAssistantStreamChunk(event.data.stream, 'usage')?.usage
+  return lastAssistantStreamChunk(event.data.stream, 'usage')?.usage
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
@@ -113,12 +110,9 @@ type ContextPressureState = z.infer<typeof contextPressureStateSchema>
 /**
  * Token-meter's session projection unit.
  *
- * Usage chunks provide an early sample that survives a later request failure;
- * embedded Assistant settlements provide the same sample when compact records
- * are the only durable representation. A repeated sample replaces the current
- * attempt's earlier value instead of double counting it. Retry-started clears
- * that replacement slot so a retried request in the same step is accumulated as
- * a separate billed attempt.
+ * Each v2 Assistant settlement contributes the last usage sample embedded in
+ * its stream. `llm/retry-started` closes the replacement slot so the retried
+ * attempt adds to the total.
  */
 export const tokenUsageProjectionDefinition = {
   key: 'tokenUsage',
@@ -131,12 +125,13 @@ export const tokenUsageProjectionDefinition = {
         ? { ...state, last: null }
         : state
     }
-    if (event.type !== 'assistant/chunk' && event.type !== 'assistant/message' && event.type !== 'assistant/attempt') {
+    if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') {
       return state
     }
+    const sample = usageOf(event)
+    if (sample === undefined) return state
     const { turn, step } = event.data
-    const usage = usageOf(event)
-    if (usage === undefined) return state
+    const usage: TokenUsage = sample
 
     const buckets = bucketsFrom(usage)
     const previous = state.last !== null
@@ -177,7 +172,7 @@ export const tokenUsageProjectionDefinition = {
  */
 export const contextPressureProjectionDefinition = {
   key: 'contextPressure',
-  stateVersion: 4,
+  stateVersion: 5,
   stateSchema: contextPressureStateSchema,
   init: () => ({ surfaceTokens: 0 }),
   apply: (state, event) => {

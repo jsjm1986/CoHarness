@@ -1,13 +1,19 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { AttachmentId, ImageVariantId } from '@deepseek-ai/dsh-attachment'
-import { DeepSeekFileId } from '../src/file-id.ts'
-import { deepSeekFileScope, DeepSeekUploadIndex } from '../src/upload-index.ts'
+import { DeepSeekFileId } from '../src/common/file-id.ts'
+import { deepSeekFileScope, DeepSeekUploadIndex } from '../src/common/upload-index.ts'
 
 const ATTACHMENT = AttachmentId(`sha256:${'a'.repeat(64)}`)
 const VARIANT = ImageVariantId(`sha256:${'b'.repeat(64)}`)
+
+/** Every temp index root created by this file, removed after each test. */
+const roots: string[] = []
+afterEach(async () => {
+  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
+})
 
 describe('DeepSeekUploadIndex', () => {
   it('normalizes trailing endpoint slashes in the credential scope', () => {
@@ -17,6 +23,7 @@ describe('DeepSeekUploadIndex', () => {
 
   it('isolates API-key namespaces and reuses only records above the refresh margin', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const index = new DeepSeekUploadIndex(join(dir, 'index.json'))
     const first = deepSeekFileScope('https://api.deepseek.com', 'first-key')
     const second = deepSeekFileScope('https://api.deepseek.com', 'second-key')
@@ -38,6 +45,7 @@ describe('DeepSeekUploadIndex', () => {
 
   it('keeps a reusable cross-process winner and removes only an exact generation', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const index = new DeepSeekUploadIndex(join(dir, 'index.json'))
     const scope = deepSeekFileScope('https://api.deepseek.com', 'key')
     const first = {
@@ -54,33 +62,9 @@ describe('DeepSeekUploadIndex', () => {
     await expect(index.get(scope, VARIANT, 2, 1)).resolves.toBeUndefined()
   })
 
-  it('removes a batch of exact remote generations without touching another namespace', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
-    const index = new DeepSeekUploadIndex(join(dir, 'index.json'))
-    const scope = deepSeekFileScope('https://api.deepseek.com', 'key')
-    const otherScope = deepSeekFileScope('https://api.deepseek.com', 'other-key')
-    const removed = {
-      scope, attachmentId: ATTACHMENT, variantId: VARIANT,
-      fileId: DeepSeekFileId('file-api-removed'), bytes: 3, createdAt: 1, expiresAt: 10_000,
-    }
-    const retained = {
-      ...removed, fileId: DeepSeekFileId('file-api-retained'), variantId: ImageVariantId(`sha256:${'c'.repeat(64)}`),
-    }
-    const other = { ...removed, scope: otherScope, fileId: DeepSeekFileId('file-api-other') }
-    await index.commit(removed, 1, 1)
-    await index.commit(retained, 1, 1)
-    await index.commit(other, 1, 1)
-
-    await index.removeFileIds(scope, [])
-    await index.removeFileIds(scope, [removed.fileId, DeepSeekFileId('file-api-absent')])
-
-    await expect(index.get(scope, VARIANT, 1, 1)).resolves.toBeUndefined()
-    await expect(index.get(scope, retained.variantId, 1, 1)).resolves.toEqual(retained)
-    await expect(index.get(otherScope, VARIANT, 1, 1)).resolves.toEqual(other)
-  })
-
   it('treats a corrupt upload cache as empty and repairs it on the next commit', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const path = join(dir, 'index.json')
     await writeFile(path, '{bad', 'utf8')
     const index = new DeepSeekUploadIndex(path)
@@ -153,6 +137,7 @@ describe('DeepSeekUploadIndex', () => {
     })}]}`,
   ])('treats an invalid persisted index as empty %#', async (text) => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const path = join(dir, 'index.json')
     await writeFile(path, text, 'utf8')
     const index = new DeepSeekUploadIndex(path)
@@ -163,6 +148,7 @@ describe('DeepSeekUploadIndex', () => {
 
   it('rejects duplicate persisted mappings as a corrupt cache', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const path = join(dir, 'index.json')
     const scope = deepSeekFileScope('https://api.deepseek.com', 'key')
     const record = {
@@ -176,6 +162,7 @@ describe('DeepSeekUploadIndex', () => {
 
   it('drops expired records on commit and clears only the selected namespace', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const index = new DeepSeekUploadIndex(join(dir, 'index.json'))
     const first = deepSeekFileScope('https://api.deepseek.com', 'first')
     const second = deepSeekFileScope('https://api.deepseek.com', 'second')
@@ -196,6 +183,7 @@ describe('DeepSeekUploadIndex', () => {
 
   it('propagates non-cache filesystem read failures', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-upload-index-'))
+    roots.push(dir)
     const path = join(dir, 'directory')
     await mkdir(path)
     const index = new DeepSeekUploadIndex(path)

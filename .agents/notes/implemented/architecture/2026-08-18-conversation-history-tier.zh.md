@@ -38,4 +38,4 @@ Host 测试钉住 conversation 省略、进行中与中断保留、`full`／缺�
 
 Chat 在 conversation 档页面上打开，而不再展开全部历史 chunk。Trajectory、inspect 交接和持久化的 Trajectory 视图为 `detail: 'full'` 付费并按 seq 合并；span 已空时第二次打开是空操作。补全仍会在 128 KiB 目标下走打包的 `full` 页，因此在巨大窗口上打开 Trajectory 会发出若干次 history RPC，而不是一次 6 MB 信封。Conversation 档 Chat 在补全前省略 TTFT。若把省略 span 当成 mux 缺口，会重新引入原来的下载。持久化、`SESSION_FORMAT_VERSION`、prompt 和模型上下文不变。Python SDK 没有 `session.history` 面，不在范围内。
 
-相关所有者：[无损 history 线路分页](2026-08-14-lossless-history-wire-pagination.zh.md)、[打包 chunk 行](2026-07-26-packed-chunk-rows-by-default.zh.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.zh.md)，以及 [Conversation 组装](2026-08-09-client-conversation-node-assembly.zh.md)。
+相关所有者：[无损 history 线路分页](2026-08-14-lossless-history-wire-pagination.zh.md)、[打包 chunk 行](../../archived/architecture/2026-07-26-packed-chunk-rows-by-default.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.zh.md)，以及 [Conversation 组装](2026-08-09-client-conversation-node-assembly.zh.md)。

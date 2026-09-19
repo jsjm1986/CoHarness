@@ -12,19 +12,16 @@
       "path": "../../attachment/attachment"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../runtime"
     },
     {
       "path": "../ui-conversation"
     },
     {
-      "path": "../ui-slots"
+      "path": "../ui-primitives"
     },
     {
-      "path": "../ui-primitives"
+      "path": "../ui-slots"
     }
   ]
 }

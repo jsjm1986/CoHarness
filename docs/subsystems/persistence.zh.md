@@ -50,11 +50,10 @@ interface SessionLocation {
  */
 interface SessionHeader {
   /**
-   * On-disk format version, stamped from {@link SESSION_FORMAT_VERSION} when the
-   * session is created. Persistence providers migrate supported historical
-   * generations before exposing a current Session and reject newer versions.
+   * Current logical format version, stamped from {@link SESSION_FORMAT_VERSION}.
+   * Historical physical headers are translated before entering this interface.
    */
-  readonly version: number
+  readonly version: typeof SESSION_FORMAT_VERSION
   /** The session's id (mirrors the {@link Session}'s id). */
   readonly id: SessionId
   /** Non-negative safe-integer Unix epoch milliseconds when the session was created. */
@@ -93,7 +92,7 @@ interface SessionHeader {
 
 ## 格式拒绝：本构建无法可靠读取的日志
 
-后端用 `SessionFormatUnsupportedError` 拒绝无法可靠解读的日志，它与 `SessionPersistenceCorruptionError` 区分，因为数据没有损坏。header 的 `version` 比 `SESSION_FORMAT_VERSION` 新时，消息说明方向（"由更新的 harness 写入，请升级 harness 后打开"）。受支持的 v0/v1 header 和事件会先通过相邻 migration catalog，再构造当前 v2 Session；缺少迁移边或目标记录格式错误时会明确拒绝。迁移后，本构建生成词汇表（`KNOWN_SESSION_EVENT_TYPES`，由 `gen-persistence-catalog` 生成）之外的事件类型同样被拒绝，除非该事件的信封带 `ignorable: true`。JSONL provider 会在保留源文件的同时发布迁移后的 v2 generation；SQLite 继续使用单调递增的 `SCHEMA_VERSION` 检查整个文件结构。
+后端用 `SessionFormatUnsupportedError` 拒绝无法可靠解读的日志，它与 `SessionPersistenceCorruptionError` 区分，因为数据没有损坏。header 的 `version` 比 `SESSION_FORMAT_VERSION` 新时，消息说明方向（"由更新的 harness 写入，请升级 harness 后打开"）。受支持的 v0/v1 header 和事件会先通过相邻 migration catalog，再构造当前 Session；缺少迁移边或目标记录格式错误时会明确拒绝。迁移后，本构建生成词汇表（`KNOWN_SESSION_EVENT_TYPES`，由 `gen-persistence-catalog` 生成）之外的事件类型同样被拒绝，除非该事件的信封带 `ignorable: true`。JSONL provider 会在保留源文件的同时发布迁移后的当前 generation；SQLite 继续使用单调递增的 `SCHEMA_VERSION` 检查整个文件结构。
 
 ## `CreateSessionOptions`：seed 与元数据
 
@@ -166,25 +165,34 @@ interface SessionRawArtifact extends SessionStorageMetadata {
 
 ```ts type-equiv
 /**
- * Fresh storage values transferred to {@link SessionStore.prepare} without a
- * second serialization copy. Callers retain no mutable aliases.
+ * Aliasing state of an adoptable Session seed. `shared-frozen` permits deeply
+ * frozen aliases plus independently owned unfrozen values in the same seed.
+ */
+type SessionSeedEventState = 'detached' | 'shared-frozen'
+```
+
+```ts type-equiv
+/**
+ * Adoptable storage values transferred to {@link SessionStore.prepare}
+ * without another serialization copy; the restore path validates and freezes
+ * them in place.
  */
 interface RestoredSessionOptions {
-  /** Fresh detached storage events to validate and freeze in place. */
+  /** Events that are independently owned or already deeply frozen. */
   readonly seed: SessionEvent[]
-  /** Fresh detached storage metadata to validate and freeze in place. */
+  /** Independently owned storage metadata to validate and freeze in place. */
   readonly meta: SessionHeader
   /** Exact number of fork-inherited leading events decoded from storage. */
   readonly inheritedEventCount: SessionLogOffset
-  /** Select the persistence ownership-transfer path. */
-  readonly seedSource: 'persistence'
+  /** Aliasing state carried from the operation that produced the seed. */
+  readonly eventState: SessionSeedEventState
 }
 ```
 
 ```ts type-equiv
 /** Inputs accepted while constructing an unpublished Session. */
 type PrepareSessionOptions =
-  | (CreateSessionOptions & { readonly seedSource?: undefined })
+  | (CreateSessionOptions & { readonly eventState?: undefined })
   | RestoredSessionOptions
 ```
 
@@ -287,12 +295,126 @@ Durable append-only session storage. Implementations preserve contiguous, lossle
 
 ```ts cordis-catalog
 /**
+ * Create a new stored session and take its write ownership. The create is
+ * lazy: the session is observable through `stat`/`list`/`open` in this
+ * process immediately, but no durable artifact exists until the handle's
+ * first `append` or `flush`.
+ * @param header - the immutable header (id, version, cwd, lineage) to store.
+ * @param options - optional cancellation and the exact fork-inherited cut.
+ * @returns a `write` handle owned by the caller; close it to release ownership.
+ * @throws {SessionAlreadyExistsError} when the id already exists.
+ */
+async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandleType>
+
+/**
+ * Open an existing stored session. `read` never takes ownership and works
+ * while another handle or process holds `write`; `write` atomically claims
+ * single-writer ownership.
+ * @param id - the stored session to open.
+ * @param access - `read` or `write`.
+ * @param options - optional cancellation.
+ * @returns the open handle.
+ * @throws {SessionPersistenceNotFoundError} when the session does not exist.
+ * @throws {SessionAlreadyOwnedError} for `write` when ownership is taken.
+ */
+async open(id: SessionId, access: SessionAccessType, options?: SessionPersistenceOpenOptions): Promise<SessionHandleType>
+
+/**
+ * Flush every active write handle owned by this service instance: pending
+ * creates materialize and routed events drain durably. A handle closed
+ * concurrently counts as flushed — close itself drains durably.
+ * @returns resolution once every write handle active at the call has flushed.
+ * @throws {AggregateError} naming each session whose flush failed.
+ */
+async flush(): Promise<void>
+
+/**
+ * Observe one stored session without reading its event log or taking
+ * ownership; pending creates count before they materialize.
+ * @param id - the stored session to observe.
+ * @param options - optional cancellation.
+ * @returns the snapshot, or `undefined` when the session does not exist.
+ */
+async stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<SessionPersistenceSnapshot | undefined>
+
+/**
+ * List every stored session visible to this process, in no promised order,
+ * including pending creates that have not materialized yet.
+ * @param options - optional cancellation.
+ * @returns one snapshot per stored session.
+ */
+async list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>
+
+/**
+ * Release one contract handle's write ownership at close.
+ * @param id - the session whose write handle is released.
+ * @param handle - the closing contract handle.
+ */
+releaseContractHandle(id: SessionId, handle: ContractSessionHandle): void
+
+/**
+ * Durably materialize one detached pending session created through
+ * {@link create}. Coordinator-backed backends implement; direct backends
+ * materialize through their own write handles and never reach this hook.
+ * @param _id - the pending session to materialize.
+ * @returns after the artifact is durable.
+ */
+materializeDetached(_id: SessionId): Promise<void>
+
+/**
+ * Drop one detached pending create that never materialized, returning its
+ * id to availability.
+ * @param _id - the pending session to discard.
+ * @returns after the reservation is released.
+ */
+discardDetached(_id: SessionId): Promise<void>
+
+/**
+ * Whether the id names a detached pending create (created through
+ * {@link create} but not yet materialized). Backends with coordinator
+ * pending-state override; a backend without deferred materialization never
+ * holds a pending session.
+ * @param id - the session to check.
+ * @returns true while the session exists only as an in-process reservation.
+ */
+isPending(id: SessionId): boolean
+
+/**
+ * Storage metadata for a session already bound to a live Session through the
+ * coordinator's `session/created` path, or `undefined`. Backends without
+ * live-session tracking never override this hook.
+ * @param _id - the session to look up.
+ * @returns the tracked storage record while a live Session owns it.
+ */
+liveStorage(_id: SessionId): Promise<SessionStorageMetadata | undefined>
+
+/**
+ * List this instance's detached pending creates.
+ * @returns one storage metadata record per pending detached session.
+ */
+listPending(): readonly SessionStorageMetadata[]
+
+/**
+ * List all stored (materialized) sessions' metadata; the backend storage hook.
+ * @param signal - optional cancellation for backend listing work.
+ * @returns one header per materialized session.
+ */
+listStored(signal?: AbortSignal): Promise<SessionHeader[]>
+
+/**
+ * Header-only listing for consumers that predate the snapshot contract.
+ * @param signal - optional cancellation for backend listing work.
+ * @returns one header per materialized session.
+ */
+listHeaders(signal?: AbortSignal): Promise<SessionHeader[]>
+
+/**
  * Create a new explicit write handle while retaining the legacy create API.
  * @param meta - immutable Session header to register.
  * @param inheritedEventCount - exact inherited prefix length for a seeded Session.
  * @returns an owned write handle.
  */
-async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle>
+async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<LegacySessionHandle>
 
 /**
  * Open a handle and acquire any provider-specific cross-process lock.
@@ -300,7 +422,7 @@ async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset):
  * @param mode - read or write access.
  * @returns a handle whose close releases local and provider ownership.
  */
-async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHandle>
+async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<LegacySessionHandle>
 
 /**
  * Open a read or write handle for an existing Session.
@@ -308,22 +430,22 @@ async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHa
  * @param mode - read allows inspection; write reserves the local writer.
  * @returns an explicit SessionHandle.
  */
-openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle
+openHandle(id: SessionId, mode: SessionHandleMode ): LegacySessionHandle
 
 /** Release a process-local writer reservation held by one handle.
  * @param id - session identity whose reservation is released.
  * @param handle - handle that owns the reservation.
  */
-releaseHandle(id: SessionId, handle: SessionHandle): void
+releaseHandle(id: SessionId, handle: LegacySessionHandle): void
 
 /**
  * Resolve this backend's independent local artifact for a session without
  * reading, creating, flushing, or otherwise materializing it. Backends such
  * as SQLite that do not own one artifact per session return `undefined`.
- * @param meta - the immutable session header whose artifact is requested.
+ * @param _meta - the immutable session header whose artifact is requested.
  * @returns the backend-specific absolute location, when one exists.
  */
-abstract locate(meta: SessionHeader): SessionLocation | undefined
+locate(_meta: SessionHeader): SessionLocation | undefined
 
 /**
  * Read a session's backend-owned artifact text verbatim — the exact durable
@@ -351,7 +473,7 @@ readRaw(_id: SessionId, signal?: AbortSignal): Promise<SessionRawArtifact | unde
  * @param inheritedEventCount - exact fork-inherited prefix length. Required
  * for a seeded header and omitted only for an unseeded header.
  */
-abstract create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void>
+async createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void>
 
 /**
  * Durably materialize an empty live session without adding a synthetic event.
@@ -372,7 +494,7 @@ ensureMaterialized(_session: Session): Promise<void>
  * @param id - the session the batch belongs to.
  * @param events - the contiguous batch to persist, in seq order.
  */
-abstract append(id: SessionId, events: readonly SessionEvent[]): Promise<void>
+async append(id: SessionId, events: readonly SessionEvent[]): Promise<void>
 
 /**
  * Remove one complete persisted session tree when the deployment exposes a
@@ -410,7 +532,7 @@ async prepare(id: SessionId, signal?: AbortSignal): Promise<SessionPreparation>
  * @param id - the persisted session to reload.
  * @returns the header and a log ending on a balanced `turn/end`.
  */
-abstract load(id: SessionId): Promise<SessionInspection>
+load(id: SessionId): Promise<SessionInspection>
 
 /**
  * Inspect an immutable logical session without committing recovery or
@@ -427,7 +549,7 @@ abstract load(id: SessionId): Promise<SessionInspection>
  * @param signal - optional cancellation for queued and backend read work.
  * @returns the validated header and current logical event log.
  */
-abstract inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>
+async inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>
 
 /**
  * Read the stored events from `fromSeq` onward — the read-from-seq
@@ -447,7 +569,7 @@ abstract inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection
  * @param signal - optional cancellation for queued and backend read work.
  * @returns storage metadata, the requested offset, and stored events with `seq >= fromSeq`.
  */
-abstract readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix>
+async readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix>
 
 /**
  * Read one session header without loading its event log. First-party
@@ -458,13 +580,6 @@ abstract readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal
  * @returns the immutable header, or undefined when the session is absent.
  */
 async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined>
-
-/**
- * Lightweight listing from metadata, without a full-log parse.
- * @param signal - optional cancellation for backend listing work.
- * @returns one header per materialized session.
- */
-abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
 
 /**
  * Read one materialized session's opaque source revision without loading its event log.
@@ -517,7 +632,7 @@ readHistoryIndex( _id: SessionId, _maxItems: number = DEFAULT_SESSION_HISTORY_IN
  * @param signal - optional cancellation for backend snapshot-listing work.
  * @returns one header and opaque revision per materialized session without loading full logs.
  */
-abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
+async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
 
 /**
  * Reserve a browser draft before an Agent is created. Local providers return

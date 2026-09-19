@@ -8,7 +8,7 @@ Status: implemented
 
 想要扇出的模型会把多个 `subagent` 调用合并进同一条 assistant 消息：这个批次本身就是并行意图。委派工具此前没有声明 `isConcurrencySafe` 分类器，按安全侧原则设计的调度器（[并行工具调用 Agent Note](2026-07-10-parallel-tool-call-execution.zh.md)）便把每个前台委派都当作独占屏障：GUI 里显示九张卡片，却只有一个子 agent（智能体）在运行，其余八个要在它的整个运行期间排在其后等待。
 
-最初的保守立场（一元分类器无法证明同级委派的工作区效果互不相交）已经不再保护任何东西：`run_in_background: true` 和可继续委派本来就会与其后的每个调用重叠执行，包括写入；`dsh-workflow-worker-thread` 也早已通过同样的 `ctx.subagents.start()` 提供方在共享工作区上并发运行子 agent，数量可达其并发上限。只有前台形态被串行化。
+最初的保守立场（一元分类器无法证明同级委派的工作区效果互不相交）已经不再保护任何东西：`run_in_background: true` 和可继续委派本来就会与其后的每个调用重叠执行，包括写入；`dsh-workflow-ptc` 也早已通过同样的 `ctx.subagents.start()` 提供方在共享工作区上并发运行子 agent，数量可达其并发上限。只有前台形态被串行化。
 
 ## 决策
 

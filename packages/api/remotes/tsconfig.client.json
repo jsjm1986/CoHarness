@@ -12,16 +12,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../gateway/tsconfig.client.json"
     },
     {
       "path": "../../client/connection/tsconfig.client.json"
     },
     {
-      "path": "../../credentials/credentials"
+      "path": "../../context/collaboration"
     },
     {
       "path": "../../context/file-reference"
@@ -30,19 +27,31 @@
       "path": "../../context/session-reference"
     },
     {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../credentials/credentials"
+    },
+    {
       "path": "../../extensions/cordis-host-runner"
     },
     {
-      "path": "../../goal/goal"
+      "path": "../../feedback/command-feedback"
     },
     {
       "path": "../../feedback/message-feedback"
+    },
+    {
+      "path": "../../goal/goal"
     },
     {
       "path": "../../host/plugin-inventory"
     },
     {
       "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../interaction/permission-presets"
     },
     {
       "path": "../../llm/llm"
@@ -54,16 +63,13 @@
       "path": "../../settings/settings"
     },
     {
-      "path": "../../typert/protocol"
-    },
-    {
       "path": "../../subagent/subagent"
     },
     {
-      "path": "../../feedback/command-feedback"
+      "path": "../../typert/protocol"
     },
     {
-      "path": "../../context/collaboration"
+      "path": "../../../vendor/cordis"
     }
   ]
 }

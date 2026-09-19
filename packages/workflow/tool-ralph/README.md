@@ -83,6 +83,8 @@ Every round pays for a fresh child context. `maxHandoffChars` bounds cross-round
 
 Each fresh child has an independent request cache. The parent result appends after the reusable request prefix.
 
+**Runtime invariant:** No companion is published. This model-facing orchestration adapter owns no independent event stream; workflow and subagent owners validate the runs and child lifecycles it starts.
+
 ## Known Limitations and Deferred Work
 
 - **Completion is worker self-declaration** — there is no independent evaluator or verifier deciding whether the objective is actually complete; evaluator policy and evaluator-driven continuation are deferred.

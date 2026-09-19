@@ -9,22 +9,22 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/loader"
+      "path": "../../acp/acp"
     },
     {
       "path": "../../boot/app-boot"
     },
     {
-      "path": "../../acp/acp"
+      "path": "../../context/agent-instructions"
     },
     {
       "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../agent-spine-demo"
     },
     {
       "path": "../../session-query/session-query"
@@ -33,19 +33,19 @@
       "path": "../../session-query/session-query-sqlite"
     },
     {
-      "path": "../agent-spine-demo"
-    },
-    {
-      "path": "../../context/agent-instructions"
-    },
-    {
       "path": "../../session/session-checkpoint-policy"
     },
     {
       "path": "../../session/session-persistence-jsonl"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

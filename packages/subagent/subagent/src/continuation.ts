@@ -82,12 +82,14 @@ export class SubagentContinuationManager {
   constructor(
     private readonly ctx: Context,
     private readonly host: ContinuationHost,
-    limits: { maxActivations: number; maxActivationsPerParent: number },
+    limits: () => { maxActivations: number; maxActivationsPerParent: number },
+    maxActiveSubagents: () => number,
   ) {
     this.activations = new ContinuableActivationRegistry(
       ctx,
       (provider, childId, parent) => host.observeActivation(provider, childId, parent),
       limits,
+      maxActiveSubagents,
     )
   }
 

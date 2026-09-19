@@ -8,13 +8,12 @@
   "files": [
     "src/agent-lookup.ts",
     "src/index.ts",
-    "src/invariant.ts",
     "src/remote-events.ts",
     "src/types.ts"
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../context/collaboration"
     },
     {
       "path": "../../core/agent"
@@ -26,7 +25,16 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../extensions/cordis-host-runner"
+    },
+    {
+      "path": "../../feedback/command-feedback"
+    },
+    {
       "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../interaction/permission-presets"
     },
     {
       "path": "../../llm/llm"
@@ -38,28 +46,19 @@
       "path": "../../session/session-persistence"
     },
     {
-      "path": "../../extensions/cordis-host-runner"
-    },
-    {
       "path": "../../settings/settings"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../typert/registry"
-    },
-    {
-      "path": "../../typert/protocol"
     },
     {
       "path": "../../subagent/subagent"
     },
     {
-      "path": "../../feedback/command-feedback"
+      "path": "../../typert/protocol"
     },
     {
-      "path": "../../context/collaboration"
+      "path": "../../typert/registry"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

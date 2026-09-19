@@ -225,6 +225,7 @@ function mount(
           useLexicon={bindSnapshotSelector(wiring.lexicon)}
           useMenuLauncher={bindSnapshotSelector(createSnapshotStore<string | null>(null))}
           useDocuments={(() => []) as InputBarProps['useDocuments']}
+          usePermissionCatalog={(() => undefined) as InputBarProps['usePermissionCatalog']}
           stop={stop}
           command={() => Promise.resolve(true)}
           t={t}

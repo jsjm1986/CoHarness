@@ -96,7 +96,6 @@ function buildSeed(): string {
         source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
       },
     },
-    sourceEventSeqs: [],
     surfaceOp: 'append',
   })
   at({ type: 'step/end', data: { turn: 1, step: 1 } })
@@ -135,7 +134,6 @@ function buildSeed(): string {
         source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
       },
     },
-    sourceEventSeqs: [],
     surfaceOp: 'append',
   })
   at({ type: 'step/end', data: { turn: 2, step: 1 } })

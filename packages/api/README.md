@@ -15,3 +15,5 @@ The runtime dependency direction is `remotes → gateway → connection → webs
 
 - Connection and WebServer remain at [`client/connection`](../client/connection/README.md) and [`host/webserver`](../host/webserver/README.md); a later package-only move can place them under `api/connection` and `api/webserver` without changing their service contracts.
 - The legacy API Proxy remains at [`host/apiproxy`](../host/apiproxy/README.md) as the fallback for methods not yet migrated to Remote. It consumes the Host resolver owned by `api-remotes` so migrated and legacy methods retain one Agent/Session identity policy.
+
+The [Typert subsystem reference](../../docs/subsystems/typert.md) records the public contracts shared by protocol, Gateway, and consumer assemblies.

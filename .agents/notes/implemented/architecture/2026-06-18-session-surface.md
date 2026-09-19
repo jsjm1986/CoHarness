@@ -16,7 +16,7 @@ Add a **surface** — a derived, cached order of event sequences (the subset of 
 
 Every `SessionEvent` gains two optional fields (structural metadata, like `seq`/`time`):
 
-- **`sourceEventSeqs?: number[]`** — seq numbers of earlier events cited as sources (e.g., the `assistant/chunk` seqs that built an `assistant/message`, or the surface nodes shadowed by a compaction marker). A present `[]` is valid only on `assistant/message` and records a known empty provider stream; when the field is absent, a legacy or foreign event does not record which earlier events produced the message. Other surface events require a non-empty list when the field is present. Without these cited seqs, replay cannot validate that a replace-range operation names every event it removed.
+- **`sourceEventSeqs?: number[]`** — seq numbers of earlier events cited as sources (e.g., a `tool/call` cited by its result or the surface nodes shadowed by a compaction marker). A present list must be non-empty; `assistant/message` embeds its provider stream in `data.stream` and cannot carry this field. Without these cited seqs, replay cannot validate that a replace-range operation names every event it removed.
 - **`surfaceOp?: SurfaceOp`** — how this event entered the surface. Absent for non-surface events.
 
 ### SurfaceOp: two operations
@@ -27,7 +27,7 @@ export type SurfaceOp =
   | { op: 'replace'; startSeq: number; endSeq: number }  // shadow [startSeq, endSeq] inclusive
 ```
 
-1. **Append** — add the new event seq to the tail. Used by `user/message`, `assistant/message`, `tool/result`, `context/message`. The loop passes `surfaceOp: 'append'` on all such appends and records `sourceEventSeqs` where applicable: every successful `assistant/message` records its complete `assistant/chunk` source set, including `[]`, while `tool/result` records its `tool/call` source.
+1. **Append** — add the new event seq to the tail. Used by `user/message`, `assistant/message`, `tool/result`, `context/message`. The loop passes `surfaceOp: 'append'` on all such appends and records `sourceEventSeqs` where applicable: `assistant/message` embeds its provider stream directly, while `tool/result` records its `tool/call` source.
 
 2. **Replace** — remove entries from `startSeq` through `endSeq` (both inclusive) and insert the new event seq in their place. Both endpoints must be present in the current surface and reference earlier events; `startSeq === endSeq` replaces one entry. The event's `sourceEventSeqs` must contain every shadowed surface seq. The shadowed events remain in the log but are no longer on the surface. When node 0 holds a `system/message`, a range covering it must be a `system/message` over exactly that node. Committed logs written before the field rename carry `start`/`end` keys; readers normalize them to `startSeq`/`endSeq` while writers always emit the canonical keys.
 
@@ -49,7 +49,7 @@ The `repair.ts` module synthesizes `tool/result` closers for orphaned tool calls
 
 ### Invariants
 
-`Session` validates `sourceEventSeqs` and `surfaceOp` at the always-on seed/append boundary: only `assistant/message` may use an empty source-event list; references are unique, earlier, and known; replacement endpoints exist in surface order; and `sourceEventSeqs` covers every shadowed node. These are single-record acceptance and storage-projection rules, not optional invariant-service contributions.
+`Session` validates `sourceEventSeqs` and `surfaceOp` at the always-on seed/append boundary: `assistant/message` carries no source list; other source lists are non-empty, unique, earlier, and known; replacement endpoints exist in surface order; and `sourceEventSeqs` covers every shadowed node. These are single-record acceptance and storage-projection rules, not optional invariant-service contributions.
 
 Every surface-eligible event must carry `surfaceOp` or it would disappear from derived history. Typed `append` overloads enforce this for literal event types; runtime checks in `append` and the seed constructor cover widened unions and loaded logs. Invalid seeds are rejected rather than upgraded under the pre-release format policy.
 

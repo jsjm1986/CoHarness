@@ -291,6 +291,7 @@ export function apply(ctx: Context, config: Config): void {
 /* jscpd:ignore-start */
 function lastTurn(agent: Agent | undefined): number {
   if (!agent) return 0
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const last = [...agent.session.snapshotEvents()].findLast(e => e.type === 'turn/start')
   /* v8 ignore next -- agent-present turnBase callers are tool/stop extension points inside an open turn. */
   return last?.type === 'turn/start' ? last.data.turn : 0

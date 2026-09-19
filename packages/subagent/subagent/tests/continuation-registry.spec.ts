@@ -27,13 +27,16 @@ function makeRegistry(limits = { maxActivations: 8, maxActivationsPerParent: 4 }
   const registry = new ContinuableActivationRegistry(
     ctx,
     () => ({}) as ActivationObserver,
-    limits,
+    () => limits,
+    () => 8,
   )
   return { ctx, registry, internals: registry as unknown as RegistryInternals }
 }
 
 function makeActivation(childId: SessionId, parentSession: SessionId, agent?: Agent): Activation {
   return {
+    pool: { reserve: () => () => {} },
+    releaseSlot: () => {},
     childId,
     parentSession,
     provider: 'test',

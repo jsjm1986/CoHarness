@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
@@ -56,11 +57,10 @@ const STEER_TWO = 'Interjection: include the word ORANGE in your final reply.'
 /** Concatenated assistant text deltas — the model-visible reply body. */
 function assistantText(events: SessionEvent[]): string {
   return events
-    .filter(e => e.type === 'assistant/chunk')
-    .map((e) => {
-      const chunk = (e as SessionEvent & { data: { chunk: { type: string; text?: string } } }).data.chunk
-      return chunk.type === 'text-delta' ? chunk.text ?? '' : ''
-    })
+    .flatMap(e => e.type === 'assistant/message' || e.type === 'assistant/attempt'
+      ? expandAssistantStream(e.data.stream)
+      : [])
+    .map(({ chunk }) => chunk.type === 'text-delta' ? chunk.text : '')
     .join('')
 }
 

@@ -64,6 +64,8 @@ Indirectly, through the preset a later session is composed from; [`dsh-agent-pre
 
 No direct invalidation. Changing the default never touches a running session's prefix; a session created afterwards establishes its own prefix from its own composition.
 
+**Runtime invariant:** No companion is published. This is a browser-side surface plugin whose node half owns no event stream or mutable runtime data; the roster and the settings write are host contracts covered there.
+
 ## Known Limitations and Deferred Work
 
 - **A preset without metadata is listed by id** — display text is optional, and a copy given no name deliberately falls back to its directory name rather than presenting itself identically to its source.

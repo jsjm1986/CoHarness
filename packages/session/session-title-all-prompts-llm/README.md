@@ -22,6 +22,8 @@ One auxiliary request may follow every new eligible prompt, bounded per request 
 
 No main-request invalidation. Auxiliary input grows or changes after each prompt, so provider-specific cache reuse ends at the first changed JSON token.
 
+**Runtime invariant:** No companion is published. This thin provider delegates request and result validation to the shared title service and LLM helper and retains no independent mutable state.
+
 ## Known Limitations and Deferred Work
 
 - Input overflow retains the prior title; this provider has no summarization-of-summaries or retention policy for very long sessions.

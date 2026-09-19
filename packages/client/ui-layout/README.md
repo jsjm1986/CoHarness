@@ -18,6 +18,8 @@ None, as the layout shell manages browser viewing state; nothing here reaches a 
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The shell viewing-state store behind `ctx.layout` emits no Cordis events; clamp and track sequencing is asserted directly by this package's columns and service specs.
+
 ## Known Limitations and Deferred Work
 
 - **Panel geometry is transient** — reload restores the sidebar default and details closed; switching between distinct Session ids also closes details and forgets its dragged width, while unselected surfaces render details at zero width without modifying geometry.

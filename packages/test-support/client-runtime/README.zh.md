@@ -18,6 +18,8 @@
 
 无；本包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。本测试支持包不拥有生产事件流或可变数据，而是围绕测试替身组装生产 SlotRegistry 与渲染器。所挂载的生产包拥有各自的不变式，本包行为由本包测试检验。
+
 ## 已知限制与延期工作
 
 - **仅可经仓内源码别名消费。** spec 通过 tsconfig `paths` 解析到 `src`；构建产物 `lib/` 再导出 `@deepseek-ai/dsh-client-runtime/client`，而该 bundle 是无 Node ESM 导出的浏览器 loader 脚本，故 `lib/index.js` 在纯 Node 下不可导入。所有消费方都是仓内 Vitest 套件；不存在 Node 兼容的运行时入口。

@@ -28,6 +28,8 @@ None, as the theme service manages a browser preference; nothing here reaches a 
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The settings scope validates and publishes the durable theme section, while the registry emits `theme/change` synchronously with its own mutations. Store/registry agreement is covered directly by this package's Host, scope, and service behavior specs.
+
 ## Known Limitations and Deferred Work
 
 - **Third-party themes are an extension point, not a product** — registering one means overriding same-named alias variables; no validation exists that an override set is complete.

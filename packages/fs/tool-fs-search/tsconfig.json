@@ -4,31 +4,21 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../util/output-retention"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../core/tools"
     },
     {
-      "path": "../../core/system-prompt"
+      "path": "../../llm/llm"
     },
     {
       "path": "../../shell/shell"
@@ -37,10 +27,25 @@
       "path": "../../spill/spill"
     },
     {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../util/output-retention"
+    },
+    {
       "path": "../../util/timeout"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

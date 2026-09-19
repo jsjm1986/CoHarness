@@ -7,17 +7,16 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import type z from '@deepseek-ai/schemastery'
+import { deepEqualJson, deepFreeze } from '@deepseek-ai/dsh-util-values'
 import { redactSchemaDefaults, redactSecrets } from './redact.ts'
 import type { RedactedSecret } from './redact.ts'
 import type { SettingsNamespace, SettingsUpdateSource } from './types.ts'
 
-export { redactSchemaDefaults, redactSecrets } from './redact.ts'
+export { redactSecrets, redactSchemaDefaults } from './redact.ts'
+export { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 export type { RedactedSecret, RedactedValue } from './redact.ts'
 export type { SettingsNamespace, SettingsUpdateSource } from './types.ts'
-
-const NAMESPACE_PATTERN = /^[a-z][a-z0-9-]*$/
 
 /**
  * Brand a raw string as a {@link SettingsNamespace}.
@@ -25,6 +24,35 @@ const NAMESPACE_PATTERN = /^[a-z][a-z0-9-]*$/
  * @returns the branded namespace.
  */
 export function settingsNamespace(value: string): SettingsNamespace {
+  return parseSettingsNamespace(value)
+}
+
+/** Logical owner of a settings namespace for scoped configuration surfaces. */
+export type SettingsOwner = 'account' | 'project' | 'organization' | 'deployment'
+/** Whether a project manager may edit a namespace in a shared runtime. */
+export type SettingsProjectWrite = 'never' | 'manager'
+/** One section path a project manager may mutate in a shared runtime. */
+export type SettingsProjectWritePath = readonly string[]
+
+const NAMESPACE_PATTERN = /^[a-z][a-z0-9-]*$/
+type LowercaseLetter = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
+  | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+type DecimalDigit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+type NamespaceCharacter = LowercaseLetter | DecimalDigit | '-'
+type ValidNamespaceTail<Value extends string> = Value extends ''
+  ? true
+  : Value extends `${NamespaceCharacter}${infer Rest}`
+    ? ValidNamespaceTail<Rest>
+    : false
+type SettingsNamespaceInput<Value extends string> = Value extends SettingsNamespace
+  ? Value
+  : string extends Value
+    ? string
+    : Value extends `${LowercaseLetter}${infer Rest}`
+      ? ValidNamespaceTail<Rest> extends true ? Value : never
+      : never
+
+function parseSettingsNamespace(value: string): SettingsNamespace {
   if (!NAMESPACE_PATTERN.test(value)) {
     throw new TypeError(`settings namespace "${value}" must match ${String(NAMESPACE_PATTERN)}`)
   }
@@ -34,32 +62,12 @@ export function settingsNamespace(value: string): SettingsNamespace {
 /** When a namespace's changes take effect for its owner. */
 export type SettingsApplies = 'live' | 'restart'
 
-/** Logical owner of a settings namespace for scoped configuration surfaces. */
-export type SettingsOwner = 'account' | 'project' | 'organization' | 'deployment'
-
-/** Whether a project manager may edit a namespace in a shared runtime. */
-export type SettingsProjectWrite = 'never' | 'manager'
-
-/** One section path a project manager may mutate in a shared runtime. */
-export type SettingsProjectWritePath = readonly string[]
-
 /** Registration options beyond the namespace schema. */
 export interface SettingsRegisterOptions<T> {
   /** Composition-layer values resolved below the user layer (entry-config subset). */
   base?: Partial<T>
   /** Owner's effect timing, surfaced to configuration UIs; defaults to `live`. */
   applies?: SettingsApplies
-  /** Logical owner shown by remote configuration surfaces. */
-  owner?: SettingsOwner
-  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
-  projectWrite?: SettingsProjectWrite
-  /**
-   * Optional allowlist for project-manager writes. Each path permits that
-   * exact value and descendants; omission keeps the whole namespace writable
-   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
-   * object-prototype keys.
-   */
-  projectWritePaths?: readonly SettingsProjectWritePath[]
   /**
    * Reject a resolved section the owner could not act on, for constraints its
    * schema cannot express — a cross-field requirement, or one field's validity
@@ -80,6 +88,17 @@ export interface SettingsRegisterOptions<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /** Logical owner shown by remote configuration surfaces. */
+  owner?: SettingsOwner
+  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
+  projectWrite?: SettingsProjectWrite
+  /**
+   * Optional allowlist for project-manager writes. Each path permits that
+   * exact value and descendants; omission keeps the whole namespace writable
+   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
+   * object-prototype keys.
+   */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
 }
 
 /** One registered namespace as surfaced to configuration UIs. */
@@ -119,10 +138,9 @@ export interface SettingsDescriptor {
 /** Options for {@link SettingsProvider.describe}. */
 export interface SettingsDescribeOptions {
   /**
-   * Strip `role('secret')` fields from `value`/`base`/`user`, remove defaults
-   * from schema nodes that can contain them, and enumerate the positions in
-   * each descriptor's `secrets`. Every wire surface MUST pass this; the
-   * verbatim default exists for same-process configuration UIs only.
+   * Strip `role('secret')` fields from `value`/`base`/`user` and enumerate
+   * them in each descriptor's `secrets`. Every wire surface MUST pass this;
+   * the verbatim default exists for same-process configuration UIs only.
    */
   redactSecrets?: boolean
 }
@@ -162,8 +180,6 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-
 /**
  * A write refused because the namespace moved since the caller read it. The
  * Service Definition's serialized write queue orders writes; it cannot tell a fresh writer
@@ -195,40 +211,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const proto: unknown = Object.getPrototypeOf(value)
   return proto === Object.prototype || proto === null
-}
-
-/** Whether an unknown value is a non-empty path made only of safe strings. */
-function isSafeSettingsPath(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.length > 0 && value.every((segment: unknown): segment is string =>
-    typeof segment === 'string' && segment.length > 0
-      && segment !== '__proto__' && segment !== 'prototype' && segment !== 'constructor')
-}
-
-/** Normalize and validate project-manager path restrictions at registration. */
-function projectWritePathsOf(
-  owner: SettingsOwner,
-  projectWrite: SettingsProjectWrite,
-  paths: readonly SettingsProjectWritePath[] | undefined,
-  ns: SettingsNamespace,
-): string[][] | undefined {
-  if (paths === undefined) return undefined
-  if (projectWrite !== 'manager' || owner !== 'project') {
-    throw new Error(`settings namespace "${ns}" may declare project write paths only with project manager writes`)
-  }
-  if (!Array.isArray(paths) || paths.length === 0) {
-    throw new Error(`settings namespace "${ns}" project write paths must be a non-empty array`)
-  }
-  const normalized: string[][] = []
-  for (const path of paths) {
-    if (!isSafeSettingsPath(path)) {
-      throw new Error(`settings namespace "${ns}" project write paths must contain non-empty safe paths`)
-    }
-    normalized.push([...path])
-  }
-  const duplicate = normalized.some((path, index) => normalized.slice(0, index).some(previous =>
-    previous.length === path.length && previous.every((segment, offset) => segment === path[offset])))
-  if (duplicate) throw new Error(`settings namespace "${ns}" project write paths must not contain duplicates`)
-  return normalized
 }
 
 /**
@@ -270,6 +252,40 @@ function applyPathOp(section: Record<string, unknown>, op: SettingsPathOp): Reco
 }
 
 /** Human label for a value that lossless JSON cannot represent (numbers reject inline). */
+/** Whether an unknown value is a non-empty path made only of safe strings. */
+function isSafeSettingsPath(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length > 0 && value.every((segment: unknown): segment is string =>
+    typeof segment === 'string' && segment.length > 0
+      && segment !== '__proto__' && segment !== 'prototype' && segment !== 'constructor')
+}
+
+/** Normalize and validate project-manager path restrictions at registration. */
+function projectWritePathsOf(
+  owner: SettingsOwner,
+  projectWrite: SettingsProjectWrite,
+  paths: readonly SettingsProjectWritePath[] | undefined,
+  ns: SettingsNamespace,
+): string[][] | undefined {
+  if (paths === undefined) return undefined
+  if (projectWrite !== 'manager' || owner !== 'project') {
+    throw new Error(`settings namespace "${ns}" may declare project write paths only with project manager writes`)
+  }
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new Error(`settings namespace "${ns}" project write paths must be a non-empty array`)
+  }
+  const normalized: string[][] = []
+  for (const path of paths) {
+    if (!isSafeSettingsPath(path)) {
+      throw new Error(`settings namespace "${ns}" project write paths must contain non-empty safe paths`)
+    }
+    normalized.push([...path])
+  }
+  const duplicate = normalized.some((path, index) => normalized.slice(0, index).some(previous =>
+    previous.length === path.length && previous.every((segment, offset) => segment === path[offset])))
+  if (duplicate) throw new Error(`settings namespace "${ns}" project write paths must not contain duplicates`)
+  return normalized
+}
+
 function describeRejected(value: unknown): string {
   if (value === undefined) return 'undefined'
   if (typeof value === 'object' && value !== null) {
@@ -366,13 +382,6 @@ function mergeLayers(under: unknown, over: unknown): unknown {
   return merged
 }
 
-/** Recursively freeze one resolved value so handed-out snapshots stay immutable. */
-function deepFreeze<T>(value: T): T {
-  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value
-  for (const entry of Object.values(value)) deepFreeze(entry)
-  return Object.freeze(value)
-}
-
 /** One registered watcher and its serialized invocation chain. */
 interface SettingsWatcher {
   callback: (next: never, prev: never) => void | Promise<void>
@@ -388,7 +397,9 @@ interface SettingsRegistration {
   schema: z<unknown>
   base: unknown
   applies: SettingsApplies
+  /** Logical owner of this namespace. */
   owner: SettingsOwner
+  /** Whether a project manager may edit this namespace. */
   projectWrite: SettingsProjectWrite
   /** Optional path allowlist for project-manager writes. */
   projectWritePaths?: string[][]
@@ -500,20 +511,26 @@ export abstract class SettingsProvider extends Service {
    * @param schema - schemastery schema resolving this namespace's value.
    * @param options - composition `base` layer and effect timing.
    * @returns the owner scope for reads, observation, and updates.
+   * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
    */
-  register<T>(ns: SettingsNamespace, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T> {
-    if (this.isStopped()) throw new Error(`settings service is disposed: "${ns}" cannot be registered`)
-    if (this.registrations.has(ns)) {
-      throw new Error(`settings namespace "${ns}" is already registered`)
+  register<const Namespace extends string, T>(
+    ns: Namespace & SettingsNamespaceInput<Namespace>,
+    schema: z<T>,
+    options?: SettingsRegisterOptions<T>,
+  ): SettingsScope<T> {
+    const parsedNs = parseSettingsNamespace(ns)
+    if (this.isStopped()) throw new Error(`settings service is disposed: "${parsedNs}" cannot be registered`)
+    if (this.registrations.has(parsedNs)) {
+      throw new Error(`settings namespace "${parsedNs}" is already registered`)
     }
     const owner = options?.owner ?? 'deployment'
     const projectWrite = options?.projectWrite ?? 'never'
     if (projectWrite === 'manager' && owner !== 'project') {
-      throw new Error(`settings namespace "${ns}" may be project-writable only when owner is project`)
+      throw new Error(`settings namespace "${parsedNs}" may be project-writable only when owner is project`)
     }
-    const projectWritePaths = projectWritePathsOf(owner, projectWrite, options?.projectWritePaths, ns)
+    const projectWritePaths = projectWritePathsOf(owner, projectWrite, options?.projectWritePaths, parsedNs)
     const registration: SettingsRegistration = {
-      ns,
+      ns: parsedNs,
       schema: schema as z<unknown>,
       base: options?.base,
       applies: options?.applies ?? 'live',
@@ -523,13 +540,13 @@ export abstract class SettingsProvider extends Service {
       ...options?.validate === undefined
         ? {}
         : { validate: options.validate as (value: unknown) => void },
-      resolved: deepFreeze(this.resolve(schema, options?.base, this.section(ns), options?.validate)),
+      resolved: deepFreeze(this.resolve(schema, options?.base, this.section(parsedNs), options?.validate)),
       revision: 0,
       watchers: new Set(),
       active: true,
     }
     this.ctx.effect(() => {
-      this.registrations.set(ns, registration)
+      this.registrations.set(parsedNs, registration)
       return async () => {
         const tails = this.deactivate(registration)
         // Keep the registration in the map until its already-started watcher
@@ -538,14 +555,14 @@ export abstract class SettingsProvider extends Service {
         await Promise.allSettled(tails)
         /* v8 ignore next -- register() rejects the namespace while this
            registration occupies the map, so nothing replaces it before the fence closes. */
-        if (this.registrations.get(ns) === registration) this.registrations.delete(ns)
+        if (this.registrations.get(parsedNs) === registration) this.registrations.delete(parsedNs)
       }
-    }, `settings.register(${JSON.stringify(String(ns))})`)
+    }, `settings.register(${JSON.stringify(String(parsedNs))})`)
     return {
       get: () => registration.resolved as T,
       watch: (callback) => {
         if (!registration.active || this.isStopped()) {
-          throw new Error(`settings namespace "${ns}" registration is disposed`)
+          throw new Error(`settings namespace "${parsedNs}" registration is disposed`)
         }
         const watcher: SettingsWatcher = { callback: callback, tail: Promise.resolve(), active: true }
         registration.watchers.add(watcher)
@@ -554,9 +571,49 @@ export abstract class SettingsProvider extends Service {
           registration.watchers.delete(watcher)
         }
       },
-      update: patch => this.update(ns, patch),
-      replace: section => this.replace(ns, section),
+      update: patch => this.update(parsedNs, patch),
+      replace: section => this.replace(parsedNs, section),
     }
+  }
+
+  /**
+   * Attach one optional-settings consumer to this provider. The consumer
+   * registers its composition entry as the base layer while this provider is
+   * present, then falls back to that entry if the provider detaches.
+   * @param owner - consumer context whose unload suppresses fallback work.
+   * @param ns - consumer-owned settings namespace.
+   * @param schema - schema resolving the namespace.
+   * @param entry - composition entry used as the base and fallback value.
+   * @param hooks - source sink, change notification, and optional validation.
+   * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
+   */
+  installSection<const Namespace extends string, T>(
+    owner: Context,
+    ns: Namespace & SettingsNamespaceInput<Namespace>,
+    schema: z<T>,
+    entry: T,
+    hooks: SettingsSectionHooks<T>,
+  ): void {
+    const scope = this.register<Namespace, T>(ns, schema, {
+      base: entry,
+      ...hooks.validate === undefined ? {} : { validate: hooks.validate },
+      ...hooks.owner === undefined ? {} : { owner: hooks.owner },
+      ...hooks.projectWrite === undefined ? {} : { projectWrite: hooks.projectWrite },
+      ...hooks.projectWritePaths === undefined ? {} : { projectWritePaths: hooks.projectWritePaths },
+    })
+    hooks.setSource(() => scope.get())
+    this.ctx.effect(() => () => {
+      // Losing the provider leaves the consumer running; unloading the
+      // consumer does not, so only the former needs fallback work.
+      if (isUnloading(owner)) return
+      hooks.setSource(() => entry)
+      hooks.onChange()
+    })
+    hooks.onChange()
+    scope.watch(() => {
+      if (isUnloading(owner)) return
+      hooks.onChange()
+    })
   }
 
   /**
@@ -611,9 +668,10 @@ export abstract class SettingsProvider extends Service {
    * Read one registered namespace's resolved value.
    * @param ns - the namespace to read.
    * @returns the resolved value, or `undefined` while unregistered.
+   * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
    */
-  get(ns: SettingsNamespace): unknown {
-    return this.registrations.get(ns)?.resolved
+  get<const Namespace extends string>(ns: Namespace & SettingsNamespaceInput<Namespace>): unknown {
+    return this.registrations.get(parseSettingsNamespace(ns))?.resolved
   }
 
   /**
@@ -626,9 +684,14 @@ export abstract class SettingsProvider extends Service {
    * @param patch - plain-object patch over the user section.
    * @param expectedRevision - the descriptor `revision` the caller read; a
    *   namespace that moved past it rejects with {@link SettingsConflictError}.
+   * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
    */
-  async update(ns: SettingsNamespace, patch: object, expectedRevision?: number): Promise<void> {
-    return this.write(ns, patch, 'merge', expectedRevision)
+  async update<const Namespace extends string>(
+    ns: Namespace & SettingsNamespaceInput<Namespace>,
+    patch: object,
+    expectedRevision?: number,
+  ): Promise<void> {
+    return this.write(parseSettingsNamespace(ns), patch, 'merge', expectedRevision)
   }
 
   /**
@@ -640,9 +703,14 @@ export abstract class SettingsProvider extends Service {
    * @param section - the complete next user section.
    * @param expectedRevision - the descriptor `revision` the caller read; a
    *   namespace that moved past it rejects with {@link SettingsConflictError}.
+   * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
    */
-  async replace(ns: SettingsNamespace, section: object, expectedRevision?: number): Promise<void> {
-    return this.write(ns, section, 'replace', expectedRevision)
+  async replace<const Namespace extends string>(
+    ns: Namespace & SettingsNamespaceInput<Namespace>,
+    section: object,
+    expectedRevision?: number,
+  ): Promise<void> {
+    return this.write(parseSettingsNamespace(ns), section, 'replace', expectedRevision)
   }
 
   /**
@@ -656,18 +724,24 @@ export abstract class SettingsProvider extends Service {
    * @param ops - ordered path edits; later ops observe earlier ones.
    * @param expectedRevision - the descriptor `revision` the caller read; a
    *   namespace that moved past it rejects with {@link SettingsConflictError}.
+   * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
    */
-  async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void> {
-    if (!Array.isArray(ops)) throw new TypeError(`settings mutate for "${ns}" must be an array of path ops`)
+  async mutate<const Namespace extends string>(
+    ns: Namespace & SettingsNamespaceInput<Namespace>,
+    ops: readonly SettingsPathOp[],
+    expectedRevision?: number,
+  ): Promise<void> {
+    const parsedNs = parseSettingsNamespace(ns)
+    if (!Array.isArray(ops)) throw new TypeError(`settings mutate for "${parsedNs}" must be an array of path ops`)
     for (const op of ops) {
       if (!isPlainObject(op) || (op['op'] !== 'set' && op['op'] !== 'unset')) {
-        throw new TypeError(`settings mutate for "${ns}" ops must be {op:'set'|'unset', path}`)
+        throw new TypeError(`settings mutate for "${parsedNs}" ops must be {op:'set'|'unset', path}`)
       }
       if (!Array.isArray(op['path']) || (op['path'] as unknown[]).some(part => typeof part !== 'string')) {
-        throw new TypeError(`settings mutate for "${ns}" op paths must be arrays of strings`)
+        throw new TypeError(`settings mutate for "${parsedNs}" op paths must be arrays of strings`)
       }
     }
-    return this.write(ns, ops, 'mutate', expectedRevision)
+    return this.write(parsedNs, ops, 'mutate', expectedRevision)
   }
 
   /** Validate a write, then queue it on the namespace's serialized write chain. */
@@ -709,10 +783,7 @@ export abstract class SettingsProvider extends Service {
       if (this.isStopped()) {
         throw new Error(`settings service was disposed before the queued "${ns}" ${verb} ran`)
       }
-      if (this.registrations.get(ns) !== registration) {
-        throw new Error(`settings namespace "${ns}" registration was disposed before the queued ${verb} ran`)
-      }
-      if (!registration.active) {
+      if (this.registrations.get(ns) !== registration || !registration.active) {
         throw new Error(`settings namespace "${ns}" registration was disposed before the queued ${verb} ran`)
       }
       // Every mode derives from the section as it stands NOW, at the front of
@@ -732,17 +803,18 @@ export abstract class SettingsProvider extends Service {
       const next = deepFreeze(this.resolve(registration.schema, registration.base, section, registration.validate))
       await this.persist(ns, section)
       // The write reached storage either way; the cache must say so. Commit
-      // through whoever owns the namespace NOW: a fiber disposed mid-persist
-      // gets no notification, and a replacement registration re-resolves the
-      // persisted section under its own schema/base rather than inheriting
-      // this write's resolved value.
+      // only when this registration is still the namespace owner — a fiber
+      // disposed (or replaced) mid-persist must not receive the notification.
       this.document[ns] = section
       const owner = this.registrations.get(ns)
-      if (owner === undefined || this.isStopped()) return
-      let ownerNext: unknown
-      if (owner === registration) {
-        ownerNext = next
-      } else {
+      if (owner === registration && !this.isStopped()) {
+        this.bumpRevision(registration, current, section)
+        this.commit(registration, next, 'update')
+      } else if (owner !== undefined && !this.isStopped()) {
+        // A replacement registration still tracks the persisted section:
+        // re-resolve it from what actually landed so an old in-flight write
+        // cannot leave the new owner stale.
+        let ownerNext: unknown
         try {
           ownerNext = deepFreeze(this.resolve(owner.schema, owner.base, section, owner.validate))
         } catch (error) {
@@ -750,9 +822,9 @@ export abstract class SettingsProvider extends Service {
           this.ctx.logger.warn(error)
           return
         }
+        this.bumpRevision(owner, current, section)
+        this.commit(owner, ownerNext, 'update')
       }
-      this.bumpRevision(owner, current, section)
-      this.commit(owner, ownerNext, 'update')
     })
     this.writeQueues.set(ns, run)
     return run
@@ -947,7 +1019,7 @@ function isUnloading(ctx: Context): boolean {
   return state === FIBER_UNLOADING || state === FIBER_DISPOSED
 }
 
-/** Hooks a consumer hands to {@link installSettingsSection}. */
+/** Hooks a consumer hands to {@link SettingsProvider.installSection}. */
 export interface SettingsSectionHooks<T> {
   /**
    * Receive the active configuration source: the resolved settings scope
@@ -996,34 +1068,7 @@ export function installSettingsSection<T>(
   hooks: SettingsSectionHooks<T>,
 ): void {
   ctx.inject(['settings'], (sctx) => {
-    const scope = sctx.settings.register(ns, schema, {
-      base: entry,
-      ...hooks.validate === undefined ? {} : { validate: hooks.validate },
-      ...hooks.owner === undefined ? {} : { owner: hooks.owner },
-      ...hooks.projectWrite === undefined ? {} : { projectWrite: hooks.projectWrite },
-      ...hooks.projectWritePaths === undefined ? {} : { projectWritePaths: hooks.projectWritePaths },
-    })
-    hooks.setSource(() => scope.get())
-    sctx.effect(() => () => {
-      // This disposer runs for two different reasons. A settings provider
-      // detaching leaves the consumer running, so it must fall back to its
-      // composition entry and re-judge what it derived. The consumer's own
-      // unload runs it too — and there `onChange` would re-register routes
-      // and touch resources the teardown is releasing, so the fallback is
-      // pointless and the notification actively harmful.
-      if (isUnloading(ctx)) return
-      hooks.setSource(() => entry)
-      hooks.onChange()
-    })
-    hooks.onChange()
-    scope.watch(() => {
-      // A stored change landing while the consumer unloads reaches the watcher
-      // before the registration is released, and `onChange` is exactly as
-      // harmful here as in the disposer above: it re-registers routes against
-      // a fiber whose resources are being let go.
-      if (isUnloading(ctx)) return
-      hooks.onChange()
-    })
+    sctx.settings.installSection(ctx, ns, schema, entry, hooks)
   })
 }
 

@@ -17,6 +17,8 @@
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。本包只把 `settings.section` ledger 投影为导航，不发出 Cordis 事件，也不持有跨插件可变关系；slot core 会在加载时拒绝冲突。
+
 ## 已知限制与暂缓事项
 
 - **失败或被拒绝的 settings.describe 保持 unavailable**：binder 一律使用 Host 持久化；`settings.describe` 抛错或非 ok 会发布 `unavailable`，插件卡片隐藏而不是停在 `loading`。Host 特权方法栅栏仍要求回环 `Host` 头；网关把 `Host`/`Origin` 改写成实例回环后，公网页才能成功。`settings.openDocument` 仍只在 loopback 页面出现，因为它打开的是宿主桌面上的文件。

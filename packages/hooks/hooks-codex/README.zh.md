@@ -89,6 +89,8 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 
 已阻塞提示词不发送请求，不会导致失效。拒绝、反馈与强制 continuation 上下文会追加在可复用前缀之后，不改写前缀。
 
+**运行时不变式：** 不发布伴生入口。本桥接发布 hook-protocol 会话事件，既有 companion 负责校验每个结果所引用的调用事件。
+
 ## 已知限制与暂缓事项
 
 - **不支持的 hook 事件（Codex 当前 10 项中的 5 项）：** `PermissionRequest`、`PreCompact`、`PostCompact`、`SubagentStart` 和 `SubagentStop`。这些事件的配置会在解析期间静默丢弃。比较基线是 Codex [官方 hook 参考](https://learn.chatgpt.com/docs/hooks)。

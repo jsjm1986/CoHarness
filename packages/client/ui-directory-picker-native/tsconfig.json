@@ -9,13 +9,10 @@
   ],
   "references": [
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../runtime"
     },
     {
       "path": "../ui-slots"
-    },
-    {
-      "path": "../runtime"
     },
     {
       "path": "../ui-workspace"

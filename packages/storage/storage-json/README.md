@@ -32,6 +32,8 @@ Zero live-request tokens.
 
 None — the backend never touches live request prefixes.
 
+**Runtime invariant:** No companion is published. Correctness here is write-durability and publish-then-reparse equivalence, which require medium round-trip tests (the shared backend conformance suite); the backend exposes no continuously observable in-process relation.
+
 ## Known Limitations and Deferred Work
 
 - Windows durability relies on libuv's `rename()` (`MoveFileExW` with replacement) without an explicit write-through flag; the session-log backend's stricter Win32 write-through publish helper is planned to move down here when the append-log facet lands (see the Agent Note's migration section).

@@ -57,6 +57,7 @@ function formatDuration(elapsedMs: number): string {
 
 /** Find the latest model-visible event, excluding this plugin's pending append. */
 function precedingMessageTime(agent: Agent): number | undefined {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of [...agent.session.snapshotEvents()].reverse()) {
     switch (event.type) {
       case 'user/message':
@@ -73,6 +74,7 @@ function precedingMessageTime(agent: Agent): number | undefined {
 
 /** Find the preceding time-context event within the open turn. */
 function precedingStepContextTime(agent: Agent, turn: number): number | undefined {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'turn/start' && event.data.turn === turn) return undefined
     if (event.type === 'user/message'
@@ -86,6 +88,7 @@ function precedingStepContextTime(agent: Agent, turn: number): number | undefine
 
 /** Find this plugin's latest durable injection, including a shadowed surface event. */
 function latestInjectionTime(agent: Agent): number | undefined {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'user/message'
       && event.data.source.kind === 'plugin'
@@ -100,6 +103,7 @@ function latestInjectionTime(agent: Agent): number | undefined {
 function requestMessages(agent: Agent, turn: number, proposed: readonly UserMessage[]): UserMessage[] {
   const entered: UserMessage[] = []
   for (let seq = agent.session.seq - 1; seq >= 0; seq -= 1) {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const event = agent.session.eventAt(SessionSeq(seq))
     if (event?.type === 'turn/start' && event.data.turn === turn) {
       return [...entered.reverse(), ...proposed]

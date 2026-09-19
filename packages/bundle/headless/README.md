@@ -14,6 +14,8 @@ None, as the runner submits the task as an ordinary user message; prompts and to
 
 None; the runner adds nothing to the request prefix.
 
+**Runtime invariant:** No companion is published. The runner's observable contract (provider reasoning on stderr, final text on stdout, exit code by turn-end reason) is process-level and owned by the launcher e2e; it registers nothing and holds no mutable relation to audit inside the tree.
+
 ## Known Limitations and Deferred Work
 
 - **One submitted task only** — the runner has no interactive follow-up surface; it waits through any work the Agent completes before returning to idle and prints the last non-empty assistant message in that interval.

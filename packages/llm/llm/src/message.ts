@@ -1,12 +1,12 @@
 /** Message value types, identity, and immutable construction helpers. */
 
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import { MessageId, type CallId } from './brand.ts'
+import { MessageId, type ToolCallId } from './brand.ts'
 import { deepFreeze } from './call-config.ts'
-import type { ContentBlock, StreamChunk, ToolResultBlock } from './types.ts'
+import type { ContentBlock, ToolResultBlock } from './types.ts'
 
 /** Provider/model identity and adapter-private replay data for an assistant message. */
-export interface AssistantProvenance {
+export interface AssistantProviderMetadata {
   /** Provider route that produced the message. */
   provider: string
   /** Provider model id that produced the message. */
@@ -20,19 +20,19 @@ export interface AssistantProvenance {
 }
 
 /** Required source of an assistant message produced by a routed model. */
-export interface ModelMessageSource extends AssistantProvenance {
+export interface ModelMessageSource extends AssistantProviderMetadata {
   kind: 'model'
 }
 
 /** Required source of a user-role message carrying one tool result. */
 export interface ToolMessageSource {
   kind: 'tool'
-  callId: CallId
+  callId: ToolCallId
 }
 
 /**
  * The kind of information in producer-supplied context, declared by the
- * producer beside its provenance.
+ * producer in the same `MessageSource`.
  *
  * `MessageSource.kind` answers *who produced this*; `form` answers *what kind
  * of thing it is*, and the two axes are deliberately independent — several
@@ -149,7 +149,11 @@ export interface AssistantMessage extends Message {
   readonly source: ModelMessageSource
 }
 
-/** A system-role message holding a rendered prompt attributed to its producer. */
+/**
+ * A system-role specialization of the shared message representation: one
+ * rendered system prompt attributed to the plugin that assembled it. Empty
+ * `content` means "no system prompt" and projects to no wire message.
+ */
 export interface SystemMessage extends Message {
   readonly role: 'system'
   readonly source: MessageSourceMap['plugin']
@@ -224,9 +228,10 @@ export function createAssistantMessage(
 }
 
 /**
- * Create and freeze one identified system-role message.
- * @param text - rendered system prompt text; an empty value creates no content blocks.
- * @param plugin - plugin identifier recorded in the message source.
+ * Create and freeze one identified system-role message holding a rendered
+ * system prompt.
+ * @param text - the complete rendered prompt; `''` records "no system prompt".
+ * @param plugin - the plugin that assembled the prompt.
  * @returns an immutable system message with a fresh stable identity.
  */
 export function createSystemMessage(text: string, plugin: string): SystemMessage {
@@ -239,7 +244,7 @@ export function createSystemMessage(text: string, plugin: string): SystemMessage
 
 /** Input whose acceptance creates one tool-result message. */
 export interface ToolResultMessageInput {
-  readonly callId: CallId
+  readonly callId: ToolCallId
   readonly content: ContentBlock[]
   readonly isError: boolean
 }
@@ -259,24 +264,4 @@ export function createToolResultMessage(input: ToolResultMessageInput): ToolResu
       isError: input.isError,
     }],
   })
-}
-
-/**
- * Whether a stream chunk carries visible model output (the first-token
- * boundary shared by client step timing and the whole-log sessionStats
- * projection). Empty deltas (heartbeats, empty tool-call frames) do not count
- * as a first token.
- * @param chunk - the stream chunk to test.
- * @returns true when the chunk contains a non-empty text/reasoning/tool delta.
- */
-export function isTokenDelta(chunk: StreamChunk): boolean {
-  switch (chunk.type) {
-    case 'text-delta':
-    case 'reasoning-delta':
-      return chunk.text !== ''
-    case 'tool-call-delta':
-      return chunk.argumentsDelta !== '' || chunk.name !== undefined
-    default:
-      return false
-  }
 }

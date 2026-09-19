@@ -36,6 +36,8 @@ sandbox mode "<mode>" is requested but no sandbox backend is usable on this host
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+**运行时不变式：** 不发布伴生入口。除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。
+
 ## 已知限制与暂缓事项
 
 - **文件操作是完整的策略词汇**：该 seam 不表达网络、进程、系统调用、设备或凭据限制。

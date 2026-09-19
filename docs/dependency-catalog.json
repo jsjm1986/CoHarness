@@ -1333,30 +1333,6 @@
       ]
     },
     {
-      "name": "@deepseek-ai/dsh-code-runtime",
-      "version": "0.1.5-rc.2",
-      "installations": [
-        {
-          "location": "node_modules/@deepseek-ai/dsh-code-runtime",
-          "direct": false,
-          "optional": false,
-          "peer": true
-        }
-      ]
-    },
-    {
-      "name": "@deepseek-ai/dsh-code-runtime-worker-thread",
-      "version": "0.1.5-rc.2",
-      "installations": [
-        {
-          "location": "node_modules/@deepseek-ai/dsh-code-runtime-worker-thread",
-          "direct": false,
-          "optional": false,
-          "peer": false
-        }
-      ]
-    },
-    {
       "name": "@deepseek-ai/dsh-command-compact",
       "version": "0.1.5-rc.2",
       "installations": [
@@ -1974,6 +1950,30 @@
       "installations": [
         {
           "location": "node_modules/@deepseek-ai/dsh-plugin-package-inventory-deepseek",
+          "direct": false,
+          "optional": false,
+          "peer": false
+        }
+      ]
+    },
+    {
+      "name": "@deepseek-ai/dsh-ptc-runtime",
+      "version": "0.1.5-rc.2",
+      "installations": [
+        {
+          "location": "node_modules/@deepseek-ai/dsh-ptc-runtime",
+          "direct": false,
+          "optional": false,
+          "peer": true
+        }
+      ]
+    },
+    {
+      "name": "@deepseek-ai/dsh-ptc-runtime-node",
+      "version": "0.1.5-rc.2",
+      "installations": [
+        {
+          "location": "node_modules/@deepseek-ai/dsh-ptc-runtime-node",
           "direct": false,
           "optional": false,
           "peer": false
@@ -3193,11 +3193,11 @@
       ]
     },
     {
-      "name": "@deepseek-ai/dsh-workflow-worker-thread",
+      "name": "@deepseek-ai/dsh-workflow-ptc",
       "version": "0.1.5-rc.2",
       "installations": [
         {
-          "location": "node_modules/@deepseek-ai/dsh-workflow-worker-thread",
+          "location": "node_modules/@deepseek-ai/dsh-workflow-ptc",
           "direct": true,
           "optional": false,
           "peer": false

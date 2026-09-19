@@ -16,6 +16,8 @@ None, as the backend serves the GUI host's directory selection; nothing here rea
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Each list/create is one stateless filesystem round trip; the filesystem itself is the authoritative state.
+
 ## Known Limitations and Deferred Work
 
 - **Windows hidden attribute is not read** — Node dirents do not expose `FILE_ATTRIBUTE_HIDDEN`, so `hidden` means dot-prefixed on every platform until a native probe is worth its cost.

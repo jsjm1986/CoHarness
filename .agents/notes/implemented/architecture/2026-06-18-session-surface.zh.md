@@ -16,7 +16,7 @@ Status: implemented
 
 每个 `SessionEvent` 获得两个可选字段（结构性元数据，与 `seq`/`time` 同级）：
 
-- **`sourceEventSeqs?: number[]`**：被引用为数据来源的早期事件 seq 编号（例如构成 `assistant/message` 的各 `assistant/chunk` 的 seq，或被压缩标记遮蔽的 surface 节点）。出现的 `[]` 只在 `assistant/message` 上有效，表示已知为空的提供方流；旧格式或外部事件缺少该字段时，没有记录这条消息由哪些早期事件产生。其他 surface 事件一旦出现此字段，就必须是非空列表。如果没有这些引用的 seq，回放就无法验证 replace-range 操作是否列出了它移除的每个事件。
+- **`sourceEventSeqs?: number[]`**：被引用为数据来源的早期事件 seq 编号（例如 `tool/result` 引用的 `tool/call`，或被压缩标记遮蔽的 surface 节点）。此字段一旦出现就必须是非空列表；`assistant/message` 把提供方流嵌入 `data.stream`，不能携带此字段。如果没有这些引用的 seq，回放就无法验证 replace-range 操作是否列出了它移除的每个事件。
 - **`surfaceOp?: SurfaceOp`**：该事件如何进入 surface。非 surface 事件不携带此字段。
 
 ### SurfaceOp：两种操作
@@ -27,7 +27,7 @@ export type SurfaceOp =
   | { op: 'replace'; startSeq: number; endSeq: number }  // shadow [startSeq, endSeq] inclusive
 ```
 
-1. **Append**：在尾部追加新事件的 seq。`user/message`、`assistant/message`、`tool/result`、`context/message` 使用此操作。agent loop（智能体循环）在所有此类追加上传入 `surfaceOp: 'append'`，并在适用时记录 `sourceEventSeqs`：每个成功的 `assistant/message` 都记录完整的 `assistant/chunk` 来源集合（包括 `[]`），而 `tool/result` 记录其 `tool/call` 来源。
+1. **Append**：在尾部追加新事件的 seq。`user/message`、`assistant/message`、`tool/result`、`context/message` 使用此操作。agent loop（智能体循环）在所有此类追加上传入 `surfaceOp: 'append'`，并在适用时记录 `sourceEventSeqs`：`assistant/message` 直接嵌入其提供方流，而 `tool/result` 记录其 `tool/call` 来源。
 
 2. **Replace**：移除从 `startSeq` 到 `endSeq`（两端包含）的条目，并在其位置插入新事件的 seq。两个端点都必须存在于当前 surface 且引用更早的事件；`startSeq === endSeq` 表示替换单个条目。该事件的 `sourceEventSeqs` 必须包含所有被遮蔽的 surface seq。被遮蔽的事件仍留在日志中，但不再出现在 surface 上。当节点 0 持有 `system/message` 时，覆盖它的区间必须是一个恰好只替换该节点的 `system/message`。字段改名前已提交的日志携带 `start`/`end` 键；读取方将它们归一化为 `startSeq`/`endSeq`，写入方始终输出规范键。
 
@@ -49,7 +49,7 @@ export type SurfaceOp =
 
 ### 不变式
 
-`Session` 在始终启用的 seed/append 边界校验 `sourceEventSeqs` 与 `surfaceOp`：只有 `assistant/message` 可以使用空的源事件列表；引用必须唯一、更早且已知；替换端点必须存在于 surface 顺序中；`sourceEventSeqs` 必须覆盖每个被遮蔽的节点。这些是单记录接纳与存储投影规则，不是由可选的不变式服务提供的规则。
+`Session` 在始终启用的 seed/append 边界校验 `sourceEventSeqs` 与 `surfaceOp`：`assistant/message` 不携带源列表；其他源列表必须非空、唯一、更早且已知；替换端点必须存在于 surface 顺序中；`sourceEventSeqs` 必须覆盖每个被遮蔽的节点。这些是单记录接纳与存储投影规则，不是由可选的不变式服务提供的规则。
 
 每个可进入 surface 的事件都必须携带 `surfaceOp`，否则它将从派生历史中消失。类型化的 `append` 重载对字面事件类型强制执行此规则；`append` 和种子构造函数中的运行时检查覆盖宽化联合类型和加载的日志。按照预发布格式策略，无效的种子被拒绝而非升级。
 

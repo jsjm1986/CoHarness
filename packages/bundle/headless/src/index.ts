@@ -68,6 +68,7 @@ function summarize(session: Session, firstSeq: SessionLogOffset): RunOutcome {
   let reason: SessionEvent<'turn/end'>['data']['reason'] | undefined
   const length = session.seq
   for (let seq = firstSeq; seq < length; seq++) {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const event = session.eventAt(SessionSeq(seq))
     if (event === undefined) {
       throw new Error(`headless summary cannot read seq ${String(seq)} below captured length ${String(length)}`)
@@ -102,7 +103,6 @@ function streamReasoning(
   agent: Agent,
   stderr: HeadlessIo['stderr'],
 ): () => void {
-  let started = false
   let open = false
   let endsWithNewline = true
   const close = (): void => {
@@ -111,15 +111,17 @@ function streamReasoning(
     open = false
     endsWithNewline = true
   }
-  const dispose = ctx.on('session/event', (session, event) => {
-    if (session !== agent.session) return
-    if (event.type === 'turn/start') {
+  const dispose = ctx.on('agent/assistant-stream', ({ agent: subject, frame }) => {
+    if (subject !== agent) return
+    if (frame.type === 'start') {
       close()
-      started = true
       return
     }
-    if (!started || event.type !== 'assistant/chunk') return
-    const chunk = event.data.chunk
+    if (frame.type === 'end') {
+      close()
+      return
+    }
+    const chunk = frame.chunk
     switch (chunk.type) {
       case 'reasoning-delta':
         if (chunk.text === '') return

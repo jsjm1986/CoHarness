@@ -11,7 +11,8 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-commands/types'
-import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionAssistantStreamFrame, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
 import { Session } from '../src/client/sessions/session.ts'
 import type {
   ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
@@ -138,7 +139,7 @@ const TEST_EVENT_DEFINITION: ConversationNodeDefinition<TestEventState> = {
   match: event => ({ id: String(event.seq), role: 'start' }),
   start: (_context, match) => ({ event: match.event, view: match.view }),
   update: context => context.state,
-  publication: match => match.event.type === 'assistant/chunk' ? 'animation-frame' : 'immediate',
+  publication: match => match.event.type === 'assistant/live-chunk' ? 'animation-frame' : 'immediate',
   buildViewNode: (context) => {
     if (context.state === undefined || context.start === undefined) return null
     return {
@@ -191,6 +192,33 @@ function histResponse(
     hasMore,
     ...omittedSpans === undefined ? {} : { omittedSpans },
   }))
+}
+
+/** One `agent/assistant-stream` frame in mux wire form. */
+function streamStart(attemptId: string, startedAfterSeq: number, turn: number, step: number): SessionAssistantStreamFrame {
+  return { type: 'start', attemptId: LlmAttemptId(attemptId), revision: 1, startedAfterSeq, turn, step }
+}
+
+function streamChunk(attemptId: string, index: number, text: string): SessionAssistantStreamFrame {
+  return {
+    type: 'chunk', attemptId: LlmAttemptId(attemptId), revision: 1, index,
+    time: 1_700_100_000_000 + index,
+    chunk: { type: 'text-delta', index: 0, text },
+  }
+}
+
+function streamEnd(
+  attemptId: string,
+  index: number,
+  outcome: Extract<SessionAssistantStreamFrame, { type: 'end' }>['outcome'],
+): SessionAssistantStreamFrame {
+  return { type: 'end', attemptId: LlmAttemptId(attemptId), revision: 1, index, outcome }
+}
+
+function feedStream(session: Session, frame: SessionAssistantStreamFrame): void {
+  session.handleMuxEnvelope('s' as never, {
+    type: 'session/assistant-stream', sessionId: SID, frame,
+  })
 }
 
 describe('open', () => {
@@ -438,9 +466,9 @@ describe('live event path', () => {
       session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event })
     }
 
-    feed(ev.chunkStart(6, 1))
-    feed(ev.chunkText(7, 1, '累'))
-    feed(ev.chunkText(8, 1, '计'))
+    feedStream(session, streamStart('att-1', 5, 1, 0))
+    feedStream(session, streamChunk('att-1', 0, '累'))
+    feedStream(session, streamChunk('att-1', 1, '计'))
     expect(published).toEqual([])
     expect(frames).toHaveLength(1)
 
@@ -449,15 +477,14 @@ describe('live event path', () => {
     frames.shift()!(0)
     frames.shift()!(0)
     frames.shift()!(0)
-    expect(published).toEqual([[0, 1, 2, 3, 4, 5, 6, 7, 8]])
+    expect(published[0]).toHaveLength(8)
 
-    feed(ev.chunkText(9, 1, '完成'))
-    feed(ev.assistant(10, 1, '累计完成'))
+    feedStream(session, streamChunk('att-1', 2, '完成'))
+    feed(ev.assistant(6, 1, '累计完成'))
+    feedStream(session, streamEnd('att-1', 3, { kind: 'committed', eventType: 'assistant/message', seq: 6 }))
     await Promise.resolve()
-    expect(published).toEqual([
-      [0, 1, 2, 3, 4, 5, 6, 7, 8],
-      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    ])
+    expect(published).toHaveLength(2)
+    expect(published[1]).toEqual([0, 1, 2, 3, 4, 5, 6])
 
     frames.shift()!(0)
     expect(published).toHaveLength(2)
@@ -698,7 +725,7 @@ describe('conversation-tier history', () => {
   it('merges detail fill by seq, clears spans, and ignores a second fill', async () => {
     const { api, session } = makeSession()
     const conversationPage = [ev.user(1, '问'), ev.assistant(10, 1, '答')]
-    const chunks = [2, 3, 4, 5, 6, 7, 8, 9].map(seq => ev.chunkText(seq, 1, 'x'))
+    const chunks = [2, 3, 4, 5, 6, 7, 8, 9].map(seq => ev.attempt(seq, 1))
     api.onHistory = (payload) => {
       if (payload.detail !== 'full') {
         return histResponse(conversationPage, false, [{ startSeq: 2, endSeq: 9 }])
@@ -728,14 +755,14 @@ describe('conversation-tier history', () => {
       }
       if (payload.beforeSeq === undefined) {
         return histResponse(
-          [ev.chunkText(15, 1, '后'), ev.assistant(20, 1, '答')],
+          [ev.attempt(15, 1), ev.assistant(20, 1, '答')],
           true,
         )
       }
       expect(payload.beforeSeq).toBe(15)
       return histResponse([
         ev.user(1, '问'),
-        ...Array.from({ length: 18 }, (_, index) => ev.chunkText(index + 2, 1, 'x')),
+        ...Array.from({ length: 18 }, (_, index) => ev.attempt(index + 2, 1)),
         ev.assistant(20, 1, '答'),
       ], false)
     }
@@ -1557,18 +1584,115 @@ describe('reference stability (the memo contract)', () => {
     const before = session.getSnapshot()
     const settledKey = before.chat.order[0]!
     const settledNode = before.chat.nodes.get(settledKey)
-    feed(ev.chunkStart(9, 1))
-    feed(ev.chunkText(10, 1, '与工具无关的流式'))
+    session.handleMuxEnvelope('s1' as never, {
+      type: 'session/assistant-stream', sessionId: SID,
+      frame: streamStart('att-9', 8, 1, 0),
+    })
+    session.handleMuxEnvelope('s2' as never, {
+      type: 'session/assistant-stream', sessionId: SID,
+      frame: streamChunk('att-9', 0, '与工具无关的流式'),
+    })
     const after = session.getSnapshot()
     expect(after).not.toBe(before)
     expect(after.runningCalls).toBe(before.runningCalls)
     expect(after.pending).toBe(before.pending)
     expect(after.chat.nodes.get(settledKey)).toBe(settledNode)
-    feed(ev.toolResult(11, 1, 'c1', 'ECHO'))
+    feed(ev.toolResult(9, 1, 'c1', 'ECHO'))
     const resolved = session.getSnapshot()
     expect(resolved.pending).toBe(after.pending)
     expect(resolved.chat.nodes.get(settledKey)).toBe(settledNode)
-    feed(ev.assistant(12, 1, '完成'))
+    feed(ev.assistant(10, 1, '完成'))
+    session.handleMuxEnvelope('s3' as never, {
+      type: 'session/assistant-stream', sessionId: SID,
+      frame: streamEnd('att-9', 1, { kind: 'committed', eventType: 'assistant/message', seq: 10 }),
+    })
     expect(session.getSnapshot()).not.toBe(resolved)
+  })
+})
+
+describe('assistant stream', () => {
+  const feed = (session: Session, event: SessionEvent) => {
+    session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event })
+  }
+  it('shows transient live chunks while streaming and settles them into the durable message on end', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, '底', '座'))
+    await session.open()
+
+    feedStream(session, streamStart('att-1', 5, 1, 0))
+    feedStream(session, streamChunk('att-1', 0, '你'))
+    feedStream(session, streamChunk('att-1', 1, '好'))
+    const liveSeqs = chatSeqs(session.getSnapshot())
+    expect(liveSeqs.slice(0, 6)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(liveSeqs[6]).toBeCloseTo(5.5)
+    expect(liveSeqs[7]).toBeCloseTo(5.6667, 3)
+
+    // The durable settlement lands first but stays invisible until its end frame.
+    feed(session, ev.assistant(6, 1, '你好'))
+    expect(chatSeqs(session.getSnapshot())).toEqual(liveSeqs)
+
+    feedStream(session, streamEnd('att-1', 2, { kind: 'committed', eventType: 'assistant/message', seq: 6 }))
+    expect(chatSeqs(session.getSnapshot())).toEqual([0, 1, 2, 3, 4, 5, 6])
+  })
+
+  it('drops transients on abandonment without publishing a settlement', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, '底', '座'))
+    await session.open()
+
+    feedStream(session, streamStart('att-1', 5, 1, 0))
+    feedStream(session, streamChunk('att-1', 0, '作废'))
+    expect(chatSeqs(session.getSnapshot())).toHaveLength(7)
+
+    feedStream(session, streamEnd('att-1', 1, { kind: 'abandoned' }))
+    expect(chatSeqs(session.getSnapshot())).toEqual([0, 1, 2, 3, 4, 5])
+  })
+
+  it('adopts the subscribed baseline when a resync reinstalls the window', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, '底', '座'))
+    await session.open()
+
+    api.onHistory = () => histResponse(plainTurn(8, 2, '远', '端'))
+    session.handleMuxEnvelope('sub' as never, {
+      type: 'session/subscribed',
+      sessionId: SID,
+      lastSeq: 13,
+      assistantStream: {
+        revision: 1,
+        activeAttempt: {
+          attemptId: LlmAttemptId('att-1'),
+          startedAfterSeq: 12,
+          turn: 3,
+          step: 0,
+          nextIndex: 2,
+          stream: [
+            { type: 'chunk', time: 1_700_100_000_000, chunk: { type: 'text-delta', index: 0, text: '续' } },
+            { type: 'chunk', time: 1_700_100_000_010, chunk: { type: 'text-delta', index: 0, text: '传' } },
+          ],
+        },
+      },
+    })
+    await vi.waitFor(() => {
+      expect(chatSeqs(session.getSnapshot())).toHaveLength(8)
+    })
+    const seqs = chatSeqs(session.getSnapshot())
+    expect(seqs.slice(0, 6)).toEqual([8, 9, 10, 11, 12, 13])
+    expect(seqs[6]).toBeCloseTo(13.5)
+    expect(seqs[7]).toBeCloseTo(13.6667, 3)
+  })
+
+  it('repairs the window when a live chunk index skips', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, '底', '座'))
+    await session.open()
+
+    feedStream(session, streamStart('att-1', 5, 1, 0))
+    feedStream(session, streamChunk('att-1', 0, '连'))
+    feedStream(session, streamChunk('att-1', 4, '断'))
+    await vi.waitFor(() => {
+      expect(api.callsOf('session.history').length).toBeGreaterThan(1)
+    })
+    expect(chatSeqs(session.getSnapshot())).toEqual([0, 1, 2, 3, 4, 5])
   })
 })

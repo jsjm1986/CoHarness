@@ -33,6 +33,8 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 
 不会直接使缓存失效；具名消费方负责请求前缀的任何变化。
 
+**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系，相关约定在所属 seam 强制执行。
+
 ## 已知限制与延期工作
 
 - **`config.cwd` 不是沙箱**：它是解析默认值，而非约束；绝对路径和 `..` 可以逃逸。请使用更严格的 `ctx.fs` 后端或 `tools/execute` waterfall（瀑布式事件）上的权限插件实施约束（见[能力 seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-17-filesystem-capability-seam.zh.md#consequences)）。

@@ -6,7 +6,6 @@
   "ignoreBinaries": [
     "bwrap",
     "icacls",
-    "musl-gcc",
     "sandbox-exec",
     "where.exe"
   ],
@@ -16,7 +15,8 @@
   ],
   "ignoreDependencies": [
     "@yarnpkg/cli-dist",
-    "lightningcss"
+    "lightningcss",
+    "@deepseek-ai/cordis"
   ],
   "workspaces": {
     "packages/util/package-manifest": {
@@ -28,7 +28,10 @@
       "entry": [
         "scripts/**/*.mjs",
         "scripts/**/*.cjs",
-        "scripts/types/client-build-environment/index.d.ts"
+        "scripts/types/client-build-environment/index.d.ts",
+        "scripts/bundle-input-isolation.ts",
+        "scripts/coverage-canonical-locations.ts",
+        "scripts/web-product-bundle-isolation.ts"
       ],
       "ignoreUnresolved": [
         "client-build-environment"
@@ -52,7 +55,6 @@
         "headless-agent/tests/fixtures/time-context-mock-llm.ts",
         "headless-agent/tests/fixtures/session-telemetry-otel-driver.ts",
         "headless-agent/tests/fixtures/telemetry-redact-rule.ts",
-        "headless-agent/tests/fixtures/e2b/e2b/bin.ts",
         "acp-agent/tests/snapshots/lsp-definition/workspace/subject.ts",
         "acp-agent/tests/fixtures/child-question-tripwire.ts",
         "acp-agent/tests/fixtures/parent-sandbox-override.ts",
@@ -72,7 +74,9 @@
         "jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/child-mock-llm.ts",
         "jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/mock-delegating-llm.ts",
         "*/tests/**/*.e2e.ts",
-        "*/tests/**/*.snapshot.ts"
+        "*/tests/**/*.snapshot.ts",
+        "acp-agent/tests/fixtures/subagent-activation-limit.ts",
+        "headless-agent/tests/fixtures/serial-preset.ts"
       ],
       "project": [
         "**/*.ts"
@@ -267,7 +271,8 @@
     },
     "packages/core/tools": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/fixtures/literal-sdk.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -288,7 +293,8 @@
     "packages/shell/bash-sandbox": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/*.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -303,19 +309,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ]
-    },
-    "packages/e2b/e2b": {
-      "entry": [
-        "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@deepseek-ai/.+"
       ]
     },
     "packages/context/time-context": {
@@ -483,7 +476,7 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/code-runtime/code-runtime-worker-thread": {
+    "packages/ptc-runtime/ptc-runtime-node": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
@@ -493,7 +486,7 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/experimental/code-runtime-python": {
+    "packages/experimental/ptc-runtime-python": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
@@ -506,7 +499,8 @@
     "packages/llm/llm-deepseek": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/messages/fixtures/history.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -611,7 +605,7 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/workflow/workflow-worker-thread": {
+    "packages/workflow/workflow-ptc": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
@@ -754,7 +748,8 @@
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts",
-        "tests/fixture-server.ts"
+        "tests/fixture-server.ts",
+        "tests/fixtures/*.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -823,14 +818,17 @@
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts",
-        "tests/**/*.snapshot.ts"
+        "tests/**/*.snapshot.ts",
+        "tests/**/fixtures/**/*.ts"
       ],
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/.+"
+        "@deepseek-ai/.+",
+        "ws",
+        "@types/ws"
       ]
     },
     "packages/client/modules": {
@@ -885,7 +883,7 @@
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-code-runtime-worker-thread"
+        "@deepseek-ai/dsh-ptc-runtime-node"
       ]
     },
     "packages/bundle/web-app": {
@@ -1008,6 +1006,178 @@
       ]
     },
     "packages/session/session-persistence-jsonl": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/client/ui-brand-official": {
+      "entry": [
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.tsx"
+      ]
+    },
+    "benchmarks": {
+      "project": [
+        "**/*.ts"
+      ]
+    },
+    "packages/subprocess/subprocess-local": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/boot/app-boot": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/cordis-plugin-timer",
+        "metadata-lib",
+        "resolution-lib",
+        "@scope/resolution-lib",
+        "real-name",
+        "missing-local",
+        "undeclared-local",
+        "conditional-lib",
+        "broken-lib",
+        "added-lib",
+        "legacy-missing"
+      ],
+      "ignoreUnresolved": [
+        "./relative.cjs",
+        "#.+"
+      ]
+    },
+    "packages/bundle/sdk-minimal": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/bundle/acp-app": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/bundle/sdk-app": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/settings/settings": {
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-session"
+      ]
+    },
+    "packages/experimental/browser-use-runtime": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-attachment-local"
+      ]
+    },
+    "packages/experimental/auto-review": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": []
+    },
+    "packages/experimental/browser-use-chrome-devtools-mcp": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-agent-loop"
+      ]
+    },
+    "packages/experimental/browser-use-playwright-mcp": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-agent-loop"
+      ]
+    },
+    "packages/experimental/browser-use-stagehand-native": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/computer-use-cua-driver-mcp": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/computer-use-cua-driver-native": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"

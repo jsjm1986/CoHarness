@@ -29,6 +29,8 @@ None, as this package only validates and migrates durable Session data; provider
 
 No direct invalidation: the package does not contribute request tokens or mutate a model request prefix.
 
+**Runtime invariant:** No companion is published. Each completed operation validates its result; decoder and transformer state belongs to one unfinished streaming restore and is never shared across restores.
+
 ## Known Limitations and Deferred Work
 
 - The pre-v3 steps normalize the historical event vocabulary (legacy message payloads, `start`/`end` replace keys, turn-scoped surface events) while each provider retains its own physical codec and publication rules.

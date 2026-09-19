@@ -16,6 +16,8 @@ Indirectly, through the role-neutral core `ImageBlock` and provider adapters tha
 
 Adding an image changes the provider request and therefore invalidates the affected request suffix.
 
+**Runtime invariant:** No companion is published. This stateless seam owns types while implementations enforce immutable-store checks.
+
 ## Known Limitations and Deferred Work
 
 - Version one accepts PNG, JPEG, WebP, and GIF only.

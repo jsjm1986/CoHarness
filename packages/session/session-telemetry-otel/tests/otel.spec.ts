@@ -575,33 +575,38 @@ describe('OpenTelemetrySessionBackend route and feedback', () => {
         mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url }, processor: { scheduledDelayMillis: 1 },
       })
       const session = ctx.sessions.create(SessionId('live-ratings'))
-      if (provider !== undefined) session.append('request/header', { header: { config: { provider, model: 'm' } }, reason: 'initial' })
-      const message = createAssistantMessage({ content: [{ type: 'text', text: 'answer' }], source: { provider: provider ?? 'mock', model: 'm' } })
-      session.append('assistant/message', { message, stream: [], turn: 1, step: 1 }, { surfaceOp: 'append' })
-      const request = { sessionId: session.id, messageId: message.id, rating: 'positive' as const, ifVersion: null }
-      const before = session.seq
-      expect((await ctx.messageFeedback.put({ ...request, note: ' ' })).ok).toBe(false)
-      expect(session.seq).toBe(before)
-      expect(captures).toEqual([])
-      const put = await ctx.messageFeedback.put(request)
-      if (!put.ok) throw new Error('live put failed')
-      await expect.poll(() => eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
-      const throughPut = session.seq
-      await ctx.messageFeedback.put({ ...request, ifVersion: put.value.version })
-      expect((await ctx.messageFeedback.put(request)).ok).toBe(false)
-      expect(session.seq).toBe(throughPut)
-      const edit = await ctx.messageFeedback.put({ ...request, ifVersion: put.value.version, note: 'edited note' })
-      if (!edit.ok) throw new Error('live note failed')
-      await expect.poll(() => eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
-      await ctx.messageFeedback.delete({ sessionId: session.id, messageId: message.id, ifVersion: edit.value.version })
-      await expect.poll(() => eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
-      const submitted = eventTypes(captures)
-      const throughDelete = session.seq
-      await ctx.messageFeedback.delete({ sessionId: session.id, messageId: message.id, ifVersion: edit.value.version })
-      expect(session.seq).toBe(throughDelete)
-      session.append('turn/start', { turn: 2 })
-      await ctx.sessionTelemetry.shutdown()
-      expect(eventTypes(captures)).toEqual(submitted)
+      const handle = await ctx.sessionPersistence.create(session.header)
+      try {
+        if (provider !== undefined) session.append('request/header', { header: { config: { provider, model: 'm' } }, reason: 'initial' })
+        const message = createAssistantMessage({ content: [{ type: 'text', text: 'answer' }], source: { provider: provider ?? 'mock', model: 'm' } })
+        session.append('assistant/message', { message, stream: [], turn: 1, step: 1 }, { surfaceOp: 'append' })
+        const request = { sessionId: session.id, messageId: message.id, rating: 'positive' as const, ifVersion: null }
+        const before = session.seq
+        expect((await ctx.messageFeedback.put({ ...request, note: ' ' })).ok).toBe(false)
+        expect(session.seq).toBe(before)
+        expect(captures).toEqual([])
+        const put = await ctx.messageFeedback.put(request)
+        if (!put.ok) throw new Error('live put failed')
+        await expect.poll(() => eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
+        const throughPut = session.seq
+        await ctx.messageFeedback.put({ ...request, ifVersion: put.value.version })
+        expect((await ctx.messageFeedback.put(request)).ok).toBe(false)
+        expect(session.seq).toBe(throughPut)
+        const edit = await ctx.messageFeedback.put({ ...request, ifVersion: put.value.version, note: 'edited note' })
+        if (!edit.ok) throw new Error('live note failed')
+        await expect.poll(() => eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
+        await ctx.messageFeedback.delete({ sessionId: session.id, messageId: message.id, ifVersion: edit.value.version })
+        await expect.poll(() => eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
+        const submitted = eventTypes(captures)
+        const throughDelete = session.seq
+        await ctx.messageFeedback.delete({ sessionId: session.id, messageId: message.id, ifVersion: edit.value.version })
+        expect(session.seq).toBe(throughDelete)
+        session.append('turn/start', { turn: 2 })
+        await ctx.sessionTelemetry.shutdown()
+        expect(eventTypes(captures)).toEqual(submitted)
+      } finally {
+        await handle.close()
+      }
     } finally {
       await ctx.fiber.dispose()
       rmSync(root, { recursive: true, force: true })

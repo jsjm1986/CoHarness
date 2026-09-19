@@ -253,15 +253,14 @@ function eventNumber(value: unknown): number | undefined {
 }
 
 /**
- * Return the logical page group for one event. Stream chunks do not carry
- * `sourceEventSeqs`, so grouping every chunk by its own sequence silently
- * reduced a page to a few dozen tokens. Turn/step coordinates keep all
- * chunks from one model step in one group while call ids keep tool lifecycles
+ * Return the logical page group for one event. Assistant stream records do not
+ * carry `sourceEventSeqs`, so grouping every attempt by its own sequence
+ * silently reduced a page to a few dozen tokens. Turn/step coordinates keep all
+ * attempts from one model step in one group while call ids keep tool lifecycles
  * independent.
  */
 function eventGroupKey(event: SessionEvent): string {
-  const candidate = event as SessionEvent & { sourceEventSeqs?: readonly number[] }
-  const sources = candidate.sourceEventSeqs
+  const sources = event.sourceEventSeqs
   if (sources !== undefined && sources.length > 0) {
     let start: number = event.seq
     for (const seq of sources) if (seq < start) start = seq

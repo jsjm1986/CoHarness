@@ -9,13 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../ui-slots"
-    },
-    {
-      "path": "../ui-primitives"
+      "path": "../locale"
     },
     {
       "path": "../runtime"
@@ -24,10 +18,13 @@
       "path": "../ui-layout"
     },
     {
-      "path": "../locale"
+      "path": "../ui-primitives"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

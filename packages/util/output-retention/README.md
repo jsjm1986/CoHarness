@@ -91,6 +91,8 @@ Indirectly, through tool consumers that render retained content and omission met
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its value algebra is enforced by unit tests.
+
 ## Known Limitations and Deferred Work
 
 - **Item retention supports `head` only** — tail, head/tail, pagination, grouping, and provider-completeness semantics remain tool-owned.

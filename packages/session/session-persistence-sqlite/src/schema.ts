@@ -16,8 +16,8 @@ import {
 import type { SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import { sql } from './sql.ts'
 
-/** Current physical-record schema with packed rows and CoHarness extensions. */
-export const SCHEMA_VERSION = 20
+/** Current physical-record schema with CoHarness extensions. */
+export const SCHEMA_VERSION = 21
 /** Application id reserved for DeepSeek Harness SQLite session databases. */
 export const SESSION_PERSISTENCE_SQLITE_APPLICATION_ID = 0x44534850
 
@@ -37,7 +37,7 @@ export interface SessionRow {
   readonly draft: number
 }
 
-/** One physical event row; packed rows may represent multiple logical events. */
+/** One physical event row; every row represents exactly one logical event. */
 export interface EventRow {
   readonly seq: number
   readonly type: string
@@ -211,7 +211,7 @@ function initializeDatabase(db: DatabaseSync): void {
   db.exec(sql('schema'))
   db.prepare(sql('insert-persistence-state')).run(randomUUID())
   db.exec(sql('set-application-id'))
-  db.exec(sql('set-user-version-20'))
+  db.exec(sql('set-user-version-21'))
 }
 
 let canonicalSchema: readonly SchemaObjectRow[] | undefined
@@ -362,7 +362,9 @@ export function decodeStoreIdentity(value: unknown): string {
  */
 export function rowToMeta(row: SessionRow): SessionHeader {
   return {
-    version: row.version,
+    // The stored physical generation version stays visible until the
+    // coordinator migrates it during adoption.
+    version: row.version as SessionHeader['version'],
     id: SessionId(row.id),
     createdAt: row.created_at,
     ...row.cwd === null ? {} : { cwd: row.cwd },

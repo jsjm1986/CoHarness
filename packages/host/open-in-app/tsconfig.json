@@ -11,13 +11,6 @@
     "src"
   ],
   "references": [
-    { "path": "../../runtime-diagnostics/invariants" },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
     {
       "path": "../webserver"
     },
@@ -29,6 +22,12 @@
     },
     {
       "path": "../../util/native-command"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

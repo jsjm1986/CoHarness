@@ -26,6 +26,8 @@ New Session 会启动运行时的页面局部前端 Session Intent。运行时�
 
 无；该包（package）既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。面板元数据是 Slot 注册表与 locale 的只读呈现投影，没有独立写入 API。注册表负责条目身份与资源释放；本包的装配测试在注册和 locale 通知完成后断言该投影。外壳没有需要与这些来源协调的独立导航状态。
+
 ## 已知限制与暂缓事项
 
 - **Session 状态点渲染由 [ui-workspace](../ui-workspace/README.zh.md) 持有**：没有可用的 done/error 通知数据源。

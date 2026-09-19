@@ -1,13 +1,27 @@
 {
   "extends": "../../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
-  "include": ["src"],
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../client/connection/tsconfig.host.json" },
-    { "path": "../../context/collaboration" },
-    { "path": "../../context/gateway-runtime" },
-    { "path": "../../attachment/userdoc" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    {
+      "path": "../../attachment/userdoc"
+    },
+    {
+      "path": "../../client/connection/tsconfig.host.json"
+    },
+    {
+      "path": "../../context/collaboration"
+    },
+    {
+      "path": "../../context/gateway-runtime"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    }
   ]
 }

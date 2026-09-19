@@ -9,22 +9,19 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
       "path": "../../preset/agent-presets"
-    },
-    {
-      "path": "../../util/brand"
     },
     {
       "path": "../../typert/protocol"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
     }
   ]
 }

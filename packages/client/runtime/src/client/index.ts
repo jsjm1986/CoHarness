@@ -29,6 +29,7 @@ export { ConversationNodeAssembler } from './sessions/conversation-assembler.ts'
 export { ConversationLocationIndex } from './sessions/conversation-location-index.ts'
 export { conversationContextKey } from './contract/conversation.ts'
 export type {
+  AssistantLiveChunkEvent,
   ChatConversationViewNode, ConversationContextReader, ConversationEventInput,
   ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataStore,
   ConversationStepDataMap,
@@ -36,7 +37,7 @@ export type {
   ConversationNodeContext, ConversationNodeDefinition, ConversationPreviousContext,
   ConversationPublication, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewBuilder,
   ConversationViewDefinition, ConversationViewNode, ConversationViewSnapshotMap,
-  ConversationViewSnapshotStore, StepLocation, TurnLocation,
+  ConversationViewSnapshotStore, SessionEventLike, StepLocation, TurnLocation,
 } from './contract/conversation.ts'
 export type { ConversationRuntime } from './sessions/conversation-assembler.ts'
 export type { RootOwnerProps } from './slots.ts'

@@ -525,8 +525,8 @@ function sendJson(res: ServerResponse, status: number, value: unknown): void {
 async function allSessionHeaders(ctx: Context) {
   const persisted = await ctx.sessionPersistence.list()
   const live = ctx.get('sessions')?.list().map(session => session.header) ?? []
-  const persistedIds = new Set(persisted.map(header => String(header.id)))
-  return [...persisted, ...live.filter(candidate => !persistedIds.has(String(candidate.id)))]
+  const persistedIds = new Set(persisted.map(snapshot => String(snapshot.header.id)))
+  return [...persisted.map(snapshot => snapshot.header), ...live.filter(candidate => !persistedIds.has(String(candidate.id)))]
 }
 
 interface ArchiveHeaderIndex {

@@ -31,6 +31,8 @@ None, as the slot registry is browser-side UI plumbing; nothing here reaches a m
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. This is a zero-dependency pure registry core; it emits no Cordis events itself (the `ui-renderer` SlotRegistry owns the event bridge and its invariants); define/register/dispose sequencing is asserted directly by this package's behavior specs.
+
 ## Known Limitations and Deferred Work
 
 - **`isLive` scans all records linearly** — fine at UI-plugin registration counts (tens); revisit with an entry→record backref if ledgers ever grow hot.

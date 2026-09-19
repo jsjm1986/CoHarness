@@ -19,6 +19,7 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
     const [session, event] = args as [Session, SessionEvent]
     if (!isTeamEvent(event)) return
     try {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const state = foldTeam(session.id, session.snapshotEvents())
       applyTeamEvent(state, event)
     } catch (error: unknown) {

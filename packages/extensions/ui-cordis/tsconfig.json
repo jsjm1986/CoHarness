@@ -9,22 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../api/remotes/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/connection/tsconfig.client.json"
     },
     {
       "path": "../../client/locale"
     },
     {
-      "path": "../cordis-client-runner"
-    },
-    {
-      "path": "../../api/remotes/tsconfig.client.json"
-    },
-    {
       "path": "../../client/runtime"
-    },
-    {
-      "path": "../../client/ui-sidebar"
     },
     {
       "path": "../../client/ui-input-trigger"
@@ -33,13 +27,19 @@
       "path": "../../client/ui-primitives"
     },
     {
+      "path": "../../client/ui-sidebar"
+    },
+    {
       "path": "../../client/ui-slots"
     },
     {
       "path": "../../client/ui-tool"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../cordis-client-runner"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

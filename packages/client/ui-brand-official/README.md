@@ -14,6 +14,8 @@ None, as the package contributes browser presentation only; nothing here reaches
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The package retains no mutable state, and its three slot occupants install and leave through one transactional effect.
+
 ## Known Limitations and Deferred Work
 
 - **The package supplies one occupant set** — alternative presentation belongs in another Cordis package occupying the same slots.

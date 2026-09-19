@@ -28,6 +28,8 @@
 
 无。
 
+**运行时不变式：** 不发布伴生入口。浏览器插件只贡献由 effect 持有的 Conversation Definition、keyed renderer 与 dictionary；测试证明资源释放时会撤销这三项贡献；Host tool 包负责持久事件不变式。
+
 ## 已知限制与暂缓事项
 
 - 只有经 `dsh-tool-workflow` 发起的顶层调用会生成这些记录；嵌套 PTC mode 调用和直接 `WorkflowEngine` 消费方不会生成。

@@ -9,19 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../storage"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../storage"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

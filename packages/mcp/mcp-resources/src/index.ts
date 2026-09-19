@@ -100,6 +100,7 @@ export class McpResourceRuntime extends Service {
         }
       }, { label: `mcpResources.provider(${server})` })
     }.bind(this), `mcpResources.register(${server})`)
+    // oxlint-disable-next-line typescript/no-misused-promises -- visibility cleanup is synchronous; Cordis retains pending fiber disposal
     return dispose
   }
 

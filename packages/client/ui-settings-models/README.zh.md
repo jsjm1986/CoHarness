@@ -30,6 +30,8 @@ pi-ai profile 的 `models` 列表就在卡片上编辑：一行一个模型，�
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。这是只贡献 nav entry 的 section 插件，渲染固定空 content column，不发出 Cordis 事件，也不持有跨插件可变关系。
+
 ## 已知限制与暂缓事项
 
 - **卡片上可编辑的只有 API 密钥与精选折叠区字段**：手写编辑器用 schema 通用的字段覆盖面换来了设计稿上的布局（[Agent Note](../../../.agents/notes/implemented/architecture/2026-07-30-web-config-plane.zh.md)）。两个家族都公开 `baseURL`、模型的 `id`/`name`/`contextWindow`/`maxTokens` 以及图片输入模态声明（DeepSeek 使用 `inputModalities`，pi-ai 使用 `input`）；pi-ai 行编辑器还会写入 `reasoningEfforts`，而端点未声明模态时保持 `input` 未设置。手工声明的 pi-ai 路由还公开 `displayName` 与 `api`。重试策略、超时、DeepSeek 模型说明及其他进阶字段仍留在 `settings.yaml` 中；编辑器未展示的现有模型字段会予以保留。不带这些约定字段的 profile schema 只渲染该提示，两套精选布局则以 `llm-deepseek`/`llm-pi-ai` 这两个 namespace 的名字为键。

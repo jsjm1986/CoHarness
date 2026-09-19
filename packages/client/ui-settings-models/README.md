@@ -30,6 +30,8 @@ None, as the section renders a browser configuration UI; nothing here reaches a 
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. A nav-entry-only section plugin rendering a fixed empty content column — it emits no cordis events and owns no cross-plugin mutable relation.
+
 ## Known Limitations and Deferred Work
 
 - **Only the API key and curated fold fields are editable on the card** — the hand-written editor traded schema-generic field coverage for the mockup layout ([Agent Note](../../../.agents/notes/implemented/architecture/2026-07-30-web-config-plane.md)). Both families expose `baseURL`, model `id`/`name`/`contextWindow`/`maxTokens`, and an image-input declaration (`inputModalities` for DeepSeek, `input` for pi-ai); the pi-ai row editor additionally writes `reasoningEfforts`, while an endpoint that omits modalities leaves `input` unset. A hand-declared pi-ai route also exposes `displayName` and `api`. Retry policy, timeouts, DeepSeek model descriptions, and other advanced fields remain in `settings.yaml`; existing model fields the editor does not show are preserved. A profile schema without the conventional fields renders the hint alone, and the two curated layouts key on the `llm-deepseek`/`llm-pi-ai` namespaces by name.

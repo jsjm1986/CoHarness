@@ -12,7 +12,7 @@ Status: implemented
 
 ## Decision
 
-`ReactLoopAgent.step()` 在消费模型流期间捕捉取消，此时 `BlockAssembler`、已记录的分片 seq 和提供方路由可以确定已送达前缀。循环把该前缀追加为 step 的 `assistant/message`，并设置 `interrupted: true`、`surfaceOp: 'append'` 以及恰好包含已记录分片的 `sourceEventSeqs`。该追加先于 `step/end` 和记录 aborted 的 `turn/end`。
+`ReactLoopAgent.step()` 在消费模型流期间捕捉取消，此时 `BlockAssembler`、已累积的流记录和提供方路由可以确定已送达前缀。循环把该前缀追加为 step 的 `assistant/message`，并设置 `interrupted: true`、`surfaceOp: 'append'` 以及恰好包含已送达流的 `data.stream`。该追加先于 `step/end` 和记录 aborted 的 `turn/end`。
 
 `BlockAssembler.interruptedBlocks()` 按流顺序返回内容非空白的已闭合和未闭合 `text` 与 `reasoning` 块。打断先于分派，没有真实工具结果，因此它会省略工具调用，也会省略空块和未闭合的未知块类型。返回结果为空时不追加 assistant 消息。提供方的 `error` 和 `aborted` finish 会在 `agent/request-error` 前离开流消费范围，因此提供方故障和恢复期间的取消都不会提交失败请求的内容。
 

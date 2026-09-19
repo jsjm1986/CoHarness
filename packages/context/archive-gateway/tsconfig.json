@@ -5,14 +5,30 @@
     "outDir": "lib/types",
     "tsBuildInfoFile": "lib/tsconfig.tsbuildinfo"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../gateway-runtime" },
-    { "path": "../../runtime-diagnostics/invariants" },
-    { "path": "../../core/session" },
-    { "path": "../../session/session-persistence" },
-    { "path": "../../session/session-title" },
-    { "path": "../../workspace/workspace" }
+    {
+      "path": "../../client/connection/tsconfig.host.json"
+    },
+    {
+      "path": "../gateway-runtime"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../session/session-title"
+    },
+    {
+      "path": "../../workspace/workspace"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    }
   ]
 }

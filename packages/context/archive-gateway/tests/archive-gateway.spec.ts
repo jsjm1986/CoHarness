@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Context } from '@deepseek-ai/cordis'
-import { SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import type { ArchivedSessionEntry, WorkspaceArchiveSnapshot } from '@deepseek-ai/dsh-workspace'
 import { describe, expect, it, vi } from 'vitest'
 import * as ArchiveGateway from '../src/index.ts'
@@ -53,7 +53,10 @@ function archivedEntry(id: SessionId, createdAt: number, rootSessionId = id): Ar
   return {
     sessionId: id,
     rootSessionId,
-    header: { id, version: 0, createdAt, isSeeded: false, ...(rootSessionId === id ? {} : { parentSession: rootSessionId }) },
+    header: {
+      id, version: SESSION_FORMAT_VERSION, createdAt, isSeeded: false,
+      ...(rootSessionId === id ? {} : { parentSession: rootSessionId }),
+    },
   }
 }
 
@@ -83,7 +86,7 @@ async function syncContext(options: {
     archivedSessionIds: options.snapshot.archivedSessionIds,
   } as never)
   ctx.provide('sessionPersistence', {
-    list: async () => options.entries.map(entry => entry.header),
+    list: async () => options.entries.map(entry => ({ header: entry.header })),
     readFrom: options.readFrom ?? (async (id: SessionId) => {
       const entry = options.entries.find(candidate => candidate.sessionId === id)
       if (entry === undefined) throw new Error(`missing ${String(id)}`)
@@ -99,15 +102,15 @@ describe('archive-gateway runtime reader', () => {
     const root = SessionId('archive-root')
     const child = SessionId('archive-child')
     const headers: SessionHeader[] = [
-      { id: root, version: 0, createdAt: 1, isSeeded: false },
-      { id: child, version: 0, createdAt: 2, parentSession: root, isSeeded: false },
+      { id: root, version: SESSION_FORMAT_VERSION, createdAt: 1, isSeeded: false },
+      { id: child, version: SESSION_FORMAT_VERSION, createdAt: 2, parentSession: root, isSeeded: false },
     ]
     const events = new Map<string, SessionEvent[]>([
       [root, [event('user/message', 0, 'hello')]],
       [child, [event('assistant/message', 0, 'world')]],
     ])
     const register = vi.fn()
-    const list = vi.fn(async () => headers)
+    const list = vi.fn(async () => headers.map(header => ({ header })))
     const ctx = new Context()
     ctx.provide('connection', { http: { handlePrefix: register } } as never)
     ctx.provide('gatewayRuntime', {
@@ -537,7 +540,7 @@ describe('archive-gateway synchronization', () => {
       restoreSession,
     } as never)
     ctx.provide('sessionPersistence', {
-      list: async () => stored ? [entry.header] : [],
+      list: async () => stored ? [{ header: entry.header }] : [],
       readFrom: async () => ({ meta: entry.header, events: [] }),
       remove,
     } as never)

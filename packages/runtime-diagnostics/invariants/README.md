@@ -78,6 +78,8 @@ None, as the service and companions observe runtime events and mutable snapshots
 
 None; invariant checks do not assemble or send provider requests.
 
+**Runtime invariant:** No companion is published. Registration ownership and child lifecycle are the service's mutation boundary itself; observing them from the same registry would only duplicate its implementation.
+
 ## Known Limitations and Deferred Work
 
 - Request reconstruction covers requests explicitly marked by the loop before freezing; direct one-shot LLM calls remain outside that marker contract even when callers freeze them or attach a session id.

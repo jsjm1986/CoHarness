@@ -14,6 +14,8 @@ Loader 结算后，runner 读取共享的 [`ctx.agentDefaultModel`](../../core/a
 
 无；runner 不向请求前缀添加任何内容。
 
+**运行时不变式：** 不发布伴生入口。runner 的可观察约定（stderr 中的提供方推理、stdout 中的最终文本、按轮次结束原因决定的退出码）属于进程级，并由启动器 e2e 负责；runner 不注册任何内容，树内也没有任何可变关系可审计。
+
 ## 已知限制与暂缓事项
 
 - **只提交一个任务**：runner 没有用于交互式后续输入的 surface；它会等待 Agent 在返回 idle 前完成的所有工作，并打印该区间内最后一条非空 assistant 消息。

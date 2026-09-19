@@ -1,9 +1,11 @@
+import type { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {
   ConversationContextReader, ConversationEventInput, ConversationLocationData, ConversationMatch,
   ConversationNodeContext, ConversationNodeDefinition, ConversationPreviousContext,
   ConversationLocationDataScope, ConversationPublication, ConversationViewBuilder,
   ConversationViewDefinition, ConversationViewNode, ConversationViewSnapshotMap,
-  ConversationViewSnapshotStore,
+  ConversationViewSnapshotStore, SessionEventLike,
 } from '../contract/conversation.ts'
 import { conversationContextKey } from '../contract/conversation.ts'
 import {
@@ -196,7 +198,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     this.revised.clear()
     this.inputs.set(input.event.seq, input)
     let publication: ConversationPublication = 'none'
-    if (isLocationBoundary(input.event.type)) {
+    if (isLocationBoundaryEvent(input.event)) {
       const previousTimeline = this.locationIndex.snapshot()
       const changed = this.locationIndex.appendBoundary(input.event)
       if (this.locationIndex.snapshot() !== previousTimeline) {
@@ -245,6 +247,28 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     if (changedLocations.size > 0) publication = 'immediate'
     this.revised.clear()
     return publication
+  }
+
+  /**
+   * Replace one attempt's transient `assistant/live-chunk` rows with its
+   * committed durable settlement, or drop them on abandonment. Transients
+   * leave `inputs` so a later window rebuild cannot resurrect them; the
+   * settlement event joins the same ordered window.
+   * @param attemptId - process-local attempt whose live rows are now redundant.
+   * @param entry - durable settlement committed for that attempt, when committed.
+   * @returns immediate publication request when the window changed.
+   */
+  settleAssistant(attemptId: LlmAttemptId, entry?: ConversationEventInput): ConversationPublication {
+    let removed = false
+    for (const [seq, input] of this.inputs) {
+      if (input.event.type === 'assistant/live-chunk' && input.event.data.attemptId === attemptId) {
+        this.inputs.delete(seq)
+        removed = true
+      }
+    }
+    if (entry !== undefined) this.inputs.set(entry.event.seq, entry)
+    if (!removed && entry === undefined) return 'none'
+    return this.replaceWindow(this.sortedInputs(), this.hasMore)
   }
 
   /**
@@ -792,6 +816,13 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
 
 function isLocationBoundary(type: string): boolean {
   return type === 'turn/start' || type === 'turn/end' || type === 'step/start' || type === 'step/end'
+}
+
+/** Narrow a window event to the four durable Turn/Step boundary types. */
+function isLocationBoundaryEvent(
+  event: SessionEventLike,
+): event is SessionEvent<'turn/start'> | SessionEvent<'turn/end'> | SessionEvent<'step/start'> | SessionEvent<'step/end'> {
+  return isLocationBoundary(event.type)
 }
 
 function requireState(

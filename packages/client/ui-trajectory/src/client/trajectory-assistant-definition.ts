@@ -7,6 +7,8 @@ import {
   displayFailureMessage, IncrementalAssistantBlocks, isTokenDelta, sanitizeAssistantText, toAssistantBlocks,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
+import { assistantStreamFirstTokenTime } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 
 /* jscpd:ignore-start -- Target-owned Definitions intentionally keep their event
@@ -116,9 +118,12 @@ function addUsage(current: UsageValue | undefined, next: UsageValue): UsageValue
   }
 }
 
-function updateChunk(state: AssistantState, match: ConversationMatch): AssistantState {
-  if (match.event.type !== 'assistant/chunk') return state
-  const chunk = match.event.data.chunk
+function updateChunk(
+  state: AssistantState,
+  chunk: StreamChunk,
+  seq: number,
+  time: number,
+): AssistantState {
   if (chunk.type === 'usage') {
     return { ...state, sawChunk: true, usage: addUsage(state.usage, chunk.usage) }
   }
@@ -146,11 +151,37 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     ...state,
     sawChunk: true,
     ...(visible && state.firstVisibleSeq === undefined
-      ? { firstVisibleSeq: match.event.seq, firstVisibleTime: match.event.time }
+      ? { firstVisibleSeq: seq, firstVisibleTime: time }
       : {}),
     ...(isTokenDelta(chunk) && state.firstTokenTime === undefined
-      ? { firstTokenTime: match.event.time }
+      ? { firstTokenTime: time }
       : {}),
+  }
+}
+
+/** The Step retains its first token across live chunks and settled retry attempts. */
+function settleTiming(
+  state: AssistantState,
+  event: SessionEvent<'assistant/message' | 'assistant/attempt'>,
+): AssistantState {
+  return {
+    ...state,
+    firstTokenTime: state.firstTokenTime ?? assistantStreamFirstTokenTime(event.data.stream),
+  }
+}
+
+function settleMessage(
+  state: AssistantState,
+  match: ConversationMatch,
+  event: SessionEvent<'assistant/message'>,
+): AssistantState {
+  const blocks = toAssistantBlocks(event.data.message.content)
+  return {
+    ...settleTiming(state, event),
+    sawChunk: false,
+    blocks: new IncrementalAssistantBlocks(blocks),
+    final: match,
+    usage: event.data.usage ?? state.usage,
   }
 }
 
@@ -170,18 +201,15 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
   let state: AssistantState | undefined
   for (const match of context.matches) {
     const event = match.event
-    if (event.type === 'assistant/chunk') {
+    if (event.type === 'assistant/live-chunk') {
       state ??= initialState(event.data.turn, event.data.step, event.seq, event.time, false)
-      state = updateChunk(state, match)
+      state = updateChunk(state, event.data.chunk, event.seq, event.time)
+    } else if (event.type === 'assistant/attempt') {
+      state ??= initialState(event.data.turn, event.data.step, event.seq, event.time, false)
+      state = settleTiming(state, event)
     } else if (event.type === 'assistant/message') {
       state ??= initialState(event.data.turn, event.data.step, event.seq, event.time, false)
-      const blocks = toAssistantBlocks(event.data.message.content)
-      state = {
-        ...state,
-        blocks: new IncrementalAssistantBlocks(blocks),
-        final: match,
-        usage: state.usage ?? event.data.usage,
-      }
+      state = settleMessage(state, match, event)
     } else if (event.type === 'step/end' && state !== undefined) {
       state = { ...state, stepEnd: match }
     }
@@ -274,8 +302,9 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     if (event.type === 'step/start') {
       return { id: `${event.data.turn}:${event.data.step}`, role: 'start' }
     }
-    if (event.type === 'assistant/chunk'
+    if (event.type === 'assistant/live-chunk'
       || event.type === 'assistant/message'
+      || event.type === 'assistant/attempt'
       || event.type === 'llm/retry'
       || event.type === 'step/end') {
       return { id: `${event.data.turn}:${event.data.step}`, role: 'update' }
@@ -295,16 +324,11 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     )
   },
   update: (context, match) => {
-    if (match.event.type === 'assistant/chunk') return updateChunk(context.state, match)
-    if (match.event.type === 'assistant/message') {
-      const blocks = toAssistantBlocks(match.event.data.message.content)
-      return {
-        ...context.state,
-        blocks: new IncrementalAssistantBlocks(blocks),
-        final: match,
-        usage: context.state.usage ?? match.event.data.usage,
-      }
+    if (match.event.type === 'assistant/live-chunk') {
+      return updateChunk(context.state, match.event.data.chunk, match.event.seq, match.event.time)
     }
+    if (match.event.type === 'assistant/message') return settleMessage(context.state, match, match.event)
+    if (match.event.type === 'assistant/attempt') return settleTiming(context.state, match.event)
     if (match.event.type === 'step/end') return { ...context.state, stepEnd: match }
     if (match.event.type !== 'llm/retry') return context.state
     const data = match.event.data
@@ -327,8 +351,8 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     }
   },
   publication: (match) => {
-    if (match.event.type === 'step/start') return 'none'
-    if (match.event.type !== 'assistant/chunk') return 'immediate'
+    if (match.event.type === 'step/start' || match.event.type === 'assistant/attempt') return 'none'
+    if (match.event.type !== 'assistant/live-chunk') return 'immediate'
     const type = match.event.data.chunk.type
     return type === 'usage' || type === 'finish' ? 'none' : 'animation-frame'
   },

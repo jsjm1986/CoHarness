@@ -1,5 +1,3 @@
-/** Session-projection type declarations owned by the agent capability. */
-
 import type { TurnBoundaryProjection } from './types.ts'
 import type {} from '@deepseek-ai/dsh-session-projection'
 

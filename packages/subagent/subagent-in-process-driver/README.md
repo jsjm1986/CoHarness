@@ -110,6 +110,8 @@ The parent receives one data-dependent result through the consumer; all other ch
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **Runs expose no `sendMessage`/`resume`** — the optional runtime capabilities are absent on in-process runs.

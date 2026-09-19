@@ -122,7 +122,7 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
   for (let index = 0; index < count; index += 1) {
     const childId = SessionId(`${SESSION_ID}-child-${String(index + 1)}`)
     const createdAt = 1_786_767_300_000 + index * 10
-    await scaffold.ctx.sessionPersistence.create({
+    await scaffold.ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: childId,
       createdAt,

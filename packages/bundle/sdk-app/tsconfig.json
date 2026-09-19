@@ -9,16 +9,13 @@
   ],
   "references": [
     {
+      "path": "../../boot/cmdline"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {
       "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../boot/cmdline"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

@@ -32,6 +32,8 @@ None, as this package defines the client-facing wire protocol; the model-visible
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. A pure wire library (transport class + type declarations) with no event stream or mutable data relation of its own; both wire ends own their protocol behavior.
+
 ## Known Limitations and Deferred Work
 
 - **No protocol-version negotiation** — the handshake carries only `serverInfo.version` (`0.0.1`, unvalidated by clients); pre-release stance, no compatibility promise.

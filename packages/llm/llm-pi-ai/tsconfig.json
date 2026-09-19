@@ -9,40 +9,46 @@
   ],
   "references": [
     {
-      "path": "../../util/launch-environment"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../model-provider-config"
-    },
-    {
       "path": "../../attachment/attachment"
-    },
-    {
-      "path": "../../credentials/credentials"
     },
     {
       "path": "../../credentials/authorization"
     },
     {
+      "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../../fs/fs"
+    },
+    {
+      "path": "../llm"
+    },
+    {
+      "path": "../model-provider-config"
+    },
+    {
       "path": "../../settings/settings"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../util/launch-environment"
     },
     {
       "path": "../../util/timeout"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

@@ -49,6 +49,8 @@ None, as this trusted search backend returns hits only to callers and registers 
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Reconciliation, cursor generations, and derived-index ownership are validated at each serialized query boundary.
+
 ## Known Limitations and Deferred Work
 
 - **No caller authorization** — this is a trusted context-wide service; a model tool or UI must enforce its own access policy.

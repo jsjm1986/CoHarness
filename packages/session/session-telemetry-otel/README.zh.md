@@ -49,6 +49,8 @@ seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；
 
 无；本包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。模式选择只改变 capture handoff、SDK setup 与本地 diagnostics，不改变可由独立 companion 对照的会话或服务状态。导出在越过后端边界后仍由 SDK 内部处理。
+
 ## 已知限制与暂缓事项
 
 - **上游实验性源码树**：`@opentelemetry/sdk-logs` 仍从上游实验性（experimental）源码树发布；SDK API 的变动只会落在本包，也仅落在本包；seam 约定不动。

@@ -55,6 +55,8 @@ Indirectly, through `dsh-tool-web`, which retains bounded normalized provider da
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. Provider maps are private and selection/result caps are enforced on each call; the seam publishes no independent registry or request/result observation stream.
+
 ## Known Limitations and Deferred Work
 
 - **No observation surface** — no provider-change event and no capability-status query; availability is observed only by executing `search()`/`fetch()` and routing the thrown `WebError` codes, and the no-provider failure is the generic `WEB_PROVIDER_UNAVAILABLE` with no per-provider reason enumeration ([Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-drop-unconsumed-web-observation-surface.md)).

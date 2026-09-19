@@ -84,6 +84,8 @@ Zero direct token effect because rendering is client-side only.
 
 None; UI presentation is outside the model request.
 
+**Runtime invariant:** No companion is published. This stateless adapter contributes one tool and prompt section, while query lifecycle and result relations remain owned by the tool and LSP seams it composes.
+
 ## Known Limitations and Deferred Work
 
 - **UTF-16 cursor coordinates** — columns are exact for the protocol but hard for a model to count around non-BMP characters; an off-symbol position may return empty results, so the prompt explains the convention without encouraging broad LSP use ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md)).

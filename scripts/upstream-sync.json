@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.1.5-rc.2",
-  "syncedCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+  "syncedTag": "dsh-v0.1.6-alpha.2",
+  "syncedCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -44,10 +44,10 @@
       "sovereignty": "adapted"
     },
     "boot/hmr": {
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "boot/plugin-manager": {
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "bundle/acp-app": {
       "sovereignty": "adapted"
@@ -213,17 +213,11 @@
     "client/web": {
       "sovereignty": "adapted"
     },
-    "code-runtime/code-runtime": {
-      "sovereignty": "adapted"
-    },
-    "code-runtime/code-runtime-worker-thread": {
-      "sovereignty": "adapted"
-    },
     "compaction/command-compact": {
       "sovereignty": "adapted"
     },
     "compaction/compaction": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "compaction/compaction-basic": {
       "sovereignty": "adapted"
@@ -300,15 +294,6 @@
     "credentials/credentials-local": {
       "sovereignty": "adapted"
     },
-    "e2b/e2b": {
-      "sovereignty": "adapted"
-    },
-    "e2b/fs-e2b": {
-      "sovereignty": "adapted"
-    },
-    "e2b/subprocess-e2b": {
-      "sovereignty": "adapted"
-    },
     "examples/acp-demo": {
       "sovereignty": "owned"
     },
@@ -325,7 +310,10 @@
         "packages/experimental/agent-team/src/projection.ts"
       ]
     },
-    "experimental/code-runtime-python": {
+    "experimental/agent-team-profile": {
+      "sovereignty": "tracked"
+    },
+    "experimental/ptc-runtime-python": {
       "sovereignty": "adapted"
     },
     "experimental/tool-agent-team": {
@@ -494,7 +482,7 @@
       "sovereignty": "adapted"
     },
     "mcp/mcp-resources": {
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "plan/plan-mode": {
       "sovereignty": "adapted"
@@ -503,6 +491,12 @@
       "sovereignty": "adapted"
     },
     "preset/persona": {
+      "sovereignty": "adapted"
+    },
+    "ptc-runtime/ptc-runtime": {
+      "sovereignty": "adapted"
+    },
+    "ptc-runtime/ptc-runtime-node": {
       "sovereignty": "adapted"
     },
     "runtime-diagnostics/invariants": {
@@ -555,12 +549,7 @@
     },
     "session/session-persistence": {
       "sovereignty": "replaced",
-      "note": ".agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md",
-      "removedUpstreamPaths": [
-        "packages/session/session-persistence/src/errors.ts",
-        "packages/session/session-persistence/src/handle.ts",
-        "packages/session/session-persistence/src/storage-contract.ts"
-      ]
+      "note": ".agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md"
     },
     "session/session-persistence-gateway": {
       "sovereignty": "owned"
@@ -703,6 +692,9 @@
     "subprocess/subprocess-local": {
       "sovereignty": "adapted"
     },
+    "subprocess/win32-process": {
+      "sovereignty": "adapted"
+    },
     "terminal/terminal": {
       "sovereignty": "adapted"
     },
@@ -767,7 +759,7 @@
       "sovereignty": "adapted"
     },
     "util/lazy-require": {
-      "sovereignty": "owned"
+      "sovereignty": "adapted"
     },
     "util/native-command": {
       "sovereignty": "adapted"
@@ -813,13 +805,61 @@
       "sovereignty": "adapted"
     },
     "workflow/workflow": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
-    "workflow/workflow-worker-thread": {
+    "workflow/workflow-ptc": {
       "sovereignty": "adapted"
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "browser-use/browser-use": {
+      "sovereignty": "tracked"
+    },
+    "compaction/compaction-image-offload": {
+      "sovereignty": "tracked"
+    },
+    "computer-use/computer-use": {
+      "sovereignty": "tracked"
+    },
+    "experimental/auto-review": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-chrome-devtools-mcp": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-playwright-mcp": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-runtime": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-stagehand-native": {
+      "sovereignty": "tracked"
+    },
+    "experimental/computer-use-cua-driver-mcp": {
+      "sovereignty": "tracked"
+    },
+    "experimental/computer-use-cua-driver-native": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-v0-to-v1": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-v1-to-v2": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-v2-to-v3": {
+      "sovereignty": "tracked"
+    },
+    "session/session-turn-outline": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-catalog": {
+      "sovereignty": "adapted"
+    },
+    "session/session-format-v3-to-v4": {
+      "sovereignty": "owned"
     }
   },
   "upstreamOnly": [
@@ -831,6 +871,11 @@
     {
       "package": "api/settings-controller",
       "reason": "settings flow through host/apiproxy under the same principal/ACL dispatch",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "api/terminal-controller",
+      "reason": "terminal sessions are served by host/apiproxy terminal remotes",
       "replacedBy": "host/apiproxy"
     },
     {
@@ -871,9 +916,22 @@
       "reason": "the desktop docking layout belongs to the rejected upstream ui-package tree; the Workbench owns the cloud layout"
     },
     {
+      "package": "client/ui-plugin-manager",
+      "reason": "plugin management surfaces live in client/ui-settings-plugins",
+      "replacedBy": "client/ui-settings-plugins"
+    },
+    {
       "package": "client/ui-session",
       "reason": "client/ui-conversation and ui-workbench own the session surface",
       "replacedBy": "client/ui-conversation"
+    },
+    {
+      "package": "client/ui-settings-unarchive-sessions",
+      "reason": "session archival actions live inside the CoHarness Workbench session settings surface"
+    },
+    {
+      "package": "client/ui-sidebar-browser",
+      "reason": "the sidebar browser dock is part of the rejected upstream ui-panel dock family"
     },
     {
       "package": "client/ui-sidebar-documentpreview",
@@ -888,8 +946,20 @@
       "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
     },
     {
-      "package": "experimental/agent-team-profile",
-      "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+      "package": "client/ui-sidebar-terminal",
+      "reason": "the sidebar terminal dock is part of the rejected upstream ui-panel dock family"
+    },
+    {
+      "package": "deliverables/tool-present",
+      "reason": "the present-file tool adds a model-visible deliverable declaration; adoption pending with the deliverables surface"
+    },
+    {
+      "package": "deliverables/workspace-changes",
+      "reason": "workspace-change review is part of the pending Phase 7 deliverables surface"
+    },
+    {
+      "package": "document/office-to-pdf",
+      "reason": "Office document conversion is a pending Phase 7 adoption; no cloud consumer yet"
     },
     {
       "package": "experimental/agent-team-web-profile",
@@ -912,36 +982,28 @@
       "reason": "experimental prototype with no cloud consumer"
     },
     {
-      "package": "fs/tool-present",
-      "reason": "the present-file tool adds a model-visible deliverable declaration surface; adoption is deferred pending a product decision on the cloud produced-files flow"
+      "package": "skill/skill-office",
+      "reason": "Office skills are a pending Phase 7 adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-catalog",
-      "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
-      "replacedBy": "session/session-format"
+      "package": "ssh/fs-ssh",
+      "reason": "SSH-backed filesystem is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-v0-to-v1",
-      "reason": "real v0 normalization inlines into session/session-format; empty bump() shells are replaced under the rc.2 Session-correctness work",
-      "replacedBy": "session/session-format"
+      "package": "ssh/sandbox-ssh",
+      "reason": "SSH-backed sandbox is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-v1-to-v2",
-      "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
-      "replacedBy": "session/session-format"
+      "package": "ssh/ssh",
+      "reason": "SSH capability is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-v2-to-v3",
-      "reason": "v2\u2192v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
-      "replacedBy": "session/session-format"
+      "package": "ssh/subprocess-ssh",
+      "reason": "SSH-backed subprocess is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-turn-outline",
-      "reason": "readHistoryIndex covers the lookup surface but only the gateway provider produces indexes; the exclusion is under review"
-    },
-    {
-      "package": "subprocess/win32-process",
-      "reason": "shared Windows process helper library; adopted or rejected with the PR-11 subprocess runner rebuild"
+      "package": "test-support/remote-mock",
+      "reason": "remote mock server is used by upstream remote tests the fork does not carry"
     },
     {
       "package": "test-support/session-snapshot",

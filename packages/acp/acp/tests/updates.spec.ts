@@ -22,8 +22,10 @@ function assistantEvent(
         source: { kind: 'model', provider: 'mock', model: 'mock' },
         content,
       },
+      stream: [],
       ...usage === undefined ? {} : { usage },
     },
+    surfaceOp: 'append',
   }
 }
 
@@ -80,6 +82,7 @@ describe('standard ACP update projection', () => {
           }],
         },
       },
+      surfaceOp: 'append',
     })
 
     expect(call).toMatchObject({ rawInput: '{' })

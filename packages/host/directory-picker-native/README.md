@@ -14,6 +14,8 @@ None, as the backend serves the GUI host's directory selection; nothing here rea
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Each pick is one stateless subprocess round trip; the chooser outcome is only the returned path.
+
 ## Known Limitations and Deferred Work
 
 - **Linux requires desktop tooling** — with neither Zenity nor KDialog installed, `pick` rejects with an actionable error; it does not fall back to a typed-path prompt (the browse backend is that fallback at the composition level).

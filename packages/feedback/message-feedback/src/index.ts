@@ -322,12 +322,19 @@ export class MessageFeedbackService extends TypertRemoteService {
    * guessed into the business `session-not-found` branch.
    */
   private async inspectSession(sessionId: SessionId): Promise<KnownSession> {
-    if (this.ctx.sessions.get(sessionId) === undefined) {
-      const snapshots = await this.ctx.sessionPersistence.listSnapshots()
-      if (!snapshots.some(snapshot => snapshot.header.id === sessionId)
-        && this.ctx.sessions.get(sessionId) === undefined) {
-        return rejected({ code: 'session-not-found', sessionId })
-      }
+    const live = this.ctx.sessions.get(sessionId)
+    if (live !== undefined) {
+      return success(Object.freeze({
+        meta: live.header,
+        inheritedEventCount: live.inheritedEventCount,
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+        events: live.snapshotEvents(),
+      }))
+    }
+    const snapshots = await this.ctx.sessionPersistence.listSnapshots()
+    if (!snapshots.some(snapshot => snapshot.header.id === sessionId)
+      && this.ctx.sessions.get(sessionId) === undefined) {
+      return rejected({ code: 'session-not-found', sessionId })
     }
     return success(await this.ctx.sessionPersistence.inspect(sessionId))
   }

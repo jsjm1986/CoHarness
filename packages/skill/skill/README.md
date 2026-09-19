@@ -71,6 +71,8 @@ Indirectly, through `dsh-tool-skill`, which renders provider summaries into dura
 
 No direct prompt effect. The named consumer owns the durable initial catalog and append-only replacements after invalidation.
 
+**Runtime invariant:** No companion is published. Provider/runtime maps and revisioned caches mutate atomically inside the registry, which exposes no independent change event or snapshot for cross-checking them.
+
 ## Known Limitations and Deferred Work
 
 - **Invalidation is provider-driven** — the registry has no TTL and cannot infer that an arbitrary remote source changed; each mutable provider must retain and call its registration-scoped `invalidate()` capability from its own observation mechanism.

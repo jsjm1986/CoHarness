@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { createUserMessage, CallId, LlmError, StreamChunk  } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, ToolCallId, LlmError, expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId, TurnEndReason } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent, type AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from './mock-adapter.ts'
@@ -600,24 +600,44 @@ describe('agent loop', () => {
     }])
   })
 
-  it('records raw chunks for replay as assistant/chunk session events', async () => {
+  it('publishes one dense live attempt and commits one message with the exact embedded stream', async () => {
     const adapter = new MockAdapter([textResponse('abc')])
     const ctx = await harness(adapter)
     const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+    const frames: AssistantStreamFrame[] = []
+    let committedAfterMessage = false
+    ctx.on('agent/assistant-stream', ({ agent: subject, frame }) => {
+      if (subject !== agent) return
+      frames.push(frame)
+      if (frame.type === 'end' && frame.outcome.kind === 'committed') {
+        committedAfterMessage = agent.session.snapshotEvents().at(-1)?.type === 'assistant/message'
+      }
+    })
 
-    send(agent, 'hi')
+    send(agent, 'stream this')
     await waitForIdle(ctx, agent)
 
-    const chunkEvents = agent.session.snapshotEvents().filter(e => e.type === 'assistant/chunk')
-    // textResponse('abc') = block-start + 3 deltas + block-end + usage + finish = 7
-    expect(chunkEvents).toHaveLength(7)
-    // replay: chunk events alone re-assemble to the recorded assistant message
-    const deltaText = chunkEvents
-      .flatMap(e => e.type === 'assistant/chunk' ? [e.data.chunk] : [])
-      .filter((c: StreamChunk): c is Extract<StreamChunk, { type: 'text-delta' }> => c.type === 'text-delta')
-      .map(c => c.text)
-      .join('')
-    expect(deltaText).toBe('abc')
+    expect(frames.at(0)?.type).toBe('start')
+    expect(frames.at(-1)?.type).toBe('end')
+    expect(frames.map(frame => frame.revision)).toEqual(frames.map((_frame, index) => index + 1))
+    const chunks = frames.filter(
+      (frame): frame is Extract<AssistantStreamFrame, { type: 'chunk' }> => frame.type === 'chunk',
+    )
+    expect(chunks.map(frame => frame.index)).toEqual(chunks.map((_frame, index) => index))
+    expect(agent.session.snapshotEvents().some(event => (event.type as string) === 'assistant/chunk')).toBe(false)
+    const message = agent.session.snapshotEvents().findLast(event => event.type === 'assistant/message')
+    expect(message?.type === 'assistant/message'
+      ? expandAssistantStream(message.data.stream).map(member => member.chunk)
+      : undefined).toStrictEqual(chunks.map(frame => frame.chunk))
+    const end = frames.at(-1)
+    expect(end).toMatchObject({
+      type: 'end',
+      index: chunks.length,
+      outcome: { kind: 'committed', eventType: 'assistant/message', seq: message?.seq },
+    })
+    if (end?.type === 'end') {
+      expect(committedAfterMessage).toBe(true)
+    }
   })
 
   it('injects steering between steps and continues the turn', async () => {
@@ -1126,7 +1146,7 @@ describe('agent loop', () => {
   })
 
   it('does not dispatch tool calls from a max-tokens-truncated step', async () => {
-    const callId = CallId('c1')
+    const callId = ToolCallId('c1')
     const adapter = new MockAdapter([[
       { type: 'block-start', index: 0, blockType: 'tool-call' },
       { type: 'tool-call-delta', index: 0, id: callId, name: 'echo', argumentsDelta: '{"text":"x"}' },
@@ -1182,7 +1202,7 @@ describe('agent loop', () => {
   it('appends an empty completion anchor for a max-tokens step with no usage', async () => {
     // The truncated tool call is dropped from durable content, while the
     // successful provider call still needs an exact replay anchor.
-    const callId = CallId('c1')
+    const callId = ToolCallId('c1')
     const adapter = new MockAdapter([[
       { type: 'block-start', index: 0, blockType: 'tool-call' },
       { type: 'tool-call-delta', index: 0, id: callId, name: 'echo', argumentsDelta: '{"text":"x"}' },
@@ -1217,7 +1237,7 @@ describe('agent loop', () => {
       },
     }))
     expect(assistant.type === 'assistant/message' && assistant.data.stream?.length).toBeGreaterThan(0)
-    expect(assistant.sourceEventSeqs?.length).toBeGreaterThan(0)
+    expect(assistant.sourceEventSeqs).toBeUndefined()
     expect(agent.session.deriveMessages().filter(message => message.role !== 'system')).toEqual([{
       id: expect.any(String) as unknown,
       role: 'user',
@@ -1252,7 +1272,7 @@ describe('agent loop', () => {
       },
     }))
     expect(assistant.type === 'assistant/message' && assistant.data.stream?.length).toBeGreaterThan(0)
-    expect(assistant.sourceEventSeqs?.length).toBe(1)
+    expect(assistant.sourceEventSeqs).toBeUndefined()
     expect(agent.session.deriveMessages().filter(message => message.role !== 'system')).toEqual([{
       id: expect.any(String) as unknown,
       role: 'user',
@@ -1262,7 +1282,7 @@ describe('agent loop', () => {
   })
 
   it('keeps safe max-tokens assistant content while dropping truncated tool calls', async () => {
-    const callId = CallId('c1')
+    const callId = ToolCallId('c1')
     const adapter = new MockAdapter([[
       { type: 'block-start', index: 0, blockType: 'text' },
       { type: 'text-delta', index: 0, text: 'partial text' },
@@ -1414,7 +1434,7 @@ describe('agent loop', () => {
     // queue the second during turn 1 when the first assistant chunk streams
     let queued = false
     ctx.on('session/event', (_s, event) => {
-      if (event.type === 'assistant/chunk' && !queued) {
+      if (event.type === 'assistant/message' && !queued) {
         queued = true
         queueMicrotask(() => { send(agent, 'second message') })
       }

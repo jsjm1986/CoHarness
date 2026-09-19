@@ -83,6 +83,8 @@ const manifest: DshPackageManifest = {
 
 类型声明不增加模型输入，因此不影响提供方的缓存复用。
 
+**运行时不变式：** 不发布伴生入口。本包没有运行时状态或可独立观察的关系。
+
 ## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>

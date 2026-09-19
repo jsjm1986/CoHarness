@@ -84,6 +84,8 @@ Use search/read for ordinary navigation. Use lsp when textual matches are ambigu
 
 无；UI 呈现位于模型请求之外。
 
+**运行时不变式：** 不发布伴生入口。该无状态适配器提供一个工具和一个提示词区段，而查询生命周期与结果关系仍由它所组合的工具 seam 和 LSP seam 负责。
+
 ## 已知限制与暂缓事项
 
 - **UTF-16 光标坐标**：列坐标与协议精确一致，但模型难以在非 BMP 字符周围计数；未落在符号上的位置可能返回空结果，因此提示词解释了该约定，但不鼓励广泛使用 LSP（见 [seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.zh.md)）。

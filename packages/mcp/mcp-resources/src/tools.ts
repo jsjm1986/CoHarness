@@ -59,5 +59,6 @@ export function registerResourceTools(ctx: Context, request: RequestResource): (
       execute: (args, exec) => request(args.server, { method: 'resources/read', uri: args.uri }, exec),
     }))
   }, 'mcpResources.resourceTools')
+  // oxlint-disable-next-line typescript/no-misused-promises -- all collected tool disposers are synchronous
   return dispose
 }

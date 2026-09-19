@@ -78,6 +78,8 @@ Zero live-request tokens. A resumed agent pays for retained history and its curr
 
 JSONL storage does not mutate live request prefixes. A resumed loop can reuse provider cache only when its reconstructed history, current envelope, and model route match; crash-repair results append.
 
+**Runtime invariant:** No companion is published. Identity is enforced at the storage layer; persistence correctness requires backend round-trip and crash-tail tests; this package exposes no continuously observable in-process relation.
+
 ## Known Limitations and Deferred Work
 
 - **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2 artifacts to current v3 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.

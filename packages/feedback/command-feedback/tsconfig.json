@@ -9,28 +9,25 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../interaction/commands"
-    },
-    {
       "path": "../../core/session"
     },
     {
       "path": "../../identity/anonymous-user-id"
     },
     {
-      "path": "../../typert/protocol"
+      "path": "../../interaction/commands"
     },
     {
       "path": "../../session/session-telemetry"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

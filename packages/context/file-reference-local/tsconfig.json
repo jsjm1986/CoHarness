@@ -9,10 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../file-reference"
     },
     {
       "path": "../../core/agent"
@@ -24,10 +21,10 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../file-reference"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

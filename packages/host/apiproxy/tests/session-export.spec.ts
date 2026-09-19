@@ -6,7 +6,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { unzipSync, strFromU8 } from 'fflate'
@@ -21,7 +21,7 @@ const sid = (id: string): SessionId => id as SessionId
 
 function header(id: string, parentSession?: SessionId): SessionHeader {
   return {
-    version: 0,
+    version: SESSION_FORMAT_VERSION,
     id: sid(id),
     createdAt: 1000, isSeeded: false,
     cwd: '/proj',
@@ -665,16 +665,18 @@ describe('session.export download endpoint', () => {
     expect(Object.keys(files).sort()).toEqual(['media/nested-1.webp', 'session.jsonl'])
   })
 
-  it('scans the wrapped, inserted, and chunk carriers plus non-object content items', async () => {
+  it('scans the wrapped, inserted, stream, and chunk carriers plus non-object content items', async () => {
     const block = (id: string, mediaType: string) =>
       `{"type":"image","attachment":{"attachmentId":"${id}","mediaType":"${mediaType}","bytes":4,"width":2,"height":2}}`
     const wrapped = `{"type":"assistant/message","seq":2,"time":2000,"data":{"message":{"role":"assistant","content":["noise",${block('wrapped-1', 'image/jpeg')}]}}}`
     const inserted = `{"type":"context/inserted","seq":3,"time":3000,"data":{"inserted":[{"content":[${block('inserted-1', 'image/gif')}]}]}}`
-    const chunk = `{"type":"assistant/chunk","seq":4,"time":4000,"data":{"chunk":{"type":"block-end","block":${block('chunk-1', 'image/png')}}}}`
+    const streamed = `{"type":"assistant/message","seq":4,"time":4000,"data":{"message":{"role":"assistant","content":[]},"stream":[{"type":"chunk","time":4000,"chunk":{"type":"block-end","block":${block('stream-1', 'image/webp')}}}]}}`
+    const chunk = `{"type":"assistant/chunk","seq":5,"time":5000,"data":{"chunk":{"type":"block-end","block":${block('chunk-1', 'image/png')}}}}`
     const root = artifact('session-root', undefined, [
       '{"type":"session","version":0,"id":"session-root","createdAt":1000}',
       wrapped,
       inserted,
+      streamed,
       chunk,
     ].join('\n') + '\n')
     const api = await buildApi({ 'session-root': root })
@@ -685,6 +687,7 @@ describe('session.export download endpoint', () => {
     expect(Object.keys(files).sort()).toEqual([
       'media/chunk-1.png',
       'media/inserted-1.gif',
+      'media/stream-1.webp',
       'media/wrapped-1.jpg',
       'session.jsonl',
     ])

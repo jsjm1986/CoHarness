@@ -6,7 +6,7 @@
  * @module @deepseek-ai/dsh-llm/assembler
  */
 
-import { CallId } from './brand.ts'
+import { ToolCallId } from './brand.ts'
 import { assertNever } from './never.ts'
 import { createMessage } from './message.ts'
 import type { Message, MessageSource } from './message.ts'
@@ -17,7 +17,7 @@ interface PartialBlock {
   /** Append-only fragments; joining happens only when the block is read. */
   textParts: string[]
   textCache: string | undefined
-  toolCallId?: CallId
+  toolCallId?: ToolCallId
   toolCallName?: string
   /** Tool arguments use the same deferred join to avoid O(n²) deltas. */
   toolCallArgumentParts: string[]
@@ -125,7 +125,7 @@ export class BlockAssembler {
       case 'reasoning': return { type: 'reasoning', text: partial.textCache ??= partial.textParts.join('') }
       case 'tool-call': return {
         type: 'tool-call',
-        id: partial.toolCallId ?? CallId(`call-${index}`),
+        id: partial.toolCallId ?? ToolCallId(`call-${index}`),
         name: partial.toolCallName ?? '',
         arguments: partial.toolCallArgumentsCache ??= partial.toolCallArgumentParts.join(''),
       }

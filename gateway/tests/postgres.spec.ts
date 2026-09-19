@@ -17,6 +17,8 @@ import { PostgresCollaborationService } from '../src/postgres/collaboration-serv
 import { ConversationRepository } from '../src/postgres/conversation-repository.ts'
 import type { ConversationEvent, ConversationHeader } from '../src/postgres/conversation-repository.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
+import { DesktopCoordinator } from '../src/desktop-coordinator.ts'
+import { PostgresDesktopCoordinatorRepository } from '../src/postgres/desktop-coordinator-repository.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import {
   PostgresModelGovernanceService,
@@ -30,7 +32,9 @@ import {
 } from '../src/postgres/runtime-context.ts'
 import { importSqliteControlPlane } from '../src/postgres/sqlite-import.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
+import type { RuntimeTarget } from '../src/instances.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
+import type { GatewayPrincipalClaims } from '../src/principal.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
 
 const DATABASE_URL = process.env.HGW_TEST_DATABASE_URL
@@ -161,7 +165,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], current: 27 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28], current: 28 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -177,7 +181,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 27 })
+      .toEqual({ applied: [], current: 28 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -2295,4 +2299,114 @@ describePg('PostgreSQL baseline', () => {
     expect(parallel.auditEvents).toBe(first.auditEvents)
     expect(parallel.organizationId).not.toBe(first.organizationId)
   }, 60_000)
+
+  describe('desktop coordination', () => {
+    const DESKTOP_CONFIG = { grantTtlMs: 1_000, stoppingTtlMs: 2_000, queueTtlMs: 5_000, queueCapacity: 4 }
+    const generations = { generationOf: async (_target: RuntimeTarget) => 1 }
+
+    function claims(over: { runtimeId?: number; userId?: number; generation?: number } = {}): GatewayPrincipalClaims {
+      return {
+        version: 1,
+        issuer: 'harness-gateway',
+        audience: 'dsh-runtime',
+        organization: 'test',
+        user: { id: over.userId ?? 7, username: 'alice', displayName: 'Alice', role: 'user' },
+        scope: { kind: 'personal' },
+        runtime: { kind: 'user', id: over.runtimeId ?? 7, generation: over.generation ?? 1 },
+        issuedAt: 0,
+        expiresAt: 0,
+        nonce: 'n',
+      }
+    }
+
+    async function desktopContext(suffix: string) {
+      const slug = `desktop-${suffix}-${randomUUID()}`
+      await pool.query(`WITH organization AS (
+        INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Desktop') RETURNING id
+      ) INSERT INTO harness.compute_nodes(organization_id,name)
+        SELECT id,'desktop-node' FROM organization`, [slug])
+      return resolvePostgresRuntimeContext(pool, slug, 'desktop-node')
+    }
+
+    it('serializes concurrent acquisition and promotes the FIFO head across gateway processes', async () => {
+      const context = await desktopContext('race')
+      const repository = new PostgresDesktopCoordinatorRepository(context)
+      const first = new DesktopCoordinator(repository, generations, DESKTOP_CONFIG)
+      const second = new DesktopCoordinator(repository, generations, DESKTOP_CONFIG)
+      await first.initialize()
+      const resource = { node: 'node-a', desktop: 'seat-1' }
+      const holderA = claims({ runtimeId: 7 })
+      const holderB = claims({ runtimeId: 8, userId: 8 })
+      const [a, b] = await Promise.all([
+        first.acquire(holderA, { ...resource, requestId: 'r-a' }),
+        second.acquire(holderB, { ...resource, requestId: 'r-b' }),
+      ])
+      expect([a.status, b.status].sort()).toEqual(['granted', 'queued'])
+      const granted = a.status === 'granted' ? { result: a, holder: holderA } : { result: b, holder: holderB }
+      const queued = a.status === 'queued' ? { result: a, holder: holderA } : { result: b, holder: holderB }
+      if (granted.result.status !== 'granted' || queued.result.status !== 'queued') throw new Error('unexpected acquire outcome')
+
+      const retry = await first.acquire(holderA, { ...resource, requestId: 'r-a' })
+      expect(retry.status === 'granted' || retry.status === 'held').toBe(true)
+
+      await first.release(granted.holder, granted.result.grantId)
+      const promoted = await second.status(queued.holder, { ...resource, requestId: queued.holder === holderA ? 'r-a' : 'r-b' })
+      expect(promoted.status).toBe('granted')
+
+      const reloaded = new DesktopCoordinator(new PostgresDesktopCoordinatorRepository(context), generations, DESKTOP_CONFIG)
+      await reloaded.initialize()
+      const snapshot = await reloaded.snapshot(resource)
+      expect(snapshot.grants.filter(grant => grant.state === 'held')).toHaveLength(1)
+      expect(await reloaded.listResources()).toHaveLength(1)
+    })
+
+    it('expires heartbeats, marks the resource unavailable, and recovers via admin clear', async () => {
+      const context = await desktopContext('sweep')
+      let now = 1_000_000
+      const make = () => new DesktopCoordinator(
+        new PostgresDesktopCoordinatorRepository(context),
+        generations, DESKTOP_CONFIG, undefined, () => now)
+      const coordinator = make()
+      await coordinator.initialize()
+      const resource = { node: 'node-b', desktop: 'seat-2' }
+      const holder = claims({ runtimeId: 7 })
+      const waiter = claims({ runtimeId: 8, userId: 8 })
+      const grant = await coordinator.acquire(holder, { ...resource, requestId: 'r-1' })
+      if (grant.status !== 'granted') throw new Error('expected grant')
+      await coordinator.acquire(waiter, { ...resource, requestId: 'r-2' })
+
+      now += 1_500
+      await coordinator.sweep()
+      expect((await coordinator.status(holder, { ...resource, requestId: 'r-1' })).status).toBe('stopping')
+
+      now += 2_500
+      await coordinator.sweep()
+      await expect(coordinator.acquire(claims({ runtimeId: 9, userId: 9 }), { ...resource, requestId: 'r-3' }))
+        .rejects.toMatchObject({ code: 'unavailable' })
+
+      await coordinator.clearUnavailable(resource, { userId: 1 })
+      expect((await coordinator.status(waiter, { ...resource, requestId: 'r-2' })).status).toBe('granted')
+
+      const reloaded = make()
+      await reloaded.initialize()
+      expect((await reloaded.snapshot(resource)).grants.filter(grant => grant.state === 'held')).toHaveLength(1)
+    })
+
+    it('scopes resources to the organization and rejects stale generations', async () => {
+      const context = await desktopContext('scope')
+      const coordinator = new DesktopCoordinator(
+        new PostgresDesktopCoordinatorRepository(context), generations, DESKTOP_CONFIG)
+      await coordinator.initialize()
+      const resource = { node: 'node-c', desktop: 'seat-3' }
+      await expect(coordinator.acquire(claims({ generation: 0 }), { ...resource, requestId: 'stale' }))
+        .rejects.toMatchObject({ code: 'stale-generation' })
+      expect((await coordinator.acquire(claims({ runtimeId: 7 }), { ...resource, requestId: 'r' })).status).toBe('granted')
+
+      const other = new DesktopCoordinator(
+        new PostgresDesktopCoordinatorRepository(await desktopContext('other')), generations, DESKTOP_CONFIG)
+      await other.initialize()
+      expect(await other.listResources()).toEqual([])
+      expect((await other.acquire(claims({ runtimeId: 7 }), { ...resource, requestId: 'r' })).status).toBe('granted')
+    })
+  })
 })

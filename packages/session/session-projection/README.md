@@ -42,6 +42,8 @@ None, as the registry only computes client-facing read models of already-logged 
 
 None; projections never assemble or send provider requests.
 
+**Runtime invariant:** No companion is published. The registry's own contracts (duplicate-key and stateVersion rejection, effect-tied removal, the `Object.is` change gate) are enforced synchronously inside the service and proven by its spec, the drive relation (every committed `session/event` passes every unit) would require re-running the drive to check — duplicating the implementation rather than detecting drift — and the served-value relation (every served key has a live registration) lives on each carrier's wire path, which emits no cordis event this companion could observe; carrier specs assert it. Synchronous-unit discipline is enforced as far as practical by the boundary `schema.parse` (a Promise-returning view fails loudly).
+
 ## Known Limitations and Deferred Work
 
 - **Every tail page carries every client-visible key** — there is no per-key opt-out or lazy-key request shape yet; acceptable while values are UI-scale whole states (a todo list, a goal snapshot), revisit if a domain's value grows large.

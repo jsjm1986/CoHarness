@@ -41,6 +41,8 @@ The auxiliary request consumes tokens according to selected input size and `maxO
 
 No main-request invalidation. Auxiliary cache reuse is provider-specific; the fixed instruction is reusable while the JSON message array changes with each revision.
 
+**Runtime invariant:** No companion is published. This stateless helper validates and freezes each auxiliary request before dispatch; deadline, stream, cited message seqs, and provider/model fields are checked synchronously and by tests.
+
 ## Known Limitations and Deferred Work
 
 - The helper accepts text output only and rejects tool calls; structured-output adapters and provider-specific prompt variants are not exposed.

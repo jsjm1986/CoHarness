@@ -3,9 +3,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AssistantStreamFrame, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import AgentDefaultModelConfig from '@deepseek-ai/dsh-agent-default-model'
-import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
+import { LlmAttemptId, createAssistantMessage, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session, UserMessage } from '@deepseek-ai/dsh-session'
 import { apply, Config, internals } from '../src/index.ts'
@@ -17,7 +17,30 @@ afterEach(() => { Object.assign(internals, originalInternals) })
 interface Script {
   progress?: boolean
   before?(session: Session): void
-  afterPrompt(session: Session, message: UserMessage): Promise<void> | void
+  afterPrompt(session: Session, message: UserMessage, agent: Agent): Promise<void> | void
+}
+
+const frameStates = new WeakMap<Agent, { attemptId: ReturnType<typeof LlmAttemptId>; revision: number; index: number }>()
+
+function startFrames(agent: Agent, turn = 1, step = 1): void {
+  const state = { attemptId: LlmAttemptId(`${agent.id}:test`), revision: 1, index: 0 }
+  frameStates.set(agent, state)
+  agent.ctx.emit('agent/assistant-stream', {
+    agent,
+    frame: {
+      type: 'start', attemptId: state.attemptId, revision: state.revision, turn, step,
+    },
+  })
+}
+
+function emitChunk(agent: Agent, chunk: StreamChunk): void {
+  const state = frameStates.get(agent)
+  if (state === undefined) throw new Error('test Assistant frames have not started')
+  const frame: AssistantStreamFrame = {
+    type: 'chunk', attemptId: state.attemptId, revision: ++state.revision,
+    index: state.index++, time: Date.now(), chunk,
+  }
+  agent.ctx.emit('agent/assistant-stream', { agent, frame })
 }
 
 function appendTurn(
@@ -32,6 +55,7 @@ function appendTurn(
   session.append('user/message', message, { surfaceOp: 'append' })
   if (text !== undefined) {
     session.append('assistant/message', {
+      stream: [],
       turn,
       step: 1,
       message: createAssistantMessage({
@@ -82,7 +106,7 @@ async function bench(script: Script): Promise<{
         send: () => {},
         followup: (message: UserMessage) => {
           agent.inbox.append('next-turn', message)
-          idle = Promise.resolve().then(() => script.afterPrompt(session, message))
+          idle = Promise.resolve().then(() => script.afterPrompt(session, message, agent))
         },
         steer: () => {},
         inject: () => {},
@@ -153,68 +177,26 @@ describe('headless runner', () => {
     const release = Promise.withResolvers<undefined>()
     const test = await bench({
       progress: true,
-      async afterPrompt(session, message) {
+      async afterPrompt(session, message, agent) {
         session.append('turn/start', { turn: 1 })
         session.append('step/start', { turn: 1, step: 1 })
         session.append('user/message', message, { surfaceOp: 'append' })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'block-start', index: 0, blockType: 'reasoning' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'reasoning-delta', index: 0, text: '' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'reasoning-delta', index: 0, text: 'checking the workspace' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'reasoning-delta', index: 0, text: ' safely\n' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'checking the workspace safely\n' } },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'usage', usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 2 } },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'block-start', index: 1, blockType: 'reasoning' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'reasoning-delta', index: 1, text: 'second pass\n' },
-        })
+        startFrames(agent)
+        emitChunk(agent, { type: 'block-start', index: 0, blockType: 'reasoning' })
+        emitChunk(agent, { type: 'reasoning-delta', index: 0, text: '' })
+        emitChunk(agent, { type: 'reasoning-delta', index: 0, text: 'checking the workspace' })
+        emitChunk(agent, { type: 'reasoning-delta', index: 0, text: ' safely\n' })
+        emitChunk(agent, { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'checking the workspace safely\n' } })
+        emitChunk(agent, { type: 'usage', usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 2 } })
+        emitChunk(agent, { type: 'block-start', index: 1, blockType: 'reasoning' })
+        emitChunk(agent, { type: 'reasoning-delta', index: 1, text: 'second pass\n' })
         reasoningAppended.resolve(undefined)
         await release.promise
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'block-start', index: 2, blockType: 'text' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'text-delta', index: 2, text: 'done' },
-        })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'block-end', index: 2, block: { type: 'text', text: 'done' } },
-        })
+        emitChunk(agent, { type: 'block-start', index: 2, blockType: 'text' })
+        emitChunk(agent, { type: 'text-delta', index: 2, text: 'done' })
+        emitChunk(agent, { type: 'block-end', index: 2, block: { type: 'text', text: 'done' } })
         session.append('assistant/message', {
+          stream: [],
           turn: 1,
           step: 1,
           message: createAssistantMessage({
@@ -231,10 +213,12 @@ describe('headless runner', () => {
     const other = test.ctx.sessions.create()
     other.append('turn/start', { turn: 1 })
     other.append('step/start', { turn: 1, step: 1 })
-    other.append('assistant/chunk', {
-      turn: 1,
-      step: 1,
-      chunk: { type: 'reasoning-delta', index: 0, text: 'other session' },
+    test.ctx.emit('agent/assistant-stream', {
+      agent: { session: other } as Agent,
+      frame: {
+        type: 'chunk', attemptId: LlmAttemptId('other'), revision: 1,
+        index: 0, time: Date.now(), chunk: { type: 'reasoning-delta', index: 0, text: 'other session' },
+      },
     })
     const streamed = test.output()
     release.resolve(undefined)
@@ -286,14 +270,20 @@ describe('headless runner', () => {
   it('separates an unterminated reasoning prefix from the terminal model failure', async () => {
     const test = await bench({
       progress: true,
-      afterPrompt(session, message) {
+      afterPrompt(session, message, agent) {
         session.append('turn/start', { turn: 1 })
         session.append('step/start', { turn: 1, step: 1 })
         session.append('user/message', message, { surfaceOp: 'append' })
-        session.append('assistant/chunk', {
-          turn: 1,
-          step: 1,
-          chunk: { type: 'reasoning-delta', index: 0, text: 'trying recovery' },
+        startFrames(agent)
+        emitChunk(agent, { type: 'reasoning-delta', index: 0, text: 'trying recovery' })
+        const state = frameStates.get(agent)
+        if (state === undefined) throw new Error('test Assistant frames have not started')
+        agent.ctx.emit('agent/assistant-stream', {
+          agent,
+          frame: {
+            type: 'end', attemptId: state.attemptId, revision: ++state.revision,
+            index: state.index, outcome: { kind: 'abandoned' },
+          },
         })
         session.append('step/end', { turn: 1, step: 1 })
         session.append('turn/end', {

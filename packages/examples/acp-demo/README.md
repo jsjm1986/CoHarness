@@ -52,6 +52,8 @@ Indirectly, through `dsh-agent-spine-demo` and the leaf's model-facing plugins. 
 
 Append-only per session; the app adds no request-prefix content itself.
 
+**Runtime invariant:** No companion is published. This composition package owns no independent event stream or mutable data; Loader and built-entry tests cover its wiring.
+
 ## Known Limitations and Deferred Work
 
 - **JSONL persistence is fixed** — a different backend requires another composition.

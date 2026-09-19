@@ -47,3 +47,5 @@ None. The log-only command lifecycle and browser download do not change the deri
 - The download endpoint requires a persistence backend with a per-Session raw artifact. The shipped JSONL backend supports plaintext and zstd artifacts; SQLite export is not included in this change.
 - This is a browser download, not a Host-path writer. The browser chooses the local destination; no Host path or native folder action is returned.
 - The preflight reports failures found before ZIP streaming starts. A descendant or attachment failure after the browser accepts the GET is reported by the browser download manager, not by the modal.
+
+No runtime invariant companion is published because the export plugin owns no independently observable registrations or state replicas.

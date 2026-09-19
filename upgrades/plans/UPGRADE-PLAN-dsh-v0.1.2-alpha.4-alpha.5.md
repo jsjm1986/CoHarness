@@ -11,7 +11,7 @@
 
 alpha.4 是一次协议/API 层面的升级：`Session.events` 被按需读取 API 取代、`SessionSeq`/`SessionLogOffset` 品牌类型贯通整条 session 栈、`report` 工具被双向 `send_message` 取代、持久化 header 从 `seedLength` 改为 `{ meta.isSeeded, inheritedEventCount }`。这四项都触及 fork 自有的 ApiProxy history-wire、Gateway/SQLite 持久化后端和 UI façade，因此本轮的主体工作是**让上游协议变更贯通 fork 自有包**而不是挑选功能条目。alpha.5 只有一个升级路径修复（#3438），其前提是上游 per-record 投影缓存布局，fork 未采纳该布局，判定为不适用并以 fork 自身架构内的等价措施覆盖同一风险。
 
-用户在 2026-09-02 22:35 决策卡 `up45-scope` 中拍板五项范围：① `Session.events` 采用新 API 并**保留 `events` 为 `@deprecated` 兼容 getter**；② 品牌类型**全量贯通**含 fork 自有包；③ invariant 伴生清理（#3367）**拆为后续独立 PR**；④ `code-runtime-python` **整包替换**为上游 experimental 版；⑤ `web_fetch` **跟随上游默认开启**。本记录按此范围执行。
+用户在 2026-09-02 22:35 决策卡 `up45-scope` 中拍板五项范围：① `Session.events` 采用新 API 并**保留 `events` 为 `@deprecated` 兼容 getter**；② 品牌类型**全量贯通**含 fork 自有包；③ invariant 伴生清理（#3367）**拆为后续独立 PR**；④ `ptc-runtime-python` **整包替换**为上游 experimental 版；⑤ `web_fetch` **跟随上游默认开启**。本记录按此范围执行。
 
 ## 2. 二开保护条件
 
@@ -50,7 +50,7 @@ alpha.4 是一次协议/API 层面的升级：`Session.events` 被按需读取 A
 | tag / 提交 | 代码主题 | CoHarness 处置 |
 | --- | --- | --- |
 | alpha.4 `5dd876025d`（#2907） | Session log 按需读取 API、不可变快照复用 | 采纳并保留 `events` 兼容 getter（§3.1）。 |
-| alpha.4 `9d15938073`（#1148） | `code-runtime-python` 从 `packages/code-runtime/` 迁至 `packages/experimental/` 并扩到约 13k 行（settlement / backlog / load-dispatch 健壮性） | **整包替换**（用户决定 ④）：`git rm -r packages/code-runtime/code-runtime-python`，导入 a5 的 `packages/experimental/code-runtime-python/` 全部 15 个文件。fork 适配：`snapshotJsonValue` 改自 `@deepseek-ai/dsh-session`；`private: true`；保留 `./invariant` 导出与 `lib/invariant.js`（#3367 拆 PR），新写说明性空 `src/invariant.ts`；`tsconfig.json` references 改 session/timeout/invariants；`tsdown.config.ts` 双入口。根配置：`tsconfig.host.json`、`tsconfig.base.json`（显式 paths ×2）、`vitest.config.ts` Windows 排除表、`knip.json`、`scripts/check-workspace-constraints.ts`、`scripts/verify-package-readme-model-experience.ts`、`scripts/gen-doc-graphs.ts`（codeRuntime seam implementations 改为 `['code-runtime-worker-thread', 'experimental-code-runtime-python']`）。该包要求 CPython ≥ 3.10（与 CI `setup-python 3.10` 一致）。 |
+| alpha.4 `9d15938073`（#1148） | `ptc-runtime-python` 从 `packages/ptc-runtime/` 迁至 `packages/experimental/` 并扩到约 13k 行（settlement / backlog / load-dispatch 健壮性） | **整包替换**（用户决定 ④）：`git rm -r packages/ptc-runtime/ptc-runtime-python`，导入 a5 的 `packages/experimental/ptc-runtime-python/` 全部 15 个文件。fork 适配：`snapshotJsonValue` 改自 `@deepseek-ai/dsh-session`；`private: true`；保留 `./invariant` 导出与 `lib/invariant.js`（#3367 拆 PR），新写说明性空 `src/invariant.ts`；`tsconfig.json` references 改 session/timeout/invariants；`tsdown.config.ts` 双入口。根配置：`tsconfig.host.json`、`tsconfig.base.json`（显式 paths ×2）、`vitest.config.ts` Windows 排除表、`knip.json`、`scripts/check-workspace-constraints.ts`、`scripts/verify-package-readme-model-experience.ts`、`scripts/gen-doc-graphs.ts`（ptcRuntime seam implementations 改为 `['ptc-runtime-node', 'experimental-ptc-runtime-python']`）。该包要求 CPython ≥ 3.10（与 CI `setup-python 3.10` 一致）。 |
 | alpha.4 `714bec1316`（#3367） | 删除约 150 个包的空 `invariant.ts` 伴生与 `./invariant` 导出、规则改为「只有能比较可分叉观测的才发布」 | **拆为后续独立 PR**（用户决定 ③）：本轮不动 `invariant.ts`、`package.json` 的 `./invariant` 导出、`dsh-invariants` peer/dev 依赖；新导入的 experimental python 包也按 fork 现行规则补伴生。 |
 | alpha.4 `52af48f808`（#3250） | Steer service、`send_message`、删 `tool-subagent-report` 与 `activation-setup-registry.ts` | 采纳（§3.1）；Remote `control.ts` 不采用。 |
 | alpha.4 `68488c552a`（#3403） | 模型发现 headers、`assertValidHeaders`、`ModelListEditor` 搜索 | 采纳（§3.1）；fork `model-access` / `model-provider-config` 自有包不受影响。 |
@@ -90,7 +90,7 @@ alpha.4 是一次协议/API 层面的升级：`Session.events` 被按需读取 A
 - Agent 与读模型：`packages/core/{agent,agent-loop,tools}`、`packages/interaction/{permission-presets,user-approval,commands}`、`packages/goal/*`、`packages/schedule/schedule`、`packages/llm/token-meter`、`packages/compaction/*`、`packages/context/{session-reference,time-context,agent-instructions}`、`packages/todo/tool-todo`、`packages/plan/plan-mode`。
 - LLM：`packages/llm/llm/src/discovery.ts`、`packages/llm/llm-pi-ai`、`packages/llm/llm-retry`、`packages/client/ui-settings-models`。
 - 客户端：`packages/client/ui-theme`、`packages/client/ui-conversation`、`packages/client/runtime`、`packages/client/ui-deliverables`、`packages/client/ui-slots`、`packages/client/ui-renderer`、`packages/client/ui-primitives`、`packages/client/ui-tool`、`packages/client/ui-agent-preset`、26 个 fork 自有 CSS module（hairline / elevation / corner-shape）。
-- 实验包：`packages/experimental/code-runtime-python`（新位置，15 文件）、`tsconfig.{host,base}.json`、`vitest.config.ts`、`knip.json`、三个 scripts。
+- 实验包：`packages/experimental/ptc-runtime-python`（新位置，15 文件）、`tsconfig.{host,base}.json`、`vitest.config.ts`、`knip.json`、三个 scripts。
 - 文档与生成物：30 篇上游改动的英文 README / docs 逐 hunk 语义补丁（en + zh）、`.agents/notes` 导入 14 篇 a5 Note、删 3 篇 report 系列 Note、整文件快进 12 篇 + 段落级快进 12 篇分叉 Note、11 个生成器输出（Cordis catalog / api-catalog / slot-catalog / tool / config / persistence catalog / scoped-events / 8 张 composition 图 / module graph / third-party notices）、`verify-translation-pairing --write` 1157 对。
 - 快照：`examples/acp-agent/tests/snapshots/**` 与 `examples/headless-agent/tests/snapshots/**` keyless refresh 重写（`send_message` schema、子会话日志），删 `subagent-report` 场景。
 
@@ -106,7 +106,7 @@ CI=true pnpm run build:lib:client     # 160 个 client 面 bundle 通过（publi
 CI=true pnpm run hygiene              # rescope / knip / publint(248) / constraints / licenses(252) / package-invariants(248) / built-package-invariants(248) / cordis-config(137) / node-next-types(257) / optional-imports / runtime-closure(4 预设 131 包) / package-dependencies(264 包 633 边) / client-packages(50) / plugin-surfaces / vendored-links 全部通过
 CI=true pnpm run release:verify --family dsh   # 247 个成员统一 0.1.2-alpha.5.coharness.1，发布顺序可解
 npx vitest run <115 个含 src/tests 改动的包目录>   # 604 文件 / 10186 用例通过（vitest-focused-3.log + 两处后续修正的单文件复跑）；lint 修正涉及的 22 个测试文件 612 用例复跑通过
-npx tsc -b packages/experimental/code-runtime-python && npx vitest run packages/experimental/code-runtime-python   # 0 错；283 通过 / 2 跳过（CPython 3.12）
+npx tsc -b packages/experimental/ptc-runtime-python && npx vitest run packages/experimental/ptc-runtime-python   # 0 错；283 通过 / 2 跳过（CPython 3.12）
 11 个文档/目录生成器（gen-cordis-catalog --write … gen-third-party-notices）   # 全部 exit 0
 npx tsx scripts/verify-translation-pairing.ts     # 1162 对一致
 DSH_SNAPSHOT=refresh vitest run --config vitest.snapshot.config.ts examples/acp-agent/tests/acp.snapshot.ts examples/headless-agent/tests/headless.snapshot.ts   # 重录（分两批）
@@ -122,6 +122,6 @@ git diff --check && git diff --cached --check     # 无空白问题
 - Gateway 线上头保留 `seedLength`，Gateway schema 与 fork 客户端无需同步发布；存储层与线上层的映射集中在 `session-persistence-gateway`，可独立回滚。
 - 持久化 header 形状变化只影响进程内类型与 SQLite / JSONL 的读写映射，不改变磁盘字节（JSONL v0 header 兼容解码、SQLite 列不变）；回滚本 PR 不需要数据转换。
 - `web_fetch` 默认开启由 `bundle/base/cordis.patch.yml` 与三个预设的 `fetch: true` 决定，部署可用 overlay 关闭。
-- `code-runtime-python` 无 shipped profile 使用，整包替换对默认组合无行为影响；需 CPython ≥ 3.10 的运行环境。
+- `ptc-runtime-python` 无 shipped profile 使用，整包替换对默认组合无行为影响；需 CPython ≥ 3.10 的运行环境。
 - 独立后续决策点：① #3367 invariant 伴生清理 PR；② 是否采纳 per-record 投影缓存布局（继而可采纳 #3438）；③ #3391 composer 座位归属迁移与 `ui-trajectory` 驻留分页；④ fork 自有 CSS 的整框描边色阶（l4）视觉复查。
 - 后续追上游时先重跑 `git diff --no-renames` 与提交清单，再检查本记录「有意不采用」项是否仍成立；三方合并脚本以 alpha.5 为新 base。

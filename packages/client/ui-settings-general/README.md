@@ -18,6 +18,8 @@ None, as the plugin renders browser settings UI; nothing here reaches a model re
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. The settings seam validates and publishes the durable onboarding section, while slot conflicts fail loud in the slot core. The local document action is browser state over typed RPC responses and is covered by store/component tests rather than a Cordis runtime relationship.
+
 ## Known Limitations and Deferred Work
 
 - The General section has no built-in rows; each row appears only when its owning feature plugin is mounted.

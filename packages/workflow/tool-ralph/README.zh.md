@@ -83,6 +83,8 @@ Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop o
 
 每个全新子 agent 都有独立的请求缓存。父级结果追加在可复用请求前缀之后。
 
+**运行时不变式：** 不发布伴生入口。该面向模型的编排适配器不拥有独立事件流；工作流与 subagent 归属方会校验该适配器启动的运行及其子 agent 生命周期。
+
 ## 已知限制与暂缓事项
 
 - **完成由 worker 自行声明**：没有独立的评估器或验证器判断目标是否实际完成；评估器策略及评估器驱动的延续均暂缓处理。

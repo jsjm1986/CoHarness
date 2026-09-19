@@ -77,6 +77,8 @@ Only the owning tool result contributes tokens.
 
 Append-only through the owning tool result.
 
+**Runtime invariant:** No companion is published. This transport owns no durable package-local event stream; protocol and lifecycle tests cover its mapping.
+
 ## Known Limitations and Deferred Work
 
 - **No load, delete, or fork method** — persisted primary sessions use the standard `session/list`, `session/resume`, and `session/close` controls; ACP `load`, deletion, and unstable fork operations are not implemented.

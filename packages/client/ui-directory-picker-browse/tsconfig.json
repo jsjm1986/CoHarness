@@ -9,19 +9,16 @@
   ],
   "references": [
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../locale"
     },
     {
-      "path": "../ui-slots"
+      "path": "../runtime"
     },
     {
       "path": "../ui-primitives"
     },
     {
-      "path": "../locale"
-    },
-    {
-      "path": "../runtime"
+      "path": "../ui-slots"
     },
     {
       "path": "../ui-workspace"

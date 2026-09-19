@@ -62,6 +62,8 @@ Indirectly, through consumers such as `dsh-tool-call-timeout-policy`, which may 
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its value algebra is enforced by unit tests.
+
 ## Known Limitations and Deferred Work
 
 - **Notification only** — a deadline cannot stop work that ignores its signal; every capability still needs its own socket/process/task termination path.

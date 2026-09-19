@@ -92,6 +92,8 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 
 无；该包既不组装也不发送提供方请求。
 
+**运行时不变式：** 不发布伴生入口。本包是线路契约层加宿主侧网关，服务均由他处拥有——自身不发出 Cordis 事件；其投影的 session/agent 事件流由所属包的伴随断言；rpcId 往返与模式验收在载体边界执行，并由协议同构套件检验。
+
 ## 已知限制与暂缓事项
 
 - **转发的 Remote 事件寄居在这套 legacy 帧联合里**：`host/remote-event` 住在 `HostFrame` 中，是为了让投递路径复用现有宿主流、不必新开第三条下行通道，因此读起来像是本包拥有 Remote 事件契约。并非如此：名单归 `dsh-api-remotes`，消费端动词是 `ctx.remote.$on`。将来宿主流整体搬离本包时，该帧随之搬走，消费端契约不受影响（[原委](../../../.agents/notes/implemented/architecture/2026-08-10-remote-event-delivery.zh.md)）。

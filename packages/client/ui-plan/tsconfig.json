@@ -12,13 +12,10 @@
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../locale"
     },
     {
       "path": "../runtime"
-    },
-    {
-      "path": "../locale"
     },
     {
       "path": "../ui-conversation"
@@ -33,7 +30,7 @@
       "path": "../../plan/plan-mode"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
     }
   ]
 }

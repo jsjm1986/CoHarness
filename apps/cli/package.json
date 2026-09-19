@@ -16,13 +16,14 @@
   },
   "files": [
     "lib/*.js",
+    "lib/types/*.d.ts",
     "config"
   ],
   "dsh": {
     "configTrees": [
       {
         "mount": "config/agent-presets",
-        "path": "../../packages/preset/agent-presets/presets",
+        "path": "config/agent-presets",
         "scanRoster": true
       }
     ]
@@ -50,6 +51,7 @@
     "@deepseek-ai/dsh-compaction-basic": "workspace:^",
     "@deepseek-ai/dsh-compaction-tool-result-pruner": "workspace:^",
     "@deepseek-ai/dsh-cordis-client-runner": "workspace:^",
+    "@deepseek-ai/dsh-experimental-agent-team-profile": "workspace:^",
     "@deepseek-ai/dsh-fs-local": "workspace:^",
     "@deepseek-ai/dsh-gateway-runtime": "workspace:^",
     "@deepseek-ai/dsh-goal": "workspace:^",
@@ -99,7 +101,7 @@
     "@deepseek-ai/dsh-tool-web": "workspace:^",
     "@deepseek-ai/dsh-tool-workflow": "workspace:^",
     "@deepseek-ai/dsh-web-app": "workspace:^",
-    "@deepseek-ai/dsh-workflow-worker-thread": "workspace:^",
+    "@deepseek-ai/dsh-workflow-ptc": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "commander": "^15.0.0",
     "js-yaml": "^5.2.3",

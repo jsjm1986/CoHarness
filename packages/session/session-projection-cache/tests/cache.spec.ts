@@ -11,8 +11,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
-import SessionStore, { SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
@@ -59,7 +59,7 @@ function fakePersistence(logs: Map<string, SessionEvent[]>) {
     const events = logs.get(String(id))
     if (events === undefined) throw new Error(`session "${id}" not found`)
     return {
-      meta: { version: 0, id, createdAt: 0, isSeeded: false },
+      meta: { version: SESSION_FORMAT_VERSION, id, createdAt: 0, isSeeded: false },
       inheritedEventCount: SessionLogOffset(0),
       events: events.filter(event => event.seq >= fromSeq),
     }
@@ -68,8 +68,8 @@ function fakePersistence(logs: Map<string, SessionEvent[]>) {
 }
 
 /** Header shape for cachedSnapshot calls (fake logs stamp createdAt 0, no cwd). */
-const headerOf = (id: SessionId, createdAt = 0, cwd?: string) =>
-  ({ version: 0, id, createdAt, isSeeded: false, ...cwd === undefined ? {} : { cwd } })
+const headerOf = (id: SessionId, createdAt = 0, cwd?: string): SessionHeader =>
+  ({ version: SESSION_FORMAT_VERSION, id, createdAt, isSeeded: false, ...cwd === undefined ? {} : { cwd } })
 
 interface HarnessOptions {
   pool?: MemoryMediaPool

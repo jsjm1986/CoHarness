@@ -110,6 +110,8 @@ When you have your final answer, you MUST report it by calling the `structured_o
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系，相关约定在所属 seam 强制执行。
+
 ## 已知限制与暂缓事项
 
 - **运行不公开 `sendMessage`/`resume`**：进程内运行不具备这些可选运行时能力。

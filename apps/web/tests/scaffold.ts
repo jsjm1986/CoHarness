@@ -46,9 +46,8 @@ import type {
   LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ReplayHandle } from '@deepseek-ai/dsh-llm-replay'
-import { installLlmReplay, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
+import { installLlmReplay, parseSessionLog, prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
 import SessionStore, {
-  packChunkRuns,
   SESSION_FORMAT_VERSION,
   SessionId,
   SessionSeq,
@@ -594,7 +593,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       }
       const recorded = parseSessionLog(fixtureText)
       const hasModelCall = recorded.some(event => (
-        event.type === 'assistant/chunk' || event.type === 'request/header' || event.type === 'tool/call'
+        event.type === 'assistant/message' || event.type === 'assistant/attempt'
+        || event.type === 'request/header' || event.type === 'tool/call'
       ))
       if (hasModelCall) {
         throw new Error('replayProvidersOnly fixture must record no model calls')
@@ -700,7 +700,7 @@ function rawSessionLog(session: Session): string {
       ...header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth },
       ...header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset },
     }),
-    ...packChunkRuns(session.snapshotEvents()).map(record => JSON.stringify(record)),
+    ...session.snapshotEvents().map(event => JSON.stringify(event)),
     '',
   ].join('\n')
 }
@@ -888,7 +888,7 @@ async function persistSeedSession(
     // Same root as the booted tree with the plugin's own default compression,
     // so the host's directory-scan list() sees one consistent encoding.
     await seeder.plugin(JsonlSessionPersistence, { root: scaffold.persistenceRoot })
-    await seeder.sessionPersistence.create(meta)
+    await seeder.sessionPersistence.createStored(meta)
     await seeder.sessionPersistence.append(meta.id, events)
   } finally {
     await seeder.fiber.dispose()
@@ -962,23 +962,24 @@ export async function captureStableAria(page: Page, selector: string, workspaceC
 }
 
 /**
- * Rewrite a seed fixture through its decoded event list. Projected fixtures
- * omit `seq`/`time` and pack chunk runs into single rows, so a scenario that
- * trims or extends a recording must edit the decoded events rather than raw
- * lines; the result is re-serialized one event per row, which
+ * Rewrite a seed fixture through its migrated event list. The fixture parses
+ * through the Session format catalog, so the callback edits current-generation
+ * events (`assistant/message`/`assistant/attempt` with embedded streams) and
+ * the result is re-serialized under the migrated header, which
  * {@link parseSessionLog} reads back unchanged. Appended events take the next
  * positional seq; `time` may be left at zero because {@link seedSession}
  * materializes times from event order.
  * @param fixtureText - raw or realized session.jsonl contents.
  * @param edit - returns the full event list to serialize (kept + appended).
- * @returns the rewritten fixture text.
+ * @returns the rewritten fixture text at the current Session format.
  */
 export function rewriteSeedEvents(
   fixtureText: string,
   edit: (events: SessionEvent[]) => SessionEvent[],
 ): string {
-  const header = fixtureText.split(/\r?\n/, 1)[0]!
-  const events = edit(parseSessionLog(fixtureText))
+  const current = prepareSessionSnapshotFixtureForComparison(fixtureText)
+  const header = current.split(/\r?\n/, 1)[0]!
+  const events = edit(parseSessionLog(current))
   events.forEach((event, index) => {
     if (event.seq !== index) {
       throw new Error(`rewritten seed events must stay contiguous from 0: seq ${String(event.seq)} at index ${String(index)}`)

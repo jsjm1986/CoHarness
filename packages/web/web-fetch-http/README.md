@@ -46,6 +46,8 @@ Indirectly, through [`dsh-tool-web`](../tool-web/README.md), which places this p
 
 No direct invalidation; the named consumer owns any request-prefix changes.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **Public-network policy is deliberately strict** — destinations that resolve to any non-public address are rejected, and all same-origin redirect hops are resolved and checked again. Deployments that need private services must provide a separate, explicitly reviewed provider rather than weakening this policy.

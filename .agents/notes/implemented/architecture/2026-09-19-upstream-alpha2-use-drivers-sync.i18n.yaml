@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-use-drivers-sync.md
+2026-09-19-upstream-alpha2-use-drivers-sync.md: ebf4a0ce23c566754b0f2555a7ffb273cbb4438f
+2026-09-19-upstream-alpha2-use-drivers-sync.zh.md: 31b8b828b07c159e58d0ca82dbb3b8c3c3cf9ba8

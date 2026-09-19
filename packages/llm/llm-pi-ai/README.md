@@ -202,6 +202,8 @@ Generated content affects later inputs only after the loop records it. pi-ai fol
 
 Recorded response content appends to the next request and does not invalidate its earlier reusable prefix. Unrecorded transport metadata and usage accounting do not affect cache identity.
 
+**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+
 ## Known Limitations and Deferred Work
 
 - **Only provider-exposed reasoning can render** — a reasoning-effort request can change hidden model computation without returning a trace, and the adapter does not synthesize one. pi-ai 0.82.1 promotes `reasoning_content`, `reasoning`, and `reasoning_text`; it retains encrypted `reasoning_details` attached to tool calls but discards text available only inside `reasoning_details` before Harness receives the event. Such a gateway must also emit a supported native field or the strict tagged text prefix, or gain upstream pi-ai support.

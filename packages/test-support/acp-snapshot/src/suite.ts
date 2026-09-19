@@ -59,8 +59,6 @@ const WINDOWS_STDOUT_SNAPSHOT = 'stdout.expected.windows.jsonl'
 /** Stable session-log token standing in for the sidecar's initial schemas. */
 const TOOLS_TOKEN = '{{tools}}'
 
-const PACKED_CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
-
 /** Canonical UUID spelling minted for ordinary message identities. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -94,8 +92,8 @@ export interface Scenario {
    * guard requires the sidecar exactly when this is set: the harness forwards
    * the file purely on existence, so an unregistered stray sidecar would
    * silently alter the derived script. The guard fails loud on either
-   * mismatch. Defaults to false (replay derives from the fixture's
-   * `assistant/chunk` events).
+   * mismatch. Defaults to false (replay derives from the fixture's durable
+   * assistant events).
    */
   overridden?: boolean
   /**
@@ -720,22 +718,6 @@ export function stabilizeFixtureMessageIds(logs: readonly string[], fixtures: re
   return logs.map(log => applyFixtureMessageIds(log, replacements))
 }
 
-/** One packed row's member times, or `undefined` for an ordinary record. */
-function packedTimes(record: Record<string, unknown>): number[] | undefined {
-  if (!PACKED_CHUNK_ROW_TYPES.has(record.type as string)) return undefined
-  const row = record as unknown as { time0?: number; data: { dt: number[] } }
-  const times = [row.time0 ?? 0]
-  for (const gap of row.data.dt) times.push((times[times.length - 1] as number) + gap)
-  return times
-}
-
-/** Expand packed timing envelopes so refresh alignment follows logical events, not physical lines. */
-function logicalRecords(records: Record<string, unknown>[]): Record<string, unknown>[] {
-  return records.flatMap((record) => {
-    const times = packedTimes(record)
-    return times === undefined ? [record] : times.map(time => ({ type: 'assistant/chunk', time }))
-  })
-}
 
 /**
  * Find tool calls whose structured result reports `UNKNOWN_TOOL`.
@@ -817,25 +799,6 @@ function preserveFixtureVolatiles(record: Record<string, unknown>, existing: Rec
   ) {
     (data as Record<string, unknown>).durationMs = (existingData as Record<string, unknown>).durationMs
   }
-}
-
-/** Carry logical member times into a fresh packed row while leaving its fragment arrays untouched. */
-function preservePackedMemberTimes(
-  record: Record<string, unknown>,
-  existingMembers: Record<string, unknown>[],
-): void {
-  if (!PACKED_CHUNK_ROW_TYPES.has(record.type as string)) return
-  const row = record as unknown as { time0: number; data: { dt: number[] } }
-  const firstTime = existingMembers[0]?.time
-  if (!Number.isSafeInteger(firstTime)) return
-  row.time0 = firstTime as number
-  if (existingMembers.length !== row.data.dt.length + 1) return
-  const times = existingMembers.map(member => Number.isSafeInteger(member.time) ? member.time as number : undefined)
-  if (times.some(time => time === undefined)) return
-  const memberTimes = times as number[]
-  const gaps = memberTimes.slice(1).map((time, index) => time - (memberTimes[index] as number))
-  if (gaps.some(gap => !Number.isSafeInteger(gap))) return
-  row.data.dt = gaps
 }
 
 /** Whether a parsed JSON value is a non-array object. */
@@ -1012,27 +975,18 @@ function normalizedStringMappings(
   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
     const record = records[recordIndex] as Record<string, unknown>
     const existingRecord = existingRecords[existingIndex]
-    const memberCount = packedTimes(record)?.length ?? 1
     if (record.type === 'session/title' && existingRecord?.type !== 'session/title') continue
-    if (memberCount > 1) {
-      const existingMembers = existingRecords.slice(existingIndex, existingIndex + memberCount)
-      if (
-        existingMembers.length !== memberCount
-        || existingMembers.some(member => member.type !== 'assistant/chunk')
-      ) return undefined
-    } else {
-      if (existingRecord === undefined || existingRecord.type !== record.type) return undefined
-      if (!collectNormalizedStringMappings(
-        record,
-        existingRecord,
-        normalizedRefreshRecord(freshRecords[recordIndex] as Record<string, unknown>, freshContext),
-        normalizedRefreshRecord(existingRecord, existingContext),
-        excludedStrings,
-        forward,
-        reverse,
-      )) return undefined
-    }
-    existingIndex += memberCount
+    if (existingRecord === undefined || existingRecord.type !== record.type) return undefined
+    if (!collectNormalizedStringMappings(
+      record,
+      existingRecord,
+      normalizedRefreshRecord(freshRecords[recordIndex] as Record<string, unknown>, freshContext),
+      normalizedRefreshRecord(existingRecord, existingContext),
+      excludedStrings,
+      forward,
+      reverse,
+    )) return undefined
+    existingIndex += 1
   }
   return existingIndex === existingRecords.length ? forward : undefined
 }
@@ -1045,9 +999,8 @@ function normalizedStringMappings(
  * complete record layout aligns and volatile strings form a consistent
  * bijection. Complete durable-message ids are excluded because the later
  * fixture-ready structural pass owns them. Ambiguous layouts or mappings
- * keep fresh strings. Packed timing envelopes expand for alignment, so
- * packing does not shift later records;
- * fresh semantic values and fragment arrays remain authoritative.
+ * keep fresh strings; fresh semantic values and fragment arrays remain
+ * authoritative.
  *
  * @param fresh The newly harvested session JSONL.
  * @param existing The committed fixture JSONL being refreshed.
@@ -1063,7 +1016,7 @@ export function stabilizeRefreshLog(
 ): string {
   const freshRecords = parseJsonlRecords(fresh)
   const stable = applyFixtureReplacements(fresh, replacements)
-  const existingRecords = logicalRecords(parseJsonlRecords(existing))
+  const existingRecords = parseJsonlRecords(existing)
   const records = parseJsonlRecords(stable)
   const existingContext = fixtureContext(existing)
   const stringMappings = normalizedStringMappings(
@@ -1078,7 +1031,6 @@ export function stabilizeRefreshLog(
   for (let i = 0; i < records.length; i++) {
     let record = records[i] as Record<string, unknown>
     const existingRecord = existingRecords[existingIndex]
-    const memberCount = packedTimes(record)?.length ?? 1
     const insertedTitle = record.type === 'session/title' && existingRecord?.type !== 'session/title'
     if (insertedTitle) {
       /* v8 ignore next -- a title is turn-enclosed, so a preceding event time exists in every valid fixture. */
@@ -1087,7 +1039,6 @@ export function stabilizeRefreshLog(
     } else {
       if (
         stringMappings !== undefined
-        && memberCount === 1
         && existingRecord !== undefined
         && existingRecord.type === record.type
       ) {
@@ -1100,9 +1051,8 @@ export function stabilizeRefreshLog(
         ) as Record<string, unknown>
         records[i] = record
       }
-      preservePackedMemberTimes(record, existingRecords.slice(existingIndex, existingIndex + memberCount))
       preserveFixtureVolatiles(record, existingRecord)
-      existingIndex += memberCount
+      existingIndex += 1
     }
     if (typeof record.time === 'number') previousEventTime = record.time
   }

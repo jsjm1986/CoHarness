@@ -27,6 +27,7 @@ function reject(message: string, code = 'GOAL_TOOL_AUTHORITY_REQUIRED'): never {
 
 /** Locate the open turn without copying the event suffix when projections are available. */
 function openTurnEvents(ctx: Context, agent: Agent): Pick<GoalToolExecution, 'events' | 'openTurnStartSeq'> {
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const events = agent.session.snapshotEvents()
   const projections = ctx.get('sessionProjections')
   const projected = projections?.stateOf(agent.session, 'turnBoundary')

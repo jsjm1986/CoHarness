@@ -26,6 +26,8 @@ None, as the sidebar renders the browser session list; nothing here reaches a mo
 
 None; this package neither assembles nor sends a provider request.
 
+**Runtime invariant:** No companion is published. Panel metadata is a read-only presentation projection of the Slot registry and locale, with no independent write API. The registry owns entry identity and disposal; this package's assembly tests assert the projection after registration and locale notifications settle. The shell owns no separate navigation state to reconcile with those sources.
+
 ## Known Limitations and Deferred Work
 
 - **Session state-dot rendering is owned by [ui-workspace](../ui-workspace/README.md)** — no done/error notification sources are available.

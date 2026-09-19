@@ -39,6 +39,8 @@ None, as this is a pure filesystem primitive; nothing here reaches a model reque
 
 None; nothing here enters a request prefix.
 
+**Runtime invariant:** No companion is published. This pure filesystem primitive owns no event stream or mutable runtime data; its replacement contract is enforced by unit tests.
+
 ## Known Limitations and Deferred Work
 
 - **Atomic, not durable** — no `fsync` of the file or its directory, so after a crash the rename may be observed unwound. The file-backed stores here re-read and republish on boot, keeping durability the caller's policy.

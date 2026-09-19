@@ -189,10 +189,10 @@
   - img
   - text: Think WIRE_REASONING_TOOL_CALL
 - paragraph: WIRE_ASSISTANT_TOOL_CALL
-- button "Bash Verify packed history carrier":
+- button "Bash Verify history wire pagination":
   - img
   - img
-  - text: Bash Verify packed history carrier
+  - text: Bash Verify history wire pagination
 - button "Think WIRE_REASONING_TOOL_DONE":
   - img
   - img

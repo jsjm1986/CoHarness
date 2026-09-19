@@ -373,7 +373,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       }
     }
     if (desc.input !== undefined) {
-      if (envelope.images > 0 && desc.input.images !== true) refuseImages()
+      if (envelope.images > 0 && desc.input.attachments !== true) refuseImages()
       return { claim: this.leadingClaim(desc, session, name) }
     }
     if (!bare) return undefined
@@ -402,7 +402,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     return {
       token,
       ...(desc.input !== undefined ? { hint: desc.input.hint } : {}),
-      ...(desc.input?.images === true ? { images: true } : {}),
+      ...(desc.input?.attachments === true ? { images: true } : {}),
       submit: (args, _actx, images) => this.execute(session, line + args, images),
     }
   }
@@ -423,7 +423,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     line: string,
     images: readonly SubmitImageAttachment[] = [],
   ): Promise<SubmitOutcome> {
-    const result = await this.ctx.remote.commands.execute(session.sessionId, line, images)
+    const attachments = images.map(image => ({ type: 'image' as const, ...image }))
+    const result = await this.ctx.remote.commands.execute(session.sessionId, line, attachments)
     if (!result.ok) throw new Error(`command.execute failed: ${result.error.code}: ${result.error.message}`)
     if (result.value === undefined) return { kind: 'error', text: `unknown or malformed command: ${line}` }
     this.notifyExecuted(session.sessionId, submittedCommandName(line), result.value.result)

@@ -62,6 +62,8 @@ export async function runWithDeadline(upstream: AbortSignal | undefined, timeout
 
 不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
 
+**运行时不变式：** 不发布伴生入口。这个纯工具不拥有事件流或可变运行时数据；其值代数约束由单元测试保障。
+
 ## 已知限制与暂缓事项
 
 - **只发出通知**：deadline 无法停止忽略其信号的工作；每项能力仍需要自己的 socket/进程/任务终止路径。

@@ -59,6 +59,8 @@ Each two-line reading accumulates until compaction shadows it. Unchanged locatio
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
+**Runtime invariant:** No companion is published. A reading is a per-turn snapshot of external tmux state, so the session holds no cross-event relation to check; scheduling and format are owned by pipeline tests.
+
 ## Known Limitations and Deferred Work
 
 - **First step only** — a pane moved or resized mid-turn is reflected on the next turn, not between steps.

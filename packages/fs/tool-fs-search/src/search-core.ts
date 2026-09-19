@@ -255,7 +255,7 @@ export async function runRipgrep(
   try {
     outcome = await handle.done
   } catch (error: unknown) {
-    throw new SearchError(`${toolName} could not start its search command (ripgrep launch failed)`, 'SEARCH_FAILED', { cause: error })
+    throw new SearchError(`${toolName} subprocess failed before reporting an outcome (ripgrep provider failure)`, 'SEARCH_FAILED', { cause: error })
   }
   const stdout = handle.collected.stdout?.readFrom(0)
   const stderr = handle.collected.stderr?.readFrom(0)
@@ -390,7 +390,7 @@ export async function trySaveFormattedResult(
   }
   const save: SaveTextSpill = {
     owner: { sessionId },
-    source: { toolName: exec.name, callId: exec.callId, label: 'result' },
+    source: { kind: 'tool', toolName: exec.name, callId: exec.callId, label: 'result' },
     suggestedName,
     content,
   }

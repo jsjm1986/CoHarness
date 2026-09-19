@@ -39,10 +39,6 @@
     "./tools": {
       "types": "./lib/types/tools.d.ts",
       "default": "./lib/types/tools.js"
-    },
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
     }
   },
   "files": [
@@ -52,8 +48,7 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts",
-    "lib/invariant.js"
+    "lib/typert.remote-client.d.ts"
   ],
   "license": "MIT",
   "dependencies": {
@@ -62,7 +57,6 @@
     "@deepseek-ai/schemastery": "workspace:^",
     "execa": "^10.0.0",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3",
     "@deepseek-ai/dsh-util-values": "workspace:^"
   },
   "peerDependencies": {
@@ -76,8 +70,7 @@
     "@deepseek-ai/dsh-brand": "workspace:^",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
     "@deepseek-ai/dsh-sandbox": "workspace:^",
-    "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/dsh-user-approval": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-hmr": {
@@ -104,7 +97,6 @@
     "@deepseek-ai/dsh-session-projection": "workspace:^",
     "@deepseek-ai/dsh-sandbox": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "pnpm": "11.7.0"
   }
 }

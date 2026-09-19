@@ -6,11 +6,14 @@
  * @module @deepseek-ai/dsh-tools/src/ptc
  */
 
-import { CallId, createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { CodeBindingFunction, CodeRunResult, CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
-import { snapshotJsonValue } from '@deepseek-ai/dsh-session'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ToolCallId, ToolSchema } from '@deepseek-ai/dsh-llm'
+import type { PtcBindingFunction, PtcRunResult, PtcRunSandbox, PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
+import { approveEscalation, ESCALATION_TARGETS, validateEscalationArgs } from '@deepseek-ai/dsh-sandbox'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
+import type { ApprovalService } from '@deepseek-ai/dsh-user-approval'
+import { deepFreeze, snapshotJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import { defineTool, parameterSchemaSpecToJsonSchema } from './schema.ts'
 import { TOOL_RUNTIME_SCHEDULER } from './index.ts'
 import type { PtcDispatchLog, ToolDefinition, ToolExecutionResult, ToolRuntime, ToolRunContext } from './index.ts'
@@ -19,13 +22,10 @@ import type {} from './types.ts'
 /** The model-facing name of the PTC mode tool. */
 export const RUN_CODE_NAME = 'run_code'
 
-/** The `tools:sdk` section order: inside the 100–199 tool-guidance band, after per-tool guidance sections. */
-export const SDK_SECTION_ORDER = 150
-
 /**
  * The language-specific `run_code` schema text: the tool `description` and its
  * `code` parameter description, kept together so a language's two model-facing
- * strings share one source of truth. Keyed by `CodeRuntime.language`, mirroring
+ * strings share one source of truth. Keyed by `PtcRuntime.language`, mirroring
  * `SDK_RENDERERS` in {@link ./index.ts}. The emitted flavor MUST match the
  * semantics the same language's SDK instructions promise, so the model never
  * receives a TypeScript schema beside a Python SDK (or vice versa).
@@ -75,17 +75,17 @@ const PYTHON_FLAVOR: RunCodeFlavor = {
  * {@link RUN_CODE_FLAVORS} here and `SDK_RENDERERS` in {@link ./index.ts} — are
  * checked against this union with `satisfies`, so a language added to one and
  * not the other fails `typecheck` instead of waiting for a runtime that reports
- * it. The tables stay declared `Record<string, …>` because `CodeRuntime.language`
+ * it. The tables stay declared `Record<string, …>` because `PtcRuntime.language`
  * is an unconstrained `string`: this union pins what the harness ships, while the
  * `Object.hasOwn` guards reject what a mounted runtime may report.
  */
-export type CodeSdkLanguage = 'typescript' | 'python'
+export type PtcSdkLanguage = 'typescript' | 'python'
 
-/** Per-language `run_code` schema flavors (see {@link RunCodeFlavor}); one entry per {@link CodeSdkLanguage}. */
+/** Per-language `run_code` schema flavors (see {@link RunCodeFlavor}); one entry per {@link PtcSdkLanguage}. */
 const RUN_CODE_FLAVORS: Record<string, RunCodeFlavor> = {
   typescript: TYPESCRIPT_FLAVOR,
   python: PYTHON_FLAVOR,
-} satisfies Record<CodeSdkLanguage, RunCodeFlavor>
+} satisfies Record<PtcSdkLanguage, RunCodeFlavor>
 
 /**
  * The `description` parameter's model-facing description: language-independent
@@ -98,26 +98,52 @@ const RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION
     + '5-10 words (shown in the UI). Examples: "Count TODO markers across packages"; '
     + '"Read failing test and its fixture"; "Rename config key in every cordis.yml".'
 
+const RUN_CODE_CONTROLS = {
+  timeoutMs: { type: 'number', description: 'Positive elapsed-time budget in milliseconds, capped by the deployment maximum.' },
+  sandbox_permissions: { type: 'string', enum: [...ESCALATION_TARGETS], description: 'Wider sandbox mode for this complete program execution; requires justification and approval.' },
+  justification: { type: 'string', description: 'Reason this complete program needs wider access, shown to the user for approval.' },
+} as const
+
+function controlParameters(runtime: PtcRuntime | undefined) {
+  // Catalog readers have no mounted runtime; real model assembly requires one.
+  if (runtime === undefined) return RUN_CODE_CONTROLS
+  return {
+    ...runtime.timeout === undefined ? {} : {
+      timeoutMs: { ...RUN_CODE_CONTROLS.timeoutMs,
+        description: `Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default ${runtime.timeout.defaultMs}; capped at ${runtime.timeout.maxMs}. Zero does not disable the deadline.` },
+    },
+    ...runtime.sandboxMode === undefined ? {} : {
+      sandbox_permissions: RUN_CODE_CONTROLS.sandbox_permissions,
+      justification: RUN_CODE_CONTROLS.justification,
+    },
+  }
+}
+
+function escalationGuidance(runtime: PtcRuntime | undefined): string {
+  return runtime?.sandboxMode === undefined ? ''
+    : ' A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.'
+}
+
 /**
  * Resolve the {@link RunCodeFlavor} for the loaded runtime's language, read at
  * schema-emission time so the model-visible `run_code` schema always matches
  * the SDK section's language. `peekRuntime` returns `undefined` only when no
  * runtime is mounted, which reaches this function through definition readers
  * and `schemas()` — the doc-catalog harvest is the only shipped one, and none
- * of them feeds a model, because `wireSchemas` calls `requireCodeRuntime`
+ * of them feeds a model, because `wireSchemas` calls `requirePtcRuntime`
  * before projecting — so that path degrades to {@link TYPESCRIPT_FLAVOR}. A
  * mounted runtime whose language has no flavor entry fails loud, exactly as
- * `requireCodeRuntime` rejects it at assembly. Keeping this table in step with
- * `SDK_RENDERERS` is the compiler's job ({@link CodeSdkLanguage}); what this
+ * `requirePtcRuntime` rejects it at assembly. Keeping this table in step with
+ * `SDK_RENDERERS` is the compiler's job ({@link PtcSdkLanguage}); what this
  * guard owns is the runtime-supplied language neither table knows, which never
  * yields a wrong-language schema for a real runtime.
  */
-function resolveFlavor(peekRuntime: () => CodeRuntime | undefined): RunCodeFlavor {
+function resolveFlavor(peekRuntime: () => PtcRuntime | undefined): RunCodeFlavor {
   const runtime = peekRuntime()
   if (runtime === undefined) {
     // No runtime mounted: reached by definition readers and `schemas()`, of
     // which the doc-catalog harvest is the only shipped one. None feeds a
-    // model — `wireSchemas` calls `requireCodeRuntime` before projecting, so
+    // model — `wireSchemas` calls `requirePtcRuntime` before projecting, so
     // the assembly path never arrives here. Degrade to the TS default.
     return TYPESCRIPT_FLAVOR
   }
@@ -259,7 +285,7 @@ function renderValue(value: JsonValue): string {
 }
 
 /** Canonical value returned by the outer PTC mode transport. */
-type RunCodeOutput = { logs: string[]; result?: JsonValue }
+type RunCodeOutput = { logs: string[]; result?: JsonValue; sandbox?: PtcRunSandbox }
 
 /**
  * Registry-private capabilities the bridge receives at construction — the
@@ -267,19 +293,21 @@ type RunCodeOutput = { logs: string[]; result?: JsonValue }
  * off its public service API and flow here as closures instead.
  */
 export interface RunCodeBridgeOptions {
-  /** Resolves `ctx.codeRuntime` or throws the loud misconfiguration error (shared with the registry's assembly-time checks). */
-  requireRuntime: () => CodeRuntime
+  /** Reads the approval channel when a program requests a wider sandbox mode. */
+  peekApprover: () => ApprovalService | undefined
+  /** Resolves standing Session authority only for a runtime that enforces file policy. */
+  resolveSandboxPolicy: (exec: ToolRunContext) => SandboxExecutionPolicy
+  /** Resolves `ctx.ptcRuntime` or throws the loud misconfiguration error (shared with the registry's assembly-time checks). */
+  requireRuntime: () => PtcRuntime
   /**
-   * Reads `ctx.codeRuntime` without throwing: `undefined` when none is mounted.
+   * Reads `ctx.ptcRuntime` without throwing: `undefined` when none is mounted.
    * Lets schema emission tell "no runtime" (degrade to TS; the readers that
    * reach it are {@link resolveFlavor}'s) apart from "unknown language" (fail
    * loud).
    */
-  peekRuntime: () => CodeRuntime | undefined
+  peekRuntime: () => PtcRuntime | undefined
   /** The run's overlap cap for parallel-classified sub-calls (the registry passes its validated `maxParallelSubCalls`). */
   maxParallel: number
-  /** Maximum number of submitted sub-calls retained by one run while they settle (including queued and committing calls). */
-  maxPending: number
   /** Runs the contained `tools/ptc-dispatch-log` waterfall over one settled sub-dispatch (the registry's private invoker). */
   shapeDispatchLog: (dispatch: PtcDispatchLog) => Promise<ContentBlock[]>
 }
@@ -296,7 +324,7 @@ export interface RunCodeBridgeOptions {
  * @returns the registry-ready definition.
  */
 export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeOptions): ToolDefinition {
-  const { requireRuntime, peekRuntime, maxParallel, maxPending, shapeDispatchLog } = options
+  const { requireRuntime, peekRuntime, maxParallel, shapeDispatchLog } = options
   const definition = defineTool({
     name: RUN_CODE_NAME,
     // The description and `code` parameter description are placeholders here:
@@ -313,6 +341,7 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         required: true,
         description: RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION,
       },
+      ...RUN_CODE_CONTROLS,
     },
     output: {
       schema: {
@@ -321,11 +350,22 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         properties: {
           logs: { type: 'array', required: true, items: { type: 'string' } },
           result: { type: 'json' },
+          sandbox: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              mode: { type: 'string', required: true, enum: ['read-only', 'workspace-write', 'danger-full-access'] },
+              denied: { type: 'boolean', required: true },
+              enforcement: { type: 'string', enum: ['full', 'partial'] },
+            },
+          },
         },
       },
       render: (_args, value) => {
         const rendered = value.result === undefined ? '' : renderValue(value.result)
         const parts = [value.logs.join('\n'), rendered].filter(part => part.length > 0)
+        if (value.sandbox?.enforcement === 'partial') parts.push('File sandbox enforcement is partial on this host.')
+        if (value.sandbox?.denied) parts.push(`The ${value.sandbox.mode} file sandbox denied an operation.${escalationGuidance(peekRuntime())}`)
         return [{ type: 'text', text: parts.length > 0 ? parts.join('\n') : '(run_code completed with no output)' }]
       },
     },
@@ -334,6 +374,29 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         throw new Error('invalid description: expected a non-empty string')
       }
       const runtime = requireRuntime()
+      validateEscalationArgs(args.sandbox_permissions, args.justification)
+      if (args.timeoutMs !== undefined && runtime.timeout === undefined) {
+        throw new Error('timeoutMs is not available for this PTC runtime')
+      }
+      if (args.timeoutMs !== undefined && (!Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
+        throw new Error('invalid timeoutMs: expected a positive finite number')
+      }
+      const standingPolicy = runtime.sandboxMode === undefined ? undefined : options.resolveSandboxPolicy(exec)
+      let policy = standingPolicy
+      if (args.sandbox_permissions !== undefined && args.justification !== undefined) {
+        if (standingPolicy === undefined) throw new Error('sandbox_permissions is not available for this PTC runtime')
+        const approvedMode = await approveEscalation({
+          requestedMode: args.sandbox_permissions,
+          justification: args.justification,
+          effectiveMode: standingPolicy.mode,
+          subject: 'program',
+        }, {
+          approver: options.peekApprover(), agent: exec.agent, callId: exec.callId,
+          toolName: RUN_CODE_NAME, signal: exec.signal,
+        })
+        policy = { ...standingPolicy, mode: approvedMode }
+      }
+      exec.signal.throwIfAborted()
 
       // The run-scoped abort: follows the outer signal in, and fires when the
       // run settles for ANY reason, so an in-flight sub-dispatch is aborted
@@ -364,25 +427,20 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         start(): Promise<void>
         classify(): 'parallel' | 'exclusive'
         abandon(): void
-        fail(error: unknown): void
         /** Ordered stage: post-execute + context deferral + settle event, in submission order. */
         commit(): Promise<void>
         /** The launched around-dispatch/body stage; resolved until start() replaces it. */
         flight: Promise<void>
         /** True once the dispatch stage parked its outcome; the commit cursor waits on it. */
         settled: boolean
-        /** True once the binding has been rejected by cancellation or a scheduler failure. */
-        failed: boolean
         /** The classification this entry started under; an exclusive holds its barrier through commit(). */
         mode?: 'parallel' | 'exclusive'
       }
       const pendingQueue: PendingDispatch[] = []
-      let pendingCursor = 0
       const inFlight = new Set<Promise<void>>()
       /** Tracked settle-event side work (log-content listener + append), drained at run settlement. */
       const logWork = new Set<Promise<void>>()
       const commitQueue: PendingDispatch[] = []
-      let commitCursor = 0
       let exclusiveActive = false
       let driving = false
       let driverRun: Promise<void> = Promise.resolve()
@@ -391,49 +449,6 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         const release = wake
         wake = undefined
         release?.()
-      }
-      // A run can settle while the driver is sleeping with only queued work.
-      // Wake it so those entries are abandoned instead of leaving bindings
-      // pending forever.
-      runController.signal.addEventListener('abort', wakeup, { once: true })
-
-      let hasDriverFailure = false
-      let driverFailure: unknown
-      const compactQueues = (): void => {
-        // The cursor avoids Array#shift's O(n) copy. Periodic compaction keeps
-        // completed entries from retaining the run's argument snapshots.
-        if (pendingCursor >= 64 && pendingCursor * 2 >= pendingQueue.length) {
-          pendingQueue.splice(0, pendingCursor)
-          pendingCursor = 0
-        }
-        if (commitCursor >= 64 && commitCursor * 2 >= commitQueue.length) {
-          commitQueue.splice(0, commitCursor)
-          commitCursor = 0
-        }
-      }
-      const failRun = (error: unknown): void => {
-        if (!hasDriverFailure) {
-          hasDriverFailure = true
-          driverFailure = error
-        }
-        // Abort first so an already-started body receives the same failure;
-        // then reject every binding which can no longer reach commit().
-        runController.abort(error)
-        for (let index = pendingCursor; index < pendingQueue.length; index += 1) {
-          pendingQueue[index]?.fail(error)
-        }
-        for (let index = commitCursor; index < commitQueue.length; index += 1) {
-          commitQueue[index]?.fail(error)
-        }
-        pendingQueue.length = 0
-        pendingCursor = 0
-        commitQueue.length = 0
-        commitCursor = 0
-        wakeup()
-      }
-      const throwDriverFailure = (): void => {
-        if (!hasDriverFailure) return
-        throw driverFailure
       }
       /**
        * The single ordered lane. Each pass commits the head-of-line settled
@@ -448,30 +463,22 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         driverRun = (async () => {
           try {
             for (;;) {
-              if (hasDriverFailure) throw driverFailure
               // Create the wakeup promise before inspecting state so a settle or submission arriving
               // between the checks and the await below cannot be lost.
               const signal = new Promise<void>((resolve) => { wake = resolve })
-              const commitHead = commitQueue[commitCursor]
+              const commitHead = commitQueue[0]
               if (commitHead !== undefined && commitHead.settled) {
+                commitQueue.shift()
                 await commitHead.commit()
-                // A concurrent failure may have cleared the queue while the
-                // commit awaited policy or log backpressure. Do not advance a
-                // replacement head in that case.
-                if (commitQueue[commitCursor] === commitHead) {
-                  commitCursor += 1
-                  compactQueues()
-                }
                 // The barrier covers post-execute: later starts wait for the
                 // exclusive call's full pipeline, as under the native loop.
                 if (commitHead.mode === 'exclusive') exclusiveActive = false
                 continue
               }
-              const head = pendingQueue[pendingCursor]
+              const head = pendingQueue[0]
               if (head !== undefined) {
                 if (runController.signal.aborted) {
-                  pendingCursor += 1
-                  compactQueues()
+                  pendingQueue.shift()
                   head.abandon()
                   continue
                 }
@@ -482,13 +489,11 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
                 if (capacity) {
                   if (mode === 'exclusive') exclusiveActive = true
                   head.mode = mode
-                  pendingCursor += 1
-                  compactQueues()
+                  pendingQueue.shift()
                   // Joined before start() so the commit cursor sees submission
                   // order; nothing commits it until `settled` flips.
                   commitQueue.push(head)
                   await head.start()
-                  throwDriverFailure()
                   const flight: Promise<void> = head.flight.finally(() => {
                     inFlight.delete(flight)
                     wakeup()
@@ -497,14 +502,9 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
                   continue
                 }
               }
-              if (pendingQueue.length === pendingCursor && commitQueue.length === commitCursor && inFlight.size === 0) return
+              if (pendingQueue.length === 0 && commitQueue.length === 0 && inFlight.size === 0) return
               await signal
             }
-          } catch (error: unknown) {
-            failRun(error)
-            // Started bodies must still reach quiescence. Their rejection is
-            // observed here so no late promise becomes an unhandled rejection.
-            await Promise.allSettled([...inFlight])
           } finally {
             driving = false
             wake = undefined
@@ -521,7 +521,6 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         // Every settle event is appended inside the open run_code turn
         // (tasks self-remove on settlement).
         while (logWork.size > 0) await Promise.allSettled([...logWork])
-        if (hasDriverFailure) throw driverFailure
       }
 
       // Read through a call, not a bare property: the abort state genuinely
@@ -529,21 +528,19 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
       // would be narrowed away by control flow analysis.
       const runOver = (): boolean => runController.signal.aborted
 
-      const binding = (name: string): CodeBindingFunction => async (rawArgs: unknown): Promise<JsonValue> => {
+      const binding = (schema: ToolSchema): PtcBindingFunction => async (rawArgs: unknown): Promise<JsonValue> => {
+        const { name } = schema
         if (runOver()) {
           throw new Error(`run_code run is over (${String(runController.signal.reason)}); ${name} not dispatched`)
         }
         const normalized = jsonNormalizeArgs(rawArgs)
-        const outstanding = pendingQueue.length - pendingCursor + commitQueue.length - commitCursor
-        if (outstanding >= maxPending) {
-          throw new Error(`run_code sub-call limit exceeded (maximum ${maxPending} outstanding calls)`)
-        }
         const n = ++dispatches
-        const subCallId = CallId(`${String(exec.callId)}:ptc:${n}`)
+        const subCallId = brandString<ToolCallId>(`${String(exec.callId)}:ptc:${n}`)
         const input = {
           callId: subCallId,
           rootCallId: exec.rootCallId,
           name,
+          schema,
           arguments: normalized.dispatched,
           ...exec.agent ? { agent: exec.agent } : {},
           parent: exec.token,
@@ -556,10 +553,7 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
           let parked:
             | { kind: 'post-result' | 'final-result'; exec: ToolRunContext; result: ToolExecutionResult }
             | undefined
-          let bindingSettled = false
           const settle = (result: ToolExecutionResult): void => {
-            if (bindingSettled) return
-            bindingSettled = true
             // The program gets its value NOW: the log-content listener (for
             // example, a spill backend) must never delay the binding or occupy
             // a dispatch slot. The event append is tracked side work; the run's
@@ -592,35 +586,22 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
                 // this record from what it actually received.
                 arguments: normalized.logged,
                 isError: result.isError,
+                ...result.error?.info === undefined ? {} : { error: result.error.info },
                 content: logged,
               })
             })().finally(() => { logWork.delete(task) })
             logWork.add(task)
           }
-          let dispatchFailed = false
-          const isDispatchFailed = (): boolean => dispatchFailed
           pendingQueue.push({
             flight: Promise.resolve(),
             settled: false,
-            failed: false,
             // Re-read per driver pass against the same agent view the SDK
             // declared; fail-closed exclusive when undeclared/invalid.
             classify: () => registry.executionMode(input).kind,
             abandon: () => {
-              if (bindingSettled) return
-              bindingSettled = true
               reject(new Error(`run_code run is over (${String(runController.signal.reason)}); ${name} tool call abandoned`))
             },
-            fail(error: unknown): void {
-              if (bindingSettled) return
-              dispatchFailed = true
-              bindingSettled = true
-              this.failed = true
-              this.settled = true
-              reject(error instanceof Error ? error : new Error(String(error)))
-            },
             async start(): Promise<void> {
-              if (isDispatchFailed()) return
               exec.agent?.session.append('tool/ptc-dispatch-start', {
                 rootCallId: exec.rootCallId,
                 parentCallId: exec.callId,
@@ -632,27 +613,17 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
               // pre-execute waits for this resolution, as under the native
               // scheduler. Only the launched body below overlaps.
               const prepared = await scheduler.prepare(input)
-              if (isDispatchFailed()) return
               if (prepared.kind === 'dispatch') {
-                this.flight = scheduler.dispatch(prepared.exec).then(
-                  (dispatchOutcome) => {
-                    if (isDispatchFailed()) return
-                    parked = { kind: dispatchOutcome.kind, exec: prepared.exec, result: dispatchOutcome.result }
-                    this.settled = true
-                  },
-                  (error: unknown) => {
-                    this.fail(error)
-                    failRun(error)
-                  },
-                )
+                this.flight = scheduler.dispatch(prepared.exec).then((dispatchOutcome) => {
+                  parked = { kind: dispatchOutcome.kind, exec: prepared.exec, result: dispatchOutcome.result }
+                  this.settled = true
+                })
                 return
               }
-              if (isDispatchFailed()) return
               parked = { kind: prepared.kind, exec: prepared.exec, result: prepared.result }
               this.settled = true
             },
             async commit(): Promise<void> {
-              if (isDispatchFailed()) return
               /* v8 ignore next -- commit() runs only after `settled` flipped, which set parked. */
               if (parked === undefined) return
               const result = parked.kind === 'post-result'
@@ -683,7 +654,7 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
             },
           })
           wakeup()
-          void drive().catch((error: unknown) => { failRun(error) })
+          void drive()
         })
         // A budget expiry or outer cancel that occurs while this call was in
         // flight already aborted the dispatch; stop the program now rather
@@ -703,20 +674,20 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
       // own key (a plain-object assignment would hit the prototype setter,
       // silently dropping the binding), and the runtime host resolves
       // binding names as own properties only.
-      const functions: Record<string, CodeBindingFunction> = Object.create(null) as Record<string, CodeBindingFunction>
+      const functions: Record<string, PtcBindingFunction> = Object.create(null) as Record<string, PtcBindingFunction>
       // Enumerate the CALLING AGENT's visible set (scoped tools join,
       // restricted globals vanish) — the same view the SDK section declared,
       // so a program can bind exactly what its prompt promised; sub-dispatch
       // re-resolves per call through the same view (exec.agent threads down).
       for (const schema of registry.schemas(exec.agent)) {
         if (schema.name === RUN_CODE_NAME) continue
-        Object.defineProperty(functions, schema.name, { enumerable: true, value: binding(schema.name) })
+        Object.defineProperty(functions, schema.name, { enumerable: true, value: binding(deepFreeze(schema)) })
       }
 
       try {
-        let result: CodeRunResult
+        let result: PtcRunResult
         try {
-          result = await runtime.run({
+          result = await runtime.run(runtime.resolve({
             program: args.code,
             bindings: [{
               global: 'tools',
@@ -724,7 +695,10 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
               errorClass: { name: 'ToolCallError', memberNameProperty: 'toolName' },
             }],
             signal: runController.signal,
-          })
+            ...exec.agent?.session.header.cwd !== undefined ? { cwd: exec.agent.session.header.cwd } : {},
+            ...policy !== undefined ? { sandboxPolicy: policy } : {},
+            ...args.timeoutMs !== undefined ? { timeoutMs: args.timeoutMs } : {},
+          }))
         } finally {
           // Abort sub-dispatches and drain every in-flight dispatch before
           // closing the turn (queued-unstarted ones are abandoned unlogged).
@@ -735,10 +709,13 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
 
         if (result.error) {
           const logsText = result.logs.length > 0 ? `\nCaptured output:\n${result.logs.join('\n')}` : ''
-          throw new CodeRunFailedError(`code run failed (${result.error.kind}): ${result.error.message}${logsText}`)
+          const sandboxText = result.sandbox === undefined ? ''
+            : `\nFile sandbox: ${result.sandbox.mode}${result.sandbox.enforcement === undefined ? '' : `; enforcement: ${result.sandbox.enforcement}`}${result.sandbox.denied ? '; operation denied' : ''}.`
+          throw new CodeRunFailedError(`code run failed (${result.error.kind}): ${result.error.message}${logsText}${sandboxText}${result.sandbox?.denied ? escalationGuidance(runtime) : ''}`)
         }
         return {
           logs: result.logs,
+          ...result.sandbox === undefined ? {} : { sandbox: result.sandbox },
           ...result.value !== undefined ? { result: result.value } : {},
         }
       } finally {
@@ -763,7 +740,14 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
   // is the least invasive point that still emits the loaded runtime's language.
   Object.defineProperty(definition, 'description', {
     enumerable: true,
-    get: () => resolveFlavor(peekRuntime).description,
+    get: () => {
+      const runtime = peekRuntime()
+      const instructions = runtime?.executionInstructions
+      return resolveFlavor(peekRuntime).description
+        + (instructions ? ` ${instructions}` : '')
+        + (runtime === undefined ? '' : " The working directory is the Session's current directory.")
+        + escalationGuidance(runtime)
+    },
   })
   Object.defineProperty(definition, 'parameters', {
     enumerable: true,
@@ -772,6 +756,7 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
     get: () => parameterSchemaSpecToJsonSchema({
       code: { type: 'string', required: true, description: resolveFlavor(peekRuntime).codeDescription },
       description: { type: 'string', required: true, description: RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION },
+      ...controlParameters(peekRuntime()),
     }) as unknown as Record<string, unknown>,
   })
   return definition
