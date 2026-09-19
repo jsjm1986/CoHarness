@@ -205,6 +205,27 @@ it('composes current files from profile data and retains launch overlay and tele
   expect(composeEntries([readProfilePatches('test', { ...enabled, overlays: [] })])[0]?.disabled).toBe(false)
 })
 
+it('re-derives launcher patches against every read generation', () => {
+  const home = tmp()
+  const installAnchor = stageInstallation({ base: { patch: '- insert:\n  - id: roster\n    name: roster\n    config:\n      default: a\n' } })
+  const dir = resolveProfileDir('test', home)
+  initProfile(dir, ['base'])
+  const patchPath = join(dir, 'application.patch.yml')
+  const context = {
+    name: 'test', dir, patchPath, installAnchor, home, cwd: home,
+    startedBundles: ['base'], overlays: [], telemetryDisabledEnv: undefined,
+    derivePatches: (rows: ReadonlyMap<string, { config?: unknown }>) => {
+      const config = rows.get('roster')?.config as { default?: string } | undefined
+      return config === undefined ? [] : [{ id: 'roster', config: { marker: config.default } }]
+    },
+  }
+  const first = composeEntries([readProfilePatches('test', context)]).find(row => row.id === 'roster')
+  expect((first?.config as { marker?: string }).marker).toBe('a')
+  writeFileSync(patchPath, '- id: roster\n  config:\n    default: b\n')
+  const second = composeEntries([readProfilePatches('test', context)]).find(row => row.id === 'roster')
+  expect((second?.config as { marker?: string }).marker).toBe('b')
+})
+
 describe('initProfile', () => {
   it('creates manifest, user patch layer, and pnpm workspace once, never overwriting', () => {
     const home = tmp()

@@ -356,10 +356,14 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       startedBundles: composed.profile.layers.map(layer => layer.packageName),
       cwd: process.cwd(), home: resolveDshHome(),
       overlays: composed.overlays, telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
+      // Re-derived on every patch-generation read, including HMR reconciliation:
+      // a stored resolved patch would go stale against edited patch files.
+      derivePatches: (rows) => {
+        const patch = resolveShippedPresetPatch(rows)
+        return patch === undefined ? [] : [patch]
+      },
     }
     const patches = readProfilePatches(NAME, profileContext, composed.profile)
-    const presetPatch = resolveShippedPresetPatch(composeRows([patches]))
-    if (presetPatch !== undefined) patches.push(presetPatch)
     const ctx = await boot(NAME, rootConfig, patches, async (hostCtx) => {
       app.current = hostCtx
       hostCtx.provide('profileContext', profileContext)

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { composeEntries, loadProfileDirectory, PROFILE_PATCH_FILENAME, type Profile } from './profile.ts'
 import { loadOptionalPatches } from './index.ts'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
+import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 
 /** Application-owned package manager executable; environment applies only to package operations. */
 export interface ProfilePnpmInvocation {
@@ -25,6 +26,15 @@ export interface ProfileContext {
   readonly startedBundles: readonly string[]
   /** Parsed command-line overlays, applied above profile and home patches. */
   readonly overlays: readonly PatchOptions[]
+  /**
+   * Derive launch-time patches from the composed row set, re-run on every read.
+   * Launchers inject deployment-derived config here (e.g. the shipped agent-preset
+   * root): deriving per read rather than storing a resolved patch keeps the result
+   * current when a live reload re-reads edited patch files.
+   * @param rows - id → composed row of the current patch generation.
+   * @returns patches appended after every file and overlay layer.
+   */
+  readonly derivePatches?: (rows: ReadonlyMap<string, EntryOptions>) => readonly PatchOptions[]
   /** Launch-time DSH_TELEMETRY_DISABLED value; any non-empty value opts out. */
   readonly telemetryDisabledEnv: string | undefined
 }
@@ -68,6 +78,13 @@ export function readProfilePatches(binName: string, context: ProfileContext, ini
     ...(loadOptionalPatches(binName, join(context.home, PROFILE_PATCH_FILENAME)) ?? []),
     ...context.overlays,
   ])
+  if (context.derivePatches !== undefined) {
+    const rows = new Map<string, EntryOptions>()
+    for (const row of composeEntries([patches])) {
+      if (typeof row.id === 'string') rows.set(row.id, row)
+    }
+    patches.push(...context.derivePatches(rows))
+  }
   const telemetryPatch = resolveTelemetryPatch(context.telemetryDisabledEnv,
     composeEntries([patches]).some(row => row.id === TELEMETRY_ROW_ID))
   if (telemetryPatch !== undefined) patches.push(telemetryPatch)
