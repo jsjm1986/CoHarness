@@ -97,7 +97,8 @@ describe('sessions.list cold merge', () => {
       throw new Error(`unexpected cold read: ${id}`)
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve(metas),
+      list: () => Promise.resolve((metas).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve(metas),
       locate: (meta: SessionHeader) => {
         if (meta.id === sid('large-unknown')) return { kind: 'jsonl', path: largePath }
         if (meta.id === sid('locationless')) return undefined
@@ -155,7 +156,8 @@ describe('sessions.list cold merge', () => {
     const meta = header('probe-disabled', 100)
     const readFrom = vi.fn()
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       locate: () => ({ kind: 'jsonl', path: '/not-read' }),
       readFrom,
     } as never)
@@ -185,7 +187,8 @@ describe('sessions.list cold merge', () => {
     const started = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       locate: () => ({ kind: 'jsonl', path }),
       readFrom: async () => {
         started.resolve(undefined)
@@ -291,7 +294,8 @@ describe('cold history recovery view', () => {
       throw new SessionPersistenceReadError('too-large', 'page limit reached')
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(SessionPersistenceRevision('page-errors:1')),
       locate: () => undefined,
@@ -364,7 +368,8 @@ describe('cold history recovery view', () => {
     })
     const revisionOf = vi.fn(async () => revision)
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       readPage,
       revision: revisionOf,
@@ -414,7 +419,8 @@ describe('cold history recovery view', () => {
       }
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(revision),
       locate: () => undefined,
@@ -469,7 +475,8 @@ describe('cold history recovery view', () => {
       }
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(revision),
       locate: () => undefined,
@@ -511,7 +518,8 @@ describe('cold history recovery view', () => {
       throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(SessionPersistenceRevision('walk:1')),
       locate: () => undefined,
@@ -563,7 +571,8 @@ describe('cold history recovery view', () => {
       }
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(revision),
       locate: () => undefined,
@@ -609,18 +618,23 @@ describe('cold history recovery view', () => {
       uncompressedBytes: 512,
     }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(SessionPersistenceRevision('walk:1')),
       locate: () => undefined,
     } as never)
-    ctx.provide('sessionProjectionCache', {
-      coldSnapshot: async () => {
+    ctx.provide('sessionQuery', {
+      observeSession: async () => {
         ctx.sessions.create(sessionId, {
           seed: [userMessage(0, 'head'), userMessage(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
           meta: { cwd: '/proj', createdAt: 1000 },
         })
-        return { asOfSeq: 99 as never, values: {} }
+        return {
+          cursor: 99 as never,
+          projections: { asOfSeq: 99 as never, values: {} },
+          [Symbol.dispose]: () => undefined,
+        }
       },
     } as never)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
@@ -651,7 +665,8 @@ describe('cold history recovery view', () => {
     const inspect = vi.fn(async () => ({ meta, events }))
     const revisionOf = vi.fn(async () => revision)
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       revision: revisionOf,
       locate: () => undefined,
@@ -707,6 +722,9 @@ describe('cold history recovery view', () => {
     const coordinator = new PersistenceCoordinator(ctx, backend)
     ctx.provide('sessionPersistence', {
       listStored: (signal?: AbortSignal) => backend.listStored(signal),
+      listHeaders: (signal?: AbortSignal) => backend.listStored(signal),
+      list: (options?: { signal?: AbortSignal }) => backend.listStored(options?.signal)
+        .then(headers => headers.map(header => ({ header }))),
       inspect: (id: SessionId, signal?: AbortSignal) => coordinator.inspect(id, signal),
       locate: () => undefined,
     } as never)
@@ -761,7 +779,8 @@ describe('Remote Agent and Session lookup policy', () => {
       data: { target: 'next-turn', start: 0, inserted: [message] },
     }] as SessionEvent[]
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({ meta, events }),
       locate: () => undefined,
     } as never)
@@ -816,7 +835,8 @@ describe('Remote Agent and Session lookup policy', () => {
     const meta = header(sessionId, 1000)
     const inspect = vi.fn(() => Promise.resolve({ meta, events: [] as SessionEvent[] }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       locate: () => undefined,
     } as never)
@@ -861,7 +881,8 @@ describe('Remote Agent and Session lookup policy', () => {
     })
     const inspect = vi.fn(() => Promise.resolve({ meta: coldMeta, events: [] as SessionEvent[] }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([coldMeta]),
+      list: () => Promise.resolve(([coldMeta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([coldMeta]),
       inspect,
       locate: () => undefined,
     } as never)
@@ -930,7 +951,8 @@ describe('subagent ownership fence', () => {
     ] as SessionEvent[]
     const inspect = vi.fn(() => Promise.resolve({ meta, events }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       locate: () => undefined,
     } as never)
@@ -987,7 +1009,8 @@ describe('subagent ownership fence', () => {
       },
     ] as SessionEvent[]
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({ meta, events }),
       locate: () => undefined,
     } as never)
@@ -1200,6 +1223,7 @@ describe('degenerate composition (no persistence, no factory)', () => {
     const inspect = vi.fn()
     ctx.provide('sessionPersistence', {
       list: () => Promise.resolve([]),
+      listHeaders: () => Promise.resolve([]),
       inspect,
     } as never)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
@@ -1326,7 +1350,8 @@ describe('sessions.prompt synchronous rejection', () => {
     const sessionId = sid('race-resume')
     const meta: SessionHeader = header('race-resume', 1000)
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({ meta, events: [] as SessionEvent[] }),
       locate: () => undefined,
     } as never)

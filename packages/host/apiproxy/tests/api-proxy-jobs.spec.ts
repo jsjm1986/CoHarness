@@ -176,7 +176,8 @@ describe('session/jobs change pushes', () => {
     const coldId = SessionId('session-cold-tasks')
     let loaded = false
     ctx.provide('sessionPersistence', {
-      list: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }],
+      list: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }].map(header => ({ header })),
+      listHeaders: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }],
       locate: () => undefined,
       load: () => { loaded = true; throw new Error('task listing must not load a cold log') },
     } as never)

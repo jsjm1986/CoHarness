@@ -49,7 +49,7 @@ async function harness(options: HarnessOptions = {}) {
   const list = vi.fn(async () => listed)
   const load = vi.fn(() => { throw new Error('event bodies must not be loaded') })
   const inspect = vi.fn(() => { throw new Error('event bodies must not be inspected') })
-  ctx.provide('sessionPersistence', { list, load, inspect } as never)
+  ctx.provide('sessionPersistence', { listHeaders: list, load, inspect } as never)
 
   if (options.sessionStore === true) {
     await ctx.plugin(SessionStore)
@@ -193,7 +193,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     expect(pool.media.has('workspace')).toBe(false)
 
     const list = vi.fn(async () => [] as SessionHeader[])
-    ctx.provide('sessionPersistence', { list } as never)
+    ctx.provide('sessionPersistence', { listHeaders: list } as never)
     await fiber.await()
     expect(ctx.workspaceRegistry.list()).toEqual([])
     expect(list).toHaveBeenCalledTimes(1)

@@ -101,6 +101,7 @@ async function buildApi(
         if (persistence === 'throw') throw new Error('/host/private/session.jsonl')
         return artifacts[id]
       }),
+      listHeaders: () => Promise.resolve([]),
     } as never)
   }
   if (services.attachments !== false) {

@@ -88,7 +88,8 @@ function bench(options: {
       : undefined,
   })
   ctx.provide('sessionPersistence', {
-    list: () => Promise.resolve(options.storedChild === false ? [] : [childHeader]),
+    list: () => Promise.resolve((options.storedChild === false ? [] : [childHeader]).map(header => ({ header }))),
+    listHeaders: () => Promise.resolve(options.storedChild === false ? [] : [childHeader]),
     inspect,
     locate: () => undefined,
   })

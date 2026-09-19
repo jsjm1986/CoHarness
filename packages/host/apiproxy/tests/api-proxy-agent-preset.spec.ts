@@ -110,7 +110,7 @@ async function harness(
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(UserQuestionService)
-  ctx.provide('sessionPersistence', (persistence ?? { list: () => Promise.resolve([]) }) as never)
+  ctx.provide('sessionPersistence', (persistence ?? { list: () => Promise.resolve([]), listHeaders: () => Promise.resolve([]) }) as never)
   if (presets !== undefined) ctx.provide('agentPresets', roster(presets, options.userIds) as never)
 
   const factory: AgentFactory = {
@@ -418,7 +418,8 @@ describe('session.history presenter scope', () => {
     // where the tools it is made of have no presenter at all.
     const meta = { id: SessionId('p4'), createdAt: 1, cwd: '/tmp/p4', agentPreset: 'standard' }
     const { api } = await harness(['standard', 'minimal'], {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve([{ header: meta }]),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({
         meta,
         events: [{ type: 'agent-preset/selected', seq: 1, time: 0, data: { agentPreset: 'minimal' } }],
@@ -449,7 +450,8 @@ describe('session.history presenter scope', () => {
     }
     const inspected = () => Promise.reject(new Error('full inspection must not run'))
     const persistence = {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve([{ header: meta }]),
+      listHeaders: () => Promise.resolve([meta]),
       revision: () => Promise.resolve('indexed:1' as never),
       inspect: inspected,
       readPage: (_id: SessionId, request: { direction?: string }) => Promise.resolve(
@@ -487,7 +489,8 @@ describe('session.history presenter scope', () => {
     // A genuinely cold session: persistence knows it, no live agent exists.
     const meta = { id: SessionId('p3'), createdAt: 1, cwd: '/tmp/p3', agentPreset: 'standard' }
     const { api } = await harness(['standard'], {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve([{ header: meta }]),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({ meta, events: [] }),
     })
     // The preset broke after the session ran: the roster rejects the mount.
