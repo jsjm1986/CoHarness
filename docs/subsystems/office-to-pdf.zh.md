@@ -8,9 +8,9 @@
 
 | 所有者 | 职责 |
 |---|---|
-| [office-to-pdf](../../packages/document/office-to-pdf/README.zh.md) | `ctx.officeToPdf`：共享 LibreOffice 转换、有界准入和 PDF 缓存 |
+| [office-to-pdf](../../packages/document/office-to-pdf/README.md) | `ctx.officeToPdf`：共享 LibreOffice 转换、有界准入和 PDF 缓存 |
 | [Web bundle](../../packages/bundle/web-app/README.zh.md) | 由宿主消费者共享的单个可配置转换提供方 |
-| [Office 预览 Client](../../packages/client/ui-sidebar-documentpreview/README.zh.md#office-preview) | Office 扩展名选择、PDF 复用和缺失字体提示 |
+| [Office 预览 Client](../../packages/client/ui-sidebar-documentpreview/README.md#office-preview) | Office 扩展名选择、PDF 复用和缺失字体提示 |
 
 ## 请求和结果
 
@@ -25,13 +25,13 @@
 | `cacheKey` | 不透明的转换 generation 加扩展名与源内容身份 |
 | `generation` | 提供方生命周期；替换后缓存 PDF 不再可复用 |
 
-提供方先准入延迟读取，再分配源文件字节；按内容身份共享转换，并在返回前删除私有临时目录。返回的 PDF 字节在提供方释放后仍有效。源文件和 PDF 字节不会进入 Session 存储。消费者可通过[工作区文件](../../packages/api/workspace-files/README.zh.md)执行已授权的有界读取。
+提供方先准入延迟读取，再分配源文件字节；按内容身份共享转换，并在返回前删除私有临时目录。返回的 PDF 字节在提供方释放后仍有效。源文件和 PDF 字节不会进入 Session 存储。消费者可通过[工作区文件](../../packages/api/workspace-files/README.md)执行已授权的有界读取。
 
 ## 预览读取
 
 `RenderedDocumentBytes` 在工作区字节响应上增加 `missingFonts` 和 `generation`；转换后的 PDF 附带原始源文件身份。
 
-`officeToPdf.render` Remote 方法通过 Session 的[工作区文件](../../packages/api/workspace-files/README.zh.md)服务检查源文件授权与版本。取得转换容量后，`fs.readBytes` 在预留字节容量内提供原始输入；该读取受 Office 输入上限约束。响应携带 base64 PDF 字节、源文件绝对路径与新鲜度版本。源访问失败直接传递；大小和引擎失败只暴露分类原因，不含诊断信息。转换不激活 Agent 或追加事件。
+`officeToPdf.render` Remote 方法通过 Session 的[工作区文件](../../packages/api/workspace-files/README.md)服务检查源文件授权与版本。取得转换容量后，`fs.readBytes` 在预留字节容量内提供原始输入；该读取受 Office 输入上限约束。响应携带 base64 PDF 字节、源文件绝对路径与新鲜度版本。源访问失败直接传递；大小和引擎失败只暴露分类原因，不含诊断信息。转换不激活 Agent 或追加事件。
 
 `api/remotes` 挂载转换服务生成的 Remote 描述符。共享文档预览包使用完整字节加载和现有 PDF.js Worker 注册 Office 格式。每次预览读取都会重新检查渲染 generation、源文件授权和版本，再共享进行中的转换或缓存 PDF。连接重置和插件卸载会取消请求并清空缓存字节。缺少服务时显示本地化配置引导。
 
@@ -39,7 +39,7 @@
 
 外部 [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-harness/libreoffice-kit) Node API 选择其预编译引擎。kit 独立维护版本和发布流程，具体归属由[发布归属决策](../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.zh.md)定义。应用构建时安装已发布的 npm 包。应用打包要求目标已声明的原生引擎；kit 未为该目标声明原生引擎时使用 Node WASM。[平台引擎决策](../../.agents/notes/implemented/architecture/2026-09-15-platform-office-engines.zh.md)定义安装和打包规则。元数据无效、必需资源缺失和转换错误都会拒绝请求，不切换引擎。转换在 Host 使用磁盘输入输出路径，不使用浏览器转换引擎或字体 RPC。
 
-[Host 提供方配置](../../packages/document/office-to-pdf/README.zh.md#use-this-package)负责并发、期限、输入输出上限、归档上限、图像分辨率和字体访问。原生/WASM 实现和资产分发属于 kit 工作区。系统 LibreOffice 探测、运行时引擎下载、持久 PDF 缓存和面向模型的渲染不属于此提供方。
+[Host 提供方配置](../../packages/document/office-to-pdf/README.md#use-this-package)负责并发、期限、输入输出上限、归档上限、图像分辨率和字体访问。原生/WASM 实现和资产分发属于 kit 工作区。系统 LibreOffice 探测、运行时引擎下载、持久 PDF 缓存和面向模型的渲染不属于此提供方。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

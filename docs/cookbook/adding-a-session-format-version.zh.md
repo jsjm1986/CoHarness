@@ -69,7 +69,7 @@ pnpm run gen-session-format-catalog
 <a id="snapshot-successors"></a>
 ## 5. 创建快照后继代际
 
-阅读[快照所有权](../../snapshots/AGENTS.md)和[快照库](../../packages/test-support/session-snapshot/README.zh.md)。选择拥有数据的场景，而非仅引用它的适配器。实现 N+1 后，保留每份历史文件，并按目标版本的规范父子文件名生成后继文件。绝不将前代重命名为目标文件名，或仅修改其 header。
+阅读[快照所有权](../../snapshots/AGENTS.md)和[快照库](../../packages/test-support/session-snapshot/README.md)。选择拥有数据的场景，而非仅引用它的适配器。实现 N+1 后，保留每份历史文件，并按目标版本的规范父子文件名生成后继文件。绝不将前代重命名为目标文件名，或仅修改其 header。
 
 如果回放输入不变，在所有者上执行无密钥 refresh，再执行不写回的 replay。以下 SDK 命令使用 `text-turn` 和工作区的写入器版本。先实现并接入 N+1，才能用它们生成该版本；功能变更应选择实际受影响的所有者：
 

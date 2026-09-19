@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/web-client.md
 web-client.md: c1c3c70d68aedc63da0a6e7aebd0b48d56886853
-web-client.zh.md: 42adffe958f9034f4d450d99dffcef85bcee19a2
+web-client.zh.md: e4fb7eff5da5617af3333f1058d1132835bc2071

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-14-chat-presentation-defaults.md
 2026-09-14-chat-presentation-defaults.md: 6703a14e2ad108c4b43dd50692a44c159cf3ea5a
-2026-09-14-chat-presentation-defaults.zh.md: 67ca433339ecf6e44d3f74b6c3ff9e465f802b0b
+2026-09-14-chat-presentation-defaults.zh.md: f5c74ead1fa86194cb77a13415a189250749af4c

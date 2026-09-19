@@ -42,7 +42,7 @@ store 是 Slot 标准件：每会话一个独占实例，按 tab id 分桶，持
 
 文件变了只提示，不应用。正文把已加载版本及读取开始时捕获的观察版本与后续 `WorkspaceFileStat.version` 比较；不同则显示变更提示。重新载入只通过 Preview face 重读当前 tab，不修改共享资源元数据或其他 tab。资源失败占用同一个提示位置，已加载内容仍保留在下方。
 
-正文头部为一行：左侧显示完整文件路径，右侧放匹配渲染器菜单、按条件出现的换行开关和重新载入按钮。[Document Preview README](../../../../packages/client/ui-sidebar-documentpreview/README.zh.md)负责当前控件、渲染器行为与滚动方式。预览占满 pane 正文的全部高度。
+正文头部为一行：左侧显示完整文件路径，右侧放匹配渲染器菜单、按条件出现的换行开关和重新载入按钮。[Document Preview README](../../../../packages/client/ui-sidebar-documentpreview/README.md)负责当前控件、渲染器行为与滚动方式。预览占满 pane 正文的全部高度。
 
 读取失败时保留已显示的内容，并增加本地化失败说明与重试操作。Preview 为可处理的文件错误提供专用文案，其他代码使用载体消息兜底；`outside-workspace` 属于目录列举，不是 Preview 专用失败。
 

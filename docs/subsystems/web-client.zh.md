@@ -37,7 +37,7 @@ Connection 拥有 request correlation、`/api` carrier、trust check、精确 Fe
 
 ### Sessions
 
-[`api/session-controller`](../../packages/api/session-controller/README.zh.md)公开 Session list、search、creation、prompt、queue、cancellation、pagination 及 follow/control stream 等 Host command。其 Client 侧按 `ClientSessions → SessionManager → Session` 组织：
+[`api/session-controller`](../../packages/api/session-controller/README.md)公开 Session list、search、creation、prompt、queue、cancellation、pagination 及 follow/control stream 等 Host command。其 Client 侧按 `ClientSessions → SessionManager → Session` 组织：
 
 - `ClientSessions` 提供 `ctx.sessions`，拥有 reference、source count、Session scope 与稳定的 `SessionBinding` object，并投影不含全局 current Session 选择的 catalog state。
 - `SessionManager` 拥有 list baseline、实时 list/control update、惰性 Session instance、queue、projection store、subagent catalog，以及 pull 与后到 update 之间的冲突顺序。
@@ -47,7 +47,7 @@ Connection 拥有 request correlation、`/api` carrier、trust check、精确 Fe
 
 ### Workspaces
 
-[`api/workspace-controller`](../../packages/api/workspace-controller/README.zh.md)把 Workspace mutation policy 与权威 follow feed 留在 Host。`ClientWorkspaceModel` 拥有浏览器侧 row、order、archived Session id、command echo，以及 stream/unary 竞态合并。每代 stream 先给出完整 baseline，再给出 `upsert`、`remove`、`order` 和 `archived` increment；重连时以新 baseline 替换 model。`WorkspaceController` 把该 model 作为 `ctx.workspaces` 公开，而 `ui-workspace` 向 UI 提供 `useWorkspaces` 与 navigation callback。archived Session id 过滤每一个分组视图，并驱动「已归档会话」设置页；该页把该集合与已加载的 Session summary 合并，为每行提供一个取消归档操作。恢复会调用 `workspace.unarchiveSession` Remote，返回的完整集合则经 `archived` increment 到达每个 Client。
+[`api/workspace-controller`](../../packages/api/workspace-controller/README.md)把 Workspace mutation policy 与权威 follow feed 留在 Host。`ClientWorkspaceModel` 拥有浏览器侧 row、order、archived Session id、command echo，以及 stream/unary 竞态合并。每代 stream 先给出完整 baseline，再给出 `upsert`、`remove`、`order` 和 `archived` increment；重连时以新 baseline 替换 model。`WorkspaceController` 把该 model 作为 `ctx.workspaces` 公开，而 `ui-workspace` 向 UI 提供 `useWorkspaces` 与 navigation callback。archived Session id 过滤每一个分组视图，并驱动「已归档会话」设置页；该页把该集合与已加载的 Session summary 合并，为每行提供一个取消归档操作。恢复会调用 `workspace.unarchiveSession` Remote，返回的完整集合则经 `archived` increment 到达每个 Client。
 
 这种配对不会产生第二份业务真相。Host controller 决定持久状态与 mutation outcome；Client model 维护最新可用的本地 projection，在有利于渲染时保持 object identity，并明确 delayed response 与 replacement baseline 的合并规则。
 

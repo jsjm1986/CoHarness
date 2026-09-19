@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/office-to-pdf.md
 office-to-pdf.md: 65f46ded856e81f9bcd7890c11c82f0a22f769c4
-office-to-pdf.zh.md: df46af01d78241bbc88f6b85a83c47551faf4bfe
+office-to-pdf.zh.md: 8400ed607e62b67c8621ce6d9f61fde0b2f72060
