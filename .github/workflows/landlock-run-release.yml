@@ -23,7 +23,7 @@ concurrency:
 
 defaults:
   run:
-    working-directory: native/landlock-run
+    working-directory: native/system
 
 jobs:
   matrix:
@@ -58,7 +58,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --filter @deepseek-ai/node-addon-landlock-run-workspace... --frozen-lockfile
+        run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Install musl toolchain
         run: |
@@ -75,7 +75,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: native/landlock-run/${{ matrix.dir }}/bin/*
+          path: native/system/${{ matrix.dir }}/bin/*
           if-no-files-found: error
           retention-days: 7
 
@@ -97,7 +97,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --filter @deepseek-ai/node-addon-landlock-run-workspace... --frozen-lockfile
+        run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Build TypeScript
         run: pnpm build:ts
@@ -111,7 +111,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: prebuild-*
-          path: native/landlock-run/.release/prebuild-artifacts
+          path: native/system/.release/prebuild-artifacts
 
       - name: Assemble and verify prebuilds
         run: node ./scripts/assemble-prebuilds.mjs .release/prebuild-artifacts
@@ -133,7 +133,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: npm-tarballs
-          path: native/landlock-run/dist/npm/*
+          path: native/system/dist/npm/*
           if-no-files-found: error
           retention-days: 7
 
@@ -162,7 +162,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: npm-tarballs
-          path: native/landlock-run/dist/npm
+          path: native/system/dist/npm
 
       - name: Configure npm token fallback
         env:

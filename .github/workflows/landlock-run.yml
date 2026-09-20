@@ -1,4 +1,4 @@
-# CI for the landlock-run packages under native/landlock-run. A separate
+# CI for the landlock-run packages under native/system. A separate
 # workflow from ci.yml keeps the native OS/architecture matrix independent of
 # the harness Node matrix. Release assembly and publication use the companion
 # Landlock Run Release workflow.
@@ -9,7 +9,7 @@ on:
     paths:
       - '.github/workflows/landlock-run.yml'
       - '.github/workflows/landlock-run-release.yml'
-      - 'native/landlock-run/**'
+      - 'native/system/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -18,7 +18,7 @@ on:
     paths:
       - '.github/workflows/landlock-run.yml'
       - '.github/workflows/landlock-run-release.yml'
-      - 'native/landlock-run/**'
+      - 'native/system/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -38,7 +38,7 @@ env:
 
 defaults:
   run:
-    working-directory: native/landlock-run
+    working-directory: native/system
 
 jobs:
   matrix:
@@ -73,7 +73,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --filter @deepseek-ai/node-addon-landlock-run-workspace... --frozen-lockfile
+        run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Install musl toolchain
         run: |
@@ -124,7 +124,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --filter @deepseek-ai/node-addon-landlock-run-workspace... --frozen-lockfile
+        run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Build TypeScript
         run: pnpm build:ts
