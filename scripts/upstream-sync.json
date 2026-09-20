@@ -56,7 +56,10 @@
       "sovereignty": "tracked"
     },
     "bundle/headless": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "removedUpstreamPaths": [
+        "packages/bundle/headless/tests/fixtures/provider-cwd.ts"
+      ]
     },
     "bundle/sdk-app": {
       "sovereignty": "tracked"

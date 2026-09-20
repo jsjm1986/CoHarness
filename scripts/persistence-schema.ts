@@ -29,7 +29,7 @@ interface RootInput {
 }
 
 /** A reachable TypeScript type that cannot be represented as a persisted JSON type. */
-export class PersistenceSchemaError extends Error {
+class PersistenceSchemaError extends Error {
   override name = 'PersistenceSchemaError'
 }
 

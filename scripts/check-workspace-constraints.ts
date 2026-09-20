@@ -215,9 +215,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // through a hashed chunk. The committed bin.js is the link target pnpm can
   // resolve at install time, before the build produces lib/bin.js.
   '@deepseek-ai/dsh-experimental-webworker-packer': ['bin.js', 'lib/repository-*.js'],
-  // TODO(alpha.2): restore 'lib/json-stream-*.js' when the headless --json /
-  // --session-id port lands and index+startup share the projection chunk.
-  '@deepseek-ai/dsh-headless': [],
+  // The headless --json stream writer shares a hashed chunk between the lib
+  // entry and the startup entry.
+  '@deepseek-ai/dsh-headless': ['lib/json-stream-*.js'],
 }
 
 function sameStringList(actual: readonly string[] | undefined, expected: readonly string[]): boolean {

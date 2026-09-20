@@ -6,7 +6,7 @@ import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 // types upstream imported from it are declared here so the policy still checks
 // corpus inventories structurally.
 /** Historical format or retired capability one retained scenario permanently exercises. */
-export type SnapshotSessionFormatCoverage =
+type SnapshotSessionFormatCoverage =
   | 'multi-hop'
   | 'packed-row'
   | 'retry-failure'
@@ -15,7 +15,7 @@ export type SnapshotSessionFormatCoverage =
   | 'retired-tools'
 
 /** Explicit historical generation retained by an owning scenario. */
-export interface SnapshotSessionFormatManifest {
+interface SnapshotSessionFormatManifest {
   /** Selected fixture generation; absent manifest metadata tracks the current writer. */
   readonly version: number
   /** Migration or retired-tool behavior that requires this immutable fixture. */
