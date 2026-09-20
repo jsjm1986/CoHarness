@@ -8,7 +8,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import { isAbsolute } from 'node:path'
-import { assertNever, deepFreeze } from '@deepseek-ai/dsh-llm'
+import { assertNever, deepFreeze } from '@deepseek-ai/dsh-util-values'
 import { scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'

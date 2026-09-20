@@ -2503,6 +2503,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:^
         version: link:../ui-slots
+      '@deepseek-ai/dsh-client-ui-workspace':
+        specifier: workspace:^
+        version: link:../ui-workspace
       '@deepseek-ai/dsh-client-userdoc-upload':
         specifier: workspace:^
         version: link:../userdoc-upload
@@ -3061,9 +3064,6 @@ importers:
       '@shikijs/langs':
         specifier: ^4.4.3
         version: 4.4.3
-      '@types/mdast':
-        specifier: ^4.0.4
-        version: 4.0.4
       anser:
         specifier: ^2.3.5
         version: 2.3.5
@@ -3122,6 +3122,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.31
@@ -3475,6 +3478,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:^
         version: link:../ui-slots
+      '@deepseek-ai/dsh-client-ui-workspace':
+        specifier: workspace:^
+        version: link:../ui-workspace
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.31
@@ -4630,9 +4636,6 @@ importers:
 
   packages/core/session:
     dependencies:
-      '@deepseek-ai/dsh-session-format':
-        specifier: workspace:*
-        version: link:../../session/session-format
       '@deepseek-ai/dsh-util-values':
         specifier: workspace:^
         version: link:../../util/values
@@ -4652,6 +4655,9 @@ importers:
       '@deepseek-ai/dsh-scope':
         specifier: workspace:^
         version: link:../scope
+      '@deepseek-ai/dsh-session-format':
+        specifier: workspace:^
+        version: link:../../session/session-format
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:^
         version: link:../../typert/protocol

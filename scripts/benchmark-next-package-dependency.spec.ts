@@ -72,7 +72,9 @@ describe('next package benchmark graph', () => {
         column: 10,
         sourceLine: "import { runtimeValue } from '@f/runtime'",
       }],
-      peerRequiredHostDependencies: new Set(),
+      peerRequiredHostDependencies: new Set(['@f/runtime']),
+      duplicateSafePackages: new Set(),
+      clientStaticInputs: new Set(),
       configurationOnlyDevDependencies: new Set(),
       clientInject: new Set(),
     }
@@ -87,10 +89,12 @@ describe('next package benchmark graph', () => {
     ]))
 
     expect(index.get('@f/probe')?.get('1.0.0')).toMatchObject({
-      dependencies: { '@f/runtime': '^2.0.0' },
-      peerDependencies: { '@deepseek-ai/cordis': '^4.0.1' },
+      peerDependencies: {
+        '@deepseek-ai/cordis': '^4.0.1',
+        '@f/runtime': '^2.0.0',
+      },
     })
-    expect(index.get('@f/probe')?.get('1.0.0')?.dependencies).not.toHaveProperty('@f/types')
+    expect(index.get('@f/probe')?.get('1.0.0')?.dependencies).toBeUndefined()
   })
 
   it('finds reachable unconfigured packages with non-Cordis peers', () => {

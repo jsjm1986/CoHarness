@@ -16,6 +16,9 @@ import {
   collectRuntimeLocalSourceSpecifiers,
   collectRuntimeSourcePackageUses,
   collectSourcePackageUses,
+  DSH_INVARIANTS,
+  PLATFORM_SOURCE,
+  readStringLiteralArray,
 } from './verify-client-packages.ts'
 
 const GATE = 'verify-package-dependencies'
@@ -62,8 +65,10 @@ export interface PackageDependencyFacts {
   readonly hostRuntimeSourceUses: ReadonlyMap<string, readonly string[]>
   readonly hostRuntimeExportUses: readonly HostRuntimeExportUse[]
   readonly peerRequiredHostDependencies: ReadonlySet<string>
+  readonly duplicateSafePackages: ReadonlySet<string>
   readonly configurationOnlyDevDependencies: ReadonlySet<string>
   readonly clientInject: ReadonlySet<string>
+  readonly clientStaticInputs: ReadonlySet<string>
 }
 
 /** One runtime export used by an authored or generated Host module. */
@@ -453,6 +458,7 @@ function readAllSourceUses(root: string, pkg: WorkspacePackageManifest): Map<str
  * @param workspaceNames - Workspace package identities.
  * @param policy - Reviewed Host export and configuration-only classifications.
  * @param generatedHostSource - Host module already emitted in memory by a batched Typert pass.
+ * @param clientStaticInputs - Statically linked Client packages and shell-seeded module names.
  * @returns Source-derived dependency facts without writing build artifacts.
  */
 export function readPackageDependencyFacts(
@@ -462,6 +468,7 @@ export function readPackageDependencyFacts(
   workspaceNames: ReadonlySet<string>,
   policy: PackageDependencyPolicy = PACKAGE_DEPENDENCY_POLICY,
   generatedHostSource?: string,
+  clientStaticInputs?: ReadonlySet<string>,
 ): PackageDependencyFacts {
   const inject = pkg.manifest.dsh?.client?.inject ?? []
   const hostRuntime = role === 'client-only'
@@ -478,10 +485,12 @@ export function readPackageDependencyFacts(
     peerRequiredHostDependencies: new Set(hostRuntime.exportUses
       .filter(use => policy.peerRequiredHostExports[use.specifier]?.includes(use.exportName) === true)
       .map(use => use.packageName)),
+    duplicateSafePackages: new Set(policy.duplicateSafePackages ?? []),
     configurationOnlyDevDependencies: new Set(
       policy.configurationOnlyDevDependencies[pkg.manifest.name ?? ''] ?? [],
     ),
     clientInject: new Set(inject.map(packageNameOf).filter(name => name !== undefined)),
+    clientStaticInputs: clientStaticInputs ?? new Set(),
   }
 }
 
@@ -559,10 +568,25 @@ export function readPackageDependencyState(
 ): PackageDependencyState {
   const packages = readWorkspacePackageManifests(root)
   const workspaceNames = new Set(packages.all.map(pkg => pkg.name))
+  const platformSource = resolve(root, PLATFORM_SOURCE)
+  const clientStaticInputs = new Set(
+    (existsSync(platformSource) ? readStringLiteralArray(root, PLATFORM_SOURCE, 'PLATFORM_MODULES') : [])
+      .map(packageNameOf)
+      .filter((name): name is string => name !== undefined),
+  )
+  for (const configPath of globSync('packages/*/*/tsdown.config.ts', { cwd: root }).sort()) {
+    // The staticLinked preset stamps the roster marker isStaticLinkedConfig reads.
+    if (!/\bstaticLinked\s*\(/.test(readFileSync(resolve(root, configPath), 'utf8'))) continue
+    const manifestPath = join(dirname(configPath), 'package.json')
+    if (!existsSync(resolve(root, manifestPath))) continue
+    const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), 'utf8')) as { name?: unknown }
+    if (typeof manifest.name === 'string') clientStaticInputs.add(manifest.name)
+  }
+  clientStaticInputs.delete(CORDIS)
   const discovered = discoverPackageDependencyScope(packages.release, policy)
   const generated = generatedHostSources(root, discovered.selected.filter(pkg => pkg.role !== 'client-only'))
   const facts = discovered.selected.map(pkg =>
-    readPackageDependencyFacts(root, pkg, pkg.role, workspaceNames, policy, generated.get(pkg.name)))
+    readPackageDependencyFacts(root, pkg, pkg.role, workspaceNames, policy, generated.get(pkg.name), clientStaticInputs))
   const selectedNames = new Set(facts.map(fact => fact.manifest.name))
   return {
     facts,
@@ -576,6 +600,18 @@ export function readPackageDependencyState(
     ].sort(),
     workspaceNames,
   }
+}
+
+/**
+ * True when a workspace name resolves through the shared plugin composition for
+ * a Client-faced consumer: Cordis-family and dsh-* packages keep one module
+ * identity, while statically linked Client packages and shell-seeded modules
+ * bundle privately.
+ */
+function isSharedModuleDependency(facts: PackageDependencyFacts, name: string): boolean {
+  return facts.workspaceNames.has(name)
+    && (name === CORDIS || name.startsWith('@deepseek-ai/dsh-') || name.startsWith('@deepseek-ai/cordis-'))
+    && !facts.clientStaticInputs.has(name)
 }
 
 /** Derive the required npm section for each relationship owned by the policy. */
@@ -595,30 +631,51 @@ export function expectedPackageDependencies(
   }
 
   expected.set(CORDIS, { section: 'peer-dev', origins: new Set(['shared Cordis runtime']) })
+  // A dynamic package's source references to shared modules ride the peer
+  // relay; statically linked inputs and third-party libraries stay in
+  // development sections.
+  const dynamicSubject = facts.manifest.name !== undefined && hasClientDeclaration(facts.manifest.dsh)
+  const sharedModule = (name: string): boolean => isSharedModuleDependency(facts, name)
   for (const [name, paths] of facts.allSourceUses) {
-    for (const path of paths) add(name, 'devDependencies', path)
+    const section = dynamicSubject && sharedModule(name) ? 'peer-dev' : 'devDependencies'
+    for (const path of paths) add(name, section, path)
   }
   if (facts.role !== 'configured-host') {
-    for (const sectionName of ['dependencies', 'optionalDependencies'] as const) {
-      for (const name of Object.keys(facts.manifest[sectionName] ?? {})) {
-        if (!facts.workspaceNames.has(name)) add(name, 'devDependencies', 'declared browser build input')
-      }
+    for (const name of Object.keys(facts.manifest.optionalDependencies ?? {})) {
+      if (!facts.workspaceNames.has(name)) add(name, 'devDependencies', 'declared browser build input')
     }
   }
   for (const name of facts.clientInject) {
-    if (facts.workspaceNames.has(name)) add(name, 'devDependencies', 'dsh.client.inject')
+    if (facts.workspaceNames.has(name)) {
+      add(name, sharedModule(name) ? 'peer-dev' : 'devDependencies', 'dsh.client.inject')
+    }
   }
   for (const name of facts.configurationOnlyDevDependencies) {
     if (facts.workspaceNames.has(name)) add(name, 'devDependencies', 'configured development-only relationship')
   }
   for (const name of Object.keys(facts.manifest.peerDependencies ?? {})) {
-    if (name !== CORDIS) add(name, 'devDependencies', 'existing non-Cordis peer')
+    // A declared workspace peer keeps the shared identity it documents;
+    // statically linked inputs bundle privately and stay dev-only.
+    const section = facts.workspaceNames.has(name) && !facts.clientStaticInputs.has(name)
+      ? 'peer-dev'
+      : 'devDependencies'
+    if (name !== CORDIS) add(name, section, 'existing non-Cordis peer')
   }
   for (const [name, paths] of facts.hostRuntimeSourceUses) {
-    const expectedSection = facts.workspaceNames.has(name) && facts.peerRequiredHostDependencies.has(name)
+    const expectedSection = facts.workspaceNames.has(name)
+      && !facts.duplicateSafePackages.has(name)
+      && facts.peerRequiredHostDependencies.has(name)
       ? 'peer-dev'
       : 'dependencies'
     for (const path of paths) add(name, expectedSection, path)
+  }
+  const invariantsRule = expected.get(DSH_INVARIANTS)
+  // An invariant companion is checked by the in-repo diagnostics harness, so
+  // importing dsh-invariants only from src/invariant.ts is a dev relationship.
+  if (invariantsRule !== undefined
+    && invariantsRule.origins.size > 0
+    && [...invariantsRule.origins].every(origin => origin.endsWith('/src/invariant.ts'))) {
+    expected.set(DSH_INVARIANTS, { section: 'devDependencies', origins: invariantsRule.origins })
   }
   return new Map([...expected].map(([name, rule]) => [name, {
     section: rule.section,
@@ -637,7 +694,8 @@ function managedRuntimeEdges(
   expectedSection: 'dependencies' | 'peer-dev',
 ): ManagedRuntimeEdge[] {
   return state.facts.flatMap(facts => [...expectedPackageDependencies(facts)]
-    .filter(([name, rule]) => name !== CORDIS && rule.section === expectedSection)
+    .filter(([name, rule]) => name !== CORDIS && rule.section === expectedSection
+      && facts.hostRuntimeSourceUses.has(name))
     .map(([dependency]) => ({
       consumer: facts.manifest.name ?? facts.manifestPath,
       dependency,
@@ -664,7 +722,7 @@ export function formatPeerRequiredRuntimeDependencies(state: PackageDependencySt
   const rows = managedRuntimeEdges(state, 'peer-dev')
   const packages = new Set(rows.map(row => row.consumer)).size
   return [
-    `${GATE}: ${String(rows.length)} Host runtime edge(s) remain in peerDependencies because their exports require shared identity across ${String(packages)} package(s):`,
+    `${GATE}: ${String(rows.length)} Host runtime edge(s) remain in peerDependencies as shared workspace instances across ${String(packages)} package(s):`,
     ...rows.map(row => `  ${row.consumer} -> ${row.dependency}: ${row.exports.join(', ')}`),
   ]
 }
@@ -685,6 +743,26 @@ function declaredSections(manifest: PackageDependencyManifest, name: string): De
 
 function describeSections(sections: readonly DependencySection[]): string {
   return sections.length === 0 ? 'no dependency section' : sections.join(' + ')
+}
+
+/**
+ * True when a development-expected relationship may legitimately stay in
+ * dependencies: ordinary libraries ship there because bundled client code
+ * inlines them, and statically linked faces keep their bare imports. A
+ * workspace dep only takes that section on a statically linked Client package
+ * (role `client-only`), whose build externalizes every bare specifier for the
+ * final host. Type-definition packages carry no runtime and stay dev-only.
+ */
+function dependenciesPlacementAllowed(
+  facts: PackageDependencyFacts,
+  name: string,
+  rule: ExpectedPackageDependency,
+): boolean {
+  return rule.section === 'devDependencies'
+    && !name.startsWith('@types/')
+    && (!facts.workspaceNames.has(name)
+      || facts.role === 'client-only'
+      || !isSharedModuleDependency(facts, name))
 }
 
 /** Return all manifest and policy violations in stable order. */
@@ -711,6 +789,8 @@ export function collectPackageDependencyViolations(state: PackageDependencyState
       if (actual.length === 1
         && actual[0] === expectedSection
         && (!facts.workspaceNames.has(name) || range === WORKSPACE_RANGE)) continue
+      if (dependenciesPlacementAllowed(facts, name, rule)
+        && actual.length === 1 && actual[0] === 'dependencies') continue
       violations.push(
         `${facts.manifestPath}: ${name} (${rule.origins.join(', ')}) must be ${expectedSection}-only`
         + (facts.workspaceNames.has(name) ? ` at ${WORKSPACE_RANGE}` : '')
@@ -786,7 +866,12 @@ export function repairPackageDependencyManifest(facts: PackageDependencyFacts): 
     name, rule, range: preferredRange(facts, name, rule.section),
   }))
   for (const { name, rule, range } of repairs) {
+    const actual = declaredSections(facts.manifest, name)
     if (rule.section === 'peer-dev') {
+      if (actual.length === 2
+        && actual.includes('peerDependencies')
+        && actual.includes('devDependencies')
+        && facts.manifest.peerDependenciesMeta?.[name] === undefined) continue
       for (const sectionName of ['dependencies', 'optionalDependencies'] as const) {
         deleteDependency(facts.manifest, sectionName, name)
       }
@@ -795,6 +880,9 @@ export function repairPackageDependencyManifest(facts: PackageDependencyFacts): 
       deletePeerMeta(facts.manifest, name)
       continue
     }
+    if (actual.length === 1
+      && (actual[0] === rule.section
+        || (actual[0] === 'dependencies' && dependenciesPlacementAllowed(facts, name, rule)))) continue
     for (const sectionName of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'] as const) {
       if (sectionName !== rule.section) deleteDependency(facts.manifest, sectionName, name)
     }

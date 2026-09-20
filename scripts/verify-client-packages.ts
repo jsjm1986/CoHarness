@@ -13,12 +13,12 @@ const GATE = 'verify-client-packages'
 const CLIENT_MANIFEST_GLOB = 'packages/*/*/package.json'
 const MANIFEST_GLOBS = ['packages/*/*/package.json', 'apps/*/package.json', 'vendor/*/package.json']
 const CONFIG_GLOB = 'packages/*/*/tsdown.config.ts'
-const PLATFORM_SOURCE = 'packages/client/web/src/platform.ts'
+export const PLATFORM_SOURCE = 'packages/client/web/src/platform.ts'
 const PARSER_PRELOAD_SOURCE = 'packages/client/modules/src/index.ts'
 const STATIC_PRESET_SOURCE = 'packages/client/tsdown.client.ts'
 const CORDIS = '@deepseek-ai/cordis'
 const DSH_PREFIX = '@deepseek-ai/dsh-'
-const DSH_INVARIANTS = '@deepseek-ai/dsh-invariants'
+export const DSH_INVARIANTS = '@deepseek-ai/dsh-invariants'
 const CLIENT_WEB = '@deepseek-ai/dsh-client-web'
 
 /** One workspace package's browser-module declaration. */
@@ -811,7 +811,7 @@ function unwrapExpression(expression: ts.Expression): ts.Expression {
   return current
 }
 
-function readStringLiteralArray(root: string, sourcePath: string, name: string): string[] {
+export function readStringLiteralArray(root: string, sourcePath: string, name: string): string[] {
   const path = resolve(root, sourcePath)
   const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
   const constants = new Map<string, string>()

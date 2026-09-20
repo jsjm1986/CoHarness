@@ -4,10 +4,7 @@
 const CLIENT_FACE_INCLUDE: readonly string[] = []
 
 /** Packages exempted from automatic Client/Host treatment despite declaring `dsh.client`. */
-const CLIENT_FACE_EXCLUDE: readonly string[] = [
-  '@deepseek-ai/dsh-api-session-controller',
-  '@deepseek-ai/dsh-api-workspace-controller',
-]
+const CLIENT_FACE_EXCLUDE: readonly string[] = []
 
 /** Host-only packages whose peer relays are deliberately flattened. */
 const HOST_DEPENDENCY_PACKAGES: readonly string[] = [
@@ -45,20 +42,22 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
  * prominent heading in the pull request description.
  */
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
-  '@deepseek-ai/dsh-credentials': ['credentialKey'],
-  '@deepseek-ai/dsh-deque': ['Deque'],
   '@deepseek-ai/dsh-llm': ['callConfigEquals'],
-  '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
   '@deepseek-ai/schemastery': ['default'],
 } as const satisfies HostDependencyExports
 
 /** Runtime exports that require every consumer to resolve the provider's shared peer instance. */
 const PEER_REQUIRED_HOST_EXPORTS = {
-  '@deepseek-ai/dsh-subprocess': ['SubprocessExecutableNotFoundError'],
-  '@deepseek-ai/dsh-scope': ['carrierKeyOf', 'scopeOf', 'scopeTarget'],
-  '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION'],
-  '@deepseek-ai/dsh-session-persistence': ['SessionPersistenceNotFoundError'],
+  '@deepseek-ai/dsh-commands/brand': ['CommandDefinitionId'],
+  '@deepseek-ai/dsh-host-apiproxy': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES', 'toFetchHandler'],
+  '@deepseek-ai/dsh-host-apiproxy/api': ['RpcId', 'clientRequestSchema', 'serverRequestJson'],
+  '@deepseek-ai/dsh-host-webserver': ['renderIndexInjections'],
+  '@deepseek-ai/dsh-llm': ['MessageId', 'freezeMessage'],
+  '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
+  '@deepseek-ai/dsh-session-format': ['sessionFormatCatalog'],
+  '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
+  '@deepseek-ai/dsh-settings': ['settingsNamespace'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */
