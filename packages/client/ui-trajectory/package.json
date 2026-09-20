@@ -41,7 +41,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@tanstack/react-virtual": "^3.14.9",
     "diff": "^9.0.0"
   },
   "peerDependencies": {
@@ -68,6 +67,7 @@
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
+    "@tanstack/react-virtual": "^3.14.9",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
     "react": "^18.2.0",

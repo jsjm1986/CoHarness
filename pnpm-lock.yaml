@@ -3109,12 +3109,6 @@ importers:
       micromark-util-types:
         specifier: ^2.0.2
         version: 2.0.2
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.2.0
-        version: 18.3.1(react@18.3.1)
       shiki:
         specifier: ^4.3.1
         version: 4.3.1
@@ -3131,6 +3125,12 @@ importers:
       '@types/react-dom':
         specifier: ~18.3.0
         version: 18.3.7(@types/react@18.3.31)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
 
   packages/client/ui-reference:
     devDependencies:
@@ -3163,10 +3163,6 @@ importers:
         version: link:../../typert/protocol
 
   packages/client/ui-renderer:
-    dependencies:
-      use-sync-external-store:
-        specifier: 1.6.0
-        version: 1.6.0(react@18.3.1)
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -3195,6 +3191,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
+      use-sync-external-store:
+        specifier: 1.6.0
+        version: 1.6.0(react@18.3.1)
 
   packages/client/ui-schedule:
     devDependencies:
@@ -3684,9 +3683,6 @@ importers:
 
   packages/client/ui-trajectory:
     dependencies:
-      '@tanstack/react-virtual':
-        specifier: ^3.14.9
-        version: 3.14.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       diff:
         specifier: ^9.0.0
         version: 9.0.0
@@ -3727,6 +3723,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@tanstack/react-virtual':
+        specifier: ^3.14.9
+        version: 3.14.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.31

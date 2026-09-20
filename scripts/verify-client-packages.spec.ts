@@ -216,6 +216,27 @@ describe('dependency sections', () => {
     expect(collectClientPackageViolations(facts([valid]))).toEqual([])
   })
 
+  it('keeps shell-seeded imports of a statically linked package development-only', () => {
+    const primitives = pkg('ui-primitives', {
+      dynamic: false,
+      staticLinked: true,
+      runtimeSourceUses: { react: ['packages/client/ui-primitives/src/Button.tsx'] },
+      dependencies: { react: '^18.2.0' },
+    })
+    const seeded = { platformModules: ['react', 'react/jsx-runtime'] }
+    const found = collectClientPackageViolations(facts([primitives], seeded))
+    expect(found).toHaveLength(1)
+    expect(found[0]).toContain('is a static client input')
+    expect(found[0]).toContain('declare it only in devDependencies')
+
+    const valid = {
+      ...primitives,
+      dependencies: {},
+      devDependencies: { [CORDIS]: 'workspace:^', react: '^18.2.0' },
+    }
+    expect(collectClientPackageViolations(facts([valid], seeded))).toEqual([])
+  })
+
   it('keeps the web shell runtime inputs development-only', () => {
     const web = pkg('web', {
       dynamic: false,

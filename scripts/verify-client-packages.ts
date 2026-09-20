@@ -267,15 +267,13 @@ export function fixClientPackageManifests(root: string, facts: ClientPackageFact
     ) || target.changed
   }
 
-  const staticInputs = new Set([
-    ...facts.staticLinkedPackages,
-    ...facts.platformModules.map(packageNameOf),
-  ])
+  const platformModuleNames = new Set(facts.platformModules.map(packageNameOf))
+  const staticInputs = new Set([...facts.staticLinkedPackages, ...platformModuleNames])
   staticInputs.delete(CORDIS)
   const inferredRanges = dependencyRangeCandidates(root)
   for (const pkg of facts.packages) {
     const target = document(pkg.manifest)
-    const expected = expectedSections(pkg, staticInputs)
+    const expected = expectedSections(pkg, staticInputs, platformModuleNames)
     for (const [name, rule] of expected) {
       const range = preferredRange(target.manifest, name, rule.kind, inferredRanges)
       if (range === undefined) continue
@@ -492,14 +490,12 @@ interface ExpectedRule {
 
 function collectDependencyViolations(facts: ClientPackageFacts): string[] {
   const violations: string[] = []
-  const staticInputs = new Set([
-    ...facts.staticLinkedPackages,
-    ...facts.platformModules.map(packageNameOf),
-  ])
+  const platformModuleNames = new Set(facts.platformModules.map(packageNameOf))
+  const staticInputs = new Set([...facts.staticLinkedPackages, ...platformModuleNames])
   staticInputs.delete(CORDIS)
 
   for (const pkg of [...facts.packages].sort((left, right) => left.manifest.localeCompare(right.manifest))) {
-    const expected = expectedSections(pkg, staticInputs)
+    const expected = expectedSections(pkg, staticInputs, platformModuleNames)
     for (const [name, rule] of [...expected].sort(([left], [right]) => left.localeCompare(right))) {
       const actual = declaredSections(pkg, name)
       if (rule.kind === 'dependency') {
@@ -565,7 +561,11 @@ function collectDependencyViolations(facts: ClientPackageFacts): string[] {
   return violations
 }
 
-function expectedSections(pkg: ClientPackage, staticInputs: ReadonlySet<string>): Map<string, ExpectedRule> {
+function expectedSections(
+  pkg: ClientPackage,
+  staticInputs: ReadonlySet<string>,
+  platformModuleNames: ReadonlySet<string>,
+): Map<string, ExpectedRule> {
   const expected = new Map<string, ExpectedRule>([
     [CORDIS, { kind: 'peer-dev', origins: new Set(['client package baseline']) }],
   ])
@@ -573,7 +573,12 @@ function expectedSections(pkg: ClientPackage, staticInputs: ReadonlySet<string>)
     if (pkg.name === CLIENT_WEB) return expected
     for (const [name, locations] of Object.entries(pkg.runtimeSourceUses)) {
       if (name === pkg.name || name === CORDIS || isInternalDsh(name)) continue
-      expected.set(name, { kind: 'dependency', origins: new Set(locations) })
+      // The shell seeds PLATFORM_MODULES entries into the module table, so a
+      // statically linked artifact resolves them there instead of through npm.
+      expected.set(name, {
+        kind: platformModuleNames.has(name) ? 'dev' : 'dependency',
+        origins: new Set(locations),
+      })
     }
     return expected
   }
