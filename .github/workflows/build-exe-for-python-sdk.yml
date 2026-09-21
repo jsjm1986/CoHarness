@@ -333,3 +333,16 @@ jobs:
           path: dist-python/${{ steps.runtime.outputs.wheel }}
           if-no-files-found: error
           retention-days: 7
+
+      - name: Preserve installed runtime evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-python-runtime-${{ matrix.target }}-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: ${{ matrix.target }}
+          DSH_BUILD_CLIENT_PROFILE: official
+        with:
+          external: python-runtime
+          status: ${{ job.status }}
+          command: clean-venv installed SDK and runtime smoke

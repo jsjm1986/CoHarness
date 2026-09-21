@@ -18,14 +18,22 @@ describe('Oxlint invocation', () => {
 
   it('uses location-preserving diagnostics in CI', () => {
     expect(resolveOxlintInvocation(['.'], { CI: 'true', DSH_OXLINT_THREADS: '4' })).toEqual({
-      args: ['.', '--format=default', '--threads=4'],
+      args: ['.', '--report-unused-disable-directives-severity=error', '--format=default', '--threads=4'],
       env: { CI: 'true', DSH_OXLINT_THREADS: '4', GOMAXPROCS: '4' },
     })
   })
 
   it('preserves an explicitly selected CI formatter', () => {
     expect(resolveOxlintInvocation(['.', '--format', 'github'], { CI: 'true' }).args)
-      .toEqual(['.', '--format', 'github'])
+      .toEqual(['.', '--format', 'github', '--report-unused-disable-directives-severity=error'])
+  })
+
+  it('keeps the fix channel diagnostic while making either CI spelling strict', () => {
+    expect(resolveOxlintInvocation(['.', '--fix'], { CI: 'true' }).args).toEqual(['.', '--fix', '--format=default'])
+    expect(resolveOxlintInvocation(['.'], { CI: '1' }).args)
+      .toContain('--report-unused-disable-directives-severity=error')
+    expect(() => resolveOxlintInvocation(['.', '--report-unused-disable-directives-severity=warn'], { CI: 'true' }))
+      .toThrow('owns unused-disable severity')
   })
 
   it.each(['0', '-1', '1.5', 'auto'])('rejects invalid worker bound %s', (value) => {

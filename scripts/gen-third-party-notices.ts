@@ -90,6 +90,7 @@ const PYTHON_METADATA: Record<string, { license: string; repo: string; role: str
   pydantic: { license: 'MIT', repo: 'https://github.com/pydantic/pydantic', role: 'runtime dependency of `deepseek-harness-sdk`' },
   hatchling: { license: 'MIT', repo: 'https://github.com/pypa/hatch', role: 'build backend' },
   pytest: { license: 'MIT', repo: 'https://github.com/pytest-dev/pytest', role: 'test-only' },
+  ruff: { license: 'MIT', repo: 'https://github.com/astral-sh/ruff', role: 'static-analysis tool' },
 }
 
 type PythonMetadata = typeof PYTHON_METADATA

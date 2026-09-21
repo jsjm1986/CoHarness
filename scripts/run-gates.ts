@@ -20,6 +20,7 @@ import {
 } from './coverage-partitions.ts'
 import { COVERAGE_SCOPED_MODE_ENV, SCOPED_BASE_ENV, SCOPED_PACKAGES_ENV, scopedPackageTestDirs } from './coverage-scoped.ts'
 import { pnpmInvocation } from './pnpm-invocation.ts'
+import { writeGateEvidence } from './gate-evidence.ts'
 
 /** A named aggregate exposed by the gate runner. */
 export type Mode =
@@ -119,6 +120,7 @@ async function main(args: string[]): Promise<number> {
   console.log(`run-gates: ${mode} running ${gates.length} gate(s) with ${maxConcurrency} worker(s) from ${concurrencySource}${failFast ? ', fail-fast after first blocking failure' : ''}.`)
 
   const results = await runGates(gates, maxConcurrency, runGate, printResult, cliGateOptions(failFast))
+  writeGateEvidence(root, mode, results, performance.now() - startedAt, process.env)
   printSummary(results, performance.now() - startedAt)
   return results.some(result => result.gate.allowFailure !== true && (result.status === 'failed' || result.status === 'skipped'))
     ? 1
@@ -287,7 +289,6 @@ export function gatesForMode(selected: Mode): Gate[] {
         pnpmScript('duplication', 'duplication'),
         snapshotGate(),
         pnpmScript('build', 'build'),
-        pnpmScript('build:web', 'build:web'),
         ...hygieneLeafGates({ artifactNeeds: ['build'] }),
         ...docSyncLeafGates({
           docTypecheckNeeds: ['build'],
@@ -317,6 +318,13 @@ function pluginTestGates(): Gate[] {
 
 function ciSharedStaticGates(): Gate[] {
   return [
+    pnpmScript('vendored-links', 'verify-vendored-links', { label: 'vendored links' }),
+    pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
+    pnpmScript('coverage-exclusions', 'verify-coverage-exclusions', { label: 'coverage exclusions' }),
+    pnpmScript('test-honesty', 'verify-test-honesty', { label: 'test honesty' }),
+    pnpmScript('ci-consumers', 'verify-ci-consumers', { label: 'consumer entry references' }),
+    pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
+    pnpmScript('upgrade-records', 'verify-upgrade-records', { label: 'upgrade records' }),
     pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
     pnpmScript('default-product-isolation', 'verify-default-product-isolation', { label: 'default product isolation' }),
     pnpmScript('application-entrypoints', 'verify-application-entrypoints', { label: 'application entrypoints' }),
@@ -368,7 +376,8 @@ function ciPrimaryGates(): Gate[] {
 }
 
 function nodeCompatGates(): Gate[] {
-  const typecheck = flagEnabled('DSH_NODE_COMPAT_SKIP_TYPECHECK')
+  const useBuildOutput = flagEnabled('DSH_NODE_COMPAT_USE_BUILD_OUTPUT')
+  const typecheck = flagEnabled('DSH_NODE_COMPAT_SKIP_TYPECHECK') || useBuildOutput
     ? []
     : [pnpmScript('typecheck', 'typecheck')]
   if (runningNodeMajor() !== 22) {
@@ -376,18 +385,14 @@ function nodeCompatGates(): Gate[] {
   }
   return [
     ...typecheck,
-    pnpmScript('build', 'build', {
+    ...useBuildOutput ? [] : [pnpmScript('build', 'build', {
       ...typecheck.length === 0 ? {} : { needs: ['typecheck'] },
-    }),
-    pnpmScript('build:web', 'build:web', {
-      label: 'Web frontend build',
-      needs: ['build'],
-    }),
-    ...nodeCompatSmokeGates({ cliSmoke: true }),
+    })],
+    ...nodeCompatSmokeGates({ cliSmoke: true, cliBuildNeeds: useBuildOutput ? [] : ['build'] }),
   ]
 }
 
-function nodeCompatSmokeGates(options: { cliSmoke?: boolean } = {}): Gate[] {
+function nodeCompatSmokeGates(options: { cliSmoke?: boolean; cliBuildNeeds?: string[] } = {}): Gate[] {
   const gates: Gate[] = [
     pnpmExec('source-worker-smoke', [
       'vitest',
@@ -426,7 +431,7 @@ function nodeCompatSmokeGates(options: { cliSmoke?: boolean } = {}): Gate[] {
       ], {
         label: 'CLI lazy-search startup smoke',
         env: { DSH_REQUIRE_BUILT_CLI_SMOKE: '1' },
-        needs: ['build:web'],
+        needs: options.cliBuildNeeds ?? ['build'],
       }),
     )
   }
@@ -458,8 +463,6 @@ function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
       docsBuildScript: 'docs:build:mpa',
     }),
     pnpmScript('module-graph', 'verify-module-graph', { label: 'module graph' }),
-    pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
-    pnpmScript('upgrade-records', 'verify-upgrade-records', { label: 'upgrade records' }),
     pnpmScript('knip', 'knip'),
   ]
 }
@@ -496,6 +499,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     ciBuildGate(),
     pnpmScript('node-compat', 'check:node-compat', {
       label: 'Node compatibility',
+      ...runningNodeMajor() === 22 ? { needs: builtTree } : {},
       // The consumer aggregate already owns the one build that its compiled
       // checks consume. Keeping this nested compatibility smoke source-only
       // prevents a second typecheck/build from writing lib/ concurrently with
@@ -503,6 +507,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
       env: {
         [CLIENT_BUILD_PROFILE_SELECTOR]: 'official',
         DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
+        DSH_NODE_COMPAT_USE_BUILD_OUTPUT: '1',
       },
     }),
     pnpmScript('publint', 'publint', { needs: builtTree }),
@@ -788,6 +793,7 @@ function flagEnabled(envName: string): boolean {
 function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
   const artifactOptions = options.artifactNeeds === undefined ? {} : { needs: options.artifactNeeds }
   return [
+    pnpmScript('vendored-links', 'verify-vendored-links', { label: 'vendored links' }),
     pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
     pnpmScript('knip', 'knip'),
     pnpmScript('publint', 'publint', artifactOptions),

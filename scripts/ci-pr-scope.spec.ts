@@ -131,7 +131,7 @@ describe('classifyCiPrScope', () => {
       reason: 'full',
       coverageMode: 'full',
       compatMode: 'full',
-      pythonMode: 'skip',
+      pythonMode: 'full',
       windowsMode: 'full',
     })
   })
@@ -182,7 +182,7 @@ describe('classifyCiPrScope', () => {
       expect(classifyCiPrScope([path], '')).toMatchObject({
         reason: 'full',
         coverageMode: 'full',
-        gatewayMode: 'skip',
+        gatewayMode: 'full',
       })
     }
   })
@@ -212,7 +212,7 @@ describe('classifyCiPrScope', () => {
         reason: 'full',
         coverageMode: 'full',
         gatewayMode: 'full',
-        adminUiMode: 'skip',
+        adminUiMode: plugin === 'dsh-model-governance' ? 'full' : 'skip',
       })
     }
   })

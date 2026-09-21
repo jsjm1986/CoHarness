@@ -70,3 +70,17 @@ jobs:
         run: >-
           pnpm exec vitest run --config vitest.e2e.config.ts
           packages/llm/llm-pi-ai/tests/provider-apis.e2e.ts
+          --reporter=default --reporter=json --outputFile=.artifacts/provider-results.json
+
+      - name: Preserve both real-provider protocols
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-real-provider-pi-ai-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: Azure OpenAI Responses + Anthropic Messages
+          DSH_PROVIDER_TEST_RESULTS: .artifacts/provider-results.json
+        with:
+          external: real-provider-pi-ai
+          status: ${{ job.status }}
+          command: real OpenAI Responses and Anthropic Messages tests

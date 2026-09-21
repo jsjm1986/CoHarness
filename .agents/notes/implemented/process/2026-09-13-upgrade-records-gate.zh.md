@@ -29,3 +29,5 @@ Status: implemented
 
 - `verify-upgrade-records.spec.ts` 覆盖行字段校验、三种覆盖形式、released-evidence 强制、历史 schema 放行，以及含 `newUpstream` 提交的清单覆盖。
 - 对已入库记录运行门禁，报告每行均携带提交覆盖或显式原因。
+
+[候选提交绑定的证据决策](2026-09-21-candidate-bound-gate-evidence.zh.md)扩展消费方选检和发布验收，同时保留本注记的覆盖率与版本规则。

@@ -20,6 +20,7 @@ on:
           - larger-runner-benchmark
           - consolidated-runner-benchmark
           - full-audit
+          - android-audit
 
 # Cancel a superseded run on every event EXCEPT push. A deployment may enable
 # the two self-hosted standby drills; they can take longer than the interval
@@ -42,6 +43,7 @@ permissions:
   contents: read
 
 env:
+  DSH_GATE_REPORT_DIR: .artifacts/gates
   PRIMARY_NODE_VERSION: '24'
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
@@ -77,6 +79,7 @@ jobs:
       windows_mode: ${{ steps.scope.outputs.windows_mode }}
       gateway_mode: ${{ steps.scope.outputs.gateway_mode }}
       admin_ui_mode: ${{ steps.scope.outputs.admin_ui_mode }}
+      android_mode: ${{ steps.scope.outputs.android_mode }}
       scoped_packages: ${{ steps.scope.outputs.scoped_packages }}
     steps:
       - uses: actions/checkout@v7
@@ -98,6 +101,21 @@ jobs:
       - name: Classify pull-request scope
         id: scope
         run: pnpm exec tsx scripts/ci-pr-scope.ts "${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize golden changes and replay status
+        if: always()
+        env:
+          DSH_GOLDEN_BASE: ${{ github.event.pull_request.base.sha }}
+          DSH_GOLDEN_REPLAY: pending
+        run: pnpm run summarize:goldens --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
+
+      - name: Preserve selection comparison
+        uses: actions/upload-artifact@v7
+        with:
+          name: gate-evidence-pr-scope-${{ github.run_attempt }}
+          path: .artifacts/gates/selection-*.json
+          include-hidden-files: true
+          if-no-files-found: error
 
   # Three jobs isolate coverage, static analysis, and the build-backed consumer
   # tail. The portable default uses standard GitHub-hosted capacity. Deployments
@@ -129,6 +147,8 @@ jobs:
           || 'ubuntu-latest' }}
     name: node 24 / static
     env:
+      DSH_EVIDENCE_JOB_NAME: "node 24 / static"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-${{ github.run_attempt }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -175,10 +195,18 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
+      - name: Fetch pinned public upstream inputs
+        run: node scripts/fetch-upstream-baseline.ts
+
       - name: Run static gates
         env:
           DSH_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: pnpm run check:ci:static
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
 
   node-24-coverage:
     needs: pr-scope
@@ -193,6 +221,8 @@ jobs:
           || 'ubuntu-latest' }}
     name: node 24 / coverage
     env:
+      DSH_EVIDENCE_JOB_NAME: "node 24 / coverage"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-coverage-${{ github.run_attempt }}
       # Partitioning replaces the instrumented share. Portable standard runners
       # use two single-worker partitions and one outer gate worker; configured
       # external pools retain their measured partition and gate bounds.
@@ -281,6 +311,11 @@ jobs:
       - name: Run exhaustive coverage
         if: needs.pr-scope.outputs.coverage_mode != 'scoped'
         run: pnpm run check:ci:coverage
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
 
   node-24-consumers:
     needs: pr-scope
@@ -295,6 +330,8 @@ jobs:
           || 'ubuntu-latest' }}
     name: node 24 / snapshots and artifacts
     env:
+      DSH_EVIDENCE_JOB_NAME: "node 24 / snapshots and artifacts"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-consumers-${{ github.run_attempt }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -385,6 +422,19 @@ jobs:
       # below owns skip/focused/full browser verification.
       - name: Run keyless compatibility, snapshot, and artifact gates
         run: pnpm run check:ci:consumers:scoped
+      - name: Summarize golden changes and replay status
+        if: always()
+        env:
+          DSH_GOLDEN_BASE: ${{ github.event.pull_request.base.sha }}
+          DSH_GOLDEN_REPLAY: ${{ job.status }}
+        run: pnpm run summarize:goldens --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
+
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+
 
   # The dedicated web browser verification lane. One stable check name lets
   # branch protection require it regardless of the tier; the selected tier and
@@ -408,6 +458,8 @@ jobs:
     name: web verification
     timeout-minutes: 90
     env:
+      DSH_EVIDENCE_JOB_NAME: "web verification"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-web-verification-${{ github.run_attempt }}
       DSH_WEB_SNAPSHOT_WORKERS: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -527,6 +579,19 @@ jobs:
       - name: Run full web verification
         if: needs.pr-scope.outputs.snapshot_mode == 'full'
         run: pnpm run check:ci:web:full
+      - name: Summarize golden changes and replay status
+        if: always() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+        env:
+          DSH_GOLDEN_BASE: ${{ github.event.pull_request.base.sha }}
+          DSH_GOLDEN_REPLAY: ${{ job.status }}
+        run: pnpm run summarize:goldens --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
+
+      - name: Preserve gate evidence
+        if: always() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+
 
   # The Gateway is an independent npm project, so the root Vitest inventory
   # cannot exercise its ACL, principal, and PostgreSQL-facing code. Run its
@@ -534,7 +599,9 @@ jobs:
   # change; ordinary package-only PRs do not pay for this installation.
   gateway:
     needs: pr-scope
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.gateway_mode == 'full'
+    if: >-
+      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.gateway_mode == 'full'))
     runs-on: ubuntu-latest
     name: gateway / typecheck and unit tests
     services:
@@ -552,6 +619,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
+      DSH_EVIDENCE_JOB_NAME: "gateway / typecheck and unit tests"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-gateway-${{ github.run_attempt }}
       HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:5432/hgw_test
     steps:
       - uses: actions/checkout@v7
@@ -585,12 +654,24 @@ jobs:
           mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
       - name: Test Gateway
         run: npm test --prefix gateway
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+          external: gateway
+          command: npm test --prefix gateway
 
   gateway-admin-ui:
     needs: pr-scope
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.admin_ui_mode == 'full'
+    if: >-
+      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.admin_ui_mode == 'full'))
     runs-on: ubuntu-latest
     name: gateway admin UI / build and tests
+    env:
+      DSH_EVIDENCE_JOB_NAME: "gateway admin UI / build and tests"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-gateway-admin-ui-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -621,6 +702,101 @@ jobs:
         run: npm test --prefix gateway/admin-ui
       - name: Build Gateway admin UI
         run: npm run build --prefix gateway/admin-ui
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+          external: admin-ui
+          command: npm test and build --prefix gateway/admin-ui
+
+  android-build:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'
+    runs-on: ubuntu-latest
+    name: android / debug build and lint
+    outputs:
+      apk_artifact: android-debug-apks-${{ github.run_attempt }}
+    timeout-minutes: 30
+    env:
+      DSH_EVIDENCE_JOB_NAME: "android / debug build and lint"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-android-build-${{ github.run_attempt }}
+      DSH_GATE_ARTIFACT_GLOBS: '["apps/android-shell/android/app/build/outputs/apk/debug/app-debug.apk", "apps/android-shell/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Validate notification registration and session navigation
+        run: pnpm run test:android:protocol
+      - name: Build ordinary debug and instrumentation APKs, lint and unit tests
+        run: pnpm run check:android
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug-apks-${{ github.run_attempt }}
+          path: apps/android-shell/android/app/build/outputs/apk/
+          if-no-files-found: error
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+          external: android-build
+          command: pnpm run check:android and test:android:protocol
+
+  android-bridge:
+    needs: android-build
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'
+    runs-on: ubuntu-latest
+    name: android / native bridge
+    timeout-minutes: 20
+    env:
+      DSH_EVIDENCE_JOB_NAME: "android / native bridge"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-android-bridge-${{ github.run_attempt }}
+      DSH_GATE_ARTIFACT_GLOBS: '[".artifacts/android/apk/debug/app-debug.apk", ".artifacts/android/apk/androidTest/debug/app-debug-androidTest.apk"]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.android-build.outputs.apk_artifact }}
+          path: .artifacts/android/apk
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DSH_ANDROID_TEST_SERIAL: emulator-5554
+        with:
+          api-level: 36
+          arch: x86_64
+          script: node scripts/check-android.ts --connected
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+          external: android-bridge
+          command: node scripts/check-android.ts --connected
+
 
   # Explicit full audit for a release candidate or a change whose impact is
   # uncertain. Pull requests use the scoped selector; this manual lane keeps a
@@ -632,6 +808,8 @@ jobs:
     name: manual / full audit
     timeout-minutes: 120
     env:
+      DSH_EVIDENCE_JOB_NAME: "manual / full audit"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-full-audit-${{ github.run_attempt }}
       DSH_COVERAGE_MAX_WORKERS: '2'
       DSH_COVERAGE_PARTITIONS: '2'
       DSH_GATE_CONCURRENCY: '1'
@@ -665,8 +843,17 @@ jobs:
           exit "$sandbox_status"
       - name: Install Gateway runtime dependencies
         run: npm ci --prefix gateway --omit=dev
+      - name: Fetch pinned public upstream inputs
+        run: node scripts/fetch-upstream-baseline.ts
+
       - name: Run full Linux audit
         run: pnpm run check:ci:linux-primary
+
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
 
 
   # The browser suite only ever ran on pull requests, and a red pull request is
@@ -684,6 +871,8 @@ jobs:
     name: web browser snapshot sweep
     timeout-minutes: 90
     env:
+      DSH_EVIDENCE_JOB_NAME: "web browser snapshot sweep"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-web-snapshot-sweep-${{ github.run_attempt }}
       DSH_WEB_SNAPSHOT_WORKERS: '2'
       # Match the bounded PR consumer lane. The master sweep runs the same
       # build-backed inventory, so it must not re-enable nested typecheck/build
@@ -744,16 +933,25 @@ jobs:
           path: .artifacts/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
 
   node-compat:
     needs: pr-scope
     # The compatibility smokes exercise runtime behaviour, so documentation-only
     # changes no longer pay for two extra full installs.
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'
+    if: >-
+      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'))
     # Each compatibility contract receives an independent standard hosted job.
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.name }}
     env:
+      DSH_EVIDENCE_JOB_NAME: "${{ matrix.name }}"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-compat-${{ strategy.job-index }}-${{ github.run_attempt }}
       DSH_GATE_CONCURRENCY: ${{ matrix.gate_concurrency }}
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
     strategy:
@@ -783,20 +981,37 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare sandbox for source workflow smokes
+        run: bash scripts/prepare-ci-bubblewrap.sh
+
       - name: Run compatibility smokes
         env:
           DSH_BUILD_CLIENT_PROFILE: official
         run: pnpm run check:node-compat
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
 
   python-sdk:
     needs: pr-scope
     # The keyless Python suite only exercises `python/**`, so it follows the Python
     # surface rather than running on every pull request.
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'
+    if: >-
+      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'))
     runs-on: ubuntu-latest
     name: python 3.10 / keyless SDK
+    env:
+      DSH_EVIDENCE_JOB_NAME: "python 3.10 / keyless SDK"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-python-sdk-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
 
       - uses: actions/setup-python@v6.3.0
         with:
@@ -806,8 +1021,19 @@ jobs:
       - name: Install uv
         run: python -m pip install uv==0.11.23
 
+      - name: Check Python static errors
+        run: uv run --locked --project python/sdk --group quality ruff check --config python/sdk/pyproject.toml python/sdk/src python/sdk-runtime/src scripts
+
       - name: Run complete keyless Python suite
         run: uv run --python 3.10 --group test --project python/sdk pytest
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+          external: python-sdk
+          command: Ruff and pytest in python/sdk
+
 
   # One native target makes the complete release-shaped Python path required
   # without duplicating platform-independent behavior across the release matrix.
@@ -817,7 +1043,9 @@ jobs:
     needs: pr-scope
     # The Python lanes build and exercise `python/**` plus the packaged runtime,
     # so they follow the Python surface rather than the coverage decision.
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'
+    if: >-
+      always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'))
     name: python runtime / release-shaped Linux x64
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
@@ -968,6 +1196,7 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/master')
       || github.event_name == 'schedule'
+      || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -979,6 +1208,8 @@ jobs:
     name: windows node 24 / native complete
     timeout-minutes: 120
     env:
+      DSH_EVIDENCE_JOB_NAME: "windows node 24 / native complete"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-windows-native-${{ github.run_attempt }}
       DSH_COVERAGE_MAX_WORKERS: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -1038,6 +1269,12 @@ jobs:
       - name: Run complete native Windows gate inventory
         shell: pwsh
         run: pnpm run check:ci:windows-complete
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+
 
   # Optional hot-standby drill for the in-house self-hosted pool. When
   # DSH_CI_SELF_HOSTED_STANDBY_ENABLED is exactly `true`, each master move

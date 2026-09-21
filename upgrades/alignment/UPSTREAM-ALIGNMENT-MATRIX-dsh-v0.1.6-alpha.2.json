@@ -1334,7 +1334,80 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localDisposition": "0R done 2026-09-18: upstream issue-management, preview-sizing, and expanded review-ownership are upstream GitHub automation, not code gates \u2014 rejected for local. ci.yml apt-mirror and review-ownership test steps are upstream-runner specific; no local lane needs copying."
+      "localDisposition": "0R done 2026-09-18: upstream issue-management, preview-sizing, and expanded review-ownership are upstream GitHub automation, not code gates — rejected for local. ci.yml apt-mirror and review-ownership test steps are upstream-runner specific; no local lane needs copying.",
+      "gateReplays": [
+        {
+          "path": ".github/workflows/build-exe-for-python-sdk.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "5042778b72204633c748afd91464c70782db5745",
+          "replay": "Preserve native target builds and installed runtime smokes. Upload a python-runtime report for each actual matrix job; do not treat a source-only SDK test as wheel evidence.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "2139231c060c0d53b1e2c12cfc424415642d8f5e",
+          "replay": "Preserve conditional PR jobs and HMR/artifact order. Add explicit required consumers, pinned Ruff and job-scoped evidence names with matrix/attempt identity. Android APK/emulator jobs are manual-only and absent from required PR and default release checks. Provision the sandbox before source compatibility tests. Keep selected required failures and skipped-required jobs blocking.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/e2e.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "f4335f78bb5445b6e49b8c1ef0021b7fdff9470b",
+          "replay": "Keep canonical-repository and secret preflight protections. Explicit dispatch may run without enabling automatic schedules. Emit JSON results, require successful real-provider assertions, and upload immutable evidence.",
+          "regressions": [
+            "scripts/ci-workflow.spec.ts",
+            "scripts/gate-evidence.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/python-release.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "b756f5bf38977cd33e22945c748461889ca2181c",
+          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/release-vendor.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "75fb865767cef11a48b6c50a107a1f1aa4213efa",
+          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "633186c8f1a8a46af8f7d008811c45a32b04b52e",
+          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/sandbox.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "713616f3b634a7ad85752e609e71169d2bf91675",
+          "replay": "Resolve native build commands against native/system. Preserve real-kernel assertions and the anti-self-skip guard; propagate the test process exit status before checking its summary. Record the actual job outcome.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        }
+      ]
     },
     {
       "area": "non-package:.gitignore",
@@ -3113,7 +3186,7 @@
         "lefthook.yml"
       ],
       "targetAssessment": "increment-review-required",
-      "localDisposition": "0R done 2026-09-18: upstream glob widening feeds its browser-bundled-externals/desktop-lock notices inputs; local gen consumes none of them and the existing glob already covers every local notices input \u2014 no change."
+      "localDisposition": "0R done 2026-09-18: upstream glob widening feeds its browser-bundled-externals/desktop-lock notices inputs; local gen consumes none of them and the existing glob already covers every local notices input — no change."
     },
     {
       "area": "non-package:native",
@@ -3153,7 +3226,19 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "inherited-scope-review-required",
-      "localDisposition": "Upstream renamed native/landlock-run to native/system (node-addon-system); adopt with the subprocess/native execution work in 4B \u2014 build:native-system wiring follows the port."
+      "localDisposition": "Upstream renamed native/landlock-run to native/system (node-addon-system); adopt with the subprocess/native execution work in 4B — build:native-system wiring follows the port.",
+      "gateReplays": [
+        {
+          "path": "native/system/scripts/publish-release.mjs",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "6953249d80a3c9b7c0fd3e8c6c020b4031b4d4c5",
+          "replay": "Before any registry access, derive candidate identity from the owning version/tag implementation and call verifyConfiguredReadiness. Preserve idempotent publication and consume the exact verified artifact inventory.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        }
+      ]
     },
     {
       "area": "non-package:package.json",
@@ -3176,7 +3261,19 @@
         "area": "non-package:package.json",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "gateReplays": [
+        {
+          "path": "package.json",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "5e7ce892f04f66e9d656da7b2e0512897eb76480",
+          "replay": "Keep upstream command names. Point hygiene and test:docs at existing executor modes and expose the fork consumer, honesty, release evidence and source-reference commands.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        }
+      ]
     },
     {
       "area": "non-package:packages",
@@ -3489,7 +3586,29 @@
         "area": "non-package:python",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "gateReplays": [
+        {
+          "path": "python/sdk/pyproject.toml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "5e91546e73f0276b7bd6d27146250feec0c80e93",
+          "replay": "Preserve SDK build and test dependencies. Retain a locked quality group with Ruff definite-error rules; do not add formatting churn or strict-mypy enforcement.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "python/sdk/uv.lock",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "c6715ebdd8039c1b38a642ff84561d3646fb432f",
+          "replay": "Preserve SDK build and test dependencies. Retain a locked quality group with Ruff definite-error rules; do not add formatting churn or strict-mypy enforcement.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        }
+      ]
     },
     {
       "area": "non-package:scripts",
@@ -3685,7 +3804,99 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localDisposition": "0R done 2026-09-18: adopted+wired verify-dependency-catalog, verify-repository-references (local exemptions for upgrades/ and .agents/notes records plus HEAD-ancestor SHAs), verify-cordis-inspect-catalog \u2014 doc-sync 31/31. Phase-wired scripts stay registered but unwired (session-format-catalog 2B, workflow-guest 4A, i18n/readme-summaries/tsconfig-paths/subsystem-pages/application-entrypoints/concrete-terms 7E). persistence-* extractor family, default-product-isolation, benchmark-next, browser-bundled-externals, session-snapshot-corpus*, snapshot-spill-locators pulled back for re-copy at owning phase (upstream couplings not yet migrated). Upstream-only automation scripts rejected."
+      "localDisposition": "0R done 2026-09-18: adopted+wired verify-dependency-catalog, verify-repository-references (local exemptions for upgrades/ and .agents/notes records plus HEAD-ancestor SHAs), verify-cordis-inspect-catalog — doc-sync 31/31. Phase-wired scripts stay registered but unwired (session-format-catalog 2B, workflow-guest 4A, i18n/readme-summaries/tsconfig-paths/subsystem-pages/application-entrypoints/concrete-terms 7E). persistence-* extractor family, default-product-isolation, benchmark-next, browser-bundled-externals, session-snapshot-corpus*, snapshot-spill-locators pulled back for re-copy at owning phase (upstream couplings not yet migrated). Upstream-only automation scripts rejected.",
+      "gateReplays": [
+        {
+          "path": "scripts/release/publish.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "87427ac816fb56e1dbc6150ac0e4ad1133cfcad8",
+          "replay": "Before any registry access, derive candidate identity from the owning version/tag implementation and call verifyConfiguredReadiness. Preserve idempotent publication and consume the exact verified artifact inventory.",
+          "regressions": [
+            "scripts/release/readiness.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "scripts/release/verify.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "5829087f97007caa12ebaf3a582d77a22fb364fa",
+          "replay": "Before any registry access, derive candidate identity from the owning version/tag implementation and call verifyConfiguredReadiness. Preserve idempotent publication and consume the exact verified artifact inventory.",
+          "regressions": [
+            "scripts/release/readiness.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "scripts/run-gates.spec.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "fb61abe8b5d8cac95f8f0f06bfad8e59dbe65d02",
+          "replay": "Update only the assertions for added source leaves, shared coverage policy and strict CI suppression handling; preserve upstream scheduling and result semantics.",
+          "regressions": [
+            "scripts/run-gates.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "scripts/run-gates.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "48ec3f0cdeb872da500583cc70d94480fb0fe60c",
+          "replay": "Keep passed/failed/skipped and needs/after unchanged. Reapply shared static leaves, optional evidence writing, hygiene union and full-build Web deduplication; verify run-gates and workflow wiring specs.",
+          "regressions": [
+            "scripts/run-gates.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "scripts/run-oxlint.spec.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "07ee0b3954e2a61f5b10be4000dae7288fe66208",
+          "replay": "Update only the assertions for added source leaves, shared coverage policy and strict CI suppression handling; preserve upstream scheduling and result semantics.",
+          "regressions": [
+            "scripts/run-oxlint.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "scripts/run-oxlint.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "335bf213ed252f239e467fdf9e9397aaeda9b2d7",
+          "replay": "For CI verification append report-unused-disable-directives-severity=error. Preserve warning-only fix invocations and reject caller severity overrides; execute the lint contract probes.",
+          "regressions": [
+            "scripts/run-oxlint.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": "scripts/publish-npm-baseline.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "755d1cf1df2e62e367adc7fe85e1782f7a88c5d8",
+          "replay": "Before RegistryPublication accesses the registry, require the committed dsh family identity and call the shared readiness assertion. Timestamp-rewritten local bundles are not accepted release evidence.",
+          "regressions": [
+            "scripts/release/readiness.spec.ts"
+          ],
+          "retireWhen": "Upstream removes the legacy write path or supplies equivalent candidate and artifact acceptance checks."
+        },
+        {
+          "path": "scripts/gen-third-party-notices.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "c77fbd6b38fd3544ecdfe6c3ed48ae4e260b6345",
+          "replay": "Retain Ruff MIT metadata as a Python static-analysis tool so the dependency-notices hook can disclose the locked quality group.",
+          "regressions": [
+            "scripts/gen-third-party-notices.spec.ts"
+          ],
+          "retireWhen": "Upstream discloses Ruff in the Python dependency metadata."
+        },
+        {
+          "path": "scripts/prepare-ci-bubblewrap.sh",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "1efaee200a1bd338ac8d2fe9e32dc7df98dc5884",
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation.",
+          "replay": "Preserve SHA-256 verification and the functional confinement probe. Download the pinned package from a dated Ubuntu snapshot; refresh version, snapshot and checksum together.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ]
+        }
+      ]
     },
     {
       "area": "non-package:snapshots",
@@ -4328,7 +4539,19 @@
         "area": "non-package:tsconfig.base.json",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "gateReplays": [
+        {
+          "path": "tsconfig.base.json",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "6ec529b39df88a409f06c58e6b315f6341371c21",
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation.",
+          "replay": "Preserve source aliases for every consumed public subpath, including dsh-subprocess/control. Resolution must work without any lib output; adopt equivalent upstream aliases.",
+          "regressions": [
+            "scripts/gen-tsconfig-paths.spec.ts"
+          ]
+        }
+      ]
     },
     {
       "area": "non-package:tsconfig.client.json",
@@ -4435,7 +4658,20 @@
         "area": "non-package:vitest.config.ts",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "gateReplays": [
+        {
+          "path": "vitest.config.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "baf4f35fc3447a2114e699cdfae9eccdb741fe57",
+          "replay": "Keep per-file 100% and worker/process settings. Import coverage-policy for include/exclude and platform test exclusions; run coverage selection and baseline specs.",
+          "regressions": [
+            "scripts/coverage-selection.spec.ts",
+            "scripts/coverage-baseline.spec.ts"
+          ],
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        }
+      ]
     },
     {
       "area": "non-package:vitest.web-stress.config.ts",
@@ -4749,7 +4985,7 @@
         "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the desktop session controller is not carried",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only BFF. Source-verified: the multi-instance change is a reference-counted retain model \u2014 sessions.retain(target,{source,signal}) returns SessionReference{binding,ready,release}, SessionRetainInfo counts per source, last release tears down local scope/history; service.ts rewritten (557 lines), manager.ts \u2212250, queue-mirror.ts deleted. Port target: an equivalent retain verb on host/apiproxy plus per-consumer references in client/runtime (current ISessions is an open/additionalStaged selection model, not reference counting)."
+      "localDisposition": "Upstream-only BFF. Source-verified: the multi-instance change is a reference-counted retain model — sessions.retain(target,{source,signal}) returns SessionReference{binding,ready,release}, SessionRetainInfo counts per source, last release tears down local scope/history; service.ts rewritten (557 lines), manager.ts −250, queue-mirror.ts deleted. Port target: an equivalent retain verb on host/apiproxy plus per-consumer references in client/runtime (current ISessions is an open/additionalStaged selection model, not reference counting)."
     },
     {
       "area": "packages/api/settings-controller",
@@ -4780,7 +5016,7 @@
         "reason": "settings flow through host/apiproxy under the same principal/ACL dispatch",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only; settings flow through host/apiproxy \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; settings flow through host/apiproxy — review delta for the replacement owner."
     },
     {
       "area": "packages/api/terminal-controller",
@@ -4852,7 +5088,7 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "unmanifested",
-      "localDisposition": "Source-verified: client/retention.ts holds a terminal window by remote.retain(sessionId, id, signal) \u2014 the session-retain Remote verb 7A ports is a 7B prerequisite for sidebar-terminal window holds."
+      "localDisposition": "Source-verified: client/retention.ts holds a terminal window by remote.retain(sessionId, id, signal) — the session-retain Remote verb 7A ports is a 7B prerequisite for sidebar-terminal window holds."
     },
     {
       "area": "packages/api/workspace-controller",
@@ -4893,7 +5129,7 @@
         "reason": "workspace operations are served by host/apiproxy and the Workbench runtime targets",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only; workspace operations are served by host/apiproxy and Workbench runtime targets \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; workspace operations are served by host/apiproxy and Workbench runtime targets — review delta for the replacement owner."
     },
     {
       "area": "packages/api/workspace-files",
@@ -4932,7 +5168,7 @@
         "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
         "replacedBy": "host/apiproxy"
       },
-      "localDisposition": "Upstream-only; workspace file reads are served by the host/apiproxy workspaceFiles RPC \u2014 review delta under the 7C authorization work."
+      "localDisposition": "Upstream-only; workspace file reads are served by the host/apiproxy workspaceFiles RPC — review delta under the 7C authorization work."
     },
     {
       "area": "packages/attachment/attachment",
@@ -5684,7 +5920,7 @@
         "reason": "cloud runtime resources live in client/runtime WorkspaceResourceRegistry bound to bootstrap/project runtimes; the upstream single-session registry is not carried",
         "replacedBy": "client/runtime"
       },
-      "localDisposition": "Upstream-only; cloud runtime resources live in client/runtime WorkspaceResourceRegistry \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; cloud runtime resources live in client/runtime WorkspaceResourceRegistry — review delta for the replacement owner."
     },
     {
       "area": "packages/client/store",
@@ -5717,7 +5953,7 @@
         "reason": "Workbench multi-runtime client state replaces the single-session upstream store",
         "replacedBy": "client/runtime"
       },
-      "localDisposition": "Upstream-only; the Workbench multi-runtime client state replaces the single-session store \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; the Workbench multi-runtime client state replaces the single-session store — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-agent-preset",
@@ -5795,7 +6031,7 @@
       "upstreamOnly": {
         "reason": "approval surfaces live inside the CoHarness Workbench conversation UI"
       },
-      "localDisposition": "Upstream-only; approval surfaces live inside the Workbench conversation UI \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; approval surfaces live inside the Workbench conversation UI — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-attachment",
@@ -5947,7 +6183,7 @@
         "reason": "client/ui-conversation owns the chat surface for the cloud product",
         "replacedBy": "client/ui-conversation"
       },
-      "localDisposition": "Upstream-only; client/ui-conversation owns the chat surface \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; client/ui-conversation owns the chat surface — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-commands",
@@ -7008,7 +7244,7 @@
         "reason": "client/ui-conversation and ui-workbench own the session surface",
         "replacedBy": "client/ui-conversation"
       },
-      "localDisposition": "Upstream-only; client/ui-conversation and ui-workbench own the session surface \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only; client/ui-conversation and ui-workbench own the session surface — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-settings",
@@ -7600,7 +7836,7 @@
       "upstreamOnly": {
         "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews"
       },
-      "localDisposition": "Upstream-only package, but its 58-file delta is the upstream Office/PDF preview surface \u2014 review as reference for the Workbench document surface under 7C."
+      "localDisposition": "Upstream-only package, but its 58-file delta is the upstream Office/PDF preview surface — review as reference for the Workbench document surface under 7C."
     },
     {
       "area": "packages/client/ui-sidebar-files",
@@ -7710,7 +7946,7 @@
       "upstreamOnly": {
         "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
       },
-      "localDisposition": "Upstream-only dock tree; the Workbench right-sidebar slots (client/ui-slots) own the cloud panel layout \u2014 review delta for the replacement owner."
+      "localDisposition": "Upstream-only dock tree; the Workbench right-sidebar slots (client/ui-slots) own the cloud panel layout — review delta for the replacement owner."
     },
     {
       "area": "packages/client/ui-sidebar-terminal",
@@ -12301,7 +12537,7 @@
         "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the catalog is inlined in session/session-format (catalog-default.ts) \u2014 review delta for drift only."
+      "localDisposition": "Not carried as a package: the catalog is inlined in session/session-format (catalog-default.ts) — review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v0-to-v1",
@@ -12341,7 +12577,7 @@
         "reason": "real v0 normalization inlines into session/session-format; empty bump() shells are replaced under the rc.2 Session-correctness work",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format \u2014 review delta for drift only."
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v1-to-v2",
@@ -12378,7 +12614,7 @@
         "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format \u2014 review delta for drift only."
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
     },
     {
       "area": "packages/session/session-format-v2-to-v3",
@@ -12409,10 +12645,10 @@
       "targetAssessment": "increment-review-required",
       "localSovereignty": "upstreamOnly",
       "upstreamOnly": {
-        "reason": "v2\u2192v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
+        "reason": "v2→v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
         "replacedBy": "session/session-format"
       },
-      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format \u2014 review delta for drift only."
+      "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only."
     },
     {
       "area": "packages/session/session-log-deepseek",
@@ -14565,7 +14801,7 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "adapted",
-      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema→create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/typert/loader",
@@ -14601,7 +14837,7 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "adapted",
-      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema→create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/typert/protocol",
@@ -14640,7 +14876,7 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "adapted",
-      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema→create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/typert/registry",
@@ -14677,7 +14913,7 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "adapted",
-      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema\u2192create); deferred to the phase owning the gateway plane."
+      "notes": "Protocol migration couples to api/gateway, host/apiproxy, remotes, and ui-* test consumers ($dispatch, TypertLookupFailure, codec.schema→create); deferred to the phase owning the gateway plane."
     },
     {
       "area": "packages/util/atomic-write",

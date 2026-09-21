@@ -4,9 +4,11 @@
     "duplicates"
   ],
   "ignoreBinaries": [
+    "adb",
     "bwrap",
     "icacls",
     "sandbox-exec",
+    "uv",
     "where.exe"
   ],
   "ignoreWorkspaces": [

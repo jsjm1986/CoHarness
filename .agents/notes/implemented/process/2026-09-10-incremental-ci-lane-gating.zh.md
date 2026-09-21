@@ -17,7 +17,7 @@ gate runner 新增两个轻量聚合：
 - `ci-coverage-scoped` 只对变更包的测试目录运行 Vitest coverage，然后用 `scripts/incremental-coverage.ts` 对生成的 map 强制执行权威的逐文件 100% 门禁。中间 Vitest 运行期间全局逐文件阈值被禁用（`DSH_COVERAGE_SCOPED_MODE=1`），因为选定测试会导入它们从不完整覆盖的未变更包；增量门禁只对恰好变更的文件拥有判定权。
 - `ci-consumers-scoped` 是完整 consumer 清单减去 Playwright web-snapshot gate。keyless ACP/CLI 快照、lint、publint、built invariants、doc-typecheck、node-next-types 与 built-bin smoke 仍然全部运行；只有浏览器级快照被去掉。
 
-工作流对 coverage 与 consumer job 沿用现有 `run_expensive` 选择器（两条 lane 都会运行它们），并把 `python-runtime`、`windows`、`windows-native` 以 `coverage_mode == 'full'` 为条件，使 scoped lane 跳过它们。`all-checks-passed` 在每条 expensive PR 上要求 coverage 与 consumers，只在 full PR 上要求 runtime/Windows job。scoped lane 跳过 Playwright 安装。
+工作流使用独立的兼容性、Python、Windows、Gateway、Admin UI 和 Android 选检结果。必需汇总状态拒绝所有已选择但未成功的 job。局部运行时验证保留 ACP（Agent Client Protocol）／CLI（命令行界面）消费方；独立浏览器车道遵循自己的分层。
 
 ## Alternatives considered
 
@@ -34,3 +34,5 @@ gate runner 新增两个轻量聚合：
 ## Tests
 
 `pnpm exec vitest run scripts/ci-pr-scope.spec.ts scripts/run-gates.spec.ts scripts/ci-workflow.spec.ts` 通过。scope spec 覆盖 scoped 分类、metadata/infra 回退 full 与包数量上限；run-gates spec 覆盖 scoped coverage/consumer 聚合及其必需输入（`DSH_SCOPED_PACKAGES`、`DSH_INCREMENTAL_BASE`）；workflow spec 固定 lane 条件与 push-reachability。
+
+[候选提交绑定的证据决策](2026-09-21-candidate-bound-gate-evidence.zh.md)扩展消费方选检和发布验收，同时保留本注记的覆盖率与版本规则。

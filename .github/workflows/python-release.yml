@@ -7,6 +7,10 @@ name: Release (Python)
 on:
   workflow_dispatch:
     inputs:
+      evidence_runs:
+        description: Comma-separated completed CI run IDs for this exact candidate. Required to publish.
+        required: false
+        type: string
       publish:
         description: Publish the validated wheels to public PyPI. Must run from a python-v* tag.
         required: true
@@ -17,12 +21,17 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   # Public runs stay globally serialized across tags. Dry runs remain isolated
   # by ref so they do not block an intentional publication.
   group: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && 'python-publication' || format('{0}-{1}', github.workflow, github.ref) }}
   cancel-in-progress: false
+
+env:
+  DSH_RELEASE_READINESS: .artifacts/release-evidence/readiness.json
+  DSH_RELEASE_EVIDENCE_RUNS: ${{ inputs.evidence_runs }}
 
 jobs:
   build:
@@ -45,6 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: actions/setup-python@v6.3.0
@@ -85,9 +95,11 @@ jobs:
     timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
+      repository-version: ${{ steps.version.outputs.repository-version }}
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: actions/setup-python@v6.3.0
@@ -106,6 +118,18 @@ jobs:
           print(f"repository-version={repository_version}")
           print(f"version={wheel_version}")
           PY
+
+      - uses: pnpm/action-setup@v6.0.10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install readiness tooling
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify source readiness
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family python --version "${{ steps.version.outputs.repository-version }}"
 
       - name: Authorize publication request
         env:
@@ -177,6 +201,19 @@ jobs:
           sha256sum *.whl | sort -k2 > SHA256SUMS
           cat SHA256SUMS
 
+      - name: Preserve validated wheel identities
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-python-release-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: Validate release candidate
+          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_GATE_ARTIFACT_GLOBS: '["dist/*.whl"]'
+        with:
+          external: python-release
+          status: ${{ job.status }}
+          command: installed SDK and runtime wheels, platform smokes and metadata
+
       - uses: actions/upload-artifact@v7
         with:
           name: python-release-${{ steps.version.outputs.version }}
@@ -193,8 +230,19 @@ jobs:
     environment: pypi-runtime
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.0.10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install readiness tooling
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - uses: actions/download-artifact@v8
         with:
           name: python-release-${{ needs.validate.outputs.version }}
@@ -202,6 +250,11 @@ jobs:
 
       - name: Verify release artifact hashes
         run: cd dist && sha256sum -c SHA256SUMS
+
+      - name: Verify publication readiness and wheel identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family python --version "${{ needs.validate.outputs.repository-version }}" --phase publish
 
       - name: Select runtime wheels
         run: |
@@ -228,8 +281,19 @@ jobs:
     environment: pypi
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.0.10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install readiness tooling
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - uses: actions/download-artifact@v8
         with:
           name: python-release-${{ needs.validate.outputs.version }}
@@ -237,6 +301,11 @@ jobs:
 
       - name: Verify release artifact hashes
         run: cd dist && sha256sum -c SHA256SUMS
+
+      - name: Verify publication readiness and wheel identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family python --version "${{ needs.validate.outputs.repository-version }}" --phase publish
 
       - name: Select SDK wheel
         run: |

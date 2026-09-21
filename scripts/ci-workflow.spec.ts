@@ -287,6 +287,9 @@ describe('CI workflow', () => {
     // `pull_request` yet IS push-reachable, so matching on the event name alone
     // would silently misclassify it as gated.
     const NOT_PUSH_REACHABLE = new Set([
+      ...['compat', 'python', 'gateway', 'admin_ui'].map(mode =>
+        `always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.${mode}_mode == 'full'))`),
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'",
       "github.event_name == 'pull_request'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'",
@@ -452,6 +455,7 @@ describe('DeepSeek e2e workflow', () => {
     const steps = e2e.steps.filter(isRecord)
     expect(e2e.if).toContain("github.repository == 'jsjm1986/CoHarness'")
     expect(e2e.if).toContain("vars.DSH_REAL_API_E2E_ENABLED == 'true'")
+    expect(e2e.if).toContain("github.event_name == 'workflow_dispatch' || vars.DSH_REAL_API_E2E_ENABLED == 'true'")
     expect(e2e.if).toContain('github.event.pull_request.head.repo.fork')
     expect(e2e.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
     expect(JSON.stringify(workflow)).not.toContain('pull_request_target')
@@ -531,9 +535,12 @@ describe('Python release workflows', () => {
     const sdkPublish = sdkSteps.find(step => step.name === 'Publish SDK wheel')
     const runtimeHashes = runtimeSteps.find(step => step.name === 'Verify release artifact hashes')
     const sdkHashes = sdkSteps.find(step => step.name === 'Verify release artifact hashes')
-    expect([...runtimeSteps, ...sdkSteps].some(
-      step => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
-    )).toBe(false)
+    // Source checkout supplies the shared readiness guard; publication still consumes downloaded wheels.
+    for (const steps of [runtimeSteps, sdkSteps]) {
+      expect(steps.some(step => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'))).toBe(true)
+      expect(steps.some(step => typeof step.run === 'string' && /(?:pnpm|npm) run build/.test(step.run))).toBe(false)
+      expect(steps.some(step => typeof step.run === 'string' && step.run.includes('release:prepare'))).toBe(true)
+    }
     expect([...runtimeSteps, ...sdkSteps].filter(
       step => step.uses === 'pypa/gh-action-pypi-publish@release/v1',
     )).toHaveLength(2)

@@ -31,6 +31,10 @@ on:
       - 'tsconfig*.json'
   workflow_dispatch:
     inputs:
+      evidence_runs:
+        description: Comma-separated completed CI run IDs for this exact candidate. Required to publish.
+        required: false
+        type: string
       publish:
         description: Publish the packed tarballs to npm. Must run from a vendor-* tag.
         required: true
@@ -39,6 +43,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   # A newer commit supersedes an in-flight pull-request pack. Pushes and manual
@@ -47,6 +52,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  DSH_RELEASE_READINESS: .artifacts/release-evidence/readiness.json
+  DSH_RELEASE_EVIDENCE_RUNS: ${{ inputs.evidence_runs }}
   PRIMARY_NODE_VERSION: '24'
   DSH_TELEMETRY_DISABLED: '1'
 
@@ -87,9 +94,19 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
+      - name: Assemble and verify source readiness
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family vendor
+
+      - name: Verify vendored resolution
+        run: pnpm run verify-vendored-links
+
       - name: Verify release version
         env:
           RELEASE_PUBLISH: ${{ inputs.publish }}
+          GH_TOKEN: ${{ inputs.publish && github.token || '' }}
         run: pnpm run release:verify --family vendor
 
       # The vendored packages publish their own sources and build outputs; the
@@ -102,6 +119,19 @@ jobs:
 
       - name: Verify packed install
         run: pnpm run release:verify-packed-install --family vendor --from dist/npm-vendor
+
+      - name: Record tested packed bytes
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-vendor-pack-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: Pack npm tarballs
+          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_GATE_ARTIFACT_GLOBS: '["dist/npm-vendor/*.tgz"]'
+        with:
+          external: npm-pack
+          status: ${{ job.status }}
+          command: pnpm run release:verify-packed-install --family vendor
 
       - uses: actions/upload-artifact@v7
         with:
@@ -121,10 +151,12 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      actions: read
     steps:
       # Checkout and install carry the release scripts only; no build step.
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: pnpm/action-setup@v6.0.10
@@ -144,7 +176,13 @@ jobs:
           name: vendor-npm-tarballs
           path: dist/npm-vendor
 
+      - name: Verify source and the tested publication artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family vendor --phase publish
+
       - name: Publish tarballs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: pnpm run release:publish --family vendor --from dist/npm-vendor

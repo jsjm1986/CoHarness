@@ -69,6 +69,8 @@
       "@deepseek-ai/dsh-subagent/client": ["./packages/subagent/subagent/src/client.ts"],
       "@deepseek-ai/dsh-subagent/internal": ["./packages/subagent/subagent/src/internal.ts"],
       "@deepseek-ai/dsh-workspace/types": ["./packages/workspace/workspace/src/types.ts"],
+      "@deepseek-ai/dsh-subprocess/control": ["./packages/subprocess/subprocess/src/control.ts"],
+      "@deepseek-ai/dsh-session-format/legacy": ["./packages/session/session-format/src/legacy.ts"],
       "@deepseek-ai/dsh-session-stats/types": ["./packages/session/session-stats/src/types.ts"],
       "@deepseek-ai/dsh-session-stats/client": ["./packages/session/session-stats/src/client.ts"],
       "@deepseek-ai/dsh-token-meter/client": ["./packages/llm/token-meter/src/client.ts"],

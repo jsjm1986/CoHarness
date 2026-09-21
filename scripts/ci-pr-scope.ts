@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import { consumerReasons, verifyConsumerReferences } from './ci-consumer-relations.ts'
 import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 import { expandPackageGroups, loadWebTestPolicy, scanGoldenOwners, WEB_TESTS_ROOT, type WebTestPolicy } from './web-test-policy.ts'
 
@@ -33,6 +34,10 @@ export interface CiPrScope {
   readonly gatewayMode: 'skip' | 'full'
   /** The independent Gateway administration UI project. */
   readonly adminUiMode: 'skip' | 'full'
+  /** Android is optional and runs only through the manual android-audit suite. */
+  readonly androidMode: 'skip'
+  /** Explicit consumer rules used to explain added lanes. */
+  readonly consumerReasons: ReturnType<typeof consumerReasons>
 }
 
 /** The web browser verification tier for one changed path set. */
@@ -290,9 +295,12 @@ export function classifyCiPrScope(
   const inertOnly = paths.length > 0 && paths.every(isInertPath)
   const fullRuntime = paths.some(isFullRuntimePath)
   const modelInput = paths.some(isModelInputPath)
-  const gatewayReachable = paths.some(isGatewayPath)
-  const adminUiReachable = paths.some(isAdminUiPath)
+  const reasons = consumerReasons(paths.filter(path => !isInertPath(path) || isModelInputPath(path)))
+  const gatewayReachable = reasons.gateway.length > 0 || paths.some(path => !isInertPath(path) && isGatewayPath(path))
+  const adminUiReachable = reasons.adminUi.length > 0 || paths.some(path => !isInertPath(path) && isAdminUiPath(path))
   const common = {
+    androidMode: 'skip' as const,
+    consumerReasons: reasons,
     changedSourceFiles,
     changedPackageFiles,
     changedDocsOnly: inertOnly && !modelInput,
@@ -305,9 +313,8 @@ export function classifyCiPrScope(
   // exempt, because it holds the gate runner every lane invokes and the fixture
   // generator the snapshot lane consumes.
   const nodeLanesUnreachable = !modelInput && paths.length > 0 && paths.every(path => isInertPath(path) || path.startsWith('python/'))
-  // The Python lanes build and exercise `python/**` plus the packaged runtime, so
-  // only a Python or dependency change can reach them.
-  const pythonLanesReachable = paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
+  // The runtime wheel executes the TypeScript loop and Session protocol too.
+  const pythonLanesReachable = reasons.python.length > 0 || paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
   const snapshotModeFromWeb: Record<WebVerificationPlan['mode'], CiPrScope['snapshotMode']> = {
     skip: 'scoped',
     focused: 'focused',
@@ -328,6 +335,8 @@ export function classifyCiPrScope(
     windowsMode: 'full',
     gatewayMode: 'full',
     adminUiMode: 'full',
+    androidMode: 'skip',
+    consumerReasons: { python: ['unknown-or-empty-diff'], gateway: ['unknown-or-empty-diff'], adminUi: ['unknown-or-empty-diff'], android: ['unknown-or-empty-diff'] },
   }
 
   const changedLines = diff
@@ -340,6 +349,10 @@ export function classifyCiPrScope(
     ...common,
     runExpensive: false,
     reason: 'action-only',
+    gatewayMode: 'skip',
+    adminUiMode: 'skip',
+    androidMode: 'skip',
+    consumerReasons: { python: [], gateway: [], adminUi: [], android: [] },
     coverageMode: 'skip',
     snapshotMode: 'skip',
     webGroups: [],
@@ -398,13 +411,23 @@ export function classifyCiPrScope(
 function main(): void {
   const base = process.argv[2]
   if (base === undefined || base === '') throw new Error('ci-pr-scope: expected a base commit')
+  verifyConsumerReferences(process.cwd())
   const range = `${base}...HEAD`
-  const paths = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
-    .trim()
-    .split('\n')
+  const paths = execFileSync('git', ['diff', '--name-only', '-z', '--no-renames', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
+    .split('\0')
     .filter(Boolean)
   const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
-  const result = classifyCiPrScope(paths, diff, clientSurfacePackages(process.cwd()))
+  const candidate = classifyCiPrScope(paths, diff, clientSurfacePackages(process.cwd()))
+  const previous = previousConsumerSelection(paths, candidate)
+  const result = unionConsumerSelection(previous, candidate)
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const baseline = execFileSync('git', ['rev-parse', `${base}^{commit}`], { encoding: 'utf8' }).trim()
+  mkdirSync('.artifacts/gates', { recursive: true })
+  writeFileSync(`.artifacts/gates/selection-${commit}.json`, JSON.stringify({
+    version: 1, kind: 'selection', phase: 'shadow', commit, baseline, paths,
+    previous, candidate, executed: result,
+    optionalConsumers: { android: { policy: 'manual-only', suite: 'android-audit', affectedRules: candidate.consumerReasons.android } },
+  }, null, 2) + '\n')
   if (result.snapshotMode === 'focused') {
     console.error(`ci-pr-scope: focused web verification for groups ${JSON.stringify(result.webGroups)}`)
   } else if (result.snapshotMode === 'full') {
@@ -427,8 +450,40 @@ function main(): void {
     `windows_mode=${result.windowsMode}`,
     `gateway_mode=${result.gatewayMode}`,
     `admin_ui_mode=${result.adminUiMode}`,
+    `android_mode=${result.androidMode}`,
     `scoped_packages=${JSON.stringify(scopedPackages)}`,
   ].join('\n')}\n`)
+}
+
+/** Preserve the pre-migration consumer decisions for shadow comparison.
+ * @param paths - changed paths used for both selectors.
+ * @param candidate - new selection; all unchanged upstream lanes are shared.
+ * @returns previous consumer decisions without duplicating the upstream classifier.
+ */
+export function previousConsumerSelection(paths: readonly string[], candidate: CiPrScope): CiPrScope {
+  const inert = candidate.reason === 'docs-only' || candidate.reason === 'action-only'
+  return {
+    ...candidate,
+    pythonMode: paths.length === 0 || (!inert && paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))) ? 'full' : 'skip',
+    gatewayMode: paths.length === 0 || paths.some(isGatewayPath) ? 'full' : 'skip',
+    adminUiMode: paths.length === 0 || paths.some(isAdminUiPath) ? 'full' : 'skip',
+    androidMode: 'skip',
+    consumerReasons: { python: [], gateway: [], adminUi: [], android: [] },
+  }
+}
+
+/** Execute the union until a reviewed commit retires the previous consumer decisions.
+ * @param previous - baseline selector result.
+ * @param candidate - proposed selector result.
+ * @returns one deduplicated decision per consumer lane.
+ */
+export function unionConsumerSelection(previous: CiPrScope, candidate: CiPrScope): CiPrScope {
+  return {
+    ...candidate,
+    pythonMode: previous.pythonMode === 'full' ? 'full' : candidate.pythonMode,
+    gatewayMode: previous.gatewayMode === 'full' ? 'full' : candidate.gatewayMode,
+    adminUiMode: previous.adminUiMode === 'full' ? 'full' : candidate.adminUiMode,
+  }
 }
 
 if (import.meta.main) main()
