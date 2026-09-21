@@ -40,6 +40,15 @@
   config:
     timeoutMs: 60000
 
+# The session-persistence backend must mount before agent-spine: configured
+# agents resolve `ctx.sessionPersistence` synchronously while the spine mounts
+# the loop, so a later backend would leave them ephemeral.
+- id: persistence
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: !!js "process.env.DSH_SNAPSHOT === undefined ? 'zstd' : 'none'"
+
 # The example composition pre-creates one fresh `main` agent for its test driver.
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
@@ -59,12 +68,6 @@
 
       Verify your work by running the code or tests. Keep answers brief and
       factual.
-
-- id: persistence
-  name: '@deepseek-ai/dsh-session-persistence-jsonl'
-  config:
-    root: './.sessions'
-    compression: !!js "process.env.DSH_SNAPSHOT === undefined ? 'zstd' : 'none'"
 
 - id: checkpoint-policy
   name: '@deepseek-ai/dsh-session-checkpoint-policy'
@@ -127,6 +130,22 @@
     backgroundMode: one-shot
     enableRunInBackground: false
     maxDepth: 1
+
+# PTC code execution resolves its file-effect boundary against the session
+# cwd; snapshots pin danger-full-access so recorded scenarios remain
+# runner-independent.
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+  config:
+    mode: !!js "process.env.DSH_PERMISSION_MODE ?? (process.env.DSH_SNAPSHOT === undefined ? 'workspace-write' : 'danger-full-access')"
+    workspaceRoot: !!js process.cwd()
+
+# The PTC runtime backs `ctx.ptcRuntime` for the workflow engine below.
+- id: ptc-runtime
+  name: '@deepseek-ai/dsh-ptc-runtime-node'
 
 # The worker-thread workflow engine fans a model-written JavaScript script's
 # `agent()` calls out through the spawn backend.

@@ -6,7 +6,7 @@
  * @module session-format-guard-snapshot
  */
 
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
@@ -17,6 +17,7 @@ import SessionStore, {
   type SessionEvent,
   type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { eventLines, generationLogPath } from '@deepseek-ai/dsh-session-persistence-jsonl/src/format.ts'
 import { describe, expect, it } from 'vitest'
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'workspace-context-resume-snapshots/offline-edit')
@@ -28,6 +29,19 @@ const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta
 const sessionId = SessionId('workspace-context-resume')
 
 /** Persist one session with the given header version and events, returning its log path. */
+/**
+ * Place a log whose header names a foreign format version, returning its path.
+ * Raw bytes are required: `create` encodes through the current encoder, which
+ * rightly refuses a version it does not own.
+ */
+async function seedForeignLog(root: string, cwd: string, version: number, events: SessionEvent[]): Promise<string> {
+  const path = generationLogPath(root, cwd, sessionId, version, 'none')
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  const header = JSON.stringify({ type: 'session', version, id: sessionId, createdAt: 1, cwd, isSeeded: false, delegationDepth: 0 })
+  await writeFile(path, `${header}\n${eventLines(events)}\n`)
+  return path
+}
+
 async function seedSession(root: string, cwd: string, version: number, events: SessionEvent[]): Promise<string> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
@@ -67,7 +81,7 @@ describe('session format guard through the assembled app', () => {
       // agent ever publishing, Node aborts the unsettled top-level await (13).
       expectedExitCode: 13,
       prepare: async (runCwd) => {
-        sessionPath = await seedSession(join(runCwd, '.sessions'), runCwd, SESSION_FORMAT_VERSION + 99, closedTurn())
+        sessionPath = await seedForeignLog(join(runCwd, '.sessions'), runCwd, SESSION_FORMAT_VERSION + 99, closedTurn())
       },
     })
     expect(result.stderr).toContain(

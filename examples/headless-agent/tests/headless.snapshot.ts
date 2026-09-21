@@ -80,6 +80,7 @@ interface PersistedLog {
 interface DeepSeekDefaultsServer {
   readonly url: string
   readonly requests: JsonObject[]
+  readonly paths: string[]
   close(): Promise<void>
 }
 
@@ -96,20 +97,33 @@ interface HtmlGatewayServer {
 }
 
 /** Serve one deterministic DeepSeek-compatible response while retaining its request body. */
-async function deepseekDefaultsServer(): Promise<DeepSeekDefaultsServer> {
+async function deepseekDefaultsServer(options: { protocol?: 'messages' } = {}): Promise<DeepSeekDefaultsServer> {
   const requests: JsonObject[] = []
+  const paths: string[] = []
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     let body = ''
     request.setEncoding('utf8')
     request.on('data', (chunk: string) => { body += chunk })
     request.on('end', () => {
       requests.push(JSON.parse(body) as JsonObject)
+      paths.push(request.url ?? '')
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       let keepAlives = 3
       const write = (): void => {
         if (keepAlives-- > 0) {
           response.write(': keep-alive\n\n')
           setTimeout(write, 60)
+          return
+        }
+        if (options.protocol === 'messages') {
+          response.end([
+            { type: 'message_start', message: { id: 'defaults-response', model: 'deepseek-v4-flash', usage: { input_tokens: 3, output_tokens: 0 } } },
+            { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'DEFAULTS_OK' } },
+            { type: 'content_block_stop', index: 0 },
+            { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+            { type: 'message_stop' },
+          ].map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''))
           return
         }
         response.end([
@@ -128,6 +142,7 @@ async function deepseekDefaultsServer(): Promise<DeepSeekDefaultsServer> {
   return {
     url: `http://127.0.0.1:${address.port}`,
     requests,
+    paths,
     close: () => new Promise(resolve => server.close(() => { resolve() })),
   }
 }
@@ -593,6 +608,7 @@ describe('headless stream-json snapshots', () => {
         // First-run posture: no key in the environment, none under ./.dsh.
         DEEPSEEK_API_KEY: '',
         DEEPSEEK_BASE_URL: '',
+        DSH_PERMISSION_MODE: 'danger-full-access',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -633,6 +649,7 @@ describe('headless stream-json snapshots', () => {
         // the header and the turn ends on a retried ByteString TypeError.
         DEEPSEEK_API_KEY: 'sk-\u{1F600}pasted-from-a-chat-window',
         DEEPSEEK_BASE_URL: '',
+        DSH_PERMISSION_MODE: 'danger-full-access',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -751,7 +768,7 @@ describe('headless stream-json snapshots', () => {
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('keeps provider comments alive and sends DeepSeek defaults through the one-shot app', async () => {
-    const server = await deepseekDefaultsServer()
+    const server = await deepseekDefaultsServer({ protocol: 'messages' })
     try {
       const result = await runLoaderSmoke({
         label: 'DeepSeek adapter defaults headless stream-json snapshot',
@@ -775,8 +792,9 @@ describe('headless stream-json snapshots', () => {
 
       expect(result.stderr).toBe('')
       expect(server.requests).toHaveLength(1)
+      expect(server.paths).toEqual(['/v1/messages'])
       expect(server.requests[0]?.max_tokens).toBe(256_000)
-      expect(server.requests[0]?.reasoning_effort).toBe('low')
+      expect(server.requests[0]?.output_config).toEqual({ effort: 'low' })
       const header = (parseJsonl(result.stdout)
         .map(record => record.event)
         .find((event): event is JsonObject => (
@@ -1113,6 +1131,7 @@ describe('headless stream-json snapshots', () => {
       env: {
         // The override fully supplies the parent script; the child fixture
         // remains separate so replay binds it to the fresh child Session.
+        DSH_SNAPSHOT: 'replay',
         DSH_SNAPSHOT_FILE: parentReplay,
         DSH_SNAPSHOT_OVERRIDE: parentOverride,
         DSH_SNAPSHOT_CHILD_FILES: childReplay,
