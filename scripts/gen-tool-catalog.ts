@@ -63,6 +63,8 @@ import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
+import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
+import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
@@ -222,6 +224,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(McpResources)
       ctx.mcpResources.register('catalog', {
         request: () => Promise.reject(new Error('gen-tool-catalog: MCP requests are unreachable during schema harvest')),
+      })
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+    dir: 'browser-use-stagehand-native',
+    source: 'packages/experimental/browser-use-stagehand-native/src/index.ts',
+    requires: ['ctx.browserUse', 'ctx.agents', 'ctx.tools', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(BrowserUseRegistry)
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(StagehandBrowserTools, {
+        mode: 'launch', model: { modelName: 'openai/gpt-5.4-mini', apiKey: 'catalog-placeholder' },
       })
     },
   },

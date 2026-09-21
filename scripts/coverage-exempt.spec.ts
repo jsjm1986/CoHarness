@@ -43,12 +43,12 @@ describe('coverage-exempt roster', () => {
     },
   )
 
-  it('selects every Typert suite for the uninstrumented gate', () => {
-    const typertSpecs = filterMatches('packages/typert/')
+  it('selects only the Typert generator suite for the uninstrumented gate', () => {
+    const generatorSpecs = filterMatches('packages/typert/generator/')
     const exemptSpecs = coverageExemptHeavySuites.flatMap(suite => excludeMatches(suite.exclude))
       .filter(spec => spec.startsWith('packages/typert/')).sort()
-    expect(typertSpecs.length).toBeGreaterThan(0)
-    expect(exemptSpecs).toEqual(typertSpecs)
+    expect(generatorSpecs.length).toBeGreaterThan(0)
+    expect(exemptSpecs).toEqual(generatorSpecs)
   })
 
   it('entries never overlap, so no suite is double-run or double-excluded', () => {

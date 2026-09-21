@@ -38,7 +38,8 @@
       "sovereignty": "owned"
     },
     "boot/app-boot": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-21-profile-resolution-ambient-source-plane.md"
     },
     "boot/cmdline": {
       "sovereignty": "tracked"
@@ -398,7 +399,8 @@
       "sovereignty": "adapted"
     },
     "core/agent-loop": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-21-configured-agent-persistence-mount-race.md"
     },
     "core/agent-tool-presentation": {
       "sovereignty": "tracked"
@@ -413,7 +415,8 @@
       "sovereignty": "tracked"
     },
     "core/tools": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-18-tool-scheduler-process-stable-symbol.md"
     },
     "credentials/authorization": {
       "sovereignty": "adapted"
@@ -618,7 +621,8 @@
       "sovereignty": "tracked"
     },
     "preset/agent-presets": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-21-preset-remote-contract-boundaries.md"
     },
     "preset/persona": {
       "sovereignty": "tracked"
@@ -790,7 +794,8 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent-acp": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md"
     },
     "subagent/subagent-claude-code": {
       "sovereignty": "adapted"
@@ -799,7 +804,8 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent-dsh-sdk": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md"
     },
     "subagent/subagent-fork-in-process": {
       "sovereignty": "adapted"

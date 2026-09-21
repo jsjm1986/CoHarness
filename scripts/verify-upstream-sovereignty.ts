@@ -87,7 +87,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Validate parsed manifest JSON against the version-1 contract.
- * @param raw - parsed JSON value of unknown provenance.
+ * @param raw - parsed JSON value of unknown origin.
  * @param repoRoot - repository root `note` paths resolve against.
  * @returns the manifest with exactly the schema fields, no extras.
  */

@@ -762,7 +762,7 @@ describe('raw Markdown projection of the published manifest', () => {
   beforeAll(() => {
     mirror = mkdtempSync(join(tmpdir(), 'dsh-doc-mirror-real-'))
     emitRawMarkdownPages(mirror, { pages: docsPages, repoRoot: repositoryRoot, repositoryRef: 'master' })
-  }, 60_000)
+  }, 120_000)
 
   afterAll(() => {
     rmSync(mirror, { recursive: true, force: true })

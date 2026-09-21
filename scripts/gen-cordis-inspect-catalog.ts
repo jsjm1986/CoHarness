@@ -10,16 +10,16 @@ const root = resolve(import.meta.dirname, '..')
 const CLIENT_OUT = 'packages/extensions/cordis-client-runner/src/client/api-catalog.ts'
 
 const CLIENT_SERVICES: Readonly<Record<string, readonly string[]>> = {
-  layout: ['selectPanel', 'beginNavigation', 'toggleSidebar', 'openRightbar', 'closeRightbar'],
-  locale: ['getLocale', 'getSnapshot', 'subscribe', 'setLocale', 'addLanguage', 'register', 'bind'],
-  sessions: ['retain', 'using', 'retainInfo', 'setSubagentCatalogOpen', 'refreshSubagents', 'search', 'fork', 'scope', 'binding'],
-  slots: ['register', 'registerFactory', 'inject'],
-  theme: ['getTheme', 'setTheme', 'setFontSize', 'register', 'overrideTokens'],
-  uiWorkspace: [
-    'openSession', 'openWorkspace', 'forkSession', 'connectWorkspace', 'startSession', 'archiveSession', 'unarchiveSession',
-    'pickDirectory', 'listDirectory', 'createDirectory',
+  layout: ['toggleSidebar', 'openDetails', 'closeDetails'],
+  locale: ['getLocale', 'getSnapshot', 'subscribe', 'setLocale', 'register', 'bind'],
+  sessions: ['setSubagentCatalogOpen', 'refreshSubagents', 'search', 'fork', 'scope', 'binding', 'open', 'openSubagent'],
+  slots: ['register', 'inject'],
+  theme: ['getTheme', 'setTheme', 'register', 'overrideTokens'],
+  timer: ['debounce', 'interval', 'throttle', 'timeout'],
+  workspaces: [
+    'openWorkspace', 'connectWorkspace', 'startSession', 'openPath', 'pickDirectory', 'listDirectory', 'createDirectory',
+    'create', 'rename', 'delete', 'insertSessionBefore', 'archiveSession',
   ],
-  workspaces: ['create', 'rename', 'delete', 'insertSessionBefore', 'archiveSession', 'unarchiveSession'],
 }
 
 const CLIENT_EVENTS = new Set([

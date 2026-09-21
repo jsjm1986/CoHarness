@@ -194,13 +194,13 @@ describe('weighted partition assignment', () => {
 describe('coverage file inventory', () => {
   it('parses vitest list --filesOnly output, keeps project ownership, and drops exempt suites', async () => {
     const root = await temporaryRoot()
-    const exemptDir = join(root, 'packages/typert/typert/tests')
+    const exemptDir = join(root, 'packages/typert/generator/tests')
     await mkdir(exemptDir, { recursive: true })
     await writeFile(join(exemptDir, 'transform-corpus.spec.ts'), '')
     const output = [
       '[thread-safe] packages/a/tests/a.spec.ts',
       '[process-bound] packages/b/tests/b.spec.ts',
-      '[thread-safe] packages/typert/typert/tests/transform-corpus.spec.ts',
+      '[thread-safe] packages/typert/generator/tests/transform-corpus.spec.ts',
       'not a test line',
     ].join('\n')
     const inventory = parseListOutput(output, root)
@@ -212,26 +212,26 @@ describe('coverage file inventory', () => {
     expect(inventory.projectOf.get('packages/b/tests/b.spec.ts')).toBe('process-bound')
   })
 
-  it('removes every Typert package from instrumented files and project assignments', async () => {
+  it('removes only the exempt Typert generator suite from instrumented files and project assignments', async () => {
     const root = await temporaryRoot()
-    const typertFiles = [
-      'packages/typert/generator/tests/type-model.spec.ts',
+    const exemptFiles = ['packages/typert/generator/tests/type-model.spec.ts']
+    const retainedFiles = [
+      'packages/api/gateway/tests/rpc.spec.ts',
+      'packages/typert/future/tests/nested/client.spec.tsx',
       'packages/typert/loader/tests/loader.spec.ts',
       'packages/typert/protocol/tests/protocol.spec.ts',
       'packages/typert/registry/tests/typert.spec.ts',
-      'packages/typert/future/tests/nested/client.spec.tsx',
     ]
-    for (const file of typertFiles) {
+    for (const file of [...exemptFiles, ...retainedFiles]) {
       await mkdir(dirname(join(root, file)), { recursive: true })
       await writeFile(join(root, file), '')
     }
-    const retained = 'packages/api/gateway/tests/rpc.spec.ts'
     const inventory = parseListOutput(
-      [...typertFiles, retained].map(file => `[thread-safe] ${file}`).join('\n'),
+      [...exemptFiles, ...retainedFiles].map(file => `[thread-safe] ${file}`).join('\n'),
       root,
     )
-    expect(inventory.files).toEqual([retained])
-    expect([...inventory.projectOf]).toEqual([[retained, 'thread-safe']])
+    expect(inventory.files).toEqual(retainedFiles)
+    expect([...inventory.projectOf]).toEqual(retainedFiles.map(file => [file, 'thread-safe']))
   })
 
   it('averages recorded durations per file from the results cache', async () => {

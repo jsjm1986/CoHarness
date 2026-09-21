@@ -214,11 +214,6 @@
     },
     {
       "doc": "docs/subsystems/goal.md",
-      "symbol": "GoalActivationChanged",
-      "source": "packages/goal/goal/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/goal.md",
       "symbol": "GoalSnapshotChangeMeta",
       "source": "packages/goal/goal/src/domain.ts"
     },
@@ -505,11 +500,6 @@
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/todo.md",
-      "symbol": "TodoItem",
-      "source": "packages/todo/tool-todo/src/types.ts"
-    },
-    {
       "doc": "docs/subsystems/session.md",
       "symbol": "SessionEvent",
       "source": "packages/core/session/src/types.ts"
@@ -689,27 +679,22 @@
     {
       "doc": "docs/subsystems/session-title.md",
       "symbol": "SessionTitleProviderId",
-      "source": "packages/session/session-title/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/session-title.md",
-      "symbol": "SessionTitleModelIdentity",
-      "source": "packages/session/session-title/src/types.ts"
+      "source": "packages/session/session-title/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-title.md",
       "symbol": "SessionTitleSource",
-      "source": "packages/session/session-title/src/types.ts"
+      "source": "packages/session/session-title/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-title.md",
       "symbol": "SessionTitleEventData",
-      "source": "packages/session/session-title/src/types.ts"
+      "source": "packages/session/session-title/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-title.md",
       "symbol": "SessionTitleSnapshot",
-      "source": "packages/session/session-title/src/types.ts"
+      "source": "packages/session/session-title/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-title.md",
@@ -719,7 +704,7 @@
     {
       "doc": "docs/subsystems/session-title.md",
       "symbol": "SessionTitleUserMessage",
-      "source": "packages/session/session-title/src/types.ts"
+      "source": "packages/session/session-title/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-title.md",
@@ -1719,7 +1704,7 @@
     {
       "doc": "docs/subsystems/credentials.md",
       "symbol": "CredentialInfo",
-      "source": "packages/credentials/credentials/src/types.ts"
+      "source": "packages/credentials/credentials/src/index.ts"
     },
     {
       "doc": "docs/subsystems/settings.md",
@@ -1828,23 +1813,8 @@
     },
     {
       "doc": "docs/subsystems/client-modules.md",
-      "symbol": "WebBootBatchPhase",
-      "source": "packages/client/modules/src/client/manifest.ts"
-    },
-    {
-      "doc": "docs/subsystems/client-modules.md",
-      "symbol": "WebBootBatch",
-      "source": "packages/client/modules/src/client/manifest.ts"
-    },
-    {
-      "doc": "docs/subsystems/client-modules.md",
       "symbol": "WebBootGraph",
       "source": "packages/client/modules/src/client/manifest.ts"
-    },
-    {
-      "doc": "docs/subsystems/client-modules.md",
-      "symbol": "ClientArtifactBaseline",
-      "source": "packages/client/modules/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-telemetry.md",
@@ -1998,16 +1968,6 @@
     },
     {
       "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackPut",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
-      "symbol": "MessageFeedbackDelete",
-      "source": "packages/feedback/message-feedback/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackListRequest",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
@@ -2142,17 +2102,6 @@
       "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/ssh.md",
-      "symbol": "Config",
-      "source": "packages/ssh/ssh/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/ssh.md",
-      "symbol": "SshConnection",
-      "source": "packages/ssh/ssh/src/index.ts",
-      "projection": "public-api"
-    },
-    {
       "doc": "docs/subsystems/mcp.md",
       "symbol": "McpResourceRequest",
       "source": "packages/mcp/mcp-resources/src/index.ts"
@@ -2163,34 +2112,159 @@
       "source": "packages/mcp/mcp-resources/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/deliverables.md",
-      "symbol": "PresentedFile",
-      "source": "packages/deliverables/tool-present/src/types.ts"
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRuntimeIdentity",
+      "source": "packages/context/gateway-runtime/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/deliverables.md",
-      "symbol": "WorkspaceChangedFile",
-      "source": "packages/deliverables/workspace-changes/src/types.ts"
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayPrincipalScope",
+      "source": "packages/context/gateway-runtime/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/deliverables.md",
-      "symbol": "WorkspaceChangesSummary",
-      "source": "packages/deliverables/workspace-changes/src/types.ts"
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayPrincipalClaims",
+      "source": "packages/context/gateway-runtime/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/deliverables.md",
-      "symbol": "WorkspaceDiffHunk",
-      "source": "packages/deliverables/workspace-changes/src/types.ts"
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "ConnectionRequestBoundary",
+      "source": "packages/client/connection/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/deliverables.md",
-      "symbol": "WorkspaceFileDiff",
-      "source": "packages/deliverables/workspace-changes/src/types.ts"
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRuntimeCredential",
+      "source": "packages/context/gateway-runtime/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/deliverables.md",
-      "symbol": "WorkspaceChanges",
-      "source": "packages/deliverables/workspace-changes/src/types.ts"
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRequestPrincipal",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRuntimeRequestInit",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationAction",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationInteractionKind",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationVisibility",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationParticipant",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationAccess",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationSessionCreation",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationAuthority",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationErrorCode",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "TurnBoundaryProjection",
+      "source": "packages/core/agent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/credentials.md",
+      "symbol": "ReadOnlyCredentialLayer",
+      "source": "packages/credentials/credentials/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/goal.md",
+      "symbol": "GoalProjection",
+      "source": "packages/goal/goal/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/goal.md",
+      "symbol": "GoalProjectionState",
+      "source": "packages/goal/goal/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProviderProtocol",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProfile",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProviderProfile",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelProviderConfigSnapshot",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelAccessTarget",
+      "source": "packages/llm/model-access/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelAccessDecision",
+      "source": "packages/llm/model-access/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionStorageMetadata",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionRawArtifact",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionInspection",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionEventSuffix",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-title.md",
+      "symbol": "SessionTitleModelIdentity",
+      "source": "packages/session/session-title/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "TodoItem",
+      "source": "packages/core/session/src/types.ts"
     }
   ]
 }

@@ -37,7 +37,7 @@ function isSessionHeader(value: unknown): boolean {
 }
 
 /** Whether any body record stores `sourceEventSeqs` in the v3 range form. */
-function usesRangeProvenance(content: string): boolean {
+function usesSourceEventRanges(content: string): boolean {
   for (const line of content.split(/\r?\n/)) {
     if (!line.trim()) continue
     let record: unknown
@@ -125,7 +125,7 @@ function parseFixtureRows(content: string, headerValue: unknown): SessionEvent[]
   return events
 }
 
-function renderFixture(headerLine: string, events: readonly SessionEvent[], provenance: 'ranges' | 'flat'): string {
+function renderFixture(headerLine: string, events: readonly SessionEvent[], sourceEventForm: 'ranges' | 'flat'): string {
   return [
     headerLine,
     ...events.map((event) => {
@@ -135,7 +135,7 @@ function renderFixture(headerLine: string, events: readonly SessionEvent[], prov
       // Python snapshots remain outside this helper's scope.
       delete record.seq
       delete record.time
-      if (provenance === 'ranges' && 'sourceEventSeqs' in record) {
+      if (sourceEventForm === 'ranges' && 'sourceEventSeqs' in record) {
         record.sourceEventSeqs = encodeSeqRanges(record.sourceEventSeqs as SessionSeq[])
       }
       return JSON.stringify(record)
@@ -189,15 +189,15 @@ export function canonicalSessionFixture(content: string, label = '<session-fixtu
   if (typeof storedVersion === 'number' && storedVersion < sessionFormatCatalog.currentVersion) {
     return content
   }
-  const provenance: 'ranges' | 'flat' = usesRangeProvenance(content) ? 'ranges' : 'flat'
-  const canonical = renderFixture(headerLine, events, provenance)
+  const sourceEventForm: 'ranges' | 'flat' = usesSourceEventRanges(content) ? 'ranges' : 'flat'
+  const canonical = renderFixture(headerLine, events, sourceEventForm)
   const decoded = parseFixtureRows(canonical, headerValue)
   try {
     deepStrictEqual(withoutEnvelope(decoded), withoutEnvelope(events))
   } catch (error) {
     throw new Error(`${label}: snapshot rewrite changed the event payload stream`, { cause: error })
   }
-  if (renderFixture(headerLine, decoded, provenance) !== canonical) {
+  if (renderFixture(headerLine, decoded, sourceEventForm) !== canonical) {
     throw new Error(`${label}: rewrite is not idempotent`)
   }
   return canonical

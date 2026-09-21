@@ -27,12 +27,12 @@ export const COVERAGE_EXEMPT_ENV = 'DSH_COVERAGE_EXEMPT_HEAVY'
 
 /** Coverage-exempt heavy suites; keep filter and exclude selecting the same files. */
 export const coverageExemptHeavySuites: readonly CoverageExemptSuite[] = [
-  // Typert src is threshold-excluded; compiler analysis runs uninstrumented.
-  // The generator's tools-catalog registry and
+  // Typert generator src is threshold-excluded; compiler analysis runs
+  // uninstrumented. The generator's tools-catalog registry and
   // tool-cordis imports are fully covered by those packages' own tests.
   {
-    filter: 'packages/typert/',
-    exclude: 'packages/typert/*/tests/**',
+    filter: 'packages/typert/generator/',
+    exclude: 'packages/typert/generator/tests/**',
   },
   // Real child-process fixtures over scripts/ sources, which coverage never measures.
   { filter: 'scripts/install-lefthook.spec.ts', exclude: 'scripts/install-lefthook.spec.ts' },

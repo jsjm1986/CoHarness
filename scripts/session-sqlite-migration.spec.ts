@@ -52,7 +52,7 @@ function events(): SessionEvent[] {
 }
 
 describe('offline Session SQLite migrations', () => {
-  it('round-trips a draft, provenance, ignorable event, and store identity both ways', async () => {
+  it('round-trips a draft, source-event, ignorable event, and store identity both ways', async () => {
     const { root, path } = await fixture()
     const store = new SqliteStore({ path, journalMode: 'delete', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header: SessionHeader = { id: SessionId('migration-session'), version: SESSION_FORMAT_VERSION, createdAt: 1, cwd: '/work', isSeeded: false, draft: true }

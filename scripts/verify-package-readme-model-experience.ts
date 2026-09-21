@@ -35,6 +35,7 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/util/home-paths': 'The package only resolves harness-owned host paths; model-facing consumers own any rendered use.',
   'packages/util/http-proxy': 'Transport policy only: it changes how bytes reach the network and registers no prompt, schema, or result text.',
   'packages/util/launch-environment': 'The package only resolves host environment values; model-facing consumers own any rendered use.',
+  'packages/util/values': 'The package only validates, snapshots, compares, freezes, or rejects caller-owned values; consumers own every model-facing use.',
 }
 
 /**
@@ -45,8 +46,6 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-open-in-app': { kind: 'none', reason: 'Desktop application launch controls do not register model-visible prompts or results.' },
   'packages/host/open-in-app': { kind: 'none', reason: 'Host application launch routes do not register model-visible prompts or results.' },
-  'packages/session/session-format': { kind: 'none', reason: 'The package validates and migrates durable Session data; provider and prompt consumers own every model-visible effect.' },
-  'packages/util/values': { kind: 'none', reason: 'JSON-safe value operations register no prompt, schema, or result text.' },
   'packages/util/package-manifest': { kind: 'none', reason: 'Shared package manifest declarations register no prompt, schema, or result text.' },
   'packages/util/chunked-list': { kind: 'none', reason: 'The immutable append-only list container registers no prompt, schema, or result text.' },
   'packages/util/lazy-require': { kind: 'none', reason: 'The Host-only module-resolution utility registers no prompt, schema, or result text.' },
@@ -63,6 +62,9 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/core/agent-tool-presentation': { kind: 'indirect', reason: 'The row only selects between the two projections dsh-tools owns; it registers no prompt, schema, or result of its own.' },
   'packages/ptc-runtime/ptc-runtime-node': { kind: 'indirect', reason: 'The worker backend delegates model rendering to PTC in dsh-tools.' },
   'packages/experimental/ptc-runtime-python': { kind: 'indirect', reason: 'The experimental CPython subprocess backend delegates model rendering to PTC in dsh-tools.' },
+  'packages/experimental/browser-use-runtime': { kind: 'indirect', reason: 'Browser providers call the library to own resources and expose upstream MCP tools.' },
+  'packages/browser-use/browser-use': { kind: 'none', reason: 'The registry only reserves a provider name; providers own browser tools and Session resources.' },
+  'packages/computer-use/computer-use': { kind: 'none', reason: 'The registry only reserves provider names; providers own all model-facing tools and guidance.' },
   'packages/client/ui-agent-preset': { kind: 'indirect', reason: 'Browser-side settings row; the preset it selects owns every model-facing effect.' },
   'packages/core/agent-default-model': { kind: 'indirect', reason: 'The service supplies a ModelSelection; request assembly and adapters own the model-visible request.' },
   'packages/preset/agent-presets': { kind: 'indirect', reason: 'The mount installs a preset\'s own plugins, which own every model-facing registration it makes visible.' },
@@ -88,6 +90,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-tool': { kind: 'none', reason: 'Browser-side Tool presentation layer; renders logged calls without changing model context.' },
   'packages/client/ui-jobs': { kind: 'none', reason: 'Browser-side read-only projection of ctx.jobs records; dsh-tool-jobs owns the model-facing behavior.' },
   'packages/client/ui-workflow-run': { kind: 'none', reason: 'Browser-side UI plugin layer; renders durable workflow records without changing model context.' },
+  'packages/client/ui-schedule': { kind: 'none', reason: 'Browser-side read-only projection of active Schedule records; dsh-schedule owns the model-facing tools and delivery.' },
   'packages/client/ui-input-trigger': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-reference': { kind: 'indirect', reason: 'Browser-side reference selection delegates file guidance and session snapshot preparation to Host-owned providers.' },
   'packages/client/ui-commands': { kind: 'indirect', reason: 'The dispatch paths trigger the host command.execute RPC; each command handler\'s host package owns any model-visible effect.' },
@@ -128,6 +131,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/bundle/base': { kind: 'indirect', reason: 'The bundle is a patch-list carrier; each inserted row\'s package owns its model-facing behavior.' },
   'packages/bundle/headless': { kind: 'none', reason: 'The one-shot runner submits the task as an ordinary user message; prompts and tools belong to the composed base and headless bundles.' },
   'packages/llm/llm': { kind: 'none', reason: 'The adapter registry forwards already-assembled requests unchanged.' },
+  'packages/llm/deepseek-llm-api-extensions': { kind: 'indirect', reason: 'The registry contributes model-hidden provider fields; dsh-llm-deepseek owns their wire placement.' },
   'packages/llm/model-provider-config': { kind: 'indirect', reason: 'The service publishes organization provider profiles; LLM adapter Consumers own model request rendering.' },
   'packages/llm/model-access': { kind: 'none', reason: 'The authorization seam permits or rejects routes but contributes no model input.' },
   'packages/llm/token-meter': { kind: 'indirect', reason: 'The measurement service leaves model-visible changes to its consumers.' },
@@ -141,6 +145,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/sdk/protocol': { kind: 'none', reason: 'Client-facing wire library; the runtime plugins behind the serving entry own model-facing behavior.' },
   'packages/session/session-projection': { kind: 'none', reason: 'The projection registry serves client-facing read models of already-logged session state and registers nothing model-facing.' },
   'packages/session/session-projection-cache': { kind: 'none', reason: 'The persisted cache accelerates host-side cold reads of projection state and registers nothing model-facing.' },
+  'packages/session/session-turn-outline': { kind: 'none', reason: 'The turnOutline unit folds already-logged turn boundaries into a client-facing read model and registers nothing model-facing.' },
   'packages/session/session-stats': { kind: 'none', reason: 'The sessionStats unit folds already-logged step boundaries into a client-facing read model and registers nothing model-facing.' },
   'packages/session-query/session-query': { kind: 'none', reason: 'The trusted query service exposes cloned records only to callers and registers nothing model-facing.' },
   'packages/session-query/session-query-sqlite': { kind: 'none', reason: 'The search backend returns hits only to callers and registers nothing model-facing.' },

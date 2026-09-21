@@ -22,6 +22,8 @@ function isExcluded(file: string): boolean {
     // Release snapshots retain the identifiers present in their pinned source.
     || /^docs\/persistence-changes\/releases\/dsh-v\d+\.\d+\.\d+-(?:alpha|rc)\.\d+\.schema\.json$/u.test(file)
     || /^docs\/persistence-changes\/historical-formats\/v(?:0|[1-9]\d*)\.schema\.json$/u.test(file)
+    // Alignment inventories record verbatim upstream commit subjects and file paths.
+    || /^upgrades\/alignment\/UPSTREAM-[^/]+\.json$/u.test(file)
 }
 
 function containsBlockedTerm(value: string): boolean {

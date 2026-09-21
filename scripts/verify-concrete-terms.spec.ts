@@ -104,6 +104,24 @@ describe('concrete terminology policy', () => {
     expect(findConcreteTermViolations(file, blockedTerm)).toEqual([{ file, line: 1 }])
   })
 
+  it.each([
+    'upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-dsh-v0.1.5-rc.2.json',
+    'upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json',
+    'upgrades/alignment/UPSTREAM-ALIGNMENT-PERFORMANCE-dsh-master-2026-09-08.json',
+  ])('preserves verbatim upstream data in %s', (file) => {
+    expect(findConcreteTermViolations(file, `"subject": "record ${blockedTerm}"`)).toEqual([])
+  })
+
+  it.each([
+    'upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md',
+    'upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-dsh-v0.1.5-rc.2.yaml',
+    'upgrades/alignment/OTHER-dsh-v0.1.5-rc.2.json',
+    'upgrades/alignment/nested/UPSTREAM-COMMIT-INVENTORY-dsh-v0.1.5-rc.2.json',
+    'upgrades/plans/UPSTREAM-PLAN-dsh-v0.1.5-rc.2.json',
+  ])('keeps non-inventory content strict outside the alignment JSON set %s', (file) => {
+    expect(findConcreteTermViolations(file, blockedTerm)).toEqual([{ file, line: 1 }])
+  })
+
   it.each(['md', 'zh.md'])('exempts only generated historical schema lines in %s references', (suffix) => {
     const file = `docs/persistence-changes/historical-formats/v2.${suffix}`
     for (const newline of ['\n', '\r\n']) {

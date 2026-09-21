@@ -92,6 +92,18 @@ export interface ScannedFile {
  * @param patterns - glob(s) selecting the TypeScript/TSX files to scan.
  * @returns one entry per interesting file, in path order.
  */
+/** Read a globbed file, tolerating entries that vanish between listing and read. */
+function readIfPresent(abs: string): string | undefined {
+  try {
+    return readFileSync(abs, 'utf8')
+  } catch (error) {
+    // A concurrent tree edit (for example a contract spec writing probe files
+    // into a real package directory) can remove a globbed path before the read.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
 export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): ScannedFile[] {
   const out: ScannedFile[] = []
   const names = new Map<string, string>()
@@ -99,8 +111,8 @@ export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): Sc
     .map(path => path.split(sep).join('/')))].sort()
   for (const rel of rels) {
     const abs = resolve(scanRoot, rel)
-    const text = readFileSync(abs, 'utf8')
-    if (!MERGE_HEAD.test(text) && !REGISTER_HEAD.test(text)) continue
+    const text = readIfPresent(abs)
+    if (text === undefined || (!MERGE_HEAD.test(text) && !REGISTER_HEAD.test(text))) continue
     out.push({
       rel,
       package: packageNameOf(scanRoot, rel, names),
@@ -126,7 +138,9 @@ export function indexExportedTypes(scanRoot: string, patterns: readonly string[]
     .map(path => path.split(sep).join('/')))].sort()
   for (const rel of rels) {
     const abs = resolve(scanRoot, rel)
-    const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(rel))
+    const text = readIfPresent(abs)
+    if (text === undefined) continue
+    const sf = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel))
     for (const statement of sf.statements) {
       if (!ts.isInterfaceDeclaration(statement) && !ts.isTypeAliasDeclaration(statement)) continue
       if (!statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue
