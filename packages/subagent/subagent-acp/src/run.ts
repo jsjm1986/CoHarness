@@ -483,27 +483,44 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
     ])
   } catch (error: unknown) {
     request.signal.removeEventListener('abort', onAbort)
-    if (!flags.cancelled) reportFailure(spec, error)
+    const cancelledBeforeCleanup = flags.cancelled
     // A child closing its protocol stream can precede its exit observation;
     // only an already-settled `done` proves the process died (a live child is
     // a transport failure).
-    const observedOutcome = flags.cancelled || error instanceof AcpRunFailure
+    const observedOutcome = cancelledBeforeCleanup || error instanceof AcpRunFailure
       ? undefined
       : await settledOutcome(child)
+    const startup = cancelledBeforeCleanup
+      ? { kind: 'cancelled' } as const
+      : {
+        kind: 'failed',
+        failure: error instanceof AcpRunFailure
+          ? error
+          : startupFailure(error, startupStage, observedOutcome),
+      } as const
+    if (startup.kind === 'failed') {
+      reportFailure(spec, error instanceof AcpRunFailure ? error.cause : error)
+    }
     try {
       await disposeProcess()
     } catch (cleanupError: unknown) {
       reportFailure(spec, cleanupError)
       const outcome = await settledOutcome(child)
-      throw new AcpRunFailure({
+      const cleanupFailure = new AcpRunFailure({
         stage: 'teardown',
         category: outcome === undefined ? 'unknown' : 'process-exit',
         ...(outcome === undefined ? {} : { outcome }),
       }, cleanupError)
+      if (startup.kind === 'cancelled') {
+        throw new AggregateError([cleanupFailure], cleanupFailure.message)
+      }
+      throw new AggregateError(
+        [startup.failure, cleanupFailure],
+        `${startup.failure.message}; ${cleanupFailure.message}`,
+      )
     }
-    if (flags.cancelled) throw new Error('subagent request was aborted before the ACP child started')
-    if (error instanceof AcpRunFailure) throw error
-    throw startupFailure(error, startupStage, observedOutcome)
+    if (startup.kind === 'cancelled') throw new Error('subagent request was aborted before the ACP child started')
+    throw startup.failure
   }
   // The startup transaction validates the returned id before it can fulfill.
   // This assertion carries that cross-closure invariant into TypeScript.

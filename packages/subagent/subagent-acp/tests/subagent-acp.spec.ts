@@ -570,6 +570,73 @@ describe('dsh-subagent-acp', () => {
     }
   })
 
+  it('preserves a cleanup failure as an AggregateError over a cancelled startup', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'acp-cancel-cleanup-'))
+    const ready = join(tmp, 'ready')
+    const go = join(tmp, 'go')
+    try {
+      const controller = new AbortController()
+      const cleanupFailure = new Error('waitForExit rejected before proving quiescence')
+      const errors: unknown[] = []
+      const starting = startAcpRun(request('p', controller.signal), {
+        command: process.execPath,
+        args: [mockServer],
+        cwd: process.cwd(),
+        permission: 'reject',
+        env: { MOCK_NEWSESSION_READY: ready, MOCK_NEWSESSION_GO: go, MOCK_TEXT: 'never read' },
+        disposeEofGraceMs: 1000,
+        disposeGraceMs: 100,
+        spawn: spec => new Proxy(spawnSubprocess(spec), {
+          get(target, property, receiver) {
+            if (property === 'waitForExit') return async () => { throw cleanupFailure }
+            return Reflect.get(target, property, receiver)
+          },
+        }),
+        onError: (error) => { errors.push(error) },
+      })
+      await waitForFile(ready)
+      controller.abort('cancel during newSession')
+      writeFileSync(go, 'go')
+      const failure = await starting.catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(AggregateError)
+      expect((failure as AggregateError).errors).toHaveLength(1)
+      expect(String((failure as AggregateError).errors[0])).toContain('stage: teardown')
+      expect(errors).toContain(cleanupFailure)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves both the startup and cleanup failures when teardown rejects', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'acp-fail-cleanup-'))
+    try {
+      const cleanupFailure = new Error('waitForExit rejected before proving quiescence')
+      await expect(startAcpRun(request(), {
+        command: process.execPath,
+        args: [mockServer],
+        cwd: process.cwd(),
+        permission: 'reject',
+        env: { MOCK_MISSING_SESSION_ID: '1' },
+        disposeEofGraceMs: 1000,
+        disposeGraceMs: 100,
+        spawn: spec => new Proxy(spawnSubprocess(spec), {
+          get(target, property, receiver) {
+            if (property === 'waitForExit') return async () => { throw cleanupFailure }
+            return Reflect.get(target, property, receiver)
+          },
+        }),
+      })).rejects.toMatchObject({
+        constructor: AggregateError,
+        errors: [
+          expect.objectContaining({ message: expect.stringContaining('stage: new-session') }),
+          expect.objectContaining({ message: expect.stringContaining('stage: teardown') }),
+        ],
+      })
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
   it('dispose escalates SIGTERM → SIGKILL for a child that traps SIGTERM (bounded quiescence)', async () => {
     // The child traps SIGTERM and keeps its event loop alive, so a graceful
     // term alone would hang dispose forever. With a short grace, dispose must
