@@ -14,13 +14,17 @@ import {
 const root = resolve(import.meta.dirname, '..')
 
 describe('generated tsconfig package aliases', () => {
-  it('resolves subprocess control from source without requiring emitted declarations', () => {
+  it.each([
+    ['subprocess/control', 'subprocess/subprocess', 'control'],
+    ['session-format/legacy', 'session/session-format', 'legacy'],
+    ['compaction-image-offload/projection', 'compaction/compaction-image-offload', 'projection'],
+  ])('resolves %s from source without requiring emitted declarations', (specifier, packagePath, entry) => {
     const path = resolve(root, 'tsconfig.base.json')
     const config = ts.readConfigFile(path, ts.sys.readFile)
     const { options } = ts.parseJsonConfigFileContent(config.config, ts.sys, root)
-    const source = resolve(root, 'packages/subprocess/subprocess/src/control.ts')
+    const source = resolve(root, `packages/${packagePath}/src/${entry}.ts`)
     const host = { ...ts.sys, fileExists: (file: string) => !file.replaceAll('\\', '/').includes('/lib/') && ts.sys.fileExists(file) }
-    expect(ts.resolveModuleName('@deepseek-ai/dsh-subprocess/control',
+    expect(ts.resolveModuleName(`@deepseek-ai/dsh-${specifier}`,
       resolve(root, 'packages/subprocess/subprocess-local/src/control-spawn.ts'), options, host).resolvedModule?.resolvedFileName).toBe(source)
   })
 
