@@ -121,7 +121,6 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       // Keep the browser conversation tree under its existing GUI debt
       // exemption while gating the newly stateful Host half and vocabulary.
       'packages/client/ui-conversation/src/client/*',
-      'packages/client/ui-conversation/src/invariant.ts',
       'packages/client/ui-primitives/src/DisclosureRow.tsx',
       'packages/client/ui-tool/src/*',
       'packages/client/ui-slots/src/*',
@@ -147,9 +146,6 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       // fuzz harness owns those cases.
       'packages/client/connection/src/client/account-preferences.ts',
       'packages/client/connection/src/client/project-models.ts',
-      // Dynamic Host/Client composition is covered by its focused lifecycle
-      // tests and assembled application checks rather than per-file coverage.
-      'packages/self-modification/*/src/**/*.{ts,tsx}',
       // This assembly imports generated Host-for-Client code that exists
       // only in lib; the post-build built-bin smoke executes both entries.
       'packages/api/remotes/src/index.ts',
@@ -196,7 +192,6 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/typert/generator/src/*.ts',
       'packages/host/apiproxy/src/index.ts',
       'packages/host/apiproxy/src/api-proxy.ts',
-      'packages/host/apiproxy/src/invariant.ts',
       // Projection/command round: executor lifecycle branches and the
       // registry's drive tails need the same maturing lanes. TODO(gui):
       // cover and remove with the client test lane above.

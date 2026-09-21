@@ -107,6 +107,8 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'docs/user/guide/index.zh.md', upstream: ['cordis'] },
   // The preset-roster loop names the `cordis` preset id, not a package.
   { file: 'apps/cli/tests/windows-shell.spec.ts', upstream: ['cordis'] },
+  // `agentPresets.mount(scope, 'cordis')` mounts the `cordis` preset id, not a package.
+  { file: 'apps/cli/tests/profiles/web/tests/fixtures/creator-plugin-manager.mjs', upstream: ['cordis'] },
   // GROUP_ORDER holds `packages/<group>/` directory names, not package names.
   { file: 'scripts/gen-module-graph.ts', upstream: ['cordis'] },
   { file: 'scripts/gen-doc-graphs.ts', upstream: ['cordis'] },

@@ -955,7 +955,7 @@
       "sovereignty": "tracked"
     },
     "workflow/workflow-ptc": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
@@ -970,7 +970,7 @@
       "sovereignty": "tracked"
     },
     "experimental/auto-review": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "experimental/browser-use-chrome-devtools-mcp": {
       "sovereignty": "tracked"
