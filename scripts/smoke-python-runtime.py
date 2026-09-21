@@ -733,7 +733,11 @@ def smoke_sdk_default(base_url: str) -> None:
             request_timeout_seconds=60,
         ) as harness:
             result = harness.run("reply with the smoke text", session_id="default-smoke")
-        assert result.final_response == EXPECTED_TEXT, result.final_response
+        assert result.final_response == EXPECTED_TEXT, (
+            f"final_response={result.final_response!r}; "
+            f"events={json.dumps(result.events[-8:])}; "
+            f"notifications={json.dumps([n.payload for n in result.notifications[-8:]], default=str)}"
+        )
         assert_zstd_session_log(sessions)
 
 

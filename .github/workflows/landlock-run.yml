@@ -76,6 +76,7 @@ jobs:
         run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Install musl toolchain
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq musl-tools
@@ -96,6 +97,7 @@ jobs:
       # prove enforcement would be a false green, so an unenforcing kernel
       # fails the leg instead of skipping.
       - name: Launcher tests (real kernel enforcement)
+        if: runner.os == 'Linux'
         run: node ./test/launcher.test.js
         env:
           NALR_REQUIRE_LANDLOCK: 1
@@ -105,10 +107,10 @@ jobs:
           node ./scripts/pack-release.mjs .release/npm --current-platform-only
           node ./scripts/verify-packed-install.mjs .release/npm --current-platform-only
         env:
-          NALR_REQUIRE_LANDLOCK: 1
+          NALR_REQUIRE_LANDLOCK: ${{ runner.os == 'Linux' && '1' || '0' }}
 
   darwin:
-    name: darwin (no platform package — degradation proof)
+    name: darwin (unbuilt addon — degradation proof)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -132,13 +134,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # darwin has shipped platform packages, so this leg instead proves the
+      # entry loads and the launcher refuses gracefully with no built binary;
+      # real darwin pack/install coverage lives on the matrix legs.
       - name: Entry tests (keyless)
         run: node ./test/entry.test.js
 
       - name: Launcher tests (must self-skip cleanly)
         run: node ./test/launcher.test.js
-
-      - name: Pack rehearsal (entry only — fallback resolution + unusable probe)
-        run: |
-          node ./scripts/pack-release.mjs .release/npm --current-platform-only
-          node ./scripts/verify-packed-install.mjs .release/npm --current-platform-only

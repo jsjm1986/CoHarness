@@ -70,6 +70,7 @@ jobs:
         run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Install musl toolchain
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq musl-tools
