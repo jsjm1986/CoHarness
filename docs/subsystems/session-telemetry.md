@@ -37,8 +37,9 @@ interface SessionTelemetryRecord {
   severity: SessionTelemetrySeverity
   /**
    * Identity attributes, deliberately minimal: ledger records carry
-   * `session.id`, `event.type`, `event.seq`, plus `session.cwd` /
-   * `session.parent_id` / `session.seed_length` when the header has them;
+   * `session.id`, `session.format_version`, `event.type`, `event.seq`, plus optional
+   * `session.cwd` / `session.parent_id`; a seeded Session also carries
+   * `session.seed_length` from its exact inherited event count;
    * ops records carry `telemetry.op`, `session.id`, and (for `agent-error`)
    * `agent.id`, `turn`, `step`, `error.name`. Anything recoverable from the
    * body is intentionally NOT duplicated here.
@@ -62,16 +63,27 @@ The seam's acknowledgement contract (owned by the [Service Definition README's s
 
 ```ts type-equiv
 /**
- * Deployment-selected session-sharing policy disclosed by a mounted
- * {@link SessionTelemetryBackend} backend to human-facing acknowledgement surfaces (the
- * `/feedback` command's confirmation text). The seam owns the vocabulary so
- * any backend can disclose a policy without depending on the OTel package;
- * the values mirror the OTel backend's serialized `SessionTelemetryMode` choices.
+ * Deployment-selected session-sharing mode, not confirmation of SDK delivery.
  */
 type SessionTelemetrySharingStatus = 'full' | 'feedback-only' | 'disabled'
 ```
 
 ## The backend contract
+
+```ts type-equiv
+/** Whether capture follows live events or reads the canonical log only when requested. */
+type SessionTelemetryCapture = 'live' | 'on-demand'
+```
+
+```ts type-equiv
+/** Backend-selected capture mode and history policy. */
+interface SessionTelemetryCaptureOptions {
+  /** Follow live events, or wait for explicit capture; defaults to live. */
+  capture?: SessionTelemetryCapture
+  /** Include stored history before this lifecycle; defaults to false. */
+  includeHistory?: boolean
+}
+```
 
 ```ts type-equiv
 /**

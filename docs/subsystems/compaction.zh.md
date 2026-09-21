@@ -27,6 +27,16 @@
 成功压缩向调用方返回：记账事件 seq、安全摘要投影、被遮蔽的范围与 seq，以及估算 token 数。
 
 ```ts type-equiv
+/** Exact input-image occurrences selected by one durable offload decision. */
+interface ImageOffloadTarget {
+  /** Current message-producing event containing these occurrences. */
+  seq: SessionSeq
+  /** Zero-based depth-first image indexes within the immutable message. */
+  imageIndexes: number[]
+}
+```
+
+```ts type-equiv
 /** Result of a successful compaction operation. */
 interface CompactionResult {
   /** Stable identity shared by this compaction's complete durable lifecycle. */
@@ -99,7 +109,7 @@ interface PrunedEntry {
   /** Newly appended pruned tool-result event. */
   readonly replacementSeq: SessionSeq
   /** Tool call shared by the original and replacement. */
-  readonly callId: CallId
+  readonly callId: ToolCallId
   /** Original text size in Unicode code points. */
   readonly charsBefore: number
   /** Replacement text size in Unicode code points. */

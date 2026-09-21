@@ -2,7 +2,7 @@
 
 English | [中文](user-questions.zh.md)
 
-The user-questions seam of [dsh-user-questions](../../packages/interaction/user-questions). It is the provider-neutral vocabulary a tool or permission plugin uses when it needs the human to answer before the agent can continue. UI surfaces provide the active `UserQuestionProvider`; the host runtime relays requests to its connected client.
+The user-questions seam of [dsh-user-questions](../../packages/interaction/user-questions). It is the provider-neutral vocabulary a tool or permission plugin uses when it needs the human to answer before the agent can continue. UI surfaces answer through the `user-questions/request` waterfall; the host runtime relays requests to its connected client.
 
 Source: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
 
@@ -41,6 +41,8 @@ type AskUserQuestionIntent = {
    * An `approve` naming no option of its own question is rejected at `ask()`.
    */
   approve: string
+  /** Logged tool invocation whose arguments contain the reviewed plan. */
+  callId?: ToolCallId
 }
 ```
 
@@ -74,14 +76,7 @@ interface AskUserQuestionItem {
 
 ```ts type-equiv
 /** Request for a human answer. */
-interface AskUserQuestionRequest {
-  /** Questions to display. */
-  questions: AskUserQuestionItem[]
-  /** Exact live calling agent, when the request came from an agent tool call. */
-  agent?: Agent
-  /** Abort signal for the owning tool/step. */
-  signal?: AbortSignal
-}
+interface AskUserQuestionRequest extends AskUserQuestionRequestEvent {}
 ```
 
 ## Answer
@@ -110,14 +105,7 @@ interface AskUserQuestionAnswer {
 
 ## Provider
 
-Only one provider may be active in a context. Provider registration is effect-bound so HMR/disposal removes the active UI.
-
-```ts type-equiv
-/** UI-side provider for user questions. */
-interface UserQuestionProvider {
-  ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
-}
-```
+A UI surface answers through the `user-questions/request` waterfall: its `ctx.on` listener returns an answer to claim the request or calls `next()` to delegate. Scope-filtered dispatch delivers an agent-scoped listener only its own agent's requests, and the listener is effect-bound so HMR or disposal removes the active UI.
 
 ## Errors
 

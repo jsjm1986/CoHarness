@@ -56,12 +56,9 @@
 | [web-client.md](web-client.zh.md) | 浏览器端 Cordis 应用：四大基础（Client Modules、API Gateway、Slots、Conversation）以及 Client 模型与功能包的归属 |
 | [slots.md](slots.zh.md) | Web Client 的类型化 React 组合系统：`ctx.slots.register()`、无 React 依赖的注册表与类型代数、渲染器的可观测源绑定 |
 | [conversation.md](conversation.zh.md) | Client Session 事件窗口与浏览器视图之间的目标中立装配层：按 binding 的注册表、Turn/Step 位置与增量 Context 组装 |
-| [sidebar-right.md](sidebar-right.zh.md) | 每 Session 的右侧停靠面板：窗格与标签页、标签类型注册表、导航服务及其 dockkit 布局引擎 |
-| [client-resources.md](client-resources.zh.md) | Client 资源模型：地址协议、每种内容一个 provider、`ctx.resources` 与 `useResource` hook |
 | [session-projection.md](session-projection.zh.md) | 投影 seam：`SessionProjectionMap`、纯函数 `ProjectionDefinition` 单元、`ProjectionSnapshot` 的一致切面、变更馈送 |
 | [session-telemetry.md](session-telemetry.zh.md) | 对外会话上报能力 seam：`SessionTelemetryRecord`/`SessionTelemetrySeverity`、`SessionTelemetrySink` 约定和 `session-telemetry/record` 脱敏 waterfall |
 | [boot.md](boot.zh.md) | 当前 profile 插件管理与 launcher 重载协调 |
 | [mcp.md](mcp.zh.md) | 外部 MCP 连接、作用域工具与资源、服务器指令、协议结果与配置归属 |
-| [office-to-pdf.md](office-to-pdf.zh.md) | Node Host 上的 Office 转 PDF：授权源读取、有界准入与瞬时 PDF 复用 |
 
 > 这些页面上的类型声明及其 JSDoc 与源码等价，并由 `pnpm run verify-type-equiv` 检查漂移（见 [development.md](../development.zh.md#documenting-types-verbatim-ts-type-equiv)）。普通块保留完整声明；`public-api` 块保留去除实现体的公开 class 声明。Cordis 服务与事件使用每页生成的 **Cordis API** 小节。

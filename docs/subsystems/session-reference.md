@@ -65,6 +65,28 @@ interface SessionReferenceMentionCandidate extends SessionReferenceCandidate {
 Preparation preserves readable current-message content and returns at most one aggregated context.
 
 ```ts type-equiv
+/** Durable source session, cited event seqs, and snapshot facts for prepared cross-session context. */
+interface SessionReferenceSource {
+  kind: 'session-reference'
+  /** Material lifted out of another session's log (`recall` context form). */
+  form: 'recall'
+  version: 1
+  references: {
+    sessionId: string
+    label: string
+    capturedThroughSeq: OptionalSessionSeq
+    compacted: boolean
+    originalMessages: number
+    retainedMessages: number
+    omittedMessages: number
+    omittedBytes: number
+    truncated: boolean
+    inputIndex: number
+  }[]
+}
+```
+
+```ts type-equiv
 /** Direct message content and optional referenced-session context. */
 interface PreparedReferencedMessage {
   /** Readable message content after host mention tokens are removed. */

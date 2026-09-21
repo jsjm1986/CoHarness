@@ -61,6 +61,38 @@ The reference records intrinsic dimensions and encoded length so clients can lay
 ## Commit and verified-read payloads
 
 ```ts type-equiv
+/**
+ * Browser-submitted prompt content accepted by Host prompt endpoints; the
+ * accepting Host promotes image parts to durable references through
+ * `ctx.attachments.admitPromptContent()` before any message is created, so a wire caller can
+ * never cite an attachment it did not upload.
+ */
+type PromptContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | {
+    readonly type: 'image'
+    readonly mediaType: ImageMediaType
+    readonly data: string
+    readonly name?: string
+  }
+```
+
+```ts type-equiv
+/** Host prompt content whose file receipts are resolved and whose image bytes await admission. */
+type AttachmentAdmissionPart =
+  | PromptContentPart
+  | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+```
+
+```ts type-equiv
+/** Host-admitted prompt content with every attachment represented by its durable reference. */
+type AdmittedPromptContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly attachment: ImageAttachmentRef }
+  | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+```
+
+```ts type-equiv
 /** Base64-encoded image upload accompanying one wire request. */
 interface EncodedImageAttachment {
   /** Declared media type, verified against the decoded bytes during admission. */
@@ -88,6 +120,48 @@ interface SaveImageAttachment {
 interface StoredImageAttachment {
   ref: ImageAttachmentRef
   data: Uint8Array
+}
+```
+
+```ts type-equiv
+/** Deterministic request-image target selected by one exact model route for one attachment. */
+interface ImageRequestTarget {
+  /** Target width in pixels; a target above the source keeps the source width. */
+  width: number
+  /** Target height in pixels; a target above the source keeps the source height. */
+  height: number
+  /** Encoded-byte target before base64 expansion or Files API upload; the smallest quality-ladder output is kept when no quality fits. */
+  maxBytes: number
+}
+```
+
+```ts type-equiv
+/** Integer width and height of one projected image. */
+interface ProjectedDimensions {
+  width: number
+  height: number
+}
+```
+
+```ts type-equiv
+/** Cached request version derived from one provider-independent normalized attachment. */
+interface RequestImageAttachment {
+  /** Cache and upload-index key over the attachment id, policy, and fixed encoder parameters. */
+  variantId: ImageVariantId
+  /** Durable normalized attachment from which this request version was derived. */
+  attachment: ImageAttachmentRef
+  /** Encoded request bytes. */
+  data: Uint8Array
+  mediaType: ImageMediaType
+  bytes: number
+  width: number
+  height: number
+  /** Provider-compatible sample depth proven after request encoding. */
+  depth: 'uchar'
+  /** Provider-compatible color space proven after request encoding. */
+  space: 'srgb'
+  /** Whether the encoded request version retains an alpha channel. */
+  hasAlpha: boolean
 }
 ```
 

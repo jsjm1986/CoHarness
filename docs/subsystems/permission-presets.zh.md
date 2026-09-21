@@ -30,13 +30,13 @@ interface Config {
   /**
    * The preset table: name → knob bundle. Defaults to `workspace-write`
    * (workspace-write + ask) and `danger-full-access` (danger-full-access +
-   * never). The name `custom` is reserved for the derived not-a-preset state.
+   * never). The names `custom` and `auto` are reserved for derived state and
+   * the Auto review integration respectively.
    */
   presets?: Record<string, PresetSpec>
   /**
-   * Default for fresh sessions and eligible confirmed blank reuse. When
-   * omitted, the preset matching the composed sandbox and approval defaults
-   * is used.
+   * Default for new sessions. When omitted, the preset matching the composed
+   * sandbox and approval defaults is used.
    */
   defaultPreset?: string
 }
@@ -51,9 +51,9 @@ interface Config {
 `names` 按预设表声明顺序列出可切换的预设；`optionOf(name)` 为某个表键（label 回退为该键）或 `custom` 构建客户端渲染的选项，传入其他任何名称都会抛出异常。
 
 ```ts type-equiv
-/** The select-option shape a presentation layer advertises for one preset (or for the derived `custom` state). */
+/** Presentation for an available preset or the derived `custom` current value. */
 interface PresetOption {
-  /** Stable option value: the table key, or `custom`. */
+  /** Stable option value: a configured preset key, live `auto`, or derived `custom`. */
   value: string
   /** The display label. */
   name: string

@@ -2,7 +2,7 @@
 
 [English](user-questions.md) | 中文
 
-[dsh-user-questions](../../packages/interaction/user-questions) 的用户交互 seam。它是工具或权限插件需要人类回答后 agent（智能体）才能继续时所使用的、提供方无关的词汇。UI 界面提供活跃的 `UserQuestionProvider`；host 运行时把请求转发给其连接的客户端。
+[dsh-user-questions](../../packages/interaction/user-questions) 的用户交互 seam。它是工具或权限插件需要人类回答后 agent（智能体）才能继续时所使用的、提供方无关的词汇。UI 界面通过 `user-questions/request` 瀑布事件应答；host 运行时把请求转发给其连接的客户端。
 
 源码：[`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
 
@@ -41,6 +41,8 @@ type AskUserQuestionIntent = {
    * An `approve` naming no option of its own question is rejected at `ask()`.
    */
   approve: string
+  /** Logged tool invocation whose arguments contain the reviewed plan. */
+  callId?: ToolCallId
 }
 ```
 
@@ -74,14 +76,7 @@ interface AskUserQuestionItem {
 
 ```ts type-equiv
 /** Request for a human answer. */
-interface AskUserQuestionRequest {
-  /** Questions to display. */
-  questions: AskUserQuestionItem[]
-  /** Exact live calling agent, when the request came from an agent tool call. */
-  agent?: Agent
-  /** Abort signal for the owning tool/step. */
-  signal?: AbortSignal
-}
+interface AskUserQuestionRequest extends AskUserQuestionRequestEvent {}
 ```
 
 ## 回答
@@ -110,14 +105,7 @@ interface AskUserQuestionAnswer {
 
 ## 提供方
 
-同一上下文中只能有一个活跃的提供方。提供方注册绑定到 effect，因此 HMR（热模块替换）或 dispose（资源释放）会移除当前活跃的 UI。
-
-```ts type-equiv
-/** UI-side provider for user questions. */
-interface UserQuestionProvider {
-  ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
-}
-```
+UI 界面通过 `user-questions/request` 瀑布事件应答：其 `ctx.on` 监听器返回答案即认领该请求，调用 `next()` 则向下委托。作用域过滤的分发只把本 agent 的请求投递给 agent 作用域的监听器，监听器绑定到 effect，因此 HMR（热模块替换）或 dispose（资源释放）会移除当前活跃的 UI。
 
 ## 错误
 

@@ -82,8 +82,8 @@ interface WorkflowResult {
   /**
    * How many `agent()` calls the run accepted over its whole lifetime. On a
    * graceful settlement this is the script-side count (calls still queued for
-   * a concurrency slot included); on a termination path (grace force-settle,
-   * worker death) it degrades to the host-observed count — calls queued
+   * a concurrency slot included); on a termination path (cancellation or
+   * process failure) it degrades to the host-observed count — calls queued
    * inside a terminated script are unknowable then.
    */
   agentsStarted: number
@@ -106,7 +106,7 @@ interface WorkflowRun {
   readonly result: Promise<WorkflowResult>
   /** Cancel the run and its children. */
   cancel(reason?: string): void
-  /** Cancel if needed and await bounded settlement and cleanup. */
+  /** Cancel if needed and await script and child cleanup. */
   dispose(): Promise<void>
 }
 ```

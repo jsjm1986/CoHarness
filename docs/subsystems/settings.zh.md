@@ -26,17 +26,6 @@ interface SettingsRegisterOptions<T> {
   base?: Partial<T>
   /** Owner's effect timing, surfaced to configuration UIs; defaults to `live`. */
   applies?: SettingsApplies
-  /** Logical owner shown by remote configuration surfaces. */
-  owner?: SettingsOwner
-  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
-  projectWrite?: SettingsProjectWrite
-  /**
-   * Optional allowlist for project-manager writes. Each path permits that
-   * exact value and descendants; omission keeps the whole namespace writable
-   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
-   * object-prototype keys.
-   */
-  projectWritePaths?: readonly SettingsProjectWritePath[]
   /**
    * Reject a resolved section the owner could not act on, for constraints its
    * schema cannot express — a cross-field requirement, or one field's validity
@@ -57,6 +46,17 @@ interface SettingsRegisterOptions<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /** Logical owner shown by remote configuration surfaces. */
+  owner?: SettingsOwner
+  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
+  projectWrite?: SettingsProjectWrite
+  /**
+   * Optional allowlist for project-manager writes. Each path permits that
+   * exact value and descendants; omission keeps the whole namespace writable
+   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
+   * object-prototype keys.
+   */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
 }
 ```
 
@@ -111,6 +111,8 @@ interface SettingsScope<T> {
 ```ts type-equiv
 /** One registered namespace as surfaced to configuration UIs. */
 interface SettingsDescriptor {
+  // TODO(settings-namespace-vocabulary): Rename `ns` to `namespace` across the
+  // public API, provider contract, implementations, tests, and consumers.
   /** The registered namespace. */
   ns: SettingsNamespace
   /** Serialized schemastery schema (`schema.toJSON()`). */
@@ -163,10 +165,9 @@ type SettingsPathOp =
 /** Options for {@link SettingsProvider.describe}. */
 interface SettingsDescribeOptions {
   /**
-   * Strip `role('secret')` fields from `value`/`base`/`user`, remove defaults
-   * from schema nodes that can contain them, and enumerate the positions in
-   * each descriptor's `secrets`. Every wire surface MUST pass this; the
-   * verbatim default exists for same-process configuration UIs only.
+   * Strip `role('secret')` fields from `value`/`base`/`user` and enumerate
+   * them in each descriptor's `secrets`. Every wire surface MUST pass this;
+   * the verbatim default exists for same-process configuration UIs only.
    */
   redactSecrets?: boolean
 }

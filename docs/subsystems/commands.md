@@ -16,13 +16,13 @@ interface CommandInputDescriptor {
   /** Placeholder shown before the user supplies free-form input. */
   readonly hint: string
   /**
-   * Whether composer image attachments may accompany an invocation. Absent or
-   * false = the executor rejects an invocation carrying images and capable
+   * Whether composer attachments may accompany an invocation. Absent or
+   * false = the executor rejects an invocation carrying attachments and capable
    * composers refuse the submission before dispatch. A declaring command's
    * handler receives the admitted durable blocks and owns every further
    * grammar decision, including rejecting sub-commands that cannot use them.
    */
-  readonly images?: boolean
+  readonly attachments?: boolean
 }
 ```
 
@@ -33,8 +33,8 @@ interface CommandInputDescriptor {
 ```ts type-equiv
 /** Plugin-owned command registration. */
 interface CommandDefinition {
-  /** Stable plugin-owned identity, independent of command name and copy. */
-  readonly definitionId?: CommandDefinitionIdType
+  /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
+  readonly definitionId?: CommandDefinitionId
   /** Lowercase command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */
@@ -66,13 +66,13 @@ interface CommandInvocation {
   /** Exact text following the registered command name, including separator whitespace. */
   readonly rawInput: string
   /**
-   * Durably admitted image blocks accompanying this invocation, in submission
-   * order; empty unless the definition declares `input.images`. The handler
+   * Durably admitted image and file blocks accompanying this invocation, in submission
+   * order; empty unless the definition declares `input.attachments`. The handler
    * owns their model-visible use — the registry never schedules them itself —
    * and a handler whose grammar cannot use them in this invocation returns an
    * error so the dispatching composer retains the originals.
    */
-  readonly attachments: readonly ImageBlock[]
+  readonly attachments: readonly (ImageBlock | FileBlock)[]
   /** Cancellation signal owned by the dispatching UI request. */
   readonly signal: AbortSignal
 }
@@ -99,7 +99,7 @@ Adapters receive handler-free immutable descriptors after scope resolution. `par
 ```ts type-equiv
 /** Handler-free immutable command view returned to UI adapters. */
 interface CommandDescriptor {
-  /** Stable plugin-owned identity; absent for legacy or third-party definitions. */
+  /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
   readonly definitionId?: CommandDefinitionId
   /** Lowercase command name without the leading slash. */
   readonly name: string
