@@ -9,6 +9,7 @@
   },
   "include": [
     "knip.config.ts",
+    "apps/web/product-isolation.ts",
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/auto-review-fixture.ts",
     "apps/web/tests/auto-review-denial.e2e.ts",
@@ -138,8 +139,9 @@
     { "path": "./vendor/hmr" },
     { "path": "./vendor/logger-console" },
     { "path": "./packages/util/brand" },
-    { "path": "./packages/util/lazy-require" },
     { "path": "./packages/util/package-manifest" },
+    { "path": "./packages/util/http-proxy" },
+    { "path": "./packages/util/lazy-require" },
     { "path": "./packages/util/launch-environment" },
     { "path": "./packages/util/native-command" },
     { "path": "./packages/util/home-paths" },

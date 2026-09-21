@@ -18,6 +18,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../util/http-proxy"
+    },
+    {
       "path": "../../../vendor/cordis"
     }
   ]

@@ -356,6 +356,9 @@
         toolName: subagent_fork
         backgroundMode: one-shot
 
+    - id: ptc-runtime
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+
     - id: workflow-ptc
       name: '@deepseek-ai/dsh-workflow-ptc'
       config:
@@ -452,6 +455,9 @@
       config:
         fetch: true
         searchTimeoutMs: 60000
+
+    - id: mcp-resources
+      name: '@deepseek-ai/dsh-mcp-resources'
 
     # ── rows every mode mounts, whose values each overlay may state ──────────────
 

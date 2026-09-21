@@ -6,6 +6,7 @@
   "type": "module",
   "devDependencies": {
     "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/dsh-terminal": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
   "peerDependencies": {

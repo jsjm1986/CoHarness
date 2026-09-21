@@ -28,10 +28,6 @@
   disabled: true
 
 - insert:
-    # PTC is a core execution capability, not a Web component.
-    - id: ptc-runtime
-      name: '@deepseek-ai/dsh-ptc-runtime-node'
-
     - id: headless-startup
       name: '@deepseek-ai/dsh-headless/startup'
 
