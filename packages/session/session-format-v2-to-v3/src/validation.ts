@@ -11,7 +11,13 @@ import { assertV3Event, isRepairIdentity, record, SURFACE_TYPES } from './payloa
  */
 export function assertReleasedV3Header(header: SessionFormatHeader): void {
   if (header.version !== 3) throw new SessionFormatError('expected format v3 header')
-  assertReleasedV2Header({ ...header, version: 2 })
+  // `draft` entered the header while v3 was current; released-v2 files predate
+  // it, so the field is checked here and stripped before the v2 key assertion.
+  if (header.draft !== undefined && typeof header.draft !== 'boolean') {
+    throw new SessionFormatError('format v3 header draft must be boolean')
+  }
+  const { draft: _draft, ...rest } = header
+  assertReleasedV2Header({ ...rest, version: 2 })
 }
 
 /**

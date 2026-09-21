@@ -52,6 +52,20 @@ describe('durable V3 admission failures', () => {
     expect(releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...header, version: 3 })).toEqual({ ...header, version: 3 })
   })
 
+  it('carries the v3-era draft flag through header decode/encode while v2 stays strict', () => {
+    const physical = { type: 'session', ...header, version: 3, draft: true }
+    expect(releasedV3SessionFormatCodec.decodeHeader(physical)).toEqual({ ...header, version: 3, draft: true })
+    const encoded = releasedV3SessionFormatCodec.encodeHeader({ ...header, version: 3, draft: false }, 0)
+    expect(encoded).toMatchObject({ version: 3, draft: false })
+    expect(releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...encoded })).toEqual({ ...header, version: 3, draft: false })
+    const absent = releasedV3SessionFormatCodec.encodeHeader({ ...header, version: 3 }, 0)
+    expect('draft' in absent).toBe(false)
+    expect(() =>{  assertReleasedV3Header({ ...header, version: 3, draft: 'yes' as unknown as boolean }) }).toThrow(/draft/)
+    expect(() =>{  releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...physical, draft: 1 }) }).toThrow()
+    // The released-v2 codec predates `draft`; it must still refuse the field.
+    expect(() =>{  sessionFormatV2ToV3.migrateHeader({ ...header, draft: true }) }).toThrow(/unexpected field/)
+  })
+
   it('retains native source extensions through payload validation without classifying their references', () => {
     const extension = event('user/message', { ...user, source: { kind: 'custom-source', localRef: 77 } }, { surfaceOp: 'append' })
     expect(() =>{  assertEvent(extension, 3) }).not.toThrow()
