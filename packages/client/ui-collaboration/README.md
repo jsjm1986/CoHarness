@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Gateway collaboration UI for the Web client. One plugin owns the account-context HTTP state, personal/project scope selector, staged root-conversation visibility, conversation sharing menu, and read-only project composer policy through existing Client slots and session-create waterfall events.
 
+## Summary
+
+Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client: an account scope selector, staged root-conversation visibility, a conversation sharing menu, and a read-only project composer policy. One plugin contributes these through existing Client slots and session-create waterfall events, so shared project conversations work without a separate account surface.
+
+
 ## User interface contract
 
 - `sidebar.footer.action` shows the active personal or project runtime, accessible memberships, `ro`/`rw` mode, and the next root conversation's `project` or `private` visibility. Changing runtime scope persists through `/account/api/scope` and reloads the page so every Host connection targets the selected runtime.
@@ -17,13 +22,11 @@ Gateway collaboration UI for the Web client. One plugin owns the account-context
 
 ## Model Experience
 
-Indirectly, through scope, visibility, and submission choices that Host collaboration Consumers enforce while `dsh-collaboration-context` records model-visible participant attribution.
+Indirectly, through host collaboration consumers, which own authorization and participant attribution for the state the browser UI selects.
 
 #### KV Cache effect
 
-The UI does not assemble model requests; the owning Host Consumers determine whether new participant context appends to a request suffix.
-
-**Runtime invariant:** No companion is published. Gateway responses are validated at the HTTP parser, while slot ownership and teardown are enforced by the shared slot ledger.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

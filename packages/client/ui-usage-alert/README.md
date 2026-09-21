@@ -4,15 +4,18 @@ English | [中文](README.zh.md)
 
 Gateway quota warnings in the global Web shell. The browser plugin contributes one `shell.overlay` entry. Its apply-side callback reads the authenticated same-origin `/account/api/usage` summary once on mount through the shared streaming 16 MiB response budget; the presentation component displays only durable natural-month 80%/100% crossings already computed by the gateway. A failed advisory read leaves the shell unchanged.
 
+## Summary
+
+Use `dsh-client-ui-usage-alert` for Gateway quota warnings in the Web shell. One `shell.overlay` entry reads the authenticated `/account/api/usage` summary on mount and displays the durable natural-month 80%/100% crossings already computed by the gateway; a failed advisory read leaves the shell unchanged.
+
+
 ## Model Experience
 
-None, as this package renders account usage metadata and contributes no model input.
+None, as the browser-side quota warning projection registers nothing model-facing.
 
 #### KV Cache effect
 
-No direct effect.
-
-**Runtime invariant:** No companion is published. The gateway owns alert threshold and idempotency semantics.
+None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,10 @@
 
 SDK 提供方会在全新的子进程中把每个 subagent 作为完整的 DeepSeek Harness 运行时运行，并经由 [TypeScript SDK 客户端](../../sdk/client/README.zh.md) 通过 stdio JSON-RPC 驱动。它是 [`subagent-acp`](../subagent-acp/README.zh.md) 之外的第二个进程外后端，差异在协议格式（wire format）和子进程约定：ACP（Agent Client Protocol）后端能驱动任何 Agent Client Protocol agent（智能体）；本后端专门驱动 harness SDK 运行时（`dsh-jsonrpc-agent` bin 或打包后的可执行文件），因此子进程是一个完整的对等 harness，拥有由 `cordis.yml` 决定的组合、会话持久化、模型路由和工具。
 
+## 概述
+
+`dsh-subagent-dsh-sdk` 在全新的 DeepSeek Harness 子进程中运行每个委派任务，子进程拥有自己的 profile、会话、模型路由与工具。父级提供任务与工作目录，每个子进程使用其已配置的运行时，并与父级对话保持隔离。父级只会收到子进程最终的 assistant 文本或安全错误；中间消息与工具流量保留在子进程内。当委派需要完整的 Harness 运行时而不是共享进程内状态时，选择此后端，并接受每次运行都要启动新进程的成本。
+
 ## 启动与所有权
 
 `start(request)` 先解析子进程工作目录，通过 `DeepSeekHarness` spawn 运行时，并在履行前完成 `initialize` 握手（携带配置的 `provider`/`model` 路由及可选的 `maxTokens` 输出上限）。因此，履行意味着子运行时已就绪、所有权已移交给调用方。spawn、握手或发布前取消失败时，只会在子进程被回收后拒绝；工作目录解析失败则会在尚未 spawn 任何内容时拒绝。
@@ -63,9 +67,9 @@ Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilte
 
 ### 子 agent 请求
 
-#### 模型看到的内容
+#### 模型看到什么
 
-子运行时的模型会收到作为用户消息的独立任务，以及该运行时自身配置的系统提示词、工具和全新会话。它不会收到父级对话。本提供方不声明可选的启动时能力，因此本地服务会拒绝要求 persona、工具过滤、深度强制或结构化输出的请求，而不是静默省略这些要求。
+子运行时的模型会收到作为用户消息的独立任务，以及该运行时自身配置的系统提示词、工具和全新会话。它不会收到父级对话。父级工具调用可以为本次运行选择子级提供方、模型与推理强度；所选路由和由部署控制的可选输出上限会固定到这个新子进程。persona、工具过滤、深度强制与结构化输出仍不受支持，并会被拒绝而不是静默省略。
 
 #### Token 影响
 
@@ -77,9 +81,9 @@ Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilte
 
 ### 父级工具结果（间接）
 
-#### 模型看到的内容
+#### 模型看到什么
 
-经由 `dsh-tool-subagent`，父级只会收到子运行时最终的 assistant 文本（或累积的部分文本），或该消费方给出的精确停止原因错误；不会收到中间消息或工具流量。
+经由 `dsh-tool-subagent`，父级只会收到子运行时最终的 assistant 文本（或累积的部分文本），或该消费方给出的精确停止原因错误；不会收到中间消息或工具流量。带诊断的非完成结果会先呈现安全诊断，再单独呈现保留的部分 assistant 输出；启动与 shutdown 错误使用同一固定事实，不公开原始 SDK 文本。
 
 #### Token 影响
 
@@ -88,8 +92,6 @@ Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilte
 #### KV Cache 影响
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。run 生命周期配对由 subagent seam 的不变式检查；本后端自身的状态位于子进程中，不在当前上下文的事件流内。
 
 ## 已知限制与暂缓事项
 

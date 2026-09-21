@@ -4,6 +4,10 @@
 
 遥测（telemetry）Service Definition 声明 `SessionTelemetrySink` 后端约定，捕获协调器把会话记录传给实现该约定的任意上报 SDK 后端。捕获侧可跟随实时会话事件，也可按需回放权威会话日志前缀。本包调用 `emit()` 后就停止处理：批处理、重试、排队与丢失策略都属于后端自身的 SDK，本包既不规定也不包装。设计依据与被否决的替代方案见[复活 Agent Note](../../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.zh.md)、[反馈门控投递](../../../.agents/notes/implemented/feature/2026-08-05-feedback-gated-session-telemetry.zh.md)与[无缓冲反馈回放](../../../.agents/notes/implemented/simplification/2026-08-06-buffer-free-feedback-telemetry.zh.md)。
 
+## 概述
+
+会话遥测让部署方发送会话活动的有序副本用于上报，同时保留权威会话日志。部署方选择一个上报后端，并可在投递前脱敏每个外发副本；如果没有脱敏规则，捕获的数据将原样离开进程。交接以非阻塞方式完成，因此上报不会延迟会话处理。投递采用尽力而为方式；如果进程崩溃，队列中的记录可能丢失。
+
 ## 后端约定
 
 `SessionTelemetrySink` 有三个成员：`emit(record)` 必须入队且不能阻塞，因为它会在 `session/event` 或显式权威日志回放期间同步执行；可选的 `flush()` 是轮次结束后的提示，调用方不等待结果，多数后端省略它并使用 SDK 的常规批处理计划；`shutdown()` 排空已入队记录，并在 SDK 停止后结束，dispose（资源释放）会等待它。提供 `flush()` 的实现必须安排并发 flush 与 `shutdown()` 最终排空的先后顺序。`SessionTelemetryBackend` 将此 API 注册在 `sessionTelemetry` 上下文键下：每个上下文只允许一个实现，重复加载会抛出异常。后端以 `live` 或 `on-demand` 捕获构造 `SessionTelemetryCoordinator`，并在自己选择的触发器中调用 `captureSession(session, throughSeq?)`。
@@ -40,13 +44,11 @@
 
 ## 模型体验
 
-无。本包只观察会话流，并把脱敏后的副本交给上报后端；它绝不向模型请求贡献任何内容。
+无，因为该 seam 观察会话流并把脱敏后的副本交给外部；它不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
 无；本包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。本包的全部输出都是后端交接，即在所有权威事件流之外同步调用 `emit()`；捕获侧不追加会话事件，因此不存在可供独立 companion 观察的事件与数据关系。
 
 ## 已知限制与暂缓事项
 

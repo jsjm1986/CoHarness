@@ -6,6 +6,10 @@ A cordis plugin that runs the supported command-hook subset of a user's existing
 
 A native cordis plugin could do everything this bridge does — more powerfully, with typed returns and no serialization boundary. **The bridge exists only as a compatibility path for the mapped CC command-hook subset**; anything bespoke should be a native plugin on the same extension points (see [the interception extension-points Agent Note](../../../.agents/notes/implemented/feature/2026-06-30-interception-extension-points.md)).
 
+## Summary
+
+`dsh-hooks-claude-code` runs command hooks from your existing Claude Code `hooks.json` or settings file during agent runs, without requiring a rewrite. Supported hooks can run when sessions, prompts, tools, stops, or subagents reach matching moments. They can block prompts or tool calls with model-visible reasons, add conversation context, or force another model turn. Choose this package to reuse Claude Code command hooks in the harness; use a native plugin for behavior that has no Claude Code equivalent.
+
 ## Config
 
 ```ts
@@ -75,7 +79,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Provider-supplied reasons pass through verbatim. When absent, a blocked prompt uses exactly `blocked by UserPromptSubmit hook`, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`. `systemMessage` and `updatedInput` are logged or warned but are not model-visible in this implementation.
+Provider-supplied reasons pass through verbatim. When absent, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`; a blocked prompt is discarded with no model-visible message, ending the turn as `blocked`. `systemMessage` and `updatedInput` are logged or warned but are not model-visible in this implementation.
 
 #### Token effect
 
@@ -84,8 +88,6 @@ Blocking a prompt removes that prompt's request tokens; denial or feedback adds 
 #### KV Cache effect
 
 A blocked prompt sends no request and invalidates nothing. Denial, feedback, and forced-continuation context append after the reusable prefix without rewriting it.
-
-**Runtime invariant:** No companion is published. This bridge publishes hook-protocol session events, whose companion owns which invocation event each result cites.
 
 ## Known Limitations and Deferred Work
 

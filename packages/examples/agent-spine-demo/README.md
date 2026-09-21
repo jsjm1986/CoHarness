@@ -6,6 +6,11 @@ The **default executor-less, UI-less agent spine** as ONE Cordis bundle plugin. 
 
 Read this package for the whole plugin tree and its composition order.
 
+## Summary
+
+Use `dsh-agent-spine-demo` as the default executor-less, UI-less agent spine in one Cordis bundle plugin: the fixed services every harness agent needs, with the loop's `agents` list forwarded as config — an app composes a working agent by adding only an entry point and swappable backends.
+
+
 ## The tree it loads
 
 `apply(ctx, config)` mounts each of these as a child of the bundle fiber:
@@ -71,13 +76,11 @@ The retry policy may repeat a failed request in a new numbered step. Retry statu
 
 ## Model Experience
 
-Indirectly, through `dsh-system-prompt`, `dsh-tool-skill`, `dsh-tool-bash`, `dsh-tools`, and `dsh-llm-retry`, plus `dsh-tool-goal` and goal-round prompts when `goals` is enabled. The bundle adds no model-bound wrapper content of its own.
+Indirectly, through the mounted child plugins, which own every model-facing behavior of the bundle.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. This composition package owns no independent event stream or mutable data; Loader and built-entry tests cover its wiring.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

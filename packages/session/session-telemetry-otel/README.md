@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — the only entry a deployment loads. Its `mode` decides whether the seam follows session events live, replays the canonical log only at recorded feedback, or keeps telemetry local. Uploading modes compose the OTel JS SDK as-is (`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP log exporter) and map each handed-over record onto `logger.emit()`, under two instrumentation scopes: ledger records on `@deepseek-ai/dsh-session-sessionTelemetry-otel`, operational records on `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops`. Resource identity contains `service.name`/`service.version` from `dsh-llm`'s `APP_IDENTITY` plus this package's anonymous `user.id` (`$DSH_HOME/.anonymous-user-id`, a random UUID created on first use and reset by deleting the file), carried once per export batch rather than per record.
 
+## Summary
+
+`dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. SDK batching can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
+
 ## Config
 
 ```yaml
@@ -43,13 +47,11 @@ Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `sev
 
 ## Model Experience
 
-None, as the backend only forwards the seam's redacted records into the OTel SDK pipeline; it never contributes to a model request.
+None, as the backend forwards seam records into the OTel SDK pipeline and registers nothing model-facing.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. Mode selection changes capture handoff, SDK setup, and local diagnostics without mutating session or service state an independent companion can compare. Export remains inside the SDK past the backend boundary.
+None; the package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

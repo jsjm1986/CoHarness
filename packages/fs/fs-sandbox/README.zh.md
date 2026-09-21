@@ -8,6 +8,10 @@
 
 只需加载它来替代 `dsh-fs-local`，并同时加载 [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/README.zh.md)，即可完成替换；面向模型的工具（`dsh-tool-fs`）无需改动。工具层把调用会话的模式和 cwd 解析为与 bash 相同的按调用策略，因此两个能力族绝不会约束到不同根目录。
 
+## 概述
+
+`dsh-fs-sandbox` 按各会话的沙箱模式限制模型对文件的写入与编辑，同时保留本地文件系统的读取行为。`read-only` 拒绝所有变更；`workspace-write` 只允许目标位于会话工作区或平台临时根目录内；`danger-full-access` 不限制变更。当会话需要将文件变更限制在工作区内时，使用它代替 `fs-local`，并加载 `ctx.sandboxPolicy`。被拒绝的操作返回 `FS_SANDBOX_DENIED`，文件系统工具会显示当前模式和同轮次升级提示。
+
 ## 围栏
 
 按调用策略携带有效模式（会话覆盖值或升级授权）和调用会话不可变的 cwd 根目录；只有没有会话的调用才回退到部署策略：
@@ -28,17 +32,15 @@
 
 #### 模型看到的内容
 
-策略归属方会贡献与具体能力无关的 `sandbox:policy` 上下文。作为间接影响，`dsh-tool-fs` 会把本后端的 `FS_SANDBOX_DENIED` 拒绝渲染为 `[sandbox: file access denied under <mode> mode]` 标记和同轮次升级提示。
+策略归属方贡献与具体能力无关的 `sandbox:policy` 上下文。作为间接影响，`dsh-tool-fs` 会把本后端的 `FS_SANDBOX_DENIED` 拒绝渲染为 `[sandbox: file access denied under <mode> mode]` 标记和同轮次升级提示。
 
 #### Token 影响
 
-该后端挂载期间，当前策略条款会增加一条简短的运行时上下文消息；拒绝则会把有界标记和升级提示追加到对话历史。
+该后端挂载期间，当前策略条款会增加一条简短的运行时上下文消息；拒绝则会把有界标记与升级提示追加到对话历史。
 
 #### KV Cache 影响
 
 常驻策略发生变化时，会在保留的历史之后追加一份由归属方渲染、取代先前状态的运行时上下文快照；操作结果保持仅追加。
-
-**运行时不变式：** 不发布伴生入口。这个无状态适配器把策略与文件系统关系委托给各自所属的 seam。
 
 ## 已知限制与暂缓事项
 

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The self-referential Cordis toolset: five model-facing tools over the live runtime in the current DSH process. The registry, the vm sandbox, and the browser broadcast belong to [`@deepseek-ai/dsh-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them. Design home — sandbox semantics, dynamic-package lifecycle and composition, standing decisions: [the toolset Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
 
+## Summary
+
+Inspect Host and Client runtime APIs before writing plugin code. Creator mode provides these read-only tools alongside Plugin Manager, which owns persistent profile changes. The inspection registry is supplied by the Cordis host runner; browser queries need a connected page.
+
 ## What it does
 
 Two paired verbs, plus the read-only report.
@@ -55,49 +59,19 @@ Namespace plugin: named exports `name` / `inject` / `apply`, no default export (
 
 ## Model Experience
 
-### Tool schemas
+### Runtime inspection
 
 #### What the model sees
 
-The conversation model sees the generated [`cordis_inspect`, `cordis_define`, `cordis_run`, `cordis_stop`, and `cordis_undefine` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis) whenever this plugin is visible.
+The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis) describes two read-only inspection tools. The [prompt](src/prompt.ts) directs persistent changes through Plugin Manager and describes MCP setup. Creator visual requests default to an installed UI plugin displayed in the current Web page; the development skill covers Client packaging and slot registration. Query results contain the requested API declarations or live tool schemas.
 
 #### Token effect
 
-Fixed schema cost on every request in that tool view.
+Both tool schemas and the guidance section enter model requests while this plugin is visible. Query results append to the transcript; exact queries avoid loading unrelated declarations.
 
 #### KV Cache effect
 
-Prefix-stable while this tool view is unchanged. Scoping or plugin lifecycle changes that hide these definitions may invalidate reuse from the first changed schema token.
-
-### Tool-call history and results
-
-#### What the model sees
-
-Inspect joins selected sections exactly as `## <section>` then a newline and the data-dependent body, with one blank line between sections; `what: "temporary"` uses the `## Dynamic Packages` heading. Each row reports the id, label, purpose, which halves exist, run state and revision, provided and awaited services, registered host methods, and the last browser-half load report. The empty state explains that definitions live only in this process's memory. Broad API/event reports omit JSDoc; `name` with `what: "api"`, `what: "events"`, or `what: "client"` returns one exact target with its full contract. The `client` section lists one seat per line with its cardinality, scope, summary, and whether registering there replaces shipped UI, then the cross-cutting registrant rules; the per-seat register options, owner and framework props, and runnable example arrive only under an exact `name`. Define answers that the package is defined and NOT running yet with the id to run; run reports the revision, what the host half provides or waits for, and whether a page acknowledged the browser half; stop and undefine acknowledge in one line. Every refusal is a tool error carrying the runner's teaching text. The submitted program remains in assistant tool-call history.
-
-#### Token effect
-
-Inspect output and submitted package code are data-dependent and resent until compaction; lifecycle acknowledgements are small. The `client` section is bounded by the shipped slot count (two lines each) and its per-seat detail is opt-in, so the default report grows with the slot surface rather than with its documentation.
-
-#### KV Cache effect
-
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-### Later requests after cordis_run
-
-#### What the model sees
-
-A running package may register tools, prompt contributions, or listeners that change later requests for the scopes it targets; `cordis_stop` and `cordis_undefine` remove those contributions after quiescence.
-
-#### Token effect
-
-Indirect token impact equals the running package's contributions and lasts only for its process-local lifetime.
-
-#### KV Cache effect
-
-Running or stopping a prompt or tool contribution changes later request prefixes and may invalidate reuse from the first changed contribution; an unchanged running set remains prefix-stable.
-
-**Runtime invariant:** No companion is published. Inspection reads its providers directly and maintains no independent runtime projection.
+Unchanged schemas and guidance remain prefix-stable. Query results append to history; enabling other plugins can change subsequent tool schemas.
 
 ## Known Limitations and Deferred Work
 

@@ -15,3 +15,8 @@ Service Definition 位于 `lsp/lsp/`。该 seam 恰好公开四种语义操作�
 设计原理见 [LSP 能力 seam Agent Note](../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.zh.md)，其中也解释了文档为何在每次查询时临时打开、stdio 主机为何使用共享的文件系统／子进程执行环境，以及扩展名归属为何在同一运行时内互斥。
 
 子系统参考——操作、坐标、请求／结果、`LspError`——见 [docs/subsystems/lsp.md](../../docs/subsystems/lsp.zh.md)；设计依据见 [LSP 能力 seam Agent Note](../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.zh.md)。
+
+
+## 概述
+
+lsp 组让 agent（智能体）通过配置好的语言服务器导航代码：转到定义、查找引用与实现，以及阅读悬停文档。使用 `lsp-stdio` 连接本地 stdio 语言服务器命令和扩展名映射，使用 `tool-lsp` 向模型提供这些操作。共享的 `lsp` 包使提供方选择和规范化结果保持一致，因此更换服务器不会改变模型请求。部署必须自行提供并配置语言服务器；本组不随附任何语言服务器。

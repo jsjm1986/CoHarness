@@ -6,6 +6,10 @@ A [DeepSeek](https://deepseek.com)-backed `WebSearchProvider` for the harness [w
 
 This is an **implementation** package: it registers a provider into `ctx.web`, resolves its credential for each search through the optional `ctx.credentials` seam, records the auxiliary request in the initiating Agent session when one exists, and does not register a model-facing tool. Like `@deepseek-ai/dsh-llm-deepseek`, it is a function/namespace plugin (`inject: ['web']`). The Anthropic wire shape is a provider-private detail — it does **not** make this provider depend on `ctx.llm`.
 
+## Summary
+
+With `dsh-web-search-deepseek`, the harness searches the web through DeepSeek's native search using an existing `DEEPSEEK_API_KEY`. Choose it when a deployment wants DeepSeek native search and accepts that one search costs a full model turn in latency and tokens, because DeepSeek exposes no dedicated search endpoint. Results come from the structured search blocks DeepSeek returns, never from scraping text out of a reply. A missing credential fails the call with a structured error; a response without a search-result block fails loudly rather than degrading. The model-facing `web_search` tool lives in `dsh-tool-web`.
+
 ## How it differs from a dedicated search endpoint
 
 Exa and Perplexity expose dedicated search endpoints; DeepSeek does not. Instead this provider issues a **full Messages model call** carrying the `web_search` server tool, so one search costs a complete model turn in latency and tokens — heavier than a pure retrieval endpoint. DeepSeek runs the search server-side and returns **structured** `web_search_tool_result` blocks; the provider parses those blocks and **never scrapes URLs out of model prose**.
@@ -69,17 +73,15 @@ Independent of the conversation request cache. The auxiliary instruction and nat
 
 #### What the model sees
 
-Through [`dsh-tool-web`](../tool-web/README.md), the conversation model sees deduplicated URLs, titles, dates, and citation snippets from structured search blocks; provider prose is not trusted as an answer. This provider's exact failures include the actionable missing-credential message, `DeepSeek search credential resolution failed: <error>`, `DeepSeek search aborted`, and post-dispatch errors that preserve the endpoint and recovery guidance; the consumer owns the error wrapper.
+Through `dsh-tool-web`, the conversation model sees deduplicated URLs, titles, dates, and citation snippets from structured search blocks; provider prose is not trusted as an answer. This provider's exact failures include the actionable missing-credential message, `DeepSeek search credential resolution failed: <error>`, and `DeepSeek search aborted`. Request, HTTP, native-search, and response-body failures append the resolved endpoint and the conditional configuration instruction described above. The consumer owns the error wrapper.
 
 #### Token effect
 
-Zero direct conversation tokens from registration. Result tokens scale with returned sources and snippets, then the seam enforces the requested source bound.
+Zero direct conversation tokens from registration. Result tokens scale with returned sources and snippets, then the service enforces the requested source bound.
 
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. The package emits a pre-dispatch log event but owns no later authoritative dispatch event to relate it to. Exact envelope equality is pinned at the provider boundary instead.
 
 ## Known Limitations and Deferred Work
 

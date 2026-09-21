@@ -10,15 +10,17 @@ The chip carries the accessible description "Plan mode on, press to turn off". A
 
 The model exits plan mode through the stable `exit_plan_mode` tool; its plan review uses the composed Web question channel.
 
+## Summary
+
+Plan mode lets you review a plan before implementation. Enter with `/plan` and leave with the composer chip. Submitted plans open automatically in the right sidebar for review and remain available from cards in the completed Turn’s final artifact area after approval, rejection, or dismissal. Reopening a plan focuses its existing tab, and browser reload restores the document from Session history.
+
 ## Model Experience
 
-Indirectly, through the `/plan off` command line the chip dispatches: `@deepseek-ai/dsh-plan-mode` owns the model-visible policy section, the exit-tool schema, and the logged state that line drives, while this package only renders the projection and sends what a user could equally type.
+Indirectly, through the `/plan off` command line the chip dispatches: `dsh-plan-mode` owns the model-visible policy section, the exit-tool schema, and the logged state that line drives.
 
 #### KV Cache effect
 
 Entering or leaving plan mode changes the active `plan:policy` system-prompt section and therefore the request prefix; the chip itself adds no prompt content.
-
-**Runtime invariant:** No companion is published. Plan state and boundary ownership are audited by dsh-plan-mode, while the control is a slot effect whose declaration, registration, and teardown are exercised by this package.
 
 ## Known Limitations and Deferred Work
 

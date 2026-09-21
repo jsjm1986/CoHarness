@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Human-facing `/goal` control over [`ctx.goals`](../goal/README.md). The plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers and executes it without a model turn. The [human goal-command Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-human-goal-command.md) owns the UX and composition decisions.
 
+## Summary
+
+`dsh-command-goal` gives users the `/goal` command to create, edit, pause, resume, clear, and inspect the current goal directly in an interactive UI. Commands and their direct output stay in the UI and do not enter model requests. Accepted changes persist, and ordered image or file attachments on a create or edit become one ordinary user message that later goal rounds can read. Use this package in interactive deployments with a command adapter; headless and automation apps without one do not need it.
+
 ## Command contract
 
 | Input | Result |
@@ -42,17 +46,15 @@ The shipped `dsh` base enables the persisted-goal stack and this command; the We
 
 #### What the model sees
 
-The slash input, mutation, and direct status/error output are absent from model requests. The goal domain records the mutation as `goal/change`; an enabled same-session driver may expose the resulting state in a later continuation prompt. Presentation text is never logged. When a create or edit carries image attachments, the model sees one ordinary user message: the image blocks followed by the text `Reference images for the goal objective.`; it precedes the next goal round in session history.
+The slash input, mutation, and direct status/error output are absent from model requests. The goal domain records the mutation as `goal/change`; an enabled same-session driver may expose the resulting state in a later continuation prompt. Presentation text is never logged. When a create or edit carries attachments, the model sees one ordinary user message: the ordered image and file blocks followed by the text `Reference attachments for the goal objective.` It precedes the next goal round in session history.
 
 #### Token effect
 
-Reading status, mutating a goal, or receiving a direct command error adds no model tokens. An enabled same-session driver may add later goal-round prompts. An objective's image attachments add one user message billed like any image prompt.
+Reading status, mutating a goal, or receiving a direct command error adds no model tokens. An enabled same-session driver may add later goal-round prompts. An objective's attachments add one ordinary user message with the normal text, image, and file-handle costs.
 
 #### KV Cache effect
 
 Command discovery, mutations, and direct output do not affect the cache. Later continuation prompts follow the driver's ordinary request history.
-
-**Runtime invariant:** No companion is published. This command adapter owns no event stream or state projection; accepted mutations are checked by the goal domain and command dispatch behavior is covered by package tests.
 
 ## Known Limitations and Deferred Work
 

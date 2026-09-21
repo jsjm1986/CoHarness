@@ -6,6 +6,11 @@ English | [中文](README.zh.md)
 
 Opening the document picker captures its destination Session. Switching panes while the dialog is open does not change which composer receives a selected document.
 
+## Summary
+
+Use `dsh-client-ui-documents` as the workspace document manager in the Web UI: organize folders, preview, upload, move, download, delete, and insert stored documents into the conversation input. The picker captures its destination Session when opened, so switching panes mid-dialog never sends a document to the wrong composer.
+
+
 ## Installation
 
 This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is loaded automatically by the web-app profile.
@@ -65,8 +70,6 @@ The manager is a client-only surface; it adds no conversation context and no tok
 
 The manager reads and writes the same durable `/api/documents` store that conversation attachments use, so previously uploaded documents remain available across sessions without re-upload. Its short-lived browser metadata cache affects only list rendering and has no model KV-cache effect.
 
-**Runtime invariant:** No companion is published. Document UI state is owned by the client session and has no independent event or mutable-data relation for this package to assert.
-
 ## Known Limitations and Deferred Work
 
 - Preview is limited to images, PDFs, and text-based files; other media types show a download fallback.
@@ -76,3 +79,5 @@ The manager reads and writes the same durable `/api/documents` store that conver
 - Current-folder and all-scope listings request bounded server pages with opaque cursors when the provider supports them; older providers remain usable through local paging. The manager keeps already fetched pages while the dialog stays mounted.
 - Trashed documents remain recoverable only for the provider's retention window; purge is permanent, while active documents remain until deleted.
 - Folder deletion is empty-only; the UI does not recursively delete a folder tree.
+
+**Runtime invariant:** No companion is published. Document UI state is owned by the client session and has no independent event or mutable-data relation for this package to assert.

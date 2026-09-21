@@ -15,3 +15,7 @@ Pre-composed plugin bundles a thin leaf `cordis.yml` loads instead of assembling
 These packages are not product API. Product seams and entry points remain in their owning groups; demo bundles select concrete compositions.
 
 Do not confuse this group with the repo-root [`examples/`](../../examples/AGENTS.md): that directory holds the runnable `cordis.yml` **leaves**; this group holds the **bundles** those leaves load.
+
+## Summary
+
+Use this group for ready-to-run demo bundles: pre-composed plugin bundles that a thin leaf `cordis.yml` loads instead of assembling the agent spine and an entry point by hand. These are reference packages — product seams stay in their owning groups, and product one-shot execution belongs to `dsh --profile headless`.

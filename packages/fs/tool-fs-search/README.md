@@ -14,6 +14,10 @@ await ctx.plugin(LocalSpillStore)                           // @deepseek-ai/dsh-
 
 Why spawn-backed: local workspace discovery is naturally a process-backed `rg` workflow, and putting search on `ctx.fs` would force every filesystem backend to grow a search API. The subprocess seam owns spawn execution, process-tree termination, environment scrubbing, and bounded output capture; this package owns schemas, argument validation, argv construction, parsing, retention, formatted-result spill, and timeout declaration. The tools never expose a background job — the call returns only after `rg` exits, is terminated by the cooperative timeout, is aborted, or fails.
 
+## Summary
+
+Use `dsh-tool-fs-search` to give models `glob` file discovery and `grep` content search over a local workspace. Searches need no host `rg` installation or filesystem provider, return workdir-relative results, and include hidden and ignored files while excluding VCS metadata. Configurable caps bound inline output; with an optional spill store, capped results remain fully recoverable. Choose the sibling `dsh-tool-fs` package for reading, writing, or editing files.
+
 ## Deployment requirement: no host rg, co-located workdir/filesystem
 
 Node deployments receive the `@vscode/ripgrep` platform package on supported macOS, Linux, and Windows x64/arm64 targets. Python SDK Linux and macOS wheels copy the target-native binary beside the single-file runtime as `<runtime>-rg`; `deepseek_harness_runtime.bundled_runtime_path()` rejects an incomplete wheel before launch. No carrier requires a host `rg` install. Returned paths are displayed relative to the resolved workdir (the calling agent's session cwd when present, else `process.cwd()`) and are follow-up-readable with `read` only when that workdir and the filesystem root are the same workspace. That co-location requirement carries no runtime cross-service validation; remote or virtual filesystem search waits for a shared workspace contract or a provider-specific search backend.
@@ -56,7 +60,7 @@ Search failures carry the package-owned `SearchError` (a `HarnessError` subclass
 
 #### What the model sees
 
-Every request in this plugin's registration scope contains the independently registered glob and grep guidance below. Agent-scoped tool restrictions can hide either schema without removing its prompt section.
+At assembly time, each section checks `ctx.tools.get(name, scope)` and renders only while its tool is visible. The grep paragraph includes its read follow-up sentence only while read is visible. The original text and section order stay unchanged for the same supported tool set, including PTC capabilities behind `run_code`. This scope-dependent text selection applies to system-prompt sections. Tool schema descriptions remain registration-time text; in particular, the grep schema still recommends read even in a scope that hides read. Scope-dependent schema wording is not implemented.
 
 ##### Glob guidance with `sampleOverCapGlobResults: true`
 
@@ -78,11 +82,11 @@ Use the grep tool — not shell grep or rg — to search file contents. Use read
 
 #### Token effect
 
-Fixed guidance cost per request while the tools are registered; the required sampling choice selects one glob variant.
+Guidance cost follows the visible tools; the required sampling choice selects one glob variant.
 
 #### KV Cache effect
 
-Prefix-stable while the plugin scope, sampling choice, and guidance text are unchanged. Activation, disposal, or changing the choice may invalidate reuse from this prompt section.
+Prefix-stable while the visible tool set, plugin scope, sampling choice, and guidance text are unchanged. Restrictions, activation, disposal, or changing the choice may invalidate reuse from the first changed section.
 
 ### Tool schemas
 
@@ -102,7 +106,7 @@ Prefix-stable while tool visibility and definitions are unchanged. Registration 
 
 #### What the model sees
 
-`glob` returns one path per line; `grep` groups `Line <line>: <preview>` matches beneath each path. Empty searches return `No files found` or `No matches found`. A capped result ends with its omission count plus the spill locator and backend retrieval hint, or says the complete result could not be saved. With `sampleOverCapGlobResults: true`, an over-cap `glob` page takes paths round-robin across entries immediately beneath the actual search root, and the footer states the sampled basis and how many top-level entries it reached; when it cannot reach them all, the footer tells the model to narrow `path`. With `false`, the page is the modification-time-ordered head and keeps the plain capped-result footer. A result that fits inline is untouched, and a flat sampled result also keeps the plain footer because its sample equals the modification-time head. The spill artifact always holds the complete list in modification-time order.
+`glob` returns one path per line; `grep` groups `Line <line>: <preview>` matches beneath each path. Empty searches return `No files found` or `No matches found`. A capped result ends with its omission count plus the spill locator and backend retrieval hint, or says the complete result could not be saved. With `sampleOverCapGlobResults: true`, an over-cap `glob` page takes paths round-robin across entries immediately beneath the actual search root, and the footer states the sampled basis and how many top-level entries it reached; with `false`, the page is the modification-time-ordered head and keeps the plain capped-result footer. The spill artifact always holds the complete list in modification-time order.
 
 #### Token effect
 
@@ -125,8 +129,6 @@ Only a failing call adds these retained tokens.
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. This model-facing adapter has no independent lifecycle stream; execution relations are owned by the capability seam it calls.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 ACP automation server app: the default agent spine, client-created agents through [`@deepseek-ai/dsh-acp`](../../acp/acp/README.md), JSONL persistence, and semantic checkpointing behind one JSON-RPC stdio bin. Programmatic clients create fresh sessions; this package mounts no human UI.
 
+## Summary
+
+Use `dsh-acp-demo` as the ACP automation server app: the default agent spine, client-created agents through `dsh-acp`, JSONL persistence, and semantic checkpointing behind one JSON-RPC stdio bin. Programmatic clients create fresh sessions; the package mounts no human UI.
+
+
 ## Composition
 
 | Plugin | Role |
@@ -46,13 +51,11 @@ The shipped [`examples/acp-agent/cordis.yml`](../../../examples/acp-agent/cordis
 
 ## Model Experience
 
-Indirectly, through `dsh-agent-spine-demo` and the leaf's model-facing plugins. ACP prompt text becomes the ordinary logged user message; protocol metadata and permission choices do not enter the model request.
+Indirectly, through dsh-agent-spine-demo and dsh-acp, which own request composition for the bundle.
 
 #### KV Cache effect
 
-Append-only per session; the app adds no request-prefix content itself.
-
-**Runtime invariant:** No companion is published. This composition package owns no independent event stream or mutable data; Loader and built-entry tests cover its wiring.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

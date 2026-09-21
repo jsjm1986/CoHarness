@@ -12,3 +12,8 @@ agent 修改自身运行时：检查已加载的插件与服务接口、定义�
 | [`ui-cordis/`](ui-cordis/README.zh.md) | 浏览器面：操作全部定义的全局面板，与只读的 define 卡片 | client 面；注册 slot |
 
 [extensions 子系统页](../../docs/subsystems/extensions.zh.md)记录生成的 `ctx.cordisInspect` 与 `ctx.dynamicCordisRunner` 服务 API。
+
+
+## 概述
+
+extensions 组为 agent 提供只读运行时 API 发现、供程序和浏览器消费者使用的进程内 runner，以及历史生成插件卡片。Creator 模式通过 [Plugin Manager](../boot/plugin-manager/README.zh.md) 安装持久化插件。按需选择检查、Host 执行、Client 执行或浏览器控件子包。

@@ -16,3 +16,8 @@
 当一个包获得产品约定和产品消费方时，它会移出 `test-support/`。
 
 不变式约定记录在 [docs/subsystems/invariants.md](../../docs/subsystems/invariants.zh.md)。
+
+
+## 概述
+
+test-support 组为仓库测试提供确定且无须密钥的真实产品测试方式。它包含 Loader 应用 harness、session-log 快照适配器、回放 LLM 插件和可通过脚本控制的 OpenAI 兼容故障服务器。每个包都是支持层基础设施；当某个包获得产品约定与产品消费方时，它就会移出本组。

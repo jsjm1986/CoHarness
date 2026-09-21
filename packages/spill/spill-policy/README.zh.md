@@ -6,6 +6,10 @@
 
 该插件**不注册任何服务**，也不负责存储或预览机制：预览由 [`@deepseek-ai/dsh-output-retention`](../../util/output-retention)（`TextRetainer`）负责，存储由 `ctx.spillStore` 负责。它只决定何时 spill，并组合通知。
 
+## 概述
+
+当过大的纯文本工具结果不应进入模型上下文时，挂载本包。超过 `maxInlineBytes` 的结果会变成有界的首尾预览，并附带定位信息与取回指引；完整文本仍可通过已配置的 spill 后端访问。spill 失败时原始结果仍然可见，省略 `maxInlineBytes` 则会禁用该策略。同一上限也约束 `run_code` 子调用的持久日志副本，但不会改变程序收到的值。
+
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -40,19 +44,17 @@
 
 ### 过大的纯文本结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-大小不超过 `maxInlineBytes` 的结果、嵌套结果、`read` 结果、被阻止的决策和包含非文本块的结果都保持不变。过大的纯文本呈现结果会变为有界的首尾预览，后面附加 `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`；存储失败或没有会话所有者时，原始结果仍然可见。
+不超过 `maxInlineBytes` 的结果、嵌套结果、`read` 结果、被阻止的决策与包含非文本块的结果保持不变。过大的纯文本面向模型结果会变成有界的首尾预览，后面附加 `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`；存储或归属失败时原始结果仍然可见。
 
 #### Token 影响
 
-成功替换后的内容最多为 `maxInlineBytes` 个 UTF-8 字节，并会保留在历史中直到压缩（compaction）；完整 spill 文本不会重新发送给模型。
+成功的替换最多为 `maxInlineBytes` 个 UTF-8 字节，并保留在历史中直到压缩（compaction）；完整 spill 文本不会重新发送给模型。
 
 #### KV Cache 影响
 
 仅追加；新可见内容位于可重用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。除在所属 seam 处强制执行的约定外，本包不公开独立的事件序列或可变数据关系。
 
 ## 已知限制与暂缓事项
 

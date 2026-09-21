@@ -23,15 +23,17 @@ The store family (`defineStore` spec in / `StoreHandle<T, A>` out) types the sto
 
 `SessionAreaProps.sessionId` optionally binds SessionProvider to an explicit Session. Omission follows current selection; an unresolved id renders the empty branch. The renderer resolves that Session’s provide bundle, including its projection and input sources, and observes provider-roster changes through the existing provide notification channel.
 
+## Summary
+
+`dsh-client-ui-slots` lets web client plugins define and compose typed UI regions. Ordinary Slots provide parent-owned extension positions; Component Factories provide reusable assemblies with caller-selected local Components. Both APIs derive scoped state, injection, locale, and child-render props from declaration-merged types and report conflicting definitions during plugin loading. Pair this React-free package with `ui-renderer` when the client needs rendering.
+
 ## Model Experience
 
-None, as the slot registry is browser-side UI plumbing; nothing here reaches a model request.
+None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. This is a zero-dependency pure registry core; it emits no Cordis events itself (the `ui-renderer` SlotRegistry owns the event bridge and its invariants); define/register/dispose sequencing is asserted directly by this package's behavior specs.
 
 ## Known Limitations and Deferred Work
 

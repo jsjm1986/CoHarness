@@ -10,6 +10,10 @@
 
 本包不包含传输逻辑或 Host 服务发现逻辑。Web 或未来的 TUI 只要提供同一份不依赖 React 的 `ctx.remote` 约定，均可复用其 Client face。
 
+## 概述
+
+为本应用选定的 Host Remote 能力提供双侧 BFF。Host 入口拥有转发事件名单并向 API Gateway 注册应用事件 source；Client 入口以运行时值形式导入生成的 `/remote` 产物，通过 `ctx.remote.$mount()` 挂载每项贡献，并重新导出对应的声明合并。Client 业务包依赖该外观，而不依赖 Gateway 实现或单独的 Remote 运行时入口。
+
 ## 转发的 Host 事件
 
 `src/remote-events.ts` 持有 `API_REMOTE_FORWARDED_EVENTS`——本应用原样转发给消费端的 Host cordis 事件名单（无投影、无脱敏、wire 名称不改写），它同时就是 `ctx.remote.$on` 的合法键集；只含类型的 `src/types.ts` 派生其选择面。六组动态 Cordis 事件同时包含官方 `cordis/*` 名称和 fork 的 `@deepseek-ai/cordis/*` 名称。Host 仍转发其实际收到的精确名称；Gateway Client 将每对名称视为同一投递组。其余事件仍只需在数组中增加一个条目：类型投影、消费端键面与 Host 转发循环全部由它派生。
@@ -29,13 +33,11 @@
 
 ## 模型体验
 
-无，因为该 BFF 只选择 Remote 应用方法和身份策略，不注册任何模型接口。
+无，因为该 BFF 只选择 Remote 应用方法和转发事件，不注册任何模型接口。
 
 #### KV Cache 影响
 
 无直接影响；其触发的任何模型可见行为均由已挂载的 Host 能力负责。
-
-**运行时不变式：** 不发布伴生入口。被观察的关系由 Typert、agent 注册表和会话注册表负责。
 
 ## 已知限制与暂缓事项
 

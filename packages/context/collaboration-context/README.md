@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Durable model-visible participant attribution for shared project conversations. The plugin listens at `agent/pre-step`, recognizes authenticated project participant metadata on final user messages, and inserts one paired attribution message immediately before each such message.
 
+## Summary
+
+Use `dsh-collaboration-context` for durable model-visible participant attribution in shared project conversations. Listening at `agent/pre-step`, it recognizes authenticated project participant metadata on final user messages and inserts one paired attribution message immediately before each, so the model sees who said what.
+
+
 ## Runtime contract
 
 - The participant snapshot contains the authenticated user id, username, display name, role, project id/name, and project `ro`/`rw` mode supplied by the collaboration authority at message admission.

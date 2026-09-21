@@ -23,6 +23,23 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 
 会话页头会在标题旁渲染会话作用域的 `'conversation.session.header.actions'` 列表，并在最右侧渲染独立的 `'conversation.session.header.utilities'` 列表。会话上下文和谱系控件保留在 `actions` 中；可选的会话工具不会改变它们的顺序或位置。编辑器链的 currency 包含当前对话 `session`；ui-subagent 会选取 one-shot 或 parent 不可用的已寻址会话，并按原因显示只读文案，而普通 InputBar 会让所有已寻址 child 仅保留 Send，因为继续执行服务不公开逐 Activation 取消操作，`session.cancel` 也会绕过其所有权。
+```ts type-equiv
+/**
+ * Composer chain currency: what ConversationRoot dispatches at its
+ * renderSlotChain site. The owner declares the currency only — never a
+ * per-entry contract; takeover packages narrow it in their own selectors
+ * (`interactions.find(i => i.kind === ...)`), so new takeover kinds register
+ * with zero owner changes.
+ */
+interface ComposerChainProps {
+  /** Whether this pane may request automatic input focus. */
+  active?: boolean
+  interactions: readonly PendingInteraction[]
+  /** Current conversation facts for feature-owned takeover selectors. */
+  session: ConversationSnapshot | undefined
+}
+```
+
 
 已记录的非用户消息渲染为默认折叠的展开项，标题栏先给出运行时为该消息投影出的角色——注入为 `上下文注入`，召回为 `跨会话召回`——其后是该投影从持久来源读出的生产者名称，因此读者无需展开即可区分 skill（技能）目录、工作区指令文件与被召回的会话。引用其他会话的直接消息在持久顺序中位于其召回行之前。Chat 快照只从紧随其后的带来源召回中关联准确标签，因此既能保留多词标题，也不会把一条召回的标签带到后续直接消息上。召回使用聊天气泡图标，其他上下文保留文档图标；来源未提供生产者名称时只显示角色。输入框与用户气泡中的引用使用同一种行内语言：聊天气泡、文件或文件夹图标加业务色文字，不嵌套胶囊容器。与已认领的 slash command 相同，输入框引用会把完整展示文本保留在透明 textarea 中，再用对齐的 backdrop 提供颜色和开头的领域图标；宽度、换行、选择区与光标位置均由原生文本度量决定。occurrence 范围仍为序列化与边界整段删除保留结构身份，在范围内部编辑则会把剩余字符转为普通文本。会话草稿镜像会存储每个 occurrence 的剪贴板投影，因此在 occurrence 表缺失的情况下重新挂载时，会恢复可解析的规范引用文本，而不是仅供显示的标签。共享的 `DisclosureRow` 原子组件让该上下文界面与消息流中的其他紧凑行保持相同几何，同时保留上下文语义：展开内容区的高度会随内容自适应，最大为 141px，超出后滚动，且不会合成工具状态或摘要（[历史展开项决策](../../../.agents/notes/archived/feature/2026-07-30-web-context-injection-disclosure.md)、[生产者标签决策](../../../.agents/notes/implemented/feature/2026-08-04-web-context-source-and-steer-marks.zh.md)）。该内容区按生产方在持久来源上声明的形态渲染：`instructions` 在正文之上列出它对账过的文件，`catalog` 列出来源记录的条目而非面向模型的正文，其余取值——未声明、本版本不认识、或字段不可用——一律渲染 opaque 内容区，即按真实换行展示面向模型的文本，并把剩余来源字段列出。opaque 不是兜底剩余物而是有文档的默认：恢复的、fork 的、外部写入的日志，无论其生产方是否挂载在此处，都必须渲染得出来。持久或待处理的 steering（中途引导）气泡沿用用户气泡的呈现，不加任何装饰；transcript 中唯一的 steering 信号是它出现在轮次中途的位置。
 
@@ -62,19 +79,21 @@ composer 统计 pill 的 token 账目来自经标准套件 `useProjection` 读�
 
 完成的一轮会物化一个有序的 `turn-tail` Conversation Node。它由引擎维护的 `TurnLocation` 提供收尾 Assistant 和 Turn data；renderer 在该 Node 的 IconActions 之前渲染 `conversation.chat.turnTail` chain，并派发包含 Turn、收尾 seq 和 `openFile` 的 `TurnTailOwnerProps`。本包只拥有空位；`@deepseek-ai/dsh-client-ui-deliverables` 把改写工具的 `locations` 累积到 Turn data，并拥有产物行、chip 上限和文案，因此把该插件从 cordis.yml 中组合掉即可关闭该交互面，空位以零成本渲染为空。收尾正文经由同一个开关参与其中：chat 视图向可选的 `chatFileMentions` service（ctx.get；由同一插件提供）索取收尾消息的行内代码词表，并把结果接进 MarkdownText 的 `fileMentions` seam——service 缺席时正文保持死文本。
 
+## 概述
+
+`ui-conversation` 拥有与 target 无关的 Conversation 组装和共享浏览器 shell。它消费 Session Controller 的 `SessionEventLikeEntry` feed，通过 `ctx.uiConversation` 暴露不依赖 React 的注册表与逐 Session binding，并通过 `ctx.uiSession` 提供 `useConversation`、`useInput` 和 `inputActions` 标准 props。它还拥有按会话的持久化图片 URL 缓存：`ctx.uiConversation.imageUrl(sessionId, attachment)` 为每个附件解析一个经会话授权的浏览器 URL，并随 Session binding 释放而撤销，因此所有 Conversation target 共享一次 `session.attachment` 读取。Chat 等具体 target 位于独立包，由各自包注册 Definition、快照 builder、View 和 renderer。
+
 ## 设置权限
 
 忙碌状态下的 Enter 偏好以及对话显示偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
 
 ## 模型体验
 
-无。会话 UI 在浏览器中渲染会话历史与流；这里没有任何内容进入模型请求。
+无，因为本包渲染浏览器状态，并通过 Session Controller API 发送用户确认提交的输入，而不构造模型请求。
 
 #### KV Cache 影响
 
-无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。Conversation Definition、target builder 与 View 已由其所属注册表和 Slot ledger 校验。
+无；Conversation 组装和浏览器输入状态不会改变提供方侧的 prompt cache。
 
 ## 已知限制与暂缓事项
 

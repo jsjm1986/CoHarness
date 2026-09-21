@@ -11,3 +11,8 @@ hooks 子系统让用户像使用 Claude Code 和 Codex 一样，在生命周期
 | [`hooks-codex/`](hooks-codex/README.zh.md) | Codex 钩子桥接 | 插件 |
 
 共享库负责通用协议行为；各桥接负责自身方言的事件映射。子 README 记录这些约定。
+
+
+## 概述
+
+hooks 组让 agent 运行可以复用为 Claude Code 或 Codex 编写的 shell 钩子。把对应集成指向现有的 `hooks.json`，即可在会话开始、提示词到达、工具运行或运行停止时执行受支持的 command hook。这些钩子可以用模型可见消息阻止提示词或工具调用、向对话添加上下文，或要求运行继续。当你需要保留现有钩子配置时，选择本组；每项集成只支持其来源工具所记录的 command hook 子集。

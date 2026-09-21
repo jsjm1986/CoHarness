@@ -14,15 +14,18 @@ The provider also registers a loopback-only `/api/internal/archive/read` route. 
 
 The provider is a runtime-only integration. Standalone local DSH compositions do not load it and keep their local archive registry unchanged.
 
+## Summary
+
+Use `dsh-archive-gateway` to synchronize a Gateway-launched runtime's durable Workspace archive state with the Gateway archive index. Revision-stamped, idempotent batches carry archived ids, lineage, headers, placement, and search projections; Gateway commands apply only after every batch of that revision succeeds. Requests are bounded and disposal joins the in-flight pass.
+
+
 ## Model Experience
 
-None, as the provider reads and synchronizes already-logged session state without adding prompts, tools, or model-request fields.
+None, as the provider synchronizes archived session records for administrator-only history and contributes no model input.
 
 #### KV Cache effect
 
-None. It does not assemble model requests or alter a reusable prefix.
-
-**Runtime invariant:** No companion is published. The provider synchronizes authoritative persistence and the registry snapshot directly.
+None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 

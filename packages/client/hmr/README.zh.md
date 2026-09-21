@@ -6,13 +6,17 @@
 
 浏览器侧订阅系统 SSE（Server-Sent Events）通道（`GET /plugins/events`），每个 `rebuilt` 帧重载一个插件，并通过队列串行执行。每帧的顺序是：`invalidate`、`prefetch`（旧 fiber 仍在服务时加载并注册新组合包）、`registry.delete`（在 fiber dispose（资源释放）之前执行：仅 dispose fiber 会触发 vendored Loader 的 self-dispose 分支，把配置项标为禁用）、排空旧 fiber、删除 `entry.fiber`、移除自身拥有的 `<style data-plugin>` 标签、通过 `entry.refresh()` 重新导入并挂载、通过 `fiber.await()` 直接重新抛出启动失败。依赖方由 Cordis 自身重载：fiber 的激活 epoch 会串联其服务提供方的 uid，因此替换提供方 fiber 会级联所有依赖方，无需客户端图分析。node 侧使用一个 interval 检测重建：从同步基线开始 stat-poll 每个图组合包；新增一行后立即重新计算 hash；缺失行保持 dirty；只广播真实 rev 变更。因此，任何生成组合包的 tsdown watch 进程都能触发 HMR（热模块替换），无需 builder→host 通道。
 
+## 概述
+
+`dsh-client-hmr` 让已打开的 Web 页面与 Host 插件图保持同步，并重载重建后的浏览器 bundle。普通插件的启停无需刷新页面或重启 Host 即可生效。代码重建会替换受影响插件并重置其组件状态。模型不会收到新的输入或输出。
+
 ## 模型体验
 
-无。重载驱动器属于浏览器侧机制；这里没有任何内容进入模型请求。
+无。重载驱动器属于浏览器侧 UI 插件层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
-无；该包（package）既不组装也不发送提供方请求。
+无；该包既不组装也不发送提供方请求。
 
 ## 已知限制与暂缓事项
 

@@ -14,3 +14,8 @@ A command feedback remark is log-only: it never enters model context or derived 
 Message feedback is not a Session event or projection. It remains in the storage-domain sidecar and causes no telemetry handoff. The Host Remote contract ships with the service; the client Remote aggregate mount and UI consumer are separately owned and deferred.
 
 The [feedback subsystem page](../../docs/subsystems/feedback.md) owns the message-feedback types, service contract, and Web consumer.
+
+
+## Summary
+
+The feedback group collects human opinions about the harness's work: users can submit a free-text remark about a whole session, and rate or annotate individual assistant messages. Neither kind of feedback reaches the model — these are signals about the output, never input to it. Users record a session remark with the `/feedback` command; product surfaces read and change per-message ratings through the `messageFeedback` service. The two packages are independent: session remarks and per-message ratings do not interact. This page maps the group; the package READMEs and the [feedback subsystem page](../../docs/subsystems/feedback.md) own the per-package contracts.

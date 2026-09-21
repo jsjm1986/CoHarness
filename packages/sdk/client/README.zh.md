@@ -6,6 +6,10 @@
 
 与 Python SDK 不同，启动规格完全显式（`command`/`args`）：本包面向仓库近旁的 TypeScript 消费方，包括 [`dsh-subagent-dsh-sdk`](../../subagent/subagent-dsh-sdk/README.zh.md) 后端和自动化；它们知道自己要启动哪个运行时。捆绑运行时解析（寻找打包可执行文件）仍归 Python 发行版负责。
 
+## 概述
+
+`dsh-sdk-client` 让 TypeScript 程序通过 stdio JSON-RPC 启动并驱动完整的 DeepSeek Harness 运行时。使用 `DeepSeekHarness` 可打开会话、发送文本或图像提示词、收集事件与通知流，并在运行时进入 idle 后取得最后提交的助手响应；使用 `HarnessClient` 可直接发送协议请求和订阅通知。调用方可以提供 `dshBin`；否则客户端解析同版本的 `@deepseek-ai/dsh` 可执行文件。客户端跨多次运行持有子进程，公开类型化的传输与协议错误，并在 `close()` 或 `await using` 时回收进程。它适用于调用方能够选择运行时 profile 和启动设置的场景。
+
 ## DeepSeekHarness
 
 ```ts
@@ -37,13 +41,11 @@ console.log(result.finalResponse)
 
 ## 模型体验
 
-无，因为这是一个客户端进程库；模型运行在 spawn 出的运行时中，其体验由该运行时的 `cordis.yml` 所组合的插件决定。
+无，因为这是客户端进程库；模型可见行为存在于所 spawn 运行时组合的插件中。
 
 #### KV Cache 影响
 
-无；本包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。本客户端库运行在任何 harness 上下文之外（其对端是独立运行时进程）；运行时自身的包负责维护事件流关系。
+客户端进程中无影响。子进程的 profile、patch、提供方、模型与历史决定缓存复用。
 
 ## 已知限制与暂缓事项
 

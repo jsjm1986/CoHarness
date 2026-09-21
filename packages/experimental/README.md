@@ -13,3 +13,8 @@ This group contains prototypes and internal-only Cordis plugins that use the rep
 The [subtree rules](AGENTS.md) define dependency isolation, release exclusion, and promotion.
 
 The [Agent Teams subsystem page](../../docs/subsystems/agent-team.md) owns the durable Team types and the `ctx.agentTeams` service API.
+
+
+## Summary
+
+The experimental group contains prototype capabilities whose contracts can change and carry no support promise. All current packages publish under their `@deepseek-ai/dsh-experimental-*` names, including the opt-in Agent Teams composition, Auto review, Cua Driver providers, browser-use backends, cross-realm Inspector, CPython PTC backend, and browser-worker preview libraries. Released products outside this group must not depend on experimental packages.

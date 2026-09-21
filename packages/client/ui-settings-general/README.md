@@ -10,15 +10,17 @@ A loopback browser loads the provider's `hasDocument` capability through `settin
 
 The Host half registers `ui-onboarding` in the user-settings seam so stored documents that still carry `welcomeNoticeVersion` remain valid. No GUI step reads or writes that field; the shell itself remains policy-free.
 
+## Summary
+
+Use this package to give the dsh web client a Settings panel, connection-recovery control, feature-contributed navigation, and sequential first-run onboarding. Users can open it from the sidebar, retry a failed connection immediately, and access a local configuration file when the Host makes one available on a loopback browser. Feature packages supply their own settings rows, sections, and onboarding steps; this package supplies their shared presentation and does not add onboarding copy or built-in General rows.
+
 ## Model Experience
 
-None, as the plugin renders browser settings UI; nothing here reaches a model request.
+None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. The settings seam validates and publishes the durable onboarding section, while slot conflicts fail loud in the slot core. The local document action is browser state over typed RPC responses and is covered by store/component tests rather than a Cordis runtime relationship.
 
 ## Known Limitations and Deferred Work
 

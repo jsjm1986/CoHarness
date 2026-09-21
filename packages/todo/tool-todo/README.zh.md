@@ -4,6 +4,10 @@
 
 面向模型的 `todo_write` 工具：agent（智能体）的完整任务列表，每次调用都会整体替换。
 
+## 概述
+
+`dsh-tool-todo` 为 agent（智能体）提供一份可用于规划的结构化任务列表：把多步工作拆成具体任务、标记正在进行的任务、完成后逐项勾掉。列表跨轮次、跨重新打开的会话持续存在，agent 与 UI 始终看到最新计划。一个配置开关决定是否允许多个任务同时处于进行中，适用于并行开展工作的 agent。凡是希望 agent 维护可见任务列表的场景都可以使用它；每次更新整体替换列表，只有拥有该列表的 agent 会话才能修改。
+
 ## 功能
 
 注册一个工具 `todo_write(todos: [{ content, status }])` 到 `ctx.tools`。模型每次调用都会发送完整列表，不存在部分更新或单项编辑。每次调用都会向调用 agent 的会话日志追加 `todo/write` 事件（完整列表快照），具体调用 `agent.session.append('todo/write', { todos })`；当前列表是最新的该类事件（回放时后写覆盖先写）。
@@ -40,31 +44,31 @@
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-模型会看到生成的 [`todo_write` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-todo)。
+模型会看到生成的 [`todo_write` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-todo)：一个对象，含一个必填的 `todos` 数组，元素为 `{ content, status }`，其中 `status` 为 `pending`、`in_progress` 或 `completed`。描述是组合后的整表指令，其活跃状态条款跟随 `allowParallelInProgress`。
 
 #### Token 影响
 
-工具可见的每个请求都有固定的 schema token 开销。
+工具可见的每个请求都有固定 schema 开销；在给定配置下描述与 schema 保持稳定。
 
 #### KV Cache 影响
 
-只要定义和可见性不变，前缀就保持稳定。插件生命周期或 scope 限制可能会使从此 schema 起的缓存复用失效。
+定义与可见性不变时前缀保持稳定。插件生命周期或作用域限制可能使从此 schema 起的复用失效。
 
 ### 工具调用历史与结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-每个 assistant 工具调用都会在参数中保留整个替换列表。成功时原样返回 `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.`。稳定失败文本为 ``Error: invalid todo: `content` must be a non-empty string``、`Error: invalid todos: duplicate content "<content>"`、`Error: todo_write requires an owning agent session`，以及——仅在部署设置了 `allowParallelInProgress: false` 时——`Error: invalid todos: at most one task may be in_progress (got <n>)`。完整 `todo/write` 会话事件是 UI 与回放状态，而非第二条模型消息。
+每次 assistant 工具调用都会在参数中保留整个替换列表。成功时原样返回 `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.`。稳定失败文本为 ``Error: invalid todo: `content` must be a non-empty string``、`Error: invalid todos: duplicate content "<content>"`、`Error: todo_write requires an owning agent session`，以及——仅在部署设置 `allowParallelInProgress: false` 时——`Error: invalid todos: at most one task may be in_progress (got <n>)`。完整的 `todo/write` 会话事件是 UI 与回放状态，而非第二条模型消息。
 
 #### Token 影响
 
-token 用量会随模型每次提交的完整列表增长，且这些调用参数会保留到压缩（compaction）。结果本身很小，且形状固定。
+token 用量随模型每次提交的完整列表增长，这些调用参数会保留到压缩（compaction）。结果本身很小且形状固定。
 
 #### KV Cache 影响
 
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
+仅追加；新可见内容位于可复用请求前缀之后，不会使既有 KV-cache 条目失效。
 
 ## 已知限制与暂缓事项
 

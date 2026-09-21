@@ -6,6 +6,11 @@ Service Definition for the enabled organization- and project-managed model Provi
 
 Organization route ids use the deployment-reserved `org-*` namespace. Project routes use a deployment-prefixed `project-<id>-<slug>` id and carry their project id. Each profile identifies its adapter driver, wire protocol, endpoint, optional read-only credential reference, and exposed models. Storage, authorization, credential resolution, and refresh ordering belong to Provider implementations.
 
+## Summary
+
+Use `dsh-model-provider-config` as the Service Definition for organization- and project-managed model Providers. A Provider publishes an immutable route snapshot on `ctx.modelProviderConfig` and emits `model-provider-config/updated` after each committed revision; adapter Consumers register those routes without copying them into user settings.
+
+
 ## Model Experience
 
 Indirectly, through LLM adapter Consumers that expose enabled organization models for selection and execution.

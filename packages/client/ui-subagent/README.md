@@ -14,13 +14,17 @@ The `@` source remains deliberately separate and inert. Candidates are zero-RPC 
 
 On phone viewports the portalled catalog becomes a safe-area sheet with the shared backdrop and touch-sized rows; the tree's keyboard navigation and focus return remain unchanged.
 
+## Summary
+
+Use this package to browse every subagent conversation beneath a parent session, open any descendant, and see whether it is running together with its token usage and active-turn duration. Completed one-shot conversations open as read-only execution records. Continuable conversations accept follow-up prompts in submission order while they run and provide Stop independently. The ordinary session sidebar omits subagent conversations, so the parent header catalog is their navigation entry point. The separate `@` source inserts a running child's label into a user message without resolving it into a continuation address.
+
 ## Model Experience
 
 ### Subagent label text in the user prompt
 
 #### What the model sees
 
-Only the legacy `@` reference source affects model input: a picked candidate reaches the ordinary user message as literal `@label`, without a dedicated block or host-side resolution. Catalog browsing, child navigation, and persisted transcript viewing add no prompt section; accepted continuation content becomes a normal FIFO user message through the host subagent adapter.
+Only the `@` reference source affects model input: a picked candidate reaches the ordinary user message as literal `@label`, without a dedicated block or host-side resolution. Catalog browsing, child navigation, and persisted transcript viewing add no prompt section; accepted continuation content becomes a normal FIFO user message through the host subagent adapter.
 
 #### Token effect
 
@@ -29,8 +33,6 @@ Conditional and append-only: the literal `@label` or a human follow-up adds toke
 #### KV Cache effect
 
 Append-only. This package never edits earlier request tokens.
-
-**Runtime invariant:** No companion is published. The plugin registers a single slash source whose disposal is proven by the HMR-safety spec; it emits no Cordis events and owns no cross-plugin mutable state.
 
 ## Known Limitations and Deferred Work
 

@@ -8,15 +8,18 @@ The package has no Cordis service or UI surface. Host-specific clients provide t
 
 Adapters may append a stable query string to every protocol request and provide a resume namespace. The namespace is part of the browser recovery key, so the same file can resume independently in separate personal or project document scopes.
 
+## Summary
+
+Use `dsh-client-userdoc-upload` as the shared browser uploader behind the conversation composer and document manager. It speaks the `resumable-v1` protocol in bounded XHR chunks with SHA-256 digests, retries transient failures, and persists opaque session metadata so an interrupted upload resumes after a page reload — file bytes never leave the browser except through the upload itself.
+
+
 ## Model Experience
 
-None, as this browser transport only moves document bytes and returns a stored reference; prompt assembly and model requests belong to the consuming Host packages.
+None, as the browser-side document transport library moves file bytes and registers nothing model-facing.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. The uploader is a browser-only functional state machine; it owns no Cordis service, event stream, or cross-plugin mutable relation, so its behavior is covered by protocol and cancellation tests.
+None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 

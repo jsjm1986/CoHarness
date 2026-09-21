@@ -15,6 +15,10 @@ This package owns the Service Definition role of the bash capability, split so e
 
 The split is a standard capability seam ([capability-seams Agent Note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)): `dsh-bash-sandbox` is a sandboxing executor behind the same Service Definition — the Consumer detects its `sandboxMode` capability and adds escalation fields without importing the provider — and a containerized or remote executor slots in the same way.
 
+## Summary
+
+Use `ctx.shell` to run foreground shell commands with bounded output or prepare background processes asynchronously before receiving their handles. A profile can select local or sandboxed Bash or PowerShell execution without changing callers. Resolve each request before execution to make the working directory, timeout, and output limits explicit. Command completion, nonzero exits, timeouts, and caller aborts return results; only infrastructure failures reject, while the `bash` and `pwsh` tools own model-visible rendering and sandbox guidance.
+
 ## Service API (`ctx.shell`)
 
 | Member | Semantics |
@@ -46,8 +50,6 @@ Indirectly, through `dsh-tool-bash`, which turns executor output and sandbox fac
 #### KV Cache effect
 
 No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. This stateless Service Definition owns request/result types, while executors and policy own observations.
 
 ## Known Limitations and Deferred Work
 

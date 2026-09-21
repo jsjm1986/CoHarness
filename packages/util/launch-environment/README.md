@@ -12,6 +12,10 @@ This run's environment as one immutable snapshot that remembers **which layer su
 
 Values do also reach `process.env` — a user's `--config` tree and third-party libraries read it — but that flattened view is not the authority for anything the harness resolves.
 
+## Summary
+
+Use `@deepseek-ai/dsh-launch-environment` to resolve launch-time environment values without trusting the flattened `process.env`. It freezes inherited process values, the invocation directory's `.env`, and the Harness home's `.env`, then returns the winning value and its source in a fixed trust order. Callers can exclude layers for sensitive lookups; an omitted layer stays unreachable regardless of later ordering changes. The snapshot is immutable, but every layer is still copied into `process.env`, so it does not isolate subprocesses. Import it as a library; it cannot be mounted from `cordis.yml`.
+
 ## Resolving
 
 `get(name)` searches every layer, most trusted first. `getFrom(name, sources)` searches only the named layers without changing that trust order.

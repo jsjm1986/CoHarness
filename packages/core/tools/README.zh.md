@@ -4,6 +4,10 @@
 
 工具注册表与执行流水线。工具插件注册各自的 schema 和执行器；agent loop（智能体循环）依次让每次调用经过 `tools/pre-execute`（可扩展的允许／拒绝门禁）→ 已注册的单调守卫 → `tools/execute`（供超时／重试／指标插件使用的环绕分发包装层）→ `tools/post-execute`（检查／替换结果、附加上下文）→ 由工具定义持有的 `finalizeContent` 边界 → 仅观测的 `tools/result` 通知。注册表还决定以何种方式向模型呈现工具：`mode` 配置可以选择原生 Function Calling（函数调用）、[PTC mode](#ptc-mode)，或同时选择两者；`ptc` 是规范名称，`code` 保留为兼容别名；单个 agent 可用 `presentAs` 为自己遮蔽该默认值。
 
+## 概述
+
+使用 `dsh-tools` 可向模型公开类型化能力、校验调用、执行允许／拒绝／询问策略，并在普通工具失败时返回最终结果而不中止当前轮次。通过 `mode` 选择原生 Function Calling（函数调用）、[PTC mode](#ptc-mode) 或两者；单个 agent（智能体）可用 `presentAs` 覆盖默认值。工具作者使用 `defineTool` 声明类型化参数与输出、协作式超时、并行安全属性和可选 UI 展示。模型会看到每个获准工具声明的名称、描述与参数 schema；按 agent 设置的限制可缩小该可见集合。
+
 ## 服务：`ToolRuntime`（ctx 键：`tools`）
 
 ### 配置
@@ -135,9 +139,9 @@ agent loop 将连续的 `parallel` 调用归入有界滚动池，并把每个 `e
 
 ### 普通工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-在普通模式下，模型会看到每个可见定义的确切名称、描述和 JSON Schema；已交付定义记录在生成的[工具包映射和 schema 章节](../../../docs/tool-catalog.zh.md#tool-package-map)中。agent 作用域的限制、遮蔽和扩展注册会改变该 agent 的最终工具集合。
+在普通模式下，模型会看到每个可见定义的确切名称、描述与 JSON Schema；已交付定义记录在生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tools)中。agent 作用域的限制、遮蔽与扩展注册会改变该 agent 的最终工具集合。
 
 #### Token 影响
 
@@ -149,13 +153,14 @@ agent loop 将连续的 `parallel` 调用归入有界滚动池，并把每个 `e
 
 ### PTC mode schema 与系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
-PTC mode 会公开生成的 [`run_code` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tools)、下方 SDK 说明，以及按所加载运行时语言生成的精确 SDK 块（TypeScript 的 `declare const tools` 块，或 Python 的 `tools` 声明）。`both` 会同时公开普通 schema 与此 PTC mode API。在 `ptc` 下，提示词还会带上 `tools:ptc-only` 规则，其顺序排在逐工具指导段之前，让模型先读到「可以调用哪些工具」再读「每个工具做什么」；`both` 下它渲染为空。说明与 SDK 块随所加载运行时的语言切换；下方展示 TypeScript 版本（经 [`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.zh.md)），Python 版本（用于任何报告 `language: 'python'` 的运行时）以 Python 语法提供相同操作和类型（`await tools.name(args)`、特殊名称用下标访问、`print(...)` 与顶层 `return`）。
+PTC mode 会公开生成的 [`run_code` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tools)、下方 SDK 说明，以及按所加载运行时语言生成的精确 SDK 块。TypeScript 说明会把生成声明明确标为只能在程序内使用的绑定。当当前 `bash` 参数 schema 接受示例参数时，说明还会给出以 `run_code` 包住 `tools.bash(...)` 的完整调用。`tools:sdk` 段使用 first-party 顺序 5000，并关闭提示词变量插值，使两种运行时语言都原样保留工具描述和 schema 中的 `{{…}}` 文本。`both` 会同时公开普通 schema 与此 PTC mode API；在 `ptc` 下，提示词还会带上处于更早 first-party 顺序的 `tools:ptc-only` 规则，让模型先读到「可以调用哪些工具」再读「每个工具做什么」。
 
-##### PTC mode SDK 说明
+##### 带 bash 的 TypeScript PTC mode SDK 说明
 
 ```markdown
+
 ## Writing code for run_code
 
 `run_code` takes two required arguments: `code` — the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped) — and `description`, a short summary of what the program does. Inside the program:

@@ -10,6 +10,10 @@ The package root exposes only the Cordis plugin contract (`name`, `inject`, `Con
 
 The plugin also contributes the `tool:bash` prompt section (order 105): check the `[exit code: N]` marker on every result and investigate failures before moving on.
 
+## Summary
+
+`dsh-tool-bash` lets an agent run one-shot `bash` commands and receive stdout, stderr, and exit markers. Each call uses a fresh shell, so cwd, variables, and functions do not persist; `run_in_background` starts long-running work that the agent can inspect with `job_output` and stop with `job_kill`. Commands receive the managed `DSH_*` environment, and sandbox denials can be retried once with wider `sandbox_permissions`, a `justification`, and user approval. Non-zero exits are reported as results, so the agent decides how to respond; use an executor such as `dsh-bash-local` or `dsh-bash-sandbox` and load `dsh-shell-env`.
+
 ## Tools
 
 ### `bash`
@@ -60,7 +64,7 @@ For sandboxing executors, each call resolves mode as one-shot escalation, then s
 
 #### What the model sees
 
-Every request in this plugin's registration scope contains the bash guidance below. The policy owner contributes current sandbox state through its cache-safe runtime context rather than changing this section. Scoped tool restrictions can hide the schemas without removing this independently registered section.
+Every request in this plugin's registration scope contains the bash guidance below at first-party order 1000. The policy owner contributes current sandbox state through its cache-safe runtime context rather than changing this section. Scoped tool restrictions can hide the schema without removing this independently registered section.
 
 ##### Bash guidance
 
@@ -122,7 +126,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Validation and policy failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, `invalid escalation: sandbox_permissions requires a justification`, `invalid escalation: justification is only valid together with sandbox_permissions`, `invalid justification: expected a non-empty sentence`, `background execution is disabled for this bash tool`, `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, `sandbox escalation to "<mode>" is not strictly wider than this call's current "<mode>" mode`, the approval-availability/rejection/cancellation variants, and `tool call aborted`.
+Validation and policy failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, the escalation pairing failures, `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the approval availability/rejection/cancellation variants, and `tool call aborted`.
 
 #### Token effect
 
@@ -131,8 +135,6 @@ Only the failing call adds these retained tokens; a rejected escalation does not
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. The environment registry validates ownership and collected values at each mutation/read; it publishes no independent snapshot that a companion could cross-check.
 
 ## Known Limitations and Deferred Work
 

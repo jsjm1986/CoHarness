@@ -62,7 +62,7 @@ The JSON validator uses an explicit work stack and tracks only the active ancest
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | JSON value type, validation and snapshot traversal, structural equality, deep freezing, and exhaustive-union failure |
-| [`src/invariant.ts`](src/invariant.ts) | Empty package companion; no runtime invariant exists because these value operations have no shared event stream or mutable state. |
+| — | No runtime invariant companion is published because these value operations have no shared event stream or mutable state. |
 
 </details>
 -----
@@ -75,16 +75,6 @@ The JSON validator uses an explicit work stack and tracks only the active ancest
 - [Tools subsystem](../../../docs/subsystems/tools.md) — schema validation and canonical tool results built on `JsonValue`.
 
 -----
-
-## Model Experience
-
-None, as this package provides JSON-safe value operations and registers no prompt, schema, or result text.
-
-#### KV Cache effect
-
-No direct invalidation: value utilities do not enter model request prefixes.
-
-**Runtime invariant:** No companion is published. These value operations have no shared runtime state; unit tests cover their algebra.
 
 ## Known Limitations and Deferred Work
 

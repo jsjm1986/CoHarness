@@ -22,15 +22,17 @@ The localized first-party token is only a draft spelling: the claim keeps it vis
 
 The `/client` entrypoint exports the plugin body (`apply`/`inject`), `CommandUiRuntime`, the directory and popup classes with their state types, and the fixed contract types; the shell component itself is internal to the overlay registration.
 
+## Summary
+
+Typing a `/` command opens a registered popup, a client action, a host command's input, or direct execution; a command line is never silently downgraded to a plain prompt. Business packages register popupSelect specs (`/model`, `/permission`) or actions through `ctx.commandUi`, or decorate existing host commands with either kind while preserving their catalog rows and argument claims. Space and Enter resolve the line against the session's directory: a host descriptor with `input` is `leadingInput`, a registered `CommandUiSpec` is `popupSelect` or `action`, and everything else is `execute`.
+
 ## Model Experience
 
-Indirectly, through the host `command.execute` RPC this package's dispatch and `claim.submit` paths trigger: a matched command's handler mutates host domain state that other packages project into the next request (the `/plan` handler flips plan mode, whose owning package injects its `plan:policy` system-prompt section), while the command line itself, the detached result, and every menu/notice rendering stay client-side and never enter the session log.
+Indirectly, through the host `command.execute` RPC they trigger, each command handler's host package owns any model-visible effect (the `/plan` handler flips plan mode, whose owning package injects its policy section), while the command line, the detached result, and every menu and notice rendering stay client-side and never enter the session log.
 
 #### KV Cache effect
 
-None directly; this package neither assembles nor sends a provider request. Command handlers it triggers may change what the owning host packages contribute to the next request's system prompt (a section appearing or disappearing replaces earlier request tokens and invalidates the provider prefix from that point), but that effect is owned and documented by each command's host package.
-
-**Runtime invariant:** No companion is published. This browser-side source uses the wire command directory; it emits no Cordis events and owns no cross-plugin mutable state. Its dispatch and cache behavior are asserted by this package's specs.
+None directly; this package neither assembles nor sends a provider request. Command handlers it triggers may change what the owning host packages contribute to the next request's system prompt — a section appearing or disappearing replaces earlier request tokens and invalidates the provider prefix from that point — but that effect is owned and documented by each command's host package.
 
 ## Known Limitations and Deferred Work
 

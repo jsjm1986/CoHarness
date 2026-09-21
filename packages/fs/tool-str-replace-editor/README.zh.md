@@ -4,6 +4,10 @@
 
 基于 `ctx.fs`、面向模型的独立 `str_replace_editor`。它可与持久 Bash、一次性 Bash、沙箱 Bash 或其他终端接口组合。
 
+## 概述
+
+`dsh-tool-str-replace-editor` 提供基于 `ctx.fs` 的独立面向模型 `str_replace_editor` 工具：`view` 显示带行号的文件内容或浅层目录列表，`create` 创建新文件，`str_replace` 应用唯一的字面量替换，`insert` 在选定的边界处插入行。它可以与持久 Bash、一次性 Bash、沙箱 Bash 或其他终端接口组合。修改操作遵守与 fs 家族其余部分相同的编辑前读取策略与沙箱围栏，具体由所挂载的后端与策略插件强制执行。当部署需要 Claude Code 风格、使用绝对路径的单一编辑器工具时选择它；`dsh-tool-fs` 包提供替代的 `read`/`write`/`edit` 套件。
+
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -21,7 +25,7 @@ schema 提供针对绝对路径的 `view`、`create`、`str_replace` 与 `insert
 
 #### 模型看到的内容
 
-生成的 [`str_replace_editor` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-str-replace-editor)，其中包含配置的 `description`。本插件不贡献独立系统提示词段。
+生成的 [`str_replace_editor` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-str-replace-editor)，包含配置的 `description`。本插件不贡献独立系统提示词段。
 
 #### Token 影响
 
@@ -44,8 +48,6 @@ schema 提供针对绝对路径的 `view`、`create`、`str_replace` 与 `insert
 #### KV Cache 影响
 
 工具结果以追加方式位于可复用请求前缀之后。
-
-**运行时不变式：** 不发布伴生入口。工具适配器不持有独立持久状态；文件系统修改关系属于提供方与策略插件。
 
 ## 已知限制与暂缓事项
 

@@ -6,6 +6,10 @@
 
 其消费方包括 ACP（Agent Client Protocol）与 headless `stream-json` 快照套件，以及 Web 浏览器 e2e 流水线。Loader 驱动的套件使用此插件替代真实 LLM 适配器；Web 流水线直接安装它，以保留清理阶段的消费检查句柄。
 
+## 概述
+
+`dsh-llm-replay` 从已记录的 Session JSONL fixture（测试前置数据）回放模型流，让快照测试无需 API 密钥即可运行真实 agent。每个 parent 与 subagent 会话按首次调用顺序取得各自的已记录脚本，而同一会话内的调用会独立推进。`replay.override.json` 伴随文件表示持久 settlement 无法重建的分片前失败、取消、挂起与注入重试。需要以固定模型输出确定性测试真实 loop 行为时，可在 ACP（Agent Client Protocol）、headless 与 Web 浏览器场景中使用本包。
+
 ## fixture 的工作方式
 
 fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `assistant/chunk` 事件包含每个 `StreamChunk`，因此按 `(turn, step)` 分组即可重建每次 agent loop（智能体循环）的 `stream()` 调用的分片序列。压缩（compaction）摘要器成功时，日志记录方式有所不同：当 `compaction/summary` 携带 `llmStreamCall: true` 和完整的 `rawOutput` 时，回放会在该事件的位置重建一条规范成功流，其中每个块各使用一对 `block-start`/`block-end`，带上已记录的用量（如有），并以 `stop` 终止。提供方增量的精确切分不属于持久压缩结果。不带该标记的 `rawOutput` 并不意味着发生了本地 LLM 调用，因为模板摘要器和远程摘要器即使未使用此上下文的适配器，也可能保留完整输出。
@@ -74,9 +78,7 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 
 #### KV Cache 影响
 
-无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。该仅测试适配器消费固定的回放脚本；其流语法由 LLM 伴生插件与 fixture 派生测试检验。
+无；本包既不组装也不发送提供方请求。
 
 ## 已知限制与暂缓事项
 

@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-Node 内置的 `fetch` 会忽略 `HTTP_PROXY` 与 `HTTPS_PROXY`，因此在代理后面运行的 Harness 无论用户导出了什么都会直连——LLM（大语言模型）请求、每次 web 搜索、走 HTTP 的 MCP 与沙箱 SDK 一概如此。本包从启动器的环境快照解析出一份代理策略，并把它装成 undici 的全局 dispatcher，而这正是 `fetch` 解析的对象。因此普通调用点无需改动、也无需引入本包：写 `fetch()` 就已经走代理。全局 dispatcher 自身够不到的场合由四个函数覆盖——安装策略、询问某个请求怎么发、把策略交给派生的子进程、以及为重放清掉它。
+Node 内置的 `fetch` 会忽略 `HTTP_PROXY`/`HTTPS_PROXY`。本包从启动器的环境快照解析出一份代理策略并装成 undici 的全局 dispatcher——这正是 `fetch` 解析的对象——因此普通调用点无需改动即走代理。全局 dispatcher 自身够不到的场合由四个函数覆盖：安装策略、询问单个请求的去向、把策略交给派生的子进程、以及为重放清掉它。
 
 ## 目录
 

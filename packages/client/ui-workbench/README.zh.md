@@ -6,6 +6,11 @@
 
 插件不导入 ConversationRoot、ChatView、InputBar 或其他呈现实现。conversation slot 的拥有者通过显式 SessionProvider 渲染各面板，因此每个面板都从同一对象层获取独立的 Session 标准 props、会话 store、projection 和注入操作。根 slot 的注入控件会在渲染时解析活动面板；缓存的根注入不会固定持有某个 Session 或 runtime target。
 
+## 概述
+
+使用 `dsh-client-ui-workbench` 把最多四个既有工作区会话呈现为一个多面板会话工作台，含会话选择器与面板选择、排序、比例与模式控制。每个面板经普通会话槽位属主在显式会话作用域下渲染，注入的控件始终解析到活动面板而非缓存目标。
+
+
 ## 组合
 
 `apply()` 等待 `conversationViewport`，通过 `ctx.slots.inject()` 注册工作台控件。侧栏面板列出已暂存的面板并提供聚焦与关闭操作，Add 与等宽操作绑定同一个选择器 store 和 viewport 能力，可退出回单会话模式，并声明由 ui-conversation 以紧凑显示偏好行填充的 `conversation.workbench.display` 孔位。提供方拥有有界 Session stage 集合；卸载工作台会释放额外历史窗口，保留普通当前会话视图。Gateway 返回经过 ACL 过滤的账户级目录，选中的项目运行时使用独立的目标传输和 principal assertion。在云端 Web 中，`workspace/resource-open` 请求预览消费方接收明确绑定 runtime 的文件。工具栏按目录读取 Workspace 文件，共用资源元数据，并通过带版本保护的 `workspaceFiles.read` 分页；二进制内容使用有界 Base64 窗口。文件变化需要重新加载，临时重连保留内容，权限拒绝则隐藏内容。本地 loopback 只有在所属连接声明原生打开能力时才调用 Host 的 `openPath`。Session JSONL、持久化格式和 Collaboration 授权语义保持不变。
@@ -18,13 +23,13 @@
 
 会话选择器排除已归档的根会话和未选中的空白草稿。个人记录使用侧栏相同的 `workspace.list.archivedSessionIds` 快照；项目记录排除归档索引中的条目，打开目标时再次检查其实时 Workspace 归档集合。账户目录响应是候选列表的依据，不会用被排除的本地记录补全。
 
-## Model Experience
+## 模型体验
 
-无；此插件只排列已有对话视图，不贡献提示词、工具 schema 或 Session 事件。
+没有直接影响；仅浏览器侧的面板控件不注册任何模型可见内容，全部模型可见内容由既有会话提交路径负责。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-无；插件不组装或发送模型请求。
+无；本包从不组装或发送提供方请求。
 
 ## Known Limitations and Deferred Work
 

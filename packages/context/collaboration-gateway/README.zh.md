@@ -4,6 +4,11 @@
 
 `dsh-collaboration` 服务定义的 Gateway 提供方。它从 `dsh-gateway-runtime` 派生参与者，将项目成员身份和根对话 ACL 决策委托给经认证的 Gateway 内部端点，并在向消费者发布前验证每个返回字段。
 
+## 概述
+
+使用 `dsh-collaboration-gateway` 作为 `dsh-collaboration` 服务定义的 Gateway 后端提供方。它从 `dsh-gateway-runtime` 派生参与者，把成员关系与根会话 ACL 决策委托给已认证的 Gateway 内部端点，并在向消费方发布前校验每个返回字段。
+
+
 ## 运行时约定
 
 - `capture()` 将当前已验证 principal 固化为一份 authority，其参与者、过期时间和提供方生命周期在该请求或流操作期间保持稳定。
@@ -14,13 +19,11 @@
 
 ## 模型体验
 
-通过面向模型操作的授权间接影响模型体验；参与者提示归属信息仍由 `dsh-collaboration-context` 负责。
+经由 dsh-collaboration-context 间接产生影响；本提供方所授权操作的模型可见参与者归属由该消费方负责。
 
 #### KV Cache 影响
 
-授权不贡献请求 token，也不改变已经可复用的前缀。
-
-**运行时不变式：** 不发布伴生入口。每项授权决定以 Gateway 为权威。
+无直接失效；消费方负责请求前缀的任何变化。
 
 ## 已知限制与延期工作
 

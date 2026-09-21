@@ -10,6 +10,10 @@
 
 插件还贡献 `tool:pwsh` 提示词段落（order 105）：非零退出以 `[exit code: N]` marker 报告，Windows 上的中断以无 signal 的 exit 1 结算。
 
+## 概述
+
+`dsh-tool-pwsh` 为 agent（智能体）提供 `pwsh` 工具，通过已挂载的 shell 执行器运行 PowerShell 命令——它是 `dsh-tool-bash` 的 Windows 对应物，逐调用镜像。每次调用都运行在全新 pwsh 进程中，因此状态不会保留；`run_in_background` 把长时间运行的命令变成后台任务。命令是 PowerShell 方言：原生 `C:\...` 路径与 `$env:NAME` 变量，不做方言翻译。每次调用都运行在受管 `DSH_*` 环境中；在沙箱执行器下，工具会向模型说明并强制执行 Windows 特有的语言模式与命名管道约定。请与 `dsh-pwsh-local` 等 PowerShell 执行器以及 `dsh-shell-env` 插件一起挂载。
+
 ## 工具
 
 ### `pwsh`
@@ -44,11 +48,11 @@
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
-本插件注册作用域内的每个请求都包含下面的 pwsh 指引。作用域工具限制可以隐藏 schema，但不会移除这个独立注册的段落。
+该插件注册作用域内的每次请求都在 first-party 顺序 1010 处包含以下 pwsh 指引。按作用域实施的工具限制可以隐藏 schema，却不会移除这个独立注册的区段。
 
-##### Pwsh guidance
+##### Pwsh 指引
 
 ```markdown
 Non-zero exits are reported as `[exit code: N]` markers; investigate failures before moving on. On Windows a killed process settles as `[exit code: 1]` without a signal marker; treat a bare exit 1 after an interruption as a termination, not a command failure.
@@ -56,69 +60,67 @@ Non-zero exits are reported as `[exit code: N]` markers; investigate failures be
 
 #### Token 影响
 
-插件激活期间每次请求的固定小额输入成本。
+插件激活期间，每次请求都会产生少量固定的输入 token 开销。
 
 #### KV Cache 影响
 
-注册作用域与 prompt 文本不变时前缀稳定。插件激活或释放可能使该 prompt 段落的复用失效。
+只要注册作用域与提示词文本不变，前缀就保持稳定。插件激活或释放可能使从该提示词区段起的复用失效。
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-模型看到生成的 [`pwsh` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-pwsh)。按 agent 作用域的工具限制可以移除该 agent 的定义。
+模型会看到生成的 [`pwsh` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-pwsh)。按 agent 作用域实施的工具限制可以移除该 agent 的定义。
 
 #### Token 影响
 
-工具可见的每个请求上的固定 schema 成本。
+工具可见的每个请求都会产生固定 schema 开销。
 
 #### KV Cache 影响
 
-可见性与工具定义不变时前缀稳定。限制或配置变更可能从首个变化 token 起使复用失效。
+只要可见性与工具定义不变，前缀就保持稳定。限制或配置变化可能从首个变化的 token 开始使复用失效。
 
 ### 前台结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-渲染器输出数据相关的 stdout 尾部，然后是可选的 `[stderr]` 与 stderr 尾部。条件行精确为 `[output truncated; full output: <path>]`、`[sandbox: file access denied under <mode> mode]` 加升级提示 `[sandbox: escalation available — …]`（仅当组合公开升级能力时）、`[timed out after <timeoutMs>ms]`、`[killed by signal: <signal>]` 与 `[exit code: <exitCode>]`（仅非零退出）；空体渲染为 `(no output)`。
+渲染器输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 和 stderr 尾部。条件行精确为 `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]` 加升权提示 `[sandbox: escalation available — …]`（仅在组合声明升权时）、`[timed out after <timeoutMs>ms]`、`[killed by signal: <signal>]` 与 `[exit code: <exitCode>]`（仅非零退出）；空正文渲染为 `(no output)`。
 
 #### Token 影响
 
-调用前零结果 token。每个流的输出有界，而每条已发出的行保留在历史中直到压缩。
+调用前的结果 token 为零。输出按流设界，而每行已发出的内容在压缩（compaction）前保留于历史。
 
 #### KV Cache 影响
 
-仅追加；新出现的内容跟随可复用的请求前缀，不会使既有 KV Cache 条目失效。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
 ### 后台结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-后台启动精确渲染为 `started background job <id>`；随后的读取与状态通过通用 `job_output`/`job_kill` 工具流转，包括内存截断丢弃未读字节时的 lossy 读取 spill 通知。
+后台启动精确渲染为 `started background job <id>`；随后的读取与状态经由通用 `job_output`／`job_kill` 工具流转，包括内存截断丢弃未读字节时的有损读取 spill 通知。
 
 #### Token 影响
 
-ack 是固定短行；任务输出按读取有界。
+确认是一行固定的短文本；任务输出按每次读取设界。
 
 #### KV Cache 影响
 
-仅追加；新出现的内容跟随可复用的请求前缀，不会使既有 KV Cache 条目失效。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
 ### 工具错误
 
-#### 模型看到的内容
+#### 模型看到什么
 
-校验与基础设施失败规范化为 `Error: <message>`。本包的稳定消息包括 `invalid command: expected a non-empty string`、`invalid description: expected a non-empty string`、`invalid timeoutMs: expected a positive number, got <value>`、`invalid escalation: sandbox_permissions requires a justification`、`invalid escalation: justification is only valid together with sandbox_permissions`、`invalid justification: expected a non-empty sentence`、`sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`、共享的升级失败（非严格更宽、无审批服务、无 agent 可路由、无审批通道、用户拒绝、已取消）、`run_in_background is disabled for this deployment (enableRunInBackground: false)`、`background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs` 与 `tool call aborted`。
+验证与基础设施失败统一为 `Error: <message>`。本包的稳定消息包括 `invalid command: expected a non-empty string`、`invalid description: expected a non-empty string`、`invalid timeoutMs: expected a positive number, got <value>`、升权配对失败、`sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`、共享升权失败（未严格加宽／无审批服务／无 agent 可路由／无审批通道／用户拒绝／已取消）、`run_in_background is disabled for this deployment (enableRunInBackground: false)`、`background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`，以及 `tool call aborted`。
 
 #### Token 影响
 
-只有失败的调用会新增这些保留 token；被中止的调用不产生命令输出。
+只有失败调用会增加这些保留 token；被中止的调用不会添加命令输出。
 
 #### KV Cache 影响
 
-仅追加；新出现的内容跟随可复用的请求前缀，不会使既有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
 ## 已知限制与暂缓事项
 

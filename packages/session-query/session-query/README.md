@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 `SessionQueryEngine` is the combined abstract `ctx.sessionQuery` contract. It implements exact session-history retrieval, relationship tracing, and provider-independent filtering over live `ctx.sessions` plus optional dynamically mounted `ctx.sessionPersistence`; concrete backends implement its two full-text methods. Matching ids produce one record: live events win, while `live` and `persisted` report both source availabilities. Conflicting immutable headers fail with `SESSION_QUERY_SOURCE_CONFLICT`.
 
+## Summary
+
+`dsh-session-query` lets application code list, filter, read, and search session history, inspect bounded event context, and trace session or event relationships. Reads prefer live sessions over persisted copies and return detached clones from one consistent observation. Exact reads, filters, and traces work with any supported storage setup; ranked full-text search requires a backend such as `dsh-session-query-sqlite`. Use it when application code needs programmatic access to the history presented to the model.
+
 ## Reads
 
 - `listSessions(signal?)` reads current persistence metadata, merges live records with live precedence, and returns cloned records in deterministic newest-first order.
@@ -46,13 +50,11 @@ The package has no provider coordinator, fallback implementation, or standalone 
 
 ## Model Experience
 
-None, as this trusted query service returns cloned session records only to its callers and registers no model-facing prompt, schema, tool, or message.
+None, as the trusted query service exposes cloned records only to callers and registers nothing model-facing.
 
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. Query results are immutable per-call projections whose lineage and event relations are validated while they are built; the service retains no observable result state.
 
 ## Known Limitations and Deferred Work
 

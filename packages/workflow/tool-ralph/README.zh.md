@@ -4,6 +4,10 @@
 
 面向模型的 `ralph` 工具运行固定的前台工作流，把一个不可变目标依次交给多个全新子 agent（智能体）。它展示如何把专用编排策略实现为基于 [`ctx.workflowEngine`](../workflow/README.zh.md) 和 [`ctx.subagents`](../../subagent/subagent/README.zh.md) 的普通插件：不会向 `agent-loop` 添加 Ralph 模式或全新 agent loop（智能体循环），同会话的[目标领域](../../goal/goal/README.zh.md)也保持独立。策略和暂缓事项由 [Ralph Agent Note（agent 决策记录）](../../../.agents/notes/implemented/feature/2026-07-19-fresh-agent-ralph-workflow-tool.zh.md)负责。
 
+## 概述
+
+`ralph` 针对一个不可变目标运行由多个全新子 agent 组成的前台序列，每个 Round 只接收上一份有界报告与共享工作区状态。它会在 worker 报告完成或具体阻塞，或达到配置的 Round 上限时返回；这些报告不会得到独立验证。父级对话与先前子 agent 会话绝不会复制到新的 Round。仅当直接用户明确要求 Ralph 式全新 agent 迭代时使用它；普通的长期工作请使用 goal 工具，有界委派请使用 subagent 或工作流。
+
 ## 契约
 
 `ralph({ objective, maxRounds? })` 会等待整个运行完成。部署配置中的 `maxRounds` 既是默认值，也是调用覆盖值的上限。每个 Ralph Round 通过 `subagentProvider` 启动一个子 agent；该提供方必须存在、支持结构化输出，并报告 `inheritsParentContext: false`。已配置的提供方以 `WorkflowStartRequest.subagentProvider` 传递，使固定脚本无法检查或更改路由，普通的模型编写 `workflow` 工具也不会因此获得提供方选择器。解析后的 Round 上限还会作为 `WorkflowStartRequest.maxTotalAgents` 传递，使固定循环与引擎的子 agent 总数后备上限协同；Ralph 上限超过引擎部署上限时，引擎会在发布运行前拒绝。
@@ -37,14 +41,14 @@
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
-在该插件的注册作用域内，每个父级请求都会收到下方的固定路由指导。
+在该插件的注册作用域内，每个父级请求都会收到下方固定的路由指导。
 
 ##### Ralph 指导
 
 ```markdown
-Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflowEngine for bounded delegation and fan-out.
+Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflows for bounded delegation and fan-out.
 ```
 
 #### Token 影响
@@ -53,13 +57,13 @@ Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop o
 
 #### KV Cache 影响
 
-只要插件作用域和指导文本不变，前缀就保持稳定。启用或 dispose（资源释放）可能会使从该提示词段起的缓存复用失效。
+只要插件作用域与指导文本不变，前缀就保持稳定。启用或 dispose（资源释放）可能会使从该提示词段起的缓存复用失效。
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-已生成的 [`ralph` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-ralph)公开一个必填 `objective` 字符串和一个可选 `maxRounds` 数字。提供方选择、交接大小、报告 schema、工作流脚本和编排行为均由部署侧控制，不在调用 schema 中。
+已生成的 [`ralph` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-ralph) 公开一个必填 `objective` 字符串与一个可选 `maxRounds` 数字。提供方选择、交接大小、报告 schema、工作流脚本与编排行为均由部署侧控制，不在调用 schema 中。
 
 #### Token 影响
 
@@ -67,13 +71,13 @@ Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop o
 
 #### KV Cache 影响
 
-只要定义和可见性不变，前缀就保持稳定。
+只要定义与可见性不变，前缀就保持稳定。
 
 ### 子 agent 请求与父级结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-每个子 agent 都会看到独立的固定 Round 提示词和结构化输出捕获契约。父级只看到原始调用和一个终态结果，其中包含 worker 报告的状态、Round 数量及经过美化打印的最终报告；中间子 agent 消息和报告不会进入父级对话。普通子 agent 失败时会改为产生错误，其中包含对应 Round 编号；从第二个 Round 起，还会包含上一次成功交接。
+每个子 agent 都会看到独立的固定 Round 提示词与结构化输出捕获约定。父级只看到原始调用与一个终态结果，其中包含 worker 报告的状态、Round 数量与美化打印的最终报告；中间子 agent 消息与报告不会进入父级对话。普通子 agent 失败时改为产生错误，其中包含对应 Round 编号；从第二个 Round 起，还会包含上一次成功交接。
 
 #### Token 影响
 
@@ -82,8 +86,6 @@ Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop o
 #### KV Cache 影响
 
 每个全新子 agent 都有独立的请求缓存。父级结果追加在可复用请求前缀之后。
-
-**运行时不变式：** 不发布伴生入口。该面向模型的编排适配器不拥有独立事件流；工作流与 subagent 归属方会校验该适配器启动的运行及其子 agent 生命周期。
 
 ## 已知限制与暂缓事项
 

@@ -8,6 +8,10 @@
 
 客户端 handle 还暴露可观察的连接状态与立即 `reconnect()` 操作。WebSocket 下行心跳允许连续两次 Pong 丢失后再安排终止，在保持卡顿主机可恢复的同时容忍一次繁忙事件循环。
 
+## 概述
+
+本包承载浏览器到 Host 的 Remote 调用、精确 Fetch 响应与 connection generation。Client 插件挂载 `ctx.connection`，其中包含当前页面的 loopback 状态、通用 RPC、当前 generation 及其 Host 信息、可观察的恢复状态、立即重连命令，以及单一 generation source 的注册点。source 报告 ready 后 generation 才可见；source 结束、失败、被撤回或显式 stop 都会清空它，再由 `ConnectionController` 执行重试策略。
+
 ## Host 配置
 
 `historyPageTargetBytes` 接受正整数，并设置每个完整、未压缩的 history RPC `server-response` JSON 正文以 UTF-8 字节计的目标大小。默认值为 131072 字节。分页会保留完整的 append 来源消息组，因此一个不可分割的消息组可能超过该目标。Fetch 历史响应仍打包剩余的 `assistant/chunk` 游程，并往返 `detail: 'conversation'` 的可选 `omittedSpans`；下载档见 [两档会话历史传输决策](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)。
@@ -37,8 +41,6 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 #### KV Cache 影响
 
 无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。浏览器会话验证会在请求授权工作时异步读取凭据记录，而记录的 commit-event 生命周期由 credentials 伴生入口负责；流与重连的时序及 rpcId 往返约束由行为规范直接验证，路由注册与 dispose（资源释放）的对称性由 webserver 伴生入口审计。
 
 ## 已知限制与暂缓事项
 

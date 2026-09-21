@@ -10,15 +10,17 @@ Settled rows stay visible and de-emphasized until the registry drops them at own
 
 Escape closes the list and returns focus to the trigger, as does a pointer press outside it. Below 768px the same list becomes a safe-area phone sheet with the shared backdrop and touch-sized rows. The last job disappearing closes the list before the control unmounts, so focus never vanishes from a removed node. Styling uses tokens only; copy goes through the package's own `job` locale namespace. The behavior is specified by the [Web background-job display Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.md).
 
+## Summary
+
+This package renders the background-job surface of the Web GUI: a session-header action that opens a popover listing the jobs this session can see. It reads host-computed registry state through the runtime's `jobsBySession` mirror and issues no RPC of its own. The trigger appears only when the session has at least one job, with a badge counting running and stopping jobs; settled rows stay visible and de-emphasized until the registry drops them. The model's own view of the same jobs belongs to `dsh-tool-jobs`; this package is a read-only projection for the human.
+
 ## Model Experience
 
-None, as this package renders host-computed registry state for a human and touches no prompt, message, schema, stream, or tool result. The model's own view of the same jobs stays with [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md).
+None, as this package renders host-computed registry state for a human and touches no prompt, message, schema, stream, or tool result.
 
 #### KV Cache effect
 
 None; the package never assembles or sends provider requests.
-
-**Runtime invariant:** No companion is published. This package is a read-only projection of the `jobsBySession` mirror onto one header slot entry. It emits no Cordis events, owns no cross-plugin mutable state, and its single slot registration proves disposal through the HMR-safety spec.
 
 ## Known Limitations and Deferred Work
 

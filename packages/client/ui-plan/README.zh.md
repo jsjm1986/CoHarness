@@ -10,15 +10,17 @@ chip 携带无障碍描述 "Plan mode on, press to turn off"。准入失败（`m
 
 模型通过稳定的 `exit_plan_mode` 工具退出 plan mode；其 plan 评审走已组合的 Web question 通道。
 
+## 概述
+
+计划模式让你在实施前审阅计划。通过 `/plan` 进入，通过编辑器中的状态按钮退出。提交的计划自动在右侧边栏打开供审阅；批准、拒绝或关闭审批后，仍可通过已完成回合末尾的产物卡片查看。重新打开同一计划会聚焦已有标签页，刷新浏览器后会从会话历史恢复正文。
+
 ## 模型体验
 
-间接地，通过 chip 派发的 `/plan off` 命令行：`@deepseek-ai/dsh-plan-mode` 拥有该命令行驱动的模型可见 policy 段、退出工具 schema 与已记录状态，本包只渲染投影并发送用户同样可以手敲的内容。
+间接地，通过 chip 派发的 `/plan off` 命令行：`dsh-plan-mode` 拥有该命令行驱动的模型可见 policy 段、退出工具 schema 与已记录状态。
 
 #### KV Cache 影响
 
 进入或离开 plan mode 会改变活跃的 `plan:policy` 系统提示词段，因此改变请求前缀；chip 本身不添加任何提示词内容。
-
-**运行时不变式：** 不发布伴生入口。plan state 与 boundary 的所有权由 dsh-plan-mode 审计；本包的 control 是一种 slot effect，其声明、注册与清理由本包执行。
 
 ## 已知局限与延后工作
 

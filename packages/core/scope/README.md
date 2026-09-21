@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Scoped registration primitive. `createScope(ctx, key)` creates a tagged Cordis context whose backing fiber owns every registration made through it. `scopeOf(ctx)` reads the tag, and `scopeTarget(base, key)` routes scoped events to listeners with the same key while leaving unscoped listeners global. Keys form an optional parent chain (`bindScopeParent`): registration views inherit DOWN it — a child scope sees its ancestors' layers, nearest shadowing farthest — and event admission extends UP it — a listener tagged with an ancestor receives a descendant key's events, never the reverse. The agent loop creates one scope per live agent and an agent preset's standing mount is a parent scope over its agents, but the mechanism is key-agnostic so lower-level packages can use it without depending on either.
 
+## Summary
+
+`dsh-scope` lets plugin authors give each agent or group an isolated contribution set with a shared lifetime. Child scopes inherit ancestor contributions, with the nearest definition taking precedence, while ancestor scopes can observe descendant activity; neither relationship works in reverse. Disposing a scope removes everything owned by it. Use this dependency-free library when per-agent or per-group isolation must work without depending on the agent loop or presets.
+
 ## Public API
 
 - `createScope(ctx: Context, key: ScopeKey, options?): Scope` Mint a scope under `ctx`'s fiber. Usable synchronously (effect collection is uid-gated; service resolution falls through to the minting plugin's dependency surface). The typed, same-process key is trusted; an inactive minting context still fails through Cordis (`INACTIVE_EFFECT`). `options.parent` binds the enclosing scope via `bindScopeParent` before the scope is usable; the binding stays internal.

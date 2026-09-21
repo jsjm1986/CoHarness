@@ -6,6 +6,10 @@ Automation-only [Agent Client Protocol](https://agentclientprotocol.com) server 
 
 This package is a transport adapter, not a UI integration or a capability seam. It does not expose editor navigation, transcript replay, commands, modes, configuration pickers, elicitation, reasoning, plans, titles, or tool presentation. Interactive rendering and human questions belong to the Web host and client modules.
 
+## Summary
+
+`dsh-acp` lets trusted programs automate persistent DeepSeek Harness agents through the standard [ACP](https://agentclientprotocol.com): create or resume sessions, select a model and reasoning effort, attach MCP servers, submit or cancel work, receive semantic updates, and close sessions independently. Choose it for out-of-process subagents, test runners, and scripted controllers; it intentionally omits DSH-specific presentation data and interactive UI features. Persistence supports listing, resuming, and closing sessions across process restarts, but deletion, forks, transcript replay, and additional directories are unsupported. Run `pnpm dsh --profile acp` to start the server; use `dsh-subagent-acp` as the repository client.
+
 ## Plugin
 
 `apply(ctx, config)` builds a typed ACP `agent()` app, connects it to stdin/stdout, and drives `ctx.agents`. Stdout is reserved for protocol frames.
@@ -49,19 +53,19 @@ ACP requires each prompt response to carry a `stopReason`, but the bridge does n
 
 ## Model Experience
 
-### Prompt text and images
+### Prompt content
 
 #### What the model sees
 
-`session/prompt` preserves text/image order in one user message; adjacent text is concatenated, and a resource link appears as a bracketed `[resource_link name=… uri=…]` reference the model may open with its own tools. Inline image base64 is discarded after batch admission, so the durable message contains only verified attachment references. Protocol metadata, client capabilities, permission choices, and session ids never enter the model request.
+`session/prompt` preserves text and image order in one user message: adjacent text concatenates, and a resource link appears as a bracketed `[resource_link name=… uri=…]` reference the model may open with its own tools. Inline image base64 is discarded after batch admission, so the durable message contains only verified attachment references. Protocol metadata, client capabilities, permission choices, and session ids never enter the model request.
 
 #### Token effect
 
-Prompt tokens and image charges are data-dependent and remain in that session's history until compaction. Concurrent ACP sessions retain independent contexts.
+Prompt content, tool calls/results, and durable image references remain in that session until compaction. Concurrent sessions retain independent contexts.
 
 #### KV Cache effect
 
-Append-only; the new user message follows the reusable request prefix and does not invalidate prior cache entries.
+Append-only while the selected route and assembled prefix stay unchanged. A model change starts the next ACP turn on the new route.
 
 ### Permission decisions
 
@@ -76,8 +80,6 @@ Only the owning tool result contributes tokens.
 #### KV Cache effect
 
 Append-only through the owning tool result.
-
-**Runtime invariant:** No companion is published. This transport owns no durable package-local event stream; protocol and lifecycle tests cover its mapping.
 
 ## Known Limitations and Deferred Work
 

@@ -8,6 +8,10 @@ Beyond name, version, and table schemas, a spec may declare a storage `layout` (
 
 Design rationale, open semantics, and the storage/domain layer split live in the [Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md).
 
+## Summary
+
+Use this package to declare schema-validated key-value domains and open them through `ctx.storageDomain` over a configured storage backend. Reads return synchronously from validated in-memory state, while each write becomes durable before it resolves and emits `domain/changed` in order. Product packages use domain handles instead of accessing storage backends directly. This host-side state does not add tools, prompts, or session events, so it remains invisible to the model and agent loop.
+
 ## Configuration
 
 | key | meaning |
@@ -21,11 +25,11 @@ Design rationale, open semantics, and the storage/domain layer split live in the
 
 #### What the model sees
 
-Nothing. The package registers no tools, injects no prompts, and appends no session events; it stores non-session data (workspace records, future session sidecars) behind `ctx.storageDomain` and emits only the in-process `domain/changed` event, which reaches a model only if a Consumer package renders it through its own documented surface.
+Nothing. The package registers no tools, injects no prompts, and appends no session events; it stores non-session data behind `ctx.storageDomain` and emits only the in-process `domain/changed` event, which reaches a model only if a consumer renders it through its own documented surface.
 
 #### Token effect
 
-Zero. No text from this package enters any model request.
+Zero: no text from this package enters any model request.
 
 #### KV Cache effect
 

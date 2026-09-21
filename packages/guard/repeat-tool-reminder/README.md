@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 An advisory loop-breaker, not a model-facing tool: it never appears in the tool list, never vetoes or rewrites a call, and adds exactly one behavior — it watches each agent's stream of tool calls, counts runs of consecutive calls to the same tool with identical canonicalized arguments, and at configured run lengths injects an escalating advisory reminder telling the model to stop repeating itself, re-read the last result, and either change approach or conclude. The decision (retry differently, gather more evidence, or finish) stays entirely with the model: a legitimately repeated call is delayed by nothing and blocked by nothing. Decision record: [the repeat-tool-reminder Agent Note](../../../.agents/notes/archived/feature/2026-07-08-repeat-tool-guard.md).
 
+## Summary
+
+This package helps a model escape loops in which it calls the same tool with identical arguments without making progress. At configured repeat counts, it asks the model to inspect the previous result and change approach or finish. The reminder is advisory: it never blocks or delays a legitimate repeated call. Repeats are tracked separately for each agent and cleared by a new user message. The `dsh` base bundle enables the package with reminders at 3, 5, and 8 repeats.
+
 ## Config
 
 ```yaml
@@ -79,8 +83,6 @@ Each reminder is retained history; `argumentsPreviewChars` bounds its data-depen
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. The repeat chain is private to one post-execute listener and exposes no package-owned event or snapshot that an independent companion can observe.
 
 ## Known Limitations and Deferred Work
 

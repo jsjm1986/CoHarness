@@ -13,6 +13,10 @@ A stored row `(key → {ver, seq, val})` is a fold shortcut, never an authority:
 - **Records are bound to a log lifecycle, not just an id.** Each record stores the complete lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`, and the exact `inheritedEventCount`) it was folded from, so a row initialized under another Session format generation or fork cut cannot seed the caller; every read validates it (the live or stored header is the witness) before accepting a row, so a deleted-then-recreated id or a persistence store swapped under a surviving cache discards the unrelated record instead of seeding phantom values.
 - **The log leads, the cache follows.** A live checkpoint flushes the session's buffered events durably BEFORE the cache row lands, so a crash can leave the cache behind the log (a longer tail replay) but never ahead of it.
 
+## Summary
+
+This package keeps durable per-session projection checkpoints so history lists, statistics, and goal snapshots can read cached values without loading each session log. Cold projection folds can resume after the checkpointed prefix, reducing restart work. The session log remains authoritative: a crash can leave a checkpoint stale, but never ahead of committed events, and incompatible records are ignored or backed up. Choose it for restarted sessions with frequent projection reads; skip it when projections are live-only or extra storage writes and unbounded checkpoint retention outweigh the saved work.
+
 ## Write policy
 
 Three mandatory points, throttled in between:
@@ -55,13 +59,11 @@ Injects `storageDomain`, `sessionProjections`, `sessions`. Without this row the 
 
 ## Model Experience
 
-None, as the cache only persists and restores host-side read models of already-logged session state and touches no prompt, message, schema, stream, or tool result.
+None, as the persisted cache accelerates host-side reads of projection state and registers nothing model-facing.
 
 #### KV Cache effect
 
 None; the cache never assembles or sends provider requests.
-
-**Runtime invariant:** No companion is published. The cache's correctness relation (a stored row equals the registry fold at its `seq` watermark) is only checkable by re-running the fold over the persisted log — duplicating the implementation rather than detecting drift — and its staleness is by design (fail-soft writes). The durable boundary is schema-validated by the cache's own zod parse on every read, and the read ladder's version/watermark guards are proven by the package spec.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Storage hub (`ctx.storage`) for non-session data: a named backend registry plus mounted data-form facilities. The hub performs no IO itself — backends own media, and data forms own semantics. The [storage family overview](../README.md) maps those packages; the [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) records the design rationale.
 
+## Summary
+
+Use `dsh-storage` to keep typed application data durable without adding it to session history. Mount it with a supported storage medium and domain configuration, then callers can access records through the public `ctx.storageDomain` API. Choose it for workspace records, session sidecars, or other application state that must survive restarts without becoming session events. It is available only to host code and has no model-visible effect; compositions that do not need such data can omit it.
+
 ## Shape
 
 - `ctx.storage.backend` — name → backend table. Multiple backends stay mounted side by side (`json`, `sqlite`); which backend serves a consumer is that consumer's configuration (the domain layer's route table), never a hub-global choice. `register()` returns the disposer; duplicate names and unknown lookups fail loud.
@@ -16,7 +20,7 @@ Storage hub (`ctx.storage`) for non-session data: a named backend registry plus 
 
 #### What the model sees
 
-Nothing. `ctx.storage` is a host-side registration table; the hub registers no tools, injects no prompts, and writes no session events.
+Nothing. `ctx.storage` is a host-side registration table: the hub registers no tools, injects no prompts, and writes no session events, so no request field ever carries this package's data.
 
 #### Token effect
 
@@ -25,8 +29,6 @@ Zero direct tokens on every request.
 #### KV Cache effect
 
 Independent of live requests: the hub never touches a request prefix, so it cannot invalidate provider cache reuse.
-
-**Runtime invariant:** No companion is published. The hub is a pure registration table (names → backends, forms → facilities) whose consistency is fully enforced at the call sites (duplicate/missing entries fail loud synchronously); it owns no event stream or mutable medium to cross-check.
 
 ## Known Limitations and Deferred Work
 

@@ -10,15 +10,17 @@ Mutations go through `ctx.remote.messageFeedback`; the Host owns per-item compar
 
 The `/client` exports are the plugin body (`apply`/`inject`), the `MessageFeedbackActions` component, the `MessageFeedbackController` class, and the injected face types.
 
+## Summary
+
+This package is the Web GUI's feedback surface: the Like/Dislike pair in the finalized assistant message's action strip, the feedback dialog with its acknowledgement and failure toasts in the composer overlay, and a decoration that opens the dialog from a bare `/feedback`. Like and Dislike both open the dialog, which collects a category and an optional description before recording the selected rating. One surface per Session backs every entry, so a single list read seeds the whole transcript and one dialog serves the Session and its messages. Ratings, categories, and notes are log-only Session events that never enter model context.
+
 ## Model Experience
 
-None, as feedback is a sidecar that never enters the append-only Session log, the model context, or telemetry; no rating or note is ever visible to the model.
+None, as ratings, categories, and notes are log-only events, not model input. Optional Session-log delivery uses request metadata rather than model context.
 
 #### KV Cache effect
 
-None; no feedback mutation touches the history tail.
-
-**Runtime invariant:** No companion is published. The plugin owns two slot registrations, one command decoration, and one per-session controller-pair map, all released by the plugin fiber's effect disposers. The lifecycle spec proves the registrations are withdrawn and every controller pair is dropped when the owning fiber is disposed, so no second authority exists to check at runtime.
+None; feedback mutations leave the model-visible history unchanged.
 
 ## Known Limitations and Deferred Work
 

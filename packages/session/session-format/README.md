@@ -11,6 +11,10 @@ English | [中文](README.zh.md)
 
 The default catalog in `src/catalog-default.ts` contains the static v0 → v1 → v2 → v3 chain. First-party providers supply the released physical codecs and event normalizers through this catalog; provider code must not copy the chain or invent a parallel format version.
 
+## Summary
+
+`dsh-session-format` lets persistence code restore a current Session directly or compose a unique sequence of adjacent migrations while consuming physical rows once. A restore transfers caller-owned parsed values through stateful stages without intermediate artifact copies or freezing. Physical framing, compression, immutable generation naming, exclusive publication, and Cordis lifecycle behavior remain outside this library.
+
 ## Ownership and safety
 
 - Future versions refuse before body decoding.
@@ -23,13 +27,19 @@ The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remai
 
 ## Model Experience
 
-None, as this package only validates and migrates durable Session data; provider and prompt consumers own every model-visible effect.
+### Session restoration
+
+#### What the model sees
+
+Nothing directly. Consumers reconstruct model history from the validated current artifact through `deriveMessages()`.
+
+#### Token effect
+
+Zero direct tokens.
 
 #### KV Cache effect
 
-No direct invalidation: the package does not contribute request tokens or mutate a model request prefix.
-
-**Runtime invariant:** No companion is published. Each completed operation validates its result; decoder and transformer state belongs to one unfinished streaming restore and is never shared across restores.
+No direct effect. A migration that changes current history can change the cache identity owned by request reconstruction.
 
 ## Known Limitations and Deferred Work
 

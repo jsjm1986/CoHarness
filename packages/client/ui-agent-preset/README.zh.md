@@ -4,6 +4,10 @@
 
 agent preset 的各个表层：General 设置中的一行，用于选择新建会话据以组装的 [preset](../../preset/agent-presets/README.zh.md)；新建会话界面上的一枚 chip，用于选择**下一个会话**的 preset；会话标题旁的一个只读标签；以及一个设置页分区，用于管理名单——复制、删除、默认值，以及通往 preset 自身文件的入口。
 
+## 概述
+
+使用本包可以为新的 Web GUI 会话选择 agent preset、在会话标题中查看当前 preset，并在设置中管理可用 preset。Agent 模式选择器默认显示；设置可以隐藏它，而不会改变运行中或历史会话。preset 在会话创建时即固定，因此更改选择或默认值只影响此后创建的会话。如果部署未提供任何 preset，这些控件保持隐藏，每个会话都使用宿主组装。
+
 ## 为什么它是"新建会话"的偏好设置
 
 会话的 preset 在创建时即固定——宿主拒绝以不同 preset 接管已存在的会话，因为该会话的历史是在最初那份 preset 的工具下产生的。因此本行不可能是实时切换，它也如实说明了这一点：更改只对此后开启的会话生效，而运行中的会话保持它们开始时的组装。
@@ -58,13 +62,11 @@ preset 自行发布描述，长度不限，而网格让每一行卡片等高—�
 
 ## 模型体验
 
-Indirectly, through the preset a later session is composed from; [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md) owns what that composition puts in front of the model.
+间接影响，经由此后会话据以组装的 preset；它所选择的 preset 拥有所有面向模型的效果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-没有直接的失效影响。更改默认值绝不触及运行中会话的前缀；此后创建的会话依据它自己的组装建立自己的前缀。
-
-**运行时不变式：** 不发布伴生入口。这是浏览器侧界面插件，Node 侧不拥有事件流或可变运行时数据；名单与设置写入属于宿主约定。
+没有直接的失效影响。更改选择器可见性或默认值不会改变运行中会话的组装或前缀，也不会改变历史会话已记录的 preset；此后创建的会话依据它自己的组装建立自己的前缀。
 
 ## 已知限制与暂缓事项
 

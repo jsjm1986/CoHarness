@@ -8,6 +8,10 @@ harness LLM（大语言模型）seam 的 DeepSeek chat-completions 适配器：�
 
 包根入口导出 Cordis 插件约定与 `DeepSeekAdapter`；协议序列化、SSE 解析与分片转换 helper 不属于该根约定。
 
+## 概述
+
+通过 `deepseek-official` 流式调用 DeepSeek 模型，默认使用 Messages，也可在 Cordis YAML 中选择 Chat Completions。两种协议共用凭据、端点配置、图片处理和模型目录。有效的设置更改在后续请求生效，进行中的请求保留原配置。Web 显示一个 DeepSeek 提供方，并提供 API 地址和密钥编辑。本包可与 [pi-ai 适配器](../llm-pi-ai/README.zh.md)并用。
+
 ## 配置
 
 ```yaml
@@ -109,33 +113,31 @@ DeepSeek 请求身份独立于应用归因。凭据解析成功后，每个提�
 
 ### DeepSeek 请求
 
-#### 模型看到的内容
+#### 模型看到什么
 
-所选 DeepSeek 模型会收到 harness 系统提示词、消息历史、工具 schema、stop sequence 和调用配置。视觉模型通常通过 Files API 引用收到保留的 user 与工具结果图片，旁边带有稳定附件句柄和请求图片尺寸；Files 解析失败时，所有保留图片改用内联 data URL。请求图片投影按 `imagePreparationConcurrency` 限制的固定批次准备，因此较慢的前置图片不会让整个请求长期保留已经完成的投影。超出上限的较旧图片由已记录的占位文本表示。之前 assistant 轮次的推理内容会原文回传，无论该轮次是否调用了工具。
+所选 DeepSeek 模型会收到 harness 系统提示词、消息历史、工具 schema、停止序列与调用配置（`maxTokens`、`reasoningEffort`、`temperature`），不包含适配器撰写的提示词散文。提供方专用请求扩展字段留在模型输入之外。视觉模型通常接收 Files API 引用形式的用户与工具结果图片，其旁带附件句柄和请求预览尺寸。当前执行文件系统可以映射附件提供方的宿主对象时，它还会收到规范化对象路径；描述符会把该副本标记为只读，并警告规范化可能缩放或重新编码上传内容。Files 解析失败时，全部保留图片改用内联 base64；超出预算的较旧图片则在占位文本中保留当前请求已解析的访问方式。此前 assistant 轮次的推理内容会原样传回，无论该轮次是否调用了工具。 对于非法 JSON 或非对象的历史工具参数，Messages 发送 `{}`。调用 ID、工具名和结果保持不变，原始参数仍保留在 Session 日志中。从 Chat Completions 切换后也适用此静默兜底。新生成的 Messages 工具参数仍须是有效 JSON 对象。
 
 #### Token 影响
 
-精确文本与图片 token 输入取决于提供方 tokenization。推理回传会把每个含推理轮次的思维链带入后续请求，丢弃超出上限的图片则避免再次支付这些 token；可用时会报告 cache-read 用量。
+提供方分词决定精确的文本与图片 token 输入。适配器声明按路由的 `imageRequestPricing`：把日志中的图片省略决策选中的每个出现位置按其占位文本计价，并按投影后的尺寸使用公开的视觉计量规则（14 px patch 网格、3:1 降采样、544×544 放大下限、单图 1024 token 上限）为每张保留图片计价。这使 token 计量服务可以在请求发出前为图片压力定价；上报的 usage 仍是权威值。推理回传会把每个推理轮次的思维链带进后续请求，而已省略的图片不再消耗视觉 token。保留的出现位置按精确请求版本字节超过 file 模式或内联回退预算（`maxRequestFilesBytes`、`maxImagesPerRequest` 与两个量子）的请求，以 `IMAGE_OFFLOAD_REQUIRED` 失败并说明还需省略多少最老的出现位置，由 `dsh-compaction-image-offload` 用 `image/offload` 事件记录所选位置并重试。可用时报告缓存读取用量。Messages 的 token 总数包含未缓存输入、输出、缓存读取与缓存写入 token。Chat Completions 使用 `prompt_tokens + completion_tokens`，提供方给出的 `total_tokens` 不一致时省略 `totalTokens`。
 
 #### KV Cache 影响
 
-未更改的已组装前缀，包括确定性编码的保留图片与占位文本，可使用 DeepSeek cache 复用，适配器会在 usage 中报告它。模型路由变更，或任何上游提示词、schema、前缀、历史或图片上限变更，都可能使从首个发生变化的 token 起的复用失效；推理回传会在每个含推理的轮次上追加。
+未改变的已组装前缀有资格获得 DeepSeek 缓存复用，本适配器会在用量中报告。确定性的请求图片字节并不意味着完整前缀固定不变：执行世界路径变化会改写历史描述符文本，刷新上传会替换 `file_id`，Files 到 base64 的回退也会改变图片表示。这些变化以及模型路由、提示词、schema、历史或图片预算变化，都可能从首个受影响 token 起阻止复用；推理回传在每个推理轮次上追加内容。在声明了 `systemPromptUpdate: in-history` 的目录条目上，同一请求序列延续期间的系统提示词变化会追加到已缓存历史之后，因此直到该历史末尾的前缀仍可复用；工具 schema 变化仍会从第一个改变的 token 起阻止复用。
 
 ### DeepSeek 响应
 
-#### 模型看到的内容
+#### 模型看到什么
 
-推理、文本与原始字符串工具参数会转换为 harness 分片，供 loop 记录和组装。
+推理、文本与原始字符串工具参数会被翻译为 harness 分片，供 loop 记录并组装。
 
 #### Token 影响
 
-生成 token 遵循请求中已记录的推理强度和 `maxTokens`；只有 loop 保留的块会影响后续输入。
+生成的 token 遵循请求中记录的推理强度与 `maxTokens`；只有 loop 保留的块会影响后续输入。
 
 #### KV Cache 影响
 
-loop 保留的响应块会追加到下一个请求，并保留其较早可复用前缀；已丢弃块不会影响后续 cache。更改提供方或模型会选择不同 cache 域。
-
-**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系，相关约定在所属 seam 强制执行。
+loop 保留的响应块会追加到下一个请求，并保留其更早的可复用前缀；被丢弃的块不再有后续缓存影响。更换提供方或模型会选中不同的缓存域。
 
 ## 已知限制与暂缓事项
 

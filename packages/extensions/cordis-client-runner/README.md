@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Browser half of dynamic dual-half plugin packages. The host-side runner holds every definition's code in process memory and asks the open pages, over a `cordis/request-run` event, whether to run one; this package answers that request, turns the definition into a live browser plugin, and turns a `dynamicCordisRunner/retract` event back into a clean page.
 
+## Summary
+
+`dsh-cordis-client-runner` runs the browser half of process-local dynamic packages for programmatic callers and existing browser controls. It loads a definition after an approved request or explicit user gesture, and removes it when the Host retracts the run. Page refresh does not restore definitions. Creator UI plugins use installed Client modules through Plugin Manager.
+
 ## What it does
 
 1. **Event subscription** — the four announcements are forwarded host cordis events, so this package consumes `cordis/request-run`, `cordis/request-run-resolved`, and `dynamicCordisRunner/retract` through `ctx.remote.$on`, whose key set IS the api-remotes allowlist.
@@ -32,35 +36,33 @@ Nothing loads at activation, and nothing is restored after a refresh — a page 
 
 ## Model Experience
 
-### Run resolution, when a model asked for the run
+### Run resolution relayed by the Host
 
 #### What the model sees
 
-This package contributes no tool, prompt, or context of its own; the first thing it authors that reaches a model is the resolution it sends back for a `cordis/request-run` round trip, which the host turns into the blocked `cordis_run` result. A success carries the loaded revision and, for a browser half parked on services this page does not have, their names. A failure carries one reason — `rejected` when the user refused, `host-half-failed`, or `client-half-failed` — and, for the browser half, this package's own text: the failing stage (`evaluate`, `module-import`, or `activate`) followed by the closure's, guard's, or fiber's message. The guard's teaching errors (an undeclared service, a shadowed browser global, a plugin that returned no `apply`) reach the model through exactly that field. A crash that happens later, while React renders the loaded half, travels the separate post-settle path below.
+This package contributes no tool or prompt. It resolves `cordis/request-run` with activation success, missing services, rejection, or Host/Client failures. The Host runner owns any message relayed to the session.
 
 #### Token effect
 
-Conditional and bounded: at most one resolution per run request, spent inside the `cordis_run` tool result the host already emits. The text is data-dependent (a definition's own error message) and this package retains nothing across requests — a page's later load failures are page-local diagnostics with no model-visible carrier.
+Conditional and bounded: at most one resolution per run request, spent inside the runner result the host already emits. The text is data-dependent (a definition's own error message) and this package retains nothing across requests — a page's later load failures are page-local diagnostics with no model-visible carrier.
 
 #### KV Cache effect
 
-Append-only. A resolution reaches the model only as the tool result for the request that was already in flight, extending the history tail; nothing this package authors rewrites or reorders earlier request tokens, so an otherwise reusable prefix stays reusable. Repeated runs of the same definition each produce their own result rather than replacing an earlier one.
+Host steering appends to the session history; this package does not rewrite earlier messages.
 
 ### Render failure, after the run settled
 
 #### What the model sees
 
-A browser half that loads cleanly can still crash when React renders it, and that crash lands after the run was answered — so the model would otherwise be told "ok" and never learn. Every entry-boundary crash of a package this page seated is sent to the host (`reportRenderFailure`) naming the slot, whether the crash retired the entry from its cell (`abdicated`: the package's UI is gone, not merely broken), and a message written for the author: the crash text, plus the redirect for a withheld browser global the text names but does not teach — `window.setInterval` around the closure trap crashes as `is not a function`, which explains nothing on its own. The host keeps the last one per package and shows it through `cordis_inspect`; nothing here reaches a run resolution. The same observation also lands on `renderFailures` for the page's own surface — one observer, two outlets, because "the last crash across pages, for the model" and "what this page is showing now" are different facts with different lifetimes.
+React can fail after a successful load. The Client reports each owned entry failure with its slot, message, and whether the entry was removed. The Host retains the latest failure and steers the owning session; the page also displays its local failure.
 
 #### Token effect
 
-Conditional and bounded by the host's retention, not by this page: one report per crash, and the host keeps only the latest per package, so a repeatedly crashing entry costs the model one paragraph rather than a growing list. The report never enters a tool result of its own — the model pays for it only when it asks.
+Conditional and bounded by the host's retention, not by this page: one report per crash, and the host keeps only the latest per package, so a repeatedly crashing entry costs the model one message rather than a growing list. The report never enters a tool result of its own — the model pays for it only when it is steered or asks.
 
 #### KV Cache effect
 
-None of its own. Reports travel over RPC and are stored, not appended to the conversation; the model reads them through an inspection it chose to make, which extends the tail like any other tool result.
-
-**Runtime invariant:** No companion is published. The owned relation (a live Plugin's loader entry exists exactly while one Plugin Run ID is live) is browser-only state reachable through the client half's service, which the node-plane companion cannot observe. The relation is asserted by the package's own load/teardown coverage instead.
+None of its own. Reports travel over RPC and are stored, not appended to the conversation; the model reads them through a steering message or an inspection it chose to make, which extends the tail like any other tool result.
 
 ## Known Limitations and Deferred Work
 

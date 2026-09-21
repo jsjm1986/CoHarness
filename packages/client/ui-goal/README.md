@@ -8,15 +8,17 @@ The plugin separately projects each durable `/goal` `command/run` through its ow
 
 The `/client` exports are the plugin body (`apply`/`inject`), the `GoalBar`/`GoalDock` components, and the injected verb face types.
 
+## Summary
+
+The Web GUI goal surface shows both the durable goal state and its current process-local activation, and lets users edit, pause, resume, or clear the goal; rejected changes appear inline. It displays durable `/goal` runs as `Command input` bubbles so commands from users or the model remain visible after reload. Goal creation remains outside this package. Shipped Web presets other than `minimal` make `/goal` available to agents.
+
 ## Model Experience
 
-Indirectly, through the `goals/edit`, `goals/pause`, `goals/resume`, and `goals/clear` Remote methods the strip invokes: each accepted mutation commits in a durable `agent/inbox/spliced` insertion, which the goal projection folds immediately, and queues a `goal/change` context message. The model sees that context only if a later pre-step admits it; discarding the queued message does not roll back the projected state. The strip itself adds no prompt content.
+Indirectly, through the `goals/edit`, `goals/pause`, `goals/resume`, and `goals/clear` mutations the strip routes; the host GoalService owns the model-visible goal context message those mutations queue.
 
 #### KV Cache effect
 
 None unless the queued goal context is admitted. An admitted context extends the history tail like any other message; an insertion discarded before admission does not affect the cache.
-
-**Runtime invariant:** No companion is published. There is a single GoalBar dock registration whose disposal is proven by the HMR-safety spec — durable state arrives on the goal projection, process-local activation arrives through the entry's private hook source, and that source subscribes only while the framework hook observes it.
 
 ## Known Limitations and Deferred Work
 

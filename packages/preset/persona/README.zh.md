@@ -6,6 +6,10 @@
 
 [`dsh-system-prompt`](../../core/system-prompt/README.zh.md) 以自身配置持有部署级人设，并且无条件注册该段落，因此一个进程只有一份。[agent preset](../agent-presets/README.zh.md) 无法自行挂载提示词注册表——若没有属于自己的行，preset 能改变 agent 的工具，却永远改不了它的身份。本包就是那一行。
 
+## 概述
+
+`dsh-persona` 让单个 agent（智能体）拥有自己的人设：preset 挂载这一可组装的行来注册人设前缀与后缀段落，为该会话遮蔽部署级默认值。它还可以把前缀变成该会话的完整系统提示词、抑制所有其他段落，并可为该会话关闭动态 runtime-context 快照。请把它挂在 preset 组装内部——全局挂载会与提示词注册表自身的人设注册相撞并明确报错。没有这一行，preset 能改变 agent 的工具，却永远改不了它的身份。
+
 ## 仅限 scope 内使用
 
 在 agent scope 之外挂载本行，会与注册表自身的 `deployment:persona-prefix` 注册相撞并明确报错。这不是需要绕开的限制：部署级人设已经有归属，而本行存在的意义正是为某一个 agent 遮蔽它。请把它挂在 preset 组装内部，由 preset 的挂载过程提供 agent scope。
@@ -24,19 +28,17 @@
 
 ### 人设段落
 
-#### What the model sees
+#### 模型看到什么
 
-位于 order 0 的 `deployment:persona-prefix` 段落，紧随 harness 身份开场白之后，携带本行配置的 `text`，其中的提示词变量已解析。对于其 preset 挂载了本行的 agent，它会替换部署所配置的任何人设。在完整模式下，模型只会看到这个渲染后的段落作为系统提示词。Runtime context 默认保持启用。禁用后，新建 agent 不会收到来自沙箱策略、批准策略、委派或其他 system-prompt 上下文提供方的 runtime-context 快照。
+位于 order `0` 的 `deployment:persona-prefix` 段落携带本行的 `prefix`；位于 order `10200` 的 `deployment:persona-suffix` 在第一方指导之后携带其 `suffix`。两者分别替换对应的部署默认值，并解析提示词变量。在完整模式下，模型只会看到渲染后的前缀段落作为系统提示词。Runtime context 默认保持启用；禁用后，新建 agent 不会收到来自沙箱策略、批准策略、委派或其他 system-prompt 上下文提供方的 runtime-context 快照。
 
-#### Token effect
+#### Token 影响
 
-对给定 preset 而言是固定的：该 agent 的每次请求都携带人设自身的 token，其他 agent 一个都不带。空文本不贡献任何 token。完整模式会移除该 agent 的其他所有系统提示词 token。
+对给定 preset 而言是固定的：该 agent 的每次请求都携带人设前缀与后缀的 token，其他 agent 一个都不带。空文本不贡献任何 token。完整模式会移除该 agent 的其他所有系统提示词 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-在一个 agent 的整个生命周期内保持前缀稳定——本行只挂载一次，发生在 agent 发布之前、因而也在它的首个请求之前，且在 agent 运行期间文本不再改变。两个使用不同 preset 的 agent 从该段落起建立各自不同的前缀，谁都无法让对方失去缓存复用。
-
-**运行时不变式：** 不发布伴生入口。本行不拥有事件流或可变运行时数据，而是注册提示词段落；身份、完整提示词强制执行、遮蔽与资源释放均归提示词注册表。
+渲染后的模板变量与文本不变时，前缀保持稳定。模型、前缀与工具一致时，后缀变化不改变前置指令。前缀变化会影响靠前的前缀；不保证提供方共享缓存。
 
 ## 已知限制与暂缓事项
 

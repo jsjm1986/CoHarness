@@ -4,6 +4,10 @@
 
 本包是两个进程内提供方共用的运行驱动器。spawn 不传入会话初始内容；fork 传入父 agent（智能体）已完成轮次的前缀。其余机制，包括深度、子 agent 创建、可选的子 agent 定制、结果读取、取消和 dispose（资源释放），都在此共用同一套实现。
 
+## 概述
+
+`dsh-subagent-in-process-driver` 是两个进程内 subagent 后端共用的运行驱动器：它通过宿主的 agent（智能体）工厂创建一个子 agent，应用按子 agent 的定制，把一项任务驱动到完成，并以单一完全停稳的 dispose（资源释放）路径返回子 agent 自身的最终输出。spawn 调用它时不传入会话初始内容；fork 调用它时传入父级已完成轮次的前缀。它是库而非独立功能：提供方后端调用 `startInProcessRun`，组合中没有任何东西配置它。阅读本页可理解两个进程内后端共享的运行生命周期。
+
 ## 启动约定
 
 `startInProcessRun(request, options): Promise<SubagentRun>` 只在子 agent 发布到 `ctx.agents` 后才兑现。启动被拒绝时，agent 工厂的未发布创建事务已经完全停稳，因此调用方绝不会收到创建到一半的句柄。
@@ -50,23 +54,23 @@
 
 ### 子 agent 请求
 
-#### 模型看到的内容
+#### 模型看到什么
 
-共享驱动器把任务逐字作为子 agent 的用户消息发送；若有请求，还会在未发布子 agent 的全新作用域中遮蔽 persona，并限制全局工具 schema、查找、执行和 PTC mode SDK 绑定。父 agent 的限制不会被继承，独立的工具指导段仍会保留。spawn 不提供历史；fork 提供平衡的初始内容。
+共享驱动器把任务逐字作为子 agent 的用户消息发送；若有请求，还会在未发布子 agent 的全新作用域中遮蔽 persona，并限制全局工具 schema、查找、执行与 PTC mode SDK 绑定。父级限制不会被继承。工具指导插件可以使用组装 scope 省略不可用工具的指导；驱动器不会改写任意静态段落。spawn 不提供历史；fork 提供其已配平的初始内容。
 
 #### Token 影响
 
-子 agent 输入与父 agent 隔离，并通过子 agent 自身的步骤增长。persona 会改变重复提示词文本；过滤会改变 schema 或生成 SDK 的成本，但不影响独立注册的指导内容。
+子 agent 输入与父级隔离，并随子 agent 自身的步骤增长。persona 会改变重复提示词文本；过滤会改变 schema 或生成 SDK 的成本，使用 scope 的指导内容也会随可见能力变化。
 
 #### KV Cache 影响
 
-与父 agent 请求缓存相互独立。子 agent 后续历史仅追加，而 persona、工具过滤、生成 SDK、提供方或模型变化会建立不同的子 agent 前缀。
+与父级请求缓存相互独立。子 agent 后续历史仅追加，而 persona、工具过滤、生成 SDK、提供方或模型变化会建立不同的子 agent 前缀。
 
 ### 结构化输出系统提示词、schema 与结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-结构化运行会添加下方的结构化输出指令。它还会添加子 agent 作用域的 `structured_output` 定义，其精确描述为 `Report your final structured result. Call this exactly once, when your answer is complete; the arguments must match this tool's parameter schema exactly.`，参数使用请求的 schema。该仅运行时存在的定义不在已生成并随产品发布的[工具包索引](../../../docs/tool-catalog.zh.md#tool-package-map)中。其规范确认值是 `{ recorded: true }`，渲染为 `Structured output recorded.`；后续调用会变为 ``Error: structured output already recorded: the run is complete, so `<tool>` is not executed``。
+结构化运行会添加下方的结构化输出指令，并添加子 agent 作用域的 `structured_output` 定义，其参数使用请求的 schema，精确描述为 `Report your final structured result. Call this exactly once, when your answer is complete; the arguments must match this tool's parameter schema exactly.` 该仅运行时存在的定义不在已生成并随产品发布的[工具包索引](../../../docs/tool-catalog.zh.md#tool-package-map)中。其规范确认值是 `{ recorded: true }`，渲染为 `Structured output recorded.`；后续调用会变为 ``Error: structured output already recorded: the run is complete, so `<tool>` is not executed``。
 
 ##### 结构化输出指令
 
@@ -76,41 +80,39 @@ When you have your final answer, you MUST report it by calling the `structured_o
 
 #### Token 影响
 
-固定指令和能力产生的 token 开销仅由该子 agent 承担。结果文本进入子 agent 历史，而只有捕获的值会成为父 agent 结果。
+固定指令与能力产生的 token 仅由该子 agent 承担。结果文本进入子 agent 历史，而只有捕获的值会成为父级结果。
 
 #### KV Cache 影响
 
-只要结构化输出指令和 schema 不变，子 agent 内部的前缀就保持稳定。更改 schema 或能力可能从该早期片段开始使子 agent 缓存失效；结果会分别追加到子 agent 和父 agent 历史中。
+只要结构化输出指令与 schema 不变，子 agent 内部的前缀就保持稳定。更改 schema 或能力可能从该早期片段开始使子 agent 缓存失效；结果会分别追加到子 agent 与父级历史中。
 
-### 父 agent 启动错误（间接）
+### 父级启动错误（间接）
 
-#### 模型看到的内容
+#### 模型看到什么
 
 通过 `dsh-tool-subagent`，无效深度状态会精确变为 `Error: agent subagentDepth must be a non-negative safe integer`、`Error: subagent child depth exceeds the safe-integer range` 或 `Error: subagent depth <attempted> exceeds maxDepth <max>`。发布前取消的中止原因会通过注册表的 `Error: <message>` 包装传递。
 
 #### Token 影响
 
-启动成功时为零 token；只有失败的父 agent 工具调用会保留这段文本。
+启动成功时为零 token；只有失败的父级工具调用会保留这段文本。
 
 #### KV Cache 影响
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-### 父 agent 结果（间接）
+### 父级结果（间接）
 
-#### 模型看到的内容
+#### 模型看到什么
 
-驱动器只提取子 agent 自身最后的 assistant 输出或捕获的结构化值；作为初始内容的父 agent 消息和子 agent 中间工作不会成为结果。
+驱动器只提取子 agent 自身最后的 assistant 输出或捕获的结构化值；作为初始内容的父级消息与子 agent 中间工作不会成为结果。
 
 #### Token 影响
 
-父 agent 通过消费方接收一个依赖数据的结果；其他所有子 agent token 都留在子 agent 会话中。
+父级通过消费方接收一个依赖数据的结果；其他所有子 agent token 都留在子 agent 会话中。
 
 #### KV Cache 影响
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系，相关约定在所属 seam 强制执行。
 
 ## 已知限制与暂缓事项
 

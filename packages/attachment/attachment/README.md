@@ -8,15 +8,17 @@ Unsent composer images remain browser-owned temporary drafts. `validateImage` ru
 
 `admitEncodedImages(attachments, images)` is the shared wire entry used by every RPC endpoint that accepts browser uploads (the session prompt endpoint and the command executor): it enforces canonical base64 on every member, then delegates batch admission — limits, validation, ordered commit — to `saveImages`. The base64 upload form is `EncodedImageAttachment`, exported from `@deepseek-ai/dsh-attachment/types` so wire contracts can reference it.
 
+## Summary
+
+Attach images and generic files to prompts and commands, then reuse them after restarting the same session, without extra setup in the shipped `dsh` composition. Images are validated and normalized before the message is accepted; PNG, JPEG, WebP, and GIF are supported within deployment limits. Other files are stored byte-for-byte without format or size limits, and models read them on demand through saved read-only paths instead of receiving their bytes. Durable session events exclude browser paths, provider URLs, local storage paths, and base64. Stored attachments are never deleted automatically; audio and video have no dedicated handling.
+
 ## Model Experience
 
-Indirectly, through the role-neutral core `ImageBlock` and provider adapters that resolve its durable reference into an exact request version. Request descriptors expose the complete attachment id and actual request dimensions.
+Indirectly, through the provider adapter, which resolves each durable image reference into an exact request version and sends its stable attachment id and actual dimensions beside the image. When the execution filesystem maps the stored object, the descriptor also includes a read-only process path and a matching extension for a writable copy. A generic file never reaches the provider as bytes: every route receives one deterministic handle line naming the file, its byte size, its digest prefix, and the saved read-only path to read with file tools.
 
 #### KV Cache effect
 
 Adding an image changes the provider request and therefore invalidates the affected request suffix.
-
-**Runtime invariant:** No companion is published. This stateless seam owns types while implementations enforce immutable-store checks.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,11 @@
 
 Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会话创建 waterfall 事件，负责账户上下文 HTTP 状态、个人/项目 scope 选择器、根对话待用可见性、对话共享菜单，以及只读项目 composer 策略。
 
+## 概述
+
+使用 `dsh-client-ui-collaboration` 获得 Web 客户端的 Gateway 协作 UI：账户上下文选择器、分阶段的根会话可见性、会话共享菜单与只读项目创作区策略。一个插件经既有 Client 槽位与会话创建瀑布事件贡献这些能力，共享项目会话无需独立账户界面即可工作。
+
+
 ## 用户界面约定
 
 - `sidebar.footer.action` 显示当前个人或项目运行时、可访问成员身份、`ro`/`rw` 模式，以及下一条根对话的 `project` 或 `private` 可见性。更改运行时 scope 会通过 `/account/api/scope` 持久化并刷新页面，使每条 Host 连接都指向所选运行时。
@@ -17,13 +22,11 @@ Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会
 
 ## 模型体验
 
-通过 scope、可见性与提交选择间接影响模型体验；Host 协作消费者执行这些选择，`dsh-collaboration-context` 记录模型可见参与者归属信息。
+经由宿主协作消费方间接产生影响；浏览器 UI 所选状态的授权与参与者归属由该消费方负责。
 
 #### KV Cache 影响
 
-UI 不组装模型请求；是否向请求后缀追加新的参与者上下文由对应 Host 消费者决定。
-
-**运行时不变式：** 不发布伴生入口。Gateway 响应在 HTTP 解析器处校验；槽位所有权与拆卸由共享槽位账本执行。
+无直接失效；消费方负责请求前缀的任何变化。
 
 ## 已知限制与延期工作
 

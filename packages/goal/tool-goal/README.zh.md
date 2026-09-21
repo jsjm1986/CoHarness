@@ -4,6 +4,10 @@
 
 [`ctx.goals`](../goal/README.zh.md) 的面向模型控制 API：`get_goal`、`create_goal` 和 `update_goal`。[goal 工具 Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-model-facing-goal-tools.zh.md) 负责权限拆分与 Codex 风格用户体验。
 
+## 概述
+
+`dsh-tool-goal` 让模型读取持久 goal，并根据人类直接请求推断和创建长期 goal。创建、编辑、暂停或恢复要求该直接请求出现在顶层 agent（智能体）轮次中；完成或阻塞也可以在自主 Goal Round 中执行。更新必须使用先前读取到的精确 goal id 和 revision。`resume` 会重新启用 active-but-disarmed 或 blocked 的 goal，而持久的 paused goal 由用户通过 Web 或 `/goal resume` 恢复。自主阻塞要求同一条件持续达到可配置阈值，默认是连续三个 Round。
+
 ## 工具
 
 - `get_goal()` 返回当前 goal 或 `null`，包括比较并设置 id／revision、持久 phase、Goal Round 的已准入数／上限、任何 blocker reason，以及当前进程本地续行启用状态。
@@ -41,7 +45,7 @@ complete 与 blocked 还接受完全一致的当前 Goal Round：来源为 goal 
 
 #### 模型看到的内容
 
-固定 goal 策略说明何种用户语义意图值得创建 goal，要求更新前先精确读取 ref，解释会话 resume／fork 后如何重新启用续行，并限制完成／阻塞声明。配置的阈值会插入该指引。
+固定 goal 策略说明何种用户语义意图值得创建 goal，要求更新前先精确读取 ref，解释会话 resume／fork 后如何重新启用续行，并限制完成／阻塞声明。持久 paused 的 resume 会在执行时以 `GOAL_TOOL_RESUME_PAUSED` 拒绝；面向用户的 goal 控件拥有该转换。配置的阈值会插入该指引。
 
 ##### Goal 策略
 
@@ -70,8 +74,6 @@ Use goal tools for one long-running completion objective in the current session.
 #### KV Cache 影响
 
 schema 的定义与可见性不变时，前缀保持稳定。调用和结果会追加到可复用请求前缀之后，不会使更早条目失效。
-
-**运行时不变式：** 不发布伴生入口。此面向模型的适配器不拥有独立状态或事件协议；已接受的变更由 goal 领域检查，权限行为则由本包测试验证。
 
 ## 已知限制与暂缓事项
 

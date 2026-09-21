@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The SDK provider runs each subagent as a complete DeepSeek Harness runtime in a fresh subprocess, driven over stdio JSON-RPC through the [TypeScript SDK client](../../sdk/client/README.md). It is the second out-of-process backend beside [`subagent-acp`](../subagent-acp/README.md), differing in the wire and the child contract: the ACP backend drives any Agent Client Protocol agent; this backend drives specifically a harness SDK runtime (`dsh-jsonrpc-agent` bin or packaged executable), so the child is a full peer harness — own `cordis.yml`-decided composition, session persistence, model route, and tools.
 
+## Summary
+
+`dsh-subagent-dsh-sdk` runs each delegated task in a fresh DeepSeek Harness subprocess with its own profile, session, model route, and tools. The parent provides the task and working directory, while each child uses its configured runtime and remains isolated from the parent conversation. The parent receives the child's final assistant text or a safe error; intermediate messages and tool traffic stay inside the child process. Choose this backend when delegation needs a complete Harness runtime rather than shared in-process state, and accept the cost of starting a new process for every run.
+
 ## Start and ownership
 
 `start(request)` resolves the child's working directory, spawns the runtime through `DeepSeekHarness`, and completes the `initialize` handshake (with the configured `provider`/`model` route and optional `maxTokens` output cap) before it fulfills. Fulfillment therefore means the child runtime is ready and ownership has transferred to the caller. A spawn, handshake, or pre-publication cancellation failure rejects only after the subprocess has been reaped; a working-directory resolution failure rejects before anything is spawned.
@@ -65,7 +69,7 @@ The package has no default export. Cordis loader unwrapping would otherwise hide
 
 #### What the model sees
 
-The child runtime's model receives the standalone task as its user message plus that runtime's own configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for persona, tool filtering, depth enforcement, or structured output instead of silently omitting them.
+The child runtime's model receives the standalone task as its user message plus that runtime's own configured system prompt, tools, and fresh session. It receives no parent conversation. A parent tool call may choose the child provider, model, and reasoning effort for this run; the selected route and any deployment-owned output cap are fixed for the new child process. Persona, tool filtering, depth enforcement, and structured output remain unsupported and are rejected instead of silently omitted.
 
 #### Token effect
 
@@ -79,7 +83,7 @@ Independent of the parent request cache. Each SDK child can reuse only prefixes 
 
 #### What the model sees
 
-Through `dsh-tool-subagent`, the parent receives only the child's final assistant text (or accumulated partial text) or that consumer's exact stop-reason error, not intermediate messages or tool traffic.
+Through `dsh-tool-subagent`, the parent receives only the child's final assistant text (or accumulated partial text) or that consumer's exact stop-reason error, not intermediate messages or tool traffic. A diagnostic-bearing non-completed result presents the safe diagnostic before separately preserved partial assistant output; startup and shutdown errors expose the same fixed facts without raw SDK text.
 
 #### Token effect
 
@@ -88,8 +92,6 @@ Parent input grows only by the final result or error, which is data-dependent an
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. Run lifecycle pairing is owned and checked by the subagent seam's invariant; this backend's own state lives in the child process beyond this context's event streams.
 
 ## Known Limitations and Deferred Work
 

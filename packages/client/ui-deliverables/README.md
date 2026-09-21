@@ -12,23 +12,25 @@ Produced-file chips use the shared `LinkIcon` classifier, so code, image, docume
 
 The Node half registers the static `ui:deliverable-file-references` system-prompt section. It asks the model to mention the primary files it successfully created or modified and to write those and any other changed-file references as Markdown inline code, using the exact file-tool path or a basename only when unique within the Turn. The guidance makes the renderer's accepted syntax explicit; it does not govern unrelated path discussions or widen the renderer's successful-mutation vocabulary.
 
+## Summary
+
+This package renders the changed-files card a finished turn ends with — the files the turn changed, with the Host's line counts, each opening the turn's review tab on that file — plus cards for explicitly delivered files, and links matching inline-code references in the closing prose so a mentioned file opens in the right Sidebar. Listed and linked paths come from the recorded summary, successful mutations, and explicit deliveries, never from the prose. Only the shipped Web patch loads this package; removing its cordis.yml entry removes the guidance, cards, and prose links together.
+
 ## Model Experience
 
 ### Clickable file-reference guidance
 
 #### What the model sees
 
-One fixed paragraph instructs the model to name primary files from successful creation or modification calls in its final response and to format those and any other changed-file references as exact-path or unique-basename Markdown inline code, such as `out/report.html`.
+The guidance asks the model to name primary outputs after successful creation or modification and link every existing-file mention outside commands, configuration expressions, and code blocks, including repeats and tables. Labels default to filenames or clear aliases, with only enough parent directories to distinguish files. Precise references display `filename:24` or `filename:24–30`; their destinations retain full relative or absolute paths with `#L24` or `#L24-L30` anchors. The display suffix contains neither `#` nor `L`.
 
 #### Token effect
 
-One fixed prompt paragraph whenever this package is loaded; no tool schema, tool result, or per-Turn context is added.
+One fixed paragraph containing an output reminder and file-reference guidance whenever this package is loaded. The `present` tool owns the delivery schema and result text.
 
 #### KV Cache effect
 
-The section is static at order 190 for the lifetime of the package mount, so it remains in the reusable prompt prefix and does not change across Turns.
-
-**Runtime invariant:** No companion is published. Prompt, slot, dictionary, file-action route, and optional service registrations are effect-owned; the Session log owns declarations and the filesystem owns file contents.
+The section is static at first-party order 9000 for the lifetime of the package mount, so it remains in the reusable prompt prefix and does not change across Turns.
 
 ## Known Limitations and Deferred Work
 

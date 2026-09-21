@@ -6,6 +6,10 @@ Event-sourced session log and in-memory store. A `Session` is the append-only so
 
 The optional `@deepseek-ai/dsh-session/invariant` companion registers this package's relational trace checks with `ctx.invariants`: monotonic sequence numbers, turn/step enclosure, and same-step tool call/result pairing. It replays existing sessions when loaded or reloaded; storage validation, snapshotting, freezing, cited source-event validation, and surface acceptance remain always-on responsibilities of the root session package.
 
+## Summary
+
+`dsh-session` records every model-visible fact in an append-only session log and derives model history from that record. Consumers can inspect, replay, fork, and flush sessions while preserving historical events; compaction hides superseded entries from the active conversation without deleting them. Sessions remain in memory unless a persistence backend is added, and durability checkpoints wait for configured backends. Choose this package wherever an agent needs a reconstructable session record; it does not call models.
+
 ## Service: `SessionStore` (ctx key: `sessions`)
 
 Creates and holds event-sourced `Session` instances. Persistence is intentionally not implemented here — plugins subscribe to `session/event`, flush on `session/flush`, and may mirror the paired `session/created`/`session/disposed` lifecycle.
@@ -69,7 +73,7 @@ Session-event import separates ownership from message validation. `snapshotSessi
 
 The shared [storage codec](src/chunk-rows.ts) losslessly converts event sequences to compact rows and back. It preserves unrecognized events verbatim and rejects malformed encoded rows; persistence backends decide whether to enable packed writes.
 
-`encodeSeqRanges()` and `decodeSeqRanges()` provide a second lossless storage helper for surface provenance arrays. Consecutive runs can be represented as inclusive `[start, end]` pairs; the decoder accepts the historical number-only representation as well.
+`encodeSeqRanges()` and `decodeSeqRanges()` provide a second lossless storage helper for surface source-event arrays. Consecutive runs can be represented as inclusive `[start, end]` pairs; the decoder accepts the historical number-only representation as well.
 
 ### Surface types
 
@@ -112,7 +116,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 ### Extension points
 
 - Persistence plugins: subscribe to `session/event` (write-behind) and drain on `session/flush` (awaited) and fiber dispose. A durable backend reads the log and reloads it into a live session; the metadata contract (`SessionHeader`, `session.header`) is what such a backend stores beside the log.
-- Replay/fork: `create(id, { seed })` validates and freezes a contiguous current-format log and rebuilds its surface; request headers require provider/model, and assistant messages require provider/model provenance. Persistence owns read compatibility before constructing this current-format seed. `fork(source, boundary?, childSessionId?)` selects a completed-turn prefix and records lineage.
+- Replay/fork: `create(id, { seed })` validates and freezes a contiguous current-format log and rebuilds its surface; request headers require provider/model, and assistant messages require provider/model source. Persistence owns read compatibility before constructing this current-format seed. `fork(source, boundary?, childSessionId?)` selects a completed-turn prefix and records lineage.
 - Compaction: `dsh-compaction-basic` appends a `user/message` replacement for summary checkpoints, while `dsh-compaction-tool-result-pruner` appends a content-only `tool/result` replacement. Tool-pairing boundary policy and its cache belong to the [`dsh-compaction` seam](../../compaction/compaction/README.md), while this package owns ordered surface membership, replacement validation, and `replaceGeneration`.
 
 ## Model Experience
@@ -121,7 +125,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 
 #### What the model sees
 
-The model receives the complete messages from `system/message`, `user/message`, `assistant/message`, and `tool/result` surface entries with logged projections applied, the system prompt first. Identities, roles, sources, and unmodified blocks retain their original values; projections never mint identities. Direct prompts and injected context remain separate `user/message` events whose sources preserve their attribution. Tool calls live inside assistant messages. Chunks, embedded streams, `assistant/attempt`, boundaries, usage, hook records, todo records, and other log-only facts add no message.
+The model receives the complete messages from `system/message`, `user/message`, `assistant/message`, and `tool/result` surface entries with logged projections applied, the system prompt first. Identities, roles, sources, and unmodified blocks retain their original values; projections never mint identities. Direct prompts and injected context remain separate `user/message` events whose sources preserve their attribution. Embedded streams, `assistant/attempt`, boundaries, and other log-only facts add no message.
 
 #### Token effect
 
@@ -149,15 +153,15 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-The session reconstructs the system prompt, tool schemas, call config, and session prefix that the loop actually sent. Header events do not add a second copy to message history; the prefix is prepended outside `deriveMessages()`.
+The session reconstructs the tool schemas and call config that the loop actually sent; the system prompt is part of `deriveMessages()` as surface node 0 and, after an in-history update, as the latest system node. Header events add no message to history and hold no copy of the prompt.
 
 #### Token effect
 
-Zero duplicate tokens from logging. The reconstructed prefix, system text, and schemas still incur their normal per-request cost.
+Zero duplicate tokens from logging. The system nodes and schemas still incur their normal per-request cost.
 
 #### KV Cache effect
 
-Logging causes no invalidation, and exact reconstruction preserves request-prefix identity. A later header with changed prefix, prompt, or schemas may invalidate reuse from its first difference.
+Logging causes no invalidation, and exact reconstruction preserves request-prefix identity. A later header with changed config or schemas may invalidate reuse from its first difference; a prompt change that replaces surface node 0 invalidates reuse from the first token, while an in-history append keeps the prefix through the cached history reusable.
 
 ## Known Limitations and Deferred Work
 

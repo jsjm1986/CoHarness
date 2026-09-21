@@ -4,6 +4,10 @@
 
 [遥测（telemetry）seam](../session-telemetry/) 的 OpenTelemetry 后端，也是部署方唯一要加载的条目。其 `mode` 决定 seam 是实时跟随会话事件、仅在记录反馈时回放权威日志，还是将遥测留在本地。上传模式会原样组合 OTel JS SDK（`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP 日志导出器），把每条已交接记录映射到 `logger.emit()`，并使用两个插桩作用域（instrumentation scope）：ledger 记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel` 下，运维记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops` 下。资源身份包含 `service.name`/`service.version`（来自 `dsh-llm` 的 `APP_IDENTITY`），以及本包的匿名 `user.id`（`$DSH_HOME/.anonymous-user-id`；首次使用时创建的随机 UUID，删除该文件可重置）；这些身份随每个导出批次携带一次，而非逐条记录携带。
 
+## 概述
+
+`dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。SDK 批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
+
 ## 配置
 
 ```yaml
@@ -43,13 +47,11 @@ seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；
 
 ## 模型体验
 
-无。该后端只把 seam 脱敏后的记录转发进 OTel SDK 流水线；它绝不向模型请求贡献任何内容。
+无，因为该后端把 seam 记录转发进 OTel SDK 流水线，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
 无；本包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。模式选择只改变 capture handoff、SDK setup 与本地 diagnostics，不改变可由独立 companion 对照的会话或服务状态。导出在越过后端边界后仍由 SDK 内部处理。
 
 ## 已知限制与暂缓事项
 

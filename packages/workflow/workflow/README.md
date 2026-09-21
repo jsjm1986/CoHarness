@@ -8,6 +8,10 @@ The workflow seam (`ctx.workflowEngine`) executes a model-written orchestration 
 
 The package root is the Host face. The browser-safe `@deepseek-ai/dsh-workflow/types` subpath contains run identities, metadata, results, and observe-only lifecycle payloads without importing `Agent`, Cordis services, or Host context declarations; Host-only `WorkflowStartRequest` and `WorkflowRun` live behind the package root.
 
+## Summary
+
+Run a plain-JavaScript orchestration script that fans work out to subagents and returns the script's final JSON value. Scripts can use `agent()`, `parallel()`, `pipeline()`, `phase()`, and `log()`; models normally access them through the `workflow` tool. Each run belongs to its caller, attributes every child to the invoking agent, resolves failures and cancellation without rejecting its result, and awaits script and child cleanup during disposal. The caller must supply an execution engine, allowing the isolation strategy to change without altering visible behavior.
+
 ## Service and run contract
 
 `WorkflowEngine.start(request): WorkflowRun` validates enough synchronously to reject a malformed meta block, unparseable script, unavailable provider route, or unsupported per-run limit before a run exists. Once returned, `WorkflowRun.result` never rejects: execution failures resolve with `stopReason: 'error'`, and cancellation resolves with `cancelled` within the engine's bounded grace.
@@ -44,11 +48,11 @@ A child that resolves normally with a non-completed stop reason is not an infras
 
 ## Model Experience
 
-Indirectly, through `dsh-tool-workflow` and a workflow engine, which create child-agent requests and return a retained parent tool result.
+Indirectly, through its consumer `dsh-tool-workflow` and a workflow engine, which render the parent tool result and the child-agent requests.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the named consumer and engine own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

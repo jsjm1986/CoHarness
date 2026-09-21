@@ -6,6 +6,10 @@ Client Tool presentation plugin. `ui-conversation` dispatches each ordered `tool
 
 Business UI packages register only their wire Tool names and atomic views. They do not pair Session events, rebuild the transcript, or own root/subcall topology. The Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection; the conversation view remains authoritative for ChatFlow placement.
 
+## Summary
+
+`dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection.
+
 ## Rendering contract
 
 `ToolCallTree` receives one root `ToolCallBlock` that already contains recursive `subCalls`, selection state, the session `cwd`, and Host callbacks for opening files and inspecting calls. It recursively walks the standard call blocks and sends the root and children at every depth through the same atomic dispatch path, without subscribing to a separate parent-to-children map.
@@ -40,13 +44,11 @@ Card-specific limits and fallback rules remain in the owning [terminal](../../..
 
 ## Model Experience
 
-None, as this package renders already logged Tool calls and results without altering model requests, Tool execution, or session events.
+None, as the package is a browser-side tool presentation layer that renders logged calls without changing model context.
 
 #### KV Cache effect
 
-None. The package is client-only presentation.
-
-**Runtime invariant:** No companion is published. Tool composition is browser-only and contributes no events or cross-plugin mutable state; slot ownership is checked by ui-slots.
+None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

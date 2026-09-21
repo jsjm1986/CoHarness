@@ -6,6 +6,10 @@
 
 可选配套入口 `@deepseek-ai/dsh-session/invariant` 将此包的关系轨迹检查注册到 `ctx.invariants`：序号单调递增、轮次／步骤闭合，以及同一步骤内的工具调用／结果配对。加载或重新加载时，它会回放现有会话；存储校验、快照、冻结、被引用的源事件校验和 surface 准入仍始终由根会话包负责。
 
+## 概述
+
+`dsh-session` 在仅追加的会话日志中记录每个模型可见事实，并从该记录派生模型历史。消费方可以检查、回放、fork 和刷新会话，同时保留历史事件；压缩（compaction）会在活跃对话中隐藏被取代的条目，但不会删除它们。除非添加持久化后端，否则会话仅保留在内存中；持久性检查点会等待配置的后端。agent 需要可重建的会话记录时请选择本包；它本身不调用模型。
+
 ## 服务：`SessionStore`（ctx 键：`sessions`）
 
 创建并持有事件溯源的 `Session` 实例。这里有意不实现持久化：插件订阅 `session/event`，在 `session/flush` 时刷新，并可镜像成对的 `session/created`／`session/disposed` 生命周期。
@@ -69,7 +73,7 @@
 
 共享的[存储编解码器](src/chunk-rows.ts)在事件序列与紧凑行之间无损转换。它会逐字保留无法识别的事件，并拒绝形态错误的编码行；是否启用打包写入由持久化后端决定。
 
-`encodeSeqRanges()` 与 `decodeSeqRanges()` 为 surface 来源数组提供另一组无损存储辅助函数。连续段可以表示为闭区间 `[start, end]`，解码器也接受历史的纯数字数组表示。
+`encodeSeqRanges()` 与 `decodeSeqRanges()` 为 surface 来源事件数组提供另一组无损存储辅助函数。连续段可以表示为闭区间 `[start, end]`，解码器也接受历史的纯数字数组表示。
 
 ### Surface 类型
 
@@ -112,16 +116,16 @@
 ### 扩展点
 
 - 持久化插件：订阅 `session/event`（延后写入），并在 `session/flush`（受等待）及 fiber dispose（资源释放）时排空。持久后端读取日志并重新加载到实时会话；这类后端会把元数据约定（`SessionHeader`、`session.header`）与日志一同存储。
-- 回放／fork：`create(id, { seed })` 校验并冻结连续的当前格式日志，再重建 surface；请求头必须包含提供方／模型，assistant 消息必须包含提供方／模型溯源信息。持久化层在构造该当前格式 seed 前负责读取兼容性处理。`fork(source, boundary?, childSessionId?)` 选择已完成轮次前缀并记录谱系。
+- 回放／fork：`create(id, { seed })` 校验并冻结连续的当前格式日志，再重建 surface；请求头必须包含提供方／模型，assistant 消息必须包含提供方／模型来源。持久化层在构造该当前格式 seed 前负责读取兼容性处理。`fork(source, boundary?, childSessionId?)` 选择已完成轮次前缀并记录谱系。
 - 压缩：`dsh-compaction-basic` 为摘要检查点追加一个替换用 `user/message`，而 `dsh-compaction-tool-result-pruner` 追加仅修改内容的 `tool/result` 替换。工具配对边界策略及其缓存归 [`dsh-compaction` seam](../../compaction/compaction/README.zh.md) 所有；此包拥有有序 surface 成员关系、替换校验与 `replaceGeneration`。
 
 ## 模型体验
 
 ### 派生消息历史
 
-#### 模型看到的内容
+#### 模型看到什么
 
-模型会接收 `system/message`、`user/message`、`assistant/message` 与 `tool/result` surface 条目中的消息，并应用日志中的投影，系统提示词在先。消息标识、角色、来源及未修改的内容块保持不变，投影不生成标识。直接提示词与注入上下文仍是独立的 `user/message` 事件，各事件的来源保留其出处。工具调用包含在 assistant 消息内。分片、嵌入式 stream、`assistant/attempt`、边界、用量、钩子记录、todo 记录以及其他仅日志事实不添加消息。
+模型会接收 `system/message`、`user/message`、`assistant/message` 与 `tool/result` surface 条目中的消息，并应用日志中的投影，系统提示词在先。消息标识、角色、来源及未修改的内容块保持不变，投影不生成标识。直接提示词与注入上下文仍是独立的 `user/message` 事件，各事件的来源保留其出处。嵌入式 stream、`assistant/attempt`、边界与其他仅日志事实不添加消息。
 
 #### Token 影响
 
@@ -133,7 +137,7 @@
 
 ### 崩溃修复结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
 如果恢复发现 assistant 工具请求没有持久 `tool/call`，其合成 `TOOL_NOT_STARTED` 结果内容为 `The tool call was interrupted before the Harness recorded it as started. Retry it if it is still needed.`。如果持久 `tool/call` 没有结果，其 `TOOL_OUTCOME_UNKNOWN` 结果内容为 `The tool call was interrupted after it was recorded, but no result was durably recorded. Its outcome is unknown. Decide whether to retry from the tool semantics: retry only if the operation is read-only or idempotent; if it may have side effects, first verify external state or ask the user. Do not retry blindly.`。
 
@@ -147,19 +151,20 @@
 
 ### 已记录的请求头
 
-#### 模型看到的内容
+#### 模型看到什么
 
-会话会重建循环实际发送的系统提示词、工具 schema、调用配置和会话前缀。请求头事件不会向消息历史加入第二份副本；前缀在 `deriveMessages()` 外部前置。
+会话会重建循环实际发送的工具 schema 与调用配置；系统提示词作为 surface 第 0 号节点、并在历史内更新之后作为最新的系统节点，属于 `deriveMessages()` 的一部分。请求头事件不向历史加入任何消息，也不持有提示词的副本。
 
 #### Token 影响
 
-日志记录不产生重复 token。重建的前缀、系统文本和 schema 仍会产生正常的逐请求开销。
+日志记录不产生重复 token。各系统节点与 schema 仍会产生正常的逐请求开销。
 
 #### KV Cache 影响
 
-记录日志不会导致失效，精确重建会保持请求前缀一致。后续请求头若更改前缀、提示词或 schema，可能从第一处差异开始使复用失效。
+记录日志不会导致失效，精确重建会保持请求前缀一致。后续请求头若更改配置或 schema，可能从第一处差异开始使复用失效；替换 surface 第 0 号节点的提示词变更会从第一个 token 起使复用失效，而历史内追加则保持直到已缓存历史末尾的前缀可复用。
 
 <a id="known-limitations-and-deferred-work"></a>
+
 ## 已知限制与暂缓事项
 
 这些限制说明何时需要特别关心会话存储。它们是当前包约束，不是任务清单。

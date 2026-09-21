@@ -14,6 +14,10 @@ This package is one third of the spill capability, split so each concern evolves
 
 The split mirrors the shell/fs seams. A future remote or virtual backend (e.g. a `spill://…` URI, a database key, or a backend-specific retrieval tool) implements this Service Definition without touching the policy plugin.
 
+## Summary
+
+`dsh-spill` lets plugins and tools save oversized text through the public `ctx.spillStore` API and receive an opaque locator, exact byte count, and retrieval guidance. Choose it when full results must remain retrievable without filling model context. Configure `dsh-spill-local` for local persistence, and add `dsh-spill-policy` when oversized tool results should become bounded previews. The API does not offer retention, replacement, retrieval, or search operations. A save rejects on storage failure, leaving the caller to keep the content inline or fail.
+
 ## Service API (`ctx.spillStore`)
 
 | Member | Semantics |
@@ -30,13 +34,11 @@ See the [tool output spill Agent Note](../../../.agents/notes/implemented/archit
 
 ## Model Experience
 
-Indirectly, through spill consumers that render a backend locator and retrieval guidance.
+Indirectly, through spill consumers, which render the backend's locator and retrieval guidance to the model.
 
 #### KV Cache effect
 
 No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
 
 ## Known Limitations and Deferred Work
 

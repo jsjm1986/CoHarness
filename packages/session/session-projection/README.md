@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Session-projection Service Definition and drive registry. It owns `ctx.sessionProjections`, the registry that drives every registered projection unit over committed session events and serves finished whole values to carriers, currently the api-proxy history tail page and `session/projection` push frame. A domain registers pure mathematics; the framework owns the drive. The [session-projection RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md) records the design rationale.
 
+## Summary
+
+Use `dsh-session-projection` when clients need current per-session state—such as todos, goals, or conversation statistics—without replaying the raw event log. Domains define synchronous projections from committed session events, and clients receive complete, schema-validated JSON values through snapshots and change notifications. Snapshots identify the last event reflected by every returned value, so carriers can pair state with the matching history cut. Projection state can be checkpointed for faster cold reads, while host-only projections remain private to the host.
+
 ## Service: `SessionProjectionRegistry` (ctx key: `sessionProjections`)
 
 ### Public API
@@ -36,13 +40,11 @@ This package owns the Service Definition and drive roles of the capability seam:
 
 ## Model Experience
 
-None, as the registry only computes client-facing read models of already-logged session state and touches no prompt, message, schema, stream, or tool result.
+None, as the projection registry serves client-facing read models of already-logged session state and registers nothing model-facing.
 
 #### KV Cache effect
 
 None; projections never assemble or send provider requests.
-
-**Runtime invariant:** No companion is published. The registry's own contracts (duplicate-key and stateVersion rejection, effect-tied removal, the `Object.is` change gate) are enforced synchronously inside the service and proven by its spec, the drive relation (every committed `session/event` passes every unit) would require re-running the drive to check — duplicating the implementation rather than detecting drift — and the served-value relation (every served key has a live registration) lives on each carrier's wire path, which emits no cordis event this companion could observe; carrier specs assert it. Synchronous-unit discipline is enforced as far as practical by the boundary `schema.parse` (a Promise-returning view fails loudly).
 
 ## Known Limitations and Deferred Work
 

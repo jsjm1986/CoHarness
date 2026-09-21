@@ -8,15 +8,17 @@
 
 node 半边是一个空 `apply`：它的存在只为让插件出现在 host 的 cordis.yml 与 Loader 中，浏览器半边经 `exports["./client"]` 出货，并通过 `dsh.client` 清单声明被发现。
 
+## 概述
+
+本包提供 Web GUI 的原生目录拾取表面：当工作区流程请求一个目录时，一个无渲染的浏览器填充会在本地机器上打开操作系统自带的选择器，并回报唯一结果——拾取的路径、取消或失败。它填充 `ui-workspace` 声明的两个目录流程 slot，用一行 `cordis.yml` 组合出原生拾取交互的客户端一侧。当浏览器与 Host 运行在同一台机器上时选择它；进程内与远程浏览器部署则需要 [`-browse`](../ui-directory-picker-browse/README.zh.md) 表面。
+
 ## 模型体验
 
 无，因为目录选择器属于浏览器界面；本包中的任何内容都不会进入模型请求。
 
 #### KV Cache 影响
 
-无；本包既不组装也不发送 provider 请求。
-
-**运行时不变式：** 不发布伴生入口。插件将一个无渲染 flow occupant 作为一个事务性 effect 注册到两个 workspace hole；HMR 安全性规范证明该 effect 的释放行为，并且插件在各次 pick 之间不保留状态。
+无；本包既不组装也不发送提供方请求。
 
 ## 已知限制与暂缓事项
 

@@ -8,15 +8,17 @@ The patch gates both shell stacks by platform on its own rows: `bash-sandbox`/`t
 
 The row set and its rationale are documented inline in the patch file; the [generated composition graph](../../../apps/cli/composition.md) renders it.
 
+## Summary
+
+Every base-backed `dsh --profile` surface runs on `dsh-base`, so those surfaces share a model connection, the full tool set, durable session history, and workspace safety defaults. The shipped `sdk-minimal` profile deliberately uses a complete standalone tree instead. You rarely touch this bundle directly — shipped base-backed profiles already include it, and a custom base-backed profile names it first. When you need different defaults, change your profile patch or add a later bundle; this package is not a library you import.
+
 ## Model Experience
 
-Indirectly, through the inserted rows: this bundle selects the shipped persona-less prompt base, tool set, and DeepSeek adapter that mode bundles specialize, and contributes no model-visible text of its own.
+Indirectly, through each inserted row's package, which owns that row's model-facing behavior.
 
 #### KV Cache effect
 
-None directly; each inserted row's package owns its effect.
-
-**Runtime invariant:** No companion is published. The package is a static patch-list carrier (a YAML document of loader rows owned by other packages); it mounts no service, emits no events, and owns no mutable relation to check. Each inserted row's own package carries that row's invariants.
+The bundle itself adds no request prefix; each inserted row's package owns any cache effect.
 
 ## Known Limitations and Deferred Work
 

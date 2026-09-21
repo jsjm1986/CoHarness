@@ -8,6 +8,10 @@ Both registrations install as one transactional effect through nested `slots.inj
 
 The node half is an empty `apply`: it exists so the plugin appears in the host cordis.yml and Loader, while the browser half ships through `exports["./client"]` and is discovered through the `dsh.client` manifest declaration.
 
+## Summary
+
+This package provides the native directory-picking surface for the Web GUI: when a workspace flow asks for a directory, a renderless browser occupant opens the operating system's own chooser on the local machine and reports the single outcome — a picked path, a cancellation, or a failure. It fills the two directory-flow slots declared by `ui-workspace`, composing the client side of the native picking interaction in one `cordis.yml` row. Choose it when the browser runs on the same machine as the Host; in-process and remote-browser deployments need the [`-browse`](../ui-directory-picker-browse/README.md) surface instead.
+
 ## Model Experience
 
 None, as the directory chooser is browser chrome; nothing here reaches a model request.
@@ -15,8 +19,6 @@ None, as the directory chooser is browser chrome; nothing here reaches a model r
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. The plugin registers a renderless flow occupant into two workspace holes as one transactional effect, whose disposal the HMR-safety spec proves, and it retains no state between picks.
 
 ## Known Limitations and Deferred Work
 

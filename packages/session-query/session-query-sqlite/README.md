@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Concrete `ctx.sessionQuery` provider. `SqliteSessionQueryEngine` inherits exact reads, traces, and provider-independent filters from the Service Definition package and implements its two full-text methods with SQLite FTS5. Search uses the live-preferred logical session corpus and groups cross-session results by their strongest event.
 
+## Summary
+
+Use this package to add ranked SQLite FTS5 search across session history, either across sessions or within one session, with cursor pagination. It indexes live and persisted history in a separate derived database, so searches reflect current state without modifying the session-persistence store. Exact reads, filters, and traces remain available through the same query API. Search is opt-in in shipped compositions; configure `openAt` to open the index at startup, on first search, or never. Results match tokens and phrases rather than arbitrary substrings, and each index path has a single process owner.
+
 ## Search contract
 
 `searchSessions(request, exec?)` returns `SessionSearchHit` pages across the corpus; `searchEvents(request, exec?)` returns `SessionEventSearchHit` pages within one session. Queries are required, trimmed, whitespace-normalized literal phrases. FTS5 syntax such as quotes, `OR`, `NEAR`, and `*` is treated as data rather than executable MATCH syntax. Metadata filters are parameterized SQL predicates applied before ranking. To keep SQLite FTS5 MATCH in a supported outer-predicate context, cross-session requests may compile at most 14 combined session and event filter predicates; within-session requests may compile at most 13 filter predicates because the fixed target-session predicate consumes one slot. Each range endpoint compiles as one predicate. A request exceeding either predicate budget or SQLite's portable limit of 32,766 total bindings, including fixed query and pagination values, fails with `SESSION_QUERY_INVALID_FILTER` before statement preparation.
@@ -43,13 +47,11 @@ Abort signals stop queued work and flow unchanged through snapshot listing and n
 
 ## Model Experience
 
-None, as this trusted search backend returns hits only to callers and registers no model-facing prompt, schema, tool, or message.
+None, as the search backend returns hits only to callers and registers nothing model-facing.
 
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. Reconciliation, cursor generations, and derived-index ownership are validated at each serialized query boundary.
 
 ## Known Limitations and Deferred Work
 

@@ -6,6 +6,10 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 业务 UI 包只注册 wire 工具名称和原子视图，不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑。运行时仍对 call/result 配对、生命周期和递归 `subCalls` 投影拥有最终决定权；conversation view 仍对 ChatFlow 位置拥有最终决定权。
 
+## 概述
+
+`dsh-client-ui-tool` 是 dsh Web 客户端的 Client 工具展示插件：它渲染对话中的每一次工具调用。`ui-conversation` 通过 `conversation.chat.node` 的匹配 key 分发每个已排序的 `tool-call` Conversation Node；本包渲染其中的 root 及其 PTC dispatch 子调用，并把每个原子调用通过 keyed slot `tool.call.toolview` 分发。没有注册的工具名称使用通用卡片。业务 UI 包只注册 wire 工具名称和原子视图——它们不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑，因为运行时仍对 call/result 配对、生命周期与递归 `subCalls` 投影拥有最终决定权。
+
 ## 渲染约定
 
 `ToolCallTree` 接收一个已经包含递归 `subCalls` 的 root `ToolCallBlock`、selection 状态、会话 `cwd`，以及用于打开文件和检查调用的 Host 回调。它递归遍历标准调用块，让 root 与任意深度的 child 经过同一条原子分发路径，不订阅独立的 parent-to-children map。
@@ -40,13 +44,11 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、冻结的 `block`
 
 ## 模型体验
 
-无，因为本包只渲染已经记录的工具调用和结果，不改变模型请求、工具执行或会话事件。
+无。该包是浏览器端工具展示层，只渲染已记录的工具调用，不改变模型上下文。
 
 #### KV Cache 影响
 
-无。本包只负责 Client 展示。
-
-**运行时不变式：** 不发布伴生入口。工具组合只存在于浏览器，不贡献事件或跨插件可变状态；slot 所有权由 ui-slots 校验。
+无；该包既不组装也不发送提供方请求。
 
 ## 已知限制与后续工作
 

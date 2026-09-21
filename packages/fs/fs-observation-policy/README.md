@@ -18,6 +18,10 @@ declare const ctx: Context
 await ctx.plugin(FsPolicy)
 ```
 
+## Summary
+
+`dsh-fs-observation-policy` makes filesystem tools require an agent to read a file before overwriting or editing it. It also rejects a mutation when the file has changed since that read, and returns a clear instruction to re-read and retry. Reading a missing path authorizes guarded creation, while concurrent creation remains protected. Choose it for deployments that want read-before-write safety; resumed sessions must read targets again because observations are not persisted.
+
 ## The four-layer split
 
 | Layer | Package | Role |
@@ -55,7 +59,7 @@ Because the plugin influences the world only through events, removing it does no
 
 #### What the model sees
 
-This plugin adds no prompt or schema. It rejects an edit without a prior observation with code `FS_NOT_OBSERVED` and exact message `edit requires reading "<path>" first`; editing a target just observed absent returns `FS_NOT_FOUND`. Guarded mutations whose positive observation is stale propagate the provider-owned `FS_STALE_VERSION` error. [`dsh-tool-fs`](../tool-fs/README.md) owns the model-facing error wrapper, which appends the recovery instruction to `FS_STALE_VERSION` (`— re-read the file, then retry`) and `FS_NOT_OBSERVED` (`— read the file, then retry`) messages while preserving the code. Following the stale remedy on an externally deleted target now records absence: the next guarded write may recreate it with `createIfAbsent`, while the provider atomically preserves any concurrent creator.
+This plugin adds no prompt or schema. It rejects an edit without a prior observation with code `FS_NOT_OBSERVED` and policy reason `edit requires reading "<path>" first`; editing a target observed absent returns `FS_NOT_FOUND`. Guarded mutations whose positive observation is stale propagate the provider-owned `FS_STALE_VERSION` error. [`dsh-tool-fs`](../tool-fs/README.md) owns the model-facing error wrapper: it normalizes every `FS_NOT_OBSERVED` source to `cannot modify "<path>": file has not been read — read the file, then retry`, while `FS_STALE_VERSION` retains the provider reason and adds `— re-read the file, then retry`; both preserve the code and original cause. Following the stale remedy on an externally deleted target records absence: the next guarded write may recreate it with `createIfAbsent`, while the provider atomically preserves any concurrent creator.
 
 #### Token effect
 
@@ -63,9 +67,7 @@ Zero tokens on allowed operations beyond the ordinary tool result. A denial adds
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 

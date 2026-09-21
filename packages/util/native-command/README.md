@@ -8,6 +8,10 @@ Its two consumers are the host-side native integrations: the [`directory-picker-
 
 It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state, emits no events.
 
+## Summary
+
+`dsh-native-command` runs host executables without a shell and opens Host filesystem paths through the desktop. The command runner captures utf8 output, propagates cancellation, and hides transient Windows consoles. The path opener supports default-application and text-editor intents, browser-renderable documents, WSL translation, and desktop availability checks. It is a library, not a plugin: no `ctx`, no state, no events.
+
 ## Surface
 
 ```ts
@@ -16,13 +20,11 @@ import { runNativeCommand, type NativeCommandRunner } from '@deepseek-ai/dsh-nat
 
 ## Model Experience
 
-None, as this is host-side subprocess plumbing; nothing here reaches a model request.
+None, as the host-side utilities register nothing model-facing.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. Each run is one stateless child-process round trip with no owned event stream or mutable runtime data; behavior is enforced by unit tests.
+Nothing here enters a request prefix; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

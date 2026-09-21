@@ -11,15 +11,17 @@ The plugin config requires `{ provider, model }`. That composition entry is the 
 
 The service does not validate catalog membership. A provider route may serve an unadvertised model, and the consumer that actually opens a model request owns availability diagnostics.
 
+## Summary
+
+`dsh-agent-default-model` gives newly created agents a shared default provider and model when their sessions do not specify one. Use it to choose the starting model once for all supported agent entry points, including `dsh --profile headless`. When settings are available, users can override the configured selection, including reasoning effort, and saved changes apply to subsequent reads. The default is process-wide; per-session model selection remains the responsibility of the entry point that creates the agent.
+
 ## Model Experience
 
-Indirectly, through the provider/model selection supplied to an entry point; request assembly and adapters own the model-visible request.
+Indirectly, through the `ModelSelection` the service supplies to an entry point; request assembly and the provider adapters own the model-visible request.
 
 #### KV Cache effect
 
-Changing the default affects only Agents that subsequently resolve from it. An existing session whose request log already names a selection keeps that selection, so this service does not invalidate its established prefix.
-
-**Runtime invariant:** No companion is published. Settings validation owns the only mutable-value relationship.
+Changing the default affects only agents that subsequently resolve from it. An existing session whose request log already names a selection keeps that selection, so this service does not invalidate its established prefix.
 
 ## Known Limitations and Deferred Work
 

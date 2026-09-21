@@ -8,6 +8,10 @@ Its plugin config is the local backend config unchanged: `cwd` remains the relat
 
 Loading it INSTEAD OF `dsh-fs-local`, together with a [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/README.md), is the whole swap; the model-facing tools (`dsh-tool-fs`) are untouched. The tool layer resolves the calling session's mode and cwd into the SAME per-call policy bash receives, so the two families never confine to different roots.
 
+## Summary
+
+`dsh-fs-sandbox` confines model file writes and edits according to each session's sandbox mode while preserving the local filesystem's read behavior. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
+
 ## The fence
 
 The per-call policy carries the effective mode (session override or escalation grant) together with the calling session's immutable cwd root, falling back to deployment policy only for calls without one:
@@ -37,8 +41,6 @@ The current-policy clause adds a small runtime-context message while this backen
 #### KV Cache effect
 
 A standing-policy change appends an owner-rendered superseding runtime-context snapshot after retained history; operation results remain append-only.
-
-**Runtime invariant:** No companion is published. This stateless adapter delegates policy and filesystem relations to their owning seams.
 
 ## Known Limitations and Deferred Work
 

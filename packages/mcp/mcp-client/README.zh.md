@@ -27,6 +27,7 @@ kind: "package-reference"
 
 当模型需要像调用原生工具一样调用外部 MCP 服务器时，添加 `dsh-mcp-client`。为每台服务器指定唯一名称和传输方式。官方 SDK 优先选择可用的 2026-07-28 协议，并回退到支持的旧版协议。本地程序使用 stdio，远端服务使用 Streamable HTTP；stdio 协商会先启动临时探测进程，再启动实际服务进程。
 
+<a id="minimal-configuration"></a>
 ### 最小配置
 
 每台服务器添加一条配置项即可，无需其他内容。harness 启动后，服务器的工具会出现在模型的工具列表中。

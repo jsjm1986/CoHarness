@@ -19,3 +19,8 @@ The host side of the dsh web GUI: the API gateway every client shape shares, and
 `apiproxy` remains transport-independent; [`client/connection`](../client/connection/README.md) supplies the browser/HTTP carrier. Picker implementations replace one another behind the shared seam.
 
 The subsystem references: [web-server.md](../../docs/subsystems/web-server.md) and [workspace.md](../../docs/subsystems/workspace.md) (the picker seam).
+
+
+## Summary
+
+The `host/` group provides the web GUI's plain HTTP server, the SPA dist server that serves the built Web shell, the workspace-directory picking seam with its native, browse, and adaptive composition packages, the open-in-app application probe and launch routes, and the read-only plugin inventory projection. All eight packages are product packages; the browser transport lives in [`client/`](../client/README.md), and the composed application is [`apps/cli`](../../apps/cli/README.md) booting the [`dsh-base` bundle](../bundle/base/cordis.patch.yml) that serves the web app under `apps/web/`. The picker backends replace one another behind the shared seam.

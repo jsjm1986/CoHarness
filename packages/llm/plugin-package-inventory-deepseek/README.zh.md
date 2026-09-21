@@ -58,13 +58,11 @@ kind: "package-reference"
 
 无；包生命周期变化不会改变模型可见前缀。
 
-**运行时不变式：** 不发布伴生入口。每次请求直接读取权威 Loader fiber 状态与 package manifest，插件不保留独立可变 inventory。
-
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **仅含 Loader 包来源**——以编程方式创建的子 fiber 与内存动态插件没有权威 NPM 名称／版本来源，因此不在该清单内。
+- **仅含 Loader 支持的包身份**——以编程方式创建的子 fiber 与内存动态插件没有权威 NPM 名称／版本身份，因此不在该清单内。
 - **省略松散模块**——没有具名且带版本所属 manifest 的相对文件是插件模块，不是插件包。
 - **原地替换包需要重启**——manifest 身份会在进程存活期内缓存。Loader 的启用、禁用、挂载、卸载与普通源码 HMR 仍会刷新存活配置项集合，但在同一进程中把已挂载包的 manifest 替换为另一版本并不是受支持的升级路径。
 

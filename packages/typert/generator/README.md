@@ -6,6 +6,10 @@ TypeScript project analyzer and model-driven Typert generator. It converts the d
 
 The analyzer can use independent `ts.Program` instances seeded from `tsconfig.host.json` or `tsconfig.client.json`. Direct project references establish compiler-face membership, while package subpaths establish Typert runtime-face contributions: an ordinary single-project package declaring `dsh.client` may contribute both Host and Client runtime models, and only a split project explicitly referenced through `tsconfig.host.json` or `tsconfig.client.json` is restricted to that corresponding face. `package.json#exports` establishes every cross-package public boundary, and source imports or re-exports are the only allowed cross-face edges. Types owned by NPM dependencies, including global declarations from `@types` packages, remain `external` references instead of being expanded.
 
+## Summary
+
+`dsh-typert-generator` lets maintainers turn public TypeScript types into build artifacts and compiler-independent models. Packages opt in through the `./typert` and optional `./client/typert` exports, and generation rejects declarations, publish lists, Remote exports, or Zod projections that it cannot represent correctly. Repository builds emit executable schema factories and matching declarations, while tools can call `WorkspaceAnalyzer` for inspection or catalog generation without publishing artifacts. Generation runs only at build time and never in a live agent session.
+
 ## Analysis Model
 
 Each face contains package exports, Cordis services and events, explicitly tagged objects and schemas, and a type graph for their reachable declarations. The graph preserves declaration identity, generic parameters and applications, explicit inheritance, conditional and mapped types, import attributes, abstract modifiers, and source JSDoc. Service and `@typert object` APIs expose public instance members only; constructors, static members, and non-public members are excluded.
@@ -26,13 +30,11 @@ The root package export includes the model-driven extraction, completeness check
 
 ## Model Experience
 
-None, as this package runs at build or test time and never contributes to a model request.
+None, as the build-time generator runs outside any agent runtime and touches no model request.
 
 #### KV Cache effect
 
-None.
-
-**Runtime invariant:** No companion is published. The source-project analyzer and build-time emitter run outside any Cordis runtime; model snapshots, executable artifacts, and consuming-package typechecks enforce the output contract.
+No direct effect; generated artifacts reach a request only when a consumer places them in one.
 
 ## Known Limitations and Deferred Work
 

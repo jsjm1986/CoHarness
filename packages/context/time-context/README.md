@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Opt-in durable context with the current zoned time, the browser zone attached to the open request, and elapsed time sampled during model-request preparation. Default compositions leave it disabled; the Schedule Web overlay mounts it so the model can interpret otherwise-unqualified dates and times in the user's browser zone. Decision record: [the durable time-context Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-durable-per-step-time-context.md).
 
+## Summary
+
+`dsh-time-context` gives the model a clock: on eligible steps it appends a durable, source-attributed reading with the current time, the browser zone attached to the open request, and the elapsed time since the preceding model-visible message. It helps the model interpret otherwise-unqualified dates and times in the user's browser zone, and tells it to ask when current-turn browser zones are mixed or missing. The plugin is opt-in: default compositions leave it disabled, and the Schedule Web overlay mounts it. A positive `refreshIntervalMs` reduces how often readings accumulate; omission or `0` injects at every eligible step.
+
 ## Config
 
 ```yaml
@@ -14,7 +18,7 @@ Opt-in durable context with the current zoned time, the browser zone attached to
     refreshIntervalMs: 60000 # optional; omit or set to 0 for every eligible attempt
 ```
 
-When the open turn contains one Host-validated browser zone, that request-local zone formats the timestamp. With missing or mixed browser provenance, `timeZone` supplies the display fallback; omitting it resolves the Node process zone once at plugin load. Node honors `TZ`, and every explicit fallback is validated through `Intl.DateTimeFormat`.
+When the open turn contains one Host-validated browser zone, that request-local zone formats the timestamp. With missing or mixed browser-zone records, `timeZone` supplies the display fallback; omitting it resolves the Node process zone once at plugin load. Node honors `TZ`, and every explicit fallback is validated through `Intl.DateTimeFormat`.
 
 `refreshIntervalMs` must be a non-negative safe integer. Omission or `0` adds context to every eligible entering pre-step whose signal is not already aborted. A positive value adds it only when the Session has no earlier time-context injection, wall time moved backward, or at least that many milliseconds elapsed since the latest injection.
 
@@ -22,7 +26,7 @@ When the open turn contains one Host-validated browser zone, that request-local 
 
 The browser samples `Intl.DateTimeFormat().resolvedOptions().timeZone` for each prompt. The Host validates and canonicalizes that value before binding it to the exact durable `user-rpc` message source. Time-context examines only those sources in the open turn: one unique zone resolves the request, multiple zones are `mixed`, and none are `unavailable`. It does not read or mutate Session headers, connection state, or Schedule records.
 
-The resolved instruction tells the model to interpret otherwise-unqualified dates and times in that browser zone. Mixed or unavailable provenance tells the model to ask the user to clarify. This is natural-language context, not an input default at another package boundary: a tool that accepts local calendar fields still owns its explicit zone requirement.
+The resolved instruction tells the model to interpret otherwise-unqualified dates and times in that browser zone. Mixed or unavailable zone records tell the model to ask the user to clarify. This is natural-language context, not an input default at another package boundary: a tool that accepts local calendar fields still owns its explicit zone requirement.
 
 ## Timing semantics
 
@@ -66,12 +70,12 @@ Each reading accumulates until compaction shadows it. A positive interval reduce
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 
-- **Prompt provenance only** — browser-zone context guides natural-language interpretation but does not silently supply another tool's required zone field.
+- **Prompt-scoped zone records only** — browser-zone context guides natural-language interpretation but does not silently supply another tool's required zone field.
 - **Mixed turns ask** — if one open turn contains prompts from different browser zones, the model is told to clarify rather than guess which one owns an unqualified time.
-- **Fallback is not user authority** — the configured or process zone formats the clock when browser provenance is missing or mixed, but the model-facing policy still says to clarify.
+- **Fallback is not user authority** — the configured or process zone formats the clock when browser-zone records are missing or mixed, but the model-facing policy still says to clarify.
 - **Whole-second display** — timestamps and durations omit sub-second precision even though durable event times retain milliseconds.
 - **History cost between compactions** — omission or `0` retains one reading for every eligible attempt; a positive interval reduces but does not eliminate this cost and may leave a later request without fresh browser-zone guidance.

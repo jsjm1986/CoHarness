@@ -6,6 +6,10 @@ Session persistence is a capability seam. The abstract `SessionPersistence` serv
 
 The persisted unit IS the existing `SessionEvent` (event-sourced model — the log is the single source of truth), so there is no parallel "persisted message" type. Metadata that is NOT replayable conversation state (format version, cwd, lineage, seed boundary, origin, delegation depth, and the transient browser-draft marker) travels separately as `SessionHeader`, owned by `dsh-session` and re-exported here.
 
+## Summary
+
+This package lets applications persist and resume session event logs through a backend-independent API. Readers can create, open, inspect, list, append to, read, flush, and close stored sessions while preserving contiguous append-only history. A completed flush is the durability barrier; readers never receive torn tails or invalid records, and only one writer per session is allowed within a backend instance. Use the shipped [JSONL backend](../session-persistence-jsonl/README.md) for one compressed log per session, or implement another backend with the same observable guarantees.
+
 ## Service API (`ctx.sessionPersistence`)
 
 `create`/`open` return the per-session {@link SessionHandle} — the canonical channel with `read`/`write` access, offset/length reads, append, per-handle `flush`, and idempotent `close`/`AsyncDisposable`. A write handle claims single-writer ownership; a second writer rejects with `SESSION_ALREADY_OWNED`, and a read handle rejects `append`/`flush` with `SESSION_READ_ONLY`. `create` is lazy: the session is observable through `stat`/`list`/`open` in this process immediately, but no durable artifact exists until the first `append` or `flush`; closing a still-pending write handle erases the reservation. `createHandle`/`openHandleAsync`/`openHandle` remain as the legacy ownership seam while providers and Consumers migrate.
@@ -83,7 +87,7 @@ Re-exported from `dsh-session`: `SessionHeader` (immutable session metadata: `ve
 
 #### What the model sees
 
-This seam adds no prompt or schema. Resume restores stored surface events as message history; stored request headers reconstruct earlier calls, while the new loop composes the current system prompt, tools, and session prefix for its next request. Crash repair marks an assistant request without a durable call as `TOOL_NOT_STARTED`; a durable call without a result becomes `TOOL_OUTCOME_UNKNOWN`, whose text lets the model retry read-only or idempotent work but directs it to verify side effects or ask the user instead of retrying blindly.
+The seam adds no prompt or schema. Resume restores stored surface events as message history; stored request headers reconstruct earlier calls, while the new loop composes the current system prompt, tools, and session prefix for its next request. Crash repair marks an assistant request without a durable call as `TOOL_NOT_STARTED`; a durable call without a result becomes `TOOL_OUTCOME_UNKNOWN`, whose text lets the model retry read-only or idempotent work but directs it to verify side effects or ask the user instead of retrying blindly.
 
 #### Token effect
 
@@ -92,8 +96,6 @@ Zero tokens during ordinary persistence. Resume restores retained history cost a
 #### KV Cache effect
 
 Persistence does not mutate live request prefixes. A resumed loop can reuse provider cache only when its reconstructed history, current envelope, and model route match; crash-repair results append without rewriting earlier history.
-
-**Runtime invariant:** No companion is published. Persistence correctness requires backend round-trip and crash-tail tests; this package exposes no continuously observable in-process relation.
 
 ## Known Limitations and Deferred Work
 

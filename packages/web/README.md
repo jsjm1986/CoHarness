@@ -16,3 +16,8 @@ This family provides provider-neutral web search and fetch operations plus the m
 The [web capability decision](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) records why search and fetch share one provider-selection service.
 
 The subsystem reference — search/fetch requests and results, availability, `WebError` — is [docs/subsystems/web.md](../../docs/subsystems/web.md); rationale (including deferred SSRF protection) in the [web capability seam Agent Note](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md).
+
+
+## Summary
+
+The `web/` packages let models search the public web and fetch HTTP(S) pages through the `web_search` and `web_fetch` tools. Deployments can choose Exa, Perplexity, or DeepSeek for search and anonymous HTTP(S) access for fetch; availability and resource limits depend on the configured provider. Use this family for search and page retrieval, not interactive browsing, content extraction, or per-URL policy enforcement. Models receive consistent tool behavior, cancellation, and error reporting when providers change.

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Provider-neutral LLM vocabulary and abstract service. This package defines the canonical language spoken by the agent loop, session logs, and every plugin.
 
+## Summary
+
+Use `@deepseek-ai/dsh-llm` to stream model calls through configured provider adapters, discover models, and resolve model capabilities and call defaults. Every dispatched request remains reconstructable from the session log. Requests are deep-frozen before dispatch, so extensions and adapters can read them but cannot rewrite them. Each stream is one provider attempt: provider-specific translation stays with its adapter, while the optional `@deepseek-ai/dsh-llm-retry` package re-runs failed requests. Streams always end with a terminal result, so callers can handle success, failure, and cancellation consistently.
+
 ## Service: `LlmRuntime` (ctx key: `llm`)
 
 An adapter registry plus a single streaming call API, interceptable via a waterfall event.
@@ -102,11 +106,11 @@ Two adapters implement `LlmAdapter` on different internals: [`@deepseek-ai/dsh-l
 
 ## Model Experience
 
-None, as the service adds no model-bound text, schema, or message; it only materializes and logs an adapter-configured reasoning effort.
+None, as the LLM service adds no content; adapters choose when to add the shared image descriptors and per-image placeholders exported by this package.
 
 #### KV Cache effect
 
-Pass-through; the registry preserves the assembled request prefix, while the selected adapter and provider own cache reuse and routing boundaries.
+Reasoning-effort materialization preserves the assembled request prefix. Image identity and request-preview text are deterministic, while an optional execution-world path is resolved for each request; a changed path or an offload decision can prevent reuse from that image.
 
 ## Known Limitations and Deferred Work
 

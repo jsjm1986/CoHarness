@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 `ctx.sessionReferenceResolver` prepares bounded, read-only snapshots of other sessions as sourced model-facing context. It consumes `ctx.sessionQuery` and the backend-independent compact checkpoint marker; SQLite FTS is not required. Hosts that support cross-session mentions may opt into the service.
 
+## Summary
+
+`dsh-session-reference` lets a conversation reference other sessions: a host turns a `@label` mention into a canonical URI, and the service prepares a bounded, read-only snapshot of each referenced session as durable, untrusted background context for the model. Candidate discovery ranks other sessions by working-directory affinity and labels them with their latest titles. Snapshots are immutable after capture and carry a fixed warning that forbids following instructions, permission claims, or tool requests inside them. It is an opt-in service for hosts that support cross-session mentions; it consumes `ctx.sessionQuery` and needs no SQLite FTS.
+
 ## Public API
 
 - `listCandidates(agent, query?, limit?)` lists sessions other than `agent.id`, filters case-insensitively by id, cwd, or the latest projected title, and ranks same-cwd, cwd-less, then other-cwd records while preserving `listSessions()` creation order within each group. Live session projections and durable projection-cache checkpoints provide titles without folding a cold log on every keystroke; a session without a projection uses its id until opened, while compositions without projection services retain the bounded log-backed fallback. The unary `sessionReferenceResolver/candidates` Remote method serves the same discovery under the configured candidate limit and attaches each candidate's canonical mention, so browser consumers call `ctx.remote.sessionReferenceResolver.candidates` without an API Proxy route.
@@ -36,13 +40,11 @@ The model sees two consecutive user-role messages: the current message with its 
 
 #### Token effect
 
-Each referenced message adds the fixed warning plus up to three serialized snapshots, each independently bounded by `maxReferenceBytes`. The exact snapshot remains in target history until target compaction shadows or summarizes it; source-session changes add no further tokens.
+Each referenced message adds the fixed warning plus up to three serialized previews, each independently bounded by the configured or model-relative byte budget. Truncated references add separate omission notices outside that budget; a saved full transcript adds tokens only when retrieved. The exact context remains in target history until target compaction shadows or summarizes it; source-session changes add no further tokens.
 
 #### KV Cache effect
 
 The request and snapshot are consecutive append-only target messages and preserve earlier cacheable history. Different references or source capture contents change the new suffix only; later target compaction may invalidate reuse from its replacement boundary.
-
-**Runtime invariant:** No companion is published. Preparation returns immutable per-call snapshots validated while they are built, and the agent/session layers own durable context admission, freezing, and replay.
 
 ## Known Limitations and Deferred Work
 

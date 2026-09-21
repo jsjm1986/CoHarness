@@ -8,15 +8,17 @@ The current-session surface remains a popupSelect DECORATION hung on the host `/
 
 The `/client` exports are the plugin body (`apply`/`inject`).
 
+## Summary
+
+Choose permission presets for the current Web session or future sessions. General settings changes only the future default; the composer and `/permission` pickers switch the current session. Default Web offers Read Only, Workspace Write, and Full access. Explicitly loading the experimental Auto integration adds Auto review with an `EXP` badge to current-session pickers. Visible Full access and Auto selections require their own risk acknowledgement; a complete `/permission <preset>` command executes directly. The host confirms each change through the Session projection.
+
 ## Model Experience
 
-Indirectly, through the permission facts written by its two surfaces: the Settings row causes a future session to start with whole-value knob events (`permission/preset`, `sandbox/mode`, `approval/policy`), while the `/permission` picker appends the same facts when it switches the current session; those events select the sandbox mode and approval policy later tool calls resolve, and picker interaction adds no prompt content.
+Indirectly, through the permission facts its two surfaces write: the Settings row causes a future session to start with whole-value knob events, while the `/permission` picker appends the selected current-session preset. Sandbox and approval consumers resolve their own knob events; selecting `auto` additionally activates the host Auto integration's independent per-call reviewer.
 
 #### KV Cache effect
 
 No direct invalidation; the knob consumers own any request-prefix changes.
-
-**Runtime invariant:** No companion is published. The command and slot contribution lifecycles are proven by the HMR-safety spec, while the browser-only Settings controller owns no host events or cross-plugin mutable state.
 
 ## Known Limitations and Deferred Work
 

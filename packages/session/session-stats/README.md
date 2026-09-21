@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Function plugin registering the `sessionStats` projection unit: whole-log conversation figures — turn/step counts and the LLM, tool, first-token, and decode wall times — folded from step boundaries, streamed chunks, compact `assistant/attempt` records, tool pairs, and assembled assistant messages, and served through the session-projection seam (registry snapshot, change feed, and every projection carrier: history tail page, `session/projection` push frames, session list rows). Clients render full-session figures that paging and compaction cannot change; the reference consumer is the web chat stats strip, whose window fold mirrors these field names as its no-unit fallback.
 
+## Summary
+
+This package gives clients whole-session turn and step counts plus LLM, tool, first-token, and decode wall times through the public `sessionStats` value. The figures come from the complete durable log, so paging and compaction do not change them. Use it when a client must display consistent conversation statistics across reloads and reduced history. When whole-session statistics are unavailable, clients can use window-scoped counting instead.
+
 ## Fold semantics
 
 - `steps` counts `step/end` events. The agent loop appends exactly one per entered step, in a `finally`, so completed, failed, cancelled, and max-tokens steps all count. Counting assembled assistant messages instead would overcount max-tokens usage-host messages (empty content, excluded from the surface) and undercount cancelled steps (aborted before the message assembles).
@@ -25,13 +29,11 @@ Injects `sessionProjections` — the plugin's whole purpose; in assemblies witho
 
 ## Model Experience
 
-None, as the plugin only computes a client-facing read model of already-logged session events and touches no prompt, message, schema, stream, or tool result.
+None, as the sessionStats unit folds already-logged step boundaries into a client-facing read model and registers nothing model-facing.
 
 #### KV Cache effect
 
-None; the plugin never assembles or sends provider requests.
-
-**Runtime invariant:** No companion is published. The package owns a single pure projection fold whose wire payload is schema-validated by the projection registry at every snapshot and change-feed emission, and the event relations the fold relies on (`step/end` exactly once per entered step, monotonic host-assigned turn numbers, chunk and tool events carrying their step coordinates and call ids) are owned and runtime-checked by dsh-agent-loop and the session surface, not here.
+None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 

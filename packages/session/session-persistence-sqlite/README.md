@@ -2,9 +2,14 @@
 
 English | [中文](README.zh.md)
 
-An opt-in SQLite `SessionPersistence` provider. It stores eligible `assistant/chunk` runs in packed physical rows, selectively Zstandard-compresses large payloads, and delta-encodes provenance sequences while restoring the exact logical `SessionEvent[]`. No shipped composition selects it; deployments mount this package explicitly and provide its database path.
+An opt-in SQLite `SessionPersistence` provider. It stores eligible `assistant/chunk` runs in packed physical rows, selectively Zstandard-compresses large payloads, and delta-encodes source-event sequences while restoring the exact logical `SessionEvent[]`. No shipped composition selects it; deployments mount this package explicitly and provide its database path.
 
 `locate(meta)` returns `undefined` because every session shares one database. The provider exposes no per-session raw artifact. `revision(id, signal?)` reads the indexed session row and does not scan other session metadata or event rows.
+
+## Summary
+
+Use `dsh-session-persistence-sqlite` as an opt-in SQLite `SessionPersistence` provider: eligible `assistant/chunk` runs store in packed physical rows with selective Zstandard compression and delta-encoded source-event sequences, restoring the exact logical `SessionEvent[]`. No shipped composition selects it; a deployment mounts it explicitly with a database path.
+
 
 ## Storage model
 
@@ -12,7 +17,7 @@ Schema 20 uses an integer internal session key plus the stable external `session
 
 Schema 20 owns its codec locally rather than importing another persistence format's mutable implementation. Only exact, consecutive same-block text, reasoning, or tool-call delta forms pack. Unknown fields, surface metadata, sequence gaps, incompatible block/call identity, and unsafe timestamps remain scalar. A packed row represents at most 1,024 events and at most 1 MiB of uncompressed UTF-8 `data`; longer runs are partitioned without changing logical events. Reads reconstruct every original sequence number, timestamp, token boundary, argument fragment, and payload before returning data to the persistence coordinator.
 
-Serialized `data` smaller than 4 KiB stays as SQLite `TEXT`. At or above that threshold, the writer uses Zstandard level 3 and stores a `BLOB` only when the frame is smaller than the original text; the reader decompresses it before UTF-8 validation and JSON parsing. `source_event_seqs` remains the complete ordered provenance array. Schema 20 prefixes a tagged varint payload and uses a compact consecutive-range encoding when it is shorter; sparse and descending values use the delta form. Large data cells use a fixed schema-owned zstd dictionary, so each row remains independently decodable.
+Serialized `data` smaller than 4 KiB stays as SQLite `TEXT`. At or above that threshold, the writer uses Zstandard level 3 and stores a `BLOB` only when the frame is smaller than the original text; the reader decompresses it before UTF-8 validation and JSON parsing. `source_event_seqs` remains the complete ordered source-event array. Schema 20 prefixes a tagged varint payload and uses a compact consecutive-range encoding when it is shorter; sparse and descending values use the delta form. Large data cells use a fixed schema-owned zstd dictionary, so each row remains independently decodable.
 
 Each append holds `BEGIN IMMEDIATE`, validates the bounded physical tail, packs only the new durable batch, inserts those records, and increments the session revision once. Normal appends never delete or replace an earlier event row. The default 200 ms write-behind window therefore compresses high-frequency streams while the physical write volume stays proportional to newly durable batches rather than repeatedly rewriting a growing packed value. A storage-level logical-tail check rejects a stale writer before mutation.
 
@@ -64,8 +69,6 @@ Zero live-request tokens. Resume pays only for the retained logical history and 
 
 Physical packing does not mutate request prefixes. Provider cache reuse depends on the reconstructed history, current envelope, and model route exactly as with other persistence backends.
 
-**Runtime invariant:** No companion is published. Physical packing is observable only by database round-trip and row-count checks, not a continuous in-process relation.
-
 ## Known Limitations and Deferred Work
 
 - **Interim SQLite-specific design** — This efficiency-focused implementation is informed by [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb). A unified relational-database design with multiple backends and configurable schemas is deferred; schema 20 is the current CoHarness format and later changes require another offline migration.
@@ -75,3 +78,5 @@ Physical packing does not mutate request prefixes. Provider cache reuse depends 
 - **Busy waits block the event loop** — SQLite waits inside synchronous `DatabaseSync` calls; only a busy journal-mode transition yields between attempts, and the open-relative cutoff prevents another attempt rather than interrupting an active call.
 - **External SQL readers must understand physical tags** — supported consumers read through this provider rather than treating every `events.type` as a logical event type.
 - **No deletion or background historical compaction** — normal appends are insert-only.
+
+**Runtime invariant:** No companion is published. Physical packing is observable only by database round-trip and row-count checks, not a continuous in-process relation.

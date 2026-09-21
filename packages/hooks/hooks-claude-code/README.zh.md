@@ -6,6 +6,10 @@
 
 原生 Cordis 插件可以完成此桥接的所有工作，功能更强，且具有类型化返回，没有序列化边界。**该桥接只是已映射 CC command hook 子集的兼容路径**；所有定制行为都应当使用相同扩展点上的原生插件（见 [拦截扩展点 Agent Note](../../../.agents/notes/implemented/feature/2026-06-30-interception-extension-points.zh.md)）。
 
+## 概述
+
+`dsh-hooks-claude-code` 在 agent（智能体）运行期间执行你现有 Claude Code `hooks.json` 或 settings 文件中的 command 钩子，无需重写。受支持的钩子会在会话、提示词、工具、停止或 subagent 到达对应时刻时运行。它们可以带模型可见的原因阻塞提示词或工具调用、添加对话上下文，或强制模型再执行一个轮次。需要在 harness 中复用 Claude Code command 钩子时选择本包；没有 Claude Code 对应物的行为应使用原生插件。
+
 ## 配置
 
 ```ts
@@ -59,9 +63,9 @@ matcher subject 是工具名称（`PreToolUse`／`PostToolUse`）、会话源（
 
 ### Hook 提供的上下文
 
-#### 模型看到的内容
+#### 模型看到什么
 
-`SessionStart`、已接受提示词、工具后和实时同进程 subagent-start hook 可以添加带源归因的上下文消息；阻塞 `Stop` hook 将原因添加为下一步 steering（中途引导）。远程 child 注入没有本地目标。
+`SessionStart`、已接受提示词、工具后与实时同进程 subagent-start hook 可以添加带源归因的上下文消息；阻塞 `Stop` hook 将原因添加为下一步 steering（中途引导）。远程 child 注入没有本地目标。
 
 #### Token 影响
 
@@ -73,9 +77,9 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 
 ### 已阻塞提示词或工具结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-提供方提供的原因逐字传递。缺失原因时，已阻塞提示词精确使用 `blocked by UserPromptSubmit hook`，已拒绝工具变为 `Error: blocked by PreToolUse hook`，已阻塞工具后反馈精确为 `blocked by PostToolUse hook`，阻塞 stop 则精确添加 steering `continue: blocked by Stop hook`。`systemMessage` 与 `updatedInput` 会被记录或警告，但在此实现中对模型不可见。
+提供方提供的原因逐字传递。缺失原因时，已拒绝工具变为 `Error: blocked by PreToolUse hook`，已阻塞工具后反馈精确为 `blocked by PostToolUse hook`，阻塞 stop 则精确添加 steering `continue: blocked by Stop hook`；已阻塞提示词不会产生任何模型可见消息，而是以 `blocked` 结束该轮次。`systemMessage` 与 `updatedInput` 会被记录或警告，但在此实现中对模型不可见。
 
 #### Token 影响
 
@@ -84,8 +88,6 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 #### KV Cache 影响
 
 已阻塞提示词不发送请求，不会导致失效。拒绝、反馈与强制 continuation 上下文会追加在可复用前缀之后，不改写前缀。
-
-**运行时不变式：** 不发布伴生入口。本桥接发布 hook-protocol 会话事件，既有 companion 负责校验每个结果所引用的调用事件。
 
 ## 已知限制与暂缓事项
 

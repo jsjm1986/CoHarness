@@ -34,21 +34,11 @@ kind: "package-reference"
 <a id="model-experience"></a>
 ## 模型体验
 
-### 注册表字段
-
-#### 模型可见内容
-
-无。`dsh_session_log` 与 `dsh_plugin_packages` 等字段是模型消息、系统提示词和工具 schema 之外的提供方元数据。
-
-#### Token 影响
-
-不增加模型输入 token；已注册字段只增加提供方请求字节。
+通过 `@deepseek-ai/dsh-llm-deepseek` 间接生效；该包在模型的 `messages`、系统提示词与工具 schema 之外发送已注册字段。
 
 #### KV Cache 影响
 
 无；注册表字段是模型不可见的提供方元数据，不改变已序列化的模型输入前缀。
-
-**运行时不变式：** 不发布伴生入口。重复所有权、detached output 与单次 acceptance settlement 都在拥有该决策的注册表操作中强制。
 
 ## 已知限制与暂缓事项
 

@@ -6,6 +6,10 @@ Host-owned editable feedback for one finalized assistant message. The package re
 
 Public request, value, version, and failure types are exported from the package root and `@deepseek-ai/dsh-message-feedback/types`; [`src/types.ts`](src/types.ts) is their source.
 
+## Summary
+
+This service records positive or negative ratings, an optional category from the fixed feedback taxonomy, and optional verbatim notes for finalized assistant messages. The canonical Session log owns every creation, edit, and deletion; `list`, `put`, and `delete` expose current feedback without constructing or waking an Agent. Feedback is log-only and does not enter model history.
+
 ## Configuration
 
 | key | meaning |
@@ -59,21 +63,19 @@ Plugin disposal closes mutation admission, drains every operation already accept
 
 ## Model Experience
 
-### Local message-feedback state
+### Message feedback
 
 #### What the model sees
 
-Nothing. `ctx.messageFeedback` registers no tool, prompt section, model-facing context, or Session event; feedback stays in a Host-owned sidecar unless a separately documented Consumer explicitly exposes it.
+Nothing. `feedback/message-put` and `feedback/message-delete` carry no surface placement, tool, prompt section, or model-facing context. Log export and delivery policies belong to their consumers.
 
 #### Token effect
 
-Zero. No request, result, rating, note, timestamp, or failure from this package enters a model request.
+Zero. Ratings, notes, and service results do not enter model requests.
 
 #### KV Cache effect
 
-Independent. Listing or mutating message feedback does not touch a model request prefix and cannot invalidate an otherwise reusable provider cache entry.
-
-**Runtime invariant:** No companion is published. The service derives feedback directly from validated canonical events and owns no independently mutable projection.
+Independent. Feedback does not change the model request prefix.
 
 ## Known Limitations and Deferred Work
 

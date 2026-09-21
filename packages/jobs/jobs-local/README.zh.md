@@ -4,6 +4,10 @@
 
 [`@deepseek-ai/dsh-jobs`](../jobs/README.zh.md) 注册表约定的进程本地实现：`LocalJobRegistry` 把每条记录保存在内存中，按 kind 签发 `<kind>-N` id，并且只交出全新快照，从不交出实时状态。作为插件加载后即注册为 `ctx.jobs`。
 
+## 概述
+
+`dsh-jobs-local` 在 harness 进程内运行后台任务：工作会在 agent（智能体）继续推进的同时保持运行，拥有它的 agent 可以读取、等待、列出和取消它；同时挂载 `dsh-tool-jobs` 时，完成以会话内通知送达。它用内存记录实现 `dsh-jobs` 约定，并且只交出全新快照，从不交出实时状态。按所有者的并发上限（默认 10）约束一个 agent 同时处于运行或停止中的任务数量；任务会随 harness 进程终止而消失，无法跨重启持久。
+
 ## 准入
 
 `maxConcurrentJobsPerOwner` 必须是正的安全整数，默认值为 `10`。调用生产方之前，`start()` 会统计确切 owner 的 `running` 与 `stopping` 记录；所有无 owner 任务共享另一个独立的服务级桶。终止历史不占用容量，处于 `stopping` 的任务只有在生产方 `done` 结算后才释放名额。
@@ -24,13 +28,11 @@
 
 ## 模型体验
 
-通过生产方插件和 [`dsh-tool-jobs`](../tool-jobs/README.zh.md) 间接影响；它们会呈现 job id、输出、状态、取消和完成通知。
+通过生产方插件与 `dsh-tool-jobs` 间接影响模型，注册表后端把全部模型渲染委托给它们。
 
 #### KV Cache 影响
 
 不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
-
-**运行时不变式：** 不发布伴生入口。快照的标识、状态、时间戳与所有者检查位于 `@deepseek-ai/dsh-jobs/invariant`。此提供方的准入决策使用私有配置，并且必须在后端启动器运行前失败；当前生产方由 `LocalJobRegistry.start()` 同步执行该决策。发布后再重复聚合只会向 companion 暴露私有配置，也无法验证失败发生在启动前。
 
 ## 已知限制与暂缓事项
 

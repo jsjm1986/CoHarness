@@ -14,15 +14,17 @@ Before prefetching or activating dynamic entries, the boot kernel installs compa
 
 The shell base styles apply automatic CJK/Latin spacing to ordinary content in supporting browsers. Code, terminal, diff, read, and search output retain literal source spacing and column alignment; engines without `text-autospace` support ignore the declarations.
 
+## Summary
+
+`dsh-client-web` boots the web GUI: it loads the client module system from the Host-provided boot graph, then activates every client plugin before the application mounts, so the full UI appears only when every plugin is up. A framework-free boot page reports per-entry status, so a failing bundle or plugin stays visible instead of a blank screen. It also defines the shared module table (`PLATFORM_MODULES`) that every dynamic bundle resolves its externals against. The model never sees this package.
+
 ## Model Experience
 
-None, as the entry shell boots the browser plugin tree; nothing here reaches a model request.
+None, as the boot kernel is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. The Vite entry shell provides boot glue and module-table seeding, emits no Cordis events, and holds no cross-plugin mutable state; the boot chain (loading page → settled → one-flip UI) is verified by the web smoke e2e against the real carrier.
 
 ## Known Limitations and Deferred Work
 

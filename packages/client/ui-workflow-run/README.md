@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The browser plugin that reconstructs durable top-level workflow runs as independent Chat nodes. It consumes the four `tool-workflow/*` Session events owned by [`dsh-tool-workflow`](../../workflow/tool-workflow/README.md), registers one `ConversationNodeDefinition`, and renders through the keyed `conversation.chat.node` slot without changing the existing workflow tool card.
 
+## Summary
+
+Use `dsh-client-ui-workflow-run` to inspect each durable top-level workflow run as an independent Chat node. Expand a run to see its phases and expand a phase to see members; running, failed, cancelled, and interrupted levels open by default, while completed levels remain closed. A running member can open its child Session only when it belongs to the current Session and is available locally. The node shows identities and statuses only; scripts, outputs, errors, logs, usage, topology, and controls remain outside this surface.
+
 ## Durable state and replay
 
 `tool-workflow/run-start` creates one Context keyed by `runId`; member starts, member endings, and the run ending update that Context in log order. A history tail containing only updates remains pending until an older page supplies the unique start, after which prepend, complete replay, and live append produce the same state. A closed Turn or Step with missing terminal events presents the affected run or members as interrupted without changing the tool result.
@@ -22,13 +26,11 @@ The package registers its Definition, locale dictionary, and `workflow-run` rend
 
 ## Model Experience
 
-None, as this package renders durable Session facts for humans and adds no prompt, tool schema, request content, or model-visible result.
+None, as the package is a browser-side UI plugin layer that renders durable workflow records without changing model context.
 
 #### KV Cache effect
 
-None.
-
-**Runtime invariant:** No companion is published. The browser plugin contributes one effect-owned Conversation Definition, keyed renderer, and dictionary; tests prove their disposal and the Host tool package owns the durable event invariant.
+None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

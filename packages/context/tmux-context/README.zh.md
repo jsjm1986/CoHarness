@@ -4,6 +4,10 @@
 
 可选启用的持久上下文，记录本 agent（智能体）进程所在的 tmux session、window、pane，以及该 window 的 pane 树布局。在准备模型请求时每轮采样一次；随附 Web／无头组合不包含它。决策记录见：[tmux-context Agent Note](../../../.agents/notes/implemented/feature/2026-07-27-tmux-location-context.zh.md)。
 
+## 概述
+
+`dsh-tmux-context` 让模型识别其 agent 进程所在的 tmux 会话、window、pane 和 pane 树布局。它仅在位置发生变化时，于每轮的第一个步骤追加一条持久、带来源的读数。若终端只继承了 tmux 环境变量，却并未在所指名的 pane 中运行，则不添加任何内容；查询失败同样不添加内容，也不会使该轮失败。本包需主动启用，且不包含在随附的 Web 或无头 profile 中。
+
 ## 配置
 
 ```yaml
@@ -53,13 +57,11 @@ window active=<0|1>, pane active=<0|1>, layout <window-layout>
 
 #### Token 影响
 
-每条两行读数会累积，直到压缩将其遮蔽。位置未变化以及间隔抑制不会新增内容。
+每条三行读数会累积，直到压缩将其遮蔽。位置未变化以及间隔抑制不会新增内容。
 
 #### KV Cache 影响
 
 仅追加；新增可见内容位于可复用的请求前缀之后，不会使已有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。每次读取都是外部 tmux 状态的单轮快照，会话没有可检查的跨事件关系；调度与格式由流水线测试负责。
 
 ## 已知限制与后续工作
 

@@ -10,6 +10,10 @@ Authorization Service Definition (`ctx.authorization`). Some credentials cannot 
 
 **The interaction travels with the request, not a registry.** Whoever starts an authorization is the one who can talk to the human about it, so prompts reach exactly the surface that asked and a headless caller supplies an interaction that declines. There is no ambient provider to be absent, and no question about which of two open pages a prompt belongs to.
 
+## Summary
+
+`dsh-authorization` lets a configuration UI or another caller obtain credentials through a human-guided sign-in, code entry, or question. Each attempt sends notices and prompts only to the surface that started it. It reports `authorized` only after the new credential has been stored; a refusal or withdrawal reports `cancelled`, while failures remain errors. Choose it for credentials that cannot be supplied through configuration. It requires the credential store and an integration that defines the available authorization methods; the package provides no provider-specific methods itself.
+
 ## Surface
 
 ```ts

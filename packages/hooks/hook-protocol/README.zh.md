@@ -6,6 +6,10 @@ Claude Code／Codex hook 协议格式（wire format）的**共享核心**。它�
 
 Codex 有意重新实现了 Claude Code hook 协议的一个*子集*，包括相同的 `hooks.json` matcher group 结构、相同的退出码／stdout 输出约定以及相同的 command hook 执行模式。真正共享的部分位于此处；每个桥接只负责不同的部分。
 
+## 概述
+
+`dsh-hook-protocol` 让两个桥接以相同方式处理你的钩子：它定义钩子能做什么、运行时会发生什么。你无需自行安装或配置它——选择 `dsh-hooks-claude-code` 或 `dsh-hooks-codex`，把它指向你现有的 `hooks.json`，这些规则就会作用于你的钩子。通过任一桥接，钩子都可以带一条模型可见的消息阻塞提示词或工具调用、向对话附加额外上下文，或请求运行停止。只有 command 钩子会运行；`http`、`mcp_tool`、`prompt` 与 `agent` handler 会被跳过并给出警告。
+
 ## 共享内容（此处）与各方言内容（桥接）
 
 | 关注点 | 此处（`dsh-hook-protocol`） | 桥接（`dsh-hooks-claude-code` / `-codex`） |
@@ -33,7 +37,7 @@ Hook 调用／结果记录必须位于一个尚未结束的轮次内。`UserProm
 
 ## 模型体验
 
-通过 `dsh-hooks-claude-code` 与 `dsh-hooks-codex` 间接影响；它们可以将解析后 hook 输出转为提示词上下文、已阻塞结果或 continuation 反馈。
+通过 `dsh-hooks-claude-code` 与 `dsh-hooks-codex` 间接影响；它们是将解码后的 hook 输出渲染为模型上下文的唯一消费方。
 
 #### KV Cache 影响
 

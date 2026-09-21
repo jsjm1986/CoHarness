@@ -2,9 +2,14 @@
 
 [English](README.md) | 中文
 
-一个可选启用的 SQLite `SessionPersistence` 提供方。它将符合条件的 `assistant/chunk` 连续段存入打包后的物理行，对大型 payload 选择性应用 Zstandard 压缩，并对来源序列进行 delta 编码，同时恢复完全一致的逻辑 `SessionEvent[]`。随产品交付的组合均不选择它；部署方需显式挂载本包并提供数据库路径。
+一个可选启用的 SQLite `SessionPersistence` 提供方。它将符合条件的 `assistant/chunk` 连续段存入打包后的物理行，对大型 payload 选择性应用 Zstandard 压缩，并对来源事件序列进行 delta 编码，同时恢复完全一致的逻辑 `SessionEvent[]`。随产品交付的组合均不选择它；部署方需显式挂载本包并提供数据库路径。
 
 `locate(meta)` 返回 `undefined`，因为所有会话共享同一个数据库。该提供方不暴露逐会话原始产物。`revision(id, signal?)` 读取带索引的会话行，不扫描其他会话元数据或事件行。
+
+## 概述
+
+使用 `dsh-session-persistence-sqlite` 作为可选的 SQLite `SessionPersistence` 提供方：符合条件的 `assistant/chunk` 段以打包物理行存储，大负载选择性 Zstandard 压缩、源事件序号增量编码，并还原出完全一致的逻辑 `SessionEvent[]`。出厂组合均不选用；部署方需显式挂载并提供数据库路径。
+
 
 ## 存储模型
 
@@ -12,7 +17,7 @@ Schema 20 使用整数内部会话键和稳定的外部 `session_key`；复合�
 
 Schema 20 在本包内拥有 codec，不导入其他持久化格式中可变的实现。只有字段完全匹配、连续且属于同一分片块的文本、推理或工具调用 delta 才会打包。未知字段、surface 元数据、序列缺口、不兼容的块／调用身份以及不安全时间戳仍以标量行存储。一个打包行最多表示 1,024 个事件，未压缩 UTF-8 `data` 最多 1 MiB；更长的连续段会在不改变逻辑事件的前提下分割。读取会在向持久化协调器返回数据前，重建每个原始序列号、时间戳、token 边界、参数片段和 payload。
 
-序列化后的 `data` 小于 4 KiB 时保持为 SQLite `TEXT`。达到或超过该阈值时，写入方会使用 Zstandard level 3，并且只在 frame 小于原文本的情况下存储 `BLOB`；读取方会先解压，再执行 UTF-8 校验和 JSON 解析。`source_event_seqs` 仍是完整且有序的来源数组。Schema 20 使用带标签的 varint payload，在连续范围更短时采用紧凑范围编码；稀疏或降序值仍使用 delta 编码。不会省略任何来源。大型 data 单元使用固定的 schema zstd 字典，因此每行都可独立解码。
+序列化后的 `data` 小于 4 KiB 时保持为 SQLite `TEXT`。达到或超过该阈值时，写入方会使用 Zstandard level 3，并且只在 frame 小于原文本的情况下存储 `BLOB`；读取方会先解压，再执行 UTF-8 校验和 JSON 解析。`source_event_seqs` 仍是完整且有序的来源事件数组。Schema 20 使用带标签的 varint payload，在连续范围更短时采用紧凑范围编码；稀疏或降序值仍使用 delta 编码。不会省略任何来源。大型 data 单元使用固定的 schema zstd 字典，因此每行都可独立解码。
 
 每次追加持有 `BEGIN IMMEDIATE`，验证有界物理尾部，只打包新的持久批次，插入这些记录，并把会话 revision 递增一次。普通追加绝不删除或替换既有事件行。默认 200 毫秒写后缓冲窗口因此仍能压缩高频流，而物理写入量与新增持久批次成正比，不会反复改写不断增长的打包值。存储层逻辑尾部检查会在陈旧写入方执行变更前拒绝该写入。
 

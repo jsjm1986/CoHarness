@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed with persistent Bash, one-shot Bash, sandboxed Bash, or another terminal surface.
 
+## Summary
+
+`dsh-tool-str-replace-editor` provides a standalone model-facing `str_replace_editor` tool over `ctx.fs`: `view` shows numbered file content or a shallow directory listing, `create` makes a new file, `str_replace` applies a unique literal replacement, and `insert` adds lines at a chosen boundary. It is composable with persistent Bash, one-shot Bash, sandboxed Bash, or another terminal surface. Mutations obey the same read-before-edit policy and sandbox fence as the rest of the fs family, enforced by whichever backend and policy plugins are mounted. Choose it when a deployment wants the Claude-Code-style single editor tool with absolute paths; the `dsh-tool-fs` package provides the alternative `read`/`write`/`edit` suite.
+
 ## Config
 
 | Key | Default | Meaning |
@@ -44,8 +48,6 @@ Data-dependent and bounded by `maxOutputChars` plus the fixed clipping notice.
 #### KV Cache effect
 
 Append-only tool results follow the reusable request prefix.
-
-**Runtime invariant:** No companion is published. The tool adapter owns no independent durable state; filesystem mutation relations stay with the provider and policy plugins.
 
 ## Known Limitations and Deferred Work
 

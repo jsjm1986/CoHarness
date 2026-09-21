@@ -4,6 +4,10 @@
 
 `jsonrpc` 插件通过 stdio 提供以换行符分隔的 JSON-RPC，使进程外 SDK 客户端能够驱动 harness agent（智能体）。[`HarnessSdkJsonRpcServer`](src/server.ts) 负责协议方法和通知；传输与具名协议类型位于 [`dsh-sdk-protocol`](../protocol/README.zh.md)，与客户端 SDK 共享；[`jsonrpc-demo`](../../examples/jsonrpc-demo/README.zh.md) 提供外围的 `cordis.yml` 应用。
 
+## 概述
+
+`dsh-sdk-jsonrpc-server` 通过 stdio 服务 SDK 协议格式（wire format），使进程外客户端能够驱动 harness agent（智能体）：它为每个 `sessionId` 打开一个会话、把用户提示词排入队列，并把每个会话事件与 agent 状态转换流式发回客户端。把它作为 `jsonrpc` 插件挂载到 Loader 组合中；外围插件树提供其余一切——agent、模型适配器、持久化与工具。Stdout 只承载 JSON-RPC 帧，因此部署不得组合 stdout logger。它通过 dispose（资源释放）根运行时并以 0 退出应答 `shutdown`；EOF 与信号退出归 app bin 负责。
+
 ## 组装
 
 `inject: ['agents']`。服务器按 `sessionId` 获取或创建一个 agent。只有服务对生命周期建立快照时记录的 `local` 标志为 true，服务器才会转发 subagent 完成事件；提供方名称、子级 id 和持久化谱系均不能证明本地性。已注册的适配器优先；尚无适配器负责的 `deepseek-official` 路由会挂载 `dsh-llm-deepseek`，任何其他尚无适配器负责的提供方都会导致初始化失败。其他能力由外围 `cordis.yml` 提供。
@@ -28,19 +32,17 @@ Stdout 只承载 JSON-RPC 帧。部署不得组合 stdout logger；诊断应写�
 
 ### SDK 用户消息
 
-#### 模型看到的内容
+#### 模型看到什么
 
-对于每个已接受的 `session/prompt`，对话模型会将调用方提供的 `contentBlocks` 原样作为该 SDK 会话中的一条用户消息接收。此包不会添加系统提示词文本或工具 schema；这些内容来自外围 `cordis.yml` 中的插件。
+对于每个已接受的 `session/prompt`，文本和持久内容引用会原样进入一条用户消息。内联 `SdkEncodedImageBlock` 会先通过组合中的附件存储完成校验与提交，因此会话日志保留内容寻址的图片引用而不是 base64 字节。此包不会添加系统提示词文本或工具 schema；这些内容来自组合中的其他插件。
 
 #### Token 影响
 
-依数据而定的用户消息 token 会进入保留的会话历史，并在后续轮次中重复发送，直至另一个包将其压缩（compaction）。JSON-RPC 帧、会话通知和服务器内部记录不会增加模型上下文 token。
+依数据而定的用户消息 token 会进入保留的会话历史，并在后续轮次中重复发送，直至另一个包将其压缩（compaction）。JSON-RPC 帧、会话通知与服务器内部记录不会增加模型上下文 token。
 
 #### KV Cache 影响
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。此展示适配器不拥有包内持久事件流；边界与回放测试覆盖协议映射。
 
 ## 已知限制与暂缓事项
 

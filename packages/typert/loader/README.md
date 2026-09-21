@@ -10,15 +10,17 @@ During activation it scans existing Loader entries. It then follows Cordis `inte
 
 Packages without the export are skipped. Package resolution and imported manifests are cached for the process lifetime, so adding an export requires a restart. A malformed artifact fails activation when already mounted; a later failure is logged without preventing unrelated packages from registering.
 
+## Summary
+
+With `dsh-typert-loader` mounted, every package that mounts in a Loader composition automatically contributes its generated Typert reflection and schema factories to the runtime registry — and withdraws them when the package or the plugin unmounts. Packages without the generated export are skipped, so adding the plugin to any composition is safe. An explicit `packages` list covers plugins nested behind another Loader entry, whose fibers carry no resolvable package specifier. It is a Node-only plugin and needs the config-tree resolution anchor to resolve packages.
+
 ## Model Experience
 
-None, as the loader only feeds [`ctx.typert`](../registry/README.md); consumers own any model-visible projection.
+None, as loader integration only registers generated artifacts; consumers own any model-visible projection.
 
 #### KV Cache effect
 
-No direct effect.
-
-**Runtime invariant:** No companion is published. The Loader entry lifecycle directly owns each exact registry disposer, and integration tests observe registration and removal.
+No direct effect; registration changes reach a request only through a consumer that reads the registry.
 
 ## Known Limitations and Deferred Work
 

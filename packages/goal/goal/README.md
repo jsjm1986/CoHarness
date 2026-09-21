@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Event-sourced same-session goal state. The service retains one current completion objective in an agent's existing session while keeping permission to continue as process-local activation. The [goal-domain Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-persisted-same-session-goal-domain.md) owns the design rationale; the [goal type catalog](../../../docs/subsystems/goal.md) records the literal data shapes.
 
+## Summary
+
+`dsh-goal` lets one long-running completion objective persist across turns, session resume, fork, and process restarts. Users and agents can create, edit, pause, resume, complete, block, or clear it; compare-and-set updates reject stale views. A configurable round cap (256 by default) bounds automatic continuation, and blocked goals retain a stable policy code with a human-readable explanation. The package stores goal state but does not schedule work, and continuation permission remains process-local rather than durable. Choose it for one objective spanning many turns; skip it for routine single-turn work or parallel objectives.
+
 ## Config
 
 ```yaml
@@ -37,11 +41,11 @@ Policy plugins call the service verbs and react to the scoped `goal/changed` eve
 
 ## Model Experience
 
-### Goal-state mutation
+### Goal-state mutations
 
 #### What the model sees
 
-Goal mutations do not inject model context. Tools such as `get_goal` return the current state, and a continuation consumer may render the objective and round state when it schedules model work. A future always-visible goal context belongs in a separate context plugin rather than the persistence path.
+Goal mutations do not inject model context. Tools such as `get_goal` return the current state, and a continuation consumer may render the objective and round state when it schedules model work.
 
 #### Token effect
 

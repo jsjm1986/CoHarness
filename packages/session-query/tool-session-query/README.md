@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Workspace-authorized model tools over `ctx.sessionQuery`. The opt-in package depends only on the unified interface and registers `session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read`; shipped host compositions do not mount it by default.
 
+## Summary
+
+Use `dsh-tool-session-query` to let a model search earlier sessions, inspect event matches, trace session or event relationships, and read exact event data. Its five read-only tools return cursor-free text and authorize cross-session access only when the target session's `cwd` exactly matches the caller's; callers without a `cwd` can inspect only themselves. Search excludes the caller session and asks the model to narrow its query when the deployment result cap is reached. The package is opt-in, and enabling it adds fixed guidance plus five tool schemas to every model request.
+
 ## Configuration
 
 | Key | Default | Meaning |
@@ -68,8 +72,6 @@ Results are data-dependent and remain in logged tool history until compaction; `
 #### KV Cache effect
 
 Append-only result text follows the reusable request prefix and does not invalidate earlier cache entries.
-
-**Runtime invariant:** No companion is published. This read-only model adapter owns no event or mutable data relationship beyond the registries that already validate registration.
 
 ## Known Limitations and Deferred Work
 

@@ -34,21 +34,11 @@ The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh
 <a id="model-experience"></a>
 ## Model Experience
 
-### Registry fields
-
-#### What the model sees
-
-Nothing. Fields such as `dsh_session_log` and `dsh_plugin_packages` are provider metadata outside the model's messages, system prompt, and tool schemas.
-
-#### Token effect
-
-Zero model-input tokens; registered fields add only provider request bytes.
+Indirectly, through `@deepseek-ai/dsh-llm-deepseek`, which sends registered fields outside the model's `messages`, system prompt, and tool schemas.
 
 #### KV Cache effect
 
 None; registry fields are model-hidden provider metadata and do not alter the serialized model-input prefix.
-
-**Runtime invariant:** No companion is published. Duplicate ownership, detached output, and one acceptance settlement are enforced inside the registry operation that owns each decision.
 
 ## Known Limitations and Deferred Work
 

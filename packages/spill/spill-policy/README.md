@@ -6,6 +6,10 @@ The **tool-result spill policy**: a `tools/post-execute` transformer that keeps 
 
 This plugin registers **no service** and owns no storage or preview mechanics: preview is [`@deepseek-ai/dsh-output-retention`](../../util/output-retention) (`TextRetainer`), storage is `ctx.spillStore`. It only decides WHEN to spill and composes the notice.
 
+## Summary
+
+Mount this package when oversized plain-text tool results should stay out of model context. Results above `maxInlineBytes` become a bounded head/tail preview with a locator and retrieval guidance, while the full text remains available through the configured spill backend. Spill failures leave the original result visible, and omitting `maxInlineBytes` disables the policy. The same limit bounds durable `run_code` sub-call log copies without changing the value returned to the program.
+
 ## Config
 
 | Key | Default | Meaning |
@@ -42,7 +46,7 @@ The policy sees only the FINAL formatted model-facing result—not a tool's inte
 
 #### What the model sees
 
-Results at or below `maxInlineBytes`, nested results, `read` results, blocked decisions, and results containing non-text blocks are unchanged. An oversized plain-text model-facing result becomes a bounded head/tail preview followed by `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`; storage or ownership failures leave the original result visible.
+Results at or below `maxInlineBytes`, nested results, `read` results, blocked decisions, and results containing non-text blocks are unchanged. An oversized plain-text model-facing result becomes a bounded head/tail preview followed by `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`; a storage or ownership failure leaves the original result visible.
 
 #### Token effect
 
@@ -51,8 +55,6 @@ A successful replacement is at most `maxInlineBytes` UTF-8 bytes and remains in 
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
 
 ## Known Limitations and Deferred Work
 

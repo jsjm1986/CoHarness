@@ -18,15 +18,18 @@ Storage is not content-addressed, so two uploads of identical bytes are two file
 
 Personal and project stores are isolated runtime stores. The Gateway document broker can copy a snapshot between any two authorized scopes, including project-to-project, without making a document id or path portable; the target store resolves a new id and name. An organization-level metadata catalog records ownership, snapshot lineage, retries, and audited operations while file bytes remain in the runtime store.
 
+## Summary
+
+Use `dsh-userdoc` as the document seam: `ctx.userDocs` stores files and folders in the runtime's document workspace and returns references carrying real absolute paths, so the agent reads documents with its ordinary filesystem and shell tools. It is the deliberate opposite of `dsh-attachment`, whose objects stay content-addressed and invisible to file tools; images keep the attachment path while documents keep the filesystem path.
+
+
 ## Model Experience
 
-Indirectly, through the host prompt-assembly consumer that either inlines a small decodable document as text or passes its path for the agent's ordinary file tools to read, using the reference and the `maxInlineTextBytes` threshold this seam supplies.
+Indirectly, through the host prompt-assembly consumer, which decides whether a document reaches the model as inlined text or as a path to read; the seam only supplies the reference and inline-size threshold.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. This stateless seam owns types while providers enforce root containment and byte limits.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Prompt-side context for `ctx.userDocs`. The plugin validates the uploaded document ids before a prompt is admitted, chooses an exact inline-text or path-only representation, and records the host-admitted snapshot in the Session log.
 
+## Summary
+
+Use `dsh-userdoc-context` for prompt-side context over `ctx.userDocs`: it validates uploaded document ids before a prompt is admitted, chooses inline text or a path-only representation per document, and records the admitted snapshot in the Session log so the model sees a stable view.
+
+
 ## Public API
 
 `prepareUserDocAttachments()` resolves a whole document batch before the Host calls `followup()` or `steer()`. It enforces `UserDocLimits.maxFilesPerMessage` and `maxMessageBytes`; a file at or below `maxInlineTextBytes` is read once and inlined only when its bytes are strict UTF-8. Other files remain path references for the agent's existing filesystem tools. `renderUserDocAttachment()` renders the frozen representation as a text block.

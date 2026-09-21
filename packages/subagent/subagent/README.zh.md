@@ -6,6 +6,10 @@ subagent seam 允许一个 agent（智能体）通过具名提供方把工作委
 
 [subagent 家族概述](../README.zh.md)列出了实现和面向模型的消费方。本包负责提供方注册表、共享请求和结果约定、持久描述符以及可继续子级编排。多个具名提供方可以在该约定背后共存。
 
+## 概述
+
+使用 `dsh-subagent` 把工作委派给具名子 agent、收集结果，并跨轮次继续受支持的子级对话。一个组合可以并排提供进程内、ACP（Agent Client Protocol）、SDK、Codex 或 Claude Code 子级。需要单个结果时选择一次性子级；需要后续消息与中断能力时选择可继续子级。你还可以检查可用子级及其模式、活动状态与谱系，而无需加载或恢复它们。启用时需要至少一个受支持的子级后端和一个委派工具。
+
 ## 服务 API
 
 `SubagentRuntime` 具有以下操作：
@@ -133,13 +137,13 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 
 ### 结算通知
 
-#### 模型看到的内容
+#### 模型看到什么
 
-一条用户角色的父级消息，开头是结果本身——`Background subagent <child-id> finished and will do no further work unless you send it more.`，或子级被停止、耗尽额度、拒绝任务或失败时的对应句子——随后是 `Its closing message:` 与子级的最终 assistant 内容；若子级没有产出内容，则是 `It left no closing message.`。这条由 runtime 生成的通知与模型编写的父子消息相互独立；后者使用 `sendMessage()` 与 `AgentMessageSource`。委派 schema 与模型控制工具归 Consumer 包所有。
+一条用户角色的父级消息，开头是结果本身——`Background subagent <child-id> finished and will do no further work unless you send it more.`，或子级被停止、耗尽额度、拒绝任务或失败时的对应句子——随后是 `Its closing message:` 与子级最终 assistant 输出中的非空文本块，保留原始内容与顺序。推理与其他非文本块不会进入通知；若没有剩余的非空文本，通知会写明 `It left no closing message.`。这条由运行时生成的通知与模型编写的父子消息相互独立；后者使用 `sendMessage()` 与 `AgentMessageSource`。委派 schema 与模型控制工具归消费方包所有。
 
 #### Token 影响
 
-父级请求中，每个已结算的 Activation 一条通知，长度取决于子级的最终消息。如果子级既上报又结算，父级请求会同时承担上报消息和结算通知两部分 token 开销。
+父级请求中，每个已结算的 Activation 一条通知，长度取决于子级的最终文本。如果子级先发送自己的消息再结算，父级请求会同时承担两者。
 
 #### KV Cache 影响
 
@@ -147,7 +151,7 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 
 ### 子级委派范围声明
 
-#### 模型看到的内容
+#### 模型看到什么
 
 每个进程内子 agent 的运行时上下文快照都携带下方的 `subagent:delegation` 声明，位于沙箱策略与审批策略语句之后。
 

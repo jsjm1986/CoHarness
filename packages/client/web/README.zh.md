@@ -14,15 +14,17 @@ Web 启动内核：`new AppWebEntry(el, seams?).run()` 会先等待 Host bootstr
 
 外壳基础样式会在支持的浏览器中为普通内容自动添加中西文间距。代码、终端、diff、读取和搜索输出会保留源码中的原始间距和列对齐；不支持 `text-autospace` 的引擎会忽略这些声明。
 
+## 概述
+
+`dsh-client-web` 启动 web GUI：它先从 Host 提供的启动图加载客户端模块系统，再在应用挂载前激活每一个客户端插件，因此只有当所有插件都就绪时完整 UI 才会出现。无框架启动页会逐 entry 报告状态，因此失败的 bundle 或插件保持可见，而不是白屏。它还定义共享模块表（`PLATFORM_MODULES`），每个动态 bundle 都依据它解析 external。模型永远看不到本包。
+
 ## 模型体验
 
-无。入口外壳负责启动浏览器插件树；这里没有任何内容进入模型请求。
+无。启动内核属于浏览器侧 UI 插件层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
 无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。这是 Vite entry shell，只负责 boot glue 与 module-table seeding，不发出 Cordis 事件或持有跨插件可变状态；boot chain（加载页 → 启动就绪 → 一次切换至 UI）由真实 carrier 上的 web e2e 冒烟测试验证。
 
 ## 已知限制与暂缓事项
 

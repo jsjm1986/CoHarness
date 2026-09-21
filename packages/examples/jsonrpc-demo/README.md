@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/server/README.md) entry serves SDK clients over newline-delimited stdio. The config composes the spine, backends, and serving plugin. The published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project. The Python SDK's `dsh-jsonrpc-agent-pkg` [single-executable runtime](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md) uses `lib/packaged-bin.js` instead: packaged bare plugins resolve from its closed runtime tree, while relative plugins remain configuration-relative.
 
+## Summary
+
+Use `dsh-sdk-jsonrpc-demo` as the bin-only app that boots an external `cordis.yml` and serves SDK clients over newline-delimited stdio through its `jsonrpc` entry. The config composes the spine, backends, and serving plugin; the published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project.
+
+
 ## Config discovery
 
 The first non-empty channel wins: `$DSH_CORDIS_CONFIG`, then positional `argv[2]`. If neither names an existing file, the bin prints one-line usage to stderr and exits 1; there is no working-directory or built-in fallback. [`dsh-app-boot`](../../boot/app-boot/README.md) makes plugin load failures fatal. This protocol does not use `DSH_SNAPSHOT`.
@@ -20,13 +25,11 @@ stdout carries only JSON-RPC frames. The bin and boot guards diagnose on stderr,
 
 ## Model Experience
 
-Indirectly, through the plugins loaded from the external `cordis.yml`, which own every model-bound prompt, schema, message, and result; this bin adds none of its own.
+Indirectly, through the externally configured plugin tree, which owns all model context.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. This composition package owns no independent event stream or mutable data; Loader and built-entry tests cover its wiring.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

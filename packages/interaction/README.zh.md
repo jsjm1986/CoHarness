@@ -15,3 +15,8 @@
 这些包通过现有的 agent 和会话约定集成，而不改变循环。交互式应用提供具体的命令、审批和提问适配器；自动化使用 [`acp/`](../acp/README.zh.md)，可运行的演示组合包位于 [`examples/`](../examples/README.zh.md)。产品 [`dsh`](../../apps/cli/README.zh.md) CLI（命令行界面）直接组合这些包。
 
 子系统参考：[approval.md](../../docs/subsystems/approval.zh.md)、[permission-presets.md](../../docs/subsystems/permission-presets.zh.md)、[user-questions.md](../../docs/subsystems/user-questions.zh.md)与 [commands.md](../../docs/subsystems/commands.zh.md)。仅自动化的 ACP 传输是 [`acp/`](../acp/README.zh.md)，SDK 的 JSON-RPC 服务器端是 [`sdk/server`](../sdk/README.zh.md)，共享 bin 启动胶水是 [`boot/`](../boot/README.zh.md)。
+
+
+## 概述
+
+`interaction/` 组覆盖用户引导运行中 agent 的各种方式。斜杠命令适合无需模型往返的即时操作；一次性审批用于敏感操作；权限预设可以同时选择沙箱与审批行为；当 agent 需要信息或决定时，它还可以向用户提问。交互式应用向用户提供这些能力；自动化则通过 ACP（Agent Client Protocol）处理自己的审批。下方包映射说明了每项能力的区别，并链接其完整行为与配置。

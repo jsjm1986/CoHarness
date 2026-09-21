@@ -4,6 +4,11 @@
 
 面向 `ctx.userDocs` 的提示上下文插件。在提示准入前校验上传文档标识，选择精确的内联文本或仅路径表示，并把主机准入后的快照记录到 Session 日志。
 
+## 概述
+
+使用 `dsh-userdoc-context` 获得 `ctx.userDocs` 的提示词侧上下文：它在提示词被受理前校验上传文档 id，按文档选择内联文本或仅路径表示，并把已受理快照记入会话日志，让模型看到稳定视图。
+
+
 ## 公共 API
 
 `prepareUserDocAttachments()` 在 Host 调用 `followup()` 或 `steer()` 前解析整批文档。它强制执行 `UserDocLimits.maxFilesPerMessage` 与 `maxMessageBytes`；不超过 `maxInlineTextBytes` 的文件会读取一次，只有严格 UTF-8 字节才会内联。其他文件保留为路径引用，由 agent 已有的文件系统工具读取。`renderUserDocAttachment()` 把冻结后的表示渲染为文本块。

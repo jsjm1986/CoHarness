@@ -6,6 +6,10 @@ A **generic stdio language-server backend** for `ctx.lsp`. One plugin instance a
 
 Namespace plugin (`name` / `inject` / `Config` / `apply`, no default export).
 
+## Summary
+
+Use `dsh-lsp-stdio` to give agents definitions, references, implementations, and hover from explicitly configured local language servers. It maps file extensions to language identifiers, starts one server per workspace on demand, and reads each queried file afresh without retaining document state between queries. Language-server processes and source reads share the mounted filesystem and subprocess environment. The package does not install servers or provide a sandbox: deployments supply commands, mappings, and any required confinement. Queries are serialized per server and workspace, while different workspaces can run in parallel.
+
 ## What it does
 
 - Resolves every server-local setting before registration; an invalid mapping or registration conflict rolls back earlier entries, so a failed load leaves no provider routes.
@@ -46,13 +50,11 @@ The provider trusts its configured server and claims no sandbox confinement. It 
 
 ## Model Experience
 
-Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results; this host contributes no prompt or schema itself.
+Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results while this host contributes no prompt or schema itself.
 
 #### KV Cache effect
 
 No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
-
-**Runtime invariant:** No companion is published. Process pools and per-workspace queues are private implementation state, and this provider publishes no independent lifecycle event stream or enumerable snapshot.
 
 ## Known Limitations and Deferred Work
 

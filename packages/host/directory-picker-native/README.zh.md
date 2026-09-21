@@ -6,15 +6,17 @@
 
 **双面包**：浏览器端（`./client`）向 [ui-workspace](../../client/ui-workspace/README.zh.md) 的两个目录流 slot 注册一个无渲染的流程占用者——每次 `open` 请求驱动 `host.pickDirectory`，并通过 slot 的属主交互约定上报唯一结果（所选路径／取消／失败）。两个目录流程声明必须同时处于有效状态，任一贡献才会安装。因此一行 cordis.yml 同时组合原生交互的两侧；客户端不包含任何按能力类型进行的分支，挂载第二个流程包会在加载期失败（slot 的 kind 为 `single`）。
 
+## 概述
+
+坐在宿主屏幕前的操作者通过原生 OS 选择器选择工作区目录：`dsh-host-directory-picker-native` 每次选择打开一个平台目录选择器，并解析出所选绝对路径（取消时为 `null`）。macOS 驱动 `osascript`，Linux 使用 Zenity 并以 KDialog 回退，Windows 在 spawn 的子进程中打开现代 `IFileOpenDialog`。只有操作者坐在宿主屏幕前时才可用——远程部署应组合[浏览后端](../directory-picker-browse/README.zh.md)。一行组合配置还会在工作区流程中注册匹配的浏览器侧交互，因此同时选择两侧。
+
 ## 模型体验
 
-无。该后端服务于 GUI 宿主的目录选择；这里没有任何内容进入模型请求。
+无。GUI 宿主的目录选择后端不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
 无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。每次选择都是一次无状态的子进程往返；选择器的结果仅为返回的路径。
 
 ## 已知限制与延期工作
 

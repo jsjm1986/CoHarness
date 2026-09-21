@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Process-local implementation of the [`@deepseek-ai/dsh-jobs`](../jobs/README.md) registry contract: `LocalJobRegistry` keeps every record in memory, issues per-kind `<kind>-N` ids, and hands out fresh snapshots, never live state. Load it as a plugin and it registers as `ctx.jobs`.
 
+## Summary
+
+`dsh-jobs-local` runs background jobs inside the harness process: work keeps running while the agent moves on, and the owning agent can read, wait on, list, and cancel it, with completion delivered as an in-session notice when `dsh-tool-jobs` is also mounted. It implements the `dsh-jobs` contract with in-memory records handed out as fresh snapshots, never live state. A per-owner concurrency limit (default 10) bounds how many jobs one agent can have running or stopping at once; jobs die with the harness process and are not durable across restarts.
+
 ## Admission
 
 `maxConcurrentJobsPerOwner` is a positive safe integer and defaults to `10`. Before invoking a producer, `start()` counts the exact owner's `running` and `stopping` records; all unowned jobs share one separate service bucket. Terminal history does not occupy capacity, and only producer `done` settlement releases a stopping job's place.
@@ -24,13 +28,11 @@ Controllers and listeners are layered by the scope that registered them, in the 
 
 ## Model Experience
 
-Indirectly, through producer plugins and [`dsh-tool-jobs`](../tool-jobs/README.md), which render job ids, output, status, cancellation, and completion notices.
+Indirectly, through producer plugins and `dsh-tool-jobs`, to which the registry backend delegates all model rendering.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. `@deepseek-ai/dsh-jobs/invariant` owns per-snapshot identity, status, timestamp, and owner checks. This provider's admission decision uses private configuration and must fail before a backend starter runs; `LocalJobRegistry.start()` enforces it synchronously for current producers. Repeating an aggregate after publication would expose private configuration solely to this companion and would not verify the fail-closed pre-start guarantee.
+No direct invalidation; the named consumers own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

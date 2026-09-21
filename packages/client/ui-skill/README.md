@@ -10,6 +10,10 @@ A failed `skill.list` throws from `candidates`, which the slash shell logs and f
 
 The `/client` exports are the plugin body (`apply`/`inject`) only; the source object is internal to the registration effect.
 
+## Summary
+
+`dsh-client-ui-skill` lets users invoke a skill by choosing it from the `/` suggestions or typing `/name` directly. The same literal command loads the skill consistently from the Web composer, TUI, and ACP, while a name shared with a host command continues to resolve as that command. Skill calls appear in the conversation as expandable `Instructions` cards whose settled contents remain stable when the installed skill catalog changes.
+
 ## Skill tool row
 
 The browser plugin also registers the `skill` wire name in `ui-tool`'s keyed `tool.call.toolview` slot. A collapsed row renders the 14-pixel skill document-and-sparkle glyph, `Skill` title, separator, and requested skill name with the same neutral hierarchy as the Bash row; running calls carry the transcript shimmer, failures replace the name with the first error line, and interrupted calls use the warning state. A settled row expands as one whole-row disclosure into a bounded `Instructions` card containing the exact durable tool output, with the standard trajectory `Inspect` affordance when available. The row derives its name, lifecycle, and body only from the frozen call/result slice supplied by `ui-tool`, never from the current catalog, so replay remains stable when installed skills or their descriptions change.
@@ -29,8 +33,6 @@ One invocation adds the rendered skill body to that turn as injected context —
 #### KV Cache effect
 
 Append-only: the injected message lands after the reusable history prefix. This package never edits earlier request tokens.
-
-**Runtime invariant:** No companion is published. The slash source, locale dictionaries, and keyed toolview are registry-owned registrations whose disposal is proven by the HMR-safety spec. They emit no Cordis events and own no cross-plugin mutable state.
 
 ## Known Limitations and Deferred Work
 

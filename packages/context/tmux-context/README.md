@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Opt-in durable context naming the tmux session, window, and pane this agent process runs in, plus the window's pane-tree layout. It is sampled once per turn during model-request preparation and is not part of the shipped Web/headless composition. Decision record: [the tmux-context Agent Note](../../../.agents/notes/implemented/feature/2026-07-27-tmux-location-context.md).
 
+## Summary
+
+`dsh-tmux-context` lets the model identify the tmux session, window, pane, and pane-tree layout containing its agent process. It adds a durable, source-attributed reading on the first step of a turn only when that location changed. Terminals that merely inherit tmux environment variables without running in the named pane add nothing; failed queries also add nothing and do not fail the turn. This package is opt-in and is not included in the shipped Web or headless profiles.
+
 ## Config
 
 ```yaml
@@ -53,13 +57,11 @@ window active=<0|1>, pane active=<0|1>, layout <window-layout>
 
 #### Token effect
 
-Each two-line reading accumulates until compaction shadows it. Unchanged locations and interval suppression add nothing.
+Each three-line reading accumulates until compaction shadows it. Unchanged locations and interval suppression add nothing.
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. A reading is a per-turn snapshot of external tmux state, so the session holds no cross-event relation to check; scheduling and format are owned by pipeline tests.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 

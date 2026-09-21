@@ -8,6 +8,10 @@ A second, library-backed implementation of the same seam exists in `@deepseek-ai
 
 The package root exposes the Cordis plugin contract and `DeepSeekAdapter`; wire serialization, SSE parsing, and chunk translation helpers are not part of that root contract.
 
+## Summary
+
+Stream DeepSeek models through `deepseek-official` with Messages by default, or select Chat Completions in Cordis YAML. Both protocols share credentials, endpoint settings, image handling, and the model catalog. Valid settings changes affect subsequent calls while in-flight calls retain their configuration. Web shows one DeepSeek provider with an editable API base and key. This package can run beside the [pi-ai adapter](../llm-pi-ai/README.md).
+
 ## Config
 
 ```yaml
@@ -111,15 +115,15 @@ Non-2xx responses throw `LlmError` with stable codes: `AUTH` (401/403), `QUOTA` 
 
 #### What the model sees
 
-The selected DeepSeek model receives the harness system prompt, message history, tool schemas, stop sequences, and call config. The vision model normally receives retained user and tool-result images as Files API references beside stable attachment handles and request-image dimensions; a Files resolution failure sends all retained images as inline data URLs instead. Request-image projections are prepared in fixed batches bounded by `imagePreparationConcurrency`, so a slow early image cannot retain completed projections for the whole request. An over-budget older image is represented by the documented placeholder. Reasoning content from a prior assistant turn is passed back verbatim, whether or not that turn called a tool.
+The selected DeepSeek model receives the harness system prompt, message history, tool schemas, stop sequences, and call config (`maxTokens`, `reasoningEffort`, `temperature`) without adapter-authored prompt prose. Provider-specific request-extension fields remain outside model input. The vision model normally receives retained user and tool-result images as Files API references beside attachment handles and request-preview dimensions. It also receives a normalized-object path when the current execution filesystem maps the attachment provider's host object; the descriptor marks this copy read-only and warns that normalization may have resized or re-encoded the upload. A Files resolution failure sends all retained images as inline base64 instead, and an over-budget older image keeps the access resolved for that request in its placeholder. Reasoning content from a prior assistant turn is passed back verbatim, whether or not that turn called a tool. Messages sends `{}` for historical tool arguments that are malformed JSON or are not objects. Call ids, tool names, and results remain intact; the original arguments stay in the Session log. This silent fallback also applies after switching from Chat Completions. Newly generated Messages tool arguments still require valid JSON objects.
 
 #### Token effect
 
-Provider tokenization governs exact text and image-token input. Reasoning passback carries every reasoned turn's chain of thought into later requests, while dropping over-budget images avoids paying those tokens again; cache-read usage is reported when available.
+Provider tokenization governs exact text and image-token input. The adapter declares per-route `imageRequestPricing`: it prices each occurrence selected by a logged image-offload decision as its placeholder text and each retained image at its projected dimensions with the published vision accounting (14px patch grid, 3:1 downsampling, 544×544 scale-up floor, 1024-token cap). This lets the token meter price image pressure before a request; reported usage remains authoritative. Reasoning passback carries every reasoned turn's chain of thought into later requests, while offloaded images stop costing visual tokens. A request whose retained occurrences exceed the file-mode or inline-fallback budget (`maxRequestFilesBytes`, `maxImagesPerRequest`, both quanta) at their exact request-version bytes fails with `IMAGE_OFFLOAD_REQUIRED` naming the additional oldest occurrences to offload, and `dsh-compaction-image-offload` records the selected occurrences in an `image/offload` event and retries. Cache-read usage is reported when available. Messages totals include uncached input, output, cache-read, and cache-write tokens. Chat Completions uses `prompt_tokens + completion_tokens` and omits `totalTokens` if a supplied `total_tokens` disagrees.
 
 #### KV Cache effect
 
-An unchanged assembled prefix, including deterministically encoded retained images and placeholders, is eligible for DeepSeek cache reuse, which this adapter reports in usage. A model-route change or any upstream prompt, schema, prefix, history, or image-budget change may prevent reuse from the first changed token; reasoning passback appends on every reasoned turn.
+An unchanged assembled prefix is eligible for DeepSeek cache reuse, which this adapter reports in usage. Deterministic request-image bytes do not make the full prefix immutable: a changed execution-world path rewrites historical descriptor text, a refreshed upload can replace a `file_id`, and Files-to-base64 fallback changes the image representation. Any of these, or a model-route, prompt, schema, history, or image-budget change, may prevent reuse from the first affected token; reasoning passback appends on every reasoned turn. On a catalog entry declaring `systemPromptUpdate: in-history`, a system prompt change inside a continuing request series is appended after the cached history, so the prefix through that history stays reusable; a tool-schema change still prevents reuse from the first altered token.
 
 ### DeepSeek response
 
@@ -134,8 +138,6 @@ Generated tokens follow the request's logged reasoning effort and `maxTokens`; o
 #### KV Cache effect
 
 Loop-retained response blocks append to the next request and preserve its earlier reusable prefix; dropped blocks have no later cache effect. Changing the provider or model selects a different cache domain.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
 
 ## Known Limitations and Deferred Work
 

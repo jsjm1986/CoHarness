@@ -4,6 +4,11 @@
 
 ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能体）主干、客户端通过 [`@deepseek-ai/dsh-acp`](../../acp/acp/README.zh.md) 创建的 agent、JSONL 持久化，以及语义检查点机制，并通过一个 JSON-RPC stdio bin 对外提供服务。程序化客户端创建新会话；此包不挂载人工交互 UI。
 
+## 概述
+
+使用 `dsh-acp-demo` 作为 ACP 自动化服务器应用：默认 agent 脊骨、经 `dsh-acp` 的客户端建代理、JSONL 持久化与语义检查点，合于一个 JSON-RPC stdio bin 之后。程序化客户端创建新会话；本包不挂载人机界面。
+
+
 ## 组合
 
 | 插件 | 角色 |
@@ -46,13 +51,11 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 
 ## 模型体验
 
-模型体验由 `dsh-agent-spine-demo` 和叶节点的面向模型插件间接提供。ACP 提示词文本会成为普通的已记录用户消息；协议元数据与权限选择不会进入模型请求。
+经由 dsh-agent-spine-demo 与 dsh-acp 间接产生影响；该捆绑的请求组装由它们负责。
 
 #### KV Cache 影响
 
-每个会话仅追加；应用本身不添加请求前缀内容。
-
-**运行时不变式：** 不发布伴生入口。该组合包不拥有独立事件流或可变数据；Loader 与构建入口测试覆盖其接线。
+无直接失效；消费方负责请求前缀的任何变化。
 
 ## 已知限制与暂缓事项
 

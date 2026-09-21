@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Gateway-backed provider for the `dsh-collaboration` Service Definition. It derives the participant from `dsh-gateway-runtime`, delegates project membership and root-conversation ACL decisions to authenticated internal Gateway endpoints, and validates every returned field before publishing it to Consumers.
 
+## Summary
+
+Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-collaboration` Service Definition. It derives the participant from `dsh-gateway-runtime`, delegates membership and root-conversation ACL decisions to authenticated internal Gateway endpoints, and validates every returned field before publishing to Consumers.
+
+
 ## Runtime contract
 
 - `capture()` freezes the current verified principal into an authority whose participant, expiry, and provider lifetime remain stable for the request or stream operation.
@@ -14,13 +19,11 @@ Gateway-backed provider for the `dsh-collaboration` Service Definition. It deriv
 
 ## Model Experience
 
-Indirectly, through authorization of model-facing operations whose participant attribution remains owned by `dsh-collaboration-context`.
+Indirectly, through dsh-collaboration-context, which owns model-visible participant attribution for the operations this provider authorizes.
 
 #### KV Cache effect
 
-Authorization contributes no request tokens and does not alter an already-reusable prefix.
-
-**Runtime invariant:** No companion is published. The Gateway is authoritative for every authorization decision.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Zero-dependency atomic file replacement shared by file-backed stores that must never leave partial, symlink-hijacked, or wider-than-intended content on disk — the user-settings document (`dsh-settings-file`) and the credentials store (`dsh-credentials-local`).
 
+## Summary
+
+Use `dsh-atomic-write` to replace a file without exposing partial content or following a symlinked temporary path. Its writer lock serializes read-modify-write cycles across processes so concurrent writers cannot overwrite one another with stale state. Each replacement uses caller-selected permission bits on a fresh inode, which safely narrows an existing file's permissions. This zero-dependency library accepts strings; it does not provide a `cordis.yml` plugin or crash durability because it does not call `fsync`.
+
 ## Surface
 
 ```ts
@@ -33,13 +37,11 @@ await withFileLock('/home/u/.dsh/settings.yaml', async () => {
 
 ## Model Experience
 
-None, as this is a pure filesystem primitive; nothing here reaches a model request.
+None, as this is a pure filesystem write primitive that registers nothing model-facing.
 
 #### KV Cache effect
 
-None; nothing here enters a request prefix.
-
-**Runtime invariant:** No companion is published. This pure filesystem primitive owns no event stream or mutable runtime data; its replacement contract is enforced by unit tests.
+Nothing here enters a request prefix, so provider cache reuse is unaffected.
 
 ## Known Limitations and Deferred Work
 

@@ -10,6 +10,10 @@ Local DOM snapshots: `declare(children)` registers an auto frame whose per-key `
 
 Not part of the product plugin graph (no `dsh.client`); feature packages depend on it in `devDependencies` only.
 
+## Summary
+
+`SlotTestRuntime.create()` lets Vitest suites drive production slots, stores, typed Session and Workspace fixtures, and local DOM assertions in jsdom. For plugin activation, reload, reconnect, and cleanup tests, `createClientTest` starts the web profile's bundle roster with endpoint-named Remote mocks, without a business Host. Missing services and unstubbed calls fail explicitly. The whole-client fixture owns startup and disposal; the local runtime provides idempotent disposal. Use this package through `devDependencies` for client tests; it is not a product plugin.
+
 ## Model Experience
 
 None, as this package is browser-side test infrastructure; nothing here reaches a model request.
@@ -17,8 +21,6 @@ None, as this package is browser-side test infrastructure; nothing here reaches 
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. This test-support package owns no production event stream or mutable data — it assembles the runtime SlotRegistry and renderer (whose packages own their invariants) around test doubles; its own behavior is exercised by its package tests.
 
 ## Known Limitations and Deferred Work
 

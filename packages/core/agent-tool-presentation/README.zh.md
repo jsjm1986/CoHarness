@@ -4,6 +4,10 @@
 
 [agent preset](../../preset/agent-presets/README.zh.md) 用来声明「模型看到的工具是哪一种形态」的那一行：`native`（全部 schema）、`ptc`（只有 `run_code` 加一份生成的 TypeScript SDK）或 `both`；`code` 保留为兼容别名。
 
+## 概述
+
+在 [agent preset](../../preset/agent-presets/README.zh.md) 中使用 `dsh-agent-tool-presentation`，可固定模型看到全部原生工具 schema、只有带生成 SDK 的 `run_code`，还是同时看到两种形态。每个 preset 可独立选择，因此 native 与 PTC agent 可以共享同一进程，而不共享工具目录。选择 `ptc` 或 `both` 需要兼容的 PTC 运行时；没有该运行时的部署会在挂载时拒绝 preset，不会等到收到第一条提示词。使用本包时 `mode` 字段为必填；省略本包则沿用部署默认值。
+
 ## 为什么是一行插件，而不是把注册表搬下来
 
 工具注册表搬不进 preset。它的消费者全在宿主平面——[`dsh-agent-loop`](../agent-loop/README.zh.md) 读它的调度器，[`dsh-apiproxy`](../../host/apiproxy/README.zh.md) 读它的 presenter 来渲染工具卡，每个工具插件都往里注册——而一个服务只有在**所有**消费者一起下沉时才能下沉。
@@ -20,13 +24,11 @@ preset 能拥有的是这份注册表的**呈现方式**。`ctx.tools.presentAs(
 
 ## 模型体验
 
-间接生效，取决于它在 `dsh-tools` 中选择的投影：`ptc` 呈现 `run_code`、一份生成的 SDK 段，以及「只有 `run_code` 可被直接调用」这条规则，`native` 呈现每个工具的 schema。该选择同时决定了**什么可以执行**：在 `ptc` 下，注册表会把模型直呼其他任何工具名解析为 `UNKNOWN_TOOL`，因此这一行正是让「通告面」与「可调用面」对每个被它覆盖的 agent 保持一致的东西（[执行器塌缩 note](../../../.agents/notes/implemented/bug-fix/2026-08-07-ptc-executor-collapse.zh.md)）。
+通过在 `dsh-tools` 中选择的工具呈现方式间接影响——这一行只在 `dsh-tools` 拥有的两种投影之间选择，本身不注册任何提示词、schema 或结果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
 没有直接的失效影响；呈现方式在 agent 组装时即固定，因此其请求前缀在该会话的整个生命周期内保持稳定。
-
-**运行时不变式：** 不发布伴生入口。本包只对 `ctx.tools` 发起一次 scoped 调用，不持有自己的事件或快照；它建立的是「某个 agent 的组装采用哪种呈现方式」这一关系，该关系由工具注册表持有，`dsh-tools` 会在工具注册表中观察该关系。
 
 ## 已知限制与暂缓事项
 

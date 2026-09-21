@@ -8,6 +8,10 @@ This package owns the `ctx.skills` interface. It does not know whether skills co
 
 The registry is host+per-scope layered over [`@deepseek-ai/dsh-scope`](../../core/scope), the shape the tools registry established: a registration files into the layer of its calling context's scope — host rows and repository plugins land in the global layer, a plugin mounted by an agent preset's standing composition lands in that preset's layer — and a read merges the global layer with the viewing scope's chain, the nearest layer winning a duplicate name outright while rank decides duplicates only within one layer.
 
+## Summary
+
+Use this package to give agents and users one catalog of reusable, task-specific instructions collected from local directories, embedded plugin data, or remote services. It resolves duplicate names predictably, validates entries, tolerates unavailable sources without discarding usable results, and loads the selected skill's full instructions on demand. Mount it when a composition needs skills from multiple or non-filesystem sources; pair it with `dsh-skill-filesystem` for local discovery and `dsh-tool-skill` for model access, because it includes no skill content itself.
+
 ## Service: `SkillRegistry` (ctx key: `skills`)
 
 ### Public API
@@ -65,13 +69,11 @@ The registry does not render model guidance or register model-facing tools. [`@d
 
 ## Model Experience
 
-Indirectly, through `dsh-tool-skill`, which renders provider summaries into durable initial or replacement catalog messages and loaded instructions into retained tool results.
+Indirectly, through `dsh-tool-skill`, which renders provider summaries into durable initial or replacement catalog messages and loaded instruction bodies into retained tool results.
 
 #### KV Cache effect
 
 No direct prompt effect. The named consumer owns the durable initial catalog and append-only replacements after invalidation.
-
-**Runtime invariant:** No companion is published. Provider/runtime maps and revisioned caches mutate atomically inside the registry, which exposes no independent change event or snapshot for cross-checking them.
 
 ## Known Limitations and Deferred Work
 

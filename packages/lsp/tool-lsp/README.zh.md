@@ -6,6 +6,10 @@
 
 Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）。注入 `tools`、`lsp` 和 `systemPrompt`。
 
+## 概述
+
+`dsh-tool-lsp` 让模型通过单个只读 `lsp` 工具导航代码：打开符号定义、查找引用与实现，或阅读悬停文档。请求使用从 1 开始的 UTF-16 行列位置。导航结果数量有上限、按文件分组，并在省略位置或截断文本时显示标记；悬停结果经过规范化，且会区分信息缺失与错误。该包要求配置 LSP 提供方，并要求会话具有工作区根目录。当文本搜索有歧义，或修改需要精确的符号关系时选择它；普通导航应继续使用 `search` 与 `read`。
+
 ## 工具
 
 `lsp` 接受 `operation`（`goToDefinition` | `findReferences` | `goToImplementation` | `hover`）、`file_path`、`line` 和 `character`。`line` 与 `character` 是正的、从 1 开始的 UTF-16 光标坐标；工具将其转换为 seam 从零开始的位置，并把渲染位置转换回来。`findReferences` 包含声明，因此影响分析不会遗漏定义位置。提供方、language id、工作区根目录、限制、超时、初始化和可执行文件均不进入模型输入。
@@ -24,9 +28,9 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
-一个系统提示词区段（顺序 112）将 LSP 定位为精确辅助工具，文本如下：
+一个系统提示词区段（first-party 顺序 2200）将 LSP 定位为精确辅助工具，文本如下：
 
 ##### 逐字指引
 
@@ -44,7 +48,7 @@ Use search/read for ordinary navigation. Use lsp when textual matches are ambigu
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
 模型会看到生成的 [`lsp` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-lsp)。
 
@@ -58,9 +62,9 @@ Use search/read for ordinary navigation. Use lsp when textual matches are ambigu
 
 ### 结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-按文件分组的 `path:line:character` 位置行或规范化 hover 文本，先由 `maxLocations` 限制，再由 `maxResultChars` 限制；省略与截断标记计入完整字符上限。这些上限只影响原生／模型呈现，不影响规范值。空结果使用不同的 `No results.`／`No hover information.` 行。
+按文件分组的 `path:line:character` 位置行或规范化悬停文本，先由 `maxLocations` 限制，再由 `maxResultChars` 限制；省略与截断标记计入完整字符上限。这些上限只影响原生／模型呈现，不影响规范值。空结果使用不同的 `No results.`／`No hover information.` 行。
 
 #### Token 影响
 
@@ -72,9 +76,9 @@ Use search/read for ordinary navigation. Use lsp when textual matches are ambigu
 
 ### UI 呈现
 
-#### 模型看到的内容
+#### 模型看到什么
 
-无。客户端渲染通用搜索卡片：`{ card: 'generic', kind: 'search', title, locations: [{ path, line }] }`；从 args 派生的标题携带操作与从 1 开始的光标，跟随焦点对准查询行，标题则保留列号。
+无。客户端渲染通用搜索卡片——`{ card: 'generic', kind: 'search', title, locations: [{ path, line }] }`——从 args 派生的标题携带操作与从 1 开始的光标；跟随焦点对准查询行，标题则保留列号。
 
 #### Token 影响
 
@@ -83,8 +87,6 @@ Use search/read for ordinary navigation. Use lsp when textual matches are ambigu
 #### KV Cache 影响
 
 无；UI 呈现位于模型请求之外。
-
-**运行时不变式：** 不发布伴生入口。该无状态适配器提供一个工具和一个提示词区段，而查询生命周期与结果关系仍由它所组合的工具 seam 和 LSP seam 负责。
 
 ## 已知限制与暂缓事项
 

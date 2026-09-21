@@ -18,6 +18,10 @@ declare const ctx: Context
 await ctx.plugin(FsPolicy)
 ```
 
+## 概述
+
+`dsh-fs-observation-policy` 要求 agent（智能体）先读取文件，文件系统工具才可覆盖或编辑它。如果文件自读取后发生变化，它也会拒绝变更，并清楚提示重新读取后重试。读取缺失路径会授权带防护的创建，同时仍防止覆盖并发创建的文件。需要编辑前读取安全性的部署请选择它；由于观察记录不持久化，恢复的会话必须重新读取目标。
+
 ## 四层拆分
 
 | 层 | 包 | 角色 |
@@ -55,7 +59,7 @@ await ctx.plugin(FsPolicy)
 
 #### 模型看到的内容
 
-该插件不添加提示词或 schema。没有先前观测时，它会以代码 `FS_NOT_OBSERVED` 和精确消息 `edit requires reading "<path>" first` 拒绝编辑；编辑刚被观测为缺失的目标会返回 `FS_NOT_FOUND`。正向观测陈旧时，带防护的变更会传播由提供方拥有的 `FS_STALE_VERSION` 错误。[`dsh-tool-fs`](../tool-fs/README.zh.md) 拥有面向模型的错误包装，会为 `FS_STALE_VERSION` 消息追加恢复指令（`— re-read the file, then retry`）、为 `FS_NOT_OBSERVED` 消息追加恢复指令（`— read the file, then retry`），同时保留错误码。外部删除目标后，遵循陈旧恢复指令会记录缺失：下一次带防护的写入可以通过 `createIfAbsent` 重新创建该目标，而提供方会以原子方式保留任何并发创建者写入的文件。
+该插件不添加提示词或 schema。没有先前观测时，它会以代码 `FS_NOT_OBSERVED` 和策略原因 `edit requires reading "<path>" first` 拒绝编辑；编辑被观测为缺失的目标返回 `FS_NOT_FOUND`。正向观测陈旧时，带防护的变更会传播由提供方拥有的 `FS_STALE_VERSION` 错误。[`dsh-tool-fs`](../tool-fs/README.zh.md) 拥有模型侧错误包装：它把所有 `FS_NOT_OBSERVED` 来源规范化为 `cannot modify "<path>": file has not been read — read the file, then retry`，而 `FS_STALE_VERSION` 保留提供方原因并追加 `— re-read the file, then retry`；两者都保留错误码和原始原因。外部删除目标后，遵循陈旧恢复指令会记录缺失：下一次带防护的写入可以通过 `createIfAbsent` 重新创建该目标，而提供方会以原子方式保留任何并发创建者写入的文件。
 
 #### Token 影响
 
@@ -64,8 +68,6 @@ await ctx.plugin(FsPolicy)
 #### KV Cache 影响
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。本包没有独立事件序列或可变数据关系，相关约定在所属 seam 强制执行。
 
 ## 已知限制与暂缓事项
 

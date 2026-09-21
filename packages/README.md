@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 npm scope: `@deepseek-ai/dsh-*`; Cordis `Service` subclasses and function plugins contribute through `ctx.effect()`, `ctx.on()`, or `ctx.waterfall()`. Rules: [package](AGENTS.md), [root](../AGENTS.md#conventions).
 
+## Summary
+
+The harness is assembled from `packages/` capability groups. Use this page as the top-level map to each group's package list.
+
 ## Hierarchy
 
 Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Group READMEs own package/ctx-key maps.**

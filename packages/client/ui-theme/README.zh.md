@@ -16,19 +16,21 @@
 
 `gradient-shadow-text.css` 拥有阴影刻度（`--dsw-shadow-lv*`）与 elevation token：`--dsw-elevation-stroke` 通过可重绑定的 `--dsw-elevation-stroke-color` 画出 0.5px 发丝描边，`--dsw-elevation-panel`／`--dsw-elevation-prominent`／`--dsw-elevation-soft`（composer 使用的更大模糊、更低透明度一档）在该描边之上叠两层极淡的柔光，因此悬浮表面设置 `border: 0`、不再携带占布局的轮廓；派生 token 逐元素重新声明，使表面对描边色的重绑定生效。扁平控件保留真实边框，但统一为 `0.5px solid` 发丝粗细；elevation 样式表 spec 会在全部包样式表上扫描这两条规则（[elevation note](../../../.agents/notes/implemented/feature/2026-09-01-web-elevation-stroke-shadows.zh.md)）。
 
+## 概述
+
+`dsh-client-ui-theme` 让 Web GUI 用户在设置中选择 `light`、`dark` 或 `system`，并把会话正文字号设为 12 至 17 px。回环客户端把两个值存入 `ui-theme` 设置命名空间，本地提供方默认将其持久化到 `$DSH_HOME/settings.yaml`。插件通过 `prefers-color-scheme` 解析 `system` 并发布不可变的 `ThemeSnapshot`；ui-layout 把每份快照应用到文档。本包还提供 `--dsw-*` token 样式表，并注入同步引导，使所选调色板与字号在外壳加载前生效。第三方主题可通过 `ctx.theme` 注册别名 token 覆盖。
+
 ## 设置权限与兼容性
 
 外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
 
 ## 模型体验
 
-无。主题服务管理浏览器偏好；这里没有任何内容进入模型请求。
+无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
 无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。settings scope 校验并发布持久 theme section，注册表与自身变更同步发出 `theme/change`；存储与注册表的一致性由本包针对 Host、scope 与服务行为的测试直接覆盖。
 
 ## 已知限制与暂缓事项
 

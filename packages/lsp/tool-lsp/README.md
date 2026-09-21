@@ -6,6 +6,10 @@ The model-facing **`lsp` tool** over `ctx.lsp`: one read-only tool with four ope
 
 Namespace plugin (`name` / `inject` / `Config` / `apply`, no default export). Injects `tools`, `lsp`, and `systemPrompt`.
 
+## Summary
+
+`dsh-tool-lsp` lets a model navigate code through one read-only `lsp` tool: open a symbol's definition, find references and implementations, or read hover documentation. Requests use one-based UTF-16 line and character positions. Navigation results are bounded, grouped by file, and labeled when locations are omitted or text is truncated; hover results are normalized and distinguish missing information from errors. The package requires a configured LSP provider and a session workspace root. Choose it when textual search is ambiguous or a change needs precise symbol relationships; ordinary navigation should continue to use `search` and `read`.
+
 ## The tool
 
 `lsp` accepts `operation` (`goToDefinition` | `findReferences` | `goToImplementation` | `hover`), `file_path`, `line`, and `character`. `line` and `character` are positive, one-based UTF-16 cursor coordinates; the tool converts them to the seam's zero-based positions and converts rendered locations back. `findReferences` includes declarations so impact analysis does not omit the defining site. Provider, language id, workspace root, limits, timeout, initialization, and executable stay outside model input.
@@ -26,7 +30,7 @@ The tool requires the workspace root from the session `header.cwd`, with no fall
 
 #### What the model sees
 
-One system-prompt section (order 112) positions LSP as a precision aid with the following text:
+One system-prompt section (first-party order 2200) positions LSP as a precision aid with the following text:
 
 ##### Verbatim guidance
 
@@ -83,8 +87,6 @@ Zero direct token effect because rendering is client-side only.
 #### KV Cache effect
 
 None; UI presentation is outside the model request.
-
-**Runtime invariant:** No companion is published. This stateless adapter contributes one tool and prompt section, while query lifecycle and result relations remain owned by the tool and LSP seams it composes.
 
 ## Known Limitations and Deferred Work
 

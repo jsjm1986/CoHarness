@@ -6,6 +6,10 @@ Local filesystem provider for the `ctx.skills` registry.
 
 This package implements one skill source. It scans local project, custom, and user skill roots, parses `SKILL.md` or flat Markdown skill files, and registers the provider on `ctx.skills`. The registry remains in `@deepseek-ai/dsh-skill`; the durable session catalogs and model-facing loader tool remain in `@deepseek-ai/dsh-tool-skill`.
 
+## Summary
+
+Agents can use local skills from the repository, a custom directory, or the user's agent configuration: author a skill as a directory bundle with a `SKILL.md` or a flat `<name>.md` file under any scanned root, and it appears in the session catalog. The provider discovers the project, custom, and user roots, parses each skill's YAML frontmatter, and watches the directories, so new, renamed, or deleted skills reach agents without a restart. Choose it when skills live on disk — the registry (`dsh-skill`) accepts any provider, and another provider can supply skills from elsewhere.
+
 ## Plugin
 
 Requires `ctx.skills` (`inject: ['skills']`).
@@ -65,8 +69,6 @@ Indirectly, through `dsh-tool-skill`, which renders this provider's invocable na
 #### KV Cache effect
 
 Watcher invalidation can cause the named consumer to append a replacement catalog to the existing request history. Body-only edits leave the catalog digest unchanged.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
 
 ## Known Limitations and Deferred Work
 

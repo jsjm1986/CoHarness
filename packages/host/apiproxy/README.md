@@ -8,6 +8,11 @@ The `workspaceFiles.*` methods read Session-relative files after Session authori
 
 The existing Host stream carries `host/workspace-file-changed` for authorized Agent observations, not OS filesystem watching. No provider path or `FsTargetKey` crosses this file API. `ApiTransportError.status` preserves HTTP 401/403/429/503 separately from RPC file errors, without consuming error response bodies.
 
+## Summary
+
+Use `dsh-host-apiproxy` as the shared API gateway: a zero-dependency TypeScript API contract importable from the browser, a fetch carrier pair, and the host-side `ApiProxyService` (`ctx.apiProxy`) that every HTTP carrier wraps. Its `workspaceFiles.*` methods serve session-relative file reads under authorization, containment, and version guards with advertised bounds.
+
+
 ## The shared Agent default (`agent-default-model` Settings section)
 
 `ApiProxyService` consumes `ctx.agentDefaultModel`; it does not own a provider/model config or settings section. The shared service registers `{provider, model, reasoningEffort?}` under `agent-default-model`: the base bundle's composition entry is the lower layer and `settings.yaml` layers the user's choice over it.
@@ -48,7 +53,7 @@ Session titles ride the generic projection pair like every other domain — the 
 
 Session model selection is a session-domain contract. `session.models` returns the current `ModelSelection` separately from provider-grouped advisory models, exact-model reasoning metadata, and provider-local lookup failures. The selection may be absent from the groups and is never injected as a synthetic row; clients can prompt for another selection without turning the directory into a routing whitelist. `session.selectModel` validates the optional adapter-owned reasoning effort and assigns the complete selection for the next prompt assembly. Catalog membership is not validation: an adapter may resolve an unlisted model, while an unavailable provider or unsupported effort returns `model-unavailable`. `session.models` additionally reports `routable`: whether an adapter currently serves the selected provider. This is deliberately not derivable from the groups because an adapter may serve an unadvertised model. `session.prompt` refuses on the same fact with `model-unavailable` before opening a turn; a disabled composer is a client affordance, and the method remains callable.
 
-`session.prompt` and `subagent.prompt` accept optional request-local `clientTimeZone` provenance. When present, the Host validates and canonicalizes `UTC` or an IANA Area/Location before Agent entry, rejects invalid input with `invalid-time-zone`, and records the canonical value on that exact `user-rpc` message beside its `rpcId`. The value is not Session, connection, create, resume, or fork state; non-browser callers may omit it. Continuable subagent prompts use the same upload-shaped image parts as ordinary prompts; the gateway admits each batch through `ctx.attachments` before the continuation inbox accepts it, and the continuation manager checks the child's resolved model modality before delivery.
+`session.prompt` and `subagent.prompt` accept optional request-local `clientTimeZone` metadata. When present, the Host validates and canonicalizes `UTC` or an IANA Area/Location before Agent entry, rejects invalid input with `invalid-time-zone`, and records the canonical value on that exact `user-rpc` message beside its `rpcId`. The value is not Session, connection, create, resume, or fork state; non-browser callers may omit it. Continuable subagent prompts use the same upload-shaped image parts as ordinary prompts; the gateway admits each batch through `ctx.attachments` before the continuation inbox accepts it, and the continuation manager checks the child's resolved model modality before delivery.
 
 Prompt admission reads `ctx.attachments` only for image parts and `ctx.userDocs` only for document parts. Text-only prompts therefore remain valid in compositions that mount neither store, and document-only prompts do not depend on image storage.
 
@@ -86,13 +91,11 @@ The `inbox` projection reconstructs pending input from Session-owned durable spl
 
 ## Model Experience
 
-None, as the package defines the client↔host wire contract and carriers; nothing here reaches a model request.
+None, as the wire contract and fetch carriers move already-composed messages and register nothing model-facing.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. This package is the wire contract layer plus the host-side gateway over services owned elsewhere — it emits no cordis events of its own; the session/agent event streams it projects are asserted by their owning packages' companions; rpcId round-trip and schema acceptance are enforced at the carrier boundary and exercised by the protocol-isomorphism suite.
+None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 

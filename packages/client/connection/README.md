@@ -8,6 +8,10 @@ Wire consumer layer: the client plugin's apply mounts `ctx.connection` (shared a
 
 The client handle also exposes an observable connection state and an immediate `reconnect()` action. The WebSocket downlink heartbeat permits two missed Pongs before scheduling termination, which tolerates one busy event-loop interval while still recovering a stalled host.
 
+## Summary
+
+The package carries browser-to-Host Remote calls, exact Fetch responses, and connection generations. The Client plugin mounts `ctx.connection` with current-page loopback state, generic RPC, the active generation and its Host facts, observable recovery state, an immediate reconnect command, and the registration point for one generation source. A generation becomes visible when its source reports ready; source completion, failure, withdrawal, or an explicit stop clears it before `ConnectionController` applies its retry policy.
+
 ## Host configuration
 
 `historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target. Fetch history responses still pack remaining `assistant/chunk` runs and round-trip optional `omittedSpans` from `detail: 'conversation'`; the [two-tier conversation history decision](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) owns the download gears.
@@ -37,8 +41,6 @@ None, as the wire consumer layer moves already-composed messages between browser
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. Browser-session verification reads the credential record asynchronously at the request that authorizes work, while the credentials companion owns record commit-event lifetime. Stream/reconnect sequencing and rpcId round-trip discipline are exercised directly by behavior specs, and route register/dispose symmetry is audited by the webserver companion.
 
 ## Known Limitations and Deferred Work
 

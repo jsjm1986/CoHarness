@@ -4,6 +4,10 @@
 
 `ctx.jobs` 的面向模型控制器：三个与 kind 无关的工具、完成通知和一个后台工作提示词区段。加载该插件会附加 `ctx.jobs.start()` 所要求的控制器。
 
+## 概述
+
+使用 `dsh-tool-jobs`，可通过 `job_output`、`job_list` 与 `job_kill` 检查和控制后台命令、PTY 工作与 subagent。读取可在配置的超时内等待，列表结果标识各任务的 kind 与状态，而取消只有在工作停止后才结算。归属明确的工作完成时，agent（智能体）会收到会话内通知：繁忙的 agent 在下一步收到通知，空闲的 agent 则可能由有界的 follow-up 轮次唤醒。配置控制等待上限、完成投递与连续唤醒次数。流输出仅供单一读取方消费，待领通知无法在所有者释放后存活。
+
 ## 工具
 
 - `job_output(job_id, wait?, timeout_ms?)` 默认以非阻塞方式读取。流任务只返回下一个增量；最终输出任务在终止后返回结果。每个响应都以 `[status: ...]` 结尾。`wait: true` 最多等待到配置上限，超时时仍让运行中的任务保持存活。
@@ -41,9 +45,9 @@
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
-该插件注册 scope 中的每次请求都包含以下指引。按 agent（智能体）scope 过滤工具时，可能会隐藏工具，却不会移除独立注册的提示词区段。
+该插件注册 scope 中的每次请求都包含以下指引。按 agent scope 过滤工具时，可能会隐藏工具，却不会移除独立注册的提示词区段。
 
 ##### 后台任务指引
 
@@ -61,7 +65,7 @@ Track every background job id you start. You are notified in-session when a job 
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
 该工具集可见时，会看到生成的 [`job_output`、`job_list` 和 `job_kill` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-jobs)。
 
@@ -75,9 +79,9 @@ Track every background job id you start. You are notified in-session when a job 
 
 ### 结果与通知
 
-#### 模型看到的内容
+#### 模型看到什么
 
-读取会返回输出或 `(no new output)`，随后是 `[status: <status>]` 和可选 detail。空列表返回 `(no background jobs)`。kill 返回 `requested cancellation of job <id>` 或现有终止状态。尚未报告且有 owner 的任务完成时使用上述通知。
+读取会返回输出或 `(no new output)`，随后是 `[status: <status>]` 和可选 detail。空列表返回 `(no background jobs)`。kill 返回 `requested cancellation of job <id>` 或现有终止状态。尚未报告且有所有者归属的完成使用上述通知。
 
 #### Token 影响
 
@@ -85,9 +89,7 @@ Track every background job id you start. You are notified in-session when a job 
 
 #### KV Cache 影响
 
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
-
-**运行时不变式：** 不发布伴生入口。这个面向模型的适配器没有独立的生命周期流；执行关系归其调用的能力 seam 所有。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
 ## 已知限制与暂缓事项
 

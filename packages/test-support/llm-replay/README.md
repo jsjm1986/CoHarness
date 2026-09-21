@@ -6,6 +6,10 @@ A replay LLM plugin for keyless snapshot tests. It yields model streams reconstr
 
 Its consumers are the ACP and headless `stream-json` snapshot suites plus the Web browser e2e lane. Loader-driven suites mount this plugin in place of a real LLM adapter; the Web lane installs it directly to retain the teardown consumption handle.
 
+## Summary
+
+`dsh-llm-replay` lets snapshot tests run the real agent without an API key by replaying model streams from recorded Session JSONL fixtures. Each parent and subagent session receives its recorded script in first-call order, while calls within a session advance independently. A `replay.override.json` sidecar represents pre-chunk failures, cancellation, hangs, and injected retries that durable settlements cannot reconstruct. Use it for deterministic ACP, headless, and Web browser scenarios that need real loop behavior with fixed model output.
+
 ## How the fixture works
 
 The fixture IS the persisted session log (`<scenario>/session.jsonl`). Its `assistant/chunk` events carry every `StreamChunk`, so grouping them by `(turn, step)` reconstructs each agent-loop `stream()` call's chunk sequence. A successful compaction summarizer is logged differently: when `compaction/summary` carries `llmStreamCall: true` and its complete `rawOutput`, replay reconstructs a canonical successful stream at that event's position using one `block-start`/`block-end` pair per block, the recorded usage when present, and a terminal `stop`. Exact provider delta partitioning is not part of the durable compaction result. `rawOutput` without the marker does not imply a local LLM call because template and remote summarizers may retain complete output without using this context's adapter.
@@ -75,8 +79,6 @@ None, as this keyless test adapter sends no request to a provider model; it only
 #### KV Cache effect
 
 None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. This test-only adapter consumes a fixed replay script; its stream grammar is checked by the LLM companion and fixture derivation tests.
 
 ## Known Limitations and Deferred Work
 

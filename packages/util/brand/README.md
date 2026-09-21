@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The `Branded<B>` and `BrandedNumber<B>` nominal-typing primitives — a tiny, **type-only** package (no runtime code, no harness-package dependency) shared by every package that owns a confusable cross-boundary value.
 
+## Summary
+
+`dsh-brand` makes structurally identical strings or numbers non-interchangeable at the type level: a `SessionId` cannot be passed where a `ToolCallId` is expected, and an event sequence cannot be passed where a log offset is required. `brandString<T>()` and `brandNumber<T>()` apply nominal brands without shared runtime state, so owning packages can define domain types without importing an unrelated capability.
+
 ## What `Branded` is
 
 A brand makes structurally-identical strings or numbers non-interchangeable at the type level: a `SessionId` cannot be passed where a `CallId` is expected, and an event sequence cannot be passed where a log offset is required, even though both pairs are plain `string`s or `number`s at runtime.

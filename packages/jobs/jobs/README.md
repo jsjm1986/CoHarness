@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The background job registry contract (`ctx.jobs`). The abstract `JobRegistry` and its vocabulary types give long-running producers shared ids, owner isolation, reads, cancellation, waiting, notices, and cleanup under one contract; the process-local registry lives in [`dsh-jobs-local`](../jobs-local/README.md). Producer plugins extend `JobKindMap` with their opaque id namespace.
 
+## Summary
+
+`dsh-jobs` lets tools keep long-running work active while an agent continues. Each job receives a stable `<kind>-N` id, and its owning agent can read output, wait with a timeout, or request cancellation. Ownership is scoped to the agent session, so other agents cannot inspect or stop the job; completion arrives as an in-session notice without polling. Background jobs can start only when the deployment supplies job execution.
+
 ## Service contract
 
 - `start(spec): JobId` validates the attached controller, spec, exact live owner, optional positive `outputLimitBytes`, and any provider-owned admission policy before calling the producer's `run()` once. A preflight rejection or starter throw leaves no job id or registered work; successful return commits without another failable step.
@@ -27,11 +31,11 @@ See the [job type catalog](../../../docs/subsystems/jobs.md), the [runtime Agent
 
 ## Model Experience
 
-Indirectly, through producer plugins and [`dsh-tool-jobs`](../tool-jobs/README.md), which render job ids, output, status, cancellation, and completion notices.
+Indirectly, through producer and controller plugins, which own all model rendering over the job registry.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the named consumers own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

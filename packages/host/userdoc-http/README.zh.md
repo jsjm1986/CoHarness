@@ -8,7 +8,7 @@
 
 上传使用版本化可续传会话协议：`POST /api/documents/uploads` 创建或复用会话，`PUT /api/documents/uploads/<uploadId>/chunks/<index>` 接收带 SHA-256 的原始 `Content-Range` 分片，`POST /api/documents/uploads/<uploadId>/complete` 启动最终校验，`GET` 查询进度，`DELETE` 取消会话。每个分片都小于公网入口限制，因此不再依赖单个请求承载整个文件。已移除的单请求 `POST /api/documents` 返回 `426 UPLOAD_PROTOCOL_REQUIRED`。`GET` 或 `HEAD /api/documents/content?id=<docId>` 以 `nosniff` 和附件 disposition 流式下载。`DELETE /api/documents?id=<docId>` 会幂等地把文档移入可恢复回收站；`DELETE /api/documents/purge?id=<docId>` 永久清理已在回收站中的文档。响应只公开稳定的 `UserDocError.code`，绝不包含文档字节或失败的绝对路径。
 
-`POST /api/documents/transfer` 是带版本号的 Gateway 快照复制操作。请求声明任意个人或项目源、目标及文档 id；支持项目到项目和管理员多目标分发。项目读取要求成员身份，写入要求 `rw`（组织管理员隐式拥有 `rw`）。Gateway 把源响应直接流式写入目标运行时上传端点，沿用目标命名策略，返回逐文件安全元数据，并在元数据目录和审计轨迹中保存溯源信息。浏览器不会收到源字节或绝对路径。runtime JSON 元数据响应会先经过 8 MiB 字节上限再校验，活动的合并列表读取为每个等待方独立处理取消。没有 `gatewayRuntime` 的 standalone composition 返回 `DOCUMENT_TRANSFER_UNAVAILABLE`。
+`POST /api/documents/transfer` 是带版本号的 Gateway 快照复制操作。请求声明任意个人或项目源、目标及文档 id；支持项目到项目和管理员多目标分发。项目读取要求成员身份，写入要求 `rw`（组织管理员隐式拥有 `rw`）。Gateway 把源响应直接流式写入目标运行时上传端点，沿用目标命名策略，返回逐文件安全元数据，并在元数据目录和审计轨迹中保存来源身份。浏览器不会收到源字节或绝对路径。runtime JSON 元数据响应会先经过 8 MiB 字节上限再校验，活动的合并列表读取为每个等待方独立处理取消。没有 `gatewayRuntime` 的 standalone composition 返回 `DOCUMENT_TRANSFER_UNAVAILABLE`。
 
 `GET /api/documents/transfer/capabilities` 只返回当前安全作用域名称和可写目标，不会列出或打开任何文档。
 
@@ -24,15 +24,18 @@ Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路�
 
 `POST /api/documents/transfer/plan` 执行只读元数据预检并返回五分钟有效的计划令牌；`/commit` 和 `/retry` 在开始流式复制前重新校验源和目标权限，成功与失败文件分别提交。
 
+## 概述
+
+使用 `dsh-host-userdoc-http` 作为 `ctx.userDocs` 的流式浏览器 HTTP 消费方：经宿主连接注册 `/api/documents`，使宿主/来源信任检查先于路由执行，上传字节旁路缓冲 JSON 桥。该路由族覆盖列表、上传、移动、回收站、还原、清除与文件夹操作，分页有界且游标不透明。
+
+
 ## 模型体验
 
-无，因为该包只存储和传输文件；另一个会话 Consumer 决定哪些文档内容进入模型请求。
+没有直接影响；流式浏览器传输只负责文件存取，任何模型可见渲染由会话消费方负责。
 
-#### KV 缓存影响
+#### KV Cache 影响
 
-无；该包既不装配也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。注册处置由 Connection 拥有；真实组合覆盖探测移除。
+无；本包从不组装或发送提供方请求。
 
 ## 已知限制与待完成工作
 

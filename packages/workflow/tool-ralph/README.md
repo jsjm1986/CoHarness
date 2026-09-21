@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The model-facing `ralph` tool runs a fixed foreground workflow that gives one immutable objective to a sequence of fresh child agents. It demonstrates a specialized orchestration policy as an ordinary plugin over [`ctx.workflowEngine`](../workflow/README.md) and [`ctx.subagents`](../../subagent/subagent/README.md): no Ralph mode or fresh-agent loop is added to `agent-loop`, and the same-session [goal domain](../../goal/goal/README.md) remains independent. The [Ralph Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-fresh-agent-ralph-workflow-tool.md) owns the policy and deferred work.
 
+## Summary
+
+`ralph` runs a foreground sequence of fresh child agents against one immutable objective, with each round receiving only the previous bounded report and shared workspace state. It returns when a worker reports completion or a concrete blocker, or when the configured round limit is reached; those reports are not independently verified. Parent conversation and prior child sessions are never copied into a new round. Use it only when the direct human explicitly requests Ralph-style fresh-agent iteration; use goal tools for ordinary long-running work and subagents or workflows for bounded delegation.
+
 ## Contract
 
 `ralph({ objective, maxRounds? })` waits for the entire run. The deployment config's `maxRounds` is both the default and a ceiling on a call override. Every Ralph round starts one child through `subagentProvider`; that provider must exist, support structured output, and report `inheritsParentContext: false`. The configured provider is carried as `WorkflowStartRequest.subagentProvider`, so the fixed script cannot inspect or change routing and the ordinary model-written `workflow` tool gains no provider selector. The resolved round cap is also carried as `WorkflowStartRequest.maxTotalAgents`, coordinating the fixed loop with the engine's total-child backstop; the engine rejects a Ralph cap above its deployment ceiling before publishing a run.
@@ -44,7 +48,7 @@ Every parent request in this plugin's registration scope receives the fixed rout
 ##### Ralph guidance
 
 ```markdown
-Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflowEngine for bounded delegation and fan-out.
+Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflows for bounded delegation and fan-out.
 ```
 
 #### Token effect
@@ -82,8 +86,6 @@ Every round pays for a fresh child context. `maxHandoffChars` bounds cross-round
 #### KV Cache effect
 
 Each fresh child has an independent request cache. The parent result appends after the reusable request prefix.
-
-**Runtime invariant:** No companion is published. This model-facing orchestration adapter owns no independent event stream; workflow and subagent owners validate the runs and child lifecycles it starts.
 
 ## Known Limitations and Deferred Work
 

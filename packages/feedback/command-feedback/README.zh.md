@@ -4,6 +4,10 @@
 
 与触发方式无关的会话反馈，以及面向用户的 `/feedback` 采集。本包导出 `recordFeedback(session, record)`；该函数从带可选 `text` 与 `category` 字段的 `FeedbackRecord` 追加一个仅写入日志的 `feedback/record` 事件。该插件通过 [`ctx.commands`](../../interaction/commands/README.zh.md) 注册一个全局命令，因此每个已组合的命令适配器都能发现它；随附的 Web 客户端无需模型轮次即可执行。
 
+## 概述
+
+`dsh-command-feedback` 让用户告诉 harness 他们对会话的看法。输入 `/feedback` 加一条评价，评价即被记录，并以会话 id 与匿名用户 id 确认；Web 反馈弹窗通过 `sessionFeedback` Host Remote 记录分类与可选描述。记录是即时的，绝不会启动模型工作：模型既看不到这条评价，也不会被打断。本包同时拥有所有反馈界面共用的固定分类表。它随标准 `dsh` 基础组合交付，无需任何配置；无头模式、ACP（Agent Client Protocol）与 JSON-RPC 入口不提供斜杠命令。
+
 ## 命令约定
 
 | 输入 | 结果 |
@@ -51,9 +55,9 @@
 
 ### 用户 `/feedback` 采集
 
-#### 模型看到的内容
+#### 模型看到什么
 
-无。斜杠输入、`feedback/record` 以及确认文本都不出现在模型请求中。反馈事件和注册表生命周期记录仅写入日志且不携带 `surfaceOp`，因此它们绝不会进入有序 surface、`deriveMessages()` 或系统提示词。在某个轮次中记录反馈不会改变该轮次剩余的请求。
+无。斜杠输入、弹窗、`feedback/record` 以及确认文本都不出现在模型请求中。反馈事件和注册表生命周期记录仅写入日志且不携带 `surfaceOp`，因此它们绝不会进入有序 surface、`deriveMessages()` 或系统提示词。在某个轮次中记录反馈不会改变该轮次剩余的请求。
 
 #### Token 影响
 
@@ -62,8 +66,6 @@
 #### KV Cache 影响
 
 与模型请求路径无关。记录只追加到会话日志，不触碰已经可复用的请求前缀。本包贡献的任何内容都不会使缓存复用失效。
-
-**运行时不变式：** 不发布伴生入口。每个 `feedback/record` 都是独立的仅追加事实，不涉及跨事件关系或与可变数据的关系。
 
 ## 已知限制与暂缓工作
 

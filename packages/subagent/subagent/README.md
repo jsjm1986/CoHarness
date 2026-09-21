@@ -6,6 +6,10 @@ The subagent seam lets one agent delegate work to a child through a named provid
 
 The [subagent family overview](../README.md) maps implementations and model-facing consumers. This package owns the provider registry, shared request and result contracts, durable descriptors, and continuable-child orchestration. Multiple named providers may coexist behind that contract.
 
+## Summary
+
+Use `dsh-subagent` to delegate work to named child agents, collect their results, and continue supported child conversations across turns. A composition can offer in-process, ACP, SDK, Codex, or Claude Code children side by side. Choose one-shot children for a single result or continuable children for later messages and interruption. You can also inspect available children, their mode, activity, and lineage without loading or resuming them. Enable at least one supported child backend and a delegation tool.
+
 ## Service API
 
 `SubagentRuntime` has these operations:
@@ -94,7 +98,7 @@ The manager reserves the child identity, resolves the durable descriptor, calls 
 
 ### Settlement delivery
 
-When a resident Activation settles, the manager tells the child's durable direct parent, in the parent's own turn stream, that the child produced everything it is going to. Delivery is unconditional for every child whose id a caller actually received: it does not consider whether the child ever sent a message back, because the endings that most need an account — a token ceiling, a model failure, cancellation, teardown — are exactly the ones where the child never got to choose. A materialization rolled back before its first accepted message stays silent, since that caller was told the child was not established. The message carries the epoch's stop reason, its final assistant content when it produced any, and durable provenance `{ kind: 'subagent-settled', form: 'notice', senderSessionId: <child-id> }` — a different source kind from a child-authored `subagent-report`, so a transcript never credits the child with words the runtime wrote.
+When a resident Activation settles, the manager tells the child's durable direct parent, in the parent's own turn stream, that the child produced everything it is going to. Delivery is unconditional for every child whose id a caller actually received: it does not consider whether the child ever sent a message back, because the endings that most need an account — a token ceiling, a model failure, cancellation, teardown — are exactly the ones where the child never got to choose. A materialization rolled back before its first accepted message stays silent, since that caller was told the child was not established. The message carries the epoch's stop reason, its final assistant content when it produced any, and durable source `{ kind: 'subagent-settled', form: 'notice', senderSessionId: <child-id> }` — a different source kind from a child-authored `subagent-report`, so a transcript never credits the child with words the runtime wrote.
 
 Two ordering rules make the delivery reliable rather than lucky, and both are why this belongs to the manager instead of an external `subagent/end` listener. First, the send happens **before** the child's ownership release, while the parent still counts the child and is therefore structurally unable to be judged settled. Second, a parent that is itself a resident Activation receives the message through the same waking-admission accounting as a child-to-parent message, so the window between the synchronous send and the microtask that admits it is not mistaken for quiescence — `Agent.status` folds context maintenance into `idle`, and a waking send behind maintenance only arms a deferred wake. Without either rule the parent can be disposed with the notice still in an inbox that `cancel()` clears, which loses it silently.
 
@@ -131,11 +135,11 @@ Continuable Activations await a best-effort final session flush without treating
 
 #### What the model sees
 
-One user-role parent message opening with the outcome — `Background subagent <child-id> finished and will do no further work unless you send it more.`, or the matching line for a child that was stopped, ran out of room, declined, or failed — followed by `Its closing message:` and the child's final assistant content, or `It left no closing message.` when it produced none. This runtime-owned notice is distinct from model-authored parent/child messages, which use `sendMessage()` and `AgentMessageSource`; delegation schemas and model controls belong to the Consumer packages.
+One user-role parent message opening with the outcome — `Background subagent <child-id> finished and will do no further work unless you send it more.`, or the matching line for a child that was stopped, ran out of room, declined, or failed — followed by `Its closing message:` and the nonempty text blocks from the child's final assistant output, preserving their content and order. Reasoning and other nontext blocks are excluded; when no nonempty text remains, the notice says `It left no closing message.` This runtime-owned notice is distinct from model-authored parent/child messages, which use `sendMessage()` and `AgentMessageSource`; delegation schemas and model controls belong to the Consumer packages.
 
 #### Token effect
 
-One notice per settled Activation in the parent's request, sized by the child's final message. A child that sends its own message and then settles costs the parent both.
+One notice per settled Activation in the parent's request, sized by the child's final text. A child that sends its own message and then settles costs the parent both.
 
 #### KV Cache effect
 

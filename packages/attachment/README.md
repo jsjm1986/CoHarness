@@ -15,3 +15,8 @@ The durable binary attachment and named user-document capability families, with 
 Unsent browser drafts are intentionally outside this capability. Bytes enter durable storage only when a user prompt is submitted or when a provider adapter commits structured model output.
 
 The [Attachment subsystem reference](../../docs/subsystems/attachment.md) owns the service contract, payload types, and the `ctx.attachments` Cordis surface.
+
+
+## Summary
+
+The `attachment/` group provides durable image attachments: attach images to prompts and commands, and the harness saves them on your machine, shows them again in conversation history, and sends them to the model in later turns. The shipped `dsh` composition enables this with no setup. The capability and its storage are split across two packages, described below. Stored images survive restarts and are never deleted automatically, and only raster image formats are supported.

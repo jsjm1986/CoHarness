@@ -49,7 +49,7 @@ The [resource manager](src/index.ts) keys ownership by live Agent identity and j
 
 Disposed-cause cancellation starts resource cleanup before AgentHandle waits for idle. Cleanup closes resources before waiting for running operations, allowing connection teardown to interrupt upstream APIs without abort support. A failed close rejects disposal and retains ownership. Agent-scoped cleanup prevents a resumed Session with the same durable id from inheriting a previous browser.
 
-The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop](../../core/agent-loop/README.md#understand-the-implementation) holds queued input and owns creation rollback. Prompt assembly reads the initialized catalog. The helper retains the provider registration through resource cleanup and uses the [MCP client](../../mcp/mcp-client/README.md) for transport, schema discovery, result conversion, and durable image admission.
+The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop](../../core/agent-loop/README.md#loop-lifecycle-agentts) holds queued input and owns creation rollback. Prompt assembly reads the initialized catalog. The helper retains the provider registration through resource cleanup and uses the [MCP client](../../mcp/mcp-client/README.md) for transport, schema discovery, result conversion, and durable image admission.
 
 No runtime invariant companion is published: resource ownership and pending work are private lifecycle state, with no separately maintained runtime projection to compare. Owner tests cover isolation, disposal, and failed cleanup.
 

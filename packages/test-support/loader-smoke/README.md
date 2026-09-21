@@ -10,6 +10,10 @@ Shared subprocess harness for tests that boot an app and `cordis.yml` through th
 
 This is support-tier test infrastructure, not product API.
 
+## Summary
+
+Use `dsh-loader-smoke` to boot an application fixture from its real bin and `cordis.yml` in an isolated temporary directory, with captured output and cleanup. `runFixtureTurn` drives one task through the configured root agent and returns the final assistant text plus token usage. Tests can select zero-build source execution or built-package execution, so local and CI smoke tests use the intended consumer path for each environment. This support-tier library is for test authors, not product integrations.
+
 ## Model Experience
 
 None, as the test harness submits only the consuming test's ordinary user task and delegates prompt and tool composition to the loaded tree.
@@ -17,8 +21,6 @@ None, as the test harness submits only the consuming test's ordinary user task a
 #### KV Cache effect
 
 None beyond the loaded tree; the helper neither changes the request prefix nor retains state across runs.
-
-**Runtime invariant:** No companion is published. This test-support package owns no production event stream or mutable data; consuming test suites exercise its behavior.
 
 ## Known Limitations and Deferred Work
 

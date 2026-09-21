@@ -10,6 +10,10 @@ The current Client assembly mounts the Goal Remote contribution and the read-onl
 
 This package contains no transport or Host service discovery logic. Its Client face can be reused by Web or a future TUI that provides the same React-free `ctx.remote` contract.
 
+## Summary
+
+Two-sided BFF for Host Remote capabilities selected by this application. The Host entry owns the forwarded-event selection and registers its application event source with API Gateway; the Client entry imports generated `/remote` artifacts as runtime values, mounts each contribution through `ctx.remote.$mount()`, and re-exports their declaration merges. Client business packages depend on this facade rather than the Gateway implementation or individual Remote runtime entries.
+
 ## Forwarded Host events
 
 `src/remote-events.ts` holds `API_REMOTE_FORWARDED_EVENTS`, the allowlist of Host cordis events this application forwards to consumers verbatim — no projection, no redaction, no wire renaming — and therefore the legal key set of `ctx.remote.$on`; the type-only `src/types.ts` derives its selection face. The six dynamic Cordis event families include both the official `cordis/*` names and the fork's `@deepseek-ai/cordis/*` names. The Host still forwards the exact name it received; the Gateway Client treats each pair as one delivery family. Forwarding any other event remains one entry in the array: the type projection, consumer key face, and Host forwarding loop derive from it.
@@ -28,13 +32,11 @@ The package-local `clientBundle(..., { hostPhase: true })` makes Host tsdown bun
 
 ## Model Experience
 
-None, as this BFF selects Remote application methods and identity policy but registers nothing model-facing.
+None, as this BFF selects Remote application methods and forwarded events but registers nothing model-facing.
 
 #### KV Cache effect
 
 No direct effect; mounted Host capabilities own any model-visible behavior they trigger.
-
-**Runtime invariant:** No companion is published. Typert and the Agent/Session registries own the observed relationships.
 
 ## Known Limitations and Deferred Work
 

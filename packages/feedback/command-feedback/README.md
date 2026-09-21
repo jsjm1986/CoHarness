@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Trigger-independent session feedback plus human-facing `/feedback` capture. The package exports `recordFeedback(session, record)`, which appends one log-only `feedback/record` event from a `FeedbackRecord` with optional `text` and `category` fields. Its plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers it; the shipped Web client executes it without a model turn.
 
+## Summary
+
+`dsh-command-feedback` lets a user tell the harness what they think of a session. Typing `/feedback` plus a remark records it and acknowledges the session and anonymous user ids; the Web feedback dialog records a category and an optional description through the `sessionFeedback` Host Remote. Recording is immediate and never starts model work: the model neither sees the remark nor is interrupted by it. The package also owns the fixed category taxonomy every feedback surface files under. It ships with the standard `dsh` base and needs no configuration; headless, ACP, and JSON-RPC entry points provide no slash commands.
+
 ## Command contract
 
 | Input | Result |
@@ -53,7 +57,7 @@ The shipped `dsh` base mounts this command unconditionally; it has no configurat
 
 #### What the model sees
 
-Nothing. The slash input, `feedback/record`, and the acknowledgement are absent from model requests. The feedback event and registry lifecycle records are log-only and carry no `surfaceOp`, so they never reach the ordered surface, `deriveMessages()`, or a system prompt. Recording feedback during a turn does not change that turn's remaining requests.
+Nothing. The slash input, the dialog, `feedback/record`, and the acknowledgement are absent from model requests. The feedback event and registry lifecycle records are log-only and carry no `surfaceOp`, so they never reach the ordered surface, `deriveMessages()`, or a system prompt. Recording feedback during a turn does not change that turn's remaining requests.
 
 #### Token effect
 
@@ -62,8 +66,6 @@ Zero direct token effect. Neither an accepted entry nor a usage error adds model
 #### KV Cache effect
 
 Independent of the model request path. Recording appends to the session log only, leaving an already-reusable request prefix untouched. Nothing this package contributes can invalidate cache reuse.
-
-**Runtime invariant:** No companion is published. Each `feedback/record` is an independent append-only fact with no cross-event or mutable-data relationship.
 
 ## Known Limitations and Deferred Work
 

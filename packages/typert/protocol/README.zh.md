@@ -4,6 +4,10 @@
 
 该包提供不依赖编译器的声明，由业务包、生成的 Typert 产物、宿主网关和客户端 API 共享。它负责 Remote 服务基类、装饰器、显式绑定回退、可通过声明合并扩展的协议映射、调用描述符、编解码器和提供方约定；它不执行 TypeScript 分析，也不注册具体 Cordis 服务。
 
+## 概述
+
+借助 `dsh-typert-protocol`，业务包可以向 Remote 客户端暴露 Host 方法：用 `@Remote`（作用域接收者用 `@RemoteScope`）标记方法，把服务绑定到 wire 命名空间，并通过可合并扩展的协议映射把 Host 对象与作用域 Context 关联到 wire identity。生成产物、Host Gateway 与 Client API 消费同一套调用描述符、编解码器与提供方约定。调用持有的值把清理责任交给 Gateway，不另增引用计数。本包不注册任何 Cordis 服务，也不运行 TypeScript 分析。
+
 ## Remote 声明
 
 - `@Remote` 将公开实例方法标记为可在其注册的 Cordis 服务上直接调用。
@@ -26,13 +30,11 @@ Host 装配以转发给消费端的 Host 事件扩展 `TypertRemoteEventSelectio
 
 ## 模型体验
 
-无，因为该协议包声明应用反射，不注册任何面向模型的内容。
+无，因为与编译器无关的 Remote 协议声明不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
-无直接影响。
-
-**运行时不变式：** 不发布伴生入口。decorator 只保留私有不可变声明，binding 也是冻结值，没有可供交叉核对的独立事件流。
+无直接影响；声明的约定只有在装配将其放入请求时才会触及请求。
 
 ## 已知限制与暂缓事项
 

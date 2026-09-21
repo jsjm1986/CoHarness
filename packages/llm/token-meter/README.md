@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Replay-aware token measurement through the singleton `ctx.tokenMeter` service. It advances one isolated fold per session from the durable log, so compaction and other pressure-sensitive plugins can share accounting without depending on `CompactionEngine`.
 
+## Summary
+
+Use `ctx.tokenMeter` to estimate a session's current request and context pressure or price one message. Measurements replay the durable session log, remain deterministic, and make no model calls, so compaction, occupancy displays, and telemetry can share one result. When session projections are available, consumers can read `tokenUsage`, `contextPressure`, and `contextBreakdown`; text and routes without image pricing use an approximate fixed heuristic, declared visual-token pricing applies when available, and files are priced as model-visible handle text. Provider-reported usage is reused only for an identical request envelope; the package adds no model-visible content and makes no loop decisions.
+
 ## Configuration
 
 The estimator has no settings. It intentionally uses one fixed heuristic: four characters per token plus structural overhead for roles, blocks, and request-envelope fields. Any key is rejected; model capacity belongs to the adapter that owns an exact provider/model route and is available through `ctx.llm.resolveModelInfo().context`.
@@ -61,8 +65,6 @@ Indirectly, through consumers such as `dsh-compaction-basic`; the service itself
 #### KV Cache effect
 
 No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. Usage folds replace samples within each attempt; totals need not be monotone. Composition and measurement share the positional replacement planner and fixed estimator, so their heuristic surface totals agree by construction rather than through independent mutable observations. Route-priced totals deliberately differ.
 
 ## Known Limitations and Deferred Work
 

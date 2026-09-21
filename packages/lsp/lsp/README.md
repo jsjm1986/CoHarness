@@ -14,6 +14,10 @@ This package owns the Service Definition role of the LSP capability:
 
 The seam exposes exactly four semantic operations — `goToDefinition`, `findReferences`, `goToImplementation`, `hover` — and no generic JSON-RPC escape hatch, so no protocol payload or unreviewed command/mutation reaches a provider through `ctx.lsp`.
 
+## Summary
+
+Use `dsh-lsp` to give agents language-server navigation for definitions, references, implementations, and hover documentation. Queries select the configured provider by file extension and return normalized results with structured failures, so backend changes do not alter the navigation request or model-visible response. Navigation is read-only and deliberately excludes generic JSON-RPC access, rename, formatting, diagnostics, and symbol lists. This package must be combined with a provider such as `dsh-lsp-stdio` and the model-facing `dsh-tool-lsp`; alone it provides no navigation.
+
 ## Service API (`ctx.lsp`)
 
 | Member | Semantics |
@@ -31,13 +35,11 @@ Providers register **capabilities**, not tools. `dsh-tool-lsp` is the only owner
 
 ## Model Experience
 
-Indirectly, through `dsh-tool-lsp`, which owns the model-facing `lsp` schema, prompt, and rendered results while this registry contributes no prompt or schema itself.
+Indirectly, through `dsh-tool-lsp`, which owns the model-facing `lsp` schema, prompt guidance, and rendered results while this registry contributes no prompt or schema itself.
 
 #### KV Cache effect
 
 No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
-
-**Runtime invariant:** No companion is published. Provider ids and extension routes are private, atomically updated state; the seam exposes neither an enumerable snapshot nor lifecycle events to compare independently.
 
 ## Known Limitations and Deferred Work
 

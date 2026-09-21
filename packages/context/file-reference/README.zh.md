@@ -8,15 +8,17 @@
 
 选择候选项不会读取或附加文件内容。导出的 `FILE_REFERENCE_PROMPT` 是稳定指引；当指定 agent 可以调用 `read` 时，提供方可以安装该指引。
 
+## 概述
+
+宿主驱动 UI 使用 `dsh-file-reference` 提供 `@file` 补全：UI 为指定 agent（智能体）请求路径候选，模型输入 `@path` 或 `@"path with spaces"`，选中候选后，匹配的 mention 作为普通提示词文本插入。seam 本身不拥有文件系统访问——具体提供方（如 `@deepseek-ai/dsh-file-reference-local`）负责提供候选、排序、缓存与失效。选中候选绝不读取或附带文件内容；模型必须调用文件系统工具才能查看文件。Session Controller 通过 `fileReferences/list` Remote 向浏览器消费方暴露同一发现能力。
+
 ## 模型体验
 
-间接影响模型体验：`@deepseek-ai/dsh-file-reference-local` 会按条件贡献本包的稳定文件引用指引。
+间接影响模型体验：本包的发现 seam 与语法把文件引用指引委托给组合的提供方，由它负责呈现。
 
-#### KV 缓存影响
+#### KV Cache 影响
 
-接口和语法本身不会增加请求 token；缓存行为取决于提供方拥有的提示词段。
-
-**运行时不变式：** 不发布伴生入口。接口不保留 candidate 或 lifecycle 状态；具体提供方负责自己的 cache 与 invalidation 关系。
+接口与语法本身不增加请求 token；提供方拥有的提示词段决定可复用前缀是否改变。
 
 ## 已知限制与暂缓事项
 

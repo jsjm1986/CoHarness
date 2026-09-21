@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Semantic durability policy for persisted agents. It checkpoints the event-sourced session before a model adapter receives a request, before a top-level tool body may produce an external side effect, and at each `agent/pre-step` boundary so the preceding response and ordered tool results are durable before the next request.
 
+## Summary
+
+Use this package with a session persistence backend to make work durable before a model request, before a top-level tool can cause external effects, and before the next agent step begins. After each checkpoint, work can resume after a crash from stored requests, tool calls, responses, and results without loss. Checkpoint failures are fail-closed: a model adapter or top-level tool body does not run until the durable write succeeds. The package has no configuration and adds no prompt or tool schema; unfinished Assistant streams remain transient, and interrupted tool calls recover with an unknown outcome instead of an automatic retry.
+
 ## Plugin (namespace: `session-checkpoint-policy`)
 
 This zero-config function plugin consumes `ctx.sessions`, `ctx.llm`, `ctx.tools`, and the presence of `ctx.sessionPersistence`. Load it beside one persistence backend:
@@ -37,8 +41,6 @@ Successful checkpoints add no tokens and do not change the request. Recovery add
 #### KV Cache effect
 
 The repair result is appended after the reusable prefix, so it does not invalidate earlier cache entries.
-
-**Runtime invariant:** No companion is published. Checkpoint ordering is enforced at the intercepted waterfall and persistence seams; this stateless policy owns no independent mutable relation.
 
 ## Known Limitations and Deferred Work
 

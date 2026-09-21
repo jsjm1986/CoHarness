@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Per-session workspace instruction loading for `AGENTS.md`-compatible files. The plugin injects the initial user-global and project instruction chain into durable history, then discovers nested files and reports later changes or removals after successful filesystem tool calls.
 
+## Summary
+
+`dsh-agent-instructions` gives agents workspace guidance from user-global and project-level `AGENTS.md`-compatible files. It loads the applicable chain for the first request. It does not watch external edits continuously: successful filesystem operations discover newly relevant nested files and make later changes or removals visible, while session resume reconciles the baseline. `dsh-base` enables this behavior by default, while profiles can disable it. A byte budget bounds the injected context: broader files are omitted before the most specific file is truncated, and an empty chain adds nothing.
+
 ## Lifecycle
 
 The first eligible `agent/pre-step` of each live session composes the baseline. When the downstream decision enters a nonempty first-step batch, the plugin folds the baseline into that final batch right after the claimed prompt, so the direct prompt and the durable baseline enter step 1 and reach the first request together. A rejected or empty first-step decision leaves the baseline in the agent's `next-step` inbox for a later wakeup. The loader reads `$DSH_HOME/AGENTS.md` followed by, in each directory from the project root to `agent.session.header.cwd`, every existing base candidate and then every existing local-overlay candidate. Within one directory, candidates whose content is byte-identical after trimming leading and trailing whitespace collapse to the earliest candidate in configured order, so a `CLAUDE.md` that merely duplicates its sibling `AGENTS.md` is rendered once. If a previously queued workspace context is still pending, the plugin removes and replaces that exact inbox item instead of accumulating duplicates. A resumed session retains one compatible visible baseline and appends only current-file transitions; a changed discovery, precedence, project-root, or budget identity instead folds one explicitly superseding complete baseline into the entering batch.
@@ -133,7 +137,7 @@ Each discovered scope adds bounded history tokens until compaction. Unchanged co
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ### Changed or removed instruction context
 
@@ -157,9 +161,7 @@ Each confirmed change or removal is one retained history message bounded by `max
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
-
-**Runtime invariant:** No companion is published. Replay intentionally tolerates unknown or malformed workspace sources, while focused pipeline tests own its private pending/cache state transitions.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 

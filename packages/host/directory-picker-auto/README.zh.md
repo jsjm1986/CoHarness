@@ -6,15 +6,17 @@
 
 判定是一次纯函数的启动时采样（`resolveDirectoryPickerBackend`），已导出供复用。`native` 要求“操作者看得到宿主屏幕、且 native 后端能服务它”的全部信号：仅回环的绑定（从注入的 `webServer` 读取；全网卡绑定会接入任何 OS 选择器都触及不到的远程浏览器）；非 SSH 启动（`SSH_CONNECTION`／`SSH_TTY` 未设置或为空——SSH 端口转发下选择器会弹在无人值守的服务器上）；以及可服务的显示会话——darwin／win32 上视为存在；linux 上要求 `DISPLAY`／`WAYLAND_DISPLAY`，外加 `PATH` 上有 zenity 或 kdialog 二进制（该探查是又一项启动时事实）；其余任何平台上都不成立，因为 native 后端驱动的平台恰为 darwin／win32／linux。任何含糊情形都判定为处处可用的 `browse`。采样每次启动恰好发生一次，因此挂载的能力在服务生命周期内保持稳定，符合 seam 的要求。固定某种交互在这里不是配置字段——直接组合 `-native` 或 `-browse` 行来替代本行，那才是 seam 文档化的切换点；同时挂载选择器**和**某个后端行会明确报错（重复的 `directoryPicker` 服务、`single` 类 slot 中的重复 client 流程）。
 
+## 概述
+
+`dsh-host-directory-picker-auto` 为每次启动选出正确的目录选择交互：它在启动时一次性判定宿主处境，并把匹配的后端——[原生](../directory-picker-native/README.zh.md)或[浏览](../directory-picker-browse/README.zh.md)——连同其 browser 半侧一起，作为真实的 Loader 条目挂进内存根树。判定是一次纯函数的启动时采样：`native` 要求仅回环绑定、非 SSH 启动与可服务的显示会话；任何含糊情形都判定为处处可用的 `browse`。固定某种交互就是直接组合那个后端。挂载的能力在服务生命周期内保持稳定，符合 seam 的要求。
+
 ## 模型体验
 
-无。该选择器仅组合 GUI 宿主的目录选择；这里没有任何内容进入模型请求。
+无。GUI 宿主的目录选择选择器只挂载一个后端行，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
 无；该包既不组装也不发送提供方请求。
-
-**运行时不变式：** 不发布伴生入口。唯一 effect 是由插件 fiber 持有的 boot-time Loader-entry mount，存储是权威来源。
 
 ## 已知限制与暂缓事项
 

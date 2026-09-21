@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 JSON backend for the [storage hub](../storage/README.md): human-readable JSON under a configured root, registered as backend `json`. The domain spec selects the layout: `single` keeps one complete `<unit>.json` file per unit; `per-record` keeps one version-stamped document per record at `<unit>/<table>/<key>.json` plus a `global.json`. Design: [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md).
 
+## Summary
+
+`dsh-storage-json` stores domain data as readable JSON under a configured root and registers as backend `json`. Its default `single` layout keeps one complete `<unit>.json` file per unit; its `per-record` layout keeps one version-stamped document per record. Both layouts publish each changed file atomically, while the domain layer orders calls. Choose it when operators need inspectable files and the selected layout fits the write volume; choose SQLite for larger or highly concurrent data. The backend is host-side only and contributes no prompt, tool, or schema.
+
 ## Model
 
 - In the `single` layout the in-memory unit state is authoritative; every write primitive republishes the whole file via temp-write + fsync + atomic `rename()` replace. A unit file is always the complete current net state — legibility is this backend's reason to exist; scale is the SQLite backend's job. In `per-record` the directory tree is authoritative: each `put`/`delete` rewrites one document and `loadAll()` rereads the tree, so one write never touches sibling records.
@@ -33,8 +37,6 @@ Zero live-request tokens.
 #### KV Cache effect
 
 None — the backend never touches live request prefixes.
-
-**Runtime invariant:** No companion is published. Correctness here is write-durability and publish-then-reparse equivalence, which require medium round-trip tests (the shared backend conformance suite); the backend exposes no continuously observable in-process relation.
 
 ## Known Limitations and Deferred Work
 

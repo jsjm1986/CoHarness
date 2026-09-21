@@ -6,6 +6,10 @@ The TypeScript client SDK for driving a DeepSeek Harness runtime as a subprocess
 
 Unlike the Python SDK, the launch spec is fully explicit (`command`/`args`): this package is for repo-adjacent TypeScript consumers — including the [`dsh-subagent-dsh-sdk`](../../subagent/subagent-dsh-sdk/README.md) backend and automation — that know which runtime they are launching. Bundled-runtime resolution (finding a packaged executable) remains the Python distribution's concern.
 
+## Summary
+
+`dsh-sdk-client` lets TypeScript programs start and drive a complete DeepSeek Harness runtime over stdio JSON-RPC. Use `DeepSeekHarness` to open sessions, send text or image prompts, collect event and notification streams, and obtain the last committed assistant response when the runtime becomes idle; use `HarnessClient` for direct protocol requests and subscriptions. Callers may provide `dshBin`; otherwise the client resolves the same-version `@deepseek-ai/dsh` executable. The client owns the subprocess across runs, exposes typed transport and protocol failures, and reaps it on `close()` or `await using`. It is suitable when the caller can choose the runtime profile and launch settings.
+
 ## DeepSeekHarness
 
 ```ts
@@ -37,13 +41,11 @@ The client exposes the transport's line, pending-request, inbound-concurrency, o
 
 ## Model Experience
 
-None, as this is a client-process library; the model runs in the spawned runtime, whose experience is owned by the plugins its `cordis.yml` composes.
+None, as this is a client-process library; model-facing behavior lives in the spawned runtime's composed plugins.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
-
-**Runtime invariant:** No companion is published. This client library runs outside any harness context (its peer is a separate runtime process); the runtime's own packages own the event-stream relations.
+None in the client process. Profile, patch, provider, model, and history choices determine cache reuse in the child.
 
 ## Known Limitations and Deferred Work
 

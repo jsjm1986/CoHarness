@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The **local-filesystem** implementation of the [`@deepseek-ai/dsh-spill`](../spill) storage seam. Registers as `ctx.spillStore` and persists a tool's oversized text to a private, session-scoped file; its locator is the file path and its retrieval hint tells the model to use `read` or `grep` on that path.
 
+## Summary
+
+`dsh-spill-local` saves a caller's oversized text to a private, session-scoped file on the host filesystem and returns that file's path as the locator, with retrieval guidance telling the model to read or grep it. Mount it whenever a composition needs spill storage on the same machine the agent runs on. Files are private to the current user, names are unpredictable, and each session's files group under a stable directory, so a shared root cannot leak output or be redirected by a planted symlink. Configuration selects the root and the startup-cleanup retention period; previews and spill decisions live in other packages.
+
 ## Storage layout
 
 Files land at `<root>/session-<hash>/​<random>-<safeName>`:
@@ -29,13 +33,11 @@ The sweep resolves filesystem identities, never follows or deletes symlinks, and
 
 ## Model Experience
 
-Indirectly, through spill consumers that render the local path and `read`/`grep` retrieval guidance.
+Indirectly, through spill consumers, which render the saved file path and read/grep retrieval guidance to the model.
 
 #### KV Cache effect
 
 No direct invalidation; the named consumer owns any request-prefix changes.
-
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam.
 
 ## Known Limitations and Deferred Work
 

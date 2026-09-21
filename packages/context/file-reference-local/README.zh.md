@@ -6,6 +6,10 @@
 
 工具结果事件会使指定 agent 的可复用索引失效，使后续补全能够反映工作区中可能发生的变更。agent 的 dispose（资源释放）会释放该索引及其作用域内的提示词贡献；插件 dispose 会等待所有提示词 fiber，并释放全部缓存的搜索器。
 
+## 概述
+
+agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排序的路径补全 `@file` mention；有界发现让大型仓库也能保持响应迅速。结果会在工具活动后刷新且不会阻塞补全，并且始终不会跟随目录符号链接。当 `read` 可用时，模型还会收到关于如何理解引用路径的稳定指引。当 `read` 使用 Harness 宿主文件系统时选择本包；远程或虚拟命名空间需要与之匹配的发现能力。
+
 ## 配置
 
 | 配置键 | 默认值 | 契约 |
@@ -20,25 +24,23 @@
 
 ### `read` 可用时的文件引用指引
 
-#### 模型看到什么
+#### 模型看到的内容
 
 当指定 agent 有实际生效的 `read` 工具时，提供方会贡献以下稳定的系统提示词段：
 
 ##### 文件引用指令
 
 ```markdown
-Paths prefixed with @ are files explicitly referenced by the user. Use the read tool when their contents are needed; do not claim to have inspected a file before reading it.
+Tokens prefixed with @ are workspace paths the user explicitly referenced, relative to the workspace root. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
 ```
 
 #### Token 影响
 
 该影响有条件且固定：只要 `read` 对指定 agent 可见，这一句就会存在；候选查询本身不增加 token，所选路径只会贡献普通用户消息中的对应字符。
 
-#### KV 缓存影响
+#### KV Cache 影响
 
-该稳定句子会加入系统提示词前缀。挂载或移除此提供方，或者改变 `read` 是否可见，都会改变该前缀；查询、候选项和索引失效不会改变前缀。
-
-**运行时不变式：** 不发布伴生入口。按 agent 的 index 是私有 advisory cache，其失效与 dispose 行为通过服务测试直接观察。
+该稳定句子会加入系统提示词前缀。挂载或移除此提供方，或者改变 `read` 是否可见，都会改变该前缀；查询、候选项和索引陈旧标记不会改变前缀。
 
 ## 已知限制与暂缓事项
 

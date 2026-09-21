@@ -6,6 +6,10 @@ Local-filesystem implementation of `ctx.fileReferences`. It maintains one bounde
 
 Tool-result events invalidate the addressed agent's reusable index so later completion observes likely workspace mutations. Agent disposal releases that index and its scoped prompt contribution; plugin disposal awaits every prompt fiber and releases all cached searches.
 
+## Summary
+
+Agents and host UIs can complete `@file` mentions with ranked paths from each agent's local workspace, with bounded discovery that stays responsive in large repositories. Results refresh after tool activity without blocking completion, and directory symlinks are never followed. When `read` is available, the model also receives stable guidance for interpreting referenced paths. Choose this package when `read` uses the Harness host filesystem; remote or virtual namespaces need matching discovery.
+
 ## Configuration
 
 | Key | Default | Contract |
@@ -18,7 +22,7 @@ Every numeric value must be a positive safe integer. Excluded names must be non-
 
 ## Model Experience
 
-### File-reference guidance when `read` is available
+### File-reference guidance when read is available
 
 #### What the model sees
 
@@ -27,7 +31,7 @@ When the addressed agent has an effective `read` tool, the provider contributes 
 ##### File-reference instruction
 
 ```markdown
-Paths prefixed with @ are files explicitly referenced by the user. Use the read tool when their contents are needed; do not claim to have inspected a file before reading it.
+Tokens prefixed with @ are workspace paths the user explicitly referenced, relative to the workspace root. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
 ```
 
 #### Token effect
@@ -36,9 +40,7 @@ Conditional and fixed: the one sentence is present while `read` is visible to th
 
 #### KV Cache effect
 
-The stable sentence joins the system-prompt prefix. Mounting or removing this provider, or changing whether `read` is visible, changes that prefix; queries, candidates, and index invalidations do not.
-
-**Runtime invariant:** No companion is published. Per-agent indexes are private advisory caches whose invalidation and disposal are observed directly through service tests.
+The stable sentence joins the system-prompt prefix. Mounting or removing this provider, or changing whether `read` is visible, changes that prefix; queries, candidates, and index staleness do not.
 
 ## Known Limitations and Deferred Work
 

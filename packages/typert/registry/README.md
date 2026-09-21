@@ -6,6 +6,10 @@ Runtime registry for generated Typert artifacts. A contribution carries one pack
 
 Package reflection is keyed by `<package>#<face>`. Schemas are keyed by `<package>#<name>` and retain the producer's Zod instance. JSON Schema is computed on demand at the consumer edge.
 
+## Summary
+
+`dsh-typert-registry` makes generated Typert artifacts queryable at runtime: each package's reflection, lazy Zod schema factories, and Remote invocation descriptors live under stable keys. A schema is materialized and cached when a consumer first requests it. Registrations are atomic and fiber-scoped: a contribution lands whole or not at all and is withdrawn automatically when the registering component unloads. The same service hosts the lookup and scoped-Context provider registries that Remote calls resolve through. It performs no TypeScript analysis and generates no schemas; the generator and the loader handle those.
+
 ## Public API
 
 - `TypertRegistry` is the default plugin and provides `ctx.typert`.
@@ -21,13 +25,11 @@ The `@deepseek-ai/dsh-typert-registry/types` subpath contains the pure contribut
 
 ## Model Experience
 
-None, as the registry contributes no prompt, tool, or session event; consumers such as `cordis_inspect` own any model-visible projection.
+None, as this runtime type registry's consumers (cordis_inspect, wire faces, gates) own any model-visible projection of registry contents.
 
 #### KV Cache effect
 
-No direct effect. A consumer that places reflection in a request owns the resulting prefix change.
-
-**Runtime invariant:** No companion is published. Schema and package-reflection records mutate together inside register/dispose, with no independent event or second data source to cross-check; duplicate identities fail at the owning operation boundary.
+No direct effect; a consumer that places reflection or schemas in a request owns the resulting prefix change.
 
 ## Known Limitations and Deferred Work
 

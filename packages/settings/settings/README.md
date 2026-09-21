@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 User-settings Service Definition (`ctx.settings`). One provider holds a raw document of per-namespace sections; plugins register a namespace schema and read a resolved value layered as schema defaults, then the registrant's composition `base` (its cordis.yml entry-config subset), then the user document section. Without a mounted provider nothing changes for consumers: they keep resolving entry config alone, so every composition works with or without settings.
 
+## Summary
+
+Use this package when users must change a plugin's configuration at runtime without restarting or rereading `cordis.yml`. Each namespace combines schema defaults, deployment configuration, and user overrides; readers receive a deep-frozen resolved snapshot and can observe committed changes. Writes affect only user overrides, are serialized per namespace, and may reject stale revisions instead of overwriting newer changes. Durable runtime edits require configured settings storage; without it, the plugin continues with its composed configuration.
+
 ## Service API
 
 - `documentPath` — absolute path of the provider's user-editable file when it has one; non-file providers leave it `undefined`. Host configuration adapters derive availability from it, while browser protocols expose only a boolean capability and never a filesystem target.
@@ -32,7 +36,7 @@ Both declarations live in the client-safe `./types` subpath export, together wit
 
 ## Model Experience
 
-Indirectly, through consumer plugins that resolve model-affecting values (for example a default model route) from their namespaces; each consumer's own surface documents the effect.
+Indirectly, through consumer plugins, which own any model-facing content fed by a settings value; the service only stores and resolves user settings and registers nothing model-facing itself.
 
 #### KV Cache effect
 

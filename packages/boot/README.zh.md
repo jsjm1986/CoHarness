@@ -12,3 +12,8 @@
 启动序列与个人配置约定见 [`app-boot/README.md`](app-boot/README.zh.md)；由应用持有的命令行见 [`cmdline/README.md`](cmdline/README.zh.md)。
 
 [boot 子系统页](../../docs/subsystems/boot.zh.md)记录 profile 管理的服务方法与结果记录。
+
+
+## 概述
+
+boot 组负责启动 profile 应用并管理其已安装组合。`app-boot` 解析配置并启动 Loader，`cmdline` 提供应用参数，`plugin-manager` 提供与 CLI 共享的当前 profile 操作。各包 README 负责各自的细节。

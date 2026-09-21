@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Tool registry and execution pipeline. Tool plugins register their schemas and executors; the agent loop executes each call through `tools/pre-execute` (the extensible allow/deny gate) → monotonic registered guards → `tools/execute` (an around-dispatch wrapper for timeout/retry/metrics plugins) → `tools/post-execute` (inspect/replace the result, attach context) → the definition-owned `finalizeContent` boundary → the observe-only `tools/result` notification. The registry also owns HOW its tools are presented to the model — its `mode` config selects native function calling, [PTC mode](#ptc-mode), or both; `ptc` is canonical and `code` remains a compatibility alias, and one agent shadows that default for itself with `presentAs`.
 
+## Summary
+
+Use `dsh-tools` to expose typed capabilities to models, validate calls, enforce allow/deny/ask policy, and return finalized results without ending a turn on ordinary tool failures. Choose native Function Calling, [PTC mode](#ptc-mode), or both with `mode`; an agent can override the default through `presentAs`. Tool authors use `defineTool` to declare typed parameters and outputs, cooperative timeouts, parallel-safety, and optional UI presentation. Models see each permitted tool's declared name, description, and parameter schema; per-agent restrictions can narrow that visible set.
+
 ## Service: `ToolRuntime` (ctx key: `tools`)
 
 ### Config
@@ -135,7 +139,7 @@ The agent loop groups consecutive `parallel` calls into a bounded rolling pool a
 
 #### What the model sees
 
-In normal mode the model sees each visible definition's exact name, description, and JSON schema; the shipped definitions are recorded in the generated [tool package map and schema sections](../../../docs/tool-catalog.md#tool-package-map). Agent-scoped restrictions, shadows, and extension registrations change that agent's end-tool set.
+In normal mode the model sees each visible definition's exact name, description, and JSON Schema; the shipped definitions are recorded in the generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tools). Agent-scoped restrictions, shadows, and extension registrations change that agent's end-tool set.
 
 #### Token effect
 
@@ -149,11 +153,12 @@ Prefix-stable while visible definitions and their order are unchanged. Registrat
 
 #### What the model sees
 
-PTC mode exposes the generated [`run_code` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tools), the SDK instructions below, and the generated exact SDK block for the loaded runtime's language (the TypeScript `declare const tools` block, or the Python `tools` declaration). `both` exposes normal schemas and this PTC mode API. Under `ptc` the prompt also carries the `tools:ptc-only` rule, ordered ahead of the per-tool guidance band so the model reads which tools it may call before it reads what each one is for; `both` renders it empty. The instructions and SDK block match the loaded runtime's language; the TypeScript version (via [`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.md)) is shown below, and the Python version (for any runtime reporting `language: 'python'`) has the same operations and types in Python syntax (`await tools.name(args)`, subscript access for exotic names, `print(...)` and top-level `return`).
+PTC mode exposes the generated [`run_code` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tools), the SDK instructions below, and the generated exact SDK block for the loaded runtime's language. The TypeScript instructions identify generated declarations as program-only bindings. When the current `bash` parameter schema accepts the example arguments, they also show a complete `run_code` call around `tools.bash(...)`. The `tools:sdk` section uses first-party order 5000 and disables prompt-variable interpolation, preserving literal `{{…}}` text in tool descriptions and schemas for both runtime languages. `both` exposes normal schemas and this PTC mode API; under `ptc` the prompt also carries the `tools:ptc-only` rule earlier in the first-party order, so the model reads which tools it may call before it reads what each one is for.
 
-##### PTC mode SDK instructions
+##### TypeScript PTC mode SDK instructions with bash
 
 ```markdown
+
 ## Writing code for run_code
 
 `run_code` takes two required arguments: `code` — the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped) — and `description`, a short summary of what the program does. Inside the program:

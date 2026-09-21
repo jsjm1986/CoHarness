@@ -7,11 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+只有 Web Host 运行在用户桌面时才应挂载本包。云端部署中的浏览器与 Host 不在用户本机应用旁边，因此在提供远程工作区桥接前必须保持禁用。
+
 ## 概述
 
-本包提供 open-in-app 功能的浏览器表面：会话头部的一个分体按钮，主按钮在记住的应用中打开当前会话的 workspace 目录（会话摘要的 `cwd`），下拉箭头列出主机探测到已安装的全部目录应用。可用性、图标与启动均来自 [`dsh-host-open-in-app`](../../host/open-in-app/README.zh.md) 的主机路由；两个包应一起挂载。没有 workspace 目录的会话、或没装任何可命名应用的主机，完全不渲染按钮。
-
-只有 Web Host 运行在用户桌面时才应挂载本包。云端部署中的浏览器与 Host 不在用户本机应用旁边，因此在提供远程工作区桥接前必须保持禁用。
+本包是 open-in-app 的浏览器表面：会话头部的一个分体按钮，主按钮在记住的应用中打开会话的 workspace `cwd`，下拉箭头列出主机探测到已安装的全部目录应用。可用性、图标与启动均来自 [`dsh-host-open-in-app`](../../host/open-in-app/README.zh.md) 的路由；两个包应一起挂载。没有 workspace 目录的会话不渲染按钮。
 
 ## 目录
 

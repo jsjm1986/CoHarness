@@ -6,6 +6,10 @@ A scriptable OpenAI-compatible HTTP/SSE server for exercising real LLM adapters,
 
 The library entry exports `startMockLlmServer(options)`, behavior and telemetry types, the default random stress weights, the accepted Node timer bound, and a running handle with the bound `baseURL`, generated or configured `randomSeed`, captured requests, and idempotent `close()`. Closing force-terminates stalled connections.
 
+## Summary
+
+This package gives tests and demos a scriptable OpenAI-compatible HTTP/SSE endpoint, so they can exercise model-provider failures and successes without a provider key. Each accepted `/chat/completions` request consumes the next scripted behavior, including resets, stalls, malformed chunks, rate limits, server errors, completions, and tool calls. Test authors can run it with `pnpm run mock:llm` or call `startMockLlmServer`, which returns captured requests for assertions. Seeded `random` behavior supports reproducible mixed-failure stress runs.
+
 ## Standalone use
 
 Run the source entry from this repository:
@@ -78,8 +82,6 @@ None, as this test server substitutes provider wire behavior without invoking a 
 #### KV Cache effect
 
 None; requests terminate locally and never reach a provider cache.
-
-**Runtime invariant:** No companion is published. This standalone test server owns no Cordis event stream or shared data; its wire behavior and lifecycle are exercised through direct HTTP and assembled-loop tests.
 
 ## Known Limitations and Deferred Work
 

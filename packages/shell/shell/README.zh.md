@@ -15,6 +15,10 @@
 
 该拆分是一个标准的能力 seam（[capability-seams Agent Note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md)）：`dsh-bash-sandbox` 是位于同一 Service Definition 之后的沙箱执行器——Consumer 检测其 `sandboxMode` 能力并添加升权字段，无需导入提供方——容器化或远程执行器也可以同样接入。
 
+## 概述
+
+使用 `ctx.shell` 运行输出有界的前台 shell 命令，或异步准备后台进程后取得句柄。配置文件可选择本地或沙箱化的 Bash 或 PowerShell 执行方式，而无需更改调用方。执行前解析每个请求，以显式确定工作目录、超时和输出上限。命令完成、非零退出、超时和调用方中止都会作为结果返回；只有基础设施故障才会 reject，而模型可见的渲染与沙箱指引由 `bash` 和 `pwsh` 工具负责。
+
 ## 服务 API（`ctx.shell`）
 
 | 成员 | 语义 |
@@ -45,9 +49,7 @@
 
 #### KV Cache 影响
 
-不会直接导致 KV Cache 失效；请求前缀变更由具名消费方负责。
-
-**运行时不变式：** 不发布伴生入口。该无状态 Service Definition 负责请求／结果类型，执行器与策略负责观察。
+不会直接导致 KV Cache 失效；请求前缀的任何变更由具名消费方负责。
 
 ## 已知限制与暂缓事项
 

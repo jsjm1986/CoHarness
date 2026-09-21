@@ -14,6 +14,10 @@ This bridge implements a deliberate subset of Codex's current hook protocol:
 
 A native cordis plugin could do everything this bridge does, more powerfully; the bridge exists only as a compatibility path for the mapped Codex subset (see [the interception extension-points Agent Note](../../../.agents/notes/implemented/feature/2026-06-30-interception-extension-points.md)).
 
+## Summary
+
+`dsh-hooks-codex` runs command hooks from an existing Codex `hooks.json` during agent runs, so prompt and tool gates work without being rewritten. It supports five Codex hook points: session start, prompt submission, before and after tool execution, and stop. Hooks can block prompts or tool calls with model-visible reasons, add conversation context, or force another agent step. Choose this package to reuse Codex command hooks in the harness; use a native plugin for behavior outside this supported subset.
+
 ## Config
 
 ```ts
@@ -69,7 +73,7 @@ Injected context carries an explicit `{ kind: 'plugin', plugin: 'hooks-codex' }`
 
 #### Token effect
 
-No cost when hooks return no context. Hook text is data-dependent, logged, and resent until compaction.
+No cost when hooks return no context. Hook text is data-dependent, logged, and resent in later conversation requests until compaction.
 
 #### KV Cache effect
 
@@ -79,17 +83,15 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Provider-supplied reasons pass through verbatim. When absent, a blocked prompt uses exactly `blocked by UserPromptSubmit hook`, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`. Codex `systemMessage` is not surfaced.
+Provider-supplied reasons pass through verbatim. When absent, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`; a blocked prompt is discarded with no model-visible message, ending the turn as `blocked`. Codex `systemMessage` is not surfaced.
 
 #### Token effect
 
-Blocking a prompt removes its request tokens; denial or feedback adds the retained fallback or provider text; forced continuation pays another full request.
+Blocking a prompt removes that prompt's request tokens; denial or feedback adds the retained fallback or provider text; forced continuation pays another full request.
 
 #### KV Cache effect
 
 A blocked prompt sends no request and invalidates nothing. Denial, feedback, and forced-continuation context append after the reusable prefix without rewriting it.
-
-**Runtime invariant:** No companion is published. This bridge publishes hook-protocol session events, whose companion owns which invocation event each result cites.
 
 ## Known Limitations and Deferred Work
 

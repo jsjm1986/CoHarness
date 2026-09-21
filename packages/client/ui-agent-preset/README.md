@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-presets/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a read-only label in the session header, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
 
+## Summary
+
+Use this package to choose the agent preset for a new Web GUI session, see the active preset in the session header, and manage available presets in Settings. The Agent mode picker is shown by default; Settings can hide it without changing running or historical sessions. A preset is fixed when a session is created, so changing the selection or default affects only later sessions. If the deployment provides no presets, these controls stay hidden and every session uses the host composition.
+
 ## Why it is a new-session preference
 
 A session's preset is fixed when the session is created — the host refuses to adopt an existing session under a different one, because that session's history was produced under the first preset's tools. So this row cannot be a live switch, and it says so: changing it applies to sessions started afterwards while running sessions keep the composition they began with.
@@ -58,13 +62,11 @@ A deployment that composes no presets answers with an empty roster, and the row,
 
 ## Model Experience
 
-Indirectly, through the preset a later session is composed from; [`dsh-agent-presets`](../../preset/agent-presets/README.md) owns what that composition puts in front of the model.
+Indirectly, through the preset a later session is composed from; the preset it selects owns every model-facing effect.
 
 #### KV Cache effect
 
-No direct invalidation. Changing the default never touches a running session's prefix; a session created afterwards establishes its own prefix from its own composition.
-
-**Runtime invariant:** No companion is published. This is a browser-side surface plugin whose node half owns no event stream or mutable runtime data; the roster and the settings write are host contracts covered there.
+No direct invalidation. Changing picker visibility or the default does not alter a running session's composition or prefix, or a historical session's recorded preset; a session created afterwards establishes its own prefix from its own composition.
 
 ## Known Limitations and Deferred Work
 

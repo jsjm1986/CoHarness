@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The model-facing `todo_write` tool: the agent's whole task list, replaced wholesale on each call.
 
+## Summary
+
+`dsh-tool-todo` gives the agent a structured task list to plan with: break multi-step work into concrete tasks, mark the task you are working on, and check tasks off as they finish. The list survives across turns and reopened sessions, so the agent and the UI always see the latest plan. One configuration flag decides whether several tasks may be in progress at once, for agents that run work in parallel. Use it wherever an agent should keep a visible task list; each update replaces the whole list, and only the owning agent session can change it.
+
 ## What it does
 
 Registers one tool, `todo_write(todos: [{ content, status }])`, on `ctx.tools`. The model sends the ENTIRE list every call — there are no partial updates or per-item edits. Each call appends a `todo/write` event (the full list snapshot) to the calling agent's session log via `agent.session.append('todo/write', { todos })`; the current list is the most recent such event (last-write-wins on replay).
@@ -42,11 +46,11 @@ A function/namespace plugin: it exports `name` / `inject` / `apply` and NO defau
 
 #### What the model sees
 
-The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo).
+The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo): an object with one required `todos` array of `{ content, status }` items, where `status` is `pending`, `in_progress`, or `completed`. The description is the composed whole-list instruction whose active-status clause follows `allowParallelInProgress`.
 
 #### Token effect
 
-Fixed schema cost on every request where the tool is visible.
+Fixed schema cost on every request where the tool is visible; the description and schema are stable for a given configuration.
 
 #### KV Cache effect
 

@@ -23,15 +23,17 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，但
 
 消费方：[`@deepseek-ai/dsh-bash-sandbox`](../../shell/bash-sandbox/)；可运行的默认组合见 [acp-agent 示例](../../../examples/acp-agent/)。
 
+## 概述
+
+`dsh-sandbox-local` 在共享宿主内核和文件系统的同时，限制 Linux、macOS 与 Windows 上的命令及其派生进程。它自动选择受支持的平台 runner；没有可用 runner 时以 `SANDBOX_UNAVAILABLE` 失败，因此命令绝不会静默无限制运行。每次执行都会报告 `full` 或 `partial` 强制执行，以及拒绝和 runner 失败签名，让调用方能区分不可用或损坏的沙箱与策略拒绝。宿主本地 bash 或 pwsh 执行适合选择它；进程需要隔离环境时应改用容器或远程执行器。
+
 ## 模型体验
 
-通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md) 和 [`dsh-tool-bash`](../../shell/tool-bash/README.zh.md) 间接影响；它们渲染该提供方的强制执行与拒绝事实，而 [`dsh-sandbox`](../sandbox/README.zh.md) seam 负责定义 `SANDBOX_UNAVAILABLE` 文本，runner 选择与 profile 则不进入上下文。
+通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md) 和 [`dsh-tool-bash`](../../shell/tool-bash/README.zh.md) 间接影响；它们渲染此提供方的强制执行与拒绝事实，而 [`dsh-sandbox`](../sandbox/README.zh.md) seam 拥有 `SANDBOX_UNAVAILABLE` 文本、本提供方拥有 runner 选择，profile 不进入上下文。
 
 #### KV Cache 影响
 
 不会直接使 KV Cache 失效；请求前缀变更由上述消费方负责。
-
-**运行时不变式：** 不发布伴生入口。除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。
 
 ## 已知限制与暂缓事项
 

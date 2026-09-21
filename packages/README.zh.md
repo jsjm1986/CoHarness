@@ -4,6 +4,10 @@
 
 npm scope 为 `@deepseek-ai/dsh-*`；Cordis `Service` 子类和函数插件通过 `ctx.effect()`、`ctx.on()` 或 `ctx.waterfall()` 注册。规则见[包](AGENTS.md)与[根规则](../AGENTS.md#conventions)。
 
+## 概述
+
+harness 由 `packages/` 能力组组装而成。把本页当作顶层地图，进入各组的包列表。
+
 ## 层级结构
 
 包按组置于 `packages/<group>/<pkg>/`；包名仍为 `@deepseek-ai/dsh-<pkg>`。**组 README 负责包／ctx 键映射。**

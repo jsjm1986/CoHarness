@@ -4,6 +4,10 @@
 
 `ctx.sessionReferenceResolver` 会把其他会话准备为有界、只读快照，作为带来源信息、面向模型的上下文。它消费 `ctx.sessionQuery` 与后端无关的 compact 检查点标记；不需要 SQLite FTS。支持跨会话 mention 的宿主可以主动启用该服务。
 
+## 概述
+
+`dsh-session-reference` 让一次对话可以引用其他会话：宿主把 `@label` mention 转换为规范 URI，服务则为模型准备每个被引用会话的有界、只读快照，作为持久、不受信任的背景上下文。候选发现按工作目录亲和度对其他会话排序，并用其最新标题作标签。快照在捕获后不可变，并带有固定警告，禁止遵循其中的指令、权限声明或工具请求。它是面向支持跨会话 mention 的宿主的可选服务；它消费 `ctx.sessionQuery`，不需要 SQLite FTS。
+
 ## 公开 API
 
 - `listCandidates(agent, query?, limit?)` 会列出 `agent.id` 之外的会话，按 id、cwd 或最新的 projection 标题进行不区分大小写的筛选，再按同 cwd、无 cwd、其他 cwd 记录排序，同时保持每组内的 `listSessions()` 创建顺序。实时 session projection 与持久 projection-cache checkpoint 提供标题，因此每次击键都不必折叠冷日志；没有 projection 的会话在首次打开前使用 id，而未挂载 projection 服务的组合保留有界日志回退。一元 `sessionReferenceResolver/candidates` Remote 方法在配置的候选上限内提供同一发现能力，并为每个候选附上规范 mention，浏览器消费方直接调用 `ctx.remote.sessionReferenceResolver.candidates`，无需 API Proxy 路由。
@@ -36,13 +40,11 @@
 
 #### Token 影响
 
-每条包含引用的消息都会添加固定警告和最多三个序列化快照，每个快照都受 `maxReferenceBytes` 独立限制。精确快照会保留在目标历史中，直到目标压缩遮蔽或摘要它；源会话变更不会添加更多 token。
+每条包含引用的消息都会添加固定警告和最多三个序列化预览，每个预览都受配置值或模型相对字节预算独立限制。被截断的引用会在该预算之外添加独立省略通知；已保存的完整 transcript 只有在被取回时才增加 token。精确上下文会保留在目标历史中，直到目标压缩遮蔽或摘要它；源会话变更不会添加更多 token。
 
 #### KV Cache 影响
 
 请求与快照是两条连续、仅追加的目标消息，并保留较早的可缓存历史。不同引用或源捕获内容只改变新后缀；后续目标压缩可能使从替换边界起的复用失效。
-
-**运行时不变式：** 不发布伴生入口。准备过程返回构建时已校验的不可变单次快照；持久上下文的准入、冻结与回放由 agent 层和会话层负责。
 
 ## 已知限制与暂缓事项
 

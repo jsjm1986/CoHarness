@@ -6,6 +6,10 @@
 
 持久化单元就是现有 `SessionEvent`（事件溯源模型：日志是唯一真源），因此不存在另一套并行的「持久消息」类型。不属于可回放对话状态的元数据（格式版本、cwd、血缘、种子边界、origin、委托深度和临时浏览器草稿标记）作为 `SessionHeader` 单独传输，该类型归 `dsh-session` 所有，并在此重新导出。
 
+## 概述
+
+本包让应用通过后端无关的 API 持久存储并恢复会话事件日志。读者可以创建、打开、检查、列出、追加、读取、刷新和关闭已存储会话，同时保持连续且仅追加的历史记录。只有完成 flush 才构成持久性屏障；读取方不会收到撕裂尾部或无效记录，并且每个后端实例内每个会话只允许一个写入方。若希望每个会话使用一份压缩日志，可选用随产品交付的 [JSONL 后端](../session-persistence-jsonl/README.zh.md)；也可以实现具备相同可观察保证的其他后端。
+
 ## 服务 API（`ctx.sessionPersistence`）
 
 `create`/`open` 返回每会话的 `SessionHandle`——规范通道：带 `read`/`write` 访问级、offset/length 读取、append、按 handle 的 `flush`，以及幂等的 `close`/`AsyncDisposable`。写 handle 声明单写者所有权；第二个写者以 `SESSION_ALREADY_OWNED` 拒绝，读 handle 的 `append`/`flush` 以 `SESSION_READ_ONLY` 拒绝。`create` 是延迟实体化：会话在创建后即可被本进程的 `stat`/`list`/`open` 观察到，但直到第一次 `append` 或 `flush` 才产生持久工件；关闭仍为 pending 的写 handle 会撤销预留。`createHandle`/`openHandleAsync`/`openHandle` 作为旧所有权 seam 保留，直到 Provider 与 Consumer 完成迁移。
@@ -81,9 +85,9 @@
 
 ### 恢复的对话历史
 
-#### 模型所见
+#### 模型看到什么
 
-该 seam 不添加提示词或 schema。恢复会将已存储的表层事件还原为消息历史；已存储请求 header 重建较早调用，新 loop 则为下一次请求组合当前系统提示词、工具和会话前缀。崩溃修复将没有持久调用的 assistant 请求标记为 `TOOL_NOT_STARTED`；有持久调用但无结果时变为 `TOOL_OUTCOME_UNKNOWN`，其文本允许模型重试只读或幂等工作，但要求验证副作用或询问用户，而不是盲目重试。
+seam 不添加提示词或 schema。恢复会将已存储的表层事件还原为消息历史；已存储请求 header 重建较早调用，新 loop 则为下一次请求组合当前系统提示词、工具与会话前缀。崩溃修复将没有持久调用的 assistant 请求标记为 `TOOL_NOT_STARTED`；有持久调用但无结果时变为 `TOOL_OUTCOME_UNKNOWN`，其文本允许模型重试只读或幂等工作，但要求验证副作用或询问用户，而不是盲目重试。
 
 #### Token 影响
 
@@ -91,9 +95,7 @@
 
 #### KV Cache 影响
 
-持久化不修改当前请求前缀。只有当重建历史、当前 envelope 和模型路由匹配时，恢复 loop 才能重用提供方缓存；崩溃修复结果仅追加，不重写较早历史。
-
-**运行时不变式：** 不发布伴生入口。持久化正确性需要后端往返与崩溃尾部测试；本包不暴露可持续观察的进程内关系。
+持久化不修改当前请求前缀。只有当重建历史、当前 envelope 与模型路由匹配时，恢复 loop 才能重用提供方缓存；崩溃修复结果仅追加，不重写较早历史。
 
 ## 已知限制与暂缓事项
 

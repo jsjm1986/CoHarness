@@ -4,6 +4,10 @@
 
 基于一个已配置 `ctx.subagents` 提供方、面向模型的委派工具。更换提供方只会改变传输，不会改变执行约定。
 
+## 概述
+
+使用本包可为 agent 提供一个具名工具，把工作委派给已配置的子 agent 后端。`one-shot` 模式下，调用默认等待子 agent；`continuable` 模式下，调用默认在后台启动持久化子 agent，并返回可用于后续消息的 id。受支持的后端还可公开获准的子级 LLM 提供方、模型与推理等级供模型选择。每个实例均可设置子 agent 的 persona、工具权限与深度限制，失败的运行会返回错误，而非部分成功。
+
 ## 提供方选择与生命周期
 
 每个插件实例把一个 `provider` 绑定到一个 `toolName`；模型不会收到提供方选择器。如需公开另一种传输，请加载另一个名称不同的实例。工具只在其提供方存在时注册，从而避免对同级加载顺序和提供方重新加载的依赖。工具描述遵循 `provider.inheritsParentContext`：新建子 agent（智能体）需要独立提示词，而 fork 子 agent 已能看到父级已完成轮次。
@@ -38,27 +42,61 @@
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-当提供方存在时，以当前实例配置的名称公开已生成的默认 [`subagent` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-subagent)。提供方是否继承上下文会改变工具描述和提示词描述。启用 `modelSelectionSettings` 且 Host setting 对该 Session 开启时，schema 会额外暴露 `provider`、`model` 和 `reasoning_effort`，并提供 `list_subagent_models` 发现工具；每个显式路由都会在创建子 agent 前按捕获的 allowlist 校验。启用后台模式会添加 `run_in_background`：可继续模式会记录其默认值为 `true`、运行时结算通知与显式前台覆盖；一次性模式会记录其默认值为 `false`，以及用 `job_output` 收集或用 `job_kill` 停止的 job id。当工具在本次组装的作用域中可见时，一个 `tool:<toolName>` 系统提示词 section 会指示模型同时启动相互独立的可继续委派、在它们运行时继续工作，并且仅当下一步动作依赖结果时选择前台；工具限制会同时移除其 schema 和这段指引。
+当提供方存在时，以当前实例配置的名称公开已生成的默认 [`subagent` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-subagent)。启用的 Session 策略会添加 `provider`、`model` 与 `reasoning_effort`，以及继承和选择指引；提供方必须支持 `agentOptions`。提供方是否继承上下文会改变工具描述和提示词描述。启用后台模式会添加 `run_in_background`：可继续模式会记录其默认值为 `true`、运行时结算通知与显式前台覆盖；一次性模式会记录其默认值为 `false`，以及用 `job_output` 收集或用 `job_kill` 停止的 job id。当工具在本次组装的作用域中可见时，一个 `tool:<toolName>` 系统提示词 section 会指示模型同时启动相互独立的可继续委派、在它们运行时继续工作，并且仅当下一步动作依赖结果时选择前台；工具限制会同时移除其 schema 和这段指引。
 
 #### Token 影响
 
-每个父级请求都会产生固定的 schema token 开销；每个提供方实例增加一个 schema，每个可继续实例还会增加一个简短的系统提示词 section。
+每个父级请求支付固定的 schema 成本；模型选择会增加三个参数。每个提供方实例增加一个 schema，每个可继续实例还增加一个简短的系统提示词 section。
 
 #### KV Cache 影响
 
-只要提供方实例、名称、描述和 schema 不变，前缀就保持稳定。提供方注册生命周期可能从首个变化的工具定义开始，使父级复用失效。
+只要提供方实例及其配置不变，前缀就保持稳定。适配器目录变化不会改变定义；子级路由覆盖可能使 fork 子 agent 无法复用继承的父级前缀。
 
-### 前台结果
+### 模型选择与发现
 
-#### 模型看到的内容
+#### 模型看到什么
 
-调用会保留描述和提示词。成功时只包含子 agent 的最终文本；其他结果会变为 `Error: <终止原因>`，随后在存在时附上安全的提供方诊断，再附上任何部分 assistant 文本。子 agent 中间步骤不会进入父级。
+Session 携带策略的 settings 控制实例会公开子级 LLM 选择字段与 `list_subagent_models`。可选 `ctx.llm` 服务不可用时，调用会失败。发现只返回精确路由策略中的已注册提供方与已公布模型；未授权提供方会在调用其适配器目录前被拒绝，精确查询也必须先获准，才会解析模型的推理强度与默认值。执行阶段会独立强制同一策略。
 
 #### Token 影响
 
-提示词和结果会留在父级历史中，直到上下文压缩（context compaction）；子 agent 工作上下文留在子 agent 中。
+启用的组合中存在一个固定发现 schema。只有模型调用工具时，目录内容才进入 transcript。
+
+#### KV Cache 影响
+
+适配器注册与目录变化不会改变 schema 前缀。每个发现结果都追加在可复用前缀之后。
+
+### 系统提示词
+
+#### 模型看到什么
+
+当 `enableRunInBackground` 与 `backgroundMode: continuable` 同时设置时，模型还会读到 `tool:<toolName>` 系统提示词 section，指示它把相互独立的可继续委派一起启动，并在它们运行时继续工作。使用默认工具名 `subagent` 时，section 文本为：
+
+##### 工具指导 section
+
+```markdown
+Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.
+```
+
+#### Token 影响
+
+每个可继续实例一个简短固定 section，只要工具在作用域内，就由每个父级请求支付。
+
+#### KV Cache 影响
+
+只要 section 文本与工具存在性不变，前缀就保持稳定；移除工具或更改 section 会建立不同的父级前缀。
+
+### 前台结果
+
+#### 模型看到什么
+
+调用会保留描述与提示词。成功时只包含子 agent 的最终文本；其他结果变为 `Error: <stop reason>`，随后在存在时附上安全的提供方诊断，再附上任何部分 assistant 文本。子 agent 中间步骤不会进入父级。
+
+#### Token 影响
+
+提示词与结果保留在父级历史中，直到上下文压缩（context compaction）；子 agent 工作上下文留在子 agent 中。
 
 #### KV Cache 影响
 
@@ -66,9 +104,9 @@
 
 ### 后台结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-在配置的可继续模式下，启动时返回内容恰为 `started subagent <childId>`；在配置的一次性模式下，则返回 `started background subagent job <id>`。一次性模式下，通用 Task 接口提供后续状态、最终输出、取消响应和通知；若结果携带提供方诊断，失败状态的 detail 会包含它。可继续模式下，本工具不返回自己的结果；子 agent 的结算会以[服务负责的通知](../subagent/README.zh.md#settlement-notice)到达父级，独立加载的 `send_message` 工具会投递后续消息，而通过其 id 查看子 agent 的 transcript 即是其详细输出来源。
+在配置的可继续模式下，启动时返回内容恰为 `started subagent <childId>`；在配置的一次性模式下，则返回 `started background subagent job <id>`。一次性模式下，通用 Task 接口提供后续状态、最终输出、取消响应与通知；若结果携带提供方诊断，失败状态的 detail 会包含它。可继续模式下，本工具不返回自己的结果：子 agent 的结算以服务负责的通知到达父级，独立加载的 `send_message` 工具投递后续消息，而通过其 id 查看子 agent 的 transcript（文本记录）即是其详细输出来源。
 
 #### Token 影响
 
