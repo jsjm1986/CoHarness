@@ -19,7 +19,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 ```
 
 - 第一个逻辑行是私有的 v0 物理 header，标记为 `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset?, draft? }`。其可选的数字 `seedLength` 保持字节兼容：缺失解码为 `SessionHeader.isSeeded: false`，零或正值解码为 `isSeeded: true` 加精确的 `inheritedEventCount`，因此逻辑 header 从不携带位置整数。用布尔 `isSeeded: true` 而非 `seedLength` 标记 fork 血统的外来 header 会被拒绝为不同 harness 构建，而不是被静默当作未植入。`delegationDepth` 在磁盘上必需，顶层会话为 `0`；缺失或无效值会拒绝日志。`agentPreset` 必须持久化，因为它决定了被恢复会话的工具与提示词——恢复成另一套组装，就会回放模型已无法据以行动的历史。后续每个逻辑行是一条存储记录；`assistant/chunk` 事件绝不丢弃，且 `seq` 在解码日志中保持连续（`events[i].seq === i`）。
-- 存储记录可以是原样的 `SessionEvent` JSON，也可以在启用 `packChunks` 且连续段符合条件时写为**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`），未识别形态原样存储；读取与布局无关，打包、非打包和混合文件加载结果一致。
+- 存储记录是逐条原样的 `SessionEvent` JSON。发布版 v0/v1 artifact 可能包含**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`）；当前写入端从不打包——打包行只会经由 catalog 解码的历史 generation 进入此后端，加载结果与非打包行一致。
 - surface 的 `sourceEventSeqs` 数组在连续段有收益时使用无损闭区间范围；读取方同时接受范围形式和旧的数字数组形式。
 - 项目目录保留规范化 cwd 的可读形式，便于导航，并限制在文件系统组件上限内。分隔符替换和截断刻意有损，因此规范化相同的 cwd 字符串共享项目目录；会话 id 仍选择不同会话目录。在不区分大小写的文件系统上，只有文件系统规范化将两种写法解析到同一 transcript（文本记录）时，身份验证才接受备选路径写法。配置根仍由部署控制：可以是项目本地、共享、临时或集中式。[项目会话目录决策](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.zh.md) 记录这项取舍。
 - 会话 id 是未验证的带品牌类型的字符串，因此在使用前单射转义为一个安全路径段（无遍历、无冲突）。结果目录保留给其他会话自有产物；发现只读取固定 transcript 文件名。
@@ -29,18 +29,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 | 键 | 类型 | 说明 |
 |---|---|---|
 | `root` | `string`（必需） | 所有会话文件的根目录。**无默认值**：`process.cwd()` 默认值会随进程 cwd 变更（bash 调用、子进程）而分散文件。现有根必须是可读目录；缺失根在第一次实体化时创建。 |
-| `packChunks` | `boolean`（默认 `true`） | 将符合条件的 delta 分片连续段写为打包行（在真实编程会话上测得逻辑日志约小 60%）。设为 `false` 可用于每事件一行诊断；无论该写入侧开关如何，都能读取打包行。 |
 | `compression` | `'zstd' \| 'none'` | 默认 `'zstd'`；`'none'` 保留换行分隔 UTF-8 文本。 |
-| `preparedSessionCacheSize` | 正整数（默认 `5`） | 冷历史检查后保留、供恢复复用的未发布会话数量上限。 |
-| `writeBatchMaxDelayMs` | 正整数（默认 `200`） | 空闲的活动事件队列收到待写入事件后开启的固定合并窗口。后续事件不会重置窗口；flush 与 teardown 会绕过它。该值不限制事件循环、串行化操作或后端延迟。最大值为 Node 计时器上限 `2_147_483_647` ms。 |
-| `maxPendingEvents` | 正整数（默认 `100,000`） | 单个活动会话写入 controller 可保留的最大事件数；超过上限的生产者会被拒绝。 |
-| `maxPendingBytes` | 正整数（默认 `64 MiB`） | 单个活动会话写入 controller 可保留的最大 UTF-8 JSON 字节数；超过上限的生产者会被拒绝。 |
-| `maxHeaderBytes` | 正整数（默认 `64 KiB`） | 单条换行结尾会话 header 的最大字节数。列表和加载会在解析前拒绝更大的 header。 |
-| `readStableMaxAttempts` | 正整数（默认 `8`） | writer 在修订稳定读取期间修改工件时，允许的最大 stat/read 重试次数。 |
-| `readStableMaxDurationMs` | 正整数（默认 `2,000`） | 修订稳定读取允许消耗的最大毫秒数；不能超过 Node 计时器上限 `2_147_483_647` ms。 |
-| `maxDecompressedBytes` | 正整数（默认 `256 MiB`） | 单个 zstd 工件在 raw、load 或恢复读取中允许解码的最大明文字节总数。 |
-| `maxArtifactBytes` | 正整数（默认 `256 MiB`） | 单个会话工件允许读取的最大物理字节数；有界读取会在将更大文件保留到内存前拒绝它。 |
-| `migrationBatchMaxBytes` | 正整数（默认 `2 MiB`） | 后继 generation 编码批次的展开 JSON 字节目标；单个事件不可拆分，因此可超过目标。 |
 
 `locate(meta)` 返回已解析项目/会话目录内固定 transcript 的 `{ kind: 'jsonl', path }`。它不执行文件系统 I/O：可以在目录或文件存在前返回目标，现有文件也只包含最近一次 flush 完成的前缀。
 
@@ -62,7 +51,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 ## 写入路径
 
-插件将冻结的会话事件复制到每个活动会话各自的 controller。第一个待处理事件会开启配置的固定批处理窗口，后续事件会加入但不会重置截止时间。窗口到期后会启动一次持久化追加；该次写入期间接纳的事件会形成另一个独立有界的后续批次。`session/flush` 会取消等待并排空当前与待处理批次。每会话游标防止恢复后的会话重新 append 已存储事件，插件加载时会为活动会话设置初始状态。所属后端实例串行化单会话操作；dispose（资源释放）会在拆卸前排空每个保留的 controller。每个逻辑事件都会保留：批处理只让单个压缩帧或一次原始 JSONL fsync 承载更多记录。
+插件将冻结的会话事件复制到每个活动会话各自的写句柄。活动事件的批处理窗口是 seam 内部调度策略而非配置项：句柄内的批处理窗口把活动缓冲区合并为一次持久化追加，`session/flush` 或 dispose 会排空当前与待处理批次。每会话游标防止恢复后的会话重新 append 已存储事件，插件加载时会为活动会话设置初始状态。所属后端实例串行化单会话操作；dispose（资源释放）会在拆卸前排空每个保留的写句柄。每个逻辑事件都会保留：批处理只让单个压缩帧或一次原始 JSONL fsync 承载更多记录。
 
 明文正文按有界字节窗口扫描，保留解码后的事件，不构建完整原始文件缓冲区。读取之间检查取消，revision 变化时重试。后继 generation 写完临时文件后重新校验源 revision；源发生变化或消失时拒绝发布。后继 generation 按有界批次编码，在事件和写入之间检查取消。压缩读取和逻辑 preparation 仍保留完整输入或事件数组。
 
@@ -84,7 +73,7 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 
 ## 已知限制与暂缓事项
 
-- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1/v2 artifact 迁移到当前 v3，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
+- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1/v2/v3 artifact 迁移到当前 v4，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
 - **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。

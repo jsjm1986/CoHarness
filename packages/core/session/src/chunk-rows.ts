@@ -1,10 +1,10 @@
 /**
- * Released-v3 JSONL storage rows for `assistant/chunk` delta runs. The v3
- * generation packed each run of consecutive same-block delta chunks into ONE
+ * Released-v0/v1 JSONL storage rows for `assistant/chunk` delta runs. Those
+ * generations packed each run of consecutive same-block delta chunks into ONE
  * storage row — `text-chunks`, `reasoning-chunks`, or `tool-call-chunks` —
  * whose `seq0`/`time0` envelope anchors members reconstructed as `seq0 + k`
  * and `time0` plus the first `k` `dt` gaps. This module decodes those rows
- * back to the exact original v3 events.
+ * back to the exact original events; v2/v3/v4 writers never pack.
  *
  * Storage rows are a durable-encoding vocabulary, NOT session events: they
  * never enter `Session.snapshotEvents()`, have no `SessionEventMap` entry, and
