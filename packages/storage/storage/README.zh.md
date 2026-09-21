@@ -14,6 +14,10 @@
 - `ctx.storage.mount(form, facility)`／`ctx.storage.form(form)`：数据形式挂载。`StorageForms` 可通过合并扩展；领域层合并 `domain`，并通过 `ctx.storage.domain` 访问。
 - 后端拥有一种介质，并公开其支持的数据形状**分面**。当前分面为 `kv`；`src/backend.ts` 负责定义其确切约定。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。枢纽是后端与已挂载数据形式的具名注册表；它不执行 IO，也不拥有记录。
+
 ## 模型体验
 
 ### 后端与形式注册

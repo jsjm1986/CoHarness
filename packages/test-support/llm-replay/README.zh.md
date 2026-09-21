@@ -72,6 +72,10 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 
 命名导出 `name` / `inject` / `Config` / `apply`，且**没有默认导出**：Cordis Loader 的 `unwrapExports` 执行 `exports.default ?? exports`，因此意外的默认导出会将模块折叠为函数本身，并丢弃 `inject` 命名空间（见 [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。适配器每个测试重放一份固定的已录制转录；不存在实时的提供方关系。
+
 ## 模型体验
 
 无。该无密钥测试适配器不向提供方模型发送请求，只将已记录 assistant 分片回放到测试 loop 中。

@@ -44,6 +44,10 @@
 
 工具拥有自己的 `presentCall`/`presentResult` 呈现意图。前台调用是携带命令、描述与可选 cwd 的 `terminal` 卡；`run_in_background` 调用是携带原始命令的 `generic` 卡，镜像 bash 工具的后台呈现。完成的前台结果同样是 `terminal` 卡：退出 marker 变成卡片的退出状态 pill（`exitCode`/`signal`），去 marker 的正文成为卡片输出——与 bash 工具的 terminal 卡故事完全一致，经由 `@deepseek-ai/dsh-shell` 的共享退出状态解析。后台 ack 与执行错误保持 `generic` 卡，以 `console` 围栏包裹渲染输出。这些 presenter 是纯函数且可重放。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。工具把模型调用适配到 `ctx.shell` 执行器与 `ctx.jobs` 运行时上；进程与 job 状态由那些服务拥有。
+
 ## 模型体验
 
 ### 系统提示词

@@ -14,6 +14,10 @@ Not part of the product plugin graph (no `dsh.client`); feature packages depend 
 
 `SlotTestRuntime.create()` lets Vitest suites drive production slots, stores, typed Session and Workspace fixtures, and local DOM assertions in jsdom. For plugin activation, reload, reconnect, and cleanup tests, `createClientTest` starts the web profile's bundle roster with endpoint-named Remote mocks, without a business Host. Missing services and unstubbed calls fail explicitly. The whole-client fixture owns startup and disposal; the local runtime provides idempotent disposal. Use this package through `devDependencies` for client tests; it is not a product plugin.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A test-only assembly of typed doubles around the production slot registry; it owns no product runtime state.
+
 ## Model Experience
 
 None, as this package is browser-side test infrastructure; nothing here reaches a model request.
@@ -26,7 +30,3 @@ None; this package neither assembles nor sends a provider request.
 
 - **Consumed through repository source aliases only.** Specs resolve the package through tsconfig `paths` to `src`; the built `lib/` artifact re-exports `@deepseek-ai/dsh-client-runtime/client`, whose bundle is a browser loader script with no Node ESM exports, so `lib/index.js` is not importable under plain Node. Every consumer is an in-repository Vitest suite; there is no Node-compatible runtime entry.
 - **Conversation snapshots are fixture data, not replayed history.** `updateSnapshot` writes the snapshot store directly; the wire-to-snapshot computation stays covered by the runtime package's own tests and the replay e2e. A fixture can therefore express states the production projection would never produce.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A test-only assembly of typed doubles around the production slot registry; it owns no product runtime state.

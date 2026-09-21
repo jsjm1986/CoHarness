@@ -75,6 +75,11 @@ const manifest: DshPackageManifest = {
 - [公共包元数据](../../../.agents/notes/implemented/architecture/2026-09-10-public-package-manifest.zh.md)——字段位置与读取方归属。
 
 <a id="model-experience"></a>
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。无运行时行为的纯类型声明；解析、校验与默认值由读取方拥有。
+
 ## 模型体验
 
 无，因为本包仅导出类型。

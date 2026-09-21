@@ -12,6 +12,10 @@ The row set and its rationale are documented inline in the patch file; the [gene
 
 Every base-backed `dsh --profile` surface runs on `dsh-base`, so those surfaces share a model connection, the full tool set, durable session history, and workspace safety defaults. The shipped `sdk-minimal` profile deliberately uses a complete standalone tree instead. You rarely touch this bundle directly — shipped base-backed profiles already include it, and a custom base-backed profile names it first. When you need different defaults, change your profile patch or add a later bundle; this package is not a library you import.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The bundle is a static `cordis.patch.yml` layer; every plugin row it inserts owns its own runtime relationships and invariant wiring.
+
 ## Model Experience
 
 Indirectly, through each inserted row's package, which owns that row's model-facing behavior.
@@ -24,7 +28,3 @@ The bundle itself adds no request prefix; each inserted row's package owns any c
 
 - **A patch replaces whole row configs** — profile overrides must restate every field a row keeps; there is no deep-merge layer.
 - **The Windows temp grant is a private per-session subdirectory** — `workspace-write` confines writes to the workspace plus the session's own temp subdirectory (`<temp>\dsh-<hash>`, TMP/TEMP rewritten for confined children); `read-only` grants nothing. See `@deepseek-ai/dsh-sandbox-windows-acl`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The bundle is a static `cordis.patch.yml` layer; every plugin row it inserts owns its own runtime relationships and invariant wiring.

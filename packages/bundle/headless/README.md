@@ -10,6 +10,10 @@ After the Loader settles, the runner reads the shared [`ctx.agentDefaultModel`](
 
 `dsh-headless` runs one dsh task from the command line and prints the final answer, then exits — no GUI, no server, no browser. Type `dsh --profile headless "run the tests"` and the agent handles it with the same model, tools, and safety defaults as every other surface. It suits scripts, CI, and one-off jobs: it opens no ports and leaves nothing running behind. It also offers a JSON event stream (`--json`) and `--session-id` to resume a conversation. Exit code 0 means the task completed; 1 means it aborted or errored. The boundary: one task per invocation, no interactive follow-up.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The patch layer inserts profile rows whose plugins own their relationships; the headless-runner plugin reads one startup request and owns no persistent state.
+
 ## Model Experience
 
 None, as the runner submits the task as an ordinary user message and the composed base and headless rows own the prompts and tools.
@@ -24,7 +28,3 @@ The runner adds nothing to the request prefix; it only drives one user message t
 - **`ctx.appExit` is launcher-owned** — booting the headless profile outside the `dsh` launcher fails loud at activation until the host provides the exit request.
 - **Adoption is scoped** — `--session-id` requires the composed `sessionPersistence` and `sessionQuery` services and refuses a Session recorded in another working directory or under an agent preset this profile does not compose.
 - **The event stream is a projection** — `--json` caps every string except the terminal `final` at 8 KiB and each line at 32 KiB, and omits events the projection does not model, so it is not a lossless copy of the Session log.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The patch layer inserts profile rows whose plugins own their relationships; the headless-runner plugin reads one startup request and owns no persistent state.

@@ -18,6 +18,10 @@ Use `dsh-gateway-runtime` for the authenticated request context and private loop
 - Credentials and principal assertions fail closed at their parsing and request boundaries. The runtime bearer token is never exposed through the public service fields.
 - Consumers that read a private JSON response use `readGatewayResponseJson()` (or its byte-level companion) with a domain limit and optional `AbortSignal`; chunked bodies are cancelled when the limit or signal is reached, so `Content-Length` is not the only protection.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The launch credential binds one fixed identity for the process lifetime; request context is derived per call, so nothing mutable exists to compare.
+
 ## Model Experience
 
 None, as the request context authenticates Host operations and contributes no model input.
@@ -31,7 +35,3 @@ None; the package never assembles or sends provider requests.
 - **Gateway-launched runtimes only** — loading the plugin without a valid private launch credential fails startup.
 - **Request-local principals** — `current()` is unavailable outside an authenticated HTTP or WebSocket operation; Consumers that outlive dispatch must capture the verified principal or a derived authority.
 - **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal freezes its project scope mode until `expiresAt`; Session Consumers must use `ctx.collaboration` for current membership and ACL decisions. Seamless in-connection principal renewal and expiry watchdogs for long-lived streams remain a deployment follow-up; current clients reconnect when their carrier generation ends.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The launch credential binds one fixed identity for the process lifetime; request context is derived per call, so nothing mutable exists to compare.

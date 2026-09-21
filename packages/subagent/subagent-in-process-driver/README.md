@@ -50,6 +50,10 @@ Depth enforcement is internal to `startInProcessRun`: it reads the parent depth 
 
 A clean turn that never commits the required structured value reports `error`; the driver does not re-prompt. All registrations ride the child fiber and disappear with it.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The driver manages one child Agent per call through the host's agent factory; depth, seeding, and result reading are per-call state.
+
 ## Model Experience
 
 ### Child-agent request
@@ -118,7 +122,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Runs expose no `sendMessage`/`resume`** — the optional runtime capabilities are absent on in-process runs.
 - **Structured capture accepts the `defineTool` schema subset only** — unsupported JSON Schema constructs fail before the child is created; a provider needing a broader schema vocabulary requires a different runtime.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The driver manages one child Agent per call through the host's agent factory; depth, seeding, and result reading are per-call state.

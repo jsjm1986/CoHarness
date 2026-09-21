@@ -42,6 +42,10 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、冻结的 `block`
 
 各类卡片的上限与 fallback 规则仍由对应的 [terminal](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.zh.md)、[diff](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.zh.md)、[read](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.zh.md)、[search](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.zh.md) 和 [web](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.zh.md) Agent Note 负责。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。调用/结果配对、生命周期与 `subCalls` 投影在 Runtime 中保持权威；本包渲染分发的块并注册工具视图 slot。
+
 ## 模型体验
 
 无。该包是浏览器端工具展示层，只渲染已记录的工具调用，不改变模型上下文。

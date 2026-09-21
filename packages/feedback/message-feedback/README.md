@@ -61,6 +61,10 @@ A per-Session promise queue encloses inspection, durability validation, sidecar 
 
 Plugin disposal closes mutation admission, drains every operation already accepted into the per-Session queues, and only then closes the storage domain. A mutation submitted after disposal begins rejects as a lifecycle failure instead of entering a closing domain.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Sidecar rows are persisted through the storage domain they belong to and exposed by the same Remote surface; no second copy exists to diverge.
+
 ## Model Experience
 
 ### Message feedback
@@ -86,7 +90,3 @@ Independent. Feedback does not change the model request prefix.
 - **Header identity is not a content fingerprint** — `{createdAt, cwd}` detects reuse only when those fields differ; a cloned log retaining the same header identity is indistinguishable.
 - **Trusted caller boundary** — `list`/`put`/`delete` carry no authenticated actor or audit identity. A deployment must expose the Host gateway only through its trusted or separately authenticated boundary until authorization and attribution are added.
 - **Catalog and row bounds** — a cold request scans the complete Session snapshot catalog because persistence has no lookup-by-id metadata operation. `maxNoteBytes` bounds one note, but the item count and aggregate retained bytes of one Session row are not capped; an indexed metadata read and deployment-owned row bound remain deferred until a concrete consumer defines their policy.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Sidecar rows are persisted through the storage domain they belong to and exposed by the same Remote surface; no second copy exists to diverge.

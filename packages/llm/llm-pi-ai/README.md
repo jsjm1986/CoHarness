@@ -176,6 +176,10 @@ Every request carries the shared attribution header from dsh-llm's `attributionH
 
 pi-ai installs several provider SDKs and lazy-loads the one selected by the catalog model. The dependency weight is isolated to this opt-in adapter package.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Provider profiles are fixed configuration resolved per request; the adapter keeps no cross-request state beyond the immutable route table.
+
 ## Model Experience
 
 ### Provider request through pi-ai
@@ -223,7 +227,3 @@ Recorded response content appends to the next request and does not invalidate it
 - **In-history `system` messages use pi-ai's common context conversion** — provider-specific placement follows pi-ai rather than a harness-owned wire override.
 - **Provider HTTP status is partial** — pi-ai's response callback exposes the status and headers before a body is consumed, so the adapter retains the status when a terminal-event parser error follows an explicit non-SSE `Content-Type`. OpenAI SDK status text also lets the adapter recognize only 404/405 path failures when the callback is skipped; other pi-ai error events still do not expose a stable HTTP status across providers and carry only stable harness error codes.
 - **Retry policy is provider-owned, not an SDK retry** — each provider profile may supply nested `retryPolicy`; omission resolves to normal mode with five retries, and the effective route policy is what `dsh-llm-retry` executes at the agent failed-step extension point. pi-ai SDK retries stay disabled so durable agent steps and `llm/retry` events own every visible attempt, and direct `ctx.llm.stream()` calls remain single-attempt.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Provider profiles are fixed configuration resolved per request; the adapter keeps no cross-request state beyond the immutable route table.

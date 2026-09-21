@@ -18,6 +18,10 @@ It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds
 import { runNativeCommand, type NativeCommandRunner } from '@deepseek-ai/dsh-native-command'
 ```
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each call spawns one child and resolves its captured output; no process state outlives the call.
+
 ## Model Experience
 
 None, as the host-side utilities register nothing model-facing.
@@ -29,7 +33,3 @@ Nothing here enters a request prefix; this package neither assembles nor sends a
 ## Known Limitations and Deferred Work
 
 - **No output bounding** — both streams buffer unbounded in memory; every current caller invokes small native tools whose output is a path or an error line. Adopt `dsh-output-retention` bounding before pointing this at commands with meaningful output volume.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each call spawns one child and resolves its captured output; no process state outlives the call.

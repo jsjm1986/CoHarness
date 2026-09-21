@@ -14,6 +14,10 @@ The Host half registers `ui-onboarding` in the user-settings seam so stored docu
 
 Use this package to give the dsh web client a Settings panel, connection-recovery control, feature-contributed navigation, and sequential first-run onboarding. Users can open it from the sidebar, retry a failed connection immediately, and access a local configuration file when the Host makes one available on a loopback browser. Feature packages supply their own settings rows, sections, and onboarding steps; this package supplies their shared presentation and does not add onboarding copy or built-in General rows.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The shell projects the `settings.section` and `settings.onboarding` ledgers contributed by registrants; durable values stay in Host settings namespaces.
+
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -25,7 +29,3 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - The General section has no built-in rows; each row appears only when its owning feature plugin is mounted.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The shell projects the `settings.section` and `settings.onboarding` ledgers contributed by registrants; durable values stay in Host settings namespaces.

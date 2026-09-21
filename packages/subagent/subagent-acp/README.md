@@ -65,6 +65,10 @@ The child spawns through the [`dsh-subprocess`](../../subprocess/subprocess/READ
 
 The package has no default export. Cordis loader unwrapping would otherwise hide the named `inject` metadata; see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run drives one child over the ACP wire; the child's runtime owns its session and the provider holds only the in-flight client.
+
 ## Model Experience
 
 ### Child-agent request
@@ -102,7 +106,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No optional start-time capabilities** — this provider cannot apply the local harness's `outputSchema`, depth cap, tool filter, or persona inside the remote process, so it advertises none and the service rejects requests that require them.
 - **Only committed `agent_message_chunk` text is collected** — the automation server keeps reasoning, tool activity, plans, and other trace data in the child session log rather than emitting them on ACP.
 - **Permission prompts are auto-answered** (`permission: allow | reject`) — no human is surfaced a child's `session/request_permission`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run drives one child over the ACP wire; the child's runtime owns its session and the provider holds only the in-flight client.

@@ -10,6 +10,10 @@ Resolution is one pure boot-time sample (`resolveDirectoryPickerBackend`), expor
 
 `dsh-host-directory-picker-auto` picks the right directory-picking interaction for every boot: it resolves the host's situation once at boot and mounts the matching backend — [native](../directory-picker-native/README.md) or [browse](../directory-picker-browse/README.md) — together with its browser half, as real Loader entries in the in-memory root tree. The resolution is one pure boot-time sample: `native` requires a loopback-only bind, a non-SSH launch, and a servable display session; anything ambiguous resolves to `browse`, which works everywhere. Pinning an interaction means composing that backend directly. The mounted capability stays stable for the service lifetime, as the seam requires.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The chooser resolves the host situation once at boot and mounts the matching backend as an ordinary Loader entry; there is no ongoing picker state.
+
 ## Model Experience
 
 None, as the GUI host's directory-selection chooser only mounts a backend row and registers nothing model-facing.
@@ -23,7 +27,3 @@ None; this package neither assembles nor sends a provider request.
 - **Detection infers operator location from launch context, which no launch-side signal can prove** — a tmux session detached from its SSH launch loses the `SSH_*` markers; a Darwin process outside an Aqua session still counts as displayed; and a workstation-local launch later reached through `ssh -L` arrives from `127.0.0.1`, resolves `native`, and opens the chooser on the unattended workstation. A wrong `native` choice degrades to the backend's existing retryable failure dialog, and composing `-browse` directly selects the safe interaction for such deployments.
 - **The Linux chooser probe reads `PATH` only** — a zenity/kdialog reachable some other way (shell alias, non-PATH install) still resolves `browse`; installing either binary on `PATH` restores `native` eligibility at the next boot.
 - **Boot-time only** — one resolution serves every client of the boot; per-connection adaptivity (native for a local browser, browse for a remote one, same server) would need a per-client capability and the wire advertisement the seam deliberately deleted, and waits for a deployment that serves both at once.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The chooser resolves the host situation once at boot and mounts the matching backend as an ordinary Loader entry; there is no ongoing picker state.

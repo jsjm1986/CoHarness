@@ -25,6 +25,10 @@ kind: "package-library"
 
 catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原始 bytes、损坏尾部恢复、备份和原子发布。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。纯迁移库：链从格式目录确定性地编译，转换产生新代而不改动来源。
+
 ## 模型体验
 
 ### 会话还原

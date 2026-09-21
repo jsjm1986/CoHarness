@@ -38,6 +38,10 @@ Use `dsh-session-projection` when clients need current per-session state—such 
 
 This package owns the Service Definition and drive roles of the capability seam: domain host plugins (e.g. `dsh-tool-todo`) contribute units, carriers (`dsh-host-apiproxy`) consume the snapshot and change feed, and neither knows the other.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Registered units are pure folds driven over committed events; drive state is itself derived from the same log.
+
 ## Model Experience
 
 None, as the projection registry serves client-facing read models of already-logged session state and registers nothing model-facing.
@@ -53,7 +57,3 @@ None; projections never assemble or send provider requests.
 - **Eager drive touches every unit per event** — cheap by construction (whole-value rule, same-reference gate), but a hot path would justify per-unit event-type prefilters, addable without contract change.
 - **Registry cells live in memory only** — a restart rebuilds by folding the log on first touch; compositions that mount `dsh-session-projection-cache` seed that fold from persisted rows instead.
 - **Synchronous unit discipline is only partially mechanical** — `wire.viewSchema.parse` rejects a Promise-returning view, but an `apply` that blocks or reads torn non-session state is a review concern; the invariant companion documents why no runtime check exists.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Registered units are pure folds driven over committed events; drive state is itself derived from the same log.

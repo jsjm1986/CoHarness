@@ -30,6 +30,10 @@
 
 插件监听 Agent publication，并通过对应 Agent scope 安装注册。因此，fresh 创建与 cold resume 都会在第一次模型请求前获得相同工具／提示词集合。Agent dispose 和插件 HMR 会移除全部 scoped 注册；重新加载插件会为仍 live 的每个成员安装一套新注册，而不改变 continuation Activation。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。适配器把工具与策略注册安装进团队作用域；团队定义与生命周期由 `ctx.agentTeams` 拥有。
+
 ## 模型体验
 
 ### Team 策略与工具

@@ -25,6 +25,10 @@ import { bytesToBase64, randomUUID, type Uuid } from '@deepseek-ai/dsh-util-cryp
 | `bytesToBase64(data)` | 以有界分片编码标准 base64。 |
 | `Uuid` | 五段式 UUID 字符串类型。 |
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。不拥有事件流或可变运行时数据的纯库；其编码代数由单元测试强制。
+
 ## 模型体验
 
 间接地，经由用它铸造请求、会话与附件标识符的消费方，这些标识符均不作为语义内容进入提示词。

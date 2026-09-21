@@ -87,6 +87,10 @@ const footer = formatRetentionNotice(
 )
 ```
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A stateless bounding algebra over caller-supplied items; retention math and omission metadata are covered by unit specs.
+
 ## Model Experience
 
 Indirectly, through the retention consumers that render retained content and omission metadata.
@@ -99,7 +103,3 @@ No direct invalidation; the retention consumers own any request-prefix changes.
 
 - **Item retention supports `head` only** — tail, head/tail, pagination, grouping, and provider-completeness semantics remain tool-owned.
 - **Text retention is byte-oriented** — line and character windows such as `read` pagination require a separate renderer, and a cut may discard partial UTF-8 boundary bytes to keep returned text valid.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A stateless bounding algebra over caller-supplied items; retention math and omission metadata are covered by unit specs.

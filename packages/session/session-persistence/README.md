@@ -81,6 +81,10 @@ The coordinator asserts the stored id and compares stored/live cwd before repair
 
 Re-exported from `dsh-session`: `SessionHeader` (immutable session metadata: `version`, `id`, `createdAt`, `cwd?`, `parentSession?`, `seedLength?`, `origin?`, `delegationDepth?`, `draft?`). `SessionPersistenceSnapshot.content`, when supplied by an authoritative backend, carries `blank`, `visibleContentSeq`, and `lastPromptAt` for cold list projections. `SessionLocation` is `{ readonly kind: string; readonly path: string }`; its path is an absolute backend target, not proof that the artifact exists or contains an unflushed turn.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The write coordinator's per-session controllers are private serialization state; durable truth is the stored log, and batching, repair, and adoption are asserted by coordinator specs.
+
 ## Model Experience
 
 ### Resumed conversation history
@@ -102,7 +106,3 @@ Persistence does not mutate live request prefixes. A resumed loop can reuse prov
 - **No deletion or retention API** — pruning stored sessions is out-of-band backend maintenance.
 - **`list()` is unpaginated and unfiltered** — it returns every stored session's header; fine for local stores, unindexed at scale.
 - **Repair-time synthetic closers are the only crash story** — a backend must synthesize `tool/result`/`step/end`/`turn/end` closers on load; there is no partial-turn resume that continues an interrupted turn instead of closing it.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The write coordinator's per-session controllers are private serialization state; durable truth is the stored log, and batching, repair, and adoption are asserted by coordinator specs.

@@ -40,6 +40,10 @@ Mount this package when oversized plain-text tool results should stay out of mod
 
 The policy sees only the FINAL formatted model-facing result—not a tool's internal resource or canonical value. If a provider already truncated (e.g. `web-fetch-http.maxBodyChars`), the spill artifact holds the full formatted result the tool returned, not the full original source. Provider/resource caps stay mandatory and separate. `glob`/`grep` own item-level presentation spill because their complete acquired values still exist before rendering; bash streams own acquisition-time spill. The generic policy prepends its waterfall listener, then delegates, so ordinary tool-owned asynchronous projections complete before generic byte bounding regardless of plugin load order. See the [tool output spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each result is transformed independently by the bounded preview policy; no cross-call state is retained.
+
 ## Model Experience
 
 ### Oversized plain-text result
@@ -60,7 +64,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Only final plain-text results are spillable** — mixed-content results, blocked feedback, and `read` pass through; provider truncation or tool-owned retention that happened earlier cannot be recovered here.
 - **A notice that cannot fit disables replacement for that call** — a tiny cap or long locator leaves the oversized original inline after the backend has already saved an unreferenced spill.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each result is transformed independently by the bounded preview policy; no cross-call state is retained.

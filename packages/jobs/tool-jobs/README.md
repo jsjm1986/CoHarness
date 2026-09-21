@@ -41,6 +41,10 @@ One host registry may carry several mounts of this plugin — one per agent pres
 
 A default above the cap fails at load.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools and notices are registrations over the `ctx.jobs` registry; job records are owned by the mounted registry provider.
+
 ## Model Experience
 
 ### System prompt
@@ -98,7 +102,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **A notice pending on an idle owner does not survive that owner's disposal** — the disposal cancel clears the unclaimed inbox, and the log keeps the insert/cancel pair as the record.
 - **Stream reads are single-consumer** — independent observers need another runtime API.
 - **Unowned jobs have no session fence** — external callers must supply policy or avoid them.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tools and notices are registrations over the `ctx.jobs` registry; job records are owned by the mounted registry provider.

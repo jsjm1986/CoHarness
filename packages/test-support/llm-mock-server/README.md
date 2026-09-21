@@ -75,6 +75,10 @@ When random weights include `stall`, configure the client under test with a shor
 
 The CLI exposes `--success-text`, `--partial-text`, `--reasoning-text`, `--chunk-size`, `--chunk-delay-ms`, `--disconnect-delay-ms`, `--retry-after-ms`, `--request-id`, `--tool-name`, and `--tool-arguments`. Millisecond delays are bounded integers within Node's timer range; `retryAfterMs` must also be positive. The library accepts the same camel-case options. An optional exact `apiKey` validates `Authorization: Bearer <token>`; omission accepts any token.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A test fixture whose scripted behaviors are consumed in arrival order; its correctness is enforced by the suites that drive it.
+
 ## Model Experience
 
 None, as this test server substitutes provider wire behavior without invoking a real model.
@@ -88,7 +92,3 @@ None; requests terminate locally and never reach a provider cache.
 - **Random weights model test pressure, not production incidence** — callers that want an environment-specific distribution must provide measured weights and record the emitted seed.
 - **Request scripts are arrival-ordered** — concurrent callers share one cursor, so deterministic per-session fault assignment requires separate server instances.
 - **True connection refusal is a listener lifecycle phase** — the CLI delay must overlap the client attempt; request-level random selection can only reset an accepted connection.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A test fixture whose scripted behaviors are consumed in arrival order; its correctness is enforced by the suites that drive it.

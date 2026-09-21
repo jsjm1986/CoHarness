@@ -18,6 +18,10 @@ On phone viewports the portalled catalog becomes a safe-area sheet with the shar
 
 Use this package to browse every subagent conversation beneath a parent session, open any descendant, and see whether it is running together with its token usage and active-turn duration. Completed one-shot conversations open as read-only execution records. Continuable conversations accept follow-up prompts in submission order while they run and provide Stop independently. The ordinary session sidebar omits subagent conversations, so the parent header catalog is their navigation entry point. The separate `@` source inserts a running child's label into a user message without resolving it into a continuation address.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tree renders the runtime's subagent catalog mirror and opens rows through `SessionRuntime.openSubagent()`; expansion and clock state are component-local.
+
 ## Model Experience
 
 ### Subagent label text in the user prompt
@@ -38,7 +42,3 @@ Append-only. This package never edits earlier request tokens.
 
 - **The catalog has no durable outcome** — activity and timing do not distinguish completion, failure, or cancellation, and the UI exposes no Activation identity; stopping is limited to the composer's current-turn Stop for a running continuable child.
 - **`@` references remain display-title text** — duplicate or renamed labels are ambiguous, so they intentionally do not acquire continuation semantics.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tree renders the runtime's subagent catalog mirror and opens rows through `SessionRuntime.openSubagent()`; expansion and clock state are component-local.

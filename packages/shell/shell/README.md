@@ -43,6 +43,10 @@ The per-session sandbox-mode override vocabulary (the `'sandbox/mode'` event, th
 
 The exported `parseExitStatus` (with `ParsedExitStatus`) is the shared rendering contract half of the shell tools: the inverse of the `[exit code: N]` / `[killed by signal: X]` markers `dsh-tool-bash`'s `renderResult` and `dsh-tool-pwsh`'s `renderPwshResult` append. Both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill; it lives with the Service Definition so the two tools never drift on the marker contract.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam defines the executor contract; job ids, ownership, and cancellation belong to the generic `ctx.jobs` runtime.
+
 ## Model Experience
 
 Indirectly, through `dsh-tool-bash`, which turns executor output and sandbox facts into guidance and retained tool-result tokens.
@@ -55,7 +59,3 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 - **No interactive-input vocabulary** — `stdin` is written once at spawn and closed; the seam has no channel to feed a running task and no PTY session concept.
 - **Foreground timeouts are always executor-owned** — a caller-owned-deadline mode on the seam is explicitly deferred by [the tool-call timeout-policy Agent Note](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md).
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam defines the executor contract; job ids, ownership, and cancellation belong to the generic `ctx.jobs` runtime.

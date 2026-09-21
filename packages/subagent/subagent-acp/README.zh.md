@@ -65,6 +65,10 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 本包没有默认导出。否则 Cordis loader 的解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次运行通过 ACP 有线驱动一个子方；子方的运行时拥有其会话，提供方只持有进行中的客户端。
+
 ## 模型体验
 
 ### 子 agent 请求

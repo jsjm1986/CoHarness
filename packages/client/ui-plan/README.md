@@ -14,6 +14,10 @@ The model exits plan mode through the stable `exit_plan_mode` tool; its plan rev
 
 Plan mode lets you review a plan before implementation. Enter with `/plan` and leave with the composer chip. Submitted plans open automatically in the right sidebar for review and remain available from cards in the completed Turn’s final artifact area after approval, rejection, or dismissal. Reopening a plan focuses its existing tab, and browser reload restores the document from Session history.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Plan state is owned by `dsh-plan-mode` and arrives through the `plan` projection; the chip is a pure renderer and the node half is an empty apply.
+
 ## Model Experience
 
 Indirectly, through the `/plan off` command line the chip dispatches: `dsh-plan-mode` owns the model-visible policy section, the exit-tool schema, and the logged state that line drives.
@@ -27,7 +31,3 @@ Entering or leaving plan mode changes the active `plan:policy` system-prompt sec
 - **Plan mode is guidance, not an execution sandbox** — deployments that require enforced read-only planning must compose the independent sandbox and approval policies.
 - **The chip belongs to the default composer** — a pending whole-composer interaction such as plan review temporarily replaces the InputBar and its chip.
 - **No inactive plan control** — entry uses the shared Command source; a session with the capability but inactive mode shows no plan affordance in the tool row.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Plan state is owned by `dsh-plan-mode` and arrives through the `plan` projection; the chip is a pure renderer and the node half is an empty apply.

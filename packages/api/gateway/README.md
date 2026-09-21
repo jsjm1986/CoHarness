@@ -28,6 +28,10 @@ Each call validates positional inputs, constructs the descriptor's exact named `
 
 Generated declaration merges provide the TypeScript API through the shared `TypertClientRemote` contract. The Client entry contains no Host Service or Host Cordis interface merge, and method lookup and invocation use ordinary objects and functions rather than a JavaScript Proxy.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each invocation resolves the live descriptor, business Service, and codecs at call time; the gateway keeps no per-endpoint state that could diverge from the registered contributions.
+
 ## Model Experience
 
 None, as the package dispatches application calls and registers no prompt, tool, or session event.
@@ -44,7 +48,3 @@ No direct effect; invoked business Services own any model-visible result.
 - The package dispatches unary methods only. Incremental Session data uses a separate named-stream protocol over the same Connection.
 - Lookup resolvers are configured per key; an individual Remote parameter or endpoint cannot currently select a live-only policy under the same `agent`/`session` key.
 - Forwarded events reach `$on` exactly as the Host emitted them: no payload projection or redaction, no Scope-bound subscription, and no replay after a reconnect.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each invocation resolves the live descriptor, business Service, and codecs at call time; the gateway keeps no per-endpoint state that could diverge from the registered contributions.

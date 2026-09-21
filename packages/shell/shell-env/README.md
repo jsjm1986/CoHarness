@@ -42,6 +42,10 @@ export function apply(ctx: Context): void {
 
 The overlay is computed from the current `ToolExecution` and passed through the dedicated `ShellExecRequest.dshEnv` channel. The local executors remove all inherited `DSH_*` before merging that snapshot, so nested harnesses and concurrent parent/child agents cannot leak stale identities. `process.env` is never modified. The shell tools' descriptions teach the generic `$DSH_*` convention rather than naming persistence-specific variables or adding a permanent system-prompt section.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The registry is a contribution set with effect-scoped disposal; collected variables are computed per shell call from the registered facts.
+
 ## Model Experience
 
 Indirectly, through the shell tools (`dsh-tool-bash`, `dsh-tool-pwsh`), which expose this registry's managed `DSH_*` facts in every shell-tool call.
@@ -53,7 +57,3 @@ The managed environment never enters the request prefix, so it does not invalida
 ## Known Limitations and Deferred Work
 
 - **`list()` enumerates contributor-declared variables only** — registry-owned built-ins (`DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`) are not included, so diagnostics, prompt, or UI code must not treat `list()` as an exhaustive environment catalog.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The registry is a contribution set with effect-scoped disposal; collected variables are computed per shell call from the registered facts.

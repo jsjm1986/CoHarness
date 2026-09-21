@@ -48,6 +48,10 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 
 `dsh-acp-demo [--config path-to-cordis.yml]`（短形式 `-c`；默认为 `./cordis.yml`）会加载 gitignore 排除的 `.env`，回放模式除外；`DSH_SNAPSHOT=replay` 选择同级 `cordis.snapshot.yml`；stdin EOF 会在退出前 dispose（资源释放）上下文并刷新会话。Loader 已安装的可选对等依赖（peer dependency）`node-addon-require-builtin` 使纯 Node 下构建后的 bin 可以解析裸插件说明符。诊断使用 stderr，因为 stdout 是 ACP wire。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 demo 把现有插件接线在一个 bin 之后；会话状态属于组合后的运行时与 ACP 服务器包。
+
 ## 模型体验
 
 经由 dsh-agent-spine-demo 与 dsh-acp 间接产生影响；该捆绑的请求组装由它们负责。

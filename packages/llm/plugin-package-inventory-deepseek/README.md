@@ -42,6 +42,11 @@ Bare package and package-subpath specifiers resolve through Node's package searc
 The version-1 `dsh_plugin_packages` field contains only `{ name, version }` pairs. Disabled, pending, failed, disposed, unloading, structural `cordis:` rows, ordinary dependencies, loose files without an owning package identity, programmatically mounted child fibers, and in-memory dynamic plugins are excluded.
 
 <a id="model-experience"></a>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The `dsh_plugin_packages` field is computed per request from the live Loader inventory; no inventory copy is retained.
+
 ## Model Experience
 
 ### Package inventory metadata
@@ -76,7 +81,3 @@ None; package lifecycle changes do not alter the model-visible prefix.
 None.
 
 </details>
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The `dsh_plugin_packages` field is computed per request from the live Loader inventory; no inventory copy is retained.

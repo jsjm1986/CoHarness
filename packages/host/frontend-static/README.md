@@ -10,6 +10,10 @@ The fallback seat is single-owner (a second claim throws) and effect-scoped: dis
 
 Serve the built Web shell to browsers from its configured distribution directory. The root and configured index path render the bootstrapped index; existing assets are served directly, while missing or non-file paths return 404, traversal returns 403, and unsupported methods return 405. Index access requires a valid process token or browser cookie, but static assets remain public. Only one instance can handle unmatched routes at a time; a second activation fails, and unloading the active instance makes unmatched requests return 404.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Responses are served statelessly from the dist tree; the only registration is the claimed fallback seat, whose disposal is proven by the HMR-safety spec.
+
 ## Model Experience
 
 None, as the SPA dist server answers browser asset requests and registers nothing model-facing.
@@ -22,7 +26,3 @@ None; this package neither assembles nor sends a provider request.
 
 - **The starter MIME table is minimal** — it covers the Vite-emitted asset set plus the shipped PWA manifest; other extensions fall back to `application/octet-stream` until an asset class actually ships.
 - **Pathname routing is explicit** — the current client enters through the root or configured index path and has no History API pathname routes. Adding one requires an explicit server rule and real-composition coverage rather than a broad fallback for every miss.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Responses are served statelessly from the dist tree; the only registration is the claimed fallback seat, whose disposal is proven by the HMR-safety spec.

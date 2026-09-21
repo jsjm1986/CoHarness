@@ -22,6 +22,10 @@ What a preset can own is the **presentation** of that registry. `ctx.tools.prese
 
 One agent declares one presentation. A second declaration in the same composition is refused rather than merged: two answers to "which form does the model see" is a contradiction, not an override.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes one declarative preset row consumed at composition time; it owns no runtime state.
+
 ## Model Experience
 
 Indirectly, through the tool presentation it selects in `dsh-tools` — the row only chooses between the two projections `dsh-tools` owns and registers no prompt, schema, or result of its own.
@@ -33,7 +37,3 @@ No direct invalidation; the presentation is fixed when the agent is composed, so
 ## Known Limitations and Deferred Work
 
 - **The runtime stays host-plane** — a preset can select PTC mode but cannot supply the TypeScript runtime it needs; a deployment that composes none can compose no ptc preset.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes one declarative preset row consumed at composition time; it owns no runtime state.

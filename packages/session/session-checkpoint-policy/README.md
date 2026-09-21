@@ -26,6 +26,10 @@ The policy wraps `llm/stream` lazily, so the downstream stream is not constructe
 
 Checkpoint rejection is fail-closed at the model and tool boundaries: neither the adapter nor the top-level tool body runs. A step-boundary rejection fails the turn before another request starts. Concurrent tool checkpoints share the session store's serialized persistence drain and cannot duplicate sequence numbers.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The policy triggers checkpoints on the owning session at defined boundaries; it stores no checkpoint data itself.
+
 ## Model Experience
 
 ### Interrupted calls
@@ -47,7 +51,3 @@ The repair result is appended after the reusable prefix, so it does not invalida
 - The policy durably records execution intent, not generic exactly-once effects. Side-effecting tools should forward `exec.callId` as an idempotency key when their provider supports one.
 - Streaming `assistant/chunk` events have no per-chunk checkpoint. Bounded background batches normally persist them before the next semantic checkpoint, but a hard crash may lose the current in-memory batch or outstanding write.
 - A persisted call without a result cannot prove whether its external effect completed. Recovery therefore records an unknown outcome instead of retrying automatically.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The policy triggers checkpoints on the owning session at defined boundaries; it stores no checkpoint data itself.

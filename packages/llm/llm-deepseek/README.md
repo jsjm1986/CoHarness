@@ -109,6 +109,10 @@ DeepSeek request identity is separate from app attribution. After credential res
 
 Non-2xx responses throw `LlmError` with stable codes: `AUTH` (401/403), `QUOTA` (a response whose provider details identify exhausted quota, balance, or credits), `RATE_LIMIT` (other 429s), `CONTEXT_WINDOW_EXCEEDED` (a 400 whose provider code, type, or message identifies context overflow), `INVALID_REQUEST` (other 400s and 413), `SERVER` (5xx), `HTTP_<status>` otherwise. Its serializable `failure` retains the HTTP status plus a valid positive `Retry-After` seconds/date delay and `x-request-id` / `x-deepseek-request-id` when present. If DeepSeek rejects a normalized image, the primary message names the attachment or display name, durable message and image position, normalized media type, 8-bit sRGB/sRGBA depth, dimensions, and provider message. With several candidates and no file id in the provider detail, it lists each possible image instead of assigning the failure to the first one. The raw response remains the error `cause`; it is never the only user-visible diagnostic. Attachment reads retain their stable attachment failure code rather than becoming transport failures. A pre-response transport failure (DNS, refused connection, TLS, proxy) throws `TRANSPORT` naming the configured endpoint and chaining the original rejection as `cause`; caller aborts throw `ABORTED`, and the loop's cancellation signal remains authoritative. Protocol violations throw `STREAM_CLOSED` (no `[DONE]`) or `MALFORMED_RESPONSE` (bad JSON payload). Unknown wire `finish_reason`s (e.g. `content_filter`, `insufficient_system_resource`) become `finish {kind: 'error', failure}` chunks, and a completed stream whose `stop` (or absent) finish opened no content blocks becomes a `finish {kind: 'error'}` with code `EMPTY_RESPONSE` (retried by default policy).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter is a stateless wire translator per request; stream lifecycle is owned by the caller and asserted by adapter specs.
+
 ## Model Experience
 
 ### DeepSeek request
@@ -146,7 +150,3 @@ Loop-retained response blocks append to the next request and preserve its earlie
 - **Requests use raw `fetch`, not `@cordisjs/plugin-http`** — no shared proxy/interception configuration; adoption is deferred until a second adapter wants it (`TODO(http)`).
 - **Plugin-added content block types are skipped** — core text and supported image blocks are serialized, and empty tool output crosses the wire as the literal `(no output)`.
 - **Images are input-only durable attachments** — direct external URLs and assistant image output are not supported; DeepSeek input normally uses the Files API and uses inline base64 only for per-request recovery.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The adapter is a stateless wire translator per request; stream lifecycle is owned by the caller and asserted by adapter specs.

@@ -110,6 +110,10 @@ Loader composition proves that the Bundle default, two additional named Claude i
 
 The project owner's identity-scoped distribution authorization covers the official SDK and the official CLI/platform payloads declared by each SDK version. [`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) discloses the current optional payload closure without classifying its declared terms as permissive; unrelated non-permissive runtime dependencies continue to fail the notices gate.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run submits one task through the vendor SDK in the delegating workspace and returns its result; no session state is retained between runs.
+
 ## Model Experience
 
 ### Child request
@@ -151,7 +155,3 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 - **Assistant payload is final text only** — a failed run may additionally expose the separate safe diagnostic; reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain product-local, while generic Job ids, notices, and status come from the shared job runtime.
 - **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run submits one task through the vendor SDK in the delegating workspace and returns its result; no session state is retained between runs.

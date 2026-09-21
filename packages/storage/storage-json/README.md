@@ -22,6 +22,10 @@ JSON backend for the [storage hub](../storage/README.md): human-readable JSON un
 | --- | --- | --- | --- |
 | `root` | string | required — no default (a cwd fallback would scatter files) | Directory holding unit files; created `0o700` on demand |
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The backend maps each domain spec onto files under one root; layout and versioning are asserted by backend specs and no second store exists.
+
 ## Model Experience
 
 ### Stored domain records
@@ -42,7 +46,3 @@ None — the backend never touches live request prefixes.
 
 - Windows durability relies on libuv's `rename()` (`MoveFileExW` with replacement) without an explicit write-through flag; the session-log backend's stricter Win32 write-through publish helper is planned to move down here when the append-log facet lands (see the Agent Note's migration section).
 - No cross-process write locking: two processes writing the same root can interleave whole-file replacements (last write wins). Single-host-process deployments are the current consumer; the multi-process story is deferred per the Agent Note's out-of-scope table.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The backend maps each domain spec onto files under one root; layout and versioning are asserted by backend specs and no second store exists.

@@ -27,6 +27,10 @@ This package gives clients whole-session turn and step counts plus LLM, tool, fi
 
 Injects `sessionProjections` — the plugin's whole purpose; in assemblies without the registry the fiber stays pending and nothing registers.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The unit is a pure fold over the durable log served through the projection seam; no state is owned outside that fold.
+
 ## Model Experience
 
 None, as the sessionStats unit folds already-logged step boundaries into a client-facing read model and registers nothing model-facing.
@@ -41,7 +45,3 @@ None; the package never assembles or sends provider requests.
 - **A cancelled step is counted but untimed** — no assistant message assembles, so its partial stream time enters no wall-time figure, matching the window fold's untimed interrupted node; a max-tokens usage-host message conversely contributes model time the surface does not show.
 - **Counts are log-scoped, not surface-scoped** — steps whose messages were later compacted away stay counted; the figures describe the whole session, not the current model-visible surface.
 - **Mounted only in the web-app bundle** — other assemblies serve no `sessionStats` key, and their consumers fall back to window-scoped counting (the web stats strip's fallback path).
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The unit is a pure fold over the durable log served through the projection seam; no state is owned outside that fold.

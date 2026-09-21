@@ -45,6 +45,10 @@ In uploading modes, records carry the complete `event.data` as the seam's `sessi
 
 Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `severity` → `severityNumber`/`severityText` (INFO 9 / WARN 13 / ERROR 17); `body` → the structured log body; `attributes` verbatim. Receivers dedupe on `(session.id, event.seq)` and alert on severity. In `FULL`, they may also detect crashes by `shutdown`-record absence: the marker is emitted at the session's own disposal or application teardown, and a marker followed by more events is a telemetry reload. In `FEEDBACK_ONLY`, a released prefix normally has no later `shutdown` marker, so its absence is not a crash signal. Streams are not self-contained across lineage: a resumed session continues its own id's stream from where the previous process left off, and a forked session's stream starts at its inherited boundary — its prefix lives in the parent's stream, stitched via `session.parent_id` + `session.seed_length`. A resumed local log may contain synthetic closers that were never exported; the wire stream stays faithful to records actually handed to the SDK.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Records are handed to the vendor SDK's own batching and export pipeline; the backend owns no queueing or retry state to compare.
+
 ## Model Experience
 
 None, as the backend forwards seam records into the OTel SDK pipeline and registers nothing model-facing.
@@ -58,7 +62,3 @@ None; the package neither assembles nor sends a provider request.
 - **Upstream experimental tree** — `@opentelemetry/sdk-logs` is still published from the upstream experimental tree; SDK API churn lands here and only here — the seam contract does not move.
 - **Live-collector behavior belongs to the SDK exporter** — authentication, TLS, throttling, and other real OTLP deployment behavior follow the upstream SDK rather than a package-owned compatibility layer.
 - **Feedback-time snapshot** — `FEEDBACK_ONLY` retains no telemetry-owned copy before feedback. It reads and redacts the current canonical log when feedback is recorded; a crash before feedback uploads nothing, and policy changes before feedback affect what that replay exports.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Records are handed to the vendor SDK's own batching and export pipeline; the backend owns no queueing or retry state to compare.

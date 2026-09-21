@@ -31,6 +31,10 @@
 
 包内 `clientBundle(..., { hostPhase: true })` 让 Host tsdown 打包 Host 入口，让后续 Client tsdown 只打包 browser 入口。普通 Client 插件仍使用单一 Client project，并在 Client tsdown 阶段一起生成 Node loader 入口和 browser bundle；不得因一个包同时存在 `src/index.ts` 与 `src/client/index.ts` 就复制本包的拆分。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每个贡献都通过 `ctx.remote.$mount()` 挂载为随组装 fiber 撤回的 effect，身份解析是针对实时 Agent 注册表的逐次调用策略。
+
 ## 模型体验
 
 无，因为该 BFF 只选择 Remote 应用方法和转发事件，不注册任何模型接口。

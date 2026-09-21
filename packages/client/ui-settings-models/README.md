@@ -26,6 +26,10 @@ A pi-ai profile's `models` list is edited on the card: one row per model showing
 
 **Add a custom provider** declares a route pi-ai does not ship. It is its own card rather than the editor with extra fields, because the route id is being chosen here and the settings address does not exist until it is: one `settings.mutate` sets the whole profile at `providers.<route>`, and the key travels separately through `credentials.set`. Provider IDs are accepted as non-empty names without a catalog or shell-identifier restriction; the `org-` and `project-` namespaces remain reserved for managed routes, credential references are derived independently, and unusual names receive a stable suffix. The create button still requires an endpoint, a supported protocol, and at least one uniquely identified model because those are the minimum facts the adapter needs to route a request. Capacities do not gate it: the adapter's fallbacks size a model the endpoint described by id alone. The protocol choices come from the namespace schema, so they stay aligned with the adapter. Leaving the key blank preserves provider-native authentication. When a profile write succeeds but the key write fails, the provider remains visible and the retry writes only the credential.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The page joins the `llm.providers`, `settings.describe`, and `credentials.describe` wire domains at render time; provider and credential state remain owned on the Host.
+
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -41,7 +45,3 @@ None; this package neither assembles nor sends a provider request.
 - **Only pi-ai routes can be hand-declared** — the custom-provider card writes into `llm-pi-ai`, the one namespace whose profiles describe a whole provider. A `llm-deepseek` route is a composition fact, not something this page can create.
 - **Interrogation covers OpenAI-compatible and Anthropic Messages listings** — other protocol families report that they cannot be asked and their models are entered by hand. A relay may still require manual entry when it exposes neither `/models` variant or returns a non-listing response.
 - **Undeclared live routes render nowhere** — a route registered without a configurable-provider declaration has no settings address; it stays visible in pickers but not on this page's rows.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The page joins the `llm.providers`, `settings.describe`, and `credentials.describe` wire domains at render time; provider and credential state remain owned on the Host.

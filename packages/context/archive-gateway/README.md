@@ -18,6 +18,9 @@ The provider is a runtime-only integration. Standalone local DSH compositions do
 
 Use `dsh-archive-gateway` to synchronize a Gateway-launched runtime's durable Workspace archive state with the Gateway archive index. Revision-stamped, idempotent batches carry archived ids, lineage, headers, placement, and search projections; Gateway commands apply only after every batch of that revision succeeds. Requests are bounded and disposal joins the in-flight pass.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Every sync batch is derived from the durable session corpus and revision-stamped against the Gateway index; the provider holds no local archive truth.
 
 ## Model Experience
 
@@ -33,7 +36,3 @@ None; the package never assembles or sends provider requests.
 - A personal transcript cannot be read while its owning runtime is unavailable or its persisted log is corrupt; the Gateway keeps the archive index row and reports the body as unavailable.
 - Archive reads reject a lineage with more than 10,000 descendants or a post-floor result whose retained records exceed 100,000 records or 64 MiB. `fromSeq` is an inclusive sequence floor applied independently to every descendant session, not a global chronological cursor.
 - A runtime-provided personal detail must fit the same descendant, event-page, and byte budgets; an invalid or oversized replacement leaves the indexed detail visible with `syncState: unavailable`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Every sync batch is derived from the durable session corpus and revision-stamped against the Gateway index; the provider holds no local archive truth.

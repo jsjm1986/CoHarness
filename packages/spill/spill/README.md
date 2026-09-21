@@ -32,6 +32,10 @@ Storage is grouped by the request's `owner` session as a save-time namespace; th
 
 See the [tool output spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) for the design rationale, including why creation belongs to the runtime spill seam rather than the model-facing `write` tool.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam declares the locator and retrieval-hint contract; backends own storage.
+
 ## Model Experience
 
 Indirectly, through spill consumers, which render the backend's locator and retrieval guidance to the model.
@@ -44,7 +48,3 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 - **The seam has no retrieval or deletion API** — consumers can only render the backend's locator and guidance; lifecycle and access semantics remain backend-specific.
 - **Storage is not access control** — `SpillOwner` namespaces writes but does not authorize reads of a locator; each backend and retrieval consumer must enforce its own boundary.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam declares the locator and retrieval-hint contract; backends own storage.

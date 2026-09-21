@@ -23,6 +23,10 @@ Every trusted `ctx.sessionQuery` call crosses one model-boundary sanitizer. Call
 
 The package deliberately performs no byte or character truncation and does not import a spill backend. Deployments that need bounded inline output mount `@deepseek-ai/dsh-spill-policy`, which can replace the rendered text after execution while retaining the complete result.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools are registrations over `ctx.sessionQuery`; corpus state stays behind the query seam.
+
 ## Model Experience
 
 ### System prompt
@@ -78,7 +82,3 @@ Append-only result text follows the reusable request prefix and does not invalid
 - Search returns at most the deployment cap and asks the model to narrow its query when more matches exist; it offers no continuation token.
 - Workspace identity is conservative exact-string `cwd` equality, so symlink-equivalent paths do not share authority.
 - Custom compositions without the generic spill policy accept complete trace and event payloads inline.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tools are registrations over `ctx.sessionQuery`; corpus state stays behind the query seam.

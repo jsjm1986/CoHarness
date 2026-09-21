@@ -53,6 +53,10 @@ ACP 要求每个提示词响应都携带 `stopReason`，但桥接层不声称它
 
 `pnpm --dir /path/to/deepseek-harness run demo:acp` 启动仓库的自动化服务器组合。父 harness 可以通过 [`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.zh.md) spawn 它；其他 ACP 客户端只需上述核心方法。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。服务器把每个 ACP 帧翻译为 `ctx.agents` 操作；会话生命周期由它所驱动的运行时拥有，因此没有适配器自有的关系可供比较。
+
 ## 模型体验
 
 ### 提示词内容

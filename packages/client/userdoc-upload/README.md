@@ -12,6 +12,9 @@ Adapters may append a stable query string to every protocol request and provide 
 
 Use `dsh-client-userdoc-upload` as the shared browser uploader behind the conversation composer and document manager. It speaks the `resumable-v1` protocol in bounded XHR chunks with SHA-256 digests, retries transient failures, and persists opaque session metadata so an interrupted upload resumes after a page reload — file bytes never leave the browser except through the upload itself.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Resume metadata is transient browser-side protocol state; the authoritative document record lands in the user-docs backend through the resumable-v1 protocol.
 
 ## Model Experience
 
@@ -26,7 +29,3 @@ None; the package never assembles or sends provider requests.
 - **One active file per call** — the host UI owns multi-file sequencing and cancellation; this package deliberately keeps one resumable state machine per selected file.
 - **Browser storage is best-effort** — private-mode or quota-restricted browsers may lose the bounded session metadata, after which the server still retains the session until its configured expiry but the user must select the file again without a local session id.
 - **Host adapters own authentication and route availability** — the uploader only maps the callbacks supplied by its consumer and cannot refresh credentials or discover an unavailable document service.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Resume metadata is transient browser-side protocol state; the authoritative document record lands in the user-docs backend through the resumable-v1 protocol.

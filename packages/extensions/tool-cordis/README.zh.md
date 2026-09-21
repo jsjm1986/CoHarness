@@ -57,6 +57,10 @@
 
 Namespace 插件：命名导出 `name`／`inject`／`apply`，无默认导出（[docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）。它注入 `tools` 与 `dynamicCordisRunner`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该工具集是 `ctx.dynamicCordisRunner` 之上的一组注册；定义与 fiber 状态属于 host runner。
+
 ## 模型体验
 
 ### 运行时检查

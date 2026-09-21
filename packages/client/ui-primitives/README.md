@@ -46,6 +46,10 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 
 `useMediaQuery` shares one native listener per query and falls back to `addListener`/`removeListener` for older WebViews. `holdInert` uses native `HTMLElement.inert` when available and also keeps `aria-hidden` plus tab stops safe while an overlay owns the page. Theme styles define a `100vh` viewport fallback before the layout plugin publishes its visual-viewport height.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Pure React atoms own no runtime state; their rendering contract is asserted by unit specs.
+
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -62,7 +66,3 @@ None; this package neither assembles nor sends a provider request.
 - **No `Active` StateDot variant** — the supported states are done, warning, ongoing, and error.
 - **User-facing copy localizes through label props, defaulting to the original Chinese literals** — the atoms are zero-cordis and cannot reach `ctx.locale`, so `HoverCard` (`copyLabel`/`copiedLabel`), `TerminalBlock` (`labels`), `JsonTree` (`labels`), `CodeBlock` (`copyLabel`/`copiedLabel`), `MarkdownText` (`codeLabels`), `JsonBlock` (`truncatedLabel`), `ConnectionBanner` (`label`), and `Modal` (`closeLabel`) take their copy as optional props. Localized plugins pass dictionary-driven labels from their own `t` seat; a consumer that passes nothing gets those defaults. `WebBlock` does not yet follow this pattern: its source-list and fetch truncation notes and its empty-search note stay inline Chinese, pending the same label-prop treatment.
 - **`TerminalBlock` is not a terminal emulator** — it renders settled or still-running command output, not an interactive session: SGR color and attributes are honored, and so are the in-line cursor movements a progress line uses — carriage return, backspace, erase-in-line, tab stops and character width. Absolute cursor positioning, screen clearing, and alternate-screen sequences are stripped. Basic-16 magenta and cyan have no token equivalent and stay literal rgb.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Pure React atoms own no runtime state; their rendering contract is asserted by unit specs.

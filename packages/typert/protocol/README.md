@@ -28,6 +28,10 @@ The Host assembly extends `TypertRemoteEventSelection` with the Host events it f
 
 Lookup and Context packages own both sides of their contract: declaration merging supplies the static association, while runtime providers register identity resolution with `ctx.typert`. A lookup or Host Context provider supplies the stable declaration and default resolver, while Host composition may separately configure a synchronous or asynchronous resolver; policy rejections may use `TypertLookupFailure` to carry a failure value owned by the boundary adapter. Strict codecs carry generated schemas; `src-json` codecs identify the weaker source-launch path.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure declaration-and-codec library with no service registration; its contracts are enforced by type-level use and codec specs.
+
 ## Model Experience
 
 None, as compiler-independent Remote protocol declarations register nothing model-facing.
@@ -40,7 +44,3 @@ No direct effect; the declared contracts reach a request only when an assembly p
 
 - Decorator markers contain only the method name and direct or Context invocation mode. Parameter, result, lookup, and schema reflection require the Typert build pipeline.
 - Remote decorators accept only public, non-static instance methods with string names. SRC execution cannot represent overloaded, destructured, defaulted, or rest-parameter signatures.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure declaration-and-codec library with no service registration; its contracts are enforced by type-level use and codec specs.

@@ -12,6 +12,10 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 
 Web 使用共享的有界 normal 默认值，在首次请求后最多再重试五次符合条件的失败。`deepseek-official` 与由 settings 新增的 pi-ai 路由在省略 `retryPolicy` 时使用该默认值；显式提供方策略仍然优先。Web 不再增加重试专用的组合覆盖，因此非 Web profile 的省略行为与之相同。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。补丁层插入 host 与 client 行，其插件各自拥有自身关系；web-runtime 粘合层只解析静态入口点，不持有可观测状态。
+
 ## 模型体验
 
 ### Harness 源码与 Web 表层上下文

@@ -24,6 +24,10 @@ spawn 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona:
 |---|---|
 | `providerName` | `ctx.subagents` 上的注册表名称（默认 `spawn`）。 |
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。子 Agent 由共享驱动器在调用内创建并释放；提供方不拥有运行后状态。
+
 ## 模型体验
 
 ### 子 agent 请求

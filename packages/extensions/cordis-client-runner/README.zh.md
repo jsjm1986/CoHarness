@@ -34,6 +34,10 @@
 - `approve(requestId)` / `decline(requestId)` / `startUserRun({ agentId, id, hasClientHalf })` —— 两条入口。三者都幂等（按 requestId，用户自发的 run 按定义 id），所以连点两次不会起两次 run。`hasClientHalf` 是必填：纯 host 定义没有源码可取，所以由调用方从它正在操作的注册表行里把这个事实说出来，而不是让编排器从一次失败的取码里反推。可回答的请求必然带浏览器半 —— 纯 host 定义是 host 自己起的，它不会去问页面。
 - `subscribe()` / `getSnapshot()` / `isLoaded(id)` —— 这一页装了什么。`isLoaded` 是页面本地的事实，永远不等于 host 说的「在跑」。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。页面按每个 host 事件执行一次挂载/撤回往返，而定义注册表位于 host runner 中；已挂载 fiber 遵循由规格证明的普通插件释放。
+
 ## 模型体验
 
 ### Host 转发的运行结果

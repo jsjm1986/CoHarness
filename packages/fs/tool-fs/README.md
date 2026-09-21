@@ -65,6 +65,10 @@ When `ctx.fs.sandboxMode` reports confinement, write/edit advertise `sandbox_per
 
 The package root exports only the Cordis plugin contract (`name`, `inject`, `Config`, and `apply`). Read rendering (line windowing + output formatting) lives in `src/read-render.ts` (Cordis-free, independently unit-tested); `src/read.ts`/`read-image.ts`/`write.ts`/`edit.ts` are the tool executors and `src/index.ts` composes them.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools validate, window, and format calls against the `ctx.fs` provider; all file state belongs to the mounted backend.
+
 ## Model Experience
 
 ### System prompt
@@ -177,7 +181,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No inline image preview on the tool-result card** — UI surfaces render the image result generically (the durable reference, not pixels); inline rendering is deferred to the UI packages.
 - **No attachment-region tool** — an agent may crop an image through other available tools when it has a filesystem path. A pasted or dragged image without a path cannot be re-read at a higher resolution.
 - **No timeout surface** — `read`/`write`/`edit` take no timeout argument and declare no `timeout-policy` budget; cancellation rides `exec.signal` only ([provider rationale](../README.md#no-timeouts-on-file-io)).
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tools validate, window, and format calls against the `ctx.fs` provider; all file state belongs to the mounted backend.

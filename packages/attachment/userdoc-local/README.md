@@ -25,6 +25,10 @@ The local provider implements the `resumable-v1` upload session used by the Web 
 
 The provider records the admission lock owner as a PID. During startup, a lock whose recorded process no longer exists is atomically removed before expired-session cleanup, so an interrupted runtime does not block later document requests for the full 30-second lock deadline. A live or unreadable lock remains contended and is not removed automatically.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Documents are ordinary files below one configured root; the backend holds no index beyond the filesystem tree its specs exercise.
+
 ## Model Experience
 
 Indirectly, through the host prompt-assembly consumer, which owns every model-visible rendering decision for stored files.
@@ -39,7 +43,3 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Completed-document retention is explicit** — active documents live until deleted; trashed documents are recoverable only for `trashRetentionDays`, after which the provider purges them. Session records, including completed-state metadata, are temporary and are cleaned after the configured upload retention.
 - **`list` walks the tree on every call** — there is no index, so a root holding many thousands of files pays a full scan per listing.
 - **Folder deletion is empty-only** — removing a tree requires moving or deleting its contents first; no recursive delete operation is exposed.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Documents are ordinary files below one configured root; the backend holds no index beyond the filesystem tree its specs exercise.

@@ -14,6 +14,10 @@ The `/client` export is the plugin body (`apply`/`inject`) only; candidate encod
 
 Use `dsh-client-ui-reference` when Web users need to mention files, folders, or sessions from one `@` completion menu. It lists files before sessions and keeps either group available when the other cannot load. Picking a file, folder, or session inserts an atomic reference with a stable clipboard form; folder rows also let users descend without closing completion. File rows omit redundant root locations, and session rows show a workspace only when it differs from the current one. Session mentions are validated before model context is captured, while browsing candidates has no model effect.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Candidates are fetched per token through the `fileReferences/list` and `sessionReferenceResolver/candidates` remotes; the source keeps no candidate state between requests.
+
 ## Model Experience
 
 Indirectly, through Host-owned providers, which own the file guidance and session snapshot preparation this package's reference selection delegates to them.
@@ -27,7 +31,3 @@ Candidate browsing has no model effect. A selected file or session changes only 
 - **Candidate failure is intentionally quiet** — one unavailable or failed Remote discovery call yields no rows for that domain. A session-reference preparation failure occurs after prompt acceptance and terminates that agent turn.
 - **No browser-side file scan** — Web completion requires a mounted Host `ctx.fileReferences` provider; the browser cannot fall back to its own filesystem.
 - **Session search remains metadata-only** — discovery filters session id, cwd, and the latest log-backed title through `ctx.sessionReferenceResolver`; message bodies and full transcripts are not searched.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Candidates are fetched per token through the `fileReferences/list` and `sessionReferenceResolver/candidates` remotes; the source keeps no candidate state between requests.

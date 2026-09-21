@@ -35,6 +35,10 @@ await withFileLock('/home/u/.dsh/settings.yaml', async () => {
 
 `withFileLock` serializes the writers of one file across processes, for the read-render-commit cycles a bare atomic commit cannot make safe on its own. The lock is a `wx`-created `<filename>.lock` sibling, so readers never contend; waiters back off exponentially and fail with a timeout rather than block forever. `EEXIST` identifies contention directly; `EPERM` does so only when a fresh `lstat` confirms that the lock path exists, covering Windows exclusive-create behavior without hiding an unrelated permission failure. A contender never removes the existing lock: age cannot distinguish a crashed owner from a paused live writer.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A stateless write primitive asserted by filesystem-level unit specs; it owns no state between calls.
+
 ## Model Experience
 
 None, as this is a pure filesystem write primitive that registers nothing model-facing.
@@ -48,7 +52,3 @@ Nothing here enters a request prefix, so provider cache reuse is unaffected.
 - **Atomic, not durable** — no `fsync` of the file or its directory, so after a crash the rename may be observed unwound. The file-backed stores here re-read and republish on boot, keeping durability the caller's policy.
 - **String content only** — no `Buffer` or stream form until a consumer needs one.
 - **Orphaned locks require operator recovery** — a process that exits while holding the lock can leave the sibling behind. Later writers time out without deleting it; an operator removes it only after verifying that no writer still owns it. File age alone is not safe evidence of abandonment.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A stateless write primitive asserted by filesystem-level unit specs; it owns no state between calls.

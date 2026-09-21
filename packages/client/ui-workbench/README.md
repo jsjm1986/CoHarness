@@ -23,6 +23,10 @@ Desktop uses equal or ratio-adjusted columns, with two rows when four columns ca
 
 The conversation chooser excludes archived roots and inactive blank drafts. Personal rows use the same `workspace.list.archivedSessionIds` snapshot as the sidebar; project rows exclude archive-index entries, and opening a target rechecks its live Workspace archive set. An account catalog response is authoritative and is never supplemented with excluded local rows.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Pane selection, order, and ratios are component state over the `conversationViewport` capability; sessions remain owned by the runtime.
+
 ## Model Experience
 
 None, as browser-only pane controls register nothing model-facing; the existing conversation submission path owns all model-visible content.
@@ -37,7 +41,3 @@ None; the package never assembles or sends provider requests.
 - The catalog is metadata-only and loads conversation history lazily when a pane is selected; it does not preload every project runtime.
 - The browser-local view state is not synchronized between devices or browser profiles.
 - The preview currently opens one text resource at a time; binary files and files rejected by the text policy are shown through a bounded Base64 byte window and do not provide an editor or upload path.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Pane selection, order, and ratios are component state over the `conversationViewport` capability; sessions remain owned by the runtime.

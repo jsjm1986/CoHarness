@@ -89,6 +89,10 @@ Direct `SessionsApi` / `SubagentsApi` and `IApiClient` history results stay expa
 
 The `inbox` projection reconstructs pending input from Session-owned durable splices without restoring an Agent. Gateway authorization still governs history reads; cold queue mutations retain the live-Agent requirement.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Request dispatch delegates to the owning session services and registered handlers; the gateway composes transport and policy without owning domain state.
+
 ## Model Experience
 
 None, as the wire contract and fetch carriers move already-composed messages and register nothing model-facing.
@@ -106,7 +110,3 @@ None; the package never assembles or sends provider requests.
 - **Search failures include provider diagnostics** — the gateway is a single-user local service. A carrier that exposes it to multiple users must replace internal search details with a public-safe diagnostic.
 - **Linux native picker requires desktop tooling** — under the `native` capability, `host.pickDirectory` reports an actionable error when neither Zenity nor KDialog is installed; the browse backend is the composition-level fallback (see the [native backend README](../directory-picker-native/README.md)).
 - **Cold-list hints degrade only toward visibility and older ordering** — a projection-cache miss or stale `lastPromptAt` falls back to `createdAt` unless an eligible small artifact supplies an exact fold, so a recently worked large Session may sort too low until the next checkpoint. A blank artifact larger than `coldBlankProbeMaxBytes`, or one from a backend without `locate()`, remains visible. The threshold is checked before `readFrom()` rather than enforced by persistence, so concurrent artifact growth may increase one probe's read cost without changing blankness safety. The [bounded blank-verification decision](../../../.agents/notes/implemented/bug-fix/2026-08-13-bounded-cold-blank-verification.md) owns this safety direction; an authoritative exact recency index remains scoped in the [last-activity-index proposal](../../../.agents/notes/proposed/architecture/2026-07-29-durable-last-activity-index.md).
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Request dispatch delegates to the owning session services and registered handlers; the gateway composes transport and policy without owning domain state.

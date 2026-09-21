@@ -74,6 +74,10 @@ A YAML include can deduplicate config but cannot own a bin or provide entry-poin
 
 The retry policy may repeat a failed request in a new numbered step. Retry status, provider errors, and failed partial chunks stay outside model history; each provider attempt can still incur billing, always mode has no attempt limit, entry points derive usage across every logged step, and the reconstructed request preserves the prior prefix for provider cache reuse.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The spine is a static composition list; every loaded service owns its own runtime relationships.
+
 ## Model Experience
 
 Indirectly, through the mounted child plugins, which own every model-facing behavior of the bundle.
@@ -86,7 +90,3 @@ No direct invalidation; the consumer owns any request-prefix changes.
 
 - **Most of the spine set is fixed in code** — `apply()` always mounts the core services; config can omit bundled goals, skills, bash, and task-control tools, but swapping the loop or dropping another spine member means composing a different bundle.
 - **The invariant service and companions remain fixed members** — `invariants.enabled: false` or package filters suppress checks but do not remove the service or companion registrations; Session's always-on validation and freezing are separate.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The spine is a static composition list; every loaded service owns its own runtime relationships.

@@ -177,6 +177,10 @@ entry config 与可编辑的 `llm-pi-ai` settings namespace 属于个人 Provide
 
 pi-ai 会安装多个提供方 SDK，并延迟加载 catalog 模型所选的 SDK。该可选适配器包将依赖体量隔离在自身范围内。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。提供方 profile 是逐请求解析的固定配置；除不可变路由表外，适配器不保留跨请求状态。
+
 ## 模型体验
 
 ### 经 pi-ai 的提供方请求

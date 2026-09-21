@@ -57,6 +57,10 @@ Every tool renders a `generic` card (`read` / `execute` / `delete`); `cordis_def
 
 Namespace plugin: named exports `name` / `inject` / `apply`, no default export ([docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)). It injects `tools` and `dynamicCordisRunner`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The toolset is a set of registrations over `ctx.dynamicCordisRunner`; definition and fiber state belong to the host runner.
+
 ## Model Experience
 
 ### Runtime inspection
@@ -78,7 +82,3 @@ Unchanged schemas and guidance remain prefix-stable. Query results append to his
 - **The sandbox is containment for honest code, not a security boundary** — host-realm helpers on the sandbox global are reachable, so package code can reach Node; load this plugin as deliberately as you would grant a bash tool (see § Trust stance).
 - **The `ctx` façade exposes no `effect()`** — package code cannot register a bespoke disposer; `on`/`provide`/`tools.register` are the supported cleanup paths.
 - **The vm and acknowledgement bounds belong to the runner** — see its [Known Limitations](../cordis-host-runner/README.md#known-limitations-and-deferred-work); an async host-half body escapes `vmTimeoutMs`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The toolset is a set of registrations over `ctx.dynamicCordisRunner`; definition and fiber state belong to the host runner.

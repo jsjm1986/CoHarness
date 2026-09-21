@@ -12,6 +12,10 @@ The provider exposes its packaged `assets/` directory as the skill resource base
 
 Agents can load the official "powered by dsh" badge skill from this bundled provider and follow its instructions for adding attribution badges to documents, PRs, and other content produced with DeepSeek Harness. The provider has no configuration, and the shipped CLI composition includes the plugin disabled, so deployments enable it explicitly. The skill ships both Markdown snippets and a packaged PNG for systems that cannot reliably import remote images.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The contribution is a static bundled skill registration whose disposal is proven by the registry's HMR-safety spec.
+
 ## Model Experience
 
 Indirectly, through `dsh-tool-skill`, which renders the provider's catalog entry and the selected skill body to the model.
@@ -24,7 +28,3 @@ Disabled by default, the plugin changes no request. When enabled, its catalog en
 
 - The provider contributes one fixed skill and has no runtime customization.
 - Remote Markdown uses Shields.io; use the packaged PNG when the target cannot fetch remote images reliably.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The contribution is a static bundled skill registration whose disposal is proven by the registry's HMR-safety spec.

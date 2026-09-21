@@ -74,6 +74,10 @@ The standard agent composition mounts the service and its four core stateful com
 
 Every ordinary Vitest topology mounts an explicitly enabled service and the current test package's companion. Focused suites cover valid and invalid observations for executable companions, while one exhaustive topology mounts all companions to prove registration and disposal wiring.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package is the registry that evaluates other packages' companions; it asserts no product-domain relation of its own.
+
 ## Model Experience
 
 None, as the observer validates requests but never rewrites their context.
@@ -87,7 +91,3 @@ Checks observe assembled requests and durable state without mutating request con
 - Request reconstruction covers requests explicitly marked by the loop before freezing; direct one-shot LLM calls remain outside that marker contract even when callers freeze them or attach a session id.
 - Live-only lifecycle companions cannot reconstruct operations that began before their own reload. Standard and test compositions mount them before the corresponding operations begin.
 - Regular-expression filters are fixed for the service lifetime; changing them requires ordinary Cordis plugin reload.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The package is the registry that evaluates other packages' companions; it asserts no product-domain relation of its own.

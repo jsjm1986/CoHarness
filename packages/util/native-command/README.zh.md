@@ -18,6 +18,10 @@
 import { runNativeCommand, type NativeCommandRunner } from '@deepseek-ai/dsh-native-command'
 ```
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次调用派生一个子进程并给出其捕获的输出；进程状态不会比调用活得更久。
+
 ## 模型体验
 
 无：宿主侧工具不注册任何面向模型的内容。

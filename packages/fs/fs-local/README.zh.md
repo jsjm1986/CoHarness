@@ -29,6 +29,10 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 
 包根 SDK 接口包含默认/具名 `LocalFileSystem` 类和 `Config`。原始 I/O 位于 `src/fsio.ts`（不依赖 Cordis，单独进行单元测试）；`src/index.ts` 是轻量服务接线。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每个原语委托给作为唯一权威的宿主文件系统；提供方不保留影子状态。
+
 ## 模型体验
 
 通过 `dsh-tool-fs` 间接产生影响；该消费方把本提供方带行窗口的 UTF-8 内容、变更确认与提供方消息原文渲染为有保留上限的结果，而版本、原子写入机制与目录元数据仍属内部细节。

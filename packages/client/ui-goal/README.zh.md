@@ -12,6 +12,10 @@ Goal 界面插件（浏览器端部分）：`GoalBar` 条带是 `conversation.in
 
 Web GUI 的 goal 界面同时显示持久 goal 状态及当前的进程本地激活状态，供用户编辑、暂停、恢复或清除 goal；被拒绝的变更所产生的错误会内联显示。它把持久的 `/goal` 运行显示为 `Command input` 气泡，让用户或模型发出的命令在重新加载后仍然可见。goal 创建仍不归本包。除 `minimal` 外，随附的 Web preset 都会向 agent（智能体）提供 `/goal`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。实时目标经由 `goal` session 投影到达，变更经由 `ctx.remote.goals` 进行；插件不拥有领域存储或刷新链。
+
 ## 模型体验
 
 间接影响：条带路由 `goals/edit`、`goals/pause`、`goals/resume` 与 `goals/clear` 变更；宿主 GoalService 拥有这些变更排队的模型可见 goal 上下文消息。

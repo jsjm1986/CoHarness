@@ -14,6 +14,10 @@ The `/client` exports are the plugin body (`apply`/`inject`), the `MessageFeedba
 
 This package is the Web GUI's feedback surface: the Like/Dislike pair in the finalized assistant message's action strip, the feedback dialog with its acknowledgement and failure toasts in the composer overlay, and a decoration that opens the dialog from a bare `/feedback`. Like and Dislike both open the dialog, which collects a category and an optional description before recording the selected rating. One surface per Session backs every entry, so a single list read seeds the whole transcript and one dialog serves the Session and its messages. Ratings, categories, and notes are log-only Session events that never enter model context.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Feedback records live in the Host-owned sidecar domain; the browser half renders the action strip and confirmation dialog without holding feedback state.
+
 ## Model Experience
 
 None, as ratings, categories, and notes are log-only events, not model input. Optional Session-log delivery uses request metadata rather than model context.
@@ -27,7 +31,3 @@ None; feedback mutations leave the model-visible history unchanged.
 - **Note size is a Host policy** — the deployment configures `maxNoteBytes` (8192 in the Web bundle) and the Host rejects an oversized note with `note-too-large`. The editor does not pre-check the limit, so an oversized note fails on save rather than while typing.
 - **No cross-tab push** — a second tab's rating becomes visible on reconnect or on the next conflict reply, not immediately; the sidecar publishes no live frames.
 - **Chat view only** — the trajectory and waterfall views render no feedback controls even though their assistant nodes now carry the same `messageId`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Feedback records live in the Host-owned sidecar domain; the browser half renders the action strip and confirmation dialog without holding feedback state.

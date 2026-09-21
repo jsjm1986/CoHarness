@@ -51,6 +51,10 @@ ACP requires each prompt response to carry a `stopReason`, but the bridge does n
 
 `pnpm --dir /path/to/deepseek-harness run demo:acp` boots the repository's automation server composition. A parent harness can spawn it through [`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.md); other ACP clients need only the core methods above.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The server translates each ACP frame into `ctx.agents` operations; session lifecycle stays owned by the runtime it drives, so there is no adapter-owned relation to compare.
+
 ## Model Experience
 
 ### Prompt content
@@ -87,7 +91,3 @@ Append-only through the owning tool result.
 - **Raster images and one workspace only** — image prompts require a durable store plus an exact route that declares image input; only PNG, JPEG, WebP, and GIF are accepted. Audio, embedded resources, and non-empty additional directories reject; resource links flatten to textual references rather than fetched content. Session MCP mounts are limited to ACP stdio and Streamable HTTP declarations.
 - **Committed answers only** — live progress, reasoning, tool activity, plans, titles, and usage stay off the wire.
 - **Connection-owned lifetime** — one connection releases all of its active sessions during teardown; `session/close` is available while the connection is open.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The server translates each ACP frame into `ctx.agents` operations; session lifecycle stays owned by the runtime it drives, so there is no adapter-owned relation to compare.

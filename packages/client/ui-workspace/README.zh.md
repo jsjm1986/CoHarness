@@ -30,6 +30,10 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 本包让用户浏览分组或扁平的 Session 列表、为新 Session 选择 Workspace，并通过添加、重命名、重排序、搜索、fork、归档和删除 Workspace 来管理 Workspace 与 Session。待处理交互显示为警告点，活动定时任务显示为闹钟标识，subagent 来源的 Session 则保持隐藏。规范化后仍有差异的文件夹路径会保留为独立 Workspace。添加 Workspace 需要组合目录选择器；没有目录选择器时，添加操作不可用。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。Workspace 与 Session 列表由运行时镜像与 Host 调用渲染；浏览器不拥有工作区数据。
+
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。

@@ -49,6 +49,10 @@ vm 沙箱隔离全局变量，但不是安全边界：Node 全局变量不存在
 
 服务包：默认导出 `DynamicCordisRunnerService`（服务键 `dynamicCordisRunner`），`./types` 则承载 `dynamicCordisRunner` remote namespace 与其消费方共享的载荷形状。`define`／`undefine` 的形状留在包内部，因为它们从不跨 wire。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。定义及其沙箱化 fiber 是私有注册表状态，其挂载/调用/撤回生命周期由 runner 的规格断言；不发布可独立观测的投影。
+
 ## 模型体验
 
 ### 转达给所属会话的运行结果、拒绝与诊断

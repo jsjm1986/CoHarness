@@ -30,6 +30,10 @@
 
 保留会对每个源独立应用 `maxReferenceBytes`，保留 compact 检查点与最新消息，再丢弃较旧的非检查点单元，并使用 `dsh-output-retention` 头部／尾部截断和精确 UTF-8 省略通知。如果某个源的固定序列化字段本身就超出限额，准备会以 `SESSION_REFERENCE_BUDGET_EXCEEDED` 失败，而不返回部分上下文。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。快照是委托给 `ctx.sessionQuery` 的只读视图；解析器自身不保留会话数据。
+
 ## 模型体验
 
 ### 引用会话背景

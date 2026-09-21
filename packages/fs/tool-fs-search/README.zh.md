@@ -54,6 +54,10 @@ Node 部署在受支持的 macOS、Linux 与 Windows x64/arm64 目标上获得 `
 
 搜索失败会携带由本包定义的 `SearchError`（`HarnessError` 子类），并以 `{ name, code }` 的形式呈现在 `isError` 结果上：`SEARCH_INVALID_PATTERN`（ripgrep 拒绝正则/glob）、`SEARCH_FAILED`（`rg` 启动失败、目标不可访问、信号终止、`--json` 输出格式错误）、`SEARCH_RAW_OUTPUT_OVERFLOW`（原始输出超过 `rawOutputMaxBytes`，或在请求 stdout 捕获预算后仍 lossy）和 `SEARCH_ABORTED`（协作式工具超时或调用方取消）。ripgrep 的退出语义由工具负责处理：退出 0 表示成功且有结果，退出 1 表示成功的空搜索（`No files found` / `No matches found`），只有其他退出值表示失败。模型参数错误（空白 pattern、列表值 `include`）仍是普通工具参数错误。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次调用通过 `ctx.subprocess` 派生一个 ripgrep 进程并返回其输出；索引或进程状态不会在调用后存活。
+
 ## 模型体验
 
 ### 系统提示词

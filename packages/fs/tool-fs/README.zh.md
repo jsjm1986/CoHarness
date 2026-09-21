@@ -65,6 +65,10 @@ await ctx.plugin(ToolFs)                                  // this package — re
 
 包根目录只导出 Cordis 插件约定（`name`、`inject`、`Config` 和 `apply`）。读取渲染（行窗口与输出格式化）位于 `src/read-render.ts`（不依赖 Cordis，单独进行单元测试）；`src/read.ts`/`read-image.ts`/`write.ts`/`edit.ts` 是工具执行器，`src/index.ts` 负责组合。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。这些工具对 `ctx.fs` 提供方的调用做校验、加窗口与格式化；所有文件状态属于已挂载后端。
+
 ## 模型体验
 
 ### 系统提示词

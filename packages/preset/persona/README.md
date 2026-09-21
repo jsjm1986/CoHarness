@@ -24,6 +24,10 @@ Mounting this row outside an agent scope collides with the registry's own `deplo
 
 `text` is a template, like any prompt section: complete `{{…}}` groups resolve strictly against registered prompt variables when the prompt renders, not when it assembles. Empty text still occupies the slot, so it shadows the deployment persona away entirely and then disappears at render. With `complete: true`, assembly still resolves contexts, tools, variables, and cooperative listeners, then the prompt registry restores this exact persona as the sole section; no identity, tool guidance, or listener can append prompt text. With `includeRuntimeContext: false`, context providers are not evaluated for this scope and contexts added by assembly listeners are discarded.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes one declarative composition row; the resolved prompt is owned by preset composition.
+
 ## Model Experience
 
 ### The persona section
@@ -43,7 +47,3 @@ Prefix-stable while the rendered template variables and text are unchanged. Suff
 ## Known Limitations and Deferred Work
 
 - **No global mount** — the prompt registry owns the unscoped persona slot, so this row is usable only from a scoped composition. A deployment-wide persona change belongs in the `system-prompt` row's own config.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes one declarative composition row; the resolved prompt is owned by preset composition.

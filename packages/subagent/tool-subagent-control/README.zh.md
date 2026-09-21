@@ -14,6 +14,10 @@
 
 `dsh-tool-subagent-control` 为可继续子级添加全局控制工具：`send_message` 在直接父级与子级之间进行 steering（中途引导），`interrupt_agent` 停止子级当前轮次但保留其收件箱与后代，`list_agents`（来自可单独加载的 `list-agents` 插件）按持久化 ID 与标签列出可继续子级。父级与可继续子级继承相同的 `send_message` 定义和顺序，因此模型通信不会增加子级专属工具 schema。是否加载这些工具不会决定委派工具是否启动可继续工作。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。这些控制是 `ctx.subagents` 之上的薄注册；agent 状态属于注册表及其提供方。
+
 ## 模型体验
 
 ### 工具 schema

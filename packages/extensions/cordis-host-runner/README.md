@@ -47,6 +47,10 @@ One field is all there is: a run request waits for a person, so the round trip h
 
 Service package: default-exports `DynamicCordisRunnerService` (service key `dynamicCordisRunner`), with `./types` carrying the payload shapes the `dynamicCordisRunner` remote namespace and its consumers share. The `define` / `undefine` shapes stay inside the package, because they never cross the wire.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Definitions and their sandboxed fibers are private registry state whose mount/invoke/retract lifecycle is asserted by the runner's specs; no independently observable projection is published.
+
 ## Model Experience
 
 ### Run outcomes, refusals, and diagnostics relayed to the owning session
@@ -74,7 +78,3 @@ None of its own. A host half that registers tools changes the next request's too
 - A success answer naming a superseded revision is refused (`accepted: false`) and leaves the request suspended, so the model's call ends only through a valid answer or its own cancellation. Settling it would take a fresh orchestration against the live revision, and no page does that today — the [browser half](../cordis-client-runner/README.md) does not read the ack — so in practice such a request is closed by another page's answer or by the caller's cancellation.
 - A browser half's declared `inject` is read from the plugin it returns in the page, so the announcement carries no service-declaration field at all.
 - **`zod` is a runtime dependency of the generated TypeRT faces, not of `src`.** `./typert` and `./remote` resolve to `lib/typert.*.js`, which `tsc` emits unbundled with a bare `import { z } from 'zod'`, so the package must declare it (the `@deepseek-ai/dsh-goal` precedent). `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists; a built checkout lets Knip observe the import directly. Nothing in `src` imports zod.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Definitions and their sandboxed fibers are private registry state whose mount/invoke/retract lifecycle is asserted by the runner's specs; no independently observable projection is published.

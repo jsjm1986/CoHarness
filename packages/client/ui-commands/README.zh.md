@@ -26,6 +26,10 @@
 
 键入 `/` 命令会打开已注册的弹窗、运行客户端动作、进入宿主命令的输入或直接执行，命令行不会被静默降级为普通提示词。业务包通过 `ctx.commandUi` 注册 popupSelect（`/model`、`/permission`）或 action，也可用这两种方式装饰既有宿主命令，同时保留其目录行与参数声明。空格与回车根据会话目录解析命令行：带 `input` 的宿主描述符是 `leadingInput`，注册了 `CommandUiSpec` 的是 `popupSelect` 或 `action`，其余是 `execute`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。命令目录是按会话键控的缓存，经由所属命令界面重新拉取；它镜像 host 数据而非拥有一个关系。
+
 ## 模型体验
 
 派发路径通过其触发的宿主 `command.execute` RPC 间接影响模型：每个命令 handler 的宿主包拥有任何模型可见效果（`/plan` 的 handler 翻转 plan 模式，其归属包注入 policy 段），而命令行、分离结果与所有菜单和 notice 渲染都留在客户端，永不进入会话日志。

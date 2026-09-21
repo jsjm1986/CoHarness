@@ -18,6 +18,10 @@ The `/client` exports are the plugin body (`apply`/`inject`) only; the source ob
 
 The browser plugin also registers the `skill` wire name in `ui-tool`'s keyed `tool.call.toolview` slot. A collapsed row renders the 14-pixel skill document-and-sparkle glyph, `Skill` title, separator, and requested skill name with the same neutral hierarchy as the Bash row; running calls carry the transcript shimmer, failures replace the name with the first error line, and interrupted calls use the warning state. A settled row expands as one whole-row disclosure into a bounded `Instructions` card containing the exact durable tool output, with the standard trajectory `Inspect` affordance when available. The row derives its name, lifecycle, and body only from the frozen call/result slice supplied by `ui-tool`, never from the current catalog, so replay remains stable when installed skills or their descriptions change.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Candidates are served per request by the Host skill catalog; the source registers one trigger contribution and keeps no catalog copy.
+
 ## Model Experience
 
 ### User-explicit skill invocation
@@ -39,7 +43,3 @@ Append-only: the injected message lands after the reusable history prefix. This 
 - **Result-only history pages use the generic row** — keyed dispatch needs the paired call in the runtime window; pagination that leaves the call outside has no tool identity. This client presentation feature does not extend the history wire contract to recover it.
 - **Text is the truth** — the reference is plain draft text; a hand-typed identical token is the same reference, and the host gesture boundary judges the sent text, not the menu interaction. Chip visuals derive from the lexicon scan; no occurrence identity, position tracking, or structured reference payload on the prompt wire (both are ledger items).
 - **A menu opened before the prewarm settles** shows no skill candidates for that keystroke; the next keystroke re-polls the settled cache.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Candidates are served per request by the Host skill catalog; the source registers one trigger contribution and keeps no catalog copy.

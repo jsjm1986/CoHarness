@@ -30,6 +30,10 @@ Every tool requires the exact calling `Agent`. `spawn_teammate` and `interrupt_a
 
 The plugin listens to Agent publication and installs its registrations through that Agent's scope. Fresh creation and cold resume therefore receive the same tool/prompt set before the first model request. Agent disposal and plugin HMR remove every scoped registration; reloading the plugin installs one fresh set in each still-live member without changing its continuation Activation.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter installs tool and policy registrations into team scopes; team definitions and lifecycle stay owned by `ctx.agentTeams`.
+
 ## Model Experience
 
 ### Team policy and tools
@@ -51,7 +55,3 @@ With the same provider/model, shared system policy, and tool schemas, a fork ret
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
 - **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
 - **No Web controls** — browser roster and task-board presentation is outside this runtime package.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The adapter installs tool and policy registrations into team scopes; team definitions and lifecycle stay owned by `ctx.agentTeams`.

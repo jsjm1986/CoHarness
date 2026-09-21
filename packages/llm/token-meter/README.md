@@ -58,6 +58,10 @@ The [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-proj
 
 Both plugins have usable defaults. The meter remains independent of model routing and optional compaction. A deployment configures capacity on its LLM adapter and compaction policy on `dsh-compaction-basic`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each session's fold is a deterministic derivation of the durable log that can be refolded identically, so the meter publishes no observation independent of its source.
+
 ## Model Experience
 
 Indirectly, through consumers such as `dsh-compaction-basic`; the service itself adds no prompt, message, schema, tool, or model call.
@@ -72,7 +76,3 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **Every measurement clones the current surface** — coherent immutable snapshots make reads O(surface), including below-threshold pressure checks.
 - **Provider usage is only reusable for an identical canonical envelope** — prompt, prefix, tools, provider, model, or call-config changes deliberately fall back to full heuristic estimation.
 - **Missing legacy source seqs are handled conservatively** — assistant messages without `sourceEventSeqs` cannot distinguish provider output from listener rewrites, so the fold avoids claiming a known empty or exact chunk stream.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each session's fold is a deterministic derivation of the durable log that can be refolded identically, so the meter publishes no observation independent of its source.

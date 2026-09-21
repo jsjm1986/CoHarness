@@ -15,6 +15,10 @@
 
 项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。schema 服务对 Host 拥有的文档执行水合与校验，scope 传输层转发各 namespace 分节；该层不拥有偏好值。
+
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。

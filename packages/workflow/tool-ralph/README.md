@@ -37,6 +37,10 @@ The pending call is a `generic` card titled `ralph`; the immutable objective is 
 
 All config values are normalized and validated when the plugin applies, including direct application outside Loader schema normalization. Provider capabilities are resolved immediately before each call because provider registration can change under plugin lifecycle and HMR.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run executes one foreground workflow through the engine and subagent seams; child state is owned by those services.
+
 ## Model Experience
 
 ### System prompt
@@ -95,7 +99,3 @@ Each fresh child has an independent request cache. The parent result appends aft
 - **One round is one fresh child** — there is no within-round fan-out, model/provider switching, fork context, or model-call-selected provider.
 - **Ordinary child failure is terminal for the run** — the fixed script reports the failed round and last successful handoff but does not retry; fatal workflow infrastructure failures can end before that state is returned.
 - **Only round count bounds aggregate effort** — token, price, and elapsed-time budgets are deferred.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each run executes one foreground workflow through the engine and subagent seams; child state is owned by those services.

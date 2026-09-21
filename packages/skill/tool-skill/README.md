@@ -34,6 +34,10 @@ An unresolved name reports that the skill is unknown or no longer available. Inv
 
 Tool execution does not add a synthetic context message. Its freshly loaded result is already recorded as the tool result and becomes available to the next model step without duplicating the body. Only the catalog projection adds replacement summaries.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tool and catalog read the `ctx.skills` registry; provider registration and content stay behind the seam.
+
 ## Model Experience
 
 ### Session catalog
@@ -171,7 +175,3 @@ Append-only; the injection lands after the reusable request prefix inside the st
 - **Loading is one-shot text** — there is no partial, streaming, or cached-content handle when a remote provider is slow or a skill body is large.
 - **Catalog replacement is whole-list** — one changed name or description appends every currently visible summary; this keeps stale-name retirement explicit but costs tokens proportional to the catalog.
 - **Bodies are not versioned** — body-only edits do not change the catalog digest or notify the model; a later tool call reads the current provider content while earlier tool results remain historical facts.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tool and catalog read the `ctx.skills` registry; provider registration and content stay behind the seam.

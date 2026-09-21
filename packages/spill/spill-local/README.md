@@ -31,6 +31,10 @@ One best-effort sweep starts after activation without delaying service availabil
 
 The sweep resolves filesystem identities, never follows or deletes symlinks, and skips unrelated entries. On POSIX it admits only roots and session directories owned by the current user, not writable by group or others, and protected from replacement through their ancestor path; writable sticky temporary directories such as `/tmp` are permitted. Unsafe paths produce a warning and remain untouched. Filesystem and warning-sink failures are contained, so cleanup cannot fail activation or a concurrent spill write. The [startup cleanup Agent Note](../../../.agents/notes/implemented/feature/2026-09-14-spill-local-startup-cleanup.md) records the retention decision.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each spill writes one session-scoped file that is itself the record; the backend keeps no index to compare.
+
 ## Model Experience
 
 Indirectly, through spill consumers, which render the saved file path and read/grep retrieval guidance to the model.
@@ -43,7 +47,3 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 - **No session-lifecycle deletion** — a spill file survives its session's end until the age-based startup sweep reclaims it, because persisted, resumed, and forked sessions may still reference a path; a process that never restarts never sweeps.
 - **Locators require a co-located filesystem consumer** — a remote or virtual deployment needs another `SpillStore` backend whose locator and retrieval hint are meaningful there.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each spill writes one session-scoped file that is itself the record; the backend keeps no index to compare.

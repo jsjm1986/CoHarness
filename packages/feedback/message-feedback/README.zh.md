@@ -61,6 +61,10 @@ message feedback 不是 Session 日志内容或 Session 投影。它不发出 `f
 
 Plugin disposal 会先关闭变更接纳，排空已进入各个 Session 队列的所有操作，然后才关闭 storage domain。disposal 开始后提交的变更会以生命周期故障拒绝，不会进入正在关闭的 domain。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。Sidecar 行通过其所属存储域持久化，并由同一 Remote 界面暴露；不存在第二份可能分歧的副本。
+
 ## 模型体验
 
 ### 消息反馈

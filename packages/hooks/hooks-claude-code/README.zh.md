@@ -59,6 +59,10 @@ matcher subject 是工具名称（`PreToolUse`／`PostToolUse`）、会话源（
 
 注入上下文携带显式 `{ kind: 'plugin', plugin: 'hooks-claude-code' }` 来源，因此持久消息绝不会被误认为用户提示词。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。桥接层把每次规范化拦截翻译为一次 Claude Code 钩子调用并把结果映射回来；钩子行为由规格固定，事件之间不保留关系。
+
 ## 模型体验
 
 ### Hook 提供的上下文

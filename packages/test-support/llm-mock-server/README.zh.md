@@ -75,6 +75,10 @@ pnpm run mock:llm -- \
 
 CLI 公开 `--success-text`、`--partial-text`、`--reasoning-text`、`--chunk-size`、`--chunk-delay-ms`、`--disconnect-delay-ms`、`--retry-after-ms`、`--request-id`、`--tool-name` 和 `--tool-arguments`。毫秒延迟是 Node timer 范围内的有界整数；`retryAfterMs` 还必须为正数。库接受相同的 camel-case 选项。可选的 `apiKey` 会精确验证 `Authorization: Bearer <token>`；省略时接受任何 token。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。测试夹具，其脚本化行为按到达顺序被消费；其正确性由驱动它的套件强制。
+
 ## 模型体验
 
 无。该测试服务器替代提供方协议行为，而不调用真实模型。

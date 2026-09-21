@@ -81,6 +81,10 @@ The document is `0600` under a `0700` directory, which stops other OS users — 
 
 That is discretion, not a boundary. A deployment that must keep provider keys away from its own agent cannot get there with file permissions; an OS-keychain provider — a store the model's processes cannot read at all — is the deferred answer and belongs beside this provider as a sibling package.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each resolution derives its answer from the layered sources at call time under the documented precedence; the file layer's behavior is asserted by specs and no credential cache is published.
+
 ## Model Experience
 
 Indirectly, through the consumers of `ctx.credentials`, which own any model-facing behavior a stored value enables.
@@ -95,7 +99,3 @@ No direct invalidation; stored values never enter a request prefix.
 - **A same-UID process can read the document** — see [Security boundary](#security-boundary): the file-effect sandbox modes do not deny reads, and an OS-keychain provider is deferred.
 - **Environment changes are invisible** — the snapshot is frozen at launch, so a variable exported after startup reaches neither resolution nor `describe`; changing an environment-sourced credential takes a restart.
 - **Atomic, not crash-durable** — inherited from `dsh-atomic-write`; the store re-reads on boot.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each resolution derives its answer from the layered sources at call time under the documented precedence; the file layer's behavior is asserted by specs and no credential cache is published.

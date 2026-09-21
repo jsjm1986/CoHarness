@@ -26,6 +26,10 @@
 
 控制器与监听器按注册方所在的 scope 分层，形状与 tools 注册表一致：一次注册归档到其注册上下文的 scope，一次读取则把全局层与所有者的 scope 链求并集。因此一个进程级注册表能逐所有者地回答逐所有者的问题——对自身组合未附加任何控制器的所有者，无论其他组合附加了多少，`start()` 都会拒绝并抛出 `background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)`；一次结算也只会抵达其所有者所属组合注册的监听器。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。记录是只以快照形式分发的私有内存状态，其 issue/snapshot 语义由单元规格断言；执行所有权留在 shell 与工具 seam。
+
 ## 模型体验
 
 通过生产方插件与 `dsh-tool-jobs` 间接影响模型，注册表后端把全部模型渲染委托给它们。

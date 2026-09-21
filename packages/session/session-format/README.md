@@ -25,6 +25,10 @@ The default catalog in `src/catalog-default.ts` contains the static v0 â†’ v1 â†
 
 The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remain responsible for their own raw bytes, crash-tail recovery, backups, and atomic publication.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure migration library: chains compile deterministically from the format catalog and conversion produces new generations without mutating sources.
+
 ## Model Experience
 
 ### Session restoration
@@ -44,7 +48,3 @@ No direct effect. A migration that changes current history can change the cache 
 ## Known Limitations and Deferred Work
 
 - The pre-v3 steps normalize the historical event vocabulary (legacy message payloads, `start`/`end` replace keys, turn-scoped surface events) while each provider retains its own physical codec and publication rules.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure migration library: chains compile deterministically from the format catalog and conversion produces new generations without mutating sources.

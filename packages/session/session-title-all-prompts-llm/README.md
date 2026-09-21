@@ -10,6 +10,10 @@ The plugin uses the complete required [shared LLM configuration](../session-titl
 
 `dsh-session-title-all-prompts-llm` summarizes every eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `all-prompts` cadence and starts a new revision after each new human prompt, using seeded history and child-session prompts. A newer revision aborts and supersedes older work, and even a provider that ignores cancellation cannot commit stale output. It uses the complete required shared LLM configuration from `dsh-session-title-llm`, so route, prompt, budget, and cancellation behavior cannot drift. Automatic behavior and configuration come first; the implementation is a thin registration over the shared policy.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each revision is generated through `ctx.llm` and committed through the title seam with newer revisions aborting stale work; no title state is kept outside the committed result.
+
 ## Model Experience
 
 ### All-messages title request
@@ -30,7 +34,3 @@ No main-request invalidation. Auxiliary input grows or changes after each prompt
 
 - Input overflow retains the prior title; this provider has no summarization-of-summaries or retention policy for very long sessions.
 - It treats all eligible human messages equally and offers no weighting, filtering, or manual-title precedence.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each revision is generated through `ctx.llm` and committed through the title seam with newer revisions aborting stale work; no title state is kept outside the committed result.

@@ -30,6 +30,10 @@ The context source is `{ kind: 'session-reference', version: 1, references }`; e
 
 Retention applies `maxReferenceBytes` independently to each source, keeps compact checkpoints and the newest message before dropping older non-checkpoint units, and uses `dsh-output-retention` head/tail truncation with an exact UTF-8 omission notice. If one source's fixed serialized fields cannot fit, preparation fails with `SESSION_REFERENCE_BUDGET_EXCEEDED` instead of returning a partial context.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Snapshots are read-only views delegated to `ctx.sessionQuery`; the resolver keeps no session data of its own.
+
 ## Model Experience
 
 ### Referenced session background
@@ -53,7 +57,3 @@ The request and snapshot are consecutive append-only target messages and preserv
 - **Text projection only** — non-text user and assistant blocks are not propagated across sessions.
 - **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.
 - **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Snapshots are read-only views delegated to `ctx.sessionQuery`; the resolver keeps no session data of its own.

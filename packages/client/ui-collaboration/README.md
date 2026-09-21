@@ -20,6 +20,10 @@ Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client
 - New `rw` project-session flows pass the staged visibility through `sessions/prepare-create`. Before reusing a blank candidate, `sessions/confirm-blank-reuse` revalidates its root visibility through the Gateway and accepts only an exact match; a mismatch creates a new root with the prepared visibility. HTTP responses are decoded at the browser trust boundary through a streaming 16 MiB byte budget before any state is published.
 - All registrations are effects and unload cleanly. Personal scope keeps the ordinary Web UI and clears project conversation detail state.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Collaboration truth lives on the Gateway behind authenticated endpoints; the plugin stages only request-scoped selections and composer policy in the page.
+
 ## Model Experience
 
 Indirectly, through host collaboration consumers, which own authorization and participant attribution for the state the browser UI selects.
@@ -33,7 +37,3 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Full reload on scope change** — personal and project runtimes use independent Host connections and process state, so switching does not preserve the current page draft. While the Gateway prepares the target runtime, the client shows a non-dismissible status layer with the target name, startup stage, and elapsed wait; the reload still occurs after the scope mutation succeeds.
 - **Gateway-only transport** — failed or absent `/account/api/context` hides the collaboration controls and leaves the ordinary personal Web UI available.
 - **Browser-staged creation visibility** — the next-conversation choice defaults to project-visible after a page load; it is not stored as an account preference.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Collaboration truth lives on the Gateway behind authenticated endpoints; the plugin stages only request-scoped selections and composer policy in the page.

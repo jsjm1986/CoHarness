@@ -23,6 +23,10 @@ Package reflection is keyed by `<package>#<face>`. Schemas are keyed by `<packag
 
 The `@deepseek-ai/dsh-typert-registry/types` subpath contains the pure contribution and record contracts. [`dsh-typert-loader`](../loader/README.md) discovers and registers generated host artifacts in Loader compositions; direct `ctx.typert.register()` supports other composition owners.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Contributions register atomically and withdraw with the calling fiber, so the registry's contents are exactly the live effect set proven by disposal specs.
+
 ## Model Experience
 
 None, as this runtime type registry's consumers (cordis_inspect, wire faces, gates) own any model-visible projection of registry contents.
@@ -35,7 +39,3 @@ No direct effect; a consumer that places reflection or schemas in a request owns
 
 - The registry stores generated reflection but does not merge host and client graphs or resolve TypeScript references. Those are analyzer and emitter concerns.
 - Schema keys omit the face because host and client run in separate contexts. Registering same-named schemas from both faces into one context is rejected as a duplicate.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Contributions register atomically and withdraw with the calling fiber, so the registry's contents are exactly the live effect set proven by disposal specs.

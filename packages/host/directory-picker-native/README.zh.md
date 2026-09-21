@@ -10,6 +10,10 @@
 
 坐在宿主屏幕前的操作者通过原生 OS 选择器选择工作区目录：`dsh-host-directory-picker-native` 每次选择打开一个平台目录选择器，并解析出所选绝对路径（取消时为 `null`）。macOS 驱动 `osascript`，Linux 使用 Zenity 并以 KDialog 回退，Windows 在 spawn 的子进程中打开现代 `IFileOpenDialog`。只有操作者坐在宿主屏幕前时才可用——远程部署应组合[浏览后端](../directory-picker-browse/README.zh.md)。一行组合配置还会在工作区流程中注册匹配的浏览器侧交互，因此同时选择两侧。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次 `pick` 派生一个平台选择器并给出其结果；选择器状态不会在调用后存活。
+
 ## 模型体验
 
 无。GUI 宿主的目录选择后端不注册任何面向模型的内容。

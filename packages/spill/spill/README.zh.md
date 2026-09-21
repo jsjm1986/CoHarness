@@ -32,6 +32,10 @@
 
 设计原理见[工具输出 spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)，其中说明了为什么创建操作应由运行时 spill seam 而非面向模型的 `write` 工具承担。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 声明定位符与检索提示契约；存储由后端拥有。
+
 ## 模型体验
 
 spill 消费方将后端的定位信息与取回指引渲染给模型，从而间接影响模型体验。

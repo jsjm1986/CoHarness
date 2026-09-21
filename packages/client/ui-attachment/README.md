@@ -22,6 +22,10 @@ This package renders everything the conversation UI shows about attachments: one
 
 `DropOverlay` is the full-viewport invitation shown while a file drag is over the page: illustration, title, and a limits line while drops are accepted (`disabled` swaps the blocked illustration and hides the limits line). The layer is pointer-inert — the owner's document-level drag listeners keep the enter/leave count and decide accept/reject; the overlay only shows state. It portals to the body like the lightbox.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes presentation occupants to conversation-declared slots; attachment data, loading, and callbacks arrive through the slot owner's inject face.
+
 ## Model Experience
 
 None, as the plugin only renders attachment state supplied by the conversation UI and contributes no model-visible input.
@@ -35,7 +39,3 @@ None; this package neither assembles nor sends a provider request.
 - **Images only** — non-image files have no rail card or history renderer yet; DeepSeek Chat-style file cards and upload-progress states wait until the composer accepts non-image attachments.
 - **No zoom or download in the lightbox** — the preview renders the original at fit-to-viewport size only.
 - **The lightbox does not trap focus** — it sets `aria-modal` and restores focus on close, but Tab can reach the page behind it.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The package contributes presentation occupants to conversation-declared slots; attachment data, loading, and callbacks arrive through the slot owner's inject face.

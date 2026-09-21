@@ -30,6 +30,10 @@ That exception is not just a `files` entry. The root `tsconfig.base.json` maps `
 
 The package-local `clientBundle(..., { hostPhase: true })` makes Host tsdown bundle the Host entry and the later Client tsdown bundle only the browser entry. Ordinary Client plugins remain single Client projects and produce both their Node loader entry and browser bundle during Client tsdown; do not copy this package's split merely because a package has both `src/index.ts` and `src/client/index.ts`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Every contribution is mounted through `ctx.remote.$mount()` as an effect withdrawn with the assembly fiber, and identity resolution is per-call policy over the live Agent registry.
+
 ## Model Experience
 
 None, as this BFF selects Remote application methods and forwarded events but registers nothing model-facing.
@@ -43,7 +47,3 @@ No direct effect; mounted Host capabilities own any model-visible behavior they 
 - The capability set is fixed by explicit build-time value imports; the Client does not discover the Host's active Services or Remote definitions at runtime.
 - Additional capabilities require an explicit `/remote` value import and mount in this assembly.
 - The standard Web Host supplies resume defaults and Agent-scope setup from the legacy API Proxy until that remaining BFF configuration moves into `api-remotes`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Every contribution is mounted through `ctx.remote.$mount()` as an effect withdrawn with the assembly fiber, and identity resolution is per-call policy over the live Agent registry.

@@ -62,6 +62,10 @@ The two invocation fields accept YAML booleans and the case-insensitive forms `t
 
 The catalog and body have separate lifecycles. Discovery parses frontmatter to produce the summary. Every `skill(name)` load rereads and reparses the current file, so body edits need no hash, revision, cache invalidation, or proactive model notification. A frontmatter rename between discovery and loading rejects the stale name and invalidates the provider; the next catalog observation publishes the new name.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Skills are discovered from the filesystem, which remains the only catalog authority; the provider keeps no second index to compare.
+
 ## Model Experience
 
 Indirectly, through `dsh-tool-skill`, which renders this provider's invocable names and capped descriptions into the initial or replacement catalog and a selected current instruction body plus resource-base guidance into retained tool history while paths, provider ranks, and disabled skills remain hidden.
@@ -77,7 +81,3 @@ Watcher invalidation can cause the named consumer to append a replacement catalo
 - **Malformed entries disappear with a warning** — the model catalog receives no per-skill diagnostic and cannot distinguish an absent skill from an invalid one; unexpected I/O failures preserve the last-good catalog instead.
 - **Missing-root observation polls one path segment** — roots absent at startup use `fs.watchFile` at `watchPollIntervalMs` until Chokidar can attach, trading bounded detection latency for reliable creation detection across IDE, Git, and shell workflows.
 - **No body revision protocol** — a loaded body is ordinary retained tool history; later file edits affect later calls but neither rewrite old results nor announce that the body changed.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Skills are discovered from the filesystem, which remains the only catalog authority; the provider keeps no second index to compare.

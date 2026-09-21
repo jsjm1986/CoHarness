@@ -24,6 +24,10 @@
 
 本包把 Definition、locale 字典和 `workflow-run` renderer 都注册为 Cordis effect；移除客户端 entry 会撤销三者。shipped Web bundle 在 `ui-conversation` 与 `ui-tool` 之后装配该插件。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。节点定义是对持久 `tool-workflow/*` session 事件的纯重建；除渲染出的节点外不增加状态。
+
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，只渲染持久化工作流记录，不改变模型上下文。

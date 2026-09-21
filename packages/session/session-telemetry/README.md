@@ -38,6 +38,10 @@ Only the first `assistant/chunk` of each `(turn, step)` ships; the rest are drop
 
 `SessionTelemetryRecord`: `channel` (`ledger` | `ops`), `time` (epoch ms), `severity` (pre-mapped: ERROR for `tool/result.isError`, `turn/end` error reasons, and `agent-error`; INFO for other captured records, while `sessionTelemetry/record` policies may assign WARN), identity-only `attributes` (`session.id`, `event.type`, `event.seq`, `session.format_version`, plus `session.cwd`/`session.parent_id`/`session.seed_length` when the header has them), and the complete deep-copied `event.data` as `body` — post-redaction. Operational records carry `sessionTelemetry.op` (`agent-error` | `shutdown`) and `session.id`, and deliberately NO `event.seq`/`event.type` — signals to alert on, not entries to sum; `agent-error` normalizes its arbitrary thrown value into a stable `{ name, message }` body. Delivery downstream of the handoff is the backend SDK's; duplicates remain possible (cursor-less re-adoption, SDK retries), so receivers dedupe on `(session.id, event.seq)`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Capture passes each session record to the mounted sink; batching, retry, and loss policy belong to the backend SDK, so the seam holds no telemetry relation.
+
 ## Model Experience
 
 None, as the seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.
@@ -51,7 +55,3 @@ None; the package neither assembles nor sends a provider request.
 - **Best-effort delivery** — the cursor marks handed-off, not delivered; a session torn down inside a reload window cannot be re-adopted; whatever sits in a backend queue at crash time is lost. A durable outbox (spool, per-sink cursors, at-least-once) is deferred until a deployment states a crash-loss requirement — see [the revival Agent Note](../../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md).
 - **No built-in redaction rules** — with no `sessionTelemetry/record` listener mounted, records leave the process exactly as captured, including any credentials embedded in file contents or command output; a deployment exporting to a shared collector owns its rule set.
 - **On-demand redaction uses current state** — uncaptured events exist only in the canonical session log. A later `captureSession()` deep-copies and redacts their current values with the policy mounted at that time; there is no capture-time telemetry snapshot or durable pre-capture spool.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Capture passes each session record to the mounted sink; batching, retry, and loss policy belong to the backend SDK, so the seam holds no telemetry relation.

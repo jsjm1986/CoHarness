@@ -63,6 +63,10 @@ Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilte
 
 本包没有默认导出。否则 Cordis loader 解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。子方是拥有自身组合与会话的完整对等运行时；提供方通过 stdio JSON-RPC 驱动它，不保留镜像状态。
+
 ## 模型体验
 
 ### 子 agent 请求

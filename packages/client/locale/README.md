@@ -33,6 +33,10 @@ export function apply(ctx) {
 
 The Language row follows the bound account-backed settings scope and disables selection while the first view is loading, the scope is unavailable, or its provider is read-only. A Gateway project runtime does not take ownership of this preference: the account transport persists it for the authenticated member, with a Host fallback only when the account route is explicitly unsupported. `LocaleRuntime.setLocale` applies the same writable-view guard, so programmatic callers cannot turn a disabled row into a mutation; failed writes are adopted back from the recovered value.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The active locale is one resolved value bound to the Host-owned settings namespace; provisional, saved, and pushed values follow a single precedence asserted by specs.
+
 ## Model Experience
 
 None, as the locale service is a browser-side UI plugin layer that registers nothing model-facing.
@@ -46,7 +50,3 @@ None; this package neither assembles nor sends a provider request.
 - **Some surfaces keep inline copy** — Settings rows, the sidebar, question composer, and model select use locale seats; other packages still own static text directly.
 - **Registry-held text reads its translation once** — copy captured at registration time outside the slot render path (e.g. the `/model` command description in the command registry) keeps the language it was registered under until re-registration; slot-rendered copy follows switches live.
 - **Language packs own language-specific behavior** — the registry supplies selection, persistence, browser matching, key fallback, and `<html lang>`; it does not add plural rules or bidirectional layout.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The active locale is one resolved value bound to the Host-owned settings namespace; provisional, saved, and pushed values follow a single precedence asserted by specs.

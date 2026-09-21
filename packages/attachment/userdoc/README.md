@@ -22,6 +22,9 @@ Personal and project stores are isolated runtime stores. The Gateway document br
 
 Use `dsh-userdoc` as the document seam: `ctx.userDocs` stores files and folders in the runtime's document workspace and returns references carrying real absolute paths, so the agent reads documents with its ordinary filesystem and shell tools. It is the deliberate opposite of `dsh-attachment`, whose objects stay content-addressed and invisible to file tools; images keep the attachment path while documents keep the filesystem path.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam resolves every call against the mounted backend and returns real paths; document state lives entirely behind the provider.
 
 ## Model Experience
 
@@ -37,7 +40,3 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **`list` walks one document root** — there is no index or cross-root view, so a very large workspace is scanned in full for recursive consumers.
 - **No content verification on read** — unlike the content-addressed attachment path, a document is an ordinary file that anything with filesystem access may have changed since upload, and `bytes` is the length recorded at upload time.
 - **Snapshot copies are not synchronized** — a cross-scope transfer is one-way and independent after the target file commits.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam resolves every call against the mounted backend and returns real paths; document state lives entirely behind the provider.

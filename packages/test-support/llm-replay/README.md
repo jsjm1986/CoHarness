@@ -72,6 +72,10 @@ Replay keys every call by its calling session id (`GenerateOptions.sessionId`, s
 
 Named `name` / `inject` / `Config` / `apply`, with **no default export**: the cordis Loader's `unwrapExports` does `exports.default ?? exports`, so a stray default would collapse the module to the bare function and drop the `inject` namespace (see [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter replays one fixed recorded transcript per test; no live provider relation exists.
+
 ## Model Experience
 
 None, as this keyless test adapter sends no request to a provider model; it only replays recorded assistant chunks into the test loop.
@@ -84,7 +88,3 @@ None; this package neither assembles nor sends a provider request.
 
 - **First-call-order script binding assumes sequential delegation** — a cut that runs sibling subagents concurrently would bind live sessions to recorded scripts non-deterministically; a stronger keying is deferred until such a scenario exists (`XXX(concurrent-subagents)`).
 - **Only ordinary loop chunks and marked local compaction outputs are derivable** — a pure pre-chunk throw, a cancel/hang, or an unmarked external summarizer call needs the `replay.override.json` sidecar. Replacement and patch forms affect only the primary session; child scripts still derive from their logs.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The adapter replays one fixed recorded transcript per test; no live provider relation exists.

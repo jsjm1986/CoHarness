@@ -26,6 +26,10 @@ The `/client` entrypoint exports the plugin body (`apply`/`inject`), `CommandUiR
 
 Typing a `/` command opens a registered popup, a client action, a host command's input, or direct execution; a command line is never silently downgraded to a plain prompt. Business packages register popupSelect specs (`/model`, `/permission`) or actions through `ctx.commandUi`, or decorate existing host commands with either kind while preserving their catalog rows and argument claims. Space and Enter resolve the line against the session's directory: a host descriptor with `input` is `leadingInput`, a registered `CommandUiSpec` is `popupSelect` or `action`, and everything else is `execute`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The command directory is a session-keyed cache refetched through the owning command surface; it mirrors host data rather than owning a relation.
+
 ## Model Experience
 
 Indirectly, through the host `command.execute` RPC they trigger, each command handler's host package owns any model-visible effect (the `/plan` handler flips plan mode, whose owning package injects its policy section), while the command line, the detached result, and every menu and notice rendering stay client-side and never enter the session log.
@@ -37,7 +41,3 @@ None directly; this package neither assembles nor sends a provider request. Comm
 ## Known Limitations and Deferred Work
 
 - **Detached-result notices fall back to the console off-session** — the fire-and-forget paths route results to the triggering session's composer via `SessionInput.notify`; after session teardown the console line is the only remaining surface.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The command directory is a session-keyed cache refetched through the owning command surface; it mirrors host data rather than owning a relation.

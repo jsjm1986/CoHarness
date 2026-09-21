@@ -81,6 +81,10 @@
 
 从 `dsh-session` 重新导出：`SessionHeader`（不可变会话元数据：`version`、`id`、`createdAt`、`cwd?`、`parentSession?`、`seedLength?`、`origin?`、`delegationDepth?`、`draft?`）。后端提供 `SessionPersistenceSnapshot.content` 时，它携带供冷列表投影使用的 `blank`、`visibleContentSeq` 和 `lastPromptAt`。`SessionLocation` 是 `{ readonly kind: string; readonly path: string }`；其 path 是绝对后端目标，不证明产物已存在或包含未 flush 轮次。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。写协调器的每会话控制器是私有串行化状态；持久事实是已存储日志，批处理、修复与收养由协调器规格断言。
+
 ## 模型体验
 
 ### 恢复的对话历史

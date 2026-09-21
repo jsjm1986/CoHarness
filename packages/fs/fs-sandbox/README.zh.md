@@ -26,6 +26,10 @@
 
 拒绝是结构化 `FsError`（`FS_SANDBOX_DENIED`，携带有效模式），不通过 stderr 文本推断（不同于 bash 的内核拒绝），因为进程内围栏准确知道自己拒绝了什么。面向模型的 `[sandbox: file access denied under <mode> mode]` 标记以及唯一一次获批的更宽权限重试位于工具层（`dsh-tool-fs`），与 bash 完全相同。见[跨能力族 fs 沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。围栏是针对注入策略的逐次调用模式检查；存储机制继承而来，文件系统保持权威。
+
 ## 模型体验
 
 ### 文件系统策略与拒绝

@@ -39,6 +39,10 @@ Complete and blocked also accept the exact current goal round: a goal-sourced `u
 
 The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools are registrations over `ctx.goals`; goal state is owned by the goal domain.
+
 ## Model Experience
 
 ### System prompt
@@ -82,7 +86,3 @@ Schemas are prefix-stable while their definitions and visibility are unchanged. 
 - **No scheduling or direct human rendering** — these tools mutate state only; the same-session driver and [`dsh-command-goal`](../command-goal/README.md) are independent consumers of the same domain.
 - **Goal-round authority requires a driver** — the autonomous `complete`/`blocked` path is dormant unless a continuation driver admits goal-sourced user turns; mounting this tool package alone does not create them.
 - **Prompt registration is independent of filtering** — a scope may hide the tools while retaining their guidance unless the deployment scopes both registrations together.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tools are registrations over `ctx.goals`; goal state is owned by the goal domain.

@@ -29,6 +29,10 @@ fork 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: 
 | `providerName` | `ctx.subagents` 上的注册表名称（默认 `fork`）。 |
 运行生命周期、模型继承与深度跟踪均为共享行为，见 [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。所有运行机制位于共享的进程内驱动器中；提供方只贡献带种子会话的 fork 入口。
+
 ## 模型体验
 
 ### 子 agent 历史与包络

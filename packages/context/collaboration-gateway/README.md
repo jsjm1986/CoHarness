@@ -17,6 +17,10 @@ Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-coll
 - Project root creation requires `rw` membership and runs under the requested visibility. Personal creation passes through without project metadata.
 - Disposing the provider aborts its lifetime signal and makes every captured authority fail closed before another request.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Participant and ACL answers are validated per request against authenticated Gateway endpoints; no account state is held locally.
+
 ## Model Experience
 
 Indirectly, through dsh-collaboration-context, which owns model-visible participant attribution for the operations this provider authorizes.
@@ -30,7 +34,3 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Gateway availability is authoritative** — a project operation is denied when the internal authorization request fails or returns invalid JSON; there is no stale local ACL cache.
 - **Per-operation authorization traffic** — session actions and visibility filtering may issue loopback requests; batching exists only for readable session ids.
 - **No offline project mode** — project runtimes cannot continue collaboration authorization after the Gateway or provider becomes unavailable.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Participant and ACL answers are validated per request against authenticated Gateway endpoints; no account state is held locally.

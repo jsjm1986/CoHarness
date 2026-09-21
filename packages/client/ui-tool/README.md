@@ -42,6 +42,10 @@ This package currently owns the generic fallback and the built-in shell/pwsh, re
 
 Card-specific limits and fallback rules remain in the owning [terminal](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.md), [diff](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.md), [read](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.md), [search](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.md), and [web](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md) notes.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Call/result pairing, lifecycle, and `subCalls` projection stay authoritative in the Runtime; the package renders dispatched blocks and registers tool-view slots.
+
 ## Model Experience
 
 None, as the package is a browser-side tool presentation layer that renders logged calls without changing model context.
@@ -55,7 +59,3 @@ None; this package neither assembles nor sends a provider request.
 - The Host excludes `run_code` from PTC mode program bindings, so production events produce one dispatch level; the recursive Runtime/UI contract supports nesting.
 - First-party Tool views are colocated here and can move to their owning business packages independently through the keyed slot.
 - Tool copy reuses the `ui-conversation` locale namespace. Ask-user transcript pairing is best-effort: ambiguous or mixed payloads remain generic so no diagnostic block is discarded.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Call/result pairing, lifecycle, and `subCalls` projection stay authoritative in the Runtime; the package renders dispatched blocks and registers tool-view slots.

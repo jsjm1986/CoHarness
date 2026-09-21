@@ -26,6 +26,10 @@ The fence is a check in TRUSTED code over a MODEL-CONTROLLED path — the operat
 
 A denial is a structured `FsError` (`FS_SANDBOX_DENIED`, carrying the effective mode) — no stderr text inference (unlike bash's kernel denials), because an in-process fence knows exactly what it refused. The model-facing `[sandbox: file access denied under <mode> mode]` marker and the one-approved-wider retry live in the tool layer (`dsh-tool-fs`), exactly as bash's do. See [the cross-family fs sandbox Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The fence is a per-call mode check against the injected policy; storage mechanics are inherited and the filesystem stays authoritative.
+
 ## Model Experience
 
 ### Filesystem policy and refusals
@@ -47,7 +51,3 @@ A standing-policy change appends an owner-rendered superseding runtime-context s
 - **A policy fence, not a kernel boundary** — the check is trusted code over a model-controlled path, so the residual resolve-to-syscall TOCTOU is narrowed (by the in-place re-canonicalization) but not eliminated; adversarial host processes are out of scope. Kernel-grade isolation of untrusted code stays `ctx.shell`'s.
 - **Fence-vs-runner parity is derived from one owner** — the writable set comes from `writableRoots`, shared with the Seatbelt profile; a runner profile that defines its writable set elsewhere would drift.
 - **Requires `ctx.sandboxPolicy`** — tools use it to resolve each session policy and the backend uses it for agentless-call fallbacks; the backend does not confine without it composed.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The fence is a per-call mode check against the injected policy; storage mechanics are inherited and the filesystem stays authoritative.

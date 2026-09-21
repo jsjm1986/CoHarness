@@ -60,6 +60,10 @@ Setting the default writes the `agent-presets` settings namespace, which the hos
 
 A deployment that composes no presets answers with an empty roster, and the row, the chip, the label, and the section all render nothing — every session then shares the host composition, and there is nothing to choose between or manage. A deployment that configures no writable root answers `authorable: false`, and the section stays a read-only browser: the shipped compositions still open in the viewer, but every copy action is disabled with the reason as its tooltip rather than offering a dialog whose create always fails.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The surfaces read and mutate the Host-owned preset roster through settings and remote calls; the plugin contributes slot occupants and keeps no preset data of its own.
+
 ## Model Experience
 
 Indirectly, through the preset a later session is composed from; the preset it selects owns every model-facing effect.
@@ -73,7 +77,3 @@ No direct invalidation. Changing picker visibility or the default does not alter
 - **A preset without metadata is listed by id** — display text is optional, and a copy given no name deliberately falls back to its directory name rather than presenting itself identically to its source.
 - **A revealed path is display text, not a link** — where the host has no desktop opener the row shows the directory to copy by hand; the browser cannot open a host filesystem location itself.
 - **Composition edits are invisible to the page** — the files are edited outside the browser and nothing on the wire announces a file change, so the roster re-reads on its own actions, `settings/changed`, and `connection/reset`, not on every disk edit.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The surfaces read and mutate the Host-owned preset roster through settings and remote calls; the plugin contributes slot occupants and keeps no preset data of its own.

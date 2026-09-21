@@ -10,6 +10,10 @@ Browse primitives fail with the typed `DirectoryPickerError` (`directory-unreada
 
 The web GUI lets an operator choose a workspace directory with either an OS chooser or an in-app browser. Use the native option when the operator can reach the host display; use the browser option for remote clients or when directory listing and creation must stay in the app. Consumers receive the interaction kind and can present the matching workflow. Directory picking is limited to the GUI host and never affects the agent loop. The browser workflow exposes one directory tree at a time; multiple roots are unsupported.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam declares the capability union; backends own their interaction and process state.
+
 ## Model Experience
 
 None, as the GUI-host picking seam registers nothing model-facing.
@@ -21,7 +25,3 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **No multi-root support** — the browse contract exposes one ancestry chain per listing; per-deployment root scoping (and Windows drive-root enumeration above a drive) waits for a consumer that needs it, per the DirectoryPicker Agent Note.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The seam declares the capability union; backends own their interaction and process state.

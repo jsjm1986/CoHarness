@@ -25,6 +25,10 @@ import { bytesToBase64, randomUUID, type Uuid } from '@deepseek-ai/dsh-util-cryp
 | `bytesToBase64(data)` | Canonical base64 encoding in bounded chunks. |
 | `Uuid` | Five-group UUID string type. |
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure library owning no event stream or mutable runtime data; its encoding algebra is enforced by unit tests.
+
 ## Model Experience
 
 Indirectly, through consumers that mint request, session, and attachment identifiers with it, none of which enter prompts as semantic content.
@@ -37,7 +41,3 @@ No direct invalidation; identifier-minting consumers own any request changes.
 
 - **v4 only** — namespaces and other UUID versions are outside this utility.
 - **Probabilistic uniqueness** — collision detection remains the consumer's responsibility.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. A pure library owning no event stream or mutable runtime data; its encoding algebra is enforced by unit tests.

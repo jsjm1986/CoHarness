@@ -23,6 +23,10 @@ interface Config {
 }
 ```
 
+## Invariants
+
+**Runtime invariant:** No companion is published. All records live in the single database file the backend opens; there is no shadow state.
+
 ## Model Experience
 
 ### Stored domain records
@@ -45,7 +49,3 @@ None — the backend never touches live request prefixes.
 - **No busy-wait or retry policy** — another connection holding a write transaction rejects the operation immediately; there is no multi-process write protection.
 - **Only the current `STORAGE_SQLITE_SCHEMA_VERSION` opens** — any other stamped version is rejected rather than migrated (pre-release stance).
 - **`openDatabase` duplicates the session-persistence SQLite open sequence** — extraction into a shared media layer is deferred to the planned session-backend migration (see the Agent Note's reuse audit).
-
-## Invariants
-
-**Runtime invariant:** No companion is published. All records live in the single database file the backend opens; there is no shadow state.

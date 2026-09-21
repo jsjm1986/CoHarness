@@ -58,6 +58,10 @@ export async function runWithDeadline(upstream: AbortSignal | undefined, timeout
 
 本地文件 `read`/`write`/`edit` 不接受 `timeoutMs`：文件 IO 不设时限地运行，因为截止时间会中止操作系统仍会完成的工作。详见[文件系统子系统页面](../../../docs/subsystems/filesystem.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。零依赖纯库；信号与分类代数由单元规格强制。
+
 ## 模型体验
 
 通过渲染超时结果的超时消费方间接影响模型。

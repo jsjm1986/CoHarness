@@ -14,6 +14,10 @@ Escape closes the list and returns focus to the trigger, as does a pointer press
 
 This package renders the background-job surface of the Web GUI: a session-header action that opens a popover listing the jobs this session can see. It reads host-computed registry state through the runtime's `jobsBySession` mirror and issues no RPC of its own. The trigger appears only when the session has at least one job, with a badge counting running and stopping jobs; settled rows stay visible and de-emphasized until the registry drops them. The model's own view of the same jobs belongs to `dsh-tool-jobs`; this package is a read-only projection for the human.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Job records arrive entirely through the runtime's `jobsBySession` mirror; the package issues no RPC and holds only popover visibility.
+
 ## Model Experience
 
 None, as this package renders host-computed registry state for a human and touches no prompt, message, schema, stream, or tool result.
@@ -26,7 +30,3 @@ None; the package never assembles or sends provider requests.
 
 - **Rows are read-only** — a job's streamed output and a human-initiated cancellation are separate phases. Cancellation additionally owes a model-facing decision the seam does not answer today: `kill()` marks terminal delivery reported, so an interrupt written against the current contract would leave the model believing its job is still running.
 - **The list is not the registry's own set** — it shows what one session can see through the wire view, so a job owned by another session never appears here, and a process restart empties the list while the transcript keeps the `run_in_background` cards that started those jobs. An unowned job (one started without a live `Agent`) is the opposite case: it reaches every session's list, matching what `list(caller)` reports to every caller.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Job records arrive entirely through the runtime's `jobsBySession` mirror; the package issues no RPC and holds only popover visibility.

@@ -42,6 +42,11 @@ kind: "package-reference"
 版本 1 的 `dsh_plugin_packages` 字段只包含 `{ name, version }` 对。系统会排除禁用、pending、failed、disposed、unloading 状态，结构性 `cordis:` 配置项，普通依赖，没有所属包身份的松散文件，以编程方式挂载的子 fiber，以及内存动态插件。
 
 <a id="model-experience"></a>
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。`dsh_plugin_packages` 字段按请求从实时 Loader 清单计算；不保留清单副本。
+
 ## 模型体验
 
 ### 包清单元数据

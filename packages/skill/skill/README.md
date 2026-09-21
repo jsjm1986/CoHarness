@@ -67,6 +67,10 @@ Definitions remain progressively loaded. `get()` asks the winning provider for t
 
 The registry does not render model guidance or register model-facing tools. [`@deepseek-ai/dsh-tool-skill`](../tool-skill) consumes `ctx.skills` to provide durable session catalogs and the `skill` tool, so providers remain independent of model-facing behavior.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The registry is a contribution table over provider registrations with effect-scoped disposal; it owns no skill content.
+
 ## Model Experience
 
 Indirectly, through `dsh-tool-skill`, which renders provider summaries into durable initial or replacement catalog messages and loaded instruction bodies into retained tool results.
@@ -81,7 +85,3 @@ No direct prompt effect. The named consumer owns the durable initial catalog and
 - **Providers are queried sequentially** — one slow cooperative provider delays every provider registered after it; cancellation stops the caller's wait but cannot terminate work an uncooperative provider keeps running.
 - **Incomplete observations are not retained** — rejected providers are omitted and explicitly supplied candidates remain available only to the current lookup; the registry owns neither a last-good catalog nor per-provider diagnostics.
 - **Duplicate resolution is first-wins** — later lower-priority candidates within a layer are logged and hidden, and a nearer layer shadows a farther one silently; there is no API to inspect all shadowed definitions.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The registry is a contribution table over provider registrations with effect-scoped disposal; it owns no skill content.

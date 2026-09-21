@@ -43,6 +43,10 @@
 
 导出的 `parseExitStatus`（连同 `ParsedExitStatus`）是 shell 工具共享渲染约定的另一半：`dsh-tool-bash` 的 `renderResult` 与 `dsh-tool-pwsh` 的 `renderPwshResult` 追加的 `[exit code: N]`／`[killed by signal: X]` marker 的逆解析。两个工具的 `presentResult` 都用它把渲染文本拆成 terminal 卡的输出正文与其退出状态 pill；它放在 Service Definition 中，两个工具便永远不会在 marker 约定上漂移。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 定义执行器契约；job id、所有权与取消属于通用 `ctx.jobs` 运行时。
+
 ## 模型体验
 
 通过 `dsh-tool-bash` 间接影响；该工具会将执行器输出与沙箱事实转为指引和保留的工具结果 token。

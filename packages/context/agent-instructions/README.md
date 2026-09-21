@@ -81,6 +81,10 @@ Rendering preserves the most specific instruction files first. It drops whole br
 
 Instruction content is read through `streamText()` under `maxSourceBytes`, even when provider metadata omits size or a file grows after its metadata probe. An oversized file is ignored; during dynamic reconciliation it is temporarily unavailable rather than removed. The plugin keeps no process-wide cache and never caches instruction prose. Its session-local scope cache uses provider versions only as a fast invalidation signal; after invalidation, SHA-1 over the bounded read remains the cross-provider content identity stored in the structured message source.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The injected chain is committed into durable history and later discoveries are derived from the session's own tool calls and `fs/*` events; no separate mutable record is kept.
+
 ## Model Experience
 
 ### Baseline context
@@ -171,7 +175,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Per-directory dedup is content-based** — sibling candidates collapse only when byte-identical after trimming leading and trailing whitespace; a `CLAUDE.md` that symlinks its sibling `AGENTS.md` resolves to the same content and collapses like any duplicate, while a distinct real copy that has drifted from `AGENTS.md` loads in full alongside it.
 - **Symlinked instruction files are followed across the trust boundary** — a candidate whose final component is a symlink is resolved and its target loaded, so a cloned repository can surface off-tree file content as lower-authority workspace guidance (it never overrides system, developer, or direct user instructions). Confine `ctx.fs` with the filesystem policy gate or an OS sandbox when loading untrusted repositories.
 - **Instruction content is bounded, not summarized** — over-budget broad files are omitted and the most-specific file may be truncated; the plugin never asks a model to compress instruction prose.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The injected chain is committed into durable history and later discoveries are derived from the session's own tool calls and `fs/*` events; no separate mutable record is kept.

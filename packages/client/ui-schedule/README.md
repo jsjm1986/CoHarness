@@ -26,6 +26,10 @@ This optional browser plugin renders the current Session's active Schedule remin
 
 The component consumes `useSession` and `useProjection('schedule')`; it does not inspect Host services directly. Placement uses the shared `useAnchoredPosition` and `useDismissOnOutsidePointer` primitives, including the portaled panel reference.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Reminder state is owned by the Host schedule plugin and its session frames; this surface renders the trigger only when a session already reports active reminders.
+
 ## Model Experience
 
 None, as this package renders a completed client projection for a human and never changes prompts, messages, schemas, streams, or tool results.
@@ -39,7 +43,3 @@ None; the package never assembles or sends provider requests.
 - The catalog is read-only; Schedule creation and cancellation remain model/tool operations.
 - Local and relative times follow the viewing browser's locale, time zone, and clock.
 - Only active records are shown; delivery history remains in the transcript.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Reminder state is owned by the Host schedule plugin and its session frames; this surface renders the trigger only when a session already reports active reminders.

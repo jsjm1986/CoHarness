@@ -48,6 +48,10 @@ Initialization advertises `general.positionEncodings: ['utf-16']`, `workspace: {
 
 The provider trusts its configured server and claims no sandbox confinement. It delegates canonical identity, containment, regular-file streaming, UTF-8 validation, and file-URI encoding to `ctx.fs`; it rejects missing, non-regular, non-UTF-8, oversized, or canonically out-of-workspace query sources before server startup. Containment is evaluated before the stream opens and does not promise stable-handle identity across concurrent path replacement. Result locations may be external, but an external path cannot become a query source. A deployment must mount filesystem and subprocess providers for the same execution world; split-world composition is invalid.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each registered provider owns one language-server child through `ctx.subprocess`; lifecycle and isolation are covered by provider specs and the plugin keeps no cross-server state.
+
 ## Model Experience
 
 Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results while this host contributes no prompt or schema itself.
@@ -62,7 +66,3 @@ No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
 - **Transient-open compatibility floor** — servers whose synchronization omits open/close (or advertise `None`) are unsupported even if closed-document queries would work; the pinned TypeScript e2e establishes one compatibility floor, not a cross-language claim.
 - **Per-server/workspace serialization latency** — parallel agents sharing one server and workspace queue behind one process; long-lived workspace processes consume memory until disposal.
 - **A hard-killed harness orphans language servers** — `initialize.processId: null` removes server-side client-PID monitoring, so servers are cleaned only by graceful service disposal; a SIGKILL'd harness leaves them running until they exit on their own.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each registered provider owns one language-server child through `ctx.subprocess`; lifecycle and isolation are covered by provider specs and the plugin keeps no cross-server state.

@@ -12,6 +12,10 @@ Behavior facts: listings return **directories only**, name-sorted, with symlinks
 
 Users who cannot reach an OS chooser still pick a workspace directory through `dsh-host-directory-picker-browse`: it provides one-level directory listing and child-directory creation over Node's standard library, and nothing renders on the host display — so it serves the remote clients the native backend cannot reach. Listings return directories only, name-sorted, with symlink-to-directory following and a host-owned `hidden` flag; creation is non-recursive and validates a single path segment. One composition row also fills the workspace flow's directory holes with the in-app **Select Workspace Directory** dialog.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Listing and creation are stateless stdlib operations answered per call; the backend keeps no session state.
+
 ## Model Experience
 
 None, as the GUI-host picking backend registers nothing model-facing.
@@ -25,7 +29,3 @@ None; this package neither assembles nor sends a provider request.
 - **Windows hidden attribute is not read** — Node dirents do not expose `FILE_ATTRIBUTE_HIDDEN`, so `hidden` means dot-prefixed on every platform until a native probe is worth its cost.
 - **No drive-root enumeration** — on Windows the ancestry stops at the drive root; crossing drives waits for the browser UI's path-entry affordance rather than an enumeration primitive here.
 - **Grants-file fence is UX scoping** — `workspace.create` still accepts arbitrary paths. The browse fence only shapes the in-app directory dialog and existing-workspace picks; [dsh-directory-guard](../../../plugins/dsh-directory-guard/README.md) and, on Linux, the systemd mount namespace remain the security boundary. Without a grants file (or with no valid paths) listing still starts at the OS home across the filesystem.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Listing and creation are stateless stdlib operations answered per call; the backend keeps no session state.

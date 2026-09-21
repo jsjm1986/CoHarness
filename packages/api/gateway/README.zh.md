@@ -28,6 +28,10 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 生成的声明合并通过共享的 `TypertClientRemote` 约定提供 TypeScript API。Client 入口不包含 Host 服务或 Host Cordis 接口合并；方法查找和调用使用普通对象与函数，而不使用 JavaScript Proxy。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次调用都在调用时解析实时的描述符、业务 Service 与编解码器；网关不保留任何可能与已注册贡献产生分歧的按端点状态。
+
 ## 模型体验
 
 无，因为该包分发应用调用，不注册任何提示词、工具或会话事件。

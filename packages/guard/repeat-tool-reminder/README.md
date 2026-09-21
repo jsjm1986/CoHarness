@@ -38,6 +38,10 @@ The chain key is `(tool name, canonical arguments)` — canonicalization is a de
 
 Reminders ride the post-execute decision's `additionalContexts` (source `{kind: 'plugin', plugin: 'repeat-tool-reminder'}`), never a `content` replacement: the `tool/result` event stays the tool's own output for audit. The loop buffers the context and appends it as an injected `user/message` after the step's tool results, which the session renders as a plain synthetic user message — so the reminder is model-visible, source-attributed, and reconstructable from the session log with no new session event. The guard always delegates via `next()` and prepends its reminder to the downstream decision's context array (both variants — a blocked call still gets the nudge); every entry retains its own source and metadata.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Run counters are advisory bookkeeping derived from the live call stream and reset with it; the injected reminder is the only observable output.
+
 ## Model Experience
 
 ### First-threshold context message
@@ -92,7 +96,3 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No subagent chain-sharing** — chains stay isolated per agent; a parent and its subagent repeating the same call never combine.
 - **Legitimate idempotent polling still draws nudges** past the thresholds — the pressure valves are `thresholds`/`exclude` config.
 - **Past the highest threshold a chain goes silent** — reminders fire only at exact configured counts, never beyond them.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Run counters are advisory bookkeeping derived from the live call stream and reset with it; the injected reminder is the only observable output.

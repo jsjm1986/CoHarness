@@ -12,6 +12,10 @@ The `/client` exports are the plugin body (`apply`/`inject`), the `GoalBar`/`Goa
 
 The Web GUI goal surface shows both the durable goal state and its current process-local activation, and lets users edit, pause, resume, or clear the goal; rejected changes appear inline. It displays durable `/goal` runs as `Command input` bubbles so commands from users or the model remain visible after reload. Goal creation remains outside this package. Shipped Web presets other than `minimal` make `/goal` available to agents.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The live goal arrives through the `goal` session projection and mutations go through `ctx.remote.goals`; the plugin owns no domain store or refresh chain.
+
 ## Model Experience
 
 Indirectly, through the `goals/edit`, `goals/pause`, `goals/resume`, and `goals/clear` mutations the strip routes; the host GoalService owns the model-visible goal context message those mutations queue.
@@ -23,7 +27,3 @@ None unless the queued goal context is admitted. An admitted context extends the
 ## Known Limitations and Deferred Work
 
 - **Durable phase only** — the projection omits process-local activation, so the strip cannot distinguish an active-but-disarmed goal from an armed one; resume re-arms through the RPC side. There is no host-live activation channel.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The live goal arrives through the `goal` session projection and mutations go through `ctx.remote.goals`; the plugin owns no domain store or refresh chain.

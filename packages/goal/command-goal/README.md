@@ -40,6 +40,10 @@ The producer injects `commands` and `goals`. A custom app mounts their owners pl
 
 The shipped `dsh` base enables the persisted-goal stack and this command; the Web client provides its interactive adapter. The ACP automation app enables the domain and model tools without a command adapter; `goals: false` removes that stack. The UI-less `agent-spine-demo` requires an explicit `goals: {}` so headless one-shot callers do not silently change from one physical turn to a multi-round operation.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The command is one registration delegating to the `ctx.goals` domain; goal state is not held here.
+
 ## Model Experience
 
 ### Human `/goal` control
@@ -62,7 +66,3 @@ Command discovery, mutations, and direct output do not affect the cache. Later c
 - **No per-command round-cap argument** — `defaultMaxGoalRounds` remains deployment config, while a direct human request may ask the model to edit `max_goal_rounds` through the separately authorized goal tool.
 - **No continuous status widget** — bare `/goal` is the portable observation API; adapter-specific badges and reconnectable command output remain future UI work.
 - **Web command adapter only in the shipped apps** — headless, ACP automation, and JSON-RPC adapters do not consume `ctx.commands`. Ordinary prompts can still authorize model-facing goal tools when those are composed.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The command is one registration delegating to the `ctx.goals` domain; goal state is not held here.

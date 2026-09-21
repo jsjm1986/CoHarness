@@ -26,6 +26,10 @@ kind: "package-reference"
 
 组件通过 `useSession` 与 `useProjection('schedule')` 读取数据，不直接检查 Host 服务。定位复用共享的 `useAnchoredPosition` 与 `useDismissOnOutsidePointer` 原语，包含 portal 弹层的 ref。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。提醒状态由 Host schedule 插件及其会话帧拥有；此界面只在会话已报告活动提醒时渲染触发器。
+
 ## 模型体验
 
 无，因为本包只为人类渲染已经完成的客户端 projection，从不改变提示词、消息、schema、流或工具结果。

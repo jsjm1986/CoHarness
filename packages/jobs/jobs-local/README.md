@@ -26,6 +26,10 @@ Settlement is first-wins: the earliest terminal outcome — producer settlement,
 
 Controllers and listeners are layered by the scope that registered them, in the tools-registry shape: a registration files into its registering context's scope, and a read unions the global layer with the owner's scope chain. One process-wide registry therefore answers per-owner questions per owner — `start()` refuses `background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)` for an owner whose own composition attaches none, however many other compositions attach theirs, and a settlement reaches only the listeners its owner's composition registered.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Records are private in-memory state handed out only as snapshots, with issue/snapshot semantics asserted by unit specs; execution ownership stays with the shell and tool seams.
+
 ## Model Experience
 
 Indirectly, through producer plugins and `dsh-tool-jobs`, to which the registry backend delegates all model rendering.
@@ -38,7 +42,3 @@ No direct invalidation; the named consumers own any request-prefix changes.
 
 - **Jobs are process-local** — records die with the harness process; durable or cross-restart execution needs a separate backend implementing the seam.
 - **A silently ineffective cancel can stall teardown and hold capacity** — if `cancel` returns without settling `done`, the registry cannot distinguish it from a slow stop; the job keeps one bucket slot for the rest of the service lifetime, and only an explicit throw can be force-failed safely.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Records are private in-memory state handed out only as snapshots, with issue/snapshot semantics asserted by unit specs; execution ownership stays with the shell and tool seams.

@@ -24,6 +24,10 @@ The tool requires the workspace root from the session `header.cwd`, with no fall
 | `maxResultChars` | `16000` | Largest complete rendered result, including truncation metadata. |
 | `timeoutMs` | `60000` | Tool-call timeout budget, enforced by `dsh-tool-call-timeout-policy`; covers the complete queued open/query/close lifecycle and is not model-configurable. |
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tool validates, converts, and bounds each request against `ctx.lsp`; provider state stays behind the seam.
+
 ## Model Experience
 
 ### System prompt
@@ -92,7 +96,3 @@ None; UI presentation is outside the model request.
 
 - **UTF-16 cursor coordinates** — columns are exact for the protocol but hard for a model to count around non-BMP characters; an off-symbol position may return empty results, so the prompt explains the convention without encouraging broad LSP use ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md)).
 - **No cross-server completeness promise** — supported servers may return empty or partial results depending on indexing readiness; the tool promises no completeness across languages or servers.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The tool validates, converts, and bounds each request against `ctx.lsp`; provider state stays behind the seam.

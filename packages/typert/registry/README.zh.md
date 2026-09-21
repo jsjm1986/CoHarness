@@ -23,6 +23,10 @@
 
 `@deepseek-ai/dsh-typert-registry/types` 子路径包含注册项和记录的纯类型约定。[`dsh-typert-loader`](../loader/README.zh.md) 会在 Loader 组合中发现并注册生成的宿主侧产物；其他组合所有者可以直接调用 `ctx.typert.register()`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。贡献原子地注册并随调用 fiber 撤回，因此注册表内容恰好是释放规格所证明的实时 effect 集。
+
 ## 模型体验
 
 无，因为该运行时类型注册表的消费方（cordis_inspect、wire faces、门禁）拥有注册表内容的任何模型可见投影。

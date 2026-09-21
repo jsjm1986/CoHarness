@@ -55,6 +55,10 @@ The plugin copies frozen session events into one write handle per live session. 
 
 Plaintext body reads scan bounded byte windows and retain decoded events without a complete raw-file buffer. They check cancellation between reads and retry changed revisions. Successor publication rechecks the source revision after writing the temporary file; a changed or missing source refuses publication. Successors are encoded in bounded batches with cancellation checks between events and writes. Compressed reads and logical preparation still retain complete input or event arrays.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each session is one append-only log whose lifecycle is covered by the shared coordinator specs; the backend adds only byte-level storage.
+
 ## Model Experience
 
 ### Resumed conversation history
@@ -79,7 +83,3 @@ JSONL storage does not mutate live request prefixes. A resumed loop can reuse pr
 - **Nothing deletes session files** — logs accumulate under `root` until removed externally (the seam has no deletion API).
 - **One live writer per session** — a write handle holds a kernel lease on `<root>/.locks/<id>.lock` for its whole life (non-blocking POSIX `flock`; a named kernel semaphore on Windows), so a second backend instance or process fails write-open with `SessionAlreadyOwnedError` until the owner releases or its process exits. A live but wedged holder keeps blocking until it exits — removing the lock file is the explicit POSIX forfeit — and advisory `flock` is unreliable on NFSv3, where exclusion degrades to in-process. Initial same-id publication remains collision-safe through the POSIX no-overwrite hard link or Windows write-through rename without replacement.
 - **POSIX materialization requires hard-link support** — first append uses `link()` so same-id races fail instead of overwriting a committed log; Windows uses write-through rename without replacement.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Each session is one append-only log whose lifecycle is covered by the shared coordinator specs; the backend adds only byte-level storage.

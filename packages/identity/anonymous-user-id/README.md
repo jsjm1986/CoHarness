@@ -18,6 +18,10 @@ Reads and writes are synchronous because both boot-time telemetry construction a
 
 This package is a shared library, not a Cordis plugin. Consumers import `getOrCreateAnonymousUserId()` directly. Its invariant companion is intentionally empty because the package owns no event stream or public mutable relation that can be checked without creating the identity as a side effect. `DSH_TELEMETRY_DISABLED` stops telemetry export only; it does not suppress direct feedback acknowledgement or the DeepSeek provider header.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The id is created once, persisted as a single durable line, and immutable thereafter; there is no changing relation to observe.
+
 ## Model Experience
 
 None, as the shared identifier reaches DeepSeek only as model-hidden HTTP metadata and registers nothing model-facing.
@@ -32,7 +36,3 @@ None; the transport header changes neither tokens nor the model-visible prefix.
 - **Best-effort concurrency** — a reader landing in the narrow interval between a concurrent process's exclusive create and completed write can use a different in-memory UUID for that run; later launches converge on the persisted value.
 - **No cross-home identity** — different `$DSH_HOME` values cannot be correlated.
 - **Configured DeepSeek gateways receive the id** — `dsh-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The id is created once, persisted as a single durable line, and immutable thereafter; there is no changing relation to observe.

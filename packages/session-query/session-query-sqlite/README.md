@@ -45,6 +45,10 @@ The index uses FTS5 `unicode61`. The trade-off is token/phrase recall rather tha
 
 Abort signals stop queued work and flow unchanged through snapshot listing and non-mutating inspection. Once source work starts, the serialized state machine awaits that backend promise itself—even when a backend ignores cancellation—then checks the signal before starting any further listing, inspection, reconciliation, or query work. The caller therefore observes cancellation only after started backend work is quiescent, and a later search cannot enter the serializer while that cleanup is pending. Node's synchronous `DatabaseSync` API cannot interrupt a metadata or MATCH statement already executing on the JavaScript thread; signals are checked immediately before and after those non-preemptible calls.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Search runs over the live-preferred logical corpus and its index lives inside the SQLite store it opens; no second corpus exists.
+
 ## Model Experience
 
 None, as the search backend returns hits only to callers and registers nothing model-facing.
@@ -59,7 +63,3 @@ None; this package neither assembles nor sends a provider request.
 - **Synchronous query execution** — `DatabaseSync` blocks the JavaScript thread during MATCH execution and cannot interrupt a statement already running.
 - **Token recall, not arbitrary substrings** — the `unicode61` tokenizer does not match substrings inside a larger token; use `filterEvents()` for literal scans.
 - **Single-owner derived index** — one service in one process must own each index path; external writers and multi-process sharing are unsupported.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. Search runs over the live-preferred logical corpus and its index lives inside the SQLite store it opens; no second corpus exists.

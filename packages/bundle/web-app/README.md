@@ -12,6 +12,10 @@ Run `dsh --profile web` to open an interactive browser GUI with chat, model and 
 
 Web uses the shared bounded normal default of five eligible retries after the initial request. The `deepseek-official` route and settings-added pi-ai routes use that default when they omit `retryPolicy`; explicit provider policies still win. Web adds no retry-specific composition override, so the same omission behavior applies to non-Web profiles.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The patch layer inserts host and client rows whose plugins own their relationships; the web-runtime glue resolves static entry points and holds no observable state.
+
 ## Model Experience
 
 ### Harness-source and Web-surface context
@@ -35,7 +39,3 @@ Source and Web sections follow first-party reusable instructions. Different chec
 - **Only handoff startup is observable** — observation ends when the platform opener accepts spawn, except that Windows waits for its short-lived PowerShell launcher to exit; a later browser exit is not reported, and the printed URL remains the manual fallback.
 - **SSH forwarding owns the browser URL** — the printed canonical URL names the remote host's loopback endpoint; automatic handoff is suppressed, and the SSH client or editor must expose and open its local forwarded address.
 - **Browser command overrides are launch-only** — a discovered `.env` may not set `BROWSER`; only an inherited value may reach an opener path that honors the variable, so a checkout cannot choose an executable for automatic handoff.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The patch layer inserts host and client rows whose plugins own their relationships; the web-runtime glue resolves static entry points and holds no observable state.
