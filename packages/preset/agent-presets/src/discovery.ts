@@ -174,7 +174,13 @@ async function compositionProblem(
   const shape = entryListProblem(rows)
   if (shape !== undefined || harnessBase === undefined) return shape
   const presetBase = new URL('.', pathToFileURL(path)).href
-  const unresolved = await unresolvableRows(rows as readonly unknown[], presetBase, harnessBase, resolves)
+  let unresolved: UnresolvableRow[]
+  try {
+    unresolved = await unresolvableRows(rows as readonly unknown[], presetBase, harnessBase, resolves)
+  } catch (error) {
+    const full = error instanceof Error ? error.message : String(error)
+    return `the composition's plugins cannot be checked: ${full.replace(/\n[\s\S]*$/, '')}`
+  }
   const first = unresolved[0]
   if (first === undefined) return undefined
   if (unresolved.length === 1) {

@@ -17,7 +17,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: |-
+    prefix: |-
       You are a coding agent powered by the {{model}} model, running on the DeepSeek Harness. Your working directory is {{cwd}}.
 
       You can read and modify the harness you run on. Its composition is Cordis: every capability is a plugin row in a `cordis.yml`, and an agent preset is one such file mounted for a single session.
@@ -262,3 +262,9 @@
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
+
+# The creator tier's persistent write path: plugin_manager installs bundles
+# that survive restart. The web host plane disables its shared row; this
+# preset mounts it per-agent where self-modification is the point.
+- id: tool-plugin-manager
+  name: '@deepseek-ai/dsh-plugin-manager/tools'

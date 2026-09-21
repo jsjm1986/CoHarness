@@ -252,3 +252,10 @@
   config:
     fetch: true
     searchTimeoutMs: 60000
+
+# plugin_manager stays a Creator-tier tool: the row rides this preset so a
+# per-session overlay can enable it, but the default coding agent does not
+# mount it — the host plane disables it for the same reason on web.
+- id: tool-plugin-manager
+  name: '@deepseek-ai/dsh-plugin-manager/tools'
+  disabled: true
