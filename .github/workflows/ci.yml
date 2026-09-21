@@ -43,7 +43,6 @@ permissions:
 
 env:
   DSH_GATE_REPORT_DIR: .artifacts/gates
-  DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
   PRIMARY_NODE_VERSION: '24'
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
@@ -112,7 +111,7 @@ jobs:
       - name: Preserve selection comparison
         uses: actions/upload-artifact@v7
         with:
-          name: gate-evidence-pr-scope
+          name: gate-evidence-pr-scope-${{ github.run_attempt }}
           path: .artifacts/gates/selection-*.json
           include-hidden-files: true
           if-no-files-found: error
@@ -148,6 +147,7 @@ jobs:
     name: node 24 / static
     env:
       DSH_EVIDENCE_JOB_NAME: "node 24 / static"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-${{ github.run_attempt }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -221,6 +221,7 @@ jobs:
     name: node 24 / coverage
     env:
       DSH_EVIDENCE_JOB_NAME: "node 24 / coverage"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-coverage-${{ github.run_attempt }}
       # Partitioning replaces the instrumented share. Portable standard runners
       # use two single-worker partitions and one outer gate worker; configured
       # external pools retain their measured partition and gate bounds.
@@ -329,6 +330,7 @@ jobs:
     name: node 24 / snapshots and artifacts
     env:
       DSH_EVIDENCE_JOB_NAME: "node 24 / snapshots and artifacts"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-consumers-${{ github.run_attempt }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -456,6 +458,7 @@ jobs:
     timeout-minutes: 90
     env:
       DSH_EVIDENCE_JOB_NAME: "web verification"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-web-verification-${{ github.run_attempt }}
       DSH_WEB_SNAPSHOT_WORKERS: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -616,6 +619,7 @@ jobs:
           --health-retries 20
     env:
       DSH_EVIDENCE_JOB_NAME: "gateway / typecheck and unit tests"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-gateway-${{ github.run_attempt }}
       HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:5432/hgw_test
     steps:
       - uses: actions/checkout@v7
@@ -666,6 +670,7 @@ jobs:
     name: gateway admin UI / build and tests
     env:
       DSH_EVIDENCE_JOB_NAME: "gateway admin UI / build and tests"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-gateway-admin-ui-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -716,6 +721,7 @@ jobs:
     timeout-minutes: 30
     env:
       DSH_EVIDENCE_JOB_NAME: "android / debug build and lint"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-android-build-${{ github.run_attempt }}
       DSH_GATE_ARTIFACT_GLOBS: '["apps/android-shell/android/app/build/outputs/apk/debug/app-debug.apk", "apps/android-shell/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"]'
     steps:
       - uses: actions/checkout@v7
@@ -758,6 +764,7 @@ jobs:
     timeout-minutes: 20
     env:
       DSH_EVIDENCE_JOB_NAME: "android / native bridge"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-android-bridge-${{ github.run_attempt }}
       DSH_GATE_ARTIFACT_GLOBS: '[".artifacts/android/apk/debug/app-debug.apk", ".artifacts/android/apk/androidTest/debug/app-debug-androidTest.apk"]'
     steps:
       - uses: actions/checkout@v7
@@ -802,6 +809,7 @@ jobs:
     timeout-minutes: 120
     env:
       DSH_EVIDENCE_JOB_NAME: "manual / full audit"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-full-audit-${{ github.run_attempt }}
       DSH_COVERAGE_MAX_WORKERS: '2'
       DSH_COVERAGE_PARTITIONS: '2'
       DSH_GATE_CONCURRENCY: '1'
@@ -864,6 +872,7 @@ jobs:
     timeout-minutes: 90
     env:
       DSH_EVIDENCE_JOB_NAME: "web browser snapshot sweep"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-web-snapshot-sweep-${{ github.run_attempt }}
       DSH_WEB_SNAPSHOT_WORKERS: '2'
       # Match the bounded PR consumer lane. The master sweep runs the same
       # build-backed inventory, so it must not re-enable nested typecheck/build
@@ -942,6 +951,7 @@ jobs:
     name: ${{ matrix.name }}
     env:
       DSH_EVIDENCE_JOB_NAME: "${{ matrix.name }}"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-compat-${{ strategy.job-index }}-${{ github.run_attempt }}
       DSH_GATE_CONCURRENCY: ${{ matrix.gate_concurrency }}
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
     strategy:
@@ -992,6 +1002,7 @@ jobs:
     name: python 3.10 / keyless SDK
     env:
       DSH_EVIDENCE_JOB_NAME: "python 3.10 / keyless SDK"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-python-sdk-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
 
@@ -1195,6 +1206,7 @@ jobs:
     timeout-minutes: 120
     env:
       DSH_EVIDENCE_JOB_NAME: "windows node 24 / native complete"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-windows-native-${{ github.run_attempt }}
       DSH_COVERAGE_MAX_WORKERS: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository

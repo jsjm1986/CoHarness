@@ -4,11 +4,25 @@ import { describe, expect, it, vi } from 'vitest'
 import { gatesForMode } from './run-gates.ts'
 
 interface Step { name?: string; if?: string; run?: string; uses?: string; with?: Record<string, unknown>; env?: Record<string, string> }
-interface Job { needs?: string[] | string; if?: string; steps?: Step[] }
-interface Workflow { jobs: Record<string, Job> }
+interface Job { needs?: string[] | string; if?: string; steps?: Step[]; env?: Record<string, string>; strategy?: unknown }
+interface Workflow { jobs: Record<string, Job>; env?: Record<string, string> }
 const workflow = (name: string): Workflow => load(readFileSync(`.github/workflows/${name}.yml`, 'utf8')) as Workflow
 
 describe('public gate and workflow wiring', () => {
+  it('names evidence within each producer job and distinguishes matrix legs and retries', () => {
+    const ci = workflow('ci')
+    expect(Object.values(ci.env ?? {}).some(value => value.includes('strategy.') || value.includes('github.job'))).toBe(false)
+    const names = new Set<string>()
+    for (const [id, job] of Object.entries(ci.jobs)) {
+      if (!job.steps?.some(step => step.uses === './.github/actions/gate-evidence')) continue
+      const name = job.env?.DSH_EVIDENCE_ARTIFACT_NAME
+      expect(name, id).toContain('${{ github.run_attempt }}')
+      expect(names.has(name!), id).toBe(false)
+      names.add(name!)
+      if (job.strategy !== undefined) expect(name, id).toContain('${{ strategy.job-index }}')
+    }
+  })
+
   it('runs every hygiene leaf through the actual static or artifact consumer CI modes', () => {
     vi.stubEnv('npm_execpath', '/fixture/pnpm.cjs')
     try {
