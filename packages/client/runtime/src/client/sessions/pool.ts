@@ -335,10 +335,12 @@ export class SessionRuntimePool implements ISessions {
     this.base.handleConnected()
     void this.baseConnection.api.workspace.list({}).then(({ result }) => {
       if (result.ok) {
-        this.archivedByTarget.set('personal', new Set(result.value.archivedSessionIds))
+        // The base entry's key tracks its current target (re-keyed by
+        // setBaseRuntimeTarget); a hardcoded 'personal' would orphan the set.
+        this.archivedByTarget.set(entry?.key ?? 'personal', new Set(result.value.archivedSessionIds))
         this.rebuild()
       }
-    })
+    }, (error: unknown) => { console.error('[web-runtime] base workspace.list refresh failed:', error) })
   }
   /** Mark the base runtime connection as unavailable. */
   handleDisconnected(): void {
@@ -394,10 +396,13 @@ export class SessionRuntimePool implements ISessions {
   setBaseRuntimeTarget(target: SessionRuntimeTarget): void {
     const baseEntry = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (baseEntry === undefined || targetKey(baseEntry.target) === targetKey(target)) return
+    const archived = this.archivedByTarget.get(baseEntry.key)
     this.entries.delete(baseEntry.key)
+    this.archivedByTarget.delete(baseEntry.key)
     baseEntry.target = target
     baseEntry.key = targetKey(target)
     this.entries.set(baseEntry.key, baseEntry)
+    if (archived !== undefined) this.archivedByTarget.set(baseEntry.key, archived)
     this.indexEntry(baseEntry)
     this.rebuild()
   }
