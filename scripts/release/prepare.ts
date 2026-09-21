@@ -77,7 +77,18 @@ async function main(): Promise<void> {
     const matches = latest.filter(({ report }) => report.stable.mode === check.mode
       && report.stable.checks.some(item => item.id === check.check) && matchesEnvironment(report, check))
     if (matches.length === 0) throw new Error(`release readiness: missing ${check.mode}/${check.environment} on ${commit}`)
-    if (new Set(matches.map(({ report }) => gateEvidenceDigest(report))).size > 1) throw new Error(`release readiness: conflicting evidence for ${check.mode}`)
+    // Complementary targets (the Python runtime matrix publishes one report
+    // per platform) are not conflicts; only same-environment contradictions are.
+    const byEnvironment = new Map<string, Set<string>>()
+    for (const { report } of matches) {
+      const key = JSON.stringify(report.stable.environment)
+      const digests = byEnvironment.get(key) ?? new Set<string>()
+      digests.add(gateEvidenceDigest(report))
+      byEnvironment.set(key, digests)
+    }
+    for (const [environment, digests] of byEnvironment) {
+      if (digests.size > 1) throw new Error(`release readiness: conflicting evidence for ${check.mode} on ${environment}`)
+    }
     const proof = matches.sort((a, b) => a.path.localeCompare(b.path))[0]
     if (proof === undefined) throw new Error('release readiness: empty proof selection')
     return { ...check, report: proof.path }

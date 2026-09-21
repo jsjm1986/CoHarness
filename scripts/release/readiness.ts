@@ -141,6 +141,32 @@ export function assertEvidenceEnvironment(
  * @param authority - authenticated GitHub read operations.
  */
 export async function assertReleaseReadiness(candidate: ReleaseCandidate, authority: EvidenceAuthority): Promise<void> {
+  // Read-only GitHub lookups are identical for every requirement of one
+  // release path; cache them within this assertion so four executions do not
+  // multiply into four times the API calls.
+  const cachedRuns = new Map<string, Promise<unknown>>()
+  const cachedJobs = new Map<string, Promise<unknown>>()
+  const cachedReports = new Map<string, Promise<string>>()
+  authority = {
+    run: (repository, runId) => {
+      const key = `${repository}#${runId}`
+      const hit = cachedRuns.get(key) ?? authority.run(repository, runId)
+      cachedRuns.set(key, hit)
+      return hit
+    },
+    jobs: (repository, runId, attempt) => {
+      const key = `${repository}#${runId}#${attempt}`
+      const hit = cachedJobs.get(key) ?? authority.jobs(repository, runId, attempt)
+      cachedJobs.set(key, hit)
+      return hit
+    },
+    report: (repository, runId, artifact, filename) => {
+      const key = `${repository}#${runId}#${artifact}#${filename}`
+      const hit = cachedReports.get(key) ?? authority.report(repository, runId, artifact, filename)
+      cachedReports.set(key, hit)
+      return hit
+    },
+  }
   const { root, family, version } = candidate
   const report = object(json(candidate.evidencePath), 'readiness report')
   if (report.version !== 1 || report.policyVersion !== 1) throw new Error('release readiness: unsupported report or policy version')
@@ -197,18 +223,40 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
     || /^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|lefthook\.yml|tsconfig.*\.json)$/.test(path),
   ).filter(path => !scopes.some(scope => matchesScope(path, scope)))
   if (uncovered.length > 0) throw new Error('release readiness: unclaimed candidate paths: ' + uncovered.join(', '))
+  // A vendored input changed after acceptance cannot inherit a review that
+  // never saw those bytes: some claiming decision must bind the release's
+  // upstream target in its reviewed upstreamCommits. Ordinary local hotfixes
+  // outside vendored inputs keep inheriting the accepted baseline.
+  const vendorChanges = changes.filter(path => path.startsWith('vendor/'))
+  const unboundVendor = vendorChanges.filter(path => !decisions.some(decision =>
+    Array.isArray(decision.commitScope)
+    && (decision.commitScope as unknown[]).some(scope => matchesScope(path, text(scope, 'decision scope')))
+    && Array.isArray(decision.upstreamCommits)
+    && (decision.upstreamCommits as unknown[]).includes(upstream)))
+  if (unboundVendor.length > 0) {
+    throw new Error('release readiness: vendor changes since the accepted baseline need a decision whose upstreamCommits bind the release target: ' + unboundVendor.join(', '))
+  }
   const proofRoot = resolve(candidate.evidencePath, '..')
   const requirements = rows(report.requirements, 'required checks')
-  for (const required of requiredReleaseChecks(changes, family, candidate.phase)) {
+  const policyRequired = requiredReleaseChecks(changes, family, candidate.phase)
+  for (const required of policyRequired) {
     if (!requirements.some((raw) => {
       const item = object(raw, 'required check')
       return item.mode === required.mode && item.check === required.check && item.environment === required.environment
     })) throw new Error(`release readiness: missing required policy check ${required.mode}/${required.check}/${required.environment}`)
   }
+  // Only the announced policy set gates the verdict: proofs recorded beyond it
+  // (a wider manual run's extra platforms or consumers) stay raw evidence in
+  // the report and cannot silently block a narrower required release.
+  const requiredKeys = new Set(policyRequired.map(required => `${required.mode}${required.check}${required.environment}`))
+  const verdictRequirements = requirements.filter((raw) => {
+    const item = object(raw, 'required check')
+    return requiredKeys.has(`${text(item.mode, 'required mode')}${text(item.check, 'required check')}${text(item.environment, 'required environment')}`)
+  })
   const coveredEnvironments = new Set<string>()
   const verifiedArtifacts = new Map<string, string>()
   const androidArtifacts = new Map<string, Map<string, string>>()
-  for (const raw of requirements) {
+  for (const raw of verdictRequirements) {
     const requirement = object(raw, 'required check')
     if (candidate.phase === 'preflight' && requirement.environment === 'artifact') continue
     const proofPath = ownedPath(proofRoot, requirement.report)

@@ -94,9 +94,15 @@ async function main(): Promise<void> {
   reportPublishOrder(family, plan)
 
   const publishing = process.env.RELEASE_PUBLISH === 'true'
-  if (publishing) {
+  // Tag verification (publishable surface + ref/tag agreement) is its own
+  // mode: workflows that only prove a tag names a releasable candidate set it
+  // without the publish-path readiness report that pre-registry writes need.
+  const tagOnly = !publishing && process.env.RELEASE_VERIFY_TAG === 'true'
+  if (publishing || tagOnly) {
     verifyPublishable(members)
     verifyTag(family, members, process.env.GITHUB_REF ?? '')
+  }
+  if (publishing) {
     await verifyConfiguredReadiness(process.cwd(), family.id,
       releaseCandidateVersion(family, members, process.env.GITHUB_REF ?? ''), 'preflight', [])
   }

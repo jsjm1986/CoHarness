@@ -668,8 +668,10 @@ describe('Documentation workflow', () => {
     expect(checkout).toMatchObject({
       with: { 'fetch-depth': 0, 'persist-credentials': false },
     })
+    // Tag verification only: the docs deployment proves the tag names a
+    // releasable candidate but produces no publish-path readiness report.
     expect(verify).toMatchObject({
-      env: { RELEASE_PUBLISH: 'true' },
+      env: { RELEASE_VERIFY_TAG: 'true' },
       run: 'pnpm run release:verify --family dsh',
     })
   })
