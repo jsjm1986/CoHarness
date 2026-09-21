@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage  , createSystemMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
@@ -69,17 +69,29 @@ async function seedVisibleBaseline(
   })
   const events: SessionEvent[] = [
     { type: 'turn/start', seq: SessionSeq(0), time: 10, data: { turn: 1 } },
+    { type: 'step/start', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1 } },
+    {
+      type: 'system/message',
+      seq: SessionSeq(2),
+      time: 12,
+      data: {
+        turn: 1,
+        step: 1,
+        message: createSystemMessage('Seeded baseline system prompt.', '@deepseek-ai/dsh-system-prompt'),
+      },
+      surfaceOp: 'append',
+    },
     {
       type: 'user/message',
-      seq: SessionSeq(1),
-      time: 11,
+      seq: SessionSeq(3),
+      time: 13,
       data: createUserMessage({ content: [{ type: 'text', text: 'Remember the workspace instruction.' }], source: { kind: 'user' } }),
       surfaceOp: 'append',
     },
     {
       type: 'user/message',
-      seq: SessionSeq(2),
-      time: 12,
+      seq: SessionSeq(4),
+      time: 14,
       data: createUserMessage({
         content: [{ type: 'text', text: baseline.text }],
         source: {
@@ -97,7 +109,8 @@ async function seedVisibleBaseline(
       }),
       surfaceOp: 'append',
     },
-    { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'step/end', seq: SessionSeq(5), time: 15, data: { turn: 1, step: 1 } },
+    { type: 'turn/end', seq: SessionSeq(6), time: 16, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
   try {
     await ctx.sessionPersistence.create(meta)

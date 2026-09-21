@@ -12,7 +12,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter as pathDelimiter } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
-import { SESSION_FORMAT_VERSION, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
+import {
+  SESSION_FORMAT_VERSION,
+  SessionLogOffset,
+  decodeChunkRow,
+  type SessionEvent,
+} from '@deepseek-ai/dsh-session'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import {
   SessionFormatUnsupportedMigrationError,
@@ -271,7 +276,11 @@ function parseSessionFixture(text: string): ParsedSessionFixture {
     eventLines.push(...Array.from({ length: cardinality }, () => lineNumber))
     nextSeq += cardinality
     try {
-      restore.decodeRow(record)
+      // Packed chunk rows are a released storage record, not one event row:
+      // expand them into their member events, then feed each member through
+      // the same row decoder as an ordinary assistant/chunk event.
+      const rows = packed ? decodeChunkRow(record) : [record]
+      for (const row of rows) restore.decodeRow(row)
     } catch (error: unknown) {
       throw fixtureFormatError(error, headerLineNumber as number, rowLines, eventLines, rowLines.length - 1)
     }
