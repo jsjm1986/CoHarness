@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { generationLogPath, scanLog } from '../src/format.ts'
+import { generationLogPath, scanLog, SessionLogScanner } from '../src/format.ts'
 
 const id = SessionId('v4-admission')
 const header = { type: 'session', version: 4, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 }
@@ -147,5 +147,27 @@ describe('native V4 event admission at EOF', () => {
       await writer.close()
     }
     expect(await readFile(path, 'utf8')).toBe(prefix + JSON.stringify(end) + '\n')
+  })
+})
+
+describe('versioned admission through SessionLogScanner', () => {
+  /** Scan a whole buffer as one declared historical generation. */
+  function scanVersion(bytes: Buffer, version: number) {
+    const headerEnd = bytes.indexOf(0x0A)
+    const scanner = new SessionLogScanner(bytes.subarray(0, headerEnd + 1), 'strict', version)
+    scanner.write(bytes.subarray(headerEnd + 1))
+    return scanner.finish()
+  }
+
+  it.each(obsoleteTypes)('refuses a required %s row under V3 admission', (type) => {
+    const v3Header = { type: 'session', version: 3, id, createdAt: 1, isSeeded: false, delegationDepth: 0 }
+    const bytes = Buffer.from([v3Header, start, obsoleteEvent(type)].map(row => JSON.stringify(row)).join('\n') + '\n')
+    expect(() => scanVersion(bytes, 3)).toThrow('format v3 contains unknown event type')
+  })
+
+  it('admits a generation older than the admission rules through its stored restore', () => {
+    const v2Header = { type: 'session', version: 2, id, createdAt: 1, isSeeded: false, delegationDepth: 0 }
+    const bytes = Buffer.from([v2Header, start].map(row => JSON.stringify(row)).join('\n') + '\n')
+    expect(scanVersion(bytes, 2).events.map(event => event.type)).toEqual(['turn/start'])
   })
 })

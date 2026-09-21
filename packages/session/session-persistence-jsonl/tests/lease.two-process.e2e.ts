@@ -29,6 +29,7 @@ afterEach(async () => {
 })
 
 const HOLDER = fileURLToPath(new URL('./fixtures/lease-holder.mjs', import.meta.url))
+const RELEASER = fileURLToPath(new URL('./fixtures/lease-releaser.mjs', import.meta.url))
 
 describe('two-process write lock (built lib)', () => {
   it('excludes a live holder process and takes over immediately after its crash', { timeout: 30_000 }, async () => {
@@ -62,6 +63,37 @@ describe('two-process write lock (built lib)', () => {
       await taken.append([{ type: 'turn/start', seq: SessionSeq(2), time: 3, data: { turn: 2 } }])
       expect((await taken.read()).events.map(event => event.seq)).toEqual([0, 1, 2])
       await taken.close()
+    } finally {
+      if (holder.exitCode === null) holder.kill('SIGKILL')
+    }
+  })
+
+  it('takes over after a live holder releases normally', { timeout: 30_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-lease-2proc-'))
+    dirs.push(root)
+
+    const holder = spawn(process.execPath, [RELEASER, root, SESSION], {
+      stdio: ['pipe', 'pipe', 'inherit'],
+    })
+    const exited = new Promise<void>((resolve) => { holder.once('exit', () => { resolve() }) })
+    try {
+      await once(holder.stdout, 'data') // 'holding'
+
+      const ctx = new Context()
+      contexts.push(ctx)
+      await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
+      const mine = ctx.sessionPersistence
+
+      await expect(mine.open(SessionId(SESSION), 'write')).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
+
+      // A released claim excludes nobody: the holder stays alive, but its
+      // kernel lock is gone and its owner record is cleared.
+      holder.stdin.write('release\n')
+      await once(holder.stdout, 'data') // 'released'
+      const taken = await mine.open(SessionId(SESSION), 'write')
+      await taken.close()
+      holder.kill('SIGKILL')
+      await exited
     } finally {
       if (holder.exitCode === null) holder.kill('SIGKILL')
     }

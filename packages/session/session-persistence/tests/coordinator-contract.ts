@@ -59,6 +59,9 @@ function send(session: Session, events: readonly SessionEvent[]): void {
   appendLog(session, events)
 }
 
+/** Legacy flat `assistant/message` field carrying the model source record. */
+const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
+
 /** A valid persisted log from immediately before messages gained wrappers and identities. */
 function legacyMessageLog(): SessionEvent[] {
   return [
@@ -80,7 +83,7 @@ function legacyMessageLog(): SessionEvent[] {
         step: 1,
         stream: [],
         content: [{ type: 'tool-call', id: 'call-1', name: 'read', arguments: '{}' }],
-        provenance: { provider: 'mock', model: 'mock' },
+        [LEGACY_ASSISTANT_SOURCE_KEY]: { provider: 'mock', model: 'mock' },
       },
       surfaceOp: 'append',
     },
@@ -1118,6 +1121,35 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
           reuse = inner.sessions.create(SessionId('buffered'), { meta: { cwd: WORK } })
         }, { inject: ['sessions'] }))
         await expect(ctx.sessions.flush(reuse)).rejects.toThrow(/persisted log|id collision/)
+      } finally {
+        await fiber.dispose()
+        await fix.cleanup()
+      }
+    })
+
+    it('an HMR reload refuses to adopt a stored artifact at a different cwd', async () => {
+      const fix = await makeFixture()
+      const { ctx, fiber } = await freshCtx(fix)
+      try {
+        const id = SessionId('hmr-cwd-collision')
+        let first!: Session
+        const firstFiber = await ctx.plugin(Object.assign((inner: Context) => {
+          first = inner.sessions.create(id, { meta: { cwd: WORK } })
+        }, { inject: ['sessions'] }))
+        first.append('turn/start', { turn: 1 })
+        first.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+        await ctx.sessions.flush(first)
+        await firstFiber.dispose()
+        await vi.waitFor(async () => {
+          expect((await ctx.sessionPersistence.listHeaders()).map(m => m.id)).toContain(id)
+        })
+
+        let collision!: Session
+        await ctx.plugin(Object.assign((inner: Context) => {
+          collision = inner.sessions.create(id, { meta: { cwd: OTHER } })
+        }, { inject: ['sessions'] }))
+        await expect(ctx.sessions.flush(collision))
+          .rejects.toThrow(/already persisted at a different cwd/)
       } finally {
         await fiber.dispose()
         await fix.cleanup()

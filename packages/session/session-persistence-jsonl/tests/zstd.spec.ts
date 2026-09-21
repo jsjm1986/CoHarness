@@ -18,6 +18,7 @@ import {
 } from '../src/zstd.ts'
 import { NodePrivateZstdFrameDecoder } from '../src/zstd-private-decoder.ts'
 import { PublicZstdFrameDecoder } from '../src/zstd-public-decoder.ts'
+import { ZstdOutputLimitError } from '../src/zstd-errors.ts'
 import {
   runPersistenceContract, meta, oneTurnLog, releasedV1OneTurnLog,
 } from '../../session-persistence/tests/contract.ts'
@@ -273,6 +274,31 @@ describe('Zstandard frame structure', () => {
         chunk => Buffer.from(chunk),
       )
       expect(decoded).toEqual(plaintext)
+    }
+  })
+
+  it('enforces the output budget inside the private decoder without wrapping the error', async () => {
+    const frame = await compressZstdFrame('plaintext longer than the budget\n')
+    const range = [{ start: 0, end: frame.length }]
+    const single = NodePrivateZstdFrameDecoder.create()!
+    try {
+      Array.from(single.decode(frame, range, 4))
+      throw new Error('expected output budget failure')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ZstdOutputLimitError)
+      expect((error as Error).message).toBe('Zstandard decompressed output exceeds 4 bytes')
+    }
+
+    // The budget is cumulative across frames: a second frame can overflow it
+    // even though its own output fits.
+    const frames = [await compressZstdFrame('ab'), await compressZstdFrame('cd')]
+    const stream = Buffer.concat(frames)
+    const cumulative = NodePrivateZstdFrameDecoder.create()!
+    try {
+      expect(() => Array.from(cumulative.decode(stream, scanZstdFrames(stream).frames, 3)))
+        .toThrow(ZstdOutputLimitError)
+    } finally {
+      cumulative.close()
     }
   })
 

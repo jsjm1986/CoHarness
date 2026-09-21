@@ -66,7 +66,7 @@ describe('SQLite compression', () => {
     },
   )
 
-  it('compresses large data and delta-encodes complete provenance arrays', () => {
+  it('compresses large data and delta-encodes complete source-event arrays', () => {
     const sources = Array.from({ length: 2_000 }, (_, index) => index + 10)
     const event = {
       type: 'assistant/message',
@@ -86,7 +86,7 @@ describe('SQLite compression', () => {
     expect(typeof small.data).toBe('string')
   })
 
-  it('round-trips empty, descending, and maximum-safe provenance deltas', () => {
+  it('round-trips empty, descending, and maximum-safe source-event deltas', () => {
     for (const sources of [
       [],
       [Number.MAX_SAFE_INTEGER - 1, 0, Number.MAX_SAFE_INTEGER - 2],
@@ -103,7 +103,7 @@ describe('SQLite compression', () => {
     }
   })
 
-  it('run-encodes ascending provenance with gaps and round-trips every run', () => {
+  it('run-encodes ascending source events with gaps and round-trips every run', () => {
     const sources = [
       ...Array.from({ length: 400 }, (_, index) => index + 10),
       ...Array.from({ length: 300 }, (_, index) => index + 600),
@@ -126,14 +126,14 @@ describe('SQLite compression', () => {
     ['a zero-length run', [1, 5, 0], /invalid ascending range/],
     ['a run starting inside the previous one', [1, 0, 3, 1, 2], /invalid ascending range/],
     ['a run longer than the event sequence allows', [1, 0, 100], /run exceeds its event sequence/],
-  ])('rejects %s in a stored provenance run stream', (_label, bytes, pattern) => {
+  ])('rejects %s in a stored source-event run stream', (_label, bytes, pattern) => {
     const base = row({
       type: 'assistant/message', seq: 10, time: 1, data: {}, sourceEventSeqs: [0], surfaceOp: 'append',
     } as unknown as SessionEvent)
     expect(() => decodeRow({ ...base, source_event_seqs: Uint8Array.from(bytes) })).toThrow(pattern)
   })
 
-  it.each([-1, 0.5])('rejects invalid provenance sequence %s before encoding', (sourceSeq) => {
+  it.each([-1, 0.5])('rejects invalid source-event sequence %s before encoding', (sourceSeq) => {
     const event = {
       type: 'assistant/message',
       seq: SessionSeq(1),

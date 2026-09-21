@@ -112,6 +112,12 @@ describe('Session format chain', () => {
     expect(current.migrateHeader(sourceHeader).version).toBe(1)
   })
 
+  it('treats an undeclared inherited cut as zero', () => {
+    const current = chain()
+    const stream = current.createStream({ ...currentHeader, version: 0 }, undefined, discard)
+    expect(stream.finish()).toBe(0)
+  })
+
   it('rejects invalid declarations and incomplete chain construction', () => {
     const base = migration()
     expect(() => defineSessionFormatMigration({ ...base, name: '' })).toThrow(/name/)

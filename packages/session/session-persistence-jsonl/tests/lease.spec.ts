@@ -12,7 +12,7 @@
  */
 
 import { existsSync } from 'node:fs'
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -47,6 +47,8 @@ const refuse = vi.hoisted(() => ({
   swapLockOnStat: 0,
   /** Next lock-path stat: unlink the file first, so the verify read finds nothing. */
   dropLockOnStat: false,
+  /** Next read of a lock file fails EACCES (unreadable pid record). */
+  lockRead: false,
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -81,6 +83,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       }
       return (actual.stat as (path: unknown, ...args: never[]) => Promise<unknown>)(path, ...rest)
     }) as typeof actual.stat,
+    readFile: (async (path: unknown, ...rest: never[]) => {
+      if (refuse.lockRead && String(path).endsWith(LOCK)) {
+        refuse.lockRead = false
+        denied('readFile')
+      }
+      return (actual.readFile as (path: unknown, ...args: never[]) => Promise<unknown>)(path, ...rest)
+    }) as typeof actual.readFile,
   }
 })
 
@@ -111,6 +120,7 @@ afterEach(async () => {
   refuse.lockStat = false
   refuse.swapLockOnStat = 0
   refuse.dropLockOnStat = false
+  refuse.lockRead = false
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true })
 })
@@ -430,5 +440,48 @@ describe('cross-process write lock', () => {
     }
     await a.close()
     await b.close()
+  })
+
+  it('arbitrates legacy create-and-probe lock files by their recorded pid', async () => {
+    const dir = join(await freshRoot(), 'legacy')
+    await mkdir(dir, { recursive: true })
+    const lock = join(dir, LOCK)
+    const acquire = () => SessionWriteLease.acquire(dir, SessionId('legacy'))
+    const kill = vi.spyOn(process, 'kill')
+    try {
+      // A live foreign pid record means a legacy writer still owns the lock.
+      await writeFile(lock, JSON.stringify({ pid: process.ppid }))
+      await expect(acquire()).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
+
+      // EPERM still means live: the holder is another user's process.
+      kill.mockImplementation(() => {
+        throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+      })
+      await writeFile(lock, JSON.stringify({ pid: 424242 }))
+      await expect(acquire()).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
+
+      // A dead recorded pid is residue, not ownership.
+      kill.mockImplementation(() => {
+        throw Object.assign(new Error('no such process'), { code: 'ESRCH' })
+      })
+      await writeFile(lock, JSON.stringify({ pid: 424242 }))
+      await (await acquire()).release()
+    } finally {
+      kill.mockRestore()
+    }
+
+    // The holder's own published pid record is residue after release.
+    await writeFile(lock, JSON.stringify({ pid: process.pid }))
+    await (await acquire()).release()
+
+    // An unreadable record degrades to kernel-lock arbitration.
+    refuse.lockRead = true
+    await (await acquire()).release()
+
+    // A record without a usable pid is residue too.
+    for (const content of ['not json', JSON.stringify({ pid: 'x' }), JSON.stringify({ pid: -1 })]) {
+      await writeFile(lock, content)
+      await (await acquire()).release()
+    }
   })
 })

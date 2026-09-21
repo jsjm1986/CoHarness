@@ -51,7 +51,10 @@ export const releasedV4SessionFormatCodec = Object.freeze({
   },
 } satisfies SessionFormatCodec & SessionFormatCurrentEncoder)
 
-/** Refuse the folded chunk row kind and the retired dispatch pair before V3 admission. */
+/**
+ * Refuse the folded chunk row kind and the retired dispatch pair before V3 admission.
+ * @param event - the decoded V4 event to validate.
+ */
 export function assertV4EventAdmission(event: SessionFormatEvent): void {
   if (event.type === 'assistant/chunk') {
     throw new SessionFormatError('format v4 stores settled assistant events; assistant/chunk is a v3 row')
@@ -65,7 +68,10 @@ export function assertV4EventAdmission(event: SessionFormatEvent): void {
   assertV3EventAdmission(event)
 }
 
-/** V4 physical-row admission: V3 structure plus the chunk and dispatch refusals. */
+/**
+ * V4 physical-row admission: V3 structure plus the chunk and dispatch refusals.
+ * @param row - the decoded JSONL row to validate.
+ */
 export function assertV4RowAdmission(row: unknown): void {
   if (isSessionFormatJsonObject(row)) assertV4EventAdmission(row as SessionFormatEvent)
   assertV3RowAdmission(row)

@@ -977,11 +977,10 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /**
-   * Release one handle's backend bookkeeping on close.
+   * Release one tracked handle after its close drained or discarded it.
    * @param handle - the closing handle.
    * @param materialized - whether the session reached durable storage.
    */
-  /** Release one tracked handle after its close drained or discarded it. */
   releaseTrackedHandle(handle: JsonlSessionHandle, materialized: boolean): void {
     this.tracker.release(handle, materialized)
   }

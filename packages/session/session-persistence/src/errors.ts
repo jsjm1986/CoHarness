@@ -128,6 +128,7 @@ export class SessionFormatUnsupportedError extends Error {
  * "upgrade the harness", never "corrupt").
  * @param id - the stored session id, for message context.
  * @param version - the stored format version.
+ * @param supportedVersion - the newest format version this build reads.
  * @returns the stable refusal text, without a raw-log path suffix.
  */
 export function sessionFormatVersionRefusal(

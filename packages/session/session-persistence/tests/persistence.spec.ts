@@ -1111,10 +1111,169 @@ describe('PersistenceCoordinator session preparations', () => {
       if (coordinator === undefined) throw new Error('coordinator did not initialize')
       const draft = ctx.sessions.create(SessionId('header-only'), { meta: { draft: true } })
       await expect(coordinator.ensureMaterialized(draft)).rejects.toThrow(/cannot materialize an empty session/)
+      // A detached pending create has the same empty-session requirement.
+      const detached = SessionId('detached-headerless')
+      await coordinator.create(meta(detached))
+      await expect(coordinator.materializeDetached(detached)).rejects.toThrow(/cannot materialize an empty session/)
       // A session whose content already reached the backend needs no header-only artifact.
       const materialized = ctx.sessions.create(SessionId('already-materialized'), { seed: oneTurnLog() })
       await ctx.sessions.flush(materialized)
       await expect(coordinator.ensureMaterialized(materialized)).resolves.toBeUndefined()
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('materializes a live empty session through the backend header hook', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    Object.assign(backend, {
+      materializeHeader: async (storage: SessionStorageMetadata) => {
+        backend.store.set(storage.meta.id, {
+          meta: structuredClone(storage.meta),
+          inheritedEventCount: storage.inheritedEventCount,
+          events: [],
+        })
+      },
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const session = ctx.sessions.create(SessionId('empty-live'), { meta: { cwd: '/work', draft: true } })
+      await ctx.sessions.flush(session)
+      await coordinator.ensureMaterialized(session)
+      expect(backend.store.get(session.id)?.events).toEqual([])
+      // A second call observes the materialized flag and writes nothing.
+      await expect(coordinator.ensureMaterialized(session)).resolves.toBeUndefined()
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('materializes and discards detached pending creates', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    Object.assign(backend, {
+      materializeHeader: async (storage: SessionStorageMetadata) => {
+        backend.store.set(storage.meta.id, {
+          meta: structuredClone(storage.meta),
+          inheritedEventCount: storage.inheritedEventCount,
+          events: [],
+        })
+      },
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      // Untracked, live-owned, and materialized ids are not detached pendings.
+      await expect(coordinator.materializeDetached(SessionId('ghost')))
+        .rejects.toThrow(/no detached pending state/)
+
+      const pending = SessionId('detached-pending')
+      await coordinator.create(meta(pending))
+      expect(coordinator.isPending(pending)).toBe(true)
+      expect(coordinator.listPending().map(storage => storage.meta.id)).toEqual([pending])
+      await coordinator.materializeDetached(pending)
+      expect(backend.store.get(pending)?.events).toEqual([])
+      // Materialized ownerless state is no longer pending.
+      expect(coordinator.isPending(pending)).toBe(false)
+      expect(coordinator.listPending()).toEqual([])
+      await expect(coordinator.materializeDetached(pending))
+        .rejects.toThrow(/no detached pending state/)
+
+      // Discarding returns the reservation to availability.
+      const discarded = SessionId('detached-discard')
+      await coordinator.create(meta(discarded))
+      await coordinator.discardDetached(discarded)
+      expect(coordinator.isPending(discarded)).toBe(false)
+      await expect(coordinator.discardDetached(discarded)).resolves.toBeUndefined()
+      await expect(coordinator.create(meta(discarded))).resolves.toBeUndefined()
+
+      // A live-owned state is never the discard target.
+      const live = ctx.sessions.create(SessionId('live-owned'), { seed: oneTurnLog() })
+      await ctx.sessions.flush(live)
+      expect(coordinator.isPending(live.id)).toBe(false)
+      await expect(coordinator.discardDetached(live.id)).resolves.toBeUndefined()
+      expect(backend.store.has(live.id)).toBe(true)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('reports an unsupported stored event without a raw-artifact location', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const id = SessionId('unsupported-event')
+      backend.store.set(id, {
+        meta: meta(id),
+        events: [{ type: 'future/unknown', seq: SessionSeq(0), time: 1, data: {} } as unknown as SessionEvent],
+      })
+      await expect(coordinator.load(id)).rejects.toThrow(/unknown to this harness/)
+      await expect(coordinator.load(id)).rejects.not.toThrow(/raw log:/)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('points an unsupported stored event at the backend artifact location', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    Object.assign(backend, {
+      locate: (m: SessionHeader) => ({ kind: 'jsonl', path: `/artifacts/${m.id}.jsonl` }),
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const id = SessionId('located-unsupported')
+      backend.store.set(id, {
+        meta: meta(id),
+        events: [{ type: 'future/unknown', seq: SessionSeq(0), time: 1, data: {} } as unknown as SessionEvent],
+      })
+      await expect(coordinator.load(id))
+        .rejects.toThrow(/unknown to this harness.*raw log: \/artifacts\/located-unsupported\.jsonl/)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('reports live storage only for a session this coordinator owns', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const session = ctx.sessions.create(SessionId('live-storage'), { meta: { cwd: '/work' } })
+      await ctx.sessions.flush(session)
+      await expect(coordinator.liveStorage(session.id))
+        .resolves.toMatchObject({ meta: { id: session.id } })
+      await expect(coordinator.liveStorage(SessionId('untracked'))).resolves.toBeUndefined()
+      // A detached pending has no live owner, so it reports as untracked here.
+      const pending = SessionId('detached-storage')
+      await coordinator.create(meta(pending))
+      await expect(coordinator.liveStorage(pending)).resolves.toBeUndefined()
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()

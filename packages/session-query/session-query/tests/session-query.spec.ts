@@ -1216,6 +1216,7 @@ describe('session-query exact reads', () => {
       { readWindowMax: -1 },
       { persistedReadConcurrency: 0 },
       { persistedReadConcurrency: Number.MAX_SAFE_INTEGER + 1 },
+      { preparedSessionCacheSize: 0 },
     ]) {
       const invalid = new Context()
       await invalid.plugin(SessionStore)
@@ -1231,6 +1232,21 @@ describe('session-query exact reads', () => {
     expect(ctx.sessionQuery).toBeInstanceOf(TestSessionQueryEngine)
     await fiber.dispose()
     expect(ctx.sessionQuery).toBeUndefined()
+  })
+
+  it('observes a live session through the service entry point', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(TestSessionQueryEngine)
+    try {
+      const session = ctx.sessions.create(SessionId('observed-live'))
+      session.append('turn/start', { turn: 1 })
+      using observed = await ctx.sessionQuery.observeSession(session.id, { projectionMode: 'none' })
+      expect(observed.source).toBe('live')
+      expect(observed.events.map(event => event.type)).toEqual(['turn/start'])
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('awaits optional-persistence child-fiber quiescence on disposal', async () => {

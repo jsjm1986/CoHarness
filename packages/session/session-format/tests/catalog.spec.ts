@@ -342,6 +342,32 @@ describe('Session format catalog', () => {
     ).finish().inheritedEventCount).toBe(0)
   })
 
+  it('restores stored headers directly and refuses a non-current stored artifact', () => {
+    const current = catalog()
+
+    const storedCurrent = current.createStoredRestore(
+      { ...oldHeader, version: 1 },
+      { recovery: 'strict', validation: 'current' },
+    )
+    storedCurrent.decodeRow(event)
+    expect(storedCurrent.finish()).toEqual({
+      header: { ...oldHeader, version: 1 },
+      inheritedEventCount: 0,
+      events: [event],
+    })
+
+    const physicalOnly = current.createStoredRestore(
+      { ...oldHeader, version: 1 },
+      { recovery: 'strict', validation: 'transformed' },
+    )
+    physicalOnly.decodeRow(event)
+    expect(physicalOnly.finish()).toMatchObject({ header: { version: 1 }, events: [event] })
+
+    const outdated = current.createStoredRestore(oldHeader, { recovery: 'strict', validation: 'current' })
+    outdated.decodeRow(event)
+    expect(outdated.finish()).toMatchObject({ header: { version: 0 }, events: [event] })
+  })
+
   it('expands an unhandled compact run without an intermediate array', () => {
     const run: SessionFormatEventRun = {
       runType: 'test-run', firstSeq: 0, eventCount: 1, expand: function* () { yield event },

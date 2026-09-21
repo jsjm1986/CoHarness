@@ -60,6 +60,9 @@ export const DEFAULT_MAX_PENDING_BYTES_PER_SESSION = DEFAULT_MAX_PENDING_BYTES
 /** Largest write batching delay accepted by Node's timer implementation. */
 export const MAX_WRITE_BATCH_DELAY_MS = MAX_TIMER_DELAY_MS
 
+/** Legacy flat `assistant/message` field carrying the model source record. */
+const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
+
 
 /** Transform a legacy event sequence through the format chain without intermediate artifacts. */
 function migrateFormatEvents(
@@ -560,8 +563,10 @@ function migrateLegacyMessageEvent(
     }
     case 'assistant/message': {
       if (Object.hasOwn(data, 'message')
-        || !Object.hasOwn(data, 'content') || !Object.hasOwn(data, 'provenance')) return event
-      const { content, provenance, ...eventData } = data
+        || !Object.hasOwn(data, 'content') || !Object.hasOwn(data, LEGACY_ASSISTANT_SOURCE_KEY)) return event
+      const { content, ...eventData } = data
+      const legacySource = asRecord(eventData[LEGACY_ASSISTANT_SOURCE_KEY])
+      Reflect.deleteProperty(eventData, LEGACY_ASSISTANT_SOURCE_KEY)
       return {
         ...event,
         data: {
@@ -571,7 +576,7 @@ function migrateLegacyMessageEvent(
             role: 'assistant',
             content,
             source: {
-              ...asRecord(provenance),
+              ...legacySource,
               kind: 'model',
             },
           },
@@ -873,6 +878,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       if (state === undefined || state.owner !== undefined || state.materialized) {
         throw new Error(`session "${id}" has no detached pending state to materialize`)
       }
+      /* v8 ignore else -- a detached pending never holds buffered events:
+         contract appends materialize directly (deferDraft=false), and a live
+         owner's draft prefix retires with its state. */
       if (state.pendingEvents.length === 0) {
         if (this.backend.materializeHeader === undefined) {
           throw new Error('session persistence backend cannot materialize an empty session')

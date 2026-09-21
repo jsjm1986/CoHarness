@@ -160,6 +160,7 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
       afterLastChunk: [],
     }
     const group = this.pending.group
+    /* v8 ignore next 4 -- a cut marker refuses while a group is open, so a pending group always agrees with the current side of the cut. */
     if (group.inherited !== (this.sourceHeader.isSeeded && !this.cutSeen)) {
       throw new SessionFormatUnsupportedMigrationError(
         'inherited Session cut splits one Assistant attempt',
@@ -223,6 +224,7 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
 
   /** Emit buffered interleaved events in source order, ahead of the settlement they preceded. */
   private flushBuffered(context: SessionFormatMigrationContext): void {
+    /* v8 ignore next -- both call sites only reach this helper with a pending group. */
     if (this.pending === undefined) return
     this.flushBufferedEvents(this.pending.afterLastChunk, context)
   }
@@ -256,6 +258,9 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
       data: this.remapDataReferences(event),
     }
     if (sourceEventSeqs !== undefined) {
+      /* v8 ignore next 5 -- transformSettlement strips a settlement's
+         sourceEventSeqs before emitSource, so remapEvent only sees it on
+         non-settlement events. */
       if (event.type === 'assistant/message' || event.type === 'assistant/attempt') {
         throw new SessionFormatError(
           `format v3 ${event.type} at seq ${event.seq} embeds its stream and cannot carry sourceEventSeqs`,

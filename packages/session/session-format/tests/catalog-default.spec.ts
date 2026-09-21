@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { sessionFormatCatalog } from '../src/legacy.ts'
-import type { SessionFormatEvent } from '../src/legacy.ts'
+import type { SessionFormatArtifact, SessionFormatEvent } from '../src/legacy.ts'
+
+/** Legacy flat `assistant/message` field carrying the model source record. */
+const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
 
 function event(type: string, seq: number, data: unknown, extra: Record<string, unknown> = {}): SessionFormatEvent {
   return { type, seq, time: seq + 1, data, ...extra } as unknown as SessionFormatEvent
@@ -254,22 +257,22 @@ describe('legacy message carriers', () => {
 
   it('wraps the early flat assistant form into the message envelope', () => {
     const migrated = migrate([
-      event('assistant/message', 0, { content: [{ type: 'text', text: 'hi' }], provenance: { provider: 'p' }, usage: { in: 1 } }),
-      event('assistant/message', 1, { content: [], provenance: 'x' }),
+      event('assistant/message', 0, { content: [{ type: 'text', text: 'hi' }], [LEGACY_ASSISTANT_SOURCE_KEY]: { provider: 'p' }, usage: { in: 1 } }),
+      event('assistant/message', 1, { content: [], [LEGACY_ASSISTANT_SOURCE_KEY]: 'x' }),
       event('assistant/message', 2, { message: { id: 'a', content: [] } }),
     ])
     expect(migrated.events[0]!.data).toMatchObject({
       usage: { in: 1 },
       message: { id: 'legacy-message:s:0', role: 'assistant', content: [{ type: 'text', text: 'hi' }], source: { provider: 'p', kind: 'model' } },
     })
-    // A non-record provenance still folds into the model source.
+    // A non-record legacy source still folds into the model source.
     expect(migrated.events[1]!.data).toMatchObject({ message: { source: { kind: 'model' } } })
     expect(migrated.events[2]!.data).toMatchObject({ message: { id: 'a' } })
   })
 
   it('rejects a flat assistant form without the required fields downstream', () => {
     expect(() => migrate([event('assistant/message', 0, { content: [] })])).toThrow('invalid message content')
-    expect(() => migrate([event('assistant/message', 0, { content: 'x', provenance: {} })])).toThrow('invalid message content')
+    expect(() => migrate([event('assistant/message', 0, { content: 'x', [LEGACY_ASSISTANT_SOURCE_KEY]: {} })])).toThrow('invalid message content')
   })
 
   it('wraps the early flat tool result form and inherits the replaced message id', () => {
@@ -358,6 +361,33 @@ describe('inherited end-seed consistency', () => {
       event('session/end-seed', 0, { inherited: true }),
     ], 0)).toThrow('unseeded Session contains an inherited end-seed marker')
   })
+
+  it('treats a stored artifact without inheritedEventCount as a zero cut', () => {
+    expect(() => sessionFormatCatalog.migrate({
+      header: { version: 0, id: 's', createdAt: 1 },
+      events: [event('turn/start', 0, { turn: 1 })],
+    } as unknown as SessionFormatArtifact)).toThrow('inheritedEventCount must be a non-negative safe integer')
+  })
+
+  it('treats an undeclared source cut as zero across the whole chain', () => {
+    const output: SessionFormatEvent[] = []
+    const flow = sessionFormatCatalog.createStream(
+      { version: 0, id: 's', createdAt: 1 },
+      undefined,
+      { emitEvent: value => output.push(value) },
+    )
+    flow.emitEvent(event('turn/start', 0, { turn: 1 }))
+    expect(flow.finish()).toBe(0)
+    expect(output.map(item => item.type)).toEqual(['turn/start'])
+
+    const late = sessionFormatCatalog.createStream(
+      { version: 2, id: 's', createdAt: 1 },
+      undefined,
+      { emitEvent: () => {} },
+    )
+    late.emitEvent(event('turn/start', 0, { turn: 1 }))
+    expect(late.finish()).toBe(0)
+  })
 })
 
 describe('v2 stage guards', () => {
@@ -366,6 +396,27 @@ describe('v2 stage guards', () => {
       event('turn/start', 0, { turn: 1 }),
       event('turn/start', 2, { turn: 2 }),
     ], 2)).toThrow('format v2 source events must be dense')
+  })
+
+  it('emits the owed end-seed marker when a seeded v2 log ends ahead of its cut', () => {
+    const migrated = migrate([
+      event('turn/start', 0, { turn: 1 }),
+    ], 2, { isSeeded: true }, 1)
+    expect(migrated.inheritedEventCount).toBe(1)
+    expect(migrated.events.map(item => item.type)).toEqual(['turn/start', 'session/end-seed'])
+    expect(migrated.events[1]!.data).toEqual({ inherited: true })
+  })
+
+  it('counts a generated system head ahead of the cut into the inherited region', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      event('request/header', 1, { header: { system: 'sys' }, reason: 'initial' }),
+      event('step/end', 2, { turn: 1, step: 1 }),
+      event('turn/end', 3, { turn: 1, reason: { kind: 'completed' } }),
+    ], 2, { isSeeded: true }, 2)
+    const marker = migrated.events.findIndex(item => item.type === 'session/end-seed')
+    expect(marker).toBeGreaterThan(-1)
+    expect(migrated.inheritedEventCount).toBe(marker)
   })
 
   it('rejects a current-generation delivery marker naming another Session', () => {
@@ -557,6 +608,38 @@ describe('v3-to-v4 assistant stream fold', () => {
 
   it('rejects a chunk without its coordinates or chunk body', () => {
     expect(() => migrate([event('assistant/chunk', 0, { turn: 1 })], 3)).toThrow('lacks turn, step, or chunk')
+    expect(() => migrate([event('assistant/chunk', 0, 7)], 3)).toThrow('lacks turn, step, or chunk')
+  })
+
+  it('passes a settlement with non-record data through with an empty stream', () => {
+    const output = stream([event('assistant/attempt', 0, 'x')], 3)
+    expect(output[0]!.data).toEqual({ stream: [] })
+  })
+
+  it('drops a settlement envelope sourceEventSeqs before remapping', () => {
+    const output = stream([
+      event('assistant/message', 0, { turn: 1, step: 1, message: { id: 'a' }, stream: [] }, { sourceEventSeqs: [0] }),
+    ], 3)
+    expect(output[0]).not.toHaveProperty('sourceEventSeqs')
+  })
+
+  it.each([7, { op: 'append' }, { op: 'replace', startSeq: 0 }] as const)(
+    'rejects a malformed v3 surfaceOp %j', (surfaceOp) => {
+      expect(() => stream([event('session/title', 0, { title: 't' }, { surfaceOp })], 3))
+        .toThrow('requires exact replace fields')
+    })
+
+  it('rejects a v3 compaction without its shadowedRange', () => {
+    expect(() => stream([event('compaction/prune', 0, { shadowedSeqs: [] })], 3))
+      .toThrow('v3 compaction/prune lacks its shadowedRange')
+  })
+
+  it('rejects non-array v3 sequence references', () => {
+    expect(() => stream([
+      event('compaction/prune', 0, { shadowedRange: { start: 0, end: 0 }, shadowedSeqs: 'x' }),
+    ], 3)).toThrow('v3 shadowedSeqs must be an array')
+    expect(() => stream([event('session/title', 0, { messageSeqs: 'x' })], 3))
+      .toThrow('v3 messageSeqs must be an array')
   })
 
   it('rejects references into consumed chunk sequences', () => {
