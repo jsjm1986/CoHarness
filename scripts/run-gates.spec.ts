@@ -266,7 +266,7 @@ describe('gate graph validation', () => {
     const ids = withPnpmEntrypoint(() => gatesForMode('hygiene').map(subject => subject.id))
 
     expect(ids).toEqual([
-      'rescope-vendor', 'knip', 'publint', 'constraints', 'default-product-isolation', 'package-dependencies',
+      'vendored-links', 'rescope-vendor', 'knip', 'publint', 'constraints', 'default-product-isolation', 'package-dependencies',
       'application-entrypoints', 'dsh-package-licenses', 'package-invariants', 'built-package-invariants', 'node-next-types',
       'optional-dependency-imports', 'client-packages', 'client-ui-i18n', 'plugin-surfaces', 'no-bare-dispatcher', 'cordis-config',
       'runtime-closure',
@@ -558,6 +558,21 @@ describe('Typert contract preparation', () => {
 })
 
 describe('Node compatibility graph', () => {
+  it('uses the parent build for Node 22 nested compatibility without another artifact writer', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(process.versions, 'node')
+    if (descriptor === undefined) throw new Error('Node version property is unavailable')
+    try {
+      Object.defineProperty(process.versions, 'node', { ...descriptor, value: '22.19.0' })
+      const parent = withPnpmEntrypoint(() => gatesForMode('ci-consumers'))
+      expect(parent.find(gate => gate.id === 'node-compat')?.needs).toEqual(['build'])
+      const nested = withPnpmEntrypoint(() => withEnv('DSH_NODE_COMPAT_USE_BUILD_OUTPUT', '1', () => gatesForMode('node-compat')))
+      expect(nested.some(gate => gate.id === 'build' || gate.id === 'build:web' || gate.id === 'typecheck')).toBe(false)
+      expect(nested.find(gate => gate.id === 'cli-lazy-search-startup-smoke')?.needs).toEqual([])
+      const standalone = withPnpmEntrypoint(() => gatesForMode('node-compat'))
+      expect(standalone.filter(gate => gate.id === 'build')).toHaveLength(1)
+      expect(standalone.find(gate => gate.id === 'cli-lazy-search-startup-smoke')?.needs).toEqual(['build'])
+    } finally { Object.defineProperty(process.versions, 'node', descriptor) }
+  })
   it('runs the jsdom environment smoke on every advertised Node line', () => {
     const subject = withPnpmEntrypoint(() => gatesForMode('node-compat'))
 
@@ -610,6 +625,7 @@ describe('Node 24 lane ownership', () => {
     expect(subject.find(item => item.id === 'node-compat')?.env).toEqual({
       DSH_BUILD_CLIENT_PROFILE: 'official',
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
+      DSH_NODE_COMPAT_USE_BUILD_OUTPUT: '1',
     })
     expect(subject.find(item => item.id === 'built-package-invariants')?.needs).toEqual(['build'])
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])

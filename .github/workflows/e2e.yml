@@ -120,4 +120,17 @@ jobs:
           DEEPSEEK_BASE_URL: https://api.deepseek.com
           DSH_E2E_MAX_WORKERS: 14
           DSH_EXAMPLE_MODE: lib
-        run: pnpm run test:e2e
+        run: pnpm run test:e2e --reporter=default --reporter=json --outputFile=.artifacts/provider-results.json
+
+      - name: Preserve real-provider evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-real-provider-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: e2e
+          DSH_PROVIDER_TEST_RESULTS: .artifacts/provider-results.json
+        with:
+          external: real-provider
+          status: ${{ job.status }}
+          command: pnpm run test:e2e (external DeepSeek API)

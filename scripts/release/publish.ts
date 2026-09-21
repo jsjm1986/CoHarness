@@ -20,6 +20,7 @@ import { parseArgs } from 'node:util'
 import { releaseFamily } from './families.ts'
 import { attempt, attemptEchoed, isEntry } from './process.ts'
 import { packedIdentity, readPublishOrder } from './tarball.ts'
+import { releaseCandidateVersion, verifyConfiguredReadiness } from './readiness.ts'
 
 /**
  * Registry codes that answer a write which did not settle, rather than a
@@ -145,6 +146,11 @@ async function main(): Promise<void> {
   // one counter answers "how far along is this run" for whoever is watching a
   // release that takes minutes per family.
   const order = readPublishOrder(directory)
+  const members = family.members(process.cwd())
+  family.verifyVersions(members)
+  const candidateVersion = releaseCandidateVersion(family, members, process.env.GITHUB_REF ?? '')
+  await verifyConfiguredReadiness(process.cwd(), family.id, candidateVersion, 'publish',
+    order.map(filename => join(directory, filename)))
   const total = String(order.length)
   let published = 0
   let skipped = 0

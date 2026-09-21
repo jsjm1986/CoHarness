@@ -40,3 +40,9 @@ Gateway 需要配置 `HGW_FCM_PROJECT_ID` 和 `HGW_FCM_SERVICE_ACCOUNT_FILE` 才
 原生 module 默认启用 JPush（`cn.jiguang.sdk:jpush:6.2.0`）。通过 Gradle 属性或环境变量设置 `JPUSH_APPKEY`；在 JPush 注册的 Android 包名必须是 `com.coharness`。薄壳只在 Android 通知权限获准后初始化 JPush，并在后续启动中记住该授权。Gateway 同时设置 `HGW_JPUSH_APP_KEY` 与 `HGW_JPUSH_MASTER_SECRET` 后才会发送 JPush 通知。只使用 JPush 的构建不需要 `google-services.json`。
 
 可选厂商插件由 `JPUSH_ENABLE_HUAWEI`、`JPUSH_ENABLE_FCM`、`JPUSH_ENABLE_XIAOMI`、`JPUSH_ENABLE_OPPO`、`JPUSH_ENABLE_VIVO`、`JPUSH_ENABLE_MEIZU` 和 `JPUSH_ENABLE_HONOR` 控制。华为构建还需要 `android/app/agconnect-services.json`；FCM 构建需要 `android/app/google-services.json`。FCM 客户端默认使用 `25.1.1`，如果厂商兼容矩阵要求其他版本，可以通过 `FCM_MESSAGING_VERSION` 覆盖。AppKey、Secret、Firebase service-account JSON 和厂商配置文件都必须放在 Git 之外。
+
+## 验证
+
+根目录命令 `pnpm run check:android` 构建普通 debug 与插桩 APK，执行 Android lint 和单元测试，需要 Java 21 与 SDK 36。CI 通过私有 HTTP 端点执行 `test:android:protocol`，再通过 `check:android:bridge` 在指定模拟器上执行下载的 APK。原生测试保留 `NATIVE_PUSH_ENABLED=true`，验证真实 MainActivity 到 WebView 的事件路径，diagnostic APK 不能提供这类证据。验证 APK 使用私有回环端点，debug 变体仅对回环地址允许明文连接。
+
+纯 Web 内容变化继续使用移动 Web 验证。原生输入和通知协议变化会选择 Android 检查。编译、桥接插桩和真实推送送达是不同证明。真实推送验收由指定测试设备和已启用 Provider 承担；需要此证明的发行在缺少环境时无法放行。

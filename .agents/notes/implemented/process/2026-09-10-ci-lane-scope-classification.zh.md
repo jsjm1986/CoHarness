@@ -31,3 +31,5 @@ CI 现在记录了独立 lane 选择所需的 scope 元数据，并为共享运�
 ## 测试
 
 `pnpm exec vitest run scripts/ci-pr-scope.spec.ts scripts/ci-workflow.spec.ts scripts/run-gates.spec.ts scripts/incremental-coverage.spec.ts` 通过，覆盖 action-only、文档-only、模型输入、共享运行时、Gateway 和源码/依赖 scope 分类，以及 gate 图和严格 coverage map 解析。
+
+[候选提交绑定的证据决策](2026-09-21-candidate-bound-gate-evidence.zh.md)扩展消费方选检和发布验收，同时保留本注记的覆盖率与版本规则。

@@ -418,6 +418,17 @@ export function unrelatedRead(): void {
     }
   })
 
+  it('rejects a stale suppression in CI verification while preserving local fix diagnostics', async () => {
+    const path = join(repositoryRoot, 'scripts', `staged-lint-probe-${randomUUID()}.ts`)
+    try {
+      await writeFile(path, '// oxlint-disable-next-line no-console\nexport const value = 1\n')
+      const result = runRepositoryOxlint(['--config', '.oxlintrc.staged.json', '--format', 'unix', relative(repositoryRoot, path)], { CI: 'true' })
+      expect(result.error).toBeUndefined()
+      expect(result.status, normalizedOutput(result)).toBe(1)
+      expect(normalizedOutput(result)).toContain('Unused oxlint-disable directive')
+    } finally { await rm(path, { force: true }) }
+  })
+
   it('prints only the final diagnostics when a fix retry still fails', async () => {
     const suffix = randomUUID()
     const path = join(repositoryRoot, 'scripts', `staged-lint-probe-${suffix}.ts`)

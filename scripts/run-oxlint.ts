@@ -32,7 +32,14 @@ export interface OxlintInvocation {
  */
 export function resolveOxlintInvocation(args: readonly string[], env: NodeJS.ProcessEnv): OxlintInvocation {
   const resolvedArgs = [...args]
-  if (env.CI === 'true' && !hasOutputFormat(args)) resolvedArgs.push('--format=default')
+  const ci = env.CI === 'true' || env.CI === '1'
+  if (ci && !isFixInvocation(args)) {
+    if (args.some(arg => arg.startsWith('--report-unused-disable-directives'))) {
+      throw new Error('run-oxlint: CI verification owns unused-disable severity; remove the direct override.')
+    }
+    resolvedArgs.push('--report-unused-disable-directives-severity=error')
+  }
+  if (ci && !hasOutputFormat(args)) resolvedArgs.push('--format=default')
   const raw = env.DSH_OXLINT_THREADS
   if (raw === undefined || raw === '') return { args: resolvedArgs, env: { ...env } }
   const parsed = Number.parseInt(raw, 10)

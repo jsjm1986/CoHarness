@@ -20,6 +20,8 @@ import { parseArgs } from 'node:util'
 import { validateTarballPayload } from './publication-payload.ts'
 import { discoverNpmBaselineManifests } from './npm-baseline-packages.ts'
 import { isPublishableWorkspaceDirectory } from './workspace-package-policy.ts'
+import { releaseFamily } from './release/families.ts'
+import { releaseCandidateVersion, verifyConfiguredReadiness } from './release/readiness.ts'
 
 const DEFAULT_REGISTRY = 'https://registry.npm.harnessment.com'
 const DEFAULT_OUTPUT_DIRECTORY = '.artifacts/npm-baseline'
@@ -621,6 +623,15 @@ class RegistryPublication {
   ) {}
 
   async publish(assumeYes: boolean): Promise<void> {
+    const root = resolve(import.meta.dirname, '..')
+    const family = releaseFamily('dsh')
+    const version = releaseCandidateVersion(family, family.members(root), process.env.GITHUB_REF ?? '')
+    const commit = this.runner.capture('git', ['rev-parse', 'HEAD'], root)
+    if (this.bundle.manifest.commit !== commit || this.bundle.manifest.version !== version) {
+      throw new Error('baseline publication requires the committed release identity; use the protected family workflow for timestamp-rewritten bundles')
+    }
+    await verifyConfiguredReadiness(root, 'dsh', version, 'publish',
+      this.bundle.manifest.packages.map(pkg => this.bundle.tarballPath(pkg)))
     this.pingRegistry()
     this.requireIdentity()
     if (!assumeYes) await this.confirm()

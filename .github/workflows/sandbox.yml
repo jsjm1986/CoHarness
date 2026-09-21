@@ -143,3 +143,15 @@ jobs:
           echo "$out"
           [ "$status" -eq 0 ]
           echo "$out" | grep -qE 'Test Files[[:space:]]+1 passed \(1\)'
+
+      - name: Preserve real-kernel evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-sandbox-${{ matrix.runner }}-${{ matrix.os }}-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: sandbox e2e (${{ matrix.runner }}, ${{ matrix.os }})
+        with:
+          external: sandbox-${{ matrix.runner }}
+          status: ${{ job.status }}
+          command: world-verified sandbox e2e

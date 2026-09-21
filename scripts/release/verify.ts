@@ -10,6 +10,7 @@
 import { parseArgs } from 'node:util'
 import { isEntry } from './process.ts'
 import { releaseFamily, type PublishPlan, type ReleaseFamily, type ReleaseMember } from './families.ts'
+import { releaseCandidateVersion, verifyConfiguredReadiness } from './readiness.ts'
 
 /**
  * Print the publish order the release will follow, and the peer declarations it
@@ -71,7 +72,7 @@ function verifyTag(family: ReleaseFamily, members: readonly ReleaseMember[], ref
 }
 
 /** Run the verification for the family named by `--family`. */
-function main(): void {
+async function main(): Promise<void> {
   const { values } = parseArgs({
     options: { family: { type: 'string' } },
     allowPositionals: false,
@@ -96,6 +97,8 @@ function main(): void {
   if (publishing) {
     verifyPublishable(members)
     verifyTag(family, members, process.env.GITHUB_REF ?? '')
+    await verifyConfiguredReadiness(process.cwd(), family.id,
+      releaseCandidateVersion(family, members, process.env.GITHUB_REF ?? ''), 'preflight', [])
   }
 
   const versions = [...new Set(members.map(member => member.version))]
@@ -107,4 +110,4 @@ function main(): void {
   )
 }
 
-if (isEntry(import.meta.url)) main()
+if (isEntry(import.meta.url)) await main()

@@ -20,7 +20,8 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { isAbsolute, relative, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 
@@ -48,6 +49,39 @@ const REVIEW_STATES = new Set([
 
 const COMMIT_ID = /^[0-9a-f]{40,64}$/
 const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Verify that recorded gate adaptations still refer to the current upstream input and executable regressions.
+ * @param root - source checkout.
+ * @param upstreamCommit - current pinned comparison target.
+ * @param matrix - active non-package alignment record.
+ */
+export function checkGateReplays(root: string, upstreamCommit: string, matrix: unknown): void {
+  if (!isRecord(matrix) || !Array.isArray(matrix.rows)) fail('gate replay matrix has no rows')
+  const replays: unknown[] = matrix.rows.flatMap((row: unknown): unknown[] =>
+    isRecord(row) && Array.isArray(row.gateReplays) ? row.gateReplays as unknown[] : [])
+  if (replays.length === 0) fail('active gate replay inventory is empty')
+  const paths = new Set<string>()
+  for (const raw of replays) {
+    if (!isRecord(raw)) fail('gate replay must be an object')
+    const path = requireString('gate replay', raw.path, 'path')
+    if (paths.has(path)) fail(`duplicate gate replay ${path}`)
+    paths.add(path)
+    if (raw.reviewedUpstreamCommit !== upstreamCommit) fail(`gate replay ${path} requires review against the new upstream target`)
+    if (!COMMIT_ID.test(String(raw.upstreamBlob))) fail(`gate replay ${path} has no upstream source identity`)
+    const blob = execFileSync('git', ['rev-parse', '--verify', `${upstreamCommit}:${path}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+    if (blob !== raw.upstreamBlob) fail(`gate replay ${path} has changed upstream input; replay and re-review are required`)
+    requireString(path, raw.replay, 'replay')
+    requireString(path, raw.retireWhen, 'retireWhen')
+    if (!Array.isArray(raw.regressions) || raw.regressions.length === 0) fail(`gate replay ${path} has no regressions`)
+    const regressions: unknown[] = raw.regressions
+    for (const value of [path, ...regressions]) {
+      const ref = requireString(path, value, 'source reference')
+      if (isAbsolute(ref) || relative(root, resolve(root, ref)).startsWith('..') || !existsSync(resolve(root, ref))) {
+        fail(`gate replay ${path} has a missing or invalid source reference ${ref}`)
+      }
+    }
+  }
+}
 
 function fail(message: string): never {
   throw new Error(`upgrade-records: ${message}`)
@@ -157,8 +191,9 @@ function recordsIn(dir: string, prefix: string, suffix: string): string[] {
  * @param path - inventory file path, for error messages.
  * @param inventory - parsed `UPSTREAM-COMMIT-INVENTORY-*.json`.
  * @param matrix - parsed matrix whose rows claim the commits.
+ * @param matching - frozen historical inventories retain their original prefix interpretation; current proof uses directory segments.
  */
-export function checkInventoryCoverage(path: string, inventory: unknown, matrix: unknown): void {
+export function checkInventoryCoverage(path: string, inventory: unknown, matrix: unknown, matching: 'segments' | 'historical' = 'segments'): void {
   if (!isRecord(inventory) || !Array.isArray(inventory.commits)) return
   const claimed = new Set<string>()
   const scopes: string[] = []
@@ -178,7 +213,12 @@ export function checkInventoryCoverage(path: string, inventory: unknown, matrix:
     if (!isRecord(commit) || (commit.bucket !== 'carried' && commit.bucket !== 'newUpstream') || typeof commit.sha !== 'string') continue
     if (claimed.has(commit.sha)) continue
     const packages = Array.isArray(commit.packages) ? commit.packages.filter((p): p is string => typeof p === 'string') : []
-    if (packages.some(key => scopes.some(prefix => `packages/${key}`.startsWith(prefix) || prefix.startsWith(`packages/${key}`)))) continue
+    if (packages.some(key => scopes.some((prefix) => {
+      if (matching === 'historical') return `packages/${key}`.startsWith(prefix) || prefix.startsWith(`packages/${key}`)
+      const scope = prefix.replace(/\/+$/, '')
+      const path = `packages/${key}`
+      return path === scope || path.startsWith(scope + '/') || scope.startsWith(path + '/')
+    }))) continue
     uncovered.push(commit.sha)
   }
   if (uncovered.length > 0) {
@@ -187,6 +227,11 @@ export function checkInventoryCoverage(path: string, inventory: unknown, matrix:
 }
 
 function main(): number {
+  const sync = JSON.parse(readFileSync(resolve(root, 'scripts/upstream-sync.json'), 'utf8')) as {
+    syncedTag: string
+    syncedCommit: string
+    gateReplayRecord?: string
+  }
   let checked = 0
   const matrices = new Map<string, unknown>()
   for (const name of recordsIn(ALIGNMENT_DIR, 'UPSTREAM-ALIGNMENT-MATRIX-', '.json')) {
@@ -202,7 +247,7 @@ function main(): number {
     const tag = name.replace('UPSTREAM-COMMIT-INVENTORY-', '').replace('.json', '')
     const matrix = matrices.get(tag)
     if (matrix === undefined) fail(`${rel} has no matching UPSTREAM-ALIGNMENT-MATRIX-${tag}.json`)
-    checkInventoryCoverage(rel, parsed, matrix)
+    checkInventoryCoverage(rel, parsed, matrix, tag === sync.syncedTag ? 'segments' : 'historical')
     checked += 1
   }
   for (const name of recordsIn(MANIFEST_DIR, 'UPGRADE-MANIFEST-', '.json')) {
@@ -213,6 +258,9 @@ function main(): number {
     checked += 1
   }
   if (checked === 0) fail(`no upgrade records found under ${ALIGNMENT_DIR}/ or ${MANIFEST_DIR}/`)
+  const replayRecord = requireString('upstream sync', sync.gateReplayRecord, 'gateReplayRecord')
+  if (!replayRecord.startsWith(ALIGNMENT_DIR + '/') || relative(root, resolve(root, replayRecord)).startsWith('..')) fail('gate replay record must be an alignment matrix')
+  checkGateReplays(root, sync.syncedCommit, JSON.parse(readFileSync(resolve(root, replayRecord), 'utf8')) as unknown)
   console.log(`upgrade-records: ${String(checked)} record file(s) conform; every row carries commit coverage or an explicit reason.`)
   return 0
 }

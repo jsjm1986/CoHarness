@@ -84,3 +84,9 @@ Label a pull request `python-release-dry-run`, or manually run the GitHub `Relea
 Public publication runs from the private automation repository; package metadata points to the separate read-only public source mirror, which does not run release Actions. The private repository defines the repository variable `PYPI_PUBLISHER_REPOSITORY` as its own `owner/name` and keeps `PUBLIC_PYPI_RELEASE_ENABLED=false` except during an intentional release.
 
 Separate runtime and SDK jobs let an SDK upload failure resume without resending immutable runtime files. They accept `publish=true` only when the workflow runs from the configured publisher repository at the matching `python-v*` tag and the protected `pypi-runtime` and `pypi` environments approve the runtime and SDK jobs, respectively. PyPI Trusted Publishing still supplies short-lived OIDC credentials, but public attestations are disabled because they would disclose the private publisher identity.
+
+## Static validation and typing
+
+Run `pnpm run check:python:static` from the repository root. The locked quality group pins Ruff and checks syntax, undefined names and selected definite errors without formatting the SDK. Python CI executes this check alongside pytest. Strict mypy remains outside the required lane; the SDK owner reassesses its recorded typing debt when public API types change or the next upstream SDK update arrives.
+
+Python publication also requires the exact-commit run IDs described in [release evidence](../scripts/release/README.md); both protected publishers revalidate the tested wheels before upload.

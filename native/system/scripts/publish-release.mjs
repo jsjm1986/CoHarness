@@ -21,6 +21,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { root } from './repo.mjs';
+import { verifyConfiguredReadiness } from '../../../scripts/release/readiness.ts';
 
 /**
  * Registry codes that answer a write which did not settle, rather than a
@@ -134,6 +135,13 @@ const order = fs
   .readFileSync(path.join(destination, 'publish-order.txt'), 'utf8')
   .split('\n')
   .filter((line) => line !== '');
+
+const repositoryRoot = path.resolve(root, '../..');
+const candidateVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+if (process.env.GITHUB_REF !== `refs/tags/node-addon-system-v${candidateVersion}`) {
+  throw new Error('native publication requires the candidate landlock-run tag');
+}
+await verifyConfiguredReadiness(repositoryRoot, 'native', candidateVersion, 'publish', order.map(filename => path.join(destination, filename)));
 
 let published = 0;
 let skipped = 0;
