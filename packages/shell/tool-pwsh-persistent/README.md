@@ -54,7 +54,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### What the agent can rely on
 
-Commands share one shell per agent, so cwd, `$env:` variables, functions, and background jobs persist across calls. Results exclude the private completion markers, the shell prompt, and the echoed input line. A non-zero wrapped command appends `[exit code: N]` — the exact native exit code when the command ran a native program, `1` for a terminating PowerShell error. A shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` (Windows forced termination reports exit 1 without a signal), then resets and tells the agent the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly.
+Commands share one shell per agent, so cwd, `$env:` variables, functions, and background jobs persist across calls. Results exclude the private completion markers and the echoed input line. When the shell reads stdin again without having printed the completion marker — an interrupt, a replaced shell, or an interactive foreground child whose stdin wait the provider proves — the call returns the captured partial output, which can end with the backend's own prompt text. A non-zero wrapped command appends `[exit code: N]` — the exact native exit code when the command ran a native program, `1` for a terminating PowerShell error. A shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` (Windows forced termination reports exit 1 without a signal), then resets and tells the agent the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly.
 
 ### What can go wrong
 
@@ -73,7 +73,7 @@ This section explains the design decisions behind the tool and points at the cod
 ### Design philosophy
 
 - **A deliberate twin of `dsh-tool-bash-persistent`.** The session registry, polling loop, and reset contract mirror the persistent bash tool by design ([pwsh persistent PTY Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md)).
-- **Backend-owned prompt readiness.** The shell's `prompt` function belongs to the backend: it prints a BEL-terminated OSC marker plus the controlled printable prompt. The backend accepts recognized prompt text through its fast path and otherwise uses its own readiness checks or silence tier. The tool neither installs nor matches a prompt of its own.
+- **Backend-owned prompt readiness.** The shell's `prompt` function belongs to the backend: it prints a BEL-terminated OSC marker plus the controlled printable prompt, and that exact prompt text settles every command through the backend's fast path. The tool neither installs nor matches a prompt of its own, so only a model redefinition of `prompt` degrades readiness to the silence tier.
 - **PSReadLine echo stripped by anchoring.** PowerShell renders submitted input back into the stream; the marker-anchored extraction and a wrapper-source strip remove the echo, and a wrapper that wraps across the terminal width may leave a partial echo in partial-output results.
 - **Reset, never repair.** Any uncertain state — an explicit `exit`, a timeout, a send failure, an abort — closes the shell and starts the next call fresh.
 
@@ -81,7 +81,7 @@ This section explains the design decisions behind the tool and points at the cod
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: shell registry, prompt setup, command wrapping, scrollback polling, extraction and rendering |
+| [`src/index.ts`](src/index.ts) | Plugin entry: shell registry, command wrapping, scrollback polling, extraction and rendering |
 | — | No runtime invariant companion is published; the adapter's private owner-to-shell cache has no observable event or data relation. Lifecycle tests prove its cleanup without adding a public API solely for an invariant. |
 
 ### Command flow
@@ -128,7 +128,7 @@ Prefix-stable while the configured description and schema remain unchanged.
 
 #### What the model sees
 
-Commands share one shell per Agent, so cwd, `$env:` variables, functions, and background jobs persist across calls. Results exclude private completion markers, the shell prompt, and the echoed input line (PSReadLine renders submitted input back into the stream; the marker-anchored extraction and the wrapper-source strip remove it). A nonzero wrapped command appends `[exit code: N]` — the exact native exit code when the command ran a native program, `1` for a terminating PowerShell error. A shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` when the backend supplies neither (Windows forced termination reports exit 1 without a signal), then resets and tells the model that the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly. Timeout returns bounded partial output, closes the uncertain shell, and reports the reset.
+Commands share one shell per Agent, so cwd, `$env:` variables, functions, and background jobs persist across calls. Results exclude private completion markers and the echoed input line (PSReadLine renders submitted input back into the stream; the marker-anchored extraction and the wrapper-source strip remove it). When the shell reads stdin again without having printed the completion marker — an interrupt, a replaced shell, or an interactive foreground child whose stdin wait the provider proves — the call returns the captured partial output, which can end with the backend's own prompt text. A nonzero wrapped command appends `[exit code: N]` — the exact native exit code when the command ran a native program, `1` for a terminating PowerShell error. A shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` when the backend supplies neither (Windows forced termination reports exit 1 without a signal), then resets and tells the model that the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly. Timeout returns bounded partial output, closes the uncertain shell, and reports the reset.
 
 #### Token effect
 
@@ -149,7 +149,7 @@ These limits define when the tool is a poor fit or needs special care. They are 
 - **Input echo is unavoidable** — PowerShell's PSReadLine renders submitted input back into the terminal stream, and there is no `stty -echo` equivalent. The marker-anchored extraction excludes the echo in complete results; the wrapper-source strip covers fallback paths, but a wrapper that wraps across the terminal width may leave a partial echo in partial-output results, bounded by `maxOutputChars`.
 - **Raw ESC characters inside model commands are unsupported** — PSReadLine consumes them before execution. The wrapper escapes the control bytes it needs (`[char]27`-built OSC markers, backtick escapes for the body).
 - **A model redefinition of the `prompt` function removes the readiness marker** — the shell then settles on the silence tier instead of the marker fast path.
-- **There is no interactive stdin during a command** — a foreground command that reads input blocks until the command timeout, which resets the shell.
+- **There is no interactive stdin during a command** — a foreground child that reads input returns early with partial output only where the provider proves its stdin wait; elsewhere the call runs to `timeoutMs`, which resets the shell.
 - **SIGTSTP/SIGHUP are unavailable on Windows** (backend-rejected); SIGINT is delivered as a console-wide Ctrl-C input write, which at a prompt cancels the pending line instead of signalling a process.
 - **Under the Windows ACL sandbox's read-only mode, pwsh starts in ConstrainedLanguage**, which may deny the bootstrap's `[Console]::` encoding pin and prompt marker. Commands can still settle through the printable prompt and silence tier, but non-ASCII output may follow the host code page.
 - **The BEL-terminated OSC marker remains a readiness signal only** — a BEL event channel to the model stays deferred, aligned with the current implementation.

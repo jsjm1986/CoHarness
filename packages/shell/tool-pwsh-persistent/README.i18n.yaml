@@ -24,8 +24,8 @@
   en: 6faae7346983f822
   zh: c9b267634d4adffa
 /deepseek-ai-dsh-tool-pwsh-persistent/use-this-package/what-the-agent-can-rely-on:
-  en: d4b8f9865f1e4763
-  zh: b0cf654a00cf9766
+  en: 9f4c22b06f940caf
+  zh: 61f755cec7ff5b76
 /deepseek-ai-dsh-tool-pwsh-persistent/use-this-package/what-can-go-wrong:
   en: 6080d95206030961
   zh: b14dd2ea6b2dd859
@@ -33,11 +33,11 @@
   en: 8d94a7381bca3fa9
   zh: f4bd2866fff6fa8d
 /deepseek-ai-dsh-tool-pwsh-persistent/understand-the-implementation/design-philosophy:
-  en: b9b75c3251f29f02
-  zh: 9114aad4726f6d0c
+  en: b8544c7025ef7f9e
+  zh: 573b0ec492dde975
 /deepseek-ai-dsh-tool-pwsh-persistent/understand-the-implementation/source-map:
-  en: 0f796c2aedf01e72
-  zh: 1ac75a785c3f0d9d
+  en: bb2d17f1385fb11d
+  zh: 8e103837238ccda2
 /deepseek-ai-dsh-tool-pwsh-persistent/understand-the-implementation/command-flow:
   en: 7440916d998ed5bd
   zh: 66f70f803c519802
@@ -63,8 +63,8 @@
   en: beaabb79f229692a
   zh: 8573891441963be4
 /deepseek-ai-dsh-tool-pwsh-persistent/model-experience/tool-results/what-the-model-sees:
-  en: dcd03670ad857fbe
-  zh: 8d0fd6ea7bda7ce3
+  en: bc99957e721951de
+  zh: e384874a0f2f63e8
 /deepseek-ai-dsh-tool-pwsh-persistent/model-experience/tool-results/token-effect:
   en: 5dea04ce6a30ad48
   zh: c2434253dc517d3d
@@ -72,8 +72,8 @@
   en: ba6a48888c3361e5
   zh: 271fcbd07a3644cb
 /deepseek-ai-dsh-tool-pwsh-persistent/known-limitations-and-deferred-work:
-  en: 8d8da5497c08d365
-  zh: 6a462edeb4fc8cea
+  en: 20977f6d57d2ae87
+  zh: e039553031e17faa
 /deepseek-ai-dsh-tool-pwsh-persistent/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

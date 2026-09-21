@@ -124,14 +124,13 @@ describe.skipIf(!hasPwsh)('persistent pwsh through a real cordis.yml Loader comp
       '    shellDialect: pwsh',
       '    pollIntervalMs: 10',
       '    exactProbeAfterMs: 20',
-      '    idleSilenceMs: 300',
       // The silence tier keeps its product default; the case body records each
       // send's wait reason, which pins the controlled-prompt fast path directly
       // instead of relying on how long silence would take to settle.
       '    handoffGraceMs: 300',
-      // The macOS lane's prompt tail arrives past the plain silence bound; the tolerance keeps
-      // those sends on the controlled-prompt path this case pins.
-      '    promptTailGraceMs: 5000',
+      // promptTailGraceMs keeps its product default (0): the self-hosted Windows failures of
+      // 2026-09-25..27 settled at the plain silence bound with the tolerance present and absent
+      // alike, so it never applied there and would only lengthen a never-arriving-tail fallback.
       '    scrollbackLines: 20000',
       // The first call pays the full pwsh cold-start latency (spawn + .NET +
       // PSReadLine + Defender) inside the tool deadline; a 60s bound on the
