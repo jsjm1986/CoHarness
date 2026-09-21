@@ -296,7 +296,8 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
     const jobs = object(await authority.jobs(repository, Number(runId), Number(attempt)), 'GitHub jobs')
     const matching = rows(jobs.jobs, 'GitHub jobs').map(job => object(job, 'job')).filter(job =>
       job.name === producer.job || (typeof job.name === 'string' && job.name.endsWith(' / ' + text(producer.job, 'producer job'))))
-    if (matching.length > 1 || (verdict && (matching.length !== 1 || matching[0]?.conclusion !== 'success'))) {
+    const authoritativeJob = matching.length === 1 ? matching[0] : undefined
+    if (matching.length > 1 || (verdict && (authoritativeJob === undefined || authoritativeJob.conclusion !== 'success'))) {
       throw new Error('release readiness: authoritative job did not succeed')
     }
     const authoritative = await authority.report(repository, Number(runId), text(producer.artifact, 'evidence artifact'), basename(proofPath))
@@ -310,8 +311,8 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
         throw new Error('release readiness: a source check is not published-artifact proof')
       }
     }
-    if (matching.length === 1) {
-      assertEvidenceEnvironment(environment, object(stable.environment, 'environment'), matching[0], String(run.path))
+    if (authoritativeJob !== undefined) {
+      assertEvidenceEnvironment(environment, object(stable.environment, 'environment'), authoritativeJob, String(run.path))
     }
     coveredEnvironments.add(environment)
     const artifacts = stable.artifacts
