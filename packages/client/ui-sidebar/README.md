@@ -35,3 +35,7 @@ None; this package neither assembles nor sends a provider request.
 - **Session state-dot rendering is owned by [ui-workspace](../ui-workspace/README.md)** — no done/error notification sources are available.
 - **Workspace browser behavior is composition-owned** — grouping, ordering, search, and row state belong to [ui-workspace](../ui-workspace/README.md), not this shell.
 - **"New task completed" unread marking is local viewing state** — completion-time > last-seen never reaches the host.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The sidebar contributes shell seats and collapse chrome; Workspace and Session rows are owned by `ui-workspace` and their data by runtime mirrors.

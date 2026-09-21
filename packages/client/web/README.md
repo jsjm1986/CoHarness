@@ -29,3 +29,7 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **The application waits for the full roster** — one failed entry keeps the framework-free boot page visible with a per-entry report; partial UI availability is not supported.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Boot is a one-shot module-load and plugin-mount sequence; a failed entry keeps the static boot page and there is no ongoing relation to observe.

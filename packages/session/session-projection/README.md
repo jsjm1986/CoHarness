@@ -53,3 +53,7 @@ None; projections never assemble or send provider requests.
 - **Eager drive touches every unit per event** — cheap by construction (whole-value rule, same-reference gate), but a hot path would justify per-unit event-type prefilters, addable without contract change.
 - **Registry cells live in memory only** — a restart rebuilds by folding the log on first touch; compositions that mount `dsh-session-projection-cache` seed that fold from persisted rows instead.
 - **Synchronous unit discipline is only partially mechanical** — `wire.viewSchema.parse` rejects a Promise-returning view, but an `apply` that blocks or reads torn non-session state is a review concern; the invariant companion documents why no runtime check exists.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Registered units are pure folds driven over committed events; drive state is itself derived from the same log.

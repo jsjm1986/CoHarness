@@ -33,3 +33,7 @@ No direct invalidation; the presentation is fixed when the agent is composed, so
 ## Known Limitations and Deferred Work
 
 - **The runtime stays host-plane** — a preset can select PTC mode but cannot supply the TypeScript runtime it needs; a deployment that composes none can compose no ptc preset.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes one declarative preset row consumed at composition time; it owns no runtime state.

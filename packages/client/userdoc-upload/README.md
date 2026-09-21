@@ -26,3 +26,7 @@ None; the package never assembles or sends provider requests.
 - **One active file per call** — the host UI owns multi-file sequencing and cancellation; this package deliberately keeps one resumable state machine per selected file.
 - **Browser storage is best-effort** — private-mode or quota-restricted browsers may lose the bounded session metadata, after which the server still retains the session until its configured expiry but the user must select the file again without a local session id.
 - **Host adapters own authentication and route availability** — the uploader only maps the callbacks supplied by its consumer and cannot refresh credentials or discover an unavailable document service.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Resume metadata is transient browser-side protocol state; the authoritative document record lands in the user-docs backend through the resumable-v1 protocol.

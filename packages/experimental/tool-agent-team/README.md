@@ -51,3 +51,7 @@ With the same provider/model, shared system policy, and tool schemas, a fork ret
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
 - **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
 - **No Web controls** — browser roster and task-board presentation is outside this runtime package.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter installs tool and policy registrations into team scopes; team definitions and lifecycle stay owned by `ctx.agentTeams`.

@@ -87,3 +87,7 @@ Checks observe assembled requests and durable state without mutating request con
 - Request reconstruction covers requests explicitly marked by the loop before freezing; direct one-shot LLM calls remain outside that marker contract even when callers freeze them or attach a session id.
 - Live-only lifecycle companions cannot reconstruct operations that began before their own reload. Standard and test compositions mount them before the corresponding operations begin.
 - Regular-expression filters are fixed for the service lifetime; changing them requires ordinary Cordis plugin reload.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package is the registry that evaluates other packages' companions; it asserts no product-domain relation of its own.

@@ -70,3 +70,7 @@ None of its own. Reports travel over RPC and are stored, not appended to the con
 - The plugin declares `remote.dynamic`, so it stays parked until the host-side namespace exists rather than loading packages whose host half it could never reach.
 - Slot admission (allow/deny lists per deployment) has no carrier: the dispatched row declares services, not target slots.
 - Guard whitelists are hand-mirrored twins of the host-side sandbox facade; sharing one specification is deferred.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The page performs one mount/retract round trip per host event while the definition registry lives in the host runner; mounted fibers follow ordinary plugin disposal proven by specs.

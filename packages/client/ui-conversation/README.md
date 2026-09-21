@@ -110,3 +110,7 @@ None; Conversation assembly and browser input state do not alter provider-side p
 - **TodoPanel truncates long item text to one ellipsized line** — the figma strip has no wrap or expand affordance; full text is not readable inline.
 - **Queue edit is text-only** — rows containing non-text blocks still show a flattened preview, but their edit control is disabled because the inline editor cannot preserve those blocks. A text row's edit mode replaces delete and strict steer with save and cancel; Enter saves and Escape cancels.
 - **Queue strict steer preserves complete messages** — while the Agent is running, the steer action atomically transfers the addressed Queue occurrence into the current next-step window. Mixed-content rows remain eligible because the action forwards the immutable message instead of the text projection. The placement-aware Host snapshot renders pending steering at the conversation tail until the consumed `user/message` folds into the durable transcript, so immediate display, reconnect, and replay share one linear authority.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Conversation nodes, turns, and composer state are projected by the runtime and Host seams; the package contributes the views and controllers that render them.

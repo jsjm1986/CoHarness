@@ -31,3 +31,7 @@ None; this package neither assembles nor sends a provider request.
 - **Global source layer only** — session-scope source registration (per-session shadowing, ScopedLayers-alike) is designed but not enabled; the ledger tracks the trigger condition (a real per-session source need).
 - **Extension icons are display-only** — built-in `file`, `folder`, and `session` values use shared glyphs; sources may also provide a shared icon component, while arbitrary strings remain text-compatible.
 - **Overlay SlotMap merge home is split from slot ownership** — the sole `conversation.input.overlay` merge lives here, while ui-conversation owns its anchor, children declaration, and lifecycle because the dependency direction is ui-conversation → ui-input-trigger.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The trigger source roster is an effect-owned registration set proven by the HMR-safety spec; arbitration is per-request controller state with no durable relation.

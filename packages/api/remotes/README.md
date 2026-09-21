@@ -43,3 +43,7 @@ No direct effect; mounted Host capabilities own any model-visible behavior they 
 - The capability set is fixed by explicit build-time value imports; the Client does not discover the Host's active Services or Remote definitions at runtime.
 - Additional capabilities require an explicit `/remote` value import and mount in this assembly.
 - The standard Web Host supplies resume defaults and Agent-scope setup from the legacy API Proxy until that remaining BFF configuration moves into `api-remotes`.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Every contribution is mounted through `ctx.remote.$mount()` as an effect withdrawn with the assembly fiber, and identity resolution is per-call policy over the live Agent registry.

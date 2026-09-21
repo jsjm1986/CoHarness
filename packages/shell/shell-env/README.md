@@ -53,3 +53,7 @@ The managed environment never enters the request prefix, so it does not invalida
 ## Known Limitations and Deferred Work
 
 - **`list()` enumerates contributor-declared variables only** — registry-owned built-ins (`DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`) are not included, so diagnostics, prompt, or UI code must not treat `list()` as an exhaustive environment catalog.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The registry is a contribution set with effect-scoped disposal; collected variables are computed per shell call from the registered facts.

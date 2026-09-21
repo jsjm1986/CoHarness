@@ -146,3 +146,7 @@ Loop-retained response blocks append to the next request and preserve its earlie
 - **Requests use raw `fetch`, not `@cordisjs/plugin-http`** — no shared proxy/interception configuration; adoption is deferred until a second adapter wants it (`TODO(http)`).
 - **Plugin-added content block types are skipped** — core text and supported image blocks are serialized, and empty tool output crosses the wire as the literal `(no output)`.
 - **Images are input-only durable attachments** — direct external URLs and assistant image output are not supported; DeepSeek input normally uses the Files API and uses inline base64 only for per-request recovery.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter is a stateless wire translator per request; stream lifecycle is owned by the caller and asserted by adapter specs.

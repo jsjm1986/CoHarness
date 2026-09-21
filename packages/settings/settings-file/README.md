@@ -47,3 +47,7 @@ No direct invalidation; the consuming plugin owns any request-prefix changes.
 - **A missed watcher event stays unseen until the next signal** — reads never re-stat the file, so a change the watcher fails to report is only folded in by the next event, the next write, or a restart.
 - **Comment preservation is YAML-only and map-shaped** — JSON documents re-serialize without comments (JSON has none), and comments inside a changed array (or attached inline to a changed scalar value) go with the value they described.
 - **No value indirection** — sections hold literal values; `${env:VAR}`-style references for secrets are a deferred seam-level feature.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The document on disk is the single authority: updates re-read it under a writer lock before writing back, and external edits republish, so no second durable copy exists to diverge.

@@ -23,3 +23,7 @@ No direct invalidation; the knob consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **The Settings row is Web-only** — non-Web clients may still switch the current session through `/permission`, but do not receive this browser contribution.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The row binds one Host-owned Settings descriptor and preset data stays in the host permission domain; nothing package-owned persists to compare.

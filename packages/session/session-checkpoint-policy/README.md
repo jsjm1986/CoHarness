@@ -47,3 +47,7 @@ The repair result is appended after the reusable prefix, so it does not invalida
 - The policy durably records execution intent, not generic exactly-once effects. Side-effecting tools should forward `exec.callId` as an idempotency key when their provider supports one.
 - Streaming `assistant/chunk` events have no per-chunk checkpoint. Bounded background batches normally persist them before the next semantic checkpoint, but a hard crash may lose the current in-memory batch or outstanding write.
 - A persisted call without a result cannot prove whether its external effect completed. Recovery therefore records an unknown outcome instead of retrying automatically.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The policy triggers checkpoints on the owning session at defined boundaries; it stores no checkpoint data itself.

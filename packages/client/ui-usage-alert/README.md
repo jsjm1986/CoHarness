@@ -20,3 +20,7 @@ None; the package never assembles or sends provider requests.
 ## Known Limitations and Deferred Work
 
 - **Mount-time refresh only** — a threshold crossed while one tab remains open appears after the next page load; the gateway remains the durable alert owner.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The banner displays durable quota crossings already computed by the Gateway from a single advisory read; it owns no usage state.

@@ -26,3 +26,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **Consumed through repository source aliases only.** Specs resolve the package through tsconfig `paths` to `src`; the built `lib/` artifact re-exports `@deepseek-ai/dsh-client-runtime/client`, whose bundle is a browser loader script with no Node ESM exports, so `lib/index.js` is not importable under plain Node. Every consumer is an in-repository Vitest suite; there is no Node-compatible runtime entry.
 - **Conversation snapshots are fixture data, not replayed history.** `updateSnapshot` writes the snapshot store directly; the wire-to-snapshot computation stays covered by the runtime package's own tests and the replay e2e. A fixture can therefore express states the production projection would never produce.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A test-only assembly of typed doubles around the production slot registry; it owns no product runtime state.

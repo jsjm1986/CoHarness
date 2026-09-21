@@ -34,3 +34,7 @@ Independent of live requests: the hub never touches a request prefix, so it cann
 
 - **`kv` is the only data shape** — backends currently have one facet to implement.
 - **Forms resolve lazily** — reading `ctx.storage.domain` before the domain plugin mounts throws `form-not-mounted`; assemblies order plugins accordingly (misconfiguration fails loud rather than silently deferring).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The hub is a named registry of backends and mounted data forms; it performs no IO and owns no records.

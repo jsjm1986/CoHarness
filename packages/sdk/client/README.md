@@ -53,3 +53,7 @@ None in the client process. Profile, patch, provider, model, and history choices
 - **No mid-turn cancel** — the wire has no prompt-cancel method; abandoning a turn means closing the runtime (see the protocol's [Known Limitations](../protocol/README.md)).
 - **No per-prompt result or cancel** — low-level `prompt()` returns only an enqueue receipt; high-level `run()` owns receipt-to-idle collection, and abandoning it means closing the runtime.
 - **Client→server notifications and server→client requests are unimplemented** on both wire ends; the transport carries them for future approval flows.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure library with no plugin surface; request correlation and subscription delivery are covered by unit specs and it owns no harness-side state.

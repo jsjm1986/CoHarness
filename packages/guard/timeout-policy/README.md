@@ -59,3 +59,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Cooperative, never a hard kill** — the deadline only notifies via `exec.signal`; a tool that ignores the signal does not stop on timeout (see § Cooperative, not a hard kill).
 - **No blanket budget** — only tools that declare `timeoutMs` on their `ToolDefinition` get a deadline; there is no registry-wide default for undeclared tools (the shipped `bash`/`read`/`write`/`edit` deliberately declare none).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each call arms a fresh cooperative deadline read from the tool's own declaration; no cross-call state exists.

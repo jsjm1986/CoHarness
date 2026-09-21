@@ -84,3 +84,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **First-call-order script binding assumes sequential delegation** — a cut that runs sibling subagents concurrently would bind live sessions to recorded scripts non-deterministically; a stronger keying is deferred until such a scenario exists (`XXX(concurrent-subagents)`).
 - **Only ordinary loop chunks and marked local compaction outputs are derivable** — a pure pre-chunk throw, a cancel/hang, or an unmarked external summarizer call needs the `replay.override.json` sidecar. Replacement and patch forms affect only the primary session; child scripts still derive from their logs.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter replays one fixed recorded transcript per test; no live provider relation exists.

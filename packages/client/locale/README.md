@@ -46,3 +46,7 @@ None; this package neither assembles nor sends a provider request.
 - **Some surfaces keep inline copy** — Settings rows, the sidebar, question composer, and model select use locale seats; other packages still own static text directly.
 - **Registry-held text reads its translation once** — copy captured at registration time outside the slot render path (e.g. the `/model` command description in the command registry) keeps the language it was registered under until re-registration; slot-rendered copy follows switches live.
 - **Language packs own language-specific behavior** — the registry supplies selection, persistence, browser matching, key fallback, and `<html lang>`; it does not add plural rules or bidirectional layout.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The active locale is one resolved value bound to the Host-owned settings namespace; provisional, saved, and pushed values follow a single precedence asserted by specs.

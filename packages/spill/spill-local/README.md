@@ -43,3 +43,7 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 - **No session-lifecycle deletion** — a spill file survives its session's end until the age-based startup sweep reclaims it, because persisted, resumed, and forked sessions may still reference a path; a process that never restarts never sweeps.
 - **Locators require a co-located filesystem consumer** — a remote or virtual deployment needs another `SpillStore` backend whose locator and retrieval hint are meaningful there.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each spill writes one session-scoped file that is itself the record; the backend keeps no index to compare.

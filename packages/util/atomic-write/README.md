@@ -48,3 +48,7 @@ Nothing here enters a request prefix, so provider cache reuse is unaffected.
 - **Atomic, not durable** — no `fsync` of the file or its directory, so after a crash the rename may be observed unwound. The file-backed stores here re-read and republish on boot, keeping durability the caller's policy.
 - **String content only** — no `Buffer` or stream form until a consumer needs one.
 - **Orphaned locks require operator recovery** — a process that exits while holding the lock can leave the sibling behind. Later writers time out without deleting it; an operator removes it only after verifying that no writer still owns it. File age alone is not safe evidence of abandonment.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A stateless write primitive asserted by filesystem-level unit specs; it owns no state between calls.

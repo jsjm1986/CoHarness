@@ -128,3 +128,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No persistent shell** — every call starts a fresh `pwsh -Command`; the persistent-shell counterpart is [`@deepseek-ai/dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.md), which keeps one owner-scoped pwsh alive across calls on Windows (ConPTY) and POSIX hosts with pwsh.
 - **PowerShell-dialect contract** — the model must write PowerShell (native paths, `$env:` variables), not bash; there is no dialect translation.
 - **Session-cwd identity is not canonicalized** — the workdir base is the session header cwd as-is, unlike the bash tool's sandbox-root-canonicalized identity. Under a confining executor the policy's workspace root IS canonicalized (by the shared policy service), so the workdir and the confinement root can diverge when the raw session cwd differs from its canonical form — a parity gap deferred to the shared shell-tool base extraction.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The tool adapts model calls onto the `ctx.shell` executor and `ctx.jobs` runtime; process and job state are owned by those services.

@@ -60,3 +60,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **No caller authorization** — this is trusted context-wide infrastructure; a future model tool or UI must constrain which sessions its caller may inspect.
 - **No registries or model-facing tool** — extractor and search-provider registries, recursive traversal through cited source events, and a model-facing tool are absent. The [tracing decision](../../../.agents/notes/implemented/feature/2026-07-13-session-query-tracing.md) owns relationship semantics; SQLite ownership and tokenizer decisions live in the [implemented search note](../../../.agents/notes/implemented/feature/2026-07-10-sqlite-session-query-provider.md).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Answers are computed per query from the live session corpus and any mounted persistence; the engine holds no cached authoritative copy.

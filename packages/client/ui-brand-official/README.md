@@ -22,3 +22,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **The package supplies one occupant set** — alternative presentation belongs in another Cordis package occupying the same slots.
 - **The browser title is independent** — `DSH_CLIENT_TITLE` selects title text at build time rather than through a UI slot.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The plugin fills brand slots with static occupants under a build flag and otherwise registers nothing; it owns no mutable state.

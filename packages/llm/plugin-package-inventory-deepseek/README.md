@@ -76,3 +76,7 @@ None; package lifecycle changes do not alter the model-visible prefix.
 None.
 
 </details>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The `dsh_plugin_packages` field is computed per request from the live Loader inventory; no inventory copy is retained.

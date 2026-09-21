@@ -60,3 +60,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Only final plain-text results are spillable** — mixed-content results, blocked feedback, and `read` pass through; provider truncation or tool-owned retention that happened earlier cannot be recovered here.
 - **A notice that cannot fit disables replacement for that call** — a tiny cap or long locator leaves the oversized original inline after the backend has already saved an unreferenced spill.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each result is transformed independently by the bounded preview policy; no cross-call state is retained.

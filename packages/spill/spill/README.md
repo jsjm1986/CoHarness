@@ -44,3 +44,7 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 - **The seam has no retrieval or deletion API** — consumers can only render the backend's locator and guidance; lifecycle and access semantics remain backend-specific.
 - **Storage is not access control** — `SpillOwner` namespaces writes but does not authorize reads of a locator; each backend and retrieval consumer must enforce its own boundary.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam declares the locator and retrieval-hint contract; backends own storage.

@@ -29,3 +29,7 @@ Nothing here enters a request prefix; this package neither assembles nor sends a
 ## Known Limitations and Deferred Work
 
 - **No output bounding** — both streams buffer unbounded in memory; every current caller invokes small native tools whose output is a path or an error line. Adopt `dsh-output-retention` bounding before pointing this at commands with meaningful output volume.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each call spawns one child and resolves its captured output; no process state outlives the call.

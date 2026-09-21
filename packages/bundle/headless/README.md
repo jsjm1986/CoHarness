@@ -24,3 +24,7 @@ The runner adds nothing to the request prefix; it only drives one user message t
 - **`ctx.appExit` is launcher-owned** — booting the headless profile outside the `dsh` launcher fails loud at activation until the host provides the exit request.
 - **Adoption is scoped** — `--session-id` requires the composed `sessionPersistence` and `sessionQuery` services and refuses a Session recorded in another working directory or under an agent preset this profile does not compose.
 - **The event stream is a projection** — `--json` caps every string except the terminal `final` at 8 KiB and each line at 32 KiB, and omits events the projection does not model, so it is not a lossless copy of the Session log.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The patch layer inserts profile rows whose plugins own their relationships; the headless-runner plugin reads one startup request and owns no persistent state.

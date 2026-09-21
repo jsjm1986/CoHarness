@@ -70,3 +70,7 @@ None; the cache never assembles or sends provider requests.
 - **No eviction or retention surface** — records accumulate per session; pruning stored checkpoints is out-of-band maintenance, same stance as session persistence itself.
 - **Interval throttle is per-session coarse** — the timer arms at the first dirty event after a clean write; a steady sub-threshold trickle writes once per interval, not a sliding window.
 - **`coldSnapshot` folds are not deduplicated** — two concurrent cold folds of one session each seed and fold the supplied log; last write-back wins (rows are equivalent), acceptable for listing-scale call rates.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Cache records are durable documents written and read through the storage domain; the service projects that same store and keeps no shadow copy.

@@ -20,3 +20,7 @@ None; the package never assembles or sends provider requests.
 ## Known Limitations and Deferred Work
 
 - **No policy storage** — deployments must mount a provider that owns policy persistence and refresh semantics.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The definition declares a decision contract whose absence means no policy; providers own any rule state.

@@ -40,3 +40,7 @@ No direct effect; the declared contracts reach a request only when an assembly p
 
 - Decorator markers contain only the method name and direct or Context invocation mode. Parameter, result, lookup, and schema reflection require the Typert build pipeline.
 - Remote decorators accept only public, non-static instance methods with string names. SRC execution cannot represent overloaded, destructured, defaulted, or rest-parameter signatures.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure declaration-and-codec library with no service registration; its contracts are enforced by type-level use and codec specs.

@@ -27,3 +27,7 @@ Candidate browsing has no model effect. A selected file or session changes only 
 - **Candidate failure is intentionally quiet** — one unavailable or failed Remote discovery call yields no rows for that domain. A session-reference preparation failure occurs after prompt acceptance and terminates that agent turn.
 - **No browser-side file scan** — Web completion requires a mounted Host `ctx.fileReferences` provider; the browser cannot fall back to its own filesystem.
 - **Session search remains metadata-only** — discovery filters session id, cwd, and the latest log-backed title through `ctx.sessionReferenceResolver`; message bodies and full transcripts are not searched.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Candidates are fetched per token through the `fileReferences/list` and `sessionReferenceResolver/candidates` remotes; the source keeps no candidate state between requests.

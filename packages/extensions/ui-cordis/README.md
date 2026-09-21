@@ -38,3 +38,7 @@ None directly: this package owns rendering; runner-originated steering changes t
 - **Any page may answer any request** — approvals are frame-wide by design, so a person in one browser tab can approve a run the model asked for while another tab is in front of the defining session. First answer wins and the rest converge; narrowing who may answer is deferred.
 - **A card whose call head left the event window loses its labels** — the card derives name and purpose from the call arguments, so a session long enough to truncate them leaves it naming its call id. The panel is unaffected: the host inventory carries the labels.
 - **Window truncation degrades the unloaded reading** — the card calls a definition unloaded from a successful `cordis_undefine` in this session's log; a session long enough to push that result out of the window shows the definition as merely not running.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The panel operates host-held definitions through the runner's remote surface and the card projects durable session events; it owns no definition state.

@@ -24,3 +24,7 @@ The bundle itself adds no request prefix; each inserted row's package owns any c
 
 - **A patch replaces whole row configs** — profile overrides must restate every field a row keeps; there is no deep-merge layer.
 - **The Windows temp grant is a private per-session subdirectory** — `workspace-write` confines writes to the workspace plus the session's own temp subdirectory (`<temp>\dsh-<hash>`, TMP/TEMP rewritten for confined children); `read-only` grants nothing. See `@deepseek-ai/dsh-sandbox-windows-acl`.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The bundle is a static `cordis.patch.yml` layer; every plugin row it inserts owns its own runtime relationships and invariant wiring.

@@ -26,3 +26,7 @@ No direct effect; registration changes reach a request only through a consumer t
 
 - Discovery imports only the host face; client runtimes need a separate composition owner before equivalent discovery is added.
 - Loader entries are discovered automatically. Nested or non-Loader plugins require an explicit `packages` entry or direct `ctx.typert.register()` ownership.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The plugin registers generated contributions with `ctx.typert` at load; artifact data is owned by the registry.

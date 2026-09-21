@@ -39,3 +39,7 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Completed-document retention is explicit** — active documents live until deleted; trashed documents are recoverable only for `trashRetentionDays`, after which the provider purges them. Session records, including completed-state metadata, are temporary and are cleaned after the configured upload retention.
 - **`list` walks the tree on every call** — there is no index, so a root holding many thousands of files pays a full scan per listing.
 - **Folder deletion is empty-only** — removing a tree requires moving or deleting its contents first; no recursive delete operation is exposed.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Documents are ordinary files below one configured root; the backend holds no index beyond the filesystem tree its specs exercise.

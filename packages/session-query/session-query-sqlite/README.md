@@ -59,3 +59,7 @@ None; this package neither assembles nor sends a provider request.
 - **Synchronous query execution** — `DatabaseSync` blocks the JavaScript thread during MATCH execution and cannot interrupt a statement already running.
 - **Token recall, not arbitrary substrings** — the `unicode61` tokenizer does not match substrings inside a larger token; use `filterEvents()` for literal scans.
 - **Single-owner derived index** — one service in one process must own each index path; external writers and multi-process sharing are unsupported.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Search runs over the live-preferred logical corpus and its index lives inside the SQLite store it opens; no second corpus exists.

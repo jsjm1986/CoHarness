@@ -25,3 +25,7 @@ The interface and grammar add no request tokens; a provider-owned prompt section
 - **Path candidates are advisory** — the seam does not prove that a later model-facing filesystem tool can access the same namespace; deployments must align the provider with the effective `read` implementation.
 - **No file-content reference object** — selected files remain ordinary prompt text and require an explicit model tool call before their contents become model-visible.
 - **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam defines the list contract and `@file` grammar; providers own indexing, caching, and invalidation.

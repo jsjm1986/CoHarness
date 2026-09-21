@@ -22,3 +22,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.
 - **Read-only inventory** — the optional preset projection adds composition origin but the tab still has no current-browser activation diagnosis or plugin mutation controls.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The tab renders one lazy `pluginInventory.list` Remote read on first mount; it owns no inventory state.

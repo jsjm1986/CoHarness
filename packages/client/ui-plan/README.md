@@ -27,3 +27,7 @@ Entering or leaving plan mode changes the active `plan:policy` system-prompt sec
 - **Plan mode is guidance, not an execution sandbox** — deployments that require enforced read-only planning must compose the independent sandbox and approval policies.
 - **The chip belongs to the default composer** — a pending whole-composer interaction such as plan review temporarily replaces the InputBar and its chip.
 - **No inactive plan control** — entry uses the shared Command source; a session with the capability but inactive mode shows no plan affordance in the tool row.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Plan state is owned by `dsh-plan-mode` and arrives through the `plan` projection; the chip is a pure renderer and the node half is an empty apply.

@@ -39,3 +39,7 @@ Append-only: the injected message lands after the reusable history prefix. This 
 - **Result-only history pages use the generic row** — keyed dispatch needs the paired call in the runtime window; pagination that leaves the call outside has no tool identity. This client presentation feature does not extend the history wire contract to recover it.
 - **Text is the truth** — the reference is plain draft text; a hand-typed identical token is the same reference, and the host gesture boundary judges the sent text, not the menu interaction. Chip visuals derive from the lexicon scan; no occurrence identity, position tracking, or structured reference payload on the prompt wire (both are ledger items).
 - **A menu opened before the prewarm settles** shows no skill candidates for that keystroke; the next keystroke re-polls the settled cache.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Candidates are served per request by the Host skill catalog; the source registers one trigger contribution and keeps no catalog copy.

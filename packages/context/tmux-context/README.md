@@ -70,3 +70,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Layout, not size** — pane/window pixel dimensions are omitted; only the layout tree and active flags are reported.
 - **Tab-delimited fields** — a tmux window name containing the literal two-character sequence `\t` would mis-split the reading and be skipped as malformed; ordinary names are unaffected.
 - **tty-based pane detection** — the process is considered "in tmux" only when its controlling terminal matches `$TMUX_PANE`'s `#{pane_tty}`. This deliberately excludes terminals that inherited `$TMUX`/`$TMUX_PANE` from a tmux ancestor (e.g. a VS Code integrated terminal). `ps -o tty=` is POSIX; the check is a no-op wherever it or `#{pane_tty}` is unavailable.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Pane facts are sampled fresh from tmux on each turn; nothing is retained between samples.

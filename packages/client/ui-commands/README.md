@@ -37,3 +37,7 @@ None directly; this package neither assembles nor sends a provider request. Comm
 ## Known Limitations and Deferred Work
 
 - **Detached-result notices fall back to the console off-session** — the fire-and-forget paths route results to the triggering session's composer via `SessionInput.notify`; after session teardown the console line is the only remaining surface.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The command directory is a session-keyed cache refetched through the owning command surface; it mirrors host data rather than owning a relation.

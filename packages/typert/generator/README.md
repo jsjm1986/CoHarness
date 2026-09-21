@@ -43,3 +43,7 @@ No direct effect; generated artifacts reach a request only when a consumer place
 - The Zod emitter supports a deliberate subset of the modeled TypeScript graph. Generic schema declarations and computed constructs such as conditional or mapped schema roots fail until a concrete schema-factory policy exists.
 - Cross-face links are represented for analysis, but no generated schema currently requires a runtime cross-face Zod import.
 - Discovery follows source files reachable from concrete public exports; declarations that are neither exported nor imported by that graph are intentionally outside the package model.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A compile-time transform from source types to `FaceModel`/`TypeGraph` data; its output is asserted by generator specs and it runs no runtime state.

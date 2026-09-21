@@ -47,3 +47,7 @@ None; this package neither assembles nor sends a provider request.
 - **History availability follows the Host** — this carrier only transports the bounded `session.history` response; whether a deployment can read a cold log without resuming an Agent belongs to the Host persistence provider.
 - **The `/api` bridge buffers each request body in memory** — `maxRequestBodyBytes` (default 288 MiB, sized for the default 200 MiB aggregate image limit after base64 expansion plus envelope headroom) is therefore also the per-request resident bound; a streaming body path would be needed to lower it without shrinking the image limits.
 - The outer bridge and inner Fetch parser use the same `maxRequestBodyBytes` value, so an admitted image envelope is not rejected a second time by a smaller parser default.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Connection state is generation-scoped and re-established from each host handshake; consumers observe the same published values, leaving no second relation that can diverge.

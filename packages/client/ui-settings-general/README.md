@@ -25,3 +25,7 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - The General section has no built-in rows; each row appears only when its owning feature plugin is mounted.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The shell projects the `settings.section` and `settings.onboarding` ledgers contributed by registrants; durable values stay in Host settings namespaces.

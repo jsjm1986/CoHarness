@@ -43,3 +43,7 @@ Prefix-stable while the rendered template variables and text are unchanged. Suff
 ## Known Limitations and Deferred Work
 
 - **No global mount** — the prompt registry owns the unscoped persona slot, so this row is usable only from a scoped composition. A deployment-wide persona change belongs in the `system-prompt` row's own config.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes one declarative composition row; the resolved prompt is owned by preset composition.

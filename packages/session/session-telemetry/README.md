@@ -51,3 +51,7 @@ None; the package neither assembles nor sends a provider request.
 - **Best-effort delivery** — the cursor marks handed-off, not delivered; a session torn down inside a reload window cannot be re-adopted; whatever sits in a backend queue at crash time is lost. A durable outbox (spool, per-sink cursors, at-least-once) is deferred until a deployment states a crash-loss requirement — see [the revival Agent Note](../../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md).
 - **No built-in redaction rules** — with no `sessionTelemetry/record` listener mounted, records leave the process exactly as captured, including any credentials embedded in file contents or command output; a deployment exporting to a shared collector owns its rule set.
 - **On-demand redaction uses current state** — uncaptured events exist only in the canonical session log. A later `captureSession()` deep-copies and redacts their current values with the policy mounted at that time; there is no capture-time telemetry snapshot or durable pre-capture spool.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Capture passes each session record to the mounted sink; batching, retry, and loss policy belong to the backend SDK, so the seam holds no telemetry relation.

@@ -23,3 +23,7 @@ None unless the queued goal context is admitted. An admitted context extends the
 ## Known Limitations and Deferred Work
 
 - **Durable phase only** — the projection omits process-local activation, so the strip cannot distinguish an active-but-disarmed goal from an armed one; resume re-arms through the RPC side. There is no host-live activation channel.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The live goal arrives through the `goal` session projection and mutations go through `ctx.remote.goals`; the plugin owns no domain store or refresh chain.

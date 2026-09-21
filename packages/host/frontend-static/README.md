@@ -22,3 +22,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **The starter MIME table is minimal** — it covers the Vite-emitted asset set plus the shipped PWA manifest; other extensions fall back to `application/octet-stream` until an asset class actually ships.
 - **Pathname routing is explicit** — the current client enters through the root or configured index path and has no History API pathname routes. Adding one requires an explicit server rule and real-composition coverage rather than a broad fallback for every miss.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Responses are served statelessly from the dist tree; the only registration is the claimed fallback seat, whose disposal is proven by the HMR-safety spec.

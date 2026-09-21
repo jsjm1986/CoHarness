@@ -35,3 +35,7 @@ None; this package neither assembles nor sends a provider request.
 - **Images only** — non-image files have no rail card or history renderer yet; DeepSeek Chat-style file cards and upload-progress states wait until the composer accepts non-image attachments.
 - **No zoom or download in the lightbox** — the preview renders the original at fit-to-viewport size only.
 - **The lightbox does not trap focus** — it sets `aria-modal` and restores focus on close, but Tab can reach the page behind it.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes presentation occupants to conversation-declared slots; attachment data, loading, and callbacks arrive through the slot owner's inject face.

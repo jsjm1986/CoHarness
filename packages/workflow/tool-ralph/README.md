@@ -95,3 +95,7 @@ Each fresh child has an independent request cache. The parent result appends aft
 - **One round is one fresh child** — there is no within-round fan-out, model/provider switching, fork context, or model-call-selected provider.
 - **Ordinary child failure is terminal for the run** — the fixed script reports the failed round and last successful handoff but does not retry; fatal workflow infrastructure failures can end before that state is returned.
 - **Only round count bounds aggregate effort** — token, price, and elapsed-time budgets are deferred.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run executes one foreground workflow through the engine and subagent seams; child state is owned by those services.

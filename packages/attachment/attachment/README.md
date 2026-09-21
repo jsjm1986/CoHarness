@@ -25,3 +25,7 @@ Adding an image changes the provider request and therefore invalidates the affec
 - Version one accepts PNG, JPEG, WebP, and GIF only.
 - Retention and garbage collection are deferred because resumed and forked sessions may share immutable objects.
 - Generic files, audio, video, and persistent unsent drafts require separate lifecycle and provider contracts.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The service validates and commits each image through the mounted provider and returns serializable references; it owns no cache or second record of attachments to compare.

@@ -41,3 +41,7 @@ None; this package neither assembles nor sends a provider request.
 - **No protocol-version negotiation** — the handshake carries only `serverInfo.version` (`0.0.1`, unvalidated by clients); pre-release stance, no compatibility promise.
 - **No cancel or session-close methods** — a client abandons a turn by closing the runtime process; see the [`dsh-sdk-jsonrpc-server` README](../server/README.md).
 - **Server→client requests are dead capability** — the transport supports them, but the server never sends one; the Python SDK's responder surface exists for future approval flows.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure wire-format library; its codec and type algebra are enforced by unit specs.

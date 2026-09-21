@@ -30,3 +30,7 @@ No direct invalidation; `dsh-tool-ask-user` owns the model-visible tool call and
 
 - **Unsubmitted drafts are not durable** — reconnect resync or a full page reload restores the host-owned pending request with the same rpcId, but a composer unmount resets local option and custom-text drafts.
 - **One request owns the composer at a time** — later pending requests remain in the session snapshot and become visible after the earlier request resolves.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Rendering is one composer-slot contribution; the question lifecycle and tool belong to `dsh-tool-ask-user` and the interaction seam.

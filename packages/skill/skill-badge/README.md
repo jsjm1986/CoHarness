@@ -24,3 +24,7 @@ Disabled by default, the plugin changes no request. When enabled, its catalog en
 
 - The provider contributes one fixed skill and has no runtime customization.
 - Remote Markdown uses Shields.io; use the packaged PNG when the target cannot fetch remote images reliably.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The contribution is a static bundled skill registration whose disposal is proven by the registry's HMR-safety spec.

@@ -99,3 +99,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No optional start-time capabilities** — the parent cannot enforce `outputSchema`, depth, tool filters, or persona inside the child process; configure the child's own `cordis.yml` instead.
 - **The child's transcript stays in the child's own session root** — the parent log records only the delegation tool call/result (the seam's child-isolation rule); the streamed `session.event` channel is consumed for output extraction, not bridged into the parent log.
 - **Local child processes only** — the resolved cwd is a local path; a remote runtime would need its own backend.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The child is a full peer runtime owning its composition and session; the provider drives it over stdio JSON-RPC and keeps no mirrored state.

@@ -92,3 +92,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No subagent chain-sharing** — chains stay isolated per agent; a parent and its subagent repeating the same call never combine.
 - **Legitimate idempotent polling still draws nudges** past the thresholds — the pressure valves are `thresholds`/`exclude` config.
 - **Past the highest threshold a chain goes silent** — reminders fire only at exact configured counts, never beyond them.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Run counters are advisory bookkeeping derived from the live call stream and reset with it; the injected reminder is the only observable output.

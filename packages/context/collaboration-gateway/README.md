@@ -30,3 +30,7 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Gateway availability is authoritative** — a project operation is denied when the internal authorization request fails or returns invalid JSON; there is no stale local ACL cache.
 - **Per-operation authorization traffic** — session actions and visibility filtering may issue loopback requests; batching exists only for readable session ids.
 - **No offline project mode** — project runtimes cannot continue collaboration authorization after the Gateway or provider becomes unavailable.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Participant and ACL answers are validated per request against authenticated Gateway endpoints; no account state is held locally.

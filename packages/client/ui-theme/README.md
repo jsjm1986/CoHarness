@@ -36,3 +36,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **Third-party themes are an extension point, not a product** — registering one means overriding same-named alias variables; no validation exists that an override set is complete.
 - **The token sheets are the sole color authority** — values absent from cssdesign (for example the design's #4176E6 tab blue) are deliberately not appended; the nearest semantic token wins. Design-owner-approved additions are the exception and enter as a static step plus a semantic alias in the same change (`--dsw-static-blue-900` / `--dsw-alias-label-primary-bluish`).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The preference's durable home is the Host settings namespace; `ThemeRuntime` keeps only the resolved snapshot, asserted by unit specs against pushed changes and reconnects.

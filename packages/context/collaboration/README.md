@@ -29,3 +29,7 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Root-owned visibility** — descendants cannot carry independent visibility; every read, write, manage, and approval decision resolves through the root conversation.
 - **No membership mutation API** — project membership remains a Gateway/admin responsibility, outside this Service Definition.
 - **One production provider** — `dsh-collaboration-gateway` is the only shipped provider; alternate deployments must implement all authority operations rather than bypass individual checks.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package declares a request-bound authority contract only; providers carry whatever account state exists.

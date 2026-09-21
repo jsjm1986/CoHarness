@@ -27,3 +27,7 @@ Changing the default affects only agents that subsequently resolve from it. An e
 
 - The service owns one process-wide default; per-session selection remains the entry point's responsibility.
 - Without a settings provider, `saveSelection()` cannot retain a selection for a later Agent.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The service publishes one configured default value; there is no mutable relation for an invariant to observe.

@@ -27,3 +27,7 @@ None; this package neither assembles nor sends a provider request.
 - **Panel geometry is transient** — reload restores the sidebar default and details closed; switching between distinct Session ids also closes details and forgets its dragged width, while unselected surfaces render details at zero width without modifying geometry.
 - **Concession-chain auto-close derives a zero width without touching the preferred width** — the panel restores itself when the window widens; consumers must not read the stored details width as the rendered truth.
 - **No scroll anchoring during squeeze reflow** — layout changes may move the reader's viewport.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Panel geometry and collapse are presentation-local service state; the frame's slot registrations prove disposal through the HMR-safety spec.

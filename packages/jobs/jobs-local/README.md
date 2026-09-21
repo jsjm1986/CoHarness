@@ -38,3 +38,7 @@ No direct invalidation; the named consumers own any request-prefix changes.
 
 - **Jobs are process-local** — records die with the harness process; durable or cross-restart execution needs a separate backend implementing the seam.
 - **A silently ineffective cancel can stall teardown and hold capacity** — if `cancel` returns without settling `done`, the registry cannot distinguish it from a slow stop; the job keeps one bucket slot for the rest of the service lifetime, and only an explicit throw can be force-failed safely.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Records are private in-memory state handed out only as snapshots, with issue/snapshot semantics asserted by unit specs; execution ownership stays with the shell and tool seams.

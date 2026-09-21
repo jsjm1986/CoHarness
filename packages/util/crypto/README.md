@@ -37,3 +37,7 @@ No direct invalidation; identifier-minting consumers own any request changes.
 
 - **v4 only** — namespaces and other UUID versions are outside this utility.
 - **Probabilistic uniqueness** — collision detection remains the consumer's responsibility.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure library owning no event stream or mutable runtime data; its encoding algebra is enforced by unit tests.

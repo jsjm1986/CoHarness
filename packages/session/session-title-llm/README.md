@@ -49,3 +49,7 @@ No main-request invalidation. Auxiliary cache reuse is provider-specific; the fi
 
 - The helper accepts text output only and rejects tool calls; structured-output adapters and provider-specific prompt variants are not exposed.
 - It enforces a byte ceiling for the whole framed user prompt rather than clipping individual messages or applying a retention policy.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package is shared per-request policy — framing, budgets, assembly — returning normalized text; it owns no durable title state.

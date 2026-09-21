@@ -72,3 +72,7 @@ No direct invalidation; the timeout consumers own any request-prefix changes.
 - **`timeoutMs <= 0` is internal vocabulary** — it disables the local timer only after an owning backend has resolved policy, never as a public model/plugin knob.
 - **The first abort reason wins classification** — when an upstream cancellation beats the local timer, this layer cannot later report that its own timeout would also have elapsed.
 - **An idle watchdog is not a total deadline** — it rearms per outstanding iterator demand and deliberately excludes consumer think time.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A zero-dependency pure library; the signal and classification algebra is enforced by unit specs.

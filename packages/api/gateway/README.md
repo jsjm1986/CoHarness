@@ -44,3 +44,7 @@ No direct effect; invoked business Services own any model-visible result.
 - The package dispatches unary methods only. Incremental Session data uses a separate named-stream protocol over the same Connection.
 - Lookup resolvers are configured per key; an individual Remote parameter or endpoint cannot currently select a live-only policy under the same `agent`/`session` key.
 - Forwarded events reach `$on` exactly as the Host emitted them: no payload projection or redaction, no Scope-bound subscription, and no replay after a reconnect.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each invocation resolves the live descriptor, business Service, and codecs at call time; the gateway keeps no per-endpoint state that could diverge from the registered contributions.

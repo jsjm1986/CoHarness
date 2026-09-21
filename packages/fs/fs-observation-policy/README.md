@@ -75,3 +75,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Actors without an agent session can never satisfy the policy** — their edits throw `FS_NOT_OBSERVED` and their writes always resolve `createIfAbsent`, so a non-agent caller cannot overwrite an existing file through the gate.
 - **Direct `ctx.fs` reads emit no `fs/observed`** — a file read outside the `read` tool stays unobserved, and a later guarded edit rejects with `FS_NOT_OBSERVED` until the tool reads it.
 - **Authorization is version freshness, not view completeness** — any windowed read authorizes a full-file overwrite of an unchanged file, deliberately weaker than a full-view rule ([seam-split Agent Note](../../../.agents/notes/implemented/simplification/2026-06-26-fsspec-style-fs-seam.md)).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Observation bookkeeping is private per-session policy state consulted only inside the installed `fs/*` gate; every outcome is observable through the fs call result itself.

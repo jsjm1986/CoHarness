@@ -50,3 +50,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **There is no per-prompt result** — `MessageId` identifies inbox admission only; clients that own an automation interval must define and observe that interval themselves.
 - **stdout purity is deployment-enforced** — a surrounding config can still load a stdout logger and corrupt the JSON-RPC channel; this plugin does not inspect or veto sibling loggers.
 - **Automatic adapter mounting is DeepSeek-specific** — `initialize` can reuse any pre-registered model adapter, but its only fallback mounts `dsh-llm-deepseek`.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The server translates each stdio frame into harness calls; session state stays in the runtime it drives.

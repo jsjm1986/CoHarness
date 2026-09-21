@@ -99,3 +99,7 @@ Type declarations add no model input, so provider cache reuse is unaffected.
 None.
 
 </details>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Pure type declarations with no runtime behavior; readers own parsing, validation, and defaults.

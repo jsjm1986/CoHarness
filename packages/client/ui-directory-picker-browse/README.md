@@ -26,3 +26,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **No search, no multi-select, and no rename or delete** — the dialog lists and creates directories; a target is reached by navigating, editing the path, or filtering the last pane by prefix.
 - **Hidden-entry filtering is client-side** — the Host always lists hidden entries and flags them, so the toggle changes only what the dialog renders.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Every listing and creation is delegated to the Host directory-picker backend through `ctx.workspaces`; the dialog holds only transient interaction state.

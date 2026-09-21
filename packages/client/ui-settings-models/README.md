@@ -41,3 +41,7 @@ None; this package neither assembles nor sends a provider request.
 - **Only pi-ai routes can be hand-declared** — the custom-provider card writes into `llm-pi-ai`, the one namespace whose profiles describe a whole provider. A `llm-deepseek` route is a composition fact, not something this page can create.
 - **Interrogation covers OpenAI-compatible and Anthropic Messages listings** — other protocol families report that they cannot be asked and their models are entered by hand. A relay may still require manual entry when it exposes neither `/models` variant or returns a non-listing response.
 - **Undeclared live routes render nowhere** — a route registered without a configurable-provider declaration has no settings address; it stays visible in pickers but not on this page's rows.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The page joins the `llm.providers`, `settings.describe`, and `credentials.describe` wire domains at render time; provider and credential state remain owned on the Host.

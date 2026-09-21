@@ -31,3 +31,7 @@ None; the package never assembles or sends provider requests.
 - **Gateway-launched runtimes only** — loading the plugin without a valid private launch credential fails startup.
 - **Request-local principals** — `current()` is unavailable outside an authenticated HTTP or WebSocket operation; Consumers that outlive dispatch must capture the verified principal or a derived authority.
 - **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal freezes its project scope mode until `expiresAt`; Session Consumers must use `ctx.collaboration` for current membership and ACL decisions. Seamless in-connection principal renewal and expiry watchdogs for long-lived streams remain a deployment follow-up; current clients reconnect when their carrier generation ends.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The launch credential binds one fixed identity for the process lifetime; request context is derived per call, so nothing mutable exists to compare.

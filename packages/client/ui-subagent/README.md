@@ -38,3 +38,7 @@ Append-only. This package never edits earlier request tokens.
 
 - **The catalog has no durable outcome** — activity and timing do not distinguish completion, failure, or cancellation, and the UI exposes no Activation identity; stopping is limited to the composer's current-turn Stop for a running continuable child.
 - **`@` references remain display-title text** — duplicate or renamed labels are ambiguous, so they intentionally do not acquire continuation semantics.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The tree renders the runtime's subagent catalog mirror and opens rows through `SessionRuntime.openSubagent()`; expansion and clock state are component-local.

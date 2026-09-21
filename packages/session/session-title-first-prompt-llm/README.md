@@ -30,3 +30,7 @@ No main-request invalidation. The auxiliary request uses the configured or logge
 
 - The first message alone may cease to represent a long-running session; use the all-messages provider when later prompts should retitle it.
 - A fork keeps its inherited title and never runs this provider automatically, even when its seeded first message came from the parent.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The summary is generated through `ctx.llm` and committed through the title seam against one exact seq; no title state is kept outside the committed result.

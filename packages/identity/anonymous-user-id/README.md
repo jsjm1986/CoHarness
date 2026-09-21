@@ -32,3 +32,7 @@ None; the transport header changes neither tokens nor the model-visible prefix.
 - **Best-effort concurrency** — a reader landing in the narrow interval between a concurrent process's exclusive create and completed write can use a different in-memory UUID for that run; later launches converge on the persisted value.
 - **No cross-home identity** — different `$DSH_HOME` values cannot be correlated.
 - **Configured DeepSeek gateways receive the id** — `dsh-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The id is created once, persisted as a single durable line, and immutable thereafter; there is no changing relation to observe.

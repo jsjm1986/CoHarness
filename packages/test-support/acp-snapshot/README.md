@@ -83,3 +83,7 @@ None; the package never assembles or sends provider requests.
 - **Session harvest requires raw JSONL mode** — `runScenario` collects persisted `.jsonl` logs, so snapshot configs set `persistenceCompression: 'none'`; compressed JSONL and SQLite compositions have no snapshot-harvest path.
 - **Built mode requires current artifacts** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; source mode remains the zero-build path.
 - **Backend coverage still rides an ACP driver** — see the [automation-only ACP decision](../../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md#snapshot-boundary) for why retained scenarios use this transport.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A test-support library; its compare and guard mechanics are exercised by the snapshot suites that consume it.

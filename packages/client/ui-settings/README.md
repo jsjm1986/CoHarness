@@ -26,3 +26,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **A failed or refused settings describe stays unavailable** — the binder always uses Host persistence; a throw or non-ok `settings.describe` publishes `unavailable` so plugin cards hide instead of hanging on `loading`. The Host privileged-method fence still requires a loopback `Host` header; a gateway that rewrites `Host`/`Origin` to the instance loopback is what makes a public page succeed. `settings.openDocument` remains a loopback-page action because it opens a file on the host desktop.
 - **One field per write** — `set` sends a single `set` op, so a row that must move two fields together has no transaction and publishes two revisions.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The schema service rehydrates and validates Host-owned documents and the scope transport forwards each namespace section; the layer owns no preference values.

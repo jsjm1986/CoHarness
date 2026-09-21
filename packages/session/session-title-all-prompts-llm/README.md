@@ -30,3 +30,7 @@ No main-request invalidation. Auxiliary input grows or changes after each prompt
 
 - Input overflow retains the prior title; this provider has no summarization-of-summaries or retention policy for very long sessions.
 - It treats all eligible human messages equally and offers no weighting, filtering, or manual-title precedence.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each revision is generated through `ctx.llm` and committed through the title seam with newer revisions aborting stale work; no title state is kept outside the committed result.

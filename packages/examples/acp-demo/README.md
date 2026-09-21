@@ -61,3 +61,7 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **JSONL persistence is fixed** — a different backend requires another composition.
 - **Sibling plugins can corrupt stdout** — the app cannot prevent another entry from writing non-protocol bytes.
 - **Fresh automation sessions only** — resume and human interaction belong to other entry points.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The demo wires existing plugins behind one bin; session state belongs to the composed runtime and the ACP server package.

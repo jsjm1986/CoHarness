@@ -86,3 +86,7 @@ No direct invalidation; the consumer owns any request-prefix changes.
 
 - **Most of the spine set is fixed in code** — `apply()` always mounts the core services; config can omit bundled goals, skills, bash, and task-control tools, but swapping the loop or dropping another spine member means composing a different bundle.
 - **The invariant service and companions remain fixed members** — `invariants.enabled: false` or package filters suppress checks but do not remove the service or companion registrations; Session's always-on validation and freezing are separate.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The spine is a static composition list; every loaded service owns its own runtime relationships.

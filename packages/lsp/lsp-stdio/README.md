@@ -62,3 +62,7 @@ No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
 - **Transient-open compatibility floor** — servers whose synchronization omits open/close (or advertise `None`) are unsupported even if closed-document queries would work; the pinned TypeScript e2e establishes one compatibility floor, not a cross-language claim.
 - **Per-server/workspace serialization latency** — parallel agents sharing one server and workspace queue behind one process; long-lived workspace processes consume memory until disposal.
 - **A hard-killed harness orphans language servers** — `initialize.processId: null` removes server-side client-PID monitoring, so servers are cleaned only by graceful service disposal; a SIGKILL'd harness leaves them running until they exit on their own.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each registered provider owns one language-server child through `ctx.subprocess`; lifecycle and isolation are covered by provider specs and the plugin keeps no cross-server state.

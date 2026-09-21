@@ -39,3 +39,7 @@ None; the package never assembles or sends provider requests.
 - The catalog is read-only; Schedule creation and cancellation remain model/tool operations.
 - Local and relative times follow the viewing browser's locale, time zone, and clock.
 - Only active records are shown; delivery history remains in the transcript.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Reminder state is owned by the Host schedule plugin and its session frames; this surface renders the trigger only when a session already reports active reminders.

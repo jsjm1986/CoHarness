@@ -63,3 +63,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **The seed is a one-time snapshot** — the child sees the parent's completed turns as of the fork and nothing the parent logs afterwards; there is no live context sharing.
 - **Fork lifecycle policy differs by composition** — the base bundle and the ACP/headless examples bind the fork delegation tool to `backgroundMode: one-shot`, while the Web app agent presets (`ptc`, `cordis`, `standard`) select `continuable`. Both keep the inherited prefix eligible for reuse because parent and child messaging definitions match byte for byte; explicit persona, tool filtering, generated-SDK, or route changes can still break equality. Rationale: [the cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. All run mechanics live in the shared in-process driver; the provider contributes only the seeded-session fork entry.

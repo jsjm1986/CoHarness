@@ -33,3 +33,7 @@ None; the package never assembles or sends provider requests.
 - A personal transcript cannot be read while its owning runtime is unavailable or its persisted log is corrupt; the Gateway keeps the archive index row and reports the body as unavailable.
 - Archive reads reject a lineage with more than 10,000 descendants or a post-floor result whose retained records exceed 100,000 records or 64 MiB. `fromSeq` is an inclusive sequence floor applied independently to every descendant session, not a global chronological cursor.
 - A runtime-provided personal detail must fit the same descendant, event-page, and byte budgets; an invalid or oversized replacement leaves the indexed detail visible with `syncState: unavailable`.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Every sync batch is derived from the durable session corpus and revision-stamped against the Gateway index; the provider holds no local archive truth.

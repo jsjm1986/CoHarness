@@ -24,3 +24,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **No cancellation of an open chooser** — the wire has no per-request abort, so a chooser already on the host display cannot be closed from the browser; a discarded settlement is simply ignored.
 - **Local Host carriers only** — an OS dialog opens on the machine running the Host, so in-process and remote-browser deployments need the `-browse` composition instead. Platform failures surface through the owner's retryable folder dialog.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The OS chooser belongs to the host backend; the renderless occupant forwards each open request and reports one outcome, keeping no directory state.

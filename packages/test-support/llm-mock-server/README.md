@@ -88,3 +88,7 @@ None; requests terminate locally and never reach a provider cache.
 - **Random weights model test pressure, not production incidence** — callers that want an environment-specific distribution must provide measured weights and record the emitted seed.
 - **Request scripts are arrival-ordered** — concurrent callers share one cursor, so deterministic per-session fault assignment requires separate server instances.
 - **True connection refusal is a listener lifecycle phase** — the CLI delay must overlap the client attempt; request-level random selection can only reset an accepted connection.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A test fixture whose scripted behaviors are consumed in arrival order; its correctness is enforced by the suites that drive it.

@@ -55,3 +55,7 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **Public-network policy is deliberately strict** — destinations that resolve to any non-public address are rejected, and all same-origin redirect hops are resolved and checked again. Deployments that need private services must provide a separate, explicitly reviewed provider rather than weakening this policy.
 - **Only textual content decodes** — html/xhtml and `text/*`-plus-JSON/XML families; a missing `Content-Type` or any binary type throws `WEB_UNSUPPORTED_CONTENT_TYPE`, and text-extractable PDF decoding is named deferred work.
 - **Charset comes only from the `Content-Type` header** (UTF-8 default) — an HTML `<meta charset>` declaration is ignored, and a declared-but-unrecognized charset label throws rather than falling back.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each call performs one bounded anonymous fetch and returns decoded content; no connection or cache state is retained.

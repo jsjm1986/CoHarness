@@ -47,3 +47,7 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **The per-target mutation lock is in-process only** — guarded create still uses an atomic no-replace publication across processes, but replacement writers in another process are caught only when the optional version guard observes their metadata change; they are never serialized.
 - **Guarded creation requires hard-link support** — filesystems or mounts that reject hard-link publication cannot serve `createIfAbsent`; the provider preserves the missing target and reports `FS_IO_ERROR`.
 - **Post-commit cleanup is best effort** — a successful publication remains successful if removal of its owner-only staging directory fails, leaving private residue for later operator cleanup.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each primitive delegates to the host filesystem, which is the sole authority; the provider keeps no shadow state.

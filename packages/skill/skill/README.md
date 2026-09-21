@@ -81,3 +81,7 @@ No direct prompt effect. The named consumer owns the durable initial catalog and
 - **Providers are queried sequentially** — one slow cooperative provider delays every provider registered after it; cancellation stops the caller's wait but cannot terminate work an uncooperative provider keeps running.
 - **Incomplete observations are not retained** — rejected providers are omitted and explicitly supplied candidates remain available only to the current lookup; the registry owns neither a last-good catalog nor per-provider diagnostics.
 - **Duplicate resolution is first-wins** — later lower-priority candidates within a layer are logged and hidden, and a nearer layer shadows a farther one silently; there is no API to inspect all shadowed definitions.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The registry is a contribution table over provider registrations with effect-scoped disposal; it owns no skill content.

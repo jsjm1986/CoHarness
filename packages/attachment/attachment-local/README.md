@@ -30,3 +30,7 @@ Normalization and request projection are deterministic. An unchanged attachment 
 - The local backend assumes the host and provider adapter share this filesystem service.
 - Animated GIF sources keep only their first frame; animation is outside the version-one image contract.
 - The normalization and request encoders are pinned by the installed sharp/libvips build; an encoder or transform-version upgrade re-addresses future normalized attachments or request variants while existing objects stay valid.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Published objects are immutable files addressed by content hash, and the staged atomic-publish path is asserted by filesystem-level specs; the provider keeps no mutable index of its own.

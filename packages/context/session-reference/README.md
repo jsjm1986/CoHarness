@@ -53,3 +53,7 @@ The request and snapshot are consecutive append-only target messages and preserv
 - **Text projection only** — non-text user and assistant blocks are not propagated across sessions.
 - **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.
 - **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Snapshots are read-only views delegated to `ctx.sessionQuery`; the resolver keeps no session data of its own.

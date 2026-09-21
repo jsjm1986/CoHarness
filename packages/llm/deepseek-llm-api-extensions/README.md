@@ -57,3 +57,7 @@ None; registry fields are model-hidden provider metadata and do not alter the se
 None.
 
 </details>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Contributions are validated declarations applied while serializing each request; the registry holds no per-request relation.

@@ -27,3 +27,7 @@ None; feedback mutations leave the model-visible history unchanged.
 - **Note size is a Host policy** — the deployment configures `maxNoteBytes` (8192 in the Web bundle) and the Host rejects an oversized note with `note-too-large`. The editor does not pre-check the limit, so an oversized note fails on save rather than while typing.
 - **No cross-tab push** — a second tab's rating becomes visible on reconnect or on the next conflict reply, not immediately; the sidecar publishes no live frames.
 - **Chat view only** — the trajectory and waterfall views render no feedback controls even though their assistant nodes now carry the same `messageId`.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Feedback records live in the Host-owned sidecar domain; the browser half renders the action strip and confirmation dialog without holding feedback state.

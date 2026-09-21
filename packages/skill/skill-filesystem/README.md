@@ -77,3 +77,7 @@ Watcher invalidation can cause the named consumer to append a replacement catalo
 - **Malformed entries disappear with a warning** — the model catalog receives no per-skill diagnostic and cannot distinguish an absent skill from an invalid one; unexpected I/O failures preserve the last-good catalog instead.
 - **Missing-root observation polls one path segment** — roots absent at startup use `fs.watchFile` at `watchPollIntervalMs` until Chokidar can attach, trading bounded detection latency for reliable creation detection across IDE, Git, and shell workflows.
 - **No body revision protocol** — a loaded body is ordinary retained tool history; later file edits affect later calls but neither rewrite old results nor announce that the body changed.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Skills are discovered from the filesystem, which remains the only catalog authority; the provider keeps no second index to compare.
