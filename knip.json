@@ -900,9 +900,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@deepseek-ai/dsh-ptc-runtime-node"
       ]
     },
     "packages/bundle/web-app": {

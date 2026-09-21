@@ -9,6 +9,8 @@
 - 带 systemd 的 Linux、root 权限、Docker Compose、供一次性导入/回滚使用的 `sqlite3`，以及 Node 25（`/usr/local/bin/node`；nvm 布局需调整单元内路径）。创建共享项目单元使用的不可登录 `harness-project` 账户，创建各个 `HGW_PROJECT_PATH_ROOTS` 目录，并授予该账户这些根目录下每个项目目录所需的 Unix 读写权限。每个配置根都会成为管理员宿主机浏览器的一项顶层入口；根本身只能导航，导入项目必须是其严格后代。两个受控根都必须让后续创建的目录继承运行时访问权，例如执行 `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects`（无法使用组继承时改用等效默认 ACL）。setgid 父目录会让 Gateway 以 `0770` 创建的项目目录带上共享运行时组。
 - 钉死版本的 dsh：`npm install -g @deepseek-ai/dsh@0.1.0-rc.8`（升级 = 改版本号 + 滚动重启，绝不检出源码）。注意：开发 clone 里未提交的本地工作（例如 UI 改动）在合入上游前不在 npm 发行版内。
 - 公网域名的 DNS/入口控制权（Nginx 或 Cloudflare Tunnel）。
+- 运行文件监听器的宿主（HMR profile 或 `watch` 会话）需要覆盖被监听树的文件描述符上限：chokidar 监听器已在 macOS 26（arm64）`1048575` 软上限下验证无 `EMFILE`（errno -24）；启动时报 `EMFILE` 表示需要调大 `ulimit -n`，而非监听器缺陷。
+- 仅当 profile 挂载实验性 `@deepseek-ai/dsh-experimental-ptc-runtime-python` 时，需要 `PATH` 上的 CPython 3.10+ 或绝对路径 `pythonBin`；运行时在加载时探测解释器并拒绝非 CPython 或低于 3.10 的二进制，老版本系统 `python3` 不会被静默选中（已验证：宿主 `python3` 3.9.6 被拒，3.12.13 通过运行时套件）。
 
 ## 安装
 

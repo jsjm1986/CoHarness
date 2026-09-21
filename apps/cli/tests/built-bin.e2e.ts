@@ -613,7 +613,8 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
       })
       expect(result.code, result.stderr).toBe(0)
       expect(result.stdout).toBe('published headless profile reached the mock')
-      expect(result.stderr).toBe('dsh: reasoning:\nInspecting the published entry.')
+      // progress defaults off in this build, so a successful run keeps stderr empty.
+      expect(result.stderr).toBe('')
       expect(server.requests.length).toBeGreaterThan(0)
       expect(server.requests.every(request => request.path === '/chat/completions')).toBe(true)
       expect(JSON.stringify(server.requests.map(request => request.body))).toContain('answer from the published entry')
@@ -784,7 +785,8 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
         NODE_OPTIONS: `--import=${webReadyExitHook}`,
       })
       expect(result.code, result.stderr).toBe(0)
-      expect(result.stdout).toMatch(/^dsh web: http:\/\/127\.0\.0\.1:\d+\/\?token=[A-Za-z0-9_-]+$/u)
+      // Local web-auth model omits the upstream browser token from the printed URL.
+      expect(result.stdout).toMatch(/^dsh web: http:\/\/127\.0\.0\.1:\d+$/u)
       expect(result.stderr).toContain('llm-pi-ai')
     } finally {
       rmSync(home, { recursive: true, force: true })

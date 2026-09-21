@@ -76,6 +76,13 @@ const windowsRunnerCoverageExclusions = process.platform === 'win32'
   ? ['packages/sandbox/sandbox-windows-acl/src/runner.ts']
   : []
 
+// Linux-only sources: the libc execve binding is exercised through mocked
+// lazy-require suites that skip off Linux (linux-execve.spec.ts gates on
+// process.platform), so non-Linux coverage lanes can never cover them.
+const linuxOnlyCoverageExclusions = process.platform !== 'linux'
+  ? ['packages/subprocess/subprocess-local/src/linux-execve.ts']
+  : []
+
 // pwsh-local's run/start/lifecycle suites self-skip without a real pwsh
 // (executor.spec.ts hasPwsh), leaving this file
 // far below per-file 100% on pwsh-less hosts; the exemption keeps those hosts
@@ -197,6 +204,8 @@ export default defineConfig({
         'packages/*/*/src/types.ts',
         'packages/*/*/src/bin.ts',
         'packages/*/*/src/worker.ts',
+        // The built Node entry invokes the independently covered process bootstrap through fd 7.
+        'packages/ptc-runtime/ptc-runtime-node/src/process-entry.ts',
         // Dynamic Host/Client composition is covered by its focused lifecycle
         // tests and assembled application checks rather than per-file coverage.
         'packages/self-modification/*/src/**/*.{ts,tsx}',
@@ -305,6 +314,7 @@ export default defineConfig({
         ...windowsUnsupportedCoveragePackages.map(path => `${path}/src/**/*.ts`),
         ...windowsOnlyCoverageExclusions,
         ...windowsRunnerCoverageExclusions,
+        ...linuxOnlyCoverageExclusions,
         ...pwshCoverageExclusions,
       ],
       // 100% or it doesn't merge (docs/testing.md: excessive tests are welcome).

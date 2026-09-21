@@ -89,40 +89,7 @@ describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot',
         "opening": true,
         "readyUrl": "http://127.0.0.1:{{port}}",
         "status": 200,
-        "stderr": "dsh: warning: 1 entry did not activate
-      typert-loader (@deepseek-ai/dsh-typert-loader): AggregateError: typert-loader: 6 typert contributor(s) failed to register:
-        - typert-loader: @deepseek-ai/dsh-plugin-manager exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-llm exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-commands exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-command-feedback exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-session-reference exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-cordis-host-runner exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at Object.apply [as callback] (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:337:33)
-          at async Fiber._reload (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/vendor/cordis/lib/index.js:1356:5)
-      Error: typert-loader: @deepseek-ai/dsh-plugin-manager exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-llm exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-commands exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-command-feedback exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-session-reference exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-cordis-host-runner exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11",
+        "stderr": "",
       }
     `)
   })
@@ -217,40 +184,7 @@ describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot',
         "opened": false,
         "opening": false,
         "readyUrl": "http://127.0.0.1:{{port}}",
-        "stderr": "dsh: warning: 1 entry did not activate
-      typert-loader (@deepseek-ai/dsh-typert-loader): AggregateError: typert-loader: 6 typert contributor(s) failed to register:
-        - typert-loader: @deepseek-ai/dsh-plugin-manager exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-llm exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-commands exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-command-feedback exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-session-reference exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-        - typert-loader: @deepseek-ai/dsh-cordis-host-runner exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at Object.apply [as callback] (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:337:33)
-          at async Fiber._reload (file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/vendor/cordis/lib/index.js:1356:5)
-      Error: typert-loader: @deepseek-ai/dsh-plugin-manager exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/boot/plugin-manager/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-llm exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/llm/llm/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-commands exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/interaction/commands/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-command-feedback exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/feedback/command-feedback/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-session-reference exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/context/session-reference/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11
-      Error: typert-loader: @deepseek-ai/dsh-cordis-host-runner exports "./typert" but importing /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js failed: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/a1234/Desktop/开发项目/wechat-worktrees/内部harness/packages/extensions/cordis-host-runner/lib/typert.host.js
-      Did you mean to import "zod/index.cjs"?
-          at file:///Users/a1234/Desktop/%E5%BC%80%E5%8F%91%E9%A1%B9%E7%9B%AE/wechat-worktrees/%E5%86%85%E9%83%A8harness/packages/typert/loader/lib/index.js:267:11",
+        "stderr": "",
       }
     `)
   })
