@@ -1,4 +1,4 @@
-{"type":"session","version":4,"id":"{{sessionId}}","createdAt":1785013630399,"cwd":"{{cwd}}/workspace","isSeeded":false}
+{"type":"session","version":4,"id":"{{sessionId}}","createdAt":1785013630399,"cwd":"{{cwd}}/workspace","isSeeded":false,"delegationDepth":0}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"step/start","data":{"turn":1,"step":1}}
 {"type":"system/message","data":{"turn":1,"step":1,"message":{"id":"v2-to-v3-system-7a0ce982e4b9557b1f679cf62686e24842fe39d81fd94658b6c5c223cc4c7625","role":"system","source":{"kind":"plugin","plugin":"@deepseek-ai/dsh-system-prompt"},"content":[]}},"surfaceOp":"append"}
