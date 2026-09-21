@@ -803,12 +803,17 @@ export class AgentPresets extends TypertRemoteService {
         await mountPreset(scope.ctx, preset)
         return { key, scope, stamp }
       } catch (error) {
-        this.standing.delete(preset.id)
         await scope.dispose()
         throw error
       }
     })()
     this.standing.set(preset.id, created)
+    // Guarded delete: a copy/remove may have cleared this pointer and a later
+    // ensureStanding installed the next generation already — dropping THAT
+    // pointer would fork a third standing mount.
+    void created.catch(() => {
+      if (this.standing.get(preset.id) === created) this.standing.delete(preset.id)
+    })
     return created
   }
 }

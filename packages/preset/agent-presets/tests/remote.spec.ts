@@ -37,9 +37,12 @@ const VALID = '- id: prompt\n  name: \'@deepseek-ai/dsh-system-prompt\'\n'
 
 /** Every temp preset root created by this file, removed after each test. */
 const roots: string[] = []
+/** Every harness Context, disposed after each test. */
+const contexts: Context[] = []
 
 afterEach(async () => {
   vi.restoreAllMocks()
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
@@ -86,6 +89,7 @@ async function harness(
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(AgentPresets, roster)
+  contexts.push(ctx)
   return ctx
 }
 
@@ -368,13 +372,9 @@ describe('switching one session\'s composition', () => {
     expect(recordedPreset(agent)).toEqual({ agentPreset: 'minimal' })
   })
 
-  it('treats an absent turn boundary as no prior turn', async () => {
+  it('switches a session that carries no conversation content', async () => {
     const ctx = await harness()
-    const agent = await agentOn(ctx, 'sel-no-turn-boundary', 'standard')
-    const stateOf = ctx.sessionProjections.stateOf.bind(ctx.sessionProjections)
-    vi.spyOn(ctx.sessionProjections, 'stateOf').mockImplementation((session, key) => (
-      key === 'turnBoundary' ? undefined : stateOf(session, key)
-    ))
+    const agent = await agentOn(ctx, 'sel-no-content', 'standard')
 
     expect(await ctx.agentPresets.select(agent, 'minimal')).toBe('minimal')
   })

@@ -59,6 +59,7 @@ async function harness(roster: Config = { default: 'standard', roots: ROOTS, inc
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(AgentPresets, roster)
+  contexts.push(ctx)
   return ctx
 }
 
@@ -95,7 +96,10 @@ beforeEach(async () => {
 
 /** Every temp preset root created by this file, removed after each test. */
 const roots: string[] = []
+/** Every harness Context, disposed after each test. */
+const contexts: Context[] = []
 afterEach(async () => {
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
@@ -278,9 +282,8 @@ describe('rejecting a composition that cannot be used', () => {
   })
 
   it('names every failed row, not just the count', async () => {
-    // The Loader folds several failed rows into one AggregateError whose own
-    // message names none of them; unflattened, the operator is told only that
-    // "loader entries failed to apply" and has nothing to act on.
+    // Both plugin specifiers fail resolution, so discovery marks the preset
+    // broken — and its reason must name each missing row, not just count them.
     await expect(agentOn(ctx, 'sess-two-broken', 'two-broken'))
       .rejects.toThrow(/first-missing[\s\S]*second-missing/)
   })
