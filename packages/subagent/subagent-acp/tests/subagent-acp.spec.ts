@@ -59,6 +59,14 @@ function text(blocks: { type: string; text?: string }[]): string {
   return blocks.filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
+function expectedFailure(fields: string): string {
+  return `Subagent failure (provider: ACP; ${fields})`
+}
+
+function expectedPermission(policy: 'allow' | 'reject', requestKind: string, decision: 'allowed' | 'denied'): string {
+  return `ACP unattended decision (policy: ${policy}; request: ${requestKind}; decision: ${decision})`
+}
+
 /**
  * Poll until `file` exists (the mock touches it once its prompt is in flight),
  * so a cancel test waits on a CONDITION rather than an arbitrary timeout — the
@@ -228,7 +236,7 @@ describe('cwd resolution', () => {
       await ctx.plugin(acp, { providerName: 'acp', command: 'touch', args: [sentinel], permission: 'reject', env: {} })
       const parent = { id: 'parent', session: { header: {} } } as unknown as Agent
       await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
-        .rejects.toThrow('no working directory')
+        .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
       // Resolution failed BEFORE the process boundary — nothing was launched.
       expect(existsSync(sentinel)).toBe(false)
     } finally {
@@ -349,7 +357,7 @@ describe('cwd resolution', () => {
     const ctx = await setup({})
     const parent = { id: 'parent', session: { header: { cwd: 'relative/workspace' } } } as unknown as Agent
     await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
-      .rejects.toThrow('must be an absolute path')
+      .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
   })
 
   it('rejects a parent session cwd that names a FILE, not a directory', async () => {
@@ -360,7 +368,7 @@ describe('cwd resolution', () => {
       const ctx = await setup({})
       const parent = { id: 'parent', session: { header: { cwd: file } } } as unknown as Agent
       await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
-        .rejects.toThrow('not an accessible directory')
+        .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
     } finally {
       rmSync(tmp, { recursive: true, force: true })
     }
@@ -376,7 +384,7 @@ describe('cwd resolution', () => {
       await ctx.plugin(acp, { providerName: 'acp', command: 'touch', args: [sentinel], permission: 'reject', env: {} })
       const parent = { id: 'parent', session: { header: { cwd: join(tmp, 'vanished') } } } as unknown as Agent
       await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
-        .rejects.toThrow('not an accessible directory')
+        .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
       expect(existsSync(sentinel)).toBe(false)
     } finally {
       rmSync(tmp, { recursive: true, force: true })
@@ -391,6 +399,7 @@ describe('dsh-subagent-acp', () => {
     expect(run.id).not.toBe('acp-child-session')
     const result = await run.result
     expect(result.stopReason).toBe('completed')
+    expect(result.diagnostic).toBeUndefined()
     expect(text(result.output)).toBe('hello from acp child')
     const disposal = run.dispose()
     expect(run.dispose()).toBe(disposal)
@@ -408,6 +417,7 @@ describe('dsh-subagent-acp', () => {
     const run = await ctx.subagents.start('acp', request())
     const result = await run.result
     expect(result.stopReason).toBe('max-tokens')
+    expect(result.diagnostic).toBeUndefined()
     await run.dispose()
   })
 
@@ -416,7 +426,75 @@ describe('dsh-subagent-acp', () => {
     const run = await ctx.subagents.start('acp', request())
     const result = await run.result
     expect(result.stopReason).toBe('refusal')
+    expect(result.diagnostic).toBeUndefined()
     await run.dispose()
+  })
+
+  it.each([
+    ['max_tokens', 'max-tokens'],
+    ['refusal', 'refusal'],
+  ] as const)('adds a permission fact to %s without changing its stop reason', async (remote, stopReason) => {
+    const ctx = await setup({
+      MOCK_PERMISSION: '1',
+      MOCK_PERMISSION_IGNORE_DECISION: '1',
+      MOCK_TOOL_KIND: 'read',
+      MOCK_STOP: remote,
+    }, 'reject')
+    const run = await ctx.subagents.start('acp', request())
+    const result = await run.result
+    expect(result.stopReason).toBe(stopReason)
+    expect(result.diagnostic).toBe(expectedPermission('reject', 'read', 'denied'))
+    await run.dispose()
+  })
+
+  it('keeps an ordinary remote cancelled stop diagnostic-free', async () => {
+    const ctx = await setup({ MOCK_STOP: 'cancelled' })
+    const run = await ctx.subagents.start('acp', request())
+    await expect(run.result).resolves.toEqual({ output: [{ type: 'text', text: 'mock child answer' }], stopReason: 'aborted' })
+    await run.dispose()
+  })
+
+  it('preserves max_turn_requests as an actionable remote limit', async () => {
+    const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_STOP: 'max_turn_requests' })
+    const run = await ctx.subagents.start('acp', request())
+    const result = await run.result
+    expect(result).toEqual({
+      output: [{ type: 'text', text: 'partial' }],
+      diagnostic: expectedFailure('stage: prompt; category: remote-limit; stop reason: max_turn_requests'),
+      stopReason: 'error',
+    })
+    await run.dispose()
+  })
+
+  it('uses a fixed fallback for an unknown remote stop reason', async () => {
+    const rawReason = 'private/path/SECRET_TOKEN'
+    const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_STOP: rawReason })
+    const run = await ctx.subagents.start('acp', request())
+    const result = await run.result
+    expect(result.stopReason).toBe('error')
+    expect(result.diagnostic).toBe(
+      expectedFailure('stage: prompt; category: unknown; stop reason: unknown'),
+    )
+    expect(result.diagnostic).not.toContain(rawReason)
+    await run.dispose()
+  })
+
+  it('reports a dead child by exit facts with the partial output preserved', async () => {
+    const ctx = await setup({ MOCK_TEXT: 'partial answer', MOCK_CRASH_AFTER_CHUNK: '1' })
+    const run = await ctx.subagents.start('acp', request())
+    const result = await run.result
+    expect(result.stopReason).toBe('error')
+    expect(text(result.output)).toBe('partial answer')
+    expect(result.diagnostic).toBe(
+      expectedFailure('stage: process; category: process-exit; exit code: 17'),
+    )
+    await run.dispose()
+  })
+
+  it('classifies a child that dies during initialize by exit facts', async () => {
+    const ctx = await setup({ MOCK_CRASH_ON_INITIALIZE: '1' })
+    await expect(ctx.subagents.start('acp', request()))
+      .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: process-exit; exit code: 11')}`)
   })
 
   it('aborting the required signal cancels a running child', async () => {
@@ -476,7 +554,7 @@ describe('dsh-subagent-acp', () => {
         disposeEofGraceMs: 1000,
         disposeGraceMs: 100,
         spawn: spawnSubprocess,
-      })).rejects.toThrow('ACP child published without a session id')
+      })).rejects.toThrow(`subagent-acp: ${expectedFailure('stage: new-session; category: protocol')}`)
       // Startup rejects only after its private child reaches quiescence. The
       // marker proves rollback closed stdin and allowed the child's EOF flush.
       expect(existsSync(flushed)).toBe(true)

@@ -18,7 +18,7 @@ import type {
   SubagentStartRequest,
 } from '@deepseek-ai/dsh-subagent'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { type AcpRunSpec, DEFAULT_DISPOSE_EOF_GRACE_MS, DEFAULT_DISPOSE_GRACE_MS, type PermissionPolicy, startAcpRun } from './run.ts'
+import { acpConfigurationFailure, type AcpRunSpec, DEFAULT_DISPOSE_EOF_GRACE_MS, DEFAULT_DISPOSE_GRACE_MS, type PermissionPolicy, startAcpRun } from './run.ts'
 
 export const name = 'subagent-acp'
 export const inject = ['subagents', 'subprocess']
@@ -157,10 +157,21 @@ class AcpProvider implements SubagentProvider {
   constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {}
 
   start(request: ResolvedSubagentStartRequest) {
+    if (request.signal.aborted) {
+      throw new Error('subagent request was aborted before the ACP child started')
+    }
+    let cwd: string
+    try {
+      cwd = resolveCwd(this.config.cwd, request)
+    } catch (error: unknown) {
+      const failure = acpConfigurationFailure(error)
+      this.ctx.logger.warn(`subagent-acp "${this.name}": child start failed: %o`, error)
+      throw failure
+    }
     const spec: AcpRunSpec = {
       command: this.config.command,
       args: this.config.args,
-      cwd: resolveCwd(this.config.cwd, request),
+      cwd,
       permission: this.config.permission,
       env: this.config.env,
       disposeEofGraceMs: this.config.disposeEofGraceMs,

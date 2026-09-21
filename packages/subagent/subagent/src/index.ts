@@ -223,7 +223,7 @@ function positiveLimit(value: number | undefined, fallback: number, label: strin
 }
 
 /**
- * Provenance attached to one browser prompt's durable user message. The Host
+ * Source descriptor attached to one browser prompt's durable user message. The Host
  * declares the `user-rpc` message source and depends on this package, so the
  * exact accepted record is described here and the correlation id rides the
  * durable message the Client reconciles its optimistic prompt against.
@@ -350,12 +350,12 @@ export class SubagentRuntime extends TypertRemoteService {
 
   /**
    * Deliver one host-protocol message to a direct continuable child.
-   * Symbol-keyed so host adapters can preserve their own provenance without
+   * Symbol-keyed so host adapters can preserve their own source descriptors without
    * widening the public Service Definition or impersonating an Agent sender.
    * @param parent - exact live direct parent authorizing delivery.
    * @param childId - durable direct-child session id.
    * @param content - host-authored content to deliver.
-   * @param source - durable host-protocol provenance.
+   * @param source - durable host-protocol source descriptor.
    * @param signal - caller cancellation before inbox acceptance.
    * @param delivery - Queue as a distinct turn or Steer at the nearest step.
    * @returns the accepted message's inbox id.
