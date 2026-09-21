@@ -20,7 +20,7 @@ describe('generated tsconfig package aliases', () => {
     ['compaction-image-offload/projection', 'compaction/compaction-image-offload', 'projection'],
   ])('resolves %s from source without requiring emitted declarations', (specifier, packagePath, entry) => {
     const path = resolve(root, 'tsconfig.base.json')
-    const config = ts.readConfigFile(path, ts.sys.readFile)
+    const config = ts.readConfigFile(path, (file: string) => ts.sys.readFile(file))
     const { options } = ts.parseJsonConfigFileContent(config.config, ts.sys, root)
     const source = resolve(root, `packages/${packagePath}/src/${entry}.ts`)
     const host = { ...ts.sys, fileExists: (file: string) => !file.replaceAll('\\', '/').includes('/lib/') && ts.sys.fileExists(file) }

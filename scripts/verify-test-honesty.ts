@@ -98,14 +98,40 @@ export function inspectTestHonesty(path: string, source: string): TestHonestyIss
     if (ts.isElementAccessExpression(node)) return testRoot(node.expression)
     return false
   }
+  /** Whether `branch` contains a `test.skip`/`it.skip` member anywhere inside it. */
+  const containsSkip = (branch: ts.Node): boolean => {
+    let found = false
+    const seek = (inner: ts.Node): void => {
+      if (ts.isPropertyAccessExpression(inner) && inner.name.text === 'skip' && testRoot(inner.expression)) found = true
+      if (!found) ts.forEachChild(inner, seek)
+    }
+    seek(branch)
+    return found
+  }
   const visit = (node: ts.Node): void => {
     const skip = (ts.isPropertyAccessExpression(node) && node.name.text === 'skip')
       || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'skip')
-    if (skip && (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && testRoot(node.expression)) {
+    // `test.skipIf(true)` is an unconditional skip: a literal-true condition
+    // never varies, so it needs the same justification as a bare skip.
+    const skipIfAlways = ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === 'skipIf' && testRoot(node.expression.expression)
+      && node.arguments.length > 0 && node.arguments[0]?.kind === ts.SyntaxKind.TrueKeyword
+    if ((skip && (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && testRoot(node.expression))
+      || skipIfAlways) {
+      let descendant: ts.Node = node
       let ancestor = node.parent
       let conditional = false
-      while (!ts.isSourceFile(ancestor) && !ts.isStatement(ancestor)) {
-        if (ts.isConditionalExpression(ancestor)) conditional = true
+      while (!ts.isSourceFile(ancestor)) {
+        if (ts.isConditionalExpression(ancestor)) {
+          // A ternary qualifies only when a sibling branch can still run the
+          // test: `cond ? test.skip : test.skip` skips on every outcome.
+          const branch = descendant === ancestor.whenTrue || descendant === ancestor.whenFalse ? descendant : undefined
+          const sibling = branch === undefined ? undefined
+            : branch === ancestor.whenTrue ? ancestor.whenFalse : ancestor.whenTrue
+          if (sibling === undefined || !containsSkip(sibling)) conditional = true
+        }
+        if (ts.isIfStatement(ancestor)) conditional = true
+        descendant = ancestor
         ancestor = ancestor.parent
       }
       const reason = precedingComments(comments, source, node.getStart(file))

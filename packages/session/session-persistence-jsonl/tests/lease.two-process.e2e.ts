@@ -46,7 +46,7 @@ function spawnLeaseChild(script: string, root: string, stdin: 'ignore' | 'pipe')
     exited,
     async awaitReady(): Promise<void> {
       const first = await Promise.race([
-        once(child.stdout, 'data').then(() => 'ready' as const),
+        once(child.stdout!, 'data').then(() => 'ready' as const),
         exited.then(() => 'exited' as const),
       ])
       if (first === 'exited') {
@@ -113,8 +113,8 @@ describe('two-process write lock (built lib)', () => {
 
       // A released claim excludes nobody: the holder stays alive, but its
       // kernel lock is gone and its owner record is cleared.
-      holder.child.stdin.write('release\n')
-      await once(holder.child.stdout, 'data') // 'released'
+      holder.child.stdin!.write('release\n')
+      await once(holder.child.stdout!, 'data') // 'released'
       const taken = await mine.open(SessionId(SESSION), 'write')
       await taken.close()
       await holder.killAndAwait()

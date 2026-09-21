@@ -120,7 +120,7 @@ vendor manifest 守卫检查 `vendor/*/src` 下的改动是否连同对应的 `v
 
 除限定范围的暂存记录校验外，这些钩子有意不运行测试、快照、文档检查、构建或 `hygiene`。贡献者只运行一次[与改动行为相关的检查](../AGENTS.md#run-relevant-checks-locally)；CI 负责全量覆盖率门禁、构建产物冒烟测试，以及 Node 22.19、24 和 26 兼容性矩阵。
 
-贡献者可以选择运行 `pnpm run check:all`，执行全面的本地门禁集。该命令独立于 Git 钩子，也不是对 agent 的指令。
+贡献者可以选择运行 `pnpm run check:all`，执行除逐文件覆盖率车道与平台矩阵外的全部本地门禁（两者由 CI 负责）。该命令独立于 Git 钩子，也不是对 agent 的指令。
 
 ### CI 门禁
 
@@ -128,7 +128,7 @@ keyless [CI 工作流](../.github/workflows/ci.yml) 按影响范围选择 lane�
 
 ### 日常命令
 
-根目录的[贡献者说明](../AGENTS.md#commands)概述常用命令，[`package.json`](../package.json) 与 [scripts/run-gates.ts](../scripts/run-gates.ts) 则负责当前脚本和门禁清单。请选择覆盖变更表面的最小检查集。文档变更使用 `pnpm run doc-sync`；包公开行为变更还需更新所属 README 或 JSDoc，而基于构建产物的检查需要先运行 `pnpm run build`。
+根目录的[贡献者说明](../AGENTS.md#commands)概述常用命令，[`package.json`](../package.json) 与 [scripts/run-gates.ts](../scripts/run-gates.ts) 则负责当前脚本和门禁清单。请选择覆盖变更表面的最小检查集。文档变更在本地使用 `pnpm run test:docs`；`pnpm run doc-sync` 是 CI 负责的完整验收车道。包公开行为变更还需更新所属 README 或 JSDoc，而基于构建产物的检查需要先运行 `pnpm run build`。
 
 ### 插件表面与性能
 

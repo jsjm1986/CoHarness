@@ -34,6 +34,18 @@ describe('test honesty source rules', () => {
       .toEqual([expect.objectContaining({ rule: 'test-skip' })])
     expect(inspectTestHonesty(path, '// test-skip: awaiting the external endpoint; docs/testing.md\nit.skip("live", () => {});')).toEqual([])
   })
+
+  it('flags literal-true skipIf and a ternary whose branches both skip, while a real if/else stays conditional', () => {
+    const path = 'scripts/guard.spec.ts'
+    expect(inspectTestHonesty(path, 'test.skipIf(true)("legacy", () => {});'))
+      .toEqual([expect.objectContaining({ rule: 'test-skip' })])
+    expect(inspectTestHonesty(path, 'const run = cond ? test.skip : test.skip; run("case", () => {});'))
+      .toEqual([expect.objectContaining({ rule: 'test-skip' }), expect.objectContaining({ rule: 'test-skip' })])
+    expect(inspectTestHonesty(path, 'if (process.platform === "win32") { test("native", () => {}); } else { test.skip("posix", () => {}); }'))
+      .toEqual([])
+    expect(inspectTestHonesty(path, 'test.skipIf(process.platform === "win32")("native", () => {});'))
+      .toEqual([])
+  })
   // Two sequential children each own a 20-second startup deadline.
   it('executes the real checker against a private repository with valid and invalid source', { timeout: 60_000 }, () => {
     const root = mkdtempSync(join(tmpdir(), 'test-honesty-'))

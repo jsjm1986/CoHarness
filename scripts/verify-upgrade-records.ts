@@ -20,7 +20,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { isAbsolute, relative, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
@@ -66,7 +66,16 @@ export function checkGateReplays(root: string, upstreamCommit: string, matrix: u
     const path = requireString('gate replay', raw.path, 'path')
     if (paths.has(path)) fail(`duplicate gate replay ${path}`)
     paths.add(path)
-    if (raw.reviewedUpstreamCommit !== upstreamCommit) fail(`gate replay ${path} requires review against the new upstream target`)
+    const reviewedCommit = String(raw.reviewedUpstreamCommit)
+    if (reviewedCommit !== upstreamCommit) {
+      // Carry-forward: when the declared upstream input is byte-identical at
+      // the new target (the blob check below), a review recorded at an earlier
+      // ancestor still covers it — unrelated upstream motion must not force a
+      // fresh review. A divergent or newer-than-target review still fails.
+      if (!COMMIT_ID.test(reviewedCommit)) fail(`gate replay ${path} requires review against the new upstream target`)
+      const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', reviewedCommit, upstreamCommit], { cwd: root, encoding: 'utf8' })
+      if (ancestor.status !== 0) fail(`gate replay ${path} review is not an ancestor of the new upstream target`)
+    }
     if (!COMMIT_ID.test(String(raw.upstreamBlob))) fail(`gate replay ${path} has no upstream source identity`)
     const blob = execFileSync('git', ['rev-parse', '--verify', `${upstreamCommit}:${path}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
     if (blob !== raw.upstreamBlob) fail(`gate replay ${path} has changed upstream input; replay and re-review are required`)

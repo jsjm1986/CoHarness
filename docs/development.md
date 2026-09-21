@@ -116,7 +116,7 @@ The vendor manifest guard checks that changes under `vendor/*/src` are staged wi
 
 Apart from the scoped staged-record verification, the hooks intentionally do not run tests, snapshots, documentation checks, builds, or hygiene. Contributors run the [checks relevant to the changed behavior](../AGENTS.md#run-relevant-checks-locally) once; CI owns exhaustive coverage, built-artifact smokes, and the Node 22.19, 24, and 26 compatibility matrix.
 
-Contributors can opt into the comprehensive local gate set with `pnpm run check:all`. The command is independent of the Git hooks and is not an agent instruction.
+Contributors can opt into the comprehensive local gate set with `pnpm run check:all`. It covers every check except the per-file coverage lane and the platform matrix, which CI owns. The command is independent of the Git hooks and is not an agent instruction.
 
 ### CI gates
 
@@ -124,7 +124,7 @@ The keyless [CI workflow](../.github/workflows/ci.yml) selects lanes by impact. 
 
 ### Daily commands
 
-The root [contributor instructions](../AGENTS.md#commands) summarize common commands, while [`package.json`](../package.json) and [scripts/run-gates.ts](../scripts/run-gates.ts) own the current script and gate inventories. Select the smallest checks that cover the changed surface. Documentation changes use `pnpm run doc-sync`; package-public behavior changes also update the owning README or JSDoc, and built-artifact checks require `pnpm run build` first.
+The root [contributor instructions](../AGENTS.md#commands) summarize common commands, while [`package.json`](../package.json) and [scripts/run-gates.ts](../scripts/run-gates.ts) own the current script and gate inventories. Select the smallest checks that cover the changed surface. Documentation changes use `pnpm run test:docs` locally; `pnpm run doc-sync` is the full acceptance lane CI owns. Package-public behavior changes also update the owning README or JSDoc, and built-artifact checks require `pnpm run build` first.
 
 ### Plugin surfaces and performance
 

@@ -587,9 +587,9 @@ describe('dsh-subagent-acp', () => {
         disposeEofGraceMs: 1000,
         disposeGraceMs: 100,
         spawn: spec => new Proxy(spawnSubprocess(spec), {
-          get(target, property, receiver) {
+          get(target, property, receiver): unknown {
             if (property === 'waitForExit') return async () => { throw cleanupFailure }
-            return Reflect.get(target, property, receiver)
+            return Reflect.get(target, property, receiver) as unknown
           },
         }),
         onError: (error) => { errors.push(error) },
@@ -611,7 +611,7 @@ describe('dsh-subagent-acp', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'acp-fail-cleanup-'))
     try {
       const cleanupFailure = new Error('waitForExit rejected before proving quiescence')
-      await expect(startAcpRun(request(), {
+      const failure: unknown = await startAcpRun(request(), {
         command: process.execPath,
         args: [mockServer],
         cwd: process.cwd(),
@@ -620,18 +620,16 @@ describe('dsh-subagent-acp', () => {
         disposeEofGraceMs: 1000,
         disposeGraceMs: 100,
         spawn: spec => new Proxy(spawnSubprocess(spec), {
-          get(target, property, receiver) {
+          get(target, property, receiver): unknown {
             if (property === 'waitForExit') return async () => { throw cleanupFailure }
-            return Reflect.get(target, property, receiver)
+            return Reflect.get(target, property, receiver) as unknown
           },
         }),
-      })).rejects.toMatchObject({
-        constructor: AggregateError,
-        errors: [
-          expect.objectContaining({ message: expect.stringContaining('stage: new-session') }),
-          expect.objectContaining({ message: expect.stringContaining('stage: teardown') }),
-        ],
-      })
+      }).then(() => { throw new Error('expected the aggregated startup/teardown rejection') }, (error: unknown) => error)
+      expect(failure).toBeInstanceOf(AggregateError)
+      const messages = (failure as AggregateError).errors.map((error: unknown) => String(error))
+      expect(messages.some(message => message.includes('stage: new-session'))).toBe(true)
+      expect(messages.some(message => message.includes('stage: teardown'))).toBe(true)
     } finally {
       rmSync(tmp, { recursive: true, force: true })
     }
