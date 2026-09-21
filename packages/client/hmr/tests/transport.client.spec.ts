@@ -49,7 +49,8 @@ it('rebuilds known entries through invalidate/prefetch/refresh, drops malformed 
   } finally {
     await fiber.dispose()
   }
-  expect(close).toHaveBeenCalled()
+  expect(close).toHaveBeenCalledTimes(1)
+  await ctx.fiber.dispose()
 })
 
 it('removes the old fiber\'s runtime record, drains inertia, and clears the entry before refresh', async () => {
@@ -96,4 +97,5 @@ it('removes the old fiber\'s runtime record, drains inertia, and clears the entr
   } finally {
     await fiber.dispose()
   }
+  await ctx.fiber.dispose()
 })
