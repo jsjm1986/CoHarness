@@ -10055,6 +10055,9 @@ importers:
       '@deepseek-ai/dsh-session-format':
         specifier: workspace:^
         version: link:../../session/session-format
+      '@deepseek-ai/dsh-session-format-catalog':
+        specifier: workspace:^
+        version: link:../../session/session-format-catalog
 
   packages/test-support/loader-smoke:
     dependencies:

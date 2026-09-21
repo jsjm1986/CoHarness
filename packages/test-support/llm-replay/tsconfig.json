@@ -21,6 +21,9 @@
       "path": "../../session/session-format"
     },
     {
+      "path": "../../session/session-format-catalog"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {
