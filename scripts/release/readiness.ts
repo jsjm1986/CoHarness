@@ -144,25 +144,26 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
   // Read-only GitHub lookups are identical for every requirement of one
   // release path; cache them within this assertion so four executions do not
   // multiply into four times the API calls.
+  const source = authority
   const cachedRuns = new Map<string, Promise<unknown>>()
   const cachedJobs = new Map<string, Promise<unknown>>()
   const cachedReports = new Map<string, Promise<string>>()
   authority = {
     run: (repository, runId) => {
       const key = `${repository}#${runId}`
-      const hit = cachedRuns.get(key) ?? authority.run(repository, runId)
+      const hit = cachedRuns.get(key) ?? source.run(repository, runId)
       cachedRuns.set(key, hit)
       return hit
     },
     jobs: (repository, runId, attempt) => {
       const key = `${repository}#${runId}#${attempt}`
-      const hit = cachedJobs.get(key) ?? authority.jobs(repository, runId, attempt)
+      const hit = cachedJobs.get(key) ?? source.jobs(repository, runId, attempt)
       cachedJobs.set(key, hit)
       return hit
     },
     report: (repository, runId, artifact, filename) => {
       const key = `${repository}#${runId}#${artifact}#${filename}`
-      const hit = cachedReports.get(key) ?? authority.report(repository, runId, artifact, filename)
+      const hit = cachedReports.get(key) ?? source.report(repository, runId, artifact, filename)
       cachedReports.set(key, hit)
       return hit
     },
@@ -246,19 +247,17 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
     })) throw new Error(`release readiness: missing required policy check ${required.mode}/${required.check}/${required.environment}`)
   }
   // Only the announced policy set gates the verdict: proofs recorded beyond it
-  // (a wider manual run's extra platforms or consumers) stay raw evidence in
-  // the report and cannot silently block a narrower required release.
+  // (a wider manual run's extra platforms or consumers) keep authentic raw
+  // evidence — their bytes, binding, and consistency are still verified — but
+  // their pass/fail status cannot silently block a narrower required release.
   const requiredKeys = new Set(policyRequired.map(required => `${required.mode}${required.check}${required.environment}`))
-  const verdictRequirements = requirements.filter((raw) => {
-    const item = object(raw, 'required check')
-    return requiredKeys.has(`${text(item.mode, 'required mode')}${text(item.check, 'required check')}${text(item.environment, 'required environment')}`)
-  })
   const coveredEnvironments = new Set<string>()
   const verifiedArtifacts = new Map<string, string>()
   const androidArtifacts = new Map<string, Map<string, string>>()
-  for (const raw of verdictRequirements) {
+  for (const raw of requirements) {
     const requirement = object(raw, 'required check')
     if (candidate.phase === 'preflight' && requirement.environment === 'artifact') continue
+    const verdict = requiredKeys.has(`${text(requirement.mode, 'required mode')}${text(requirement.check, 'required check')}${text(requirement.environment, 'required environment')}`)
     const proofPath = ownedPath(proofRoot, requirement.report)
     const rawProof = readFileSync(proofPath, 'utf8')
     const proof = object(JSON.parse(rawProof) as unknown, 'gate evidence')
@@ -271,9 +270,11 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
     if (new Set(checks.map(check => check.id)).size !== checks.length) throw new Error('release readiness: duplicate check identity')
     const chosen = checks.filter(check => check.id === requirement.check)
     if (chosen.length !== 1 || stable.mode !== requirement.mode) throw new Error('release readiness: required check was not executed')
-    for (const check of checks.filter(check => check.required === true || check === chosen[0])) {
-      if (check.status !== 'passed' || check.exitCode !== 0 || check.signal !== null || check.aborted !== false) {
-        throw new Error('release readiness: failed, skipped or cancelled required check')
+    if (verdict) {
+      for (const check of checks.filter(check => check.required === true || check === chosen[0])) {
+        if (check.status !== 'passed' || check.exitCode !== 0 || check.signal !== null || check.aborted !== false) {
+          throw new Error('release readiness: failed, skipped or cancelled required check')
+        }
       }
     }
     const producer = object(object(proof.observations, 'observations').producer, 'GitHub producer')
@@ -288,24 +289,30 @@ export async function assertReleaseReadiness(candidate: ReleaseCandidate, author
     const completed = run.status === 'completed' && run.conclusion === 'success'
     const publishing = Number(runId) === candidate.currentRunId && run.status === 'in_progress'
       && ['.github/workflows/release.yml', '.github/workflows/release-vendor.yml', '.github/workflows/python-release.yml', '.github/workflows/landlock-run-release.yml'].includes(String(run.path))
-    if (run.head_sha !== head || (!completed && !publishing) || run.path !== producer.workflow) {
+    if (run.head_sha !== head || (verdict && !completed && !publishing) || run.path !== producer.workflow) {
       throw new Error('release readiness: authoritative run does not match candidate')
     }
     if (object(run.repository, 'GitHub repository').full_name !== candidate.repository) throw new Error('release readiness: foreign evidence repository')
     const jobs = object(await authority.jobs(repository, Number(runId), Number(attempt)), 'GitHub jobs')
     const matching = rows(jobs.jobs, 'GitHub jobs').map(job => object(job, 'job')).filter(job =>
       job.name === producer.job || (typeof job.name === 'string' && job.name.endsWith(' / ' + text(producer.job, 'producer job'))))
-    if (matching.length !== 1 || matching[0]?.conclusion !== 'success') throw new Error('release readiness: authoritative job did not succeed')
+    if (matching.length > 1 || (verdict && (matching.length !== 1 || matching[0]?.conclusion !== 'success'))) {
+      throw new Error('release readiness: authoritative job did not succeed')
+    }
     const authoritative = await authority.report(repository, Number(runId), text(producer.artifact, 'evidence artifact'), basename(proofPath))
     if (rawProof !== authoritative) throw new Error('release readiness: report bytes do not match the completed job artifact')
     const environment = text(requirement.environment, 'required environment')
-    if (environment === 'real-provider' && (!Array.isArray(stable.providerAssertions) || stable.providerAssertions.length === 0)) {
-      throw new Error('release readiness: no executed provider assertion evidence')
+    if (verdict) {
+      if (environment === 'real-provider' && (!Array.isArray(stable.providerAssertions) || stable.providerAssertions.length === 0)) {
+        throw new Error('release readiness: no executed provider assertion evidence')
+      }
+      if (environment === 'artifact' && !['built-bin-smoke', 'node-next-types', 'built-package-invariants', 'publint', 'npm-pack', 'python-runtime', 'python-release', 'native-pack'].includes(String(requirement.check))) {
+        throw new Error('release readiness: a source check is not published-artifact proof')
+      }
     }
-    if (environment === 'artifact' && !['built-bin-smoke', 'node-next-types', 'built-package-invariants', 'publint', 'npm-pack', 'python-runtime', 'python-release', 'native-pack'].includes(String(requirement.check))) {
-      throw new Error('release readiness: a source check is not published-artifact proof')
+    if (matching.length === 1) {
+      assertEvidenceEnvironment(environment, object(stable.environment, 'environment'), matching[0], String(run.path))
     }
-    assertEvidenceEnvironment(environment, object(stable.environment, 'environment'), matching[0], String(run.path))
     coveredEnvironments.add(environment)
     const artifacts = stable.artifacts
     if (artifacts !== undefined) {
