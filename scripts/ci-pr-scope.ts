@@ -9,7 +9,7 @@ import { expandPackageGroups, loadWebTestPolicy, scanGoldenOwners, WEB_TESTS_ROO
 /** The expensive pull-request CI lanes that a scope decision controls. */
 export interface CiPrScope {
   readonly runExpensive: boolean
-  readonly reason: 'action-only' | 'docs-only' | 'scoped' | 'python-only' | 'full'
+  readonly reason: 'action-only' | 'docs-only' | 'scoped' | 'python-only' | 'consumer-only' | 'full'
   readonly changedSourceFiles: readonly string[]
   readonly changedPackageFiles: readonly string[]
   readonly changedDocsOnly: boolean
@@ -81,12 +81,12 @@ const DEPENDENCY_PATH = /(^|\/)(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.
 
 /**
  * Documentation records and agent notes, which no lane's inputs depend on.
- * Golden payloads under `apps/web/tests/snapshots/` are test data, not docs:
+ * Golden payloads under any `tests/snapshots/` tree are test data, not docs:
  * their `.md` extension must not read as documentation, or a golden-only diff
  * would skip every lane.
  */
 function isInertPath(path: string): boolean {
-  if (path.startsWith(`${WEB_TESTS_ROOT}snapshots/`)) return false
+  if (/(?:^|\/)tests?\/snapshots\//.test(path)) return false
   return policy.inertPrefixes.some(prefix => path.startsWith(prefix))
     || path.endsWith('.md')
     || path.endsWith('.mdx')
@@ -112,7 +112,10 @@ function isModelInputPath(path: string): boolean {
 }
 
 function isGatewayPath(path: string): boolean {
-  return policy.gatewayPrefixes.some(prefix => path.startsWith(prefix))
+  // The Admin app lives under gateway/ but is an independent npm project with
+  // its own lane; a page-only edit there does not reach the Gateway runtime.
+  return !path.startsWith(policy.adminUiPrefix)
+    && policy.gatewayPrefixes.some(prefix => path.startsWith(prefix))
 }
 
 function isAdminUiPath(path: string): boolean {
@@ -312,7 +315,8 @@ export function classifyCiPrScope(
   // SDK are provably outside their input domain; `scripts/**` is deliberately not
   // exempt, because it holds the gate runner every lane invokes and the fixture
   // generator the snapshot lane consumes.
-  const nodeLanesUnreachable = !modelInput && paths.length > 0 && paths.every(path => isInertPath(path) || path.startsWith('python/'))
+  const nodeLanesUnreachable = !modelInput && paths.length > 0
+    && paths.every(path => isInertPath(path) || path.startsWith('python/') || path.startsWith(scopePolicy.adminUiPrefix))
   // The runtime wheel executes the TypeScript loop and Session protocol too.
   const pythonLanesReachable = reasons.python.length > 0 || paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
   const snapshotModeFromWeb: Record<WebVerificationPlan['mode'], CiPrScope['snapshotMode']> = {
@@ -342,9 +346,19 @@ export function classifyCiPrScope(
   const changedLines = diff
     .split('\n')
     .filter(line => (line.startsWith('+') || line.startsWith('-')) && !line.startsWith('+++') && !line.startsWith('---'))
+  // A pin bump changes complete `uses:` lines and nothing else: a `run:` line
+  // that merely contains the ref text is a real command edit, not a pin bump.
+  const SETUP_USES = /^\s*-\s*uses:\s*pnpm\/action-setup@v[\d.]+\s*$/
+  const normalizeRef = (line: string): string => line.replace(/pnpm\/action-setup@v[\d.]+/, 'pnpm/action-setup@')
+  const added = changedLines.filter(line => line.startsWith('+')).map(line => line.slice(1))
+  const removed = changedLines.filter(line => line.startsWith('-')).map(line => line.slice(1))
+  const normalizedAdded = added.map(normalizeRef).sort()
+  const normalizedRemoved = removed.map(normalizeRef).sort()
   const actionOnly = paths.every(path => path.startsWith('.github/workflows/'))
-    && changedLines.length > 0
-    && changedLines.every(line => /pnpm\/action-setup@v\d/.test(line))
+    && added.length > 0
+    && added.length === removed.length
+    && [...added, ...removed].every(line => SETUP_USES.test(line))
+    && normalizedAdded.every((line, index) => line === normalizedRemoved[index])
   if (actionOnly) return {
     ...common,
     runExpensive: false,
@@ -393,16 +407,19 @@ export function classifyCiPrScope(
     windowsMode: 'full',
   }
 
+  const unreachableReason = paths.every(path => isInertPath(path) || path.startsWith('python/')) ? 'python-only' : 'consumer-only'
   return {
     ...common,
     runExpensive: !nodeLanesUnreachable,
-    reason: nodeLanesUnreachable ? 'python-only' : 'full',
+    reason: nodeLanesUnreachable ? unreachableReason : 'full',
     coverageMode: nodeLanesUnreachable ? 'skip' : 'full',
     // A change with no browser-rendered input keeps the keyless ACP/CLI snapshots
     // but not the Playwright inventory, which would have nothing new to render.
     snapshotMode: nodeLanesUnreachable ? 'skip' : snapshotModeFromWeb[webPlan.mode],
     webGroups: nodeLanesUnreachable ? [] : webPlan.groups,
-    compatMode: 'full',
+    // The Node compatibility smokes exercise the Node runtime against the
+    // TypeScript build; a Python-only change has no Node input to break them.
+    compatMode: nodeLanesUnreachable ? 'skip' : 'full',
     pythonMode: pythonLanesReachable ? 'full' : 'skip',
     windowsMode: nodeLanesUnreachable ? 'skip' : 'full',
   }

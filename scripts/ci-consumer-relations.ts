@@ -13,8 +13,17 @@ export type ConsumerLane = keyof typeof policy.lanes
  */
 export function consumerReasons(paths: readonly string[]): Record<ConsumerLane, string[]> {
   const result: Record<ConsumerLane, string[]> = { python: [], gateway: [], adminUi: [], android: [] }
+  const standalonePrefixes = (policy as { standalonePrefixes?: readonly string[] }).standalonePrefixes ?? []
+  const standaloneOf = (path: string): string | undefined => standalonePrefixes.find(prefix => path.startsWith(prefix))
+  // A path inside a standalone subtree only satisfies prefixes rooted inside
+  // that same tree: a bare `gateway` prefix must not claim Admin-app pages.
+  const claims = (path: string, prefix: string): boolean => {
+    if (path !== prefix && !path.startsWith(`${prefix}/`)) return false
+    const standalone = standaloneOf(path)
+    return standalone === undefined || `${prefix}/` === standalone || prefix.startsWith(standalone)
+  }
   for (const relation of policy.relations) {
-    if (!paths.some(path => relation.paths.some(prefix => path === prefix || path.startsWith(prefix + '/')))) continue
+    if (!paths.some(path => relation.paths.some(prefix => claims(path, prefix)))) continue
     for (const lane of relation.lanes as ConsumerLane[]) result[lane].push(relation.id)
   }
   // Cordis overlays, workers and process launchers can change runtime composition

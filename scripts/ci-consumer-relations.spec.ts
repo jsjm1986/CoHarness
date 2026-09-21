@@ -13,6 +13,11 @@ describe('fork consumer selection', () => {
     ['packages/llm/llm/src/discovery.ts', ['gateway', 'adminUi']],
     ['packages/client/ui-primitives/src/Button.tsx', ['adminUi']],
     ['apps/web/src/native-push.ts', ['android', 'gateway']],
+    ['packages/context/gateway-runtime/src/index.ts', ['gateway']],
+    ['packages/context/collaboration-gateway/src/index.ts', ['gateway']],
+    ['scripts/build-exe-for-python-sdk.ts', ['python']],
+    ['.github/workflows/build-exe-for-python-sdk.yml', ['python']],
+    ['scripts/snapshots/python-sdk-single-exe/minimal/model-visible.json', ['python']],
     ['examples/cli/cordis.yml', ['python', 'gateway', 'adminUi', 'android']],
   ])('routes %s to its consumers', (path, lanes) => {
     const reasons = consumerReasons([path])

@@ -67,6 +67,9 @@
       ]
     }
   },
+  "standalonePrefixes": [
+    "gateway/admin-ui/"
+  ],
   "relations": [
     {
       "id": "loop-session-sdk",
@@ -153,6 +156,17 @@
       "basis": "BFF and Gateway protocol, authorization and runtime process consumers."
     },
     {
+      "id": "gateway-context-plugins",
+      "paths": [
+        "packages/context/gateway-runtime",
+        "packages/context/collaboration-gateway"
+      ],
+      "lanes": [
+        "gateway"
+      ],
+      "basis": "Gateway composes these context plugins into its runtime; a change inside them alters Gateway behavior without touching gateway/."
+    },
+    {
       "id": "admin-app",
       "paths": [
         "gateway/admin-ui"
@@ -161,6 +175,18 @@
         "adminUi"
       ],
       "basis": "Independent administration application."
+    },
+    {
+      "id": "python-runtime-build",
+      "paths": [
+        "scripts/build-exe-for-python-sdk.ts",
+        ".github/workflows/build-exe-for-python-sdk.yml",
+        "scripts/snapshots/python-sdk-single-exe"
+      ],
+      "lanes": [
+        "python"
+      ],
+      "basis": "The exe build script, its reusable workflow, and the single-exe golden fixtures produce the python-runtime proof the lane executes."
     },
     {
       "id": "python-surface",
