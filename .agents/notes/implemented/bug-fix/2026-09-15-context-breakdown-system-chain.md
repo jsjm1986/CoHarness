@@ -10,7 +10,7 @@ The O(1) `contextBreakdown` fold priced `systemTokens` from the last `system/mes
 
 ## Decision
 
-The projection tracks live system nodes exactly in a small ordered list (`systems: {seq, tokens}`), updated from each system write's own price and the surface provenance rule — `sourceEventSeqs` covers every shadowed node, so any replace, whether prompt maintenance or a compaction, retires the entries it shadows. `systemTokens` is the newest surviving nonempty node's estimate; the message figure is the non-system surface fold plus the superseded entries' estimates, matching the upstream classification (effective prompt in system, every other surviving visible price in messages). A non-system replacement that shadows a tracked node conserves its estimate inside the message accumulator, keeping the fold's preserve-total contract consistent across buckets for both claim-priced and unclaimed replaces.
+The projection tracks live system nodes exactly in a small ordered list (`systems: {seq, tokens}`), updated from each system write's own price and the surface source-reference rule — `sourceEventSeqs` covers every shadowed node, so any replace, whether prompt maintenance or a compaction, retires the entries it shadows. `systemTokens` is the newest surviving nonempty node's estimate; the message figure is the non-system surface fold plus the superseded entries' estimates, matching the upstream classification (effective prompt in system, every other surviving visible price in messages). A non-system replacement that shadows a tracked node conserves its estimate inside the message accumulator, keeping the fold's preserve-total contract consistent across buckets for both claim-priced and unclaimed replaces.
 
 ## Alternatives considered
 

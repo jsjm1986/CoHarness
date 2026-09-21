@@ -21,7 +21,7 @@ pwsh GUI 渲染已随 [pwsh UI 呈现与 bash 对齐决策](2026-08-05-pwsh-ui-b
 
 **在 `dsh-bash-local` 内部让 Windows 默认 pwsh（一个执行器，方言开关）。** 否决，理由与执行器决策否决模式开关相同：执行器的身份就是它 spawn 的 shell，而按平台门控的组合是部署选择，不是执行器配置。
 
-**从 `apps/cli` 代码而非 bundle 数据文件交付平台层。** 否决：patch 应放在它替换的行旁边、属于拥有这些行的 bundle，让交付清单作为组合数据保持可见、转储带有出处；启动器只贡献 win32 门控。
+**从 `apps/cli` 代码而非 bundle 数据文件交付平台层。** 否决：patch 应放在它替换的行旁边、属于拥有这些行的 bundle，让交付清单作为组合数据保持可见、转储携带来源包信息；启动器只贡献 win32 门控。
 
 **在 Windows 没有隔离 runner 时保留 `permission`/`ui-permission`。** 最初交付时否决：`dsh-permission-presets` 硬性要求 `ctx.shell.sandboxMode`，并在不限权执行器上加载时 fail loud。后续的 ACL runner 消除了该前提，因此当前清单保留这两行。
 

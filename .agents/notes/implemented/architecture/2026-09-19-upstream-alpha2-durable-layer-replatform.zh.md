@@ -24,7 +24,7 @@ Status: implemented
 
 本次落地：
 
-- `compaction` 组同步至 alpha.2：`compaction/summary-error` waterfall 事件（失败摘要的持久输入恢复）、`compactSurfaceRegion` recover/重试循环、`deepFreeze` 迁至 `dsh-llm`、provenance/`CommandDefinitionId` 品牌化、错误文案更新、README 按文档标准重写。
+- `compaction` 组同步至 alpha.2：`compaction/summary-error` waterfall 事件（失败摘要的持久输入恢复）、`compactSurfaceRegion` recover/重试循环、`deepFreeze` 迁至 `dsh-llm`、source-event/`CommandDefinitionId` 品牌化、错误文案更新、README 按文档标准重写。
 - 新包 `dsh-compaction-image-offload`（required 行）：把 `image/offload` 事件投影到保留消息上，监听 `agent/request-error` 与 `compaction/summary-error` 中的 `IMAGE_OFFLOAD_REQUIRED` 失败，以最旧图片占位符替换后重试。以 `image-offload` 挂载于 `bundle/base/cordis.patch.yml`。
 - 新包 `dsh-session-turn-outline`（required 行）：session-projection 缝隙上的 `turnOutline` 投影单元。挂载于 `bundle/web-app/cordis.patch.yml`，登记于 `tsconfig.host.json`。
 - `session-format` 补入上游叶子模块 `context.ts`（`SessionFormatEventCollector`）、`filename.ts`（`sessionFormatLogFilename`/`parseSessionFormatLogFilename` 规范 `session[.vN].jsonl` 文件名）、`sessionFormatVersion` 与 `SessionFormatEventRun` 类型。

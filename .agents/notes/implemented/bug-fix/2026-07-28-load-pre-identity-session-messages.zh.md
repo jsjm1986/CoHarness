@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-带标识的不可变消息变更将四种持久化事件载荷替换为完整消息值。现有的 v0 JSONL 和 SQLite 会话仍保留紧邻该变更之前的形状：用户事件和 steering（中途引导）事件直接携带 `content`/`source`，assistant 事件携带 `content`/`provenance`，工具结果则携带 `callId`/`content`/`isError`。这些会话的标头仍与 `SESSION_FORMAT_VERSION` 匹配，但当前形状验证会拒绝它们，导致恢复流程无法构造活跃的 `Session`。
+带标识的不可变消息变更将四种持久化事件载荷替换为完整消息值。现有的 v0 JSONL 和 SQLite 会话仍保留紧邻该变更之前的形状：用户事件和 steering（中途引导）事件直接携带 `content`/`source`，assistant 事件携带 `content` 与旧版来源字段，工具结果则携带 `callId`/`content`/`isError`。这些会话的标头仍与 `SESSION_FORMAT_VERSION` 匹配，但当前形状验证会拒绝它们，导致恢复流程无法构造活跃的 `Session`。
 
 消息表示改变时没有提升版本，导致这些日志无法仅凭标头与当前的 v0 日志区分。运行时需要一条范围受限的导入规则，既能恢复受支持的第一方后端所创建的数据，又不削弱对无关过时事件或格式错误事件的验证。
 

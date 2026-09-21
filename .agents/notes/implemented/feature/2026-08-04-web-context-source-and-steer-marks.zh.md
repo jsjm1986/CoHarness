@@ -14,7 +14,7 @@ Status: implemented
 
 transcript 为非提示消息可能承担的三种角色分别命名：注入上下文、召回会话、steering。
 
-Chat Message Definition 为每个 `ContextMessageNode` 附加一份包含生产者角色和名称的 `provenance` 视图；`contextProvenance()` 仅依据持久来源计算该视图。它返回 `role`（`inject`，跨会话快照则为 `recall`）与命名生产者的 `label`。`ContextInjectionRow` 以角色作为标题，并按 `ToolRow` 摘要的几何在标题旁展示该名称，因此折叠态就已经回答了「注入了什么、由谁注入」；141px 滚动视口与截断上限沿用[已归档的展开项决策](../../archived/feature/2026-07-30-web-context-injection-disclosure.md)，未作改动。视口里渲染什么，则由[上下文形态决策](2026-08-05-context-form-vocabulary.zh.md)引入的、相互独立的形态轴决定。
+Chat Message Definition 为每个 `ContextMessageNode` 附加一份包含生产者角色和名称的 `producer` 视图；`contextProducer()` 仅依据持久来源计算该视图。它返回 `role`（`inject`，跨会话快照则为 `recall`）与命名生产者的 `label`。`ContextInjectionRow` 以角色作为标题，并按 `ToolRow` 摘要的几何在标题旁展示该名称，因此折叠态就已经回答了「注入了什么、由谁注入」；141px 滚动视口与截断上限沿用[已归档的展开项决策](../../archived/feature/2026-07-30-web-context-injection-disclosure.md)，未作改动。视口里渲染什么，则由[上下文形态决策](2026-08-05-context-form-vocabulary.zh.md)引入的、相互独立的形态轴决定。
 
 **名称从日志中读出，绝不来自客户端维护的生产者名称表。** `agent-instructions` 以它对账过的去重指令文件路径命名，`session-reference` 以它读取的会话标题命名，插件来源以其记录的插件 id 命名，其余来源则以自身的 `kind` 命名——这正是可合并扩展联合类型有文档记载的默认分支。没有可读 kind 的来源降级为无名注入。于是新增或重命名的生产者无需客户端发版即可辨识，任何名称都不会相对代码失准，恢复、fork 或来自外部的日志与实时会话的投影结果完全一致。
 

@@ -16,7 +16,7 @@ Status: implemented
 
 默认 Web 源码图从实际 HTML 入口中的 module script 出发，包括内联模块和本地引用的 Worker 入口。独立的实验预览可以存在而不加入此图；默认入口导入它时检查会失败。源码中的 Cordis 配置文件引用会将 Desktop patch 纳入同一证明。
 
-[Host 启动 smoke](../../../../apps/cli/tests/profiles/web/tests/web-default-isolation.expected.e2e.ts) 在独立 Harness home 中通过构建后的 `dsh` 导出启动真实 Web profile。测试专用观察器在就绪后读取实际 Loader 行、注册的 fiber、注册回调所属模块和 Node 已加载模块缓存。[Chromium smoke](../../../../apps/web/tests/default-product-isolation.e2e.ts) 启动实际交付的页面，读取真实 Client Loader、registry 和模块缓存，并要求所有交付 entry 均已激活。两项检查都会拒绝其显式负例命令挂载的真实实验插件。现有 expected-output 和 Web CI lane 在完整构建后执行这些测试。
+[Host 启动 smoke](../../../../scripts/verify-default-product-isolation.spec.ts) 在独立 Harness home 中通过构建后的 `dsh` 导出启动真实 Web profile。测试专用观察器在就绪后读取实际 Loader 行、注册的 fiber、注册回调所属模块和 Node 已加载模块缓存。[Chromium smoke](../../../../scripts/verify-default-product-isolation.spec.ts) 启动实际交付的页面，读取真实 Client Loader、registry 和模块缓存，并要求所有交付 entry 均已激活。两项检查都会拒绝其显式负例命令挂载的真实实验插件。现有 expected-output 和 Web CI lane 在完整构建后执行这些测试。
 
 构建输入检查覆盖浏览器打包的两个阶段。[Client preset](../../../../packages/client/tsdown.client.ts) 在原始路径被折叠进 `lib/client.js` 前，拒绝非实验输出中的实验输入。[Web 图检查](../../../../scripts/web-product-bundle-isolation.ts) 从 `index.html` 沿真实 Vite 输出边遍历，覆盖延迟加载 chunk、Worker、CSS 依赖和资源。独立 preview 不属于产品图。缺少必需的模块或资源输入记录会使构建失败；失败的 Web 构建无法产生成功的完整 Client 构建记录。Notices 生成器通过显式分析标记检查其部分依赖图，该标记要求禁用输出写入。其他内存内产品构建仍执行这些检查。
 
@@ -36,4 +36,4 @@ Status: implemented
 
 ## Consequences
 
-实验包可以发布而不加入默认安装或组合。源码、最终组合、构建输入、安装依赖和运行时 registry 检查提供相互独立的证据。SDK 的[源码启动兼容 patch](../../../../apps/cli/src/sdk-source.cordis.patch.yml) 通过计算出的文件路径选择，不在静态配置发现范围内。运行时 smoke 观察启动和 Client 激活；它们不替代后续每条用户触发路径的测试，也不替代显式安装的 profile 扩展测试。
+实验包可以发布而不加入默认安装或组合。源码、最终组合、构建输入、安装依赖和运行时 registry 检查提供相互独立的证据。SDK 的`apps/cli/src/sdk-source.cordis.patch.yml` 通过计算出的文件路径选择，不在静态配置发现范围内。运行时 smoke 观察启动和 Client 激活；它们不替代后续每条用户触发路径的测试，也不替代显式安装的 profile 扩展测试。

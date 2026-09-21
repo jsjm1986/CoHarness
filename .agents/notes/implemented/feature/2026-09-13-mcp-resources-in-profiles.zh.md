@@ -30,7 +30,7 @@ Status: implemented
 
 ## 验证
 
-[资源测试](../../../../packages/mcp/mcp-resources/tests/resources.spec.ts)覆盖空 native 与 PTC 视图、作用域继承、首个与最后一个提供方的变化、释放，以及已配置提供方调用失败。[真实 SDK 测试](../../../../packages/mcp/mcp-client/tests/protocol.spec.ts)固定了只提供工具的服务器返回空发现结果，以及不受支持的读取报错。[Profile 组合测试](../../../../apps/cli/tests/profile-mcp.spec.ts)解析每个随附 CLI 模板；[Desktop 组合测试](../../../../apps/desktop/tests/profile-mcp.spec.ts)包含其 profile 与 Host overlay。空 native 与 PTC 录制会话使用随附 headless 组合，不添加资源条目。
+[资源测试](../../../../packages/mcp/mcp-resources/tests/resources.spec.ts)覆盖空 native 与 PTC 视图、作用域继承、首个与最后一个提供方的变化、释放，以及已配置提供方调用失败。[真实 SDK 测试](../../../../packages/mcp/mcp-client/tests/protocol.spec.ts)固定了只提供工具的服务器返回空发现结果，以及不受支持的读取报错。`apps/cli/tests/profile-mcp.spec.ts`解析每个随附 CLI 模板；`apps/desktop/tests/profile-mcp.spec.ts`包含其 profile 与 Host overlay。空 native 与 PTC 录制会话使用随附 headless 组合，不添加资源条目。
 
 ## 后果
 

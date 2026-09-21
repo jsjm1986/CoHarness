@@ -6,7 +6,7 @@ English | [中文](2026-09-19-assistant-chunk-event-removal.zh.md)
 
 ## Problem
 
-The `assistant/chunk` event made every streamed delta a durable `SessionEvent`: token-sized rows dominated retained bytes, `sourceEventSeqs` citations linked each settled message to its chunk run, and every consumer — metering, pagination, projections, UI — resolved that indirection. The [embedded-stream decision](2026-09-18-assistant-message-embedded-stream.md) moved settlement provenance into `assistant/message.data.stream`; what remained was the chunk event itself and the physical row packing two backends built on it.
+The `assistant/chunk` event made every streamed delta a durable `SessionEvent`: token-sized rows dominated retained bytes, `sourceEventSeqs` citations linked each settled message to its chunk run, and every consumer — metering, pagination, projections, UI — resolved that indirection. The [embedded-stream decision](2026-09-18-assistant-message-embedded-stream.md) moved settlement source references into `assistant/message.data.stream`; what remained was the chunk event itself and the physical row packing two backends built on it.
 
 ## Decision
 

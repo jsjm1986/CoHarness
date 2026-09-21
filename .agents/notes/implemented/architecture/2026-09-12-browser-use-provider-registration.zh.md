@@ -24,7 +24,7 @@ Stagehand 使用显式配置的固定版本 SDK 目录内原生模型。配置�
 
 MCP 客户端激活会等待连接和工具发现，但提供方可能在任何 Session 存在之前就完成激活。该激活 promise 无法代表未来各 Session 拥有的客户端。每个 MCP 浏览器提供方在现有的串行 `agent/created` 事件中等待一次客户端启动尝试。[等待 Agent 创建的决策](2026-09-09-awaited-agent-creation.zh.md)负责排队输入顺序与创建回滚。创建或恢复成功后，提示词组装与直接调用方即可读取完整目录。
 
-启动失败或取消会拒绝创建或恢复，并触发 Agent 及其客户端资源的回滚。附加连接被占用时，本次激活永久跳过启动，但其他工作继续运行；连接释放后，新创建或恢复的 Agent 可以获取连接。较晚安装和重新加载只作用于后续激活，与 [Schedule 的挂载策略](../../../../packages/schedule/schedule/README.zh.md#use-this-package)一致。成功客户端的浏览器工具与资源请求共享 Session 队列；其他 Session 不能执行这些请求，也不能收到该服务器的指导。
+启动失败或取消会拒绝创建或恢复，并触发 Agent 及其客户端资源的回滚。附加连接被占用时，本次激活永久跳过启动，但其他工作继续运行；连接释放后，新创建或恢复的 Agent 可以获取连接。较晚安装和重新加载只作用于后续激活，与 [Schedule 的挂载策略](../../../../packages/schedule/schedule/README.zh.md#composition)一致。成功客户端的浏览器工具与资源请求共享 Session 队列；其他 Session 不能执行这些请求，也不能收到该服务器的指导。
 
 ## 考虑过的替代方案
 

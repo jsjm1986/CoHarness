@@ -30,7 +30,7 @@ This decision partially supersedes the separate opt-in mount in the [resource an
 
 ## Verification
 
-[Resource tests](../../../../packages/mcp/mcp-resources/tests/resources.spec.ts) cover empty native and PTC views, scoped inheritance, first/last-provider transitions, disposal, and failing configured providers. [Real SDK tests](../../../../packages/mcp/mcp-client/tests/protocol.spec.ts) pin empty discovery and unsupported read errors for a tools-only server. [Profile composition tests](../../../../apps/cli/tests/profile-mcp.spec.ts) resolve every shipped CLI template; [Desktop composition tests](../../../../apps/desktop/tests/profile-mcp.spec.ts) include its profile and Host overlay. The empty native and PTC recorded Sessions exercise the shipped headless composition without adding a resource entry.
+[Resource tests](../../../../packages/mcp/mcp-resources/tests/resources.spec.ts) cover empty native and PTC views, scoped inheritance, first/last-provider transitions, disposal, and failing configured providers. [Real SDK tests](../../../../packages/mcp/mcp-client/tests/protocol.spec.ts) pin empty discovery and unsupported read errors for a tools-only server. `apps/cli/tests/profile-mcp.spec.ts` resolve every shipped CLI template; `apps/desktop/tests/profile-mcp.spec.ts` include its profile and Host overlay. The empty native and PTC recorded Sessions exercise the shipped headless composition without adding a resource entry.
 
 ## Consequences
 

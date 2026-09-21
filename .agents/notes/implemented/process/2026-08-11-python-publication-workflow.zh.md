@@ -16,7 +16,7 @@ GitHub 的 `Release (Python)` 工作流为带有 `python-release-dry-run` 标签
 
 发布过程使用同一次工作流运行中生成并检查过的汇总产物。每个发布作业都会在选择上传文件前验证保留的 `SHA256SUMS`。一个运行时作业先上传全部三个平台 wheel 包，再由依赖它的作业上传 SDK wheel 包，因为 PyPI 上传不是原子操作，而 SDK 会把运行时分发包固定到完全相同的版本。两个作业都不会检出源码，也不会重新构建 wheel 包。将它们拆开后，GitHub 的失败作业重试可以在 SDK 上传失败时继续执行，而不会尝试替换不可变的运行时文件。
 
-两个发布 action 都会禁用公开 attestation。action 仍使用 Trusted Publishing 进行身份认证，同时不上传会披露私有发布仓库而非公开源码镜像的 provenance。
+两个发布 action 都会禁用公开 attestation。action 仍使用 Trusted Publishing 进行身份认证，同时不上传会披露私有发布仓库而非公开源码镜像的 attestation。
 
 仓库版本可以是稳定版，也可以使用受支持的预发布写法。标签保留仓库写法，wheel 包文件名、元数据、依赖版本固定和产物查找则使用规范化的 PEP 440 写法。
 
@@ -36,7 +36,7 @@ GitHub 的 `Release (Python)` 工作流为带有 `python-release-dry-run` 标签
 
 **从公开镜像发布。** 公开镜像是只读源码投影，不运行发布 Actions。将 PyPI Publisher 绑定到该镜像后，没有工作负载能够提供已登记的 OIDC 身份。
 
-**发布公开 attestation。** action 默认行为会让 Trusted Publisher 仓库身份可公开验证。该 provenance 标识私有自动化仓库而非包的公开源码镜像，因此发布作业将其禁用。
+**发布公开 attestation。** action 默认行为会让 Trusted Publisher 仓库身份可公开验证。该 attestation 标识私有自动化仓库而非包的公开源码镜像，因此发布作业将其禁用。
 
 ## 后果
 
@@ -46,6 +46,6 @@ GitHub 的 `Release (Python)` 工作流为带有 `python-release-dry-run` 标签
 
 两个分发项目之间的 PyPI 发布仍然不是原子操作。运行时优先的顺序会缩小可见的失败状态；独立的发布作业和校验和验证则让失败的 SDK 上传能够从经过检查的精确文件继续执行，并且绝不替换已上传的同名文件。
 
-禁用公开 attestation 会放弃上传身份的公开密码学 provenance。Trusted Publishing 仍会认证每次上传，而保留的汇总产物会在私有发布工作流内部保存经过检查的 wheel 包哈希。
+禁用公开 attestation 会放弃上传身份的公开密码学来源证明。Trusted Publishing 仍会认证每次上传，而保留的汇总产物会在私有发布工作流内部保存经过检查的 wheel 包哈希。
 
 升级 Hatchling 时，必须先使用发布流水线固定的 Twine 版本验证其生成的 Core Metadata 版本，再同时修改两个包的构建依赖。

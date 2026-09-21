@@ -22,7 +22,7 @@ This extends the cross-scope snapshot and resumable-upload decisions recorded in
 
 **Switch the global collaboration scope.** Rejected because `/account/api/scope` reloads the page and changes the active conversation runtime for a document-only action.
 
-**Upload to the current runtime and copy a temporary document.** Rejected because it creates intermediate files, fails when the current scope is read-only, and complicates cleanup and provenance.
+**Upload to the current runtime and copy a temporary document.** Rejected because it creates intermediate files, fails when the current scope is read-only, and complicates cleanup and source tracking.
 
 **Expose the selected runtime's upload port or path to the browser.** Rejected because runtime authorities and filesystem paths are private Gateway facts; the Gateway broker already provides authenticated loopback forwarding.
 

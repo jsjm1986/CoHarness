@@ -1,4 +1,4 @@
-# Agent Note: Large history provenance is scanned without argument expansion
+# Agent Note: Large history source-event lists are scanned without argument expansion
 
 Status: implemented
 
@@ -10,9 +10,9 @@ A finalized assistant message can reference hundreds of thousands of streamed ch
 
 ## Decision
 
-Pagination scans `sourceEventSeqs` and updates the earliest sequence number one element at a time. The algorithm remains linear in the provenance size and preserves the existing page boundary: a page starts before all recorded sources of its oldest included message.
+Pagination scans `sourceEventSeqs` and updates the earliest sequence number one element at a time. The algorithm remains linear in the source-event count and preserves the existing page boundary: a page starts before all recorded sources of its oldest included message.
 
-A regression test rejects multi-argument minimum calls and verifies that every provenance event remains on the page with its finalized message. This exercises the failure mechanism without making the default test suite allocate a production-sized chunk stream.
+A regression test rejects multi-argument minimum calls and verifies that every source event remains on the page with its finalized message. This exercises the failure mechanism without making the default test suite allocate a production-sized chunk stream.
 
 ## Alternatives considered
 
@@ -22,6 +22,6 @@ A regression test rejects multi-argument minimum calls and verifies that every p
 
 ## Consequences
 
-- Large provenance arrays no longer make history pagination throw solely because of their length.
+- Large source-event arrays no longer make history pagination throw solely because of their length.
 - Pagination semantics and wire responses are unchanged.
 - This does not bound the byte size of a history page or the browser cost of replaying it; those performance concerns remain separate from the server-side call-stack failure.

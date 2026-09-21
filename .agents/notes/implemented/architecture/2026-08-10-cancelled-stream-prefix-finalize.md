@@ -16,7 +16,7 @@ The model history must contain assistant content that remains visible to the use
 
 `BlockAssembler.interruptedBlocks()` returns closed and open `text` and `reasoning` blocks with non-whitespace content in stream order. It omits tool calls because interruption precedes dispatch and no real result exists; it also omits empty blocks and open unknown block types. An empty result appends no assistant message. Provider `error` and `aborted` finishes leave the stream-consumption scope before `agent/request-error`, so provider failures and cancellation during recovery commit no content from the failed request.
 
-Chat and Trajectory Conversation Definitions read `interrupted` from the durable message. Chat renders the Stopped marker, while Trajectory keeps the provider request in the error lifecycle after `step/end` and retains the durable result seq and provenance. Cancellation during tool execution follows the tool scheduler contract because the assistant message has already committed: started calls produce real results, and undispatched calls receive `ABORTED_BEFORE_DISPATCH` results.
+Chat and Trajectory Conversation Definitions read `interrupted` from the durable message. Chat renders the Stopped marker, while Trajectory keeps the provider request in the error lifecycle after `step/end` and retains the durable result seq and provider metadata. Cancellation during tool execution follows the tool scheduler contract because the assistant message has already committed: started calls produce real results, and undispatched calls receive `ABORTED_BEFORE_DISPATCH` results.
 
 ## Alternatives considered
 

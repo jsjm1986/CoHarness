@@ -23,13 +23,13 @@ Status: implemented
 
 例如，窗口在 14:00 断开，而命令持续到 20:00，则最早也不能在 22:00 前回收。期限从之后第一次确认空闲的观察开始计算。
 
-[侧栏](../../../../packages/client/ui-sidebar-right/README.md#state) 按 Session 持久化布局，并通过 `openTabs` 发布已保存和已采用 Session 的标签元数据。启动发现不会挂载非当前内容、pin 文件或激活 Agent。窗口内以已采用的 store 为准；其他窗口对 storage 的写入不能撤销当前窗口的活动持有关系。永久删除 scope 时移除相应元数据。
+`packages/client/ui-sidebar-right` 按 Session 持久化布局，并通过 `openTabs` 发布已保存和已采用 Session 的标签元数据。启动发现不会挂载非当前内容、pin 文件或激活 Agent。窗口内以已采用的 store 为准；其他窗口对 storage 的写入不能撤销当前窗口的活动持有关系。永久删除 scope 时移除相应元数据。
 
 终端 provider 将该清单与自己保存的终端关联及未完成的关闭请求取交集。每个窗口为每个不同终端使用一条 `retain(sessionId, id, signal)` Remote 流。确认帧授予持有关系，不发送屏幕输出、不激活 Agent、不接管输入，也不创建进程。恢复输出前等待当前持有关系确认。传输代次独立取消，传输存活由现有 Gateway 重连和心跳机制负责。
 
 subprocess 能力接口提供带状态和 revision 的 `inspectActivity()`。普通非登录的 Bash 4.4+ 和 Zsh 支持显式启用生命周期记录，并结合完整进程表观察和原始进程身份。Zsh 区分空的顶层编辑提示符与 `vared`、选择及续行输入。输入使提示符证据失效；后台和停止的后代阻止空闲判断。原生 Linux 还检查 systemd task 数，保护脱离进程树但仍在自有 scope 中的后代。自定义 trap、Zsh 异步文件描述符 handler、不支持的启动方式和不完整观察保持 unknown。生命周期文件为私有文件，在清理成功后删除。
 
-Host [终端控制器](../../../../packages/api/terminal-controller/README.md#use-this-package) 管理可配置的 `unattendedTimeoutMs`（7200000）、`activityPollIntervalMs`（30000）和 `cleanupRetryMs`（60000）。零只禁用自动回收。控制器使用单调时钟；观察间隔超过轮询周期两倍时，旧证据失效并重置宽限期。输入和持有关系变化会使正在进行的观察失效。最终检查通过后，在异步终止前将身份标记为关闭，阻止迟到的创建和连接。已关闭身份不能复用，每个清理任务始终属于原来的 Session owner。
+Host `packages/api/terminal-controller` 管理可配置的 `unattendedTimeoutMs`（7200000）、`activityPollIntervalMs`（30000）和 `cleanupRetryMs`（60000）。零只禁用自动回收。控制器使用单调时钟；观察间隔超过轮询周期两倍时，旧证据失效并重置宽限期。输入和持有关系变化会使正在进行的观察失效。最终检查通过后，在异步终止前将身份标记为关闭，阻止迟到的创建和连接。已关闭身份不能复用，每个清理任务始终属于原来的 Session owner。
 
 清理等待 provider 范围完全停稳和最终屏幕输出排空。失败时保留所有权、拒绝新持有关系，并安排一次重试，不重新给予空闲宽限期。分配失败后的清理采用相同重试策略。owner 卸载会停止计时器和流，在清理与观察都结束后才报告失败，包括清理早于观察结束而拒绝的情况。Agent 终端工具、模型输入和 Session 事件均不改变。
 

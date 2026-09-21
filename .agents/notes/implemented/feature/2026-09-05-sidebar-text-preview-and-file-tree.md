@@ -42,7 +42,7 @@ Navigation is a `line`. The `read` tool row passes its 1-based `offset` as `open
 
 A changed file is announced, not applied. The body compares the loaded version and the observation captured at read start with later `WorkspaceFileStat.version`; a difference shows the change bar. Reload rereads only this tab through the Preview face and does not mutate shared resource metadata or another tab. A resource failure takes the same bar's place above any content already loaded.
 
-The body's header is one row: the full file path on the left and the matching-renderer menu, conditional wrap toggle, and reload button on the right. The [Document Preview README](../../../../packages/client/ui-sidebar-documentpreview/README.md) owns the current controls, renderer behavior, and scrolling. The preview takes the pane body's full height.
+The body's header is one row: the full file path on the left and the matching-renderer menu, conditional wrap toggle, and reload button on the right. The [Document Preview README](../../../../packages/client/ui-documents/README.md) owns the current controls, renderer behavior, and scrolling. The preview takes the pane body's full height.
 
 A failed read keeps content already shown and adds a localized failure with a retry action. The Preview names actionable file failures and falls back to the carrier message for other codes; `outside-workspace` belongs to directory listing and is not a Preview-specific failure.
 

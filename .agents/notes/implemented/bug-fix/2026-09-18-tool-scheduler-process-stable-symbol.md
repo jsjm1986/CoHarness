@@ -20,7 +20,7 @@ A source-launch Loader composition loads two copies of `dsh-tools` in one proces
 
 ## Consequences
 
-Tool calls succeed under mixed source/artifact compositions, and consistent single-plane runs are unchanged. `Symbol.for` covers this one protocol slot only — `instanceof` checks and private `Symbol()` keys still diverge across module copies, so deeper plane mixing still warrants its own fix.
+Tool calls succeed under mixed source/artifact compositions, and consistent single-plane runs are unchanged. `Symbol.for` covers this one protocol slot only — `instanceof` checks and private `Symbol()` keys still diverge across module copies, so deeper plane mixing still warrants its own fix. The plane split itself is closed by [ambient source-plane profile resolution](2026-09-21-profile-resolution-ambient-source-plane.md), which keeps source-launch plugin entries and their dependencies on `src`; this symbol stays on the global registry as defense for any residual copy split.
 
 ## Testing
 

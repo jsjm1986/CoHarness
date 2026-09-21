@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-`assistant/chunk` 事件把每个流式增量都变成持久 `SessionEvent`：token 粒度的行占满保留字节，`sourceEventSeqs` 引用把每条已结算消息连回它的 chunk 序列，每个消费方——计量、分页、投影、UI——都要解析这层间接。[embedded-stream 决定](2026-09-18-assistant-message-embedded-stream.zh.md)已把结算溯源搬进 `assistant/message.data.stream`；剩下的是 chunk 事件本身，以及两个后端在其上构建的物理行打包。
+`assistant/chunk` 事件把每个流式增量都变成持久 `SessionEvent`：token 粒度的行占满保留字节，`sourceEventSeqs` 引用把每条已结算消息连回它的 chunk 序列，每个消费方——计量、分页、投影、UI——都要解析这层间接。[embedded-stream 决定](2026-09-18-assistant-message-embedded-stream.zh.md)已把结算来源引用搬进 `assistant/message.data.stream`；剩下的是 chunk 事件本身，以及两个后端在其上构建的物理行打包。
 
 ## Decision
 

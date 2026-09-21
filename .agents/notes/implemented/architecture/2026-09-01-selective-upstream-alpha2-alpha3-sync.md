@@ -56,7 +56,7 @@ The affected package TypeScript programs, focused Vitest suites, Cordis configur
 
 **Apply the alpha.3 SQLite removal.** Rejected because the fork still serves existing SQLite Session files and its migration/export behavior is part of the deployed business path. Removing the provider would be a data and availability regression, not a cleanup.
 
-**Expose upstream `RemoteError` beside the local taxonomy.** Rejected because two exception vocabularies at one Gateway endpoint would make client code choose by provenance rather than the owning failure category. The existing typed Gateway errors and RPC envelopes already preserve the local authorization and diagnostic contract.
+**Expose upstream `RemoteError` beside the local taxonomy.** Rejected because two exception vocabularies at one Gateway endpoint would make client code choose by origin rather than the owning failure category. The existing typed Gateway errors and RPC envelopes already preserve the local authorization and diagnostic contract.
 
 **Enable all new UI and Schedule rows by default.** Rejected because Schedule introduces tools, timers, and projection state, while the fork's default composition intentionally has no reminder capability. The overlay keeps the feature explicit and reversible.
 

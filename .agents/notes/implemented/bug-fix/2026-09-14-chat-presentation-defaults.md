@@ -10,7 +10,7 @@ Trajectory inspection benefits from exposing complete recorded reasoning. Applyi
 
 ## Decision
 
-[Chat](../../../../packages/client/ui-chat/README.md#turn-process-folding) starts each reasoning row collapsed and retains the reader's manual disclosure choice through subsequent output and settlement. Settlement retires the observed live chunks and rebuilds Chat reply nodes from durable events without recovering first-token time from embedded streams. Consequently, completed-turn TTFT and decoding speed are absent after live settlement as well as after reopening history. Turn-level process folding remains independently owned.
+[Chat](../../../../packages/client/ui-conversation/README.md) starts each reasoning row collapsed and retains the reader's manual disclosure choice through subsequent output and settlement. Settlement retires the observed live chunks and rebuilds Chat reply nodes from durable events without recovering first-token time from embedded streams. Consequently, completed-turn TTFT and decoding speed are absent after live settlement as well as after reopening history. Turn-level process folding remains independently owned.
 
 [Trajectory inspection](../feature/2026-09-09-ptc-trajectory-code-inspection.md) keeps its expanded reasoning default, recorded timing, JSON controls, and PTC code inspector. The [compact stream readers](../architecture/2026-09-06-embedded-stream-record-readers.md) remain available to Trajectory and other consumers. These decisions partially supersede the Chat presentation additions while preserving both notes' independent rationale.
 

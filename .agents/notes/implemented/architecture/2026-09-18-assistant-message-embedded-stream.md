@@ -6,7 +6,7 @@ English | [中文](2026-09-18-assistant-message-embedded-stream.zh.md)
 
 ## Problem
 
-`assistant/message` events cited their producing `assistant/chunk` seqs through `sourceEventSeqs`, so every consumer of a settled assistant message — token metering, history pagination, suffix windowing — resolved indirection through the log. The citation also made `assistant/message` eligible as a replace node even though a replacement that cites shadowed surface nodes has no valid assistant use, and it duplicated provenance the message can carry directly.
+`assistant/message` events cited their producing `assistant/chunk` seqs through `sourceEventSeqs`, so every consumer of a settled assistant message — token metering, history pagination, suffix windowing — resolved indirection through the log. The citation also made `assistant/message` eligible as a replace node even though a replacement that cites shadowed surface nodes has no valid assistant use, and it duplicated source references the message can carry directly.
 
 ## Decision
 
@@ -22,7 +22,7 @@ Consumers changed shape rather than semantics:
 
 ## Alternatives considered
 
-Keeping citations alongside the embedded stream duplicates provenance and preserves an invalid replace shape. Dropping `assistant/chunk` in the same change couples this contract migration to the larger settlement and format-split work. Stripping `sourceEventSeqs` on read would rewrite immutable stored generations.
+Keeping citations alongside the embedded stream duplicates the source references and preserves an invalid replace shape. Dropping `assistant/chunk` in the same change couples this contract migration to the larger settlement and format-split work. Stripping `sourceEventSeqs` on read would rewrite immutable stored generations.
 
 ## Consequences
 

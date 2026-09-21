@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-tool-scheduler-process-stable-symbol.md
-2026-09-18-tool-scheduler-process-stable-symbol.md: 4f276b572850c9110529ffb9a0ff834ff404a48f
-2026-09-18-tool-scheduler-process-stable-symbol.zh.md: a37eeb0b99fd76a8663398175f72ecfa1021f128
+2026-09-18-tool-scheduler-process-stable-symbol.md: ccb70c33aefd9aaf97845f1f808797a88bd6dfaf
+2026-09-18-tool-scheduler-process-stable-symbol.zh.md: a7d397634ad3edc80dda9e6954c124f2f166636a

@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-可继续 Agent 最初使用方向专属的模型控制。parent 调用 `send_message({ subagent_id, message })`，委托给 FIFO `followup` 服务操作。child 则获得 child 作用域的 `report({ output })` 工具、`tool:report` 系统提示词 section，以及由部署选择的静默或唤醒投递。两个工具用不同 schema、服务路径、来源与调度描述同一个相邻 Agent 操作。
+可继续 Agent 最初使用方向专属的模型控制。parent 调用 `send_message({ subagent_id, message })`，委托给 FIFO `followup` 服务操作。child 则获得 child 作用域的 `report({ output })` 工具、`tool:report` 系统提示词 section，以及由部署选择的静默或唤醒投递。两个工具用不同 schema、服务路径、来源记录与调度描述同一个相邻 Agent 操作。
 
 可继续 child 拥有自己的 Session，因此 parent 不会自动收到 child 的 transcript（文本记录）、工具输出或推理。返回路径必须保持显式且可重复：child 可以在结束前发送进度、发送后仍保持可用，也可能在来得及配合前失败。把每条最终 assistant 消息变成隐式结果会混淆轮次完成与模型选择的通信，而且无法覆盖异常结束。
 

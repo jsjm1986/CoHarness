@@ -24,7 +24,7 @@ Adopt the upstream durable-layer architecture wholesale in one sequenced workstr
 
 Shipped in this change:
 
-- `compaction` group synced to alpha.2: `compaction/summary-error` waterfall event (durable input recovery for failed summaries), `compactSurfaceRegion` recover/retry loop, `deepFreeze` relocation to `dsh-llm`, provenance/`CommandDefinitionId` branding, error-copy updates, README/doc-standard rewrites.
+- `compaction` group synced to alpha.2: `compaction/summary-error` waterfall event (durable input recovery for failed summaries), `compactSurfaceRegion` recover/retry loop, `deepFreeze` relocation to `dsh-llm`, source-event/`CommandDefinitionId` branding, error-copy updates, README/doc-standard rewrites.
 - New package `dsh-compaction-image-offload` (required row): projects `image/offload` events onto retained messages, listens on `agent/request-error` + `compaction/summary-error` for `IMAGE_OFFLOAD_REQUIRED` failures, replaces oldest images with placeholders and retries. Mounted as `image-offload` in `bundle/base/cordis.patch.yml`.
 - New package `dsh-session-turn-outline` (required row): `turnOutline` projection unit over the session-projection seam. Mounted in `bundle/web-app/cordis.patch.yml`; registered in `tsconfig.host.json`.
 - `session-format` gained upstream leaf modules `context.ts` (`SessionFormatEventCollector`), `filename.ts` (`sessionFormatLogFilename`/`parseSessionFormatLogFilename` canonical `session[.vN].jsonl` names), `sessionFormatVersion`, and the `SessionFormatEventRun` type.

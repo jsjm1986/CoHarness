@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-05-sidebar-tab-types-and-navigation.md
-2026-09-05-sidebar-tab-types-and-navigation.md: 834a26e55f87e5db54d57f06fec592e4fdb9f61c
-2026-09-05-sidebar-tab-types-and-navigation.zh.md: 9884db9eef49162e8883c390dd71bdbf9d45489f
+2026-09-05-sidebar-tab-types-and-navigation.md: 135d64cb6c77f14566d4dee8a01d857c914830ff
+2026-09-05-sidebar-tab-types-and-navigation.zh.md: f60a7fe8d7aa189712eb97db080467680069e08b

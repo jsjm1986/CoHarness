@@ -57,7 +57,7 @@ durable child Session
 
 ### 面向模型的 `send_message`
 
-模型获得一个由 `SubagentRuntime.sendMessage()` 支撑的全局 `send_message(agent_id, message)` 工具。确切在线 sender 只能指定其直接 parent 或直接可继续 child；服务负责相邻关系检查、冷恢复、固定 Steer 调度，以及持久化 `{ kind: 'agent-message', senderSessionId }` 来源信息。取消只负责 inbox 接受前的工作。用户适配器保持分离，因为浏览器编写的输入携带用户来源信息与请求身份，而不是 Agent 权限。该工具位于单独加载的 `@deepseek-ai/dsh-tool-subagent-control` 包中，因此按提供方绑定的 `@deepseek-ai/dsh-tool-subagent` 实例可以继续为 spawn、fork 或 ACP 注册不同的委派工具，而不会重复注册全局控制工具。
+模型获得一个由 `SubagentRuntime.sendMessage()` 支撑的全局 `send_message(agent_id, message)` 工具。确切在线 sender 只能指定其直接 parent 或直接可继续 child；服务负责相邻关系检查、冷恢复、固定 Steer 调度，以及持久化 `{ kind: 'agent-message', senderSessionId }` 来源信息。取消只负责 inbox 接受前的工作。用户适配器保持分离，因为浏览器编写的输入携带用户身份与请求身份，而不是 Agent 权限。该工具位于单独加载的 `@deepseek-ai/dsh-tool-subagent-control` 包中，因此按提供方绑定的 `@deepseek-ai/dsh-tool-subagent` 实例可以继续为 spawn、fork 或 ACP 注册不同的委派工具，而不会重复注册全局控制工具。
 
 - 如果 child 存在运行中的 Task 并支持在线消息，服务会调用 `run.steer(message, source)` 并返回现有 job id；它不会创建新 Task。
 - 如果 child 没有运行中的 Task，`send_message` 会创建新 Task，使用该消息从持久化存储恢复会话，并返回新的 job id。

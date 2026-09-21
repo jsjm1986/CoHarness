@@ -20,7 +20,7 @@ Status: implemented
 
 ## Consequences
 
-工具调用在 source/artifact 混合组合下成功，单一平面的一致运行不受影响。`Symbol.for` 只覆盖这一个协议槽位——`instanceof` 检查与模块私有 `Symbol()` 键跨副本仍不同身，更深层的平面混载仍需各自修复。
+工具调用在 source/artifact 混合组合下成功，单一平面的一致运行不受影响。`Symbol.for` 只覆盖这一个协议槽位——`instanceof` 检查与模块私有 `Symbol()` 键跨副本仍不同身，更深层的平面混载仍需各自修复。平面分裂本身已由 [ambient source-plane profile 解析](2026-09-21-profile-resolution-ambient-source-plane.zh.md)闭合——它让源码启动的插件入口与其依赖同处 `src`；该符号保留在全局注册表上，作为对任何残留拷贝分裂的防御。
 
 ## Testing
 

@@ -21,7 +21,7 @@ The pwsh GUI rendering shipped earlier with the [pwsh UI presentation matches ba
 
 **Default Windows to pwsh inside `dsh-bash-local` (one executor, dialect switch).** Rejected for the same reason the executor decision rejected a mode switch: the executor's identity is the shell it spawns, and platform-gated composition is a deployment choice, not an executor config.
 
-**Ship the platform layer from `apps/cli` code instead of a bundle data file.** Rejected: the patch belongs next to the rows it replaces, in the bundle that owns them, so the shipped roster stays visible as composition data and dumps carry its provenance; the launcher contributes only the win32 gate.
+**Ship the platform layer from `apps/cli` code instead of a bundle data file.** Rejected: the patch belongs next to the rows it replaces, in the bundle that owns them, so the shipped roster stays visible as composition data and dumps carry its source package; the launcher contributes only the win32 gate.
 
 **Keep `permission`/`ui-permission` on Windows without a confining runner.** Rejected by the original delivery: `dsh-permission-presets` hard-requires `ctx.shell.sandboxMode` and fails loud at load over an unconfined executor. The later ACL runner removed that premise, so the current roster retains both rows.
 

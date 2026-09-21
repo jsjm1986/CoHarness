@@ -6,7 +6,7 @@ English | [中文](2026-07-28-load-pre-identity-session-messages.zh.md)
 
 ## Problem
 
-The identified immutable message change replaced four durable event payloads with complete message values. Existing v0 JSONL and SQLite sessions still held the immediately preceding shapes: direct `content`/`source` on user and steering events, `content`/`provenance` on assistant events, and `callId`/`content`/`isError` on tool results. Their headers still matched `SESSION_FORMAT_VERSION`, but current-shape validation rejected them before resume could construct a live `Session`.
+The identified immutable message change replaced four durable event payloads with complete message values. Existing v0 JSONL and SQLite sessions still held the immediately preceding shapes: direct `content`/`source` on user and steering events, `content` plus the legacy source field on assistant events, and `callId`/`content`/`isError` on tool results. Their headers still matched `SESSION_FORMAT_VERSION`, but current-shape validation rejected them before resume could construct a live `Session`.
 
 Changing the message representation without a version bump made those logs indistinguishable at the header level from current v0 logs. The runtime needs a narrow import rule that restores data created by the supported first-party backends without weakening validation for unrelated obsolete or malformed events.
 

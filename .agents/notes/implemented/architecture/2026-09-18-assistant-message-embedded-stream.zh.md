@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-`assistant/message` 事件通过 `sourceEventSeqs` 引用产生它们的 `assistant/chunk` 序号，因此每个已结算助手消息的消费方——令牌计量、历史分页、后缀窗口——都要经由日志解析一层间接引用。该引用还让 `assistant/message` 有资格充当替换节点，尽管引用被遮蔽 surface 节点的替换在助手事件上并无有效用途，而且它复制了消息本可直接携带的溯源信息。
+`assistant/message` 事件通过 `sourceEventSeqs` 引用产生它们的 `assistant/chunk` 序号，因此每个已结算助手消息的消费方——令牌计量、历史分页、后缀窗口——都要经由日志解析一层间接引用。该引用还让 `assistant/message` 有资格充当替换节点，尽管引用被遮蔽 surface 节点的替换在助手事件上并无有效用途，而且它复制了消息本可直接携带的来源引用。
 
 ## 决策
 
@@ -22,7 +22,7 @@ Status: implemented
 
 ## 备选方案
 
-在内嵌流之外保留引用会复制溯源信息并保留无效的替换形态。在同一变更中移除 `assistant/chunk` 会把本次契约迁移与更大规模的结算及格式拆分工作耦合。读取时剥离 `sourceEventSeqs` 会改写不可变的已存储代次。
+在内嵌流之外保留引用会复制来源引用并保留无效的替换形态。在同一变更中移除 `assistant/chunk` 会把本次契约迁移与更大规模的结算及格式拆分工作耦合。读取时剥离 `sourceEventSeqs` 会改写不可变的已存储代次。
 
 ## 影响
 

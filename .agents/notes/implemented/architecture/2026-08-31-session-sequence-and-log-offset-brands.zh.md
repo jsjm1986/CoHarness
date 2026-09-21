@@ -14,7 +14,7 @@ Session 位置曾用同一个结构化 `number` 类型表达两种不兼容的�
 
 `@deepseek-ai/dsh-brand` 导出编译后消失的数值原语 `BrandedNumber<B>` 与运行时保持原值的 helper `brandNumber()`。`@deepseek-ai/dsh-session` 拥有两个经验证的 brand：`SessionSeq` 指明一条已存在事件，`SessionLogOffset` 指明日志间隙、前缀长度或读取偏移。`SessionSeqCursor = SessionSeq | -1` 表达首条事件之前或之后的闭区间 watermark，`OptionalSessionSeq = SessionSeq | null` 表达允许以缺失为数据的事件身份。
 
-`SessionEvent.seq`、surface 替换端点、provenance 以及 owner payload 中指向 Session 事件的字段使用 `SessionSeq`。`Session.seq`、`Session.firstLiveSeq`、`Session.inheritedEventCount`、带正文读取的偏移与继承前缀切点使用 `SessionLogOffset`。算术结果恢复为普通 number，并通过对应的验证构造函数重新进入任一领域。
+`SessionEvent.seq`、surface 替换端点、source-event 引用以及 owner payload 中指向 Session 事件的字段使用 `SessionSeq`。`Session.seq`、`Session.firstLiveSeq`、`Session.inheritedEventCount`、带正文读取的偏移与继承前缀切点使用 `SessionLogOffset`。算术结果恢复为普通 number，并通过对应的验证构造函数重新进入任一领域。
 
 逻辑 `SessionHeader` 携带 `isSeeded: boolean`，不携带数值 seed cut。包含正文的存储值和 observation 在 header 旁携带 `inheritedEventCount`；`Session.ownEvents()` 与 `Session.isOwnSeq()` 向普通 consumer 隐藏比较。seeded constructor 必须显式提供 seed 与精确 cut，包括 cut 为零的空 seed，因为 constructor 输入可能在继承前缀之后还包含 child-owned setup event。
 

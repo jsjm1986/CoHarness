@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-28-load-pre-identity-session-messages.md
-2026-07-28-load-pre-identity-session-messages.md: 694bf9ed9ec7a24399b5898665c2222a806f93c6
-2026-07-28-load-pre-identity-session-messages.zh.md: 374f1993638fae503736543815a62e634850afa1
+2026-07-28-load-pre-identity-session-messages.md: 1aad962ec1d0a723893b1e08a0854cceb9882076
+2026-07-28-load-pre-identity-session-messages.zh.md: 1359594b7ae650cc05c674722321c6e620d9a86a

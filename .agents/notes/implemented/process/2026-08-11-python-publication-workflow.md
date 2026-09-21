@@ -16,7 +16,7 @@ A run with `publish=true` must use the `python-v<repository-version>` tag in the
 
 Publication consumes the aggregate artifact produced and checked in the same workflow run. Each publication job verifies the retained `SHA256SUMS` before selecting its upload set. A runtime job uploads all three platform wheels before a dependent job uploads the SDK wheel because PyPI uploads are not atomic and the SDK pins the runtime distribution at the exact same version. Neither job checks out source or rebuilds a wheel. Separating them lets GitHub's failed-job retry resume an SDK failure without attempting to replace immutable runtime files.
 
-Both publication actions disable public attestations. The action still uses Trusted Publishing for authentication, while omitting provenance that would disclose the private publisher repository instead of the public source mirror.
+Both publication actions disable public attestations. The action still uses Trusted Publishing for authentication, while omitting attestation that would disclose the private publisher repository instead of the public source mirror.
 
 Repository versions may be stable or use the supported prerelease spellings. Tags retain the repository spelling, while wheel filenames, metadata, dependency pins, and artifact lookup use the normalized PEP 440 spelling.
 
@@ -36,7 +36,7 @@ Both Python build-system requirements pin Hatchling 1.30.1. The next available H
 
 **Publishing from the public mirror.** The public mirror is a read-only source projection and does not run release Actions. Binding the PyPI publisher to it would leave no workload capable of presenting the registered OIDC identity.
 
-**Publishing public attestations.** The default action behavior makes the Trusted Publisher repository identity publicly verifiable. That provenance identifies the private automation repository rather than the package's public source mirror, so the publication jobs disable it.
+**Publishing public attestations.** The default action behavior makes the Trusted Publisher repository identity publicly verifiable. That attestation identifies the private automation repository rather than the package's public source mirror, so the publication jobs disable it.
 
 ## Consequences
 
@@ -46,6 +46,6 @@ The private automation repository owner and name, workflow filename, and each jo
 
 PyPI publication remains non-atomic across the two distribution projects. Runtime-first ordering narrows the visible failure mode, while separate publication jobs and checksum verification let a failed SDK upload resume with the exact checked bytes; an uploaded filename is never replaced.
 
-Disabling public attestations gives up public cryptographic provenance for the upload identity. Trusted Publishing still authenticates each upload, and the retained aggregate artifact keeps the checked wheel hashes inside the private release workflow.
+Disabling public attestations gives up public cryptographic attestation for the upload identity. Trusted Publishing still authenticates each upload, and the retained aggregate artifact keeps the checked wheel hashes inside the private release workflow.
 
 Upgrading Hatchling now requires validating the emitted Core Metadata version with the release pipeline's pinned Twine version before changing both package build requirements together.
