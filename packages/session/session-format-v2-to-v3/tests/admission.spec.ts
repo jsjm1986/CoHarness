@@ -60,8 +60,8 @@ describe('durable V3 admission failures', () => {
     expect(releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...encoded })).toEqual({ ...header, version: 3, draft: false })
     const absent = releasedV3SessionFormatCodec.encodeHeader({ ...header, version: 3 }, 0)
     expect('draft' in absent).toBe(false)
-    expect(() =>{  assertReleasedV3Header({ ...header, version: 3, draft: 'yes' as unknown as boolean }) }).toThrow(/draft/)
-    expect(() =>{  releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...physical, draft: 1 }) }).toThrow()
+    expect(() =>{  assertReleasedV3Header({ ...header, version: 3, draft: 'yes' }) }).toThrow(/draft/)
+    expect(() =>{  releasedV3SessionFormatCodec.decodeHeader({ ...physical, draft: 1 }) }).toThrow()
     // The released-v2 codec predates `draft`; it must still refuse the field.
     expect(() =>{  sessionFormatV2ToV3.migrateHeader({ ...header, draft: true }) }).toThrow(/unexpected field/)
   })
