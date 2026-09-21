@@ -509,16 +509,25 @@ describe('normalizeSessionSnapshot', () => {
   it('projects envelopes and folds a versioned fixture\'s chunk rows into a durable stream', () => {
     const raw = [
       header,
+      JSON.stringify({ type: 'turn/start', data: { turn: 1 } }),
+      JSON.stringify({ type: 'step/start', data: { turn: 1, step: 1 } }),
       JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [9, 8], texts: ['a', 'b', 'c'] } }),
       JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [7, 6], texts: ['d', 'e', 'f'] } }),
+      JSON.stringify({ type: 'step/end', data: { turn: 1, step: 1 } }),
+      JSON.stringify({ type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }),
       '',
     ].join('\n')
     expect(normalizeSessionSnapshot(raw, ctx)).toBe([
-      JSON.stringify({ type: 'session', version: 4, id: 's', createdAt: 0, isSeeded: false }),
+      JSON.stringify({ type: 'session', version: 4, id: 's', createdAt: 0, isSeeded: false, delegationDepth: 0 }),
+      JSON.stringify({ type: 'turn/start', data: { turn: 1 } }),
+      JSON.stringify({ type: 'step/start', data: { turn: 1, step: 1 } }),
+      JSON.stringify({ type: 'system/message', data: { turn: 1, step: 1, message: { id: 'v2-to-v3-system-76b7b872aa62ec8e220a5cb8891c4468ebf0fb84cb0e2e236beb0e6353c653db', role: 'system', source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }, content: [{ type: 'text', text: '{{system}}' }] } }, surfaceOp: 'append' }),
       JSON.stringify({
         type: 'assistant/attempt',
         data: { turn: 1, step: 1, stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [0, 0, 0, 0, 0], texts: ['a', 'b', 'c', 'd', 'e', 'f'] }] },
       }),
+      JSON.stringify({ type: 'step/end', data: { turn: 1, step: 1 } }),
+      JSON.stringify({ type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }),
       '',
     ].join('\n'))
   })

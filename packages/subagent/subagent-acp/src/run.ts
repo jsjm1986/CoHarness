@@ -90,20 +90,37 @@ export const DEFAULT_DISPOSE_EOF_GRACE_MS = 6_000
 export const DEFAULT_DISPOSE_GRACE_MS = 3_000
 
 /**
- * Read the child's exit facts only when they already exist. A pending `done`
- * cannot classify the active failure, so the observation gives up after one
- * macrotask instead of blocking on a live child.
+ * Read the child's exit facts within a bounded window. A pending `done` cannot
+ * classify the active failure, but the exit observation can trail the protocol
+ * failure by a few ticks, so the race waits up to `boundMs` — or the caller's
+ * signal — instead of requiring an already-settled `done` in one macrotask.
  * @param child - the spawned ACP child's handle.
+ * @param boundMs - observation cap, conventionally `spec.disposeGraceMs`.
+ * @param signal - optional caller cancellation joined into the bound.
  * @returns the settled outcome, or `undefined` while the process still runs.
  */
-async function settledOutcome(child: SubprocessHandle): Promise<SubprocessOutcome | undefined> {
-  return Promise.race([
-    child.done.then(
-      outcome => outcome,
-      () => undefined,
-    ),
-    new Promise<undefined>((resolve) => { setTimeout(() => { resolve(undefined) }, 0) }),
-  ])
+async function settledOutcome(
+  child: SubprocessHandle,
+  boundMs: number,
+  signal?: AbortSignal,
+): Promise<SubprocessOutcome | undefined> {
+  const timeout = AbortSignal.timeout(Math.ceil(boundMs))
+  const bound = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
+  const aborted = Promise.withResolvers<undefined>()
+  const onObservationAbort = (): void => { aborted.resolve(undefined) }
+  bound.addEventListener('abort', onObservationAbort, { once: true })
+  if (bound.aborted) onObservationAbort()
+  try {
+    return await Promise.race([
+      child.done.then(
+        outcome => outcome,
+        () => undefined,
+      ),
+      aborted.promise,
+    ])
+  } finally {
+    bound.removeEventListener('abort', onObservationAbort)
+  }
 }
 
 /** Bounded whole-tree exit wait: polls the handle's tree liveness until it exits or `ms` elapses. */
@@ -485,11 +502,11 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
     request.signal.removeEventListener('abort', onAbort)
     const cancelledBeforeCleanup = flags.cancelled
     // A child closing its protocol stream can precede its exit observation;
-    // only an already-settled `done` proves the process died (a live child is
-    // a transport failure).
+    // the bounded observation lets a dying child's `done` land before the
+    // failure is classified (a live child is a transport failure).
     const observedOutcome = cancelledBeforeCleanup || error instanceof AcpRunFailure
       ? undefined
-      : await settledOutcome(child)
+      : await settledOutcome(child, spec.disposeGraceMs)
     const startup = cancelledBeforeCleanup
       ? { kind: 'cancelled' } as const
       : {
@@ -505,7 +522,7 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
       await disposeProcess()
     } catch (cleanupError: unknown) {
       reportFailure(spec, cleanupError)
-      const outcome = await settledOutcome(child)
+      const outcome = await settledOutcome(child, spec.disposeGraceMs)
       const cleanupFailure = new AcpRunFailure({
         stage: 'teardown',
         category: outcome === undefined ? 'unknown' : 'process-exit',
@@ -554,7 +571,7 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
       if (flags.cancelled) return { output: collectOutput(), stopReason: 'aborted' }
       // A dead child classifies the prompt failure by its exit facts; a live
       // one stays transport.
-      const outcome = await settledOutcome(child)
+      const outcome = await settledOutcome(child, spec.disposeGraceMs, request.signal)
       diagnostic = diagnosticText(
         outcome === undefined
           ? { stage: 'prompt', category: 'transport' }
@@ -590,7 +607,7 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
           await disposeProcess()
         } catch (error: unknown) {
           reportFailure(spec, error)
-          const outcome = await settledOutcome(child)
+          const outcome = await settledOutcome(child, spec.disposeGraceMs)
           throw new AcpRunFailure({
             stage: 'teardown',
             category: outcome === undefined ? 'unknown' : 'process-exit',
