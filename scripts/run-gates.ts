@@ -245,7 +245,15 @@ export function gatesForMode(selected: Mode): Gate[] {
     case 'ci-primary':
       return ciPrimaryGates()
     case 'ci-linux-primary':
-      return [...ciPrimaryGates(), webSnapshotGate(['built-package-invariants'])]
+      // The HMR web test rewrites the shared `lib/` and `apps/web/dist/`
+      // trees; let every built-artifact reader in this mode settle first.
+      return [...ciPrimaryGates(), webSnapshotGate(['built-package-invariants'], [
+        'publint',
+        'snapshot',
+        'doc-typecheck',
+        'node-next-types',
+        'built-bin-smoke',
+      ])]
     case 'ci-static':
       return ciStaticGates({ ownsBuild: false })
     case 'ci-lint-contracts-ready':
@@ -279,7 +287,16 @@ export function gatesForMode(selected: Mode): Gate[] {
     case 'node-compat':
       return nodeCompatGates()
     case 'check-all':
+      // Comprehensive local acceptance: every gate except the coverage lane
+      // and the CI platform matrix, which the hosted lanes own. `test` runs
+      // the suite; per-file coverage thresholds stay a `test:coverage` gate.
       return [
+        lintGate(),
+        pnpmScript('coverage-exclusions', 'verify-coverage-exclusions', { label: 'coverage exclusions' }),
+        pnpmScript('test-honesty', 'verify-test-honesty', { label: 'test honesty' }),
+        pnpmScript('ci-consumers', 'verify-ci-consumers', { label: 'consumer entry references' }),
+        pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
+        pnpmScript('upgrade-records', 'verify-upgrade-records', { label: 'upgrade records' }),
         pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
@@ -362,9 +379,9 @@ function ciPrimaryGates(): Gate[] {
     pnpmScript('module-graph', 'verify-module-graph', { label: 'module graph' }),
     pnpmScript('knip', 'knip'),
     // The prepared typecheck and build both drive Client tsc, while build also
-    // repeats the Host contract pass. Wait for all three consumers so build
-    // neither races tsbuildinfo nor replaces declarations while they are read.
-    ciBuildGate('build', { needs: ['typecheck', 'lint', 'doc-typecheck'] }),
+    // repeats the Host contract pass. `after` serializes the readers against
+    // the writer without making an independent failure skip the build leg.
+    ciBuildGate('build', { after: ['typecheck', 'lint', 'doc-typecheck'] }),
     pnpmScript('publint', 'publint', { needs: ['build'] }),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',

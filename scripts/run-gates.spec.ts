@@ -529,7 +529,10 @@ describe('Typert contract preparation', () => {
         needs: ['typert-contracts'],
       })
     }
-    expect(subject.find(item => item.id === 'build')?.needs).toEqual([
+    // Ordering, not generation: an independent lint/typecheck failure must
+    // not starve the build diagnostic; the writer still serializes behind
+    // every declaration reader.
+    expect(subject.find(item => item.id === 'build')?.after).toEqual([
       'typecheck',
       'lint',
       'doc-typecheck',

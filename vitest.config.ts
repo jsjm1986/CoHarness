@@ -5,7 +5,7 @@ import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
 import { COVERAGE_PARTITION_MODE_ENV } from './scripts/coverage-partitions.ts'
 import { COVERAGE_SCOPED_MODE_ENV } from './scripts/coverage-scoped.ts'
-import { repositoryCoveragePolicy } from './scripts/coverage-policy.ts'
+import { probePwshAvailable, repositoryCoveragePolicy, repositoryTestExclusions, resolveCoveragePolicy, type CoveragePolicy } from './scripts/coverage-policy.ts'
 
 // Prints exact `path:line:col` records for every uncovered statement, branch
 // path, and function when a file misses the per-file 100% gate — the built-in
@@ -19,8 +19,9 @@ const uncoveredLocationsReporter = fileURLToPath(new URL('./scripts/coverage-unc
 // lib/ never loads a second module-singleton copy.
 const pathsPlugin = (): ReturnType<typeof tsconfigPaths> => tsconfigPaths({ projects: ['./tsconfig.base.json'] })
 
-const coveragePolicy = repositoryCoveragePolicy()
-const windowsUnsupportedTests = [...coveragePolicy.excludedTests]
+// Plain test runs need only the platform test exclusions; the pure-type
+// source scan is a coverage-lane concern and stays lazy (see below).
+const windowsUnsupportedTests = [...repositoryTestExclusions()]
 
 const testIncludes = [
   'packages/*/*/tests/**/*.spec.{ts,tsx}',
@@ -40,6 +41,16 @@ if (coverageExemptRaw !== undefined && coverageExemptRaw !== '' && coverageExemp
 const coverageExemptExcludes = coverageExemptRaw === '1'
   ? coverageExemptHeavySuites.map(suite => suite.exclude)
   : []
+
+// The pure-type exclusion scan reads every measured source; derive the full
+// source policy only when this invocation actually collects coverage.
+const coverageRequested = process.argv.some(arg => arg === '--coverage' || arg.startsWith('--coverage.'))
+  || process.env[COVERAGE_PARTITION_MODE_ENV] === '1'
+  || process.env[COVERAGE_SCOPED_MODE_ENV] === '1'
+let memoizedCoveragePolicy: CoveragePolicy | undefined
+const coveragePolicy = (): CoveragePolicy => coverageRequested
+  ? memoizedCoveragePolicy ??= repositoryCoveragePolicy()
+  : resolveCoveragePolicy(process.platform, probePwshAvailable())
 
 const coveragePartitionRaw = process.env[COVERAGE_PARTITION_MODE_ENV]
 if (coveragePartitionRaw !== undefined && coveragePartitionRaw !== '' && coveragePartitionRaw !== '1') {
@@ -122,10 +133,10 @@ export default defineConfig({
       // executable code; vendor/ and examples/ are out of scope (examples are
       // exercised by the demo smoke test instead).
       // .tsx: client components are gated like everything else (jsdom lane).
-      include: [...coveragePolicy.include],
+      include: [...coveragePolicy().include],
       // Types-only files have no runtime coverage. Importing self-executing bins/workers would boot
       // them inside the unit process, so real subprocess/Worker tests cover their thin entry glue.
-      exclude: [...coveragePolicy.exclude],
+      exclude: [...coveragePolicy().exclude],
       // 100% or it doesn't merge (docs/testing.md: excessive tests are welcome).
       // Per-file so a well-covered big file can't subsidize a bare one.
       // Every v8 ignore comment must carry a reason — see the quality-gates Agent Note

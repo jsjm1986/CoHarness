@@ -216,14 +216,28 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
   }
 }
 
-/** Resolve coverage using the same PowerShell availability as the executor suites.
- * @returns the current host's source policy.
+/** Probe real PowerShell availability the same way the executor suites do.
+ * @returns whether a real `pwsh` answered the trivial probe.
  */
-export function repositoryCoveragePolicy(): CoveragePolicy {
+export function probePwshAvailable(): boolean {
   const probe = spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8', timeout: 15000 })
   if (probe.error !== undefined && 'code' in probe.error && probe.error.code === 'ETIMEDOUT') {
     throw new Error('coverage policy: PowerShell availability probe timed out')
   }
-  const policy = resolveCoveragePolicy(process.platform, probe.status === 0)
+  return probe.status === 0
+}
+
+/** Platform test exclusions only — cheap enough for every plain test run.
+ * @returns the current host's `excludedTests` glob list.
+ */
+export function repositoryTestExclusions(): readonly string[] {
+  return resolveCoveragePolicy(process.platform, probePwshAvailable()).excludedTests
+}
+
+/** Resolve coverage using the same PowerShell availability as the executor suites.
+ * @returns the current host's source policy.
+ */
+export function repositoryCoveragePolicy(): CoveragePolicy {
+  const policy = resolveCoveragePolicy(process.platform, probePwshAvailable())
   return { ...policy, exclude: [...policy.exclude, ...pureTypeCoverageSources(resolve(import.meta.dirname, '..'), policy)] }
 }
