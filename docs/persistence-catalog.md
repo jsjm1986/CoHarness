@@ -2868,7 +2868,7 @@ SHA-256: `b222069eea2d768065161c1147b1f2c78c1b54328c84b3586ae5c8f91b8ed35e`
 
 SHA-256: `477614bca595a9e7adb5a1870be446b9a8684f3ba8950259d6289f2d3b74f028`
 
-Sources: [`packages/compaction/compaction-image-offload/lib/types/projection.d.ts:20`](../packages/compaction/compaction-image-offload/lib/types/projection.d.ts)
+Sources: [`packages/compaction/compaction-image-offload/src/projection.ts:25`](../packages/compaction/compaction-image-offload/src/projection.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2880,7 +2880,7 @@ Sources: [`packages/compaction/compaction-image-offload/lib/types/projection.d.t
 
 SHA-256: `9e2c06d8653585b33d72d5c1a80da79c8a24a88c284409bca15cc0f0ead5ebfb`
 
-Array of [`packages/compaction/compaction-image-offload/lib/types/projection.d.ts#ImageOffloadTarget`](#persistence-type-packagescompactioncompaction-image-offloadlibtypesprojectiondtsimageoffloadtarget).
+Array of [`packages/compaction/compaction-image-offload/src/projection.ts#ImageOffloadTarget`](#persistence-type-packagescompactioncompaction-image-offloadsrcprojectiontsimageoffloadtarget).
 
 <a id="persistence-type-eventllmretry"></a>
 
@@ -4579,13 +4579,13 @@ Sources: [`packages/attachment/userdoc/src/types.ts:33`](../packages/attachment/
 | `name` | required | `string` |
 | `path` | required | `string` |
 
-<a id="persistence-type-packagescompactioncompaction-image-offloadlibtypesprojectiondtsimageoffloadtarget"></a>
+<a id="persistence-type-packagescompactioncompaction-image-offloadsrcprojectiontsimageoffloadtarget"></a>
 
-### `packages/compaction/compaction-image-offload/lib/types/projection.d.ts#ImageOffloadTarget`
+### `packages/compaction/compaction-image-offload/src/projection.ts#ImageOffloadTarget`
 
 SHA-256: `1cde1bedde79c5e8a56aee9c05c8e0a579cf5bc611deb85b93fa331a16ca978f`
 
-Sources: [`packages/compaction/compaction-image-offload/lib/types/projection.d.ts:5`](../packages/compaction/compaction-image-offload/lib/types/projection.d.ts)
+Sources: [`packages/compaction/compaction-image-offload/src/projection.ts:9`](../packages/compaction/compaction-image-offload/src/projection.ts)
 
 | Property | Presence | Type |
 |---|---|---|

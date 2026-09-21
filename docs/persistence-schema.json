@@ -19253,10 +19253,10 @@
         ]
       },
       "names": [
-        "packages/compaction/compaction-image-offload/lib/types/projection.d.ts#ImageOffloadTarget"
+        "packages/compaction/compaction-image-offload/src/projection.ts#ImageOffloadTarget"
       ],
       "sources": [
-        "packages/compaction/compaction-image-offload/lib/types/projection.d.ts:5"
+        "packages/compaction/compaction-image-offload/src/projection.ts:9"
       ]
     },
     {
@@ -26737,7 +26737,7 @@
         "event:image/offload.data"
       ],
       "sources": [
-        "packages/compaction/compaction-image-offload/lib/types/projection.d.ts:20"
+        "packages/compaction/compaction-image-offload/src/projection.ts:25"
       ]
     },
     {

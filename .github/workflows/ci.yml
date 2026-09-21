@@ -633,6 +633,12 @@ jobs:
           cache-dependency-path: gateway/package-lock.json
       - name: Install Gateway dependencies
         run: npm ci --prefix gateway
+      # The paths map keeps vendored packages on their emitted lib/types
+      # (their source needs the loose vendored compiler flags); emit just
+      # those declarations with the lane's own tsc instead of a workspace
+      # build a standalone npm-ci checkout cannot produce.
+      - name: Emit vendored type declarations the Gateway paths consume
+        run: gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their

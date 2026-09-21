@@ -26,7 +26,7 @@ def test_otool_parser_uses_the_newest_macho_slice() -> None:
 
 
 def test_otool_parser_requires_a_deployment_target() -> None:
-    with pytest.raises(ValueError, match="contains no LC_BUILD_VERSION"):
+    with pytest.raises(ValueError, match="contains no macOS deployment target load command"):
         checker.parse_otool_deployment_target("Load command 0\n")
 
 

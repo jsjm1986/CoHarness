@@ -2870,7 +2870,7 @@ SHA-256: `b222069eea2d768065161c1147b1f2c78c1b54328c84b3586ae5c8f91b8ed35e`
 
 SHA-256: `477614bca595a9e7adb5a1870be446b9a8684f3ba8950259d6289f2d3b74f028`
 
-来源：[`packages/compaction/compaction-image-offload/lib/types/projection.d.ts:20`](../packages/compaction/compaction-image-offload/lib/types/projection.d.ts)
+来源：[`packages/compaction/compaction-image-offload/src/projection.ts:25`](../packages/compaction/compaction-image-offload/src/projection.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2882,7 +2882,7 @@ SHA-256: `477614bca595a9e7adb5a1870be446b9a8684f3ba8950259d6289f2d3b74f028`
 
 SHA-256: `9e2c06d8653585b33d72d5c1a80da79c8a24a88c284409bca15cc0f0ead5ebfb`
 
-[`packages/compaction/compaction-image-offload/lib/types/projection.d.ts#ImageOffloadTarget`](#persistence-type-packagescompactioncompaction-image-offloadlibtypesprojectiondtsimageoffloadtarget) 的数组。
+[`packages/compaction/compaction-image-offload/src/projection.ts#ImageOffloadTarget`](#persistence-type-packagescompactioncompaction-image-offloadsrcprojectiontsimageoffloadtarget) 的数组。
 
 <a id="persistence-type-eventllmretry"></a>
 
@@ -4581,13 +4581,13 @@ SHA-256: `995d3369d395b64efb484508352e45fd5348880d480d8107f78daa7366779f77`
 | `name` | 必需 | `string` |
 | `path` | 必需 | `string` |
 
-<a id="persistence-type-packagescompactioncompaction-image-offloadlibtypesprojectiondtsimageoffloadtarget"></a>
+<a id="persistence-type-packagescompactioncompaction-image-offloadsrcprojectiontsimageoffloadtarget"></a>
 
-### `packages/compaction/compaction-image-offload/lib/types/projection.d.ts#ImageOffloadTarget`
+### `packages/compaction/compaction-image-offload/src/projection.ts#ImageOffloadTarget`
 
 SHA-256: `1cde1bedde79c5e8a56aee9c05c8e0a579cf5bc611deb85b93fa331a16ca978f`
 
-来源：[`packages/compaction/compaction-image-offload/lib/types/projection.d.ts:5`](../packages/compaction/compaction-image-offload/lib/types/projection.d.ts)
+来源：[`packages/compaction/compaction-image-offload/src/projection.ts:9`](../packages/compaction/compaction-image-offload/src/projection.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
