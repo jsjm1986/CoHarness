@@ -128,8 +128,11 @@ export function collectGateEvidence(
   if (!Array.isArray(rawGlobs) || !rawGlobs.every(pattern => typeof pattern === 'string')) {
     throw new Error('gate evidence: artifact globs must be a JSON string array')
   }
-  const artifactPaths = [...globSync(rawGlobs, { cwd: root })].sort()
-  if (rawGlobs.length > 0 && artifactPaths.length === 0) throw new Error('gate evidence: declared artifacts are absent')
+  const matches = rawGlobs.map(pattern => [...globSync(pattern, { cwd: root })])
+  if (results.every(result => result.status === 'passed') && matches.some(paths => paths.length === 0)) {
+    throw new Error('gate evidence: declared artifacts are absent')
+  }
+  const artifactPaths = [...new Set(matches.flat())].sort()
   const artifacts = artifactPaths.map((path) => {
     const child = relative(root, resolve(root, path))
     if (child === '..' || child.startsWith('..' + sep) || isAbsolute(child)) throw new Error('gate evidence: artifact escapes checkout')

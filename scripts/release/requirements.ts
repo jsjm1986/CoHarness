@@ -25,10 +25,6 @@ export function requiredReleaseChecks(paths: readonly string[], family: string, 
       if (lane === 'python') result.push({ mode: 'python-runtime', check: 'python-runtime', environment: 'source' })
     }
   }
-  if (reasons.android.length > 0) {
-    result.push({ mode: 'android-build', check: 'android-build', environment: 'source' },
-      { mode: 'android-bridge', check: 'android-bridge', environment: 'android-native' })
-  }
   const native = paths.some(path =>
     /^(?:vendor\/|native\/|packages\/(?:sandbox|subprocess|shell)\/|scripts\/build|pnpm-lock\.yaml$)/.test(path))
   if (native) result.push({ mode: 'ci-windows-complete', check: 'build', environment: 'windows-native' })
@@ -41,11 +37,6 @@ export function requiredReleaseChecks(paths: readonly string[], family: string, 
   }
   if (paths.some(path => /^(?:packages\/llm\/llm-pi-ai\/|plugins\/dsh-model-governance\/)/.test(path))) {
     result.push({ mode: 'real-provider-pi-ai', check: 'real-provider-pi-ai', environment: 'real-provider' })
-  }
-  const pushInputs = ['apps/android-shell/android/app/src/main/', 'apps/android-shell/android/app/build.gradle',
-    'apps/android-shell/capacitor.config.ts', 'apps/android-shell/package.json', 'gateway/src/push-notifications.ts']
-  if (paths.some(path => pushInputs.some(input => input.endsWith('/') ? path.startsWith(input) : path === input))) {
-    result.push({ mode: 'android-push', check: 'android-push', environment: 'android-push' })
   }
   if (phase === 'publish') {
     const mode = family === 'python' ? 'python-release' : family === 'native' ? 'native-pack' : 'npm-pack'

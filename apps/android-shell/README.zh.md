@@ -43,6 +43,6 @@ Gateway 需要配置 `HGW_FCM_PROJECT_ID` 和 `HGW_FCM_SERVICE_ACCOUNT_FILE` 才
 
 ## 验证
 
-根目录命令 `pnpm run check:android` 构建普通 debug 与插桩 APK，执行 Android lint 和单元测试，需要 Java 21 与 SDK 36。CI 通过私有 HTTP 端点执行 `test:android:protocol`，再通过 `check:android:bridge` 在指定模拟器上执行下载的 APK。原生测试保留 `NATIVE_PUSH_ENABLED=true`，验证真实 MainActivity 到 WebView 的事件路径，diagnostic APK 不能提供这类证据。验证 APK 使用私有回环端点，debug 变体仅对回环地址允许明文连接。
+根目录命令 `pnpm run check:android` 构建普通 debug 与插桩 APK，执行 Android lint 和单元测试，需要 Java 21 与 SDK 36。可选的 `android-audit` 手动 CI 套件通过私有 HTTP 端点执行 `test:android:protocol`，再通过 `check:android:bridge` 在指定模拟器上执行下载的 APK。原生测试保留 `NATIVE_PUSH_ENABLED=true`，验证真实 MainActivity 到 WebView 的事件路径，diagnostic APK 不能提供这类证据。验证 APK 使用私有回环端点，debug 变体仅对回环地址允许明文连接。
 
-纯 Web 内容变化继续使用移动 Web 验证。原生输入和通知协议变化会选择 Android 检查。编译、桥接插桩和真实推送送达是不同证明。真实推送验收由指定测试设备和已启用 Provider 承担；需要此证明的发行在缺少环境时无法放行。
+Android 是可选消费方。PR、完整审计及默认产品发布要求不包含 Android 原生验证；选检报告将受影响的 Android 规则记录为仅手动验证范围。托管 Web 和 Gateway 协议检查保持各自的正常要求。编译、桥接插桩和真实推送送达仍是不同证明；这个可选套件不验证通过推送服务送达的行为。

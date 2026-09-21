@@ -34,6 +34,6 @@
 
 ## 验证归属
 
-Linux 源码审计、两个 SDK、Gateway、Admin UI 和 Android 消费方各自提供证据。Wine 不能替代原生 Windows。内核隔离和真实 Provider 调用必须由各自 workflow 证明。普通 debug APK 和模拟器桥接测试不能证明真实推送送达，后者需要指定测试设备及已启用的推送服务。发布维护者负责这些依赖环境的验收，以及受保护环境的最终批准。
+Linux 源码审计、两个 SDK、Gateway 和 Admin UI 各自提供证据。Android 是可选功能，不属于默认发布验收要求；其手动检查不代表真实推送送达已验证。Wine 不能替代原生 Windows。内核隔离和真实 Provider 调用必须由各自 workflow 证明。发布维护者负责这些依赖环境的验收，以及受保护环境的最终批准。
 
 [决策注记](../../.agents/notes/implemented/process/2026-09-21-candidate-bound-gate-evidence.zh.md)解释保留上游执行器和影子选检的原因。[就绪测试](readiness.spec.ts)中的单元测试和可执行拒绝案例不连接注册表即可验证守卫行为。

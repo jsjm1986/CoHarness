@@ -1350,7 +1350,7 @@
           "path": ".github/workflows/ci.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "2139231c060c0d53b1e2c12cfc424415642d8f5e",
-          "replay": "Preserve conditional PR jobs and HMR/artifact order. Add explicit consumer outputs, Android APK producer and emulator consumer, Python Ruff and report upload; keep both selected failures and skipped-required jobs blocking.",
+          "replay": "Preserve conditional PR jobs and HMR/artifact order. Add explicit required consumers, pinned Ruff and job-scoped evidence names with matrix/attempt identity. Android APK/emulator jobs are manual-only and absent from required PR and default release checks. Provision the sandbox before source compatibility tests. Keep selected required failures and skipped-required jobs blocking.",
           "regressions": [
             "scripts/gate-workflow-wiring.spec.ts"
           ],
@@ -1360,9 +1360,10 @@
           "path": ".github/workflows/e2e.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "f4335f78bb5445b6e49b8c1ef0021b7fdff9470b",
-          "replay": "Keep secret preflight and real provider commands. Emit JSON test results, require successful real-provider assertions, and upload the immutable report after execution.",
+          "replay": "Keep canonical-repository and secret preflight protections. Explicit dispatch may run without enabling automatic schedules. Emit JSON results, require successful real-provider assertions, and upload immutable evidence.",
           "regressions": [
-            "scripts/gate-workflow-wiring.spec.ts"
+            "scripts/ci-workflow.spec.ts",
+            "scripts/gate-evidence.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
         },
@@ -1400,7 +1401,7 @@
           "path": ".github/workflows/sandbox.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "713616f3b634a7ad85752e609e71169d2bf91675",
-          "replay": "Preserve real-kernel external-operation assertions and the anti-self-skip guard. Upload the runner-specific report only after capturing the actual job outcome.",
+          "replay": "Resolve native build commands against native/system. Preserve real-kernel assertions and the anti-self-skip guard; propagate the test process exit status before checking its summary. Record the actual job outcome.",
           "regressions": [
             "scripts/gate-workflow-wiring.spec.ts"
           ],
@@ -3884,6 +3885,16 @@
             "scripts/gen-third-party-notices.spec.ts"
           ],
           "retireWhen": "Upstream discloses Ruff in the Python dependency metadata."
+        },
+        {
+          "path": "scripts/prepare-ci-bubblewrap.sh",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "1efaee200a1bd338ac8d2fe9e32dc7df98dc5884",
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation.",
+          "replay": "Preserve SHA-256 verification and the functional confinement probe. Download the pinned package from a dated Ubuntu snapshot; refresh version, snapshot and checksum together.",
+          "regressions": [
+            "scripts/gate-workflow-wiring.spec.ts"
+          ]
         }
       ]
     },
@@ -4528,7 +4539,19 @@
         "area": "non-package:tsconfig.base.json",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "gateReplays": [
+        {
+          "path": "tsconfig.base.json",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "6ec529b39df88a409f06c58e6b315f6341371c21",
+          "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation.",
+          "replay": "Preserve source aliases for every consumed public subpath, including dsh-subprocess/control. Resolution must work without any lib output; adopt equivalent upstream aliases.",
+          "regressions": [
+            "scripts/gen-tsconfig-paths.spec.ts"
+          ]
+        }
+      ]
     },
     {
       "area": "non-package:tsconfig.client.json",

@@ -34,8 +34,8 @@ export interface CiPrScope {
   readonly gatewayMode: 'skip' | 'full'
   /** The independent Gateway administration UI project. */
   readonly adminUiMode: 'skip' | 'full'
-  /** Ordinary Android build and native notification bridge. */
-  readonly androidMode: 'skip' | 'full'
+  /** Android is optional and runs only through the manual android-audit suite. */
+  readonly androidMode: 'skip'
   /** Explicit consumer rules used to explain added lanes. */
   readonly consumerReasons: ReturnType<typeof consumerReasons>
 }
@@ -299,7 +299,7 @@ export function classifyCiPrScope(
   const gatewayReachable = reasons.gateway.length > 0 || paths.some(path => !isInertPath(path) && isGatewayPath(path))
   const adminUiReachable = reasons.adminUi.length > 0 || paths.some(path => !isInertPath(path) && isAdminUiPath(path))
   const common = {
-    androidMode: reasons.android.length > 0 ? 'full' as const : 'skip' as const,
+    androidMode: 'skip' as const,
     consumerReasons: reasons,
     changedSourceFiles,
     changedPackageFiles,
@@ -335,7 +335,7 @@ export function classifyCiPrScope(
     windowsMode: 'full',
     gatewayMode: 'full',
     adminUiMode: 'full',
-    androidMode: 'full',
+    androidMode: 'skip',
     consumerReasons: { python: ['unknown-or-empty-diff'], gateway: ['unknown-or-empty-diff'], adminUi: ['unknown-or-empty-diff'], android: ['unknown-or-empty-diff'] },
   }
 
@@ -426,6 +426,7 @@ function main(): void {
   writeFileSync(`.artifacts/gates/selection-${commit}.json`, JSON.stringify({
     version: 1, kind: 'selection', phase: 'shadow', commit, baseline, paths,
     previous, candidate, executed: result,
+    optionalConsumers: { android: { policy: 'manual-only', suite: 'android-audit', affectedRules: candidate.consumerReasons.android } },
   }, null, 2) + '\n')
   if (result.snapshotMode === 'focused') {
     console.error(`ci-pr-scope: focused web verification for groups ${JSON.stringify(result.webGroups)}`)
@@ -482,7 +483,6 @@ export function unionConsumerSelection(previous: CiPrScope, candidate: CiPrScope
     pythonMode: previous.pythonMode === 'full' ? 'full' : candidate.pythonMode,
     gatewayMode: previous.gatewayMode === 'full' ? 'full' : candidate.gatewayMode,
     adminUiMode: previous.adminUiMode === 'full' ? 'full' : candidate.adminUiMode,
-    androidMode: previous.androidMode === 'full' ? 'full' : candidate.androidMode,
   }
 }
 

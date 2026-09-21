@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 import {
   collectPackageAliases,
   collectPackageNames,
@@ -13,6 +14,16 @@ import {
 const root = resolve(import.meta.dirname, '..')
 
 describe('generated tsconfig package aliases', () => {
+  it('resolves subprocess control from source without requiring emitted declarations', () => {
+    const path = resolve(root, 'tsconfig.base.json')
+    const config = ts.readConfigFile(path, ts.sys.readFile)
+    const { options } = ts.parseJsonConfigFileContent(config.config, ts.sys, root)
+    const source = resolve(root, 'packages/subprocess/subprocess/src/control.ts')
+    const host = { ...ts.sys, fileExists: (file: string) => !file.replaceAll('\\', '/').includes('/lib/') && ts.sys.fileExists(file) }
+    expect(ts.resolveModuleName('@deepseek-ai/dsh-subprocess/control',
+      resolve(root, 'packages/subprocess/subprocess-local/src/control-spawn.ts'), options, host).resolvedModule?.resolvedFileName).toBe(source)
+  })
+
   it('maps each package to its own source directory', () => {
     const aliases = collectPackageAliases()
     expect(aliases.length).toBeGreaterThan(100)

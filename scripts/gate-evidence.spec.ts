@@ -59,6 +59,11 @@ describe('immutable gate evidence', () => {
     expect(path).toBeDefined()
     expect(JSON.parse(readFileSync(path!, 'utf8')) as unknown).toMatchObject({ observations: { producer: { runId: 15, attempt: 2 } } })
     expect(() => collectGateEvidence(root, 'test', [passed], 5, { DSH_GATE_ARTIFACT_GLOBS: '[".artifacts/missing/*.tgz"]' })).toThrow('absent')
+    const globs = { DSH_GATE_ARTIFACT_GLOBS: '["scripts/gate.ts", ".artifacts/missing/*.tgz"]' }
+    expect(() => collectGateEvidence(root, 'test', [passed], 5, globs)).toThrow('absent')
+    const failed = collectGateEvidence(root, 'test', [{ ...passed, status: 'failed', exitCode: 1 }], 5, globs)
+    expect(failed.stable.checks[0]?.status).toBe('failed')
+    expect(failed.stable.artifacts).toHaveLength(1)
     expect(() => writeGateEvidence(root, 'test', [passed], 5, { DSH_GATE_REPORT_DIR: '../outside' })).toThrow('under .artifacts/gates')
   })
 

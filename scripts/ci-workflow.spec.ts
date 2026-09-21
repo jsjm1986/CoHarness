@@ -289,8 +289,7 @@ describe('CI workflow', () => {
     const NOT_PUSH_REACHABLE = new Set([
       ...['compat', 'python', 'gateway', 'admin_ui'].map(mode =>
         `always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.${mode}_mode == 'full'))`),
-      "always() && ((github.event_name == 'pull_request' && needs.pr-scope.outputs.android_mode == 'full') || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit'))",
-      "github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'",
       "github.event_name == 'pull_request'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'",
@@ -456,6 +455,7 @@ describe('DeepSeek e2e workflow', () => {
     const steps = e2e.steps.filter(isRecord)
     expect(e2e.if).toContain("github.repository == 'jsjm1986/CoHarness'")
     expect(e2e.if).toContain("vars.DSH_REAL_API_E2E_ENABLED == 'true'")
+    expect(e2e.if).toContain("github.event_name == 'workflow_dispatch' || vars.DSH_REAL_API_E2E_ENABLED == 'true'")
     expect(e2e.if).toContain('github.event.pull_request.head.repo.fork')
     expect(e2e.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
     expect(JSON.stringify(workflow)).not.toContain('pull_request_target')

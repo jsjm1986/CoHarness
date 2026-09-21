@@ -34,6 +34,6 @@ A timestamp-rewritten legacy baseline cannot substitute for a committed family v
 
 ## Verification ownership
 
-Linux source audits, both SDKs, Gateway, Admin UI and Android consumers supply their own evidence. Native Windows cannot be replaced by Wine. Kernel confinement and real-provider calls require their owning workflows. An ordinary debug APK and emulator bridge tests do not prove real push delivery; that requires a designated test device and enabled push service. Release maintainers own these environment-dependent acceptances and the final protected-environment approval.
+Linux source audits, both SDKs, Gateway and Admin UI supply their own evidence. Android is optional and excluded from default release requirements; its manual checks do not certify real push delivery. Native Windows cannot be replaced by Wine. Kernel confinement and real-provider calls require their owning workflows. Release maintainers own these environment-dependent acceptances and the final protected-environment approval.
 
 The [decision](../../.agents/notes/implemented/process/2026-09-21-candidate-bound-gate-evidence.md) explains the retained upstream executor and shadow selector. The unit and executable rejection cases in [readiness tests](readiness.spec.ts) cover guard behavior without contacting a registry.

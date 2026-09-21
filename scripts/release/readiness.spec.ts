@@ -210,9 +210,11 @@ describe('release environment requirements', () => {
     expect(() =>{  assertEvidenceEnvironment('android-native', { runnerOS: 'Linux' }, { name: 'android / debug build and lint' }, '.github/workflows/ci.yml') }).toThrow('not interchangeable')
     expect(() =>{  assertEvidenceEnvironment('windows-native', { runnerOS: 'Windows', execution: 'native', processPlatform: 'win32' }, { labels: ['windows-2025'] }, '.github/workflows/ci.yml') }).not.toThrow()
   })
-  it('requires kernel, SDK, provider and Android proofs for their changed inputs', () => {
+  it('requires kernel and SDK proofs while leaving Android outside product release requirements', () => {
     expect(requiredReleaseChecks(['packages/core/agent-loop/src/index.ts'], 'dsh', 'preflight').map(check => check.mode)).toContain('python-sdk')
     expect(requiredReleaseChecks(['packages/sandbox/sandbox-local/src/index.ts'], 'dsh', 'preflight').map(check => check.environment)).toContain('windows-native')
-    expect(requiredReleaseChecks(['gateway/src/push-notifications.ts'], 'dsh', 'publish').map(check => check.environment)).toContain('android-push')
+    const checks = requiredReleaseChecks(['gateway/src/push-notifications.ts', 'apps/android-shell/android/app/src/main/MainActivity.java'], 'dsh', 'publish')
+    expect(checks.map(check => check.mode)).toContain('gateway')
+    expect(checks.some(check => check.mode.startsWith('android-'))).toBe(false)
   })
 })

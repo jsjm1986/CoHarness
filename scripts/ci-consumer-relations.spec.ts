@@ -19,8 +19,8 @@ describe('fork consumer selection', () => {
     for (const lane of lanes) expect(reasons[lane as keyof typeof reasons].length).toBeGreaterThan(0)
   })
 
-  it('keeps ordinary docs, unrelated packages and hosted web outside Android rebuilds', () => {
-    for (const path of ['docs/testing.md', 'apps/web/src/style.css', 'packages/util/timeout/src/index.ts']) {
+  it('records Android impact without scheduling optional native verification', () => {
+    for (const path of ['docs/testing.md', 'apps/web/src/style.css', 'packages/util/timeout/src/index.ts', 'apps/web/src/native-push.ts', 'apps/android-shell/android/app/build.gradle']) {
       expect(classifyCiPrScope([path], '').androidMode, path).toBe('skip')
     }
     expect(classifyCiPrScope(['gateway/README.md'], '')).toMatchObject({ gatewayMode: 'skip', adminUiMode: 'skip' })

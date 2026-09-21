@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { load } from 'js-yaml'
 import { describe, expect, it, vi } from 'vitest'
 import { gatesForMode } from './run-gates.ts'
@@ -9,6 +9,18 @@ interface Workflow { jobs: Record<string, Job>; env?: Record<string, string> }
 const workflow = (name: string): Workflow => load(readFileSync(`.github/workflows/${name}.yml`, 'utf8')) as Workflow
 
 describe('public gate and workflow wiring', () => {
+  it('resolves each Sandbox native-build command to an existing workspace script', () => {
+    const steps = workflow('sandbox').jobs['sandbox-e2e']!.steps!
+    const commands = steps.flatMap(step => [...step.run?.matchAll(/pnpm --dir (\S+) run (\S+)/g) ?? []])
+    expect(commands.length).toBeGreaterThan(0)
+    for (const [, directory, script] of commands) {
+      const path = `${directory}/package.json`
+      expect(existsSync(path), path).toBe(true)
+      const manifest = JSON.parse(readFileSync(path, 'utf8')) as { scripts: Record<string, string> }
+      expect(manifest.scripts[script!], `${directory}/${script}`).toBeTruthy()
+    }
+  })
+
   it('names evidence within each producer job and distinguishes matrix legs and retries', () => {
     const ci = workflow('ci')
     expect(Object.values(ci.env ?? {}).some(value => value.includes('strategy.') || value.includes('github.job'))).toBe(false)
@@ -52,16 +64,27 @@ describe('public gate and workflow wiring', () => {
     } finally { vi.unstubAllEnvs() }
   })
 
-  it('blocks the aggregate on selected Android checks and executes pinned Ruff in Python CI', () => {
+  it('keeps Android manual-only and executes pinned Ruff in required Python CI', () => {
     const jobs = workflow('ci').jobs
-    expect(jobs['all-checks-passed']!.needs).toContain('android-build')
-    expect(jobs['all-checks-passed']!.needs).toContain('android-bridge')
-    expect(jobs['all-checks-passed']!.steps![0]!.if).toContain('needs.android-bridge.result')
+    expect(jobs['all-checks-passed']!.needs).not.toContain('android-build')
+    expect(jobs['all-checks-passed']!.needs).not.toContain('android-bridge')
+    expect(jobs['all-checks-passed']!.steps![0]!.if).not.toContain('needs.android-bridge.result')
+    for (const id of ['android-build', 'android-bridge']) {
+      expect(jobs[id]!.if).toBe("github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'")
+    }
     expect(jobs['python-sdk']!.steps!.some(step => step.run?.includes('--locked --project python/sdk --group quality ruff check'))).toBe(true)
     expect(jobs['android-build']!.steps!.some(step => step.run === 'pnpm run check:android')).toBe(true)
+    expect(jobs['android-build']!.steps!.find(step => step.uses?.startsWith('android-actions/setup-android@'))?.with?.packages).toBe('platform-tools')
     expect(jobs['android-bridge']!.steps!.some(step => step.with?.script === 'node scripts/check-android.ts --connected')).toBe(true)
     expect(jobs['android-bridge']!.steps!.some(step => step.with?.name === '${{ needs.android-build.outputs.apk_artifact }}')).toBe(true)
     expect(jobs['android-bridge']!.steps!.some(step => step.run?.includes('assemble'))).toBe(false)
+  })
+
+  it('prepares a functioning kernel sandbox before source compatibility smokes', () => {
+    const steps = workflow('ci').jobs['node-compat']!.steps!
+    const prepare = steps.findIndex(step => step.run === 'bash scripts/prepare-ci-bubblewrap.sh')
+    expect(prepare).toBeGreaterThanOrEqual(0)
+    expect(steps.findIndex(step => step.run === 'pnpm run check:node-compat')).toBeGreaterThan(prepare)
   })
 
   it.each(['release', 'release-vendor', 'python-release', 'landlock-run-release'])(
