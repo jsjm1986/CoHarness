@@ -15,6 +15,12 @@
 import type { WebBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallBlock } from './tool-call-model.ts'
 
+/** Distributive `Omit` over a discriminated union. */
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
+
+/** Web-card data owned by the presenter; render sites add localized labels and classes. */
+export type WebCardModelProps = DistributiveOmit<WebBlockProps, 'labels' | 'className'>
+
 /**
  * Derive the web-card props for a tool call, or null when this call is not a
  * web card and belongs on the generic path.
@@ -36,7 +42,7 @@ import type { ToolCallBlock } from './tool-call-model.ts'
  * @param block - RunningToolCall or ToolResultNode off the snapshot caches.
  * @returns the web-card props, or null for the generic path.
  */
-export function webCardModel(block: ToolCallBlock): WebBlockProps | null {
+export function webCardModel(block: ToolCallBlock): WebCardModelProps | null {
   // Running calls have no result view; the web card is result-only.
   if (!('kind' in block)) return null
   const result = block.resultView

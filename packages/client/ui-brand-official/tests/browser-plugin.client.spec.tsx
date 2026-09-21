@@ -5,6 +5,7 @@ import { cleanup, render } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/index.ts'
 import { OfficialBrandMark, OfficialBrandName } from '../src/client/Brand.tsx'
+import { apply as nodeApply } from '../src/index.ts'
 
 afterEach(() => {
   cleanup()
@@ -75,5 +76,11 @@ describe('official browser-brand plugin', () => {
     expect(mark.container.querySelector('svg')?.getAttribute('class')).toBe('hero-mark')
     mark.rerender(<OfficialBrandMark size={24} />)
     expect(mark.container.querySelector('svg')?.getAttribute('width')).toBe('24')
+  })
+})
+
+describe('ui-brand-official node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

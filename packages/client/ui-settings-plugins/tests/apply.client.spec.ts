@@ -11,6 +11,7 @@ import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/clien
 import type {
   ConfigurablePluginsTabFace, PluginsSettingsSectionInjected,
 } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+import { apply as nodeApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -219,5 +220,11 @@ describe('ui-settings-plugins apply', () => {
     expect(slots.entries('settings.section')).toHaveLength(0)
     expect(slots.spec('settings.plugins.tab')).toBeUndefined()
     expect(slots.spec('settings.plugin.item')).toBeUndefined()
+  })
+})
+
+describe('ui-settings-plugins node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

@@ -13,7 +13,7 @@
 // a labelled button because in a two-outcome decision it is the third real
 // answer, not an escape hatch.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button, IconEditOutline16, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PendingQuestion, PlanReview, QuestionComposerProps } from './contract/slots.ts'
 import css from './PlanReviewPanel.module.css'
@@ -40,6 +40,10 @@ function tooltip(description: string | undefined): { title?: string } {
  * @returns The plan-review takeover for this request.
  */
 export function PlanReviewPanel({ pending, review, t }: PlanReviewPanelProps) {
+  const markdownLabels = useMemo(() => ({
+    code: { copyLabel: t('copy'), copiedLabel: t('copied') },
+    footnotes: t('markdown.footnotes'),
+  }), [t])
   // One-shot latch shaped like the approval takeover's: the panel leaves only
   // when the host's resolved frame lands, so until then a second click must
   // not re-fire. A failed send (rejected receipt / transport) re-arms it and
@@ -67,7 +71,7 @@ export function PlanReviewPanel({ pending, review, t }: PlanReviewPanelProps) {
           {t('plan.header')}
         </div>
         <div className={css.body} data-plan-review-scroll>
-          <MarkdownText text={review.plan} />
+          <MarkdownText text={review.plan} labels={markdownLabels} />
         </div>
         <div className={css.footer}>
           <div className={css.feedback} role="status">{error}</div>

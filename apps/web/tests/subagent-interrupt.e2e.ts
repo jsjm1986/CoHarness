@@ -6,6 +6,7 @@
 // resumed the preserved FIFO order. No browser: the Remote surface is the
 // product surface under test, and subagent-interrupt-ui.e2e.ts owns the
 // composer interaction.
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -29,7 +30,7 @@ async function rpc<T>(baseUrl: string, method: string, payload: unknown): Promis
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       type: 'client-request',
-      rpcId: `interrupt-e2e-${method}-${crypto.randomUUID()}`,
+      rpcId: `interrupt-e2e-${method}-${randomUUID()}`,
       method,
       payload,
     }),
@@ -124,7 +125,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
     const queued = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagents/prompt', {
       args: {
         request: {
-          requestId: crypto.randomUUID(),
+          requestId: randomUUID(),
           parentSessionId: parentId,
           childSessionId: childId,
           mode: 'continuable',
@@ -163,7 +164,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
     const waking = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagents/prompt', {
       args: {
         request: {
-          requestId: crypto.randomUUID(),
+          requestId: randomUUID(),
           parentSessionId: parentId,
           childSessionId: childId,
           mode: 'continuable',

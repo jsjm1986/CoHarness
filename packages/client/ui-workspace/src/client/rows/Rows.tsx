@@ -338,7 +338,7 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
         <span className={css.searchResultTitle}>{result.title}</span>
       </span>
       <span className={css.searchResultMeta}>
-        <span className={css.searchResultWorkspace}>{result.workspace}</span>
+        <span className={css.searchResultWorkspace}>{result.workspace || t('group.ungrouped')}</span>
         {result.snippet !== undefined && (
           <span className={css.searchResultSnippet}>{result.snippet}</span>
         )}

@@ -144,6 +144,7 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
     <RiskConfirmation
       open={confirmation !== null}
       title={t('access.confirm.title')}
+      closeLabel={t('close')}
       description={t('access.confirm.description')}
       acknowledgeLabel={t('access.confirm.acknowledge')}
       cancelLabel={t('access.confirm.cancel')}

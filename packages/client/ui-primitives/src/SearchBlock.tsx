@@ -8,7 +8,7 @@
 // scrolls horizontally instead of folding. Geometry mirrors CodeBlock and
 // TerminalBlock so a search card reads as one family with them.
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { headTailCap } from './head-tail-cap.ts'
 import { useCopyFeedback } from './use-copy-feedback.ts'
@@ -59,20 +59,6 @@ export interface SearchBlockLabels {
   expand: (hidden: number) => string
 }
 
-const DEFAULT_LABELS: SearchBlockLabels = {
-  pathsSummary: (shown, total, truncated) => truncated ? `显示 ${shown} / 共 ${total} 个路径` : `${shown} 个路径`,
-  matchesSummary: (shown, total, files, truncated) => truncated
-    ? `显示 ${shown} / 共 ${total} 处匹配 · ${files} 个文件`
-    : `${shown} 处匹配 · ${files} 个文件`,
-  copy: '复制',
-  copied: '复制成功',
-  noResults: '无结果',
-  collapseAria: '收起结果',
-  expandAria: hidden => `展开其余 ${hidden} 行结果`,
-  collapse: '收起',
-  expand: hidden => `… 其余 ${hidden} 行`,
-}
-
 /** Fields both search shapes carry (the render site positions; this component draws). */
 interface SearchBlockCommon {
   /**
@@ -88,8 +74,8 @@ interface SearchBlockCommon {
   maxLines?: number | undefined
   /** Extra class merged onto the wrapper. */
   className?: string | undefined
-  /** Localized display copy; omitted fields keep the built-in defaults. */
-  labels?: Partial<SearchBlockLabels> | undefined
+  /** Localized display copy supplied by the owning render site. */
+  labels: SearchBlockLabels
 }
 
 /** Props for the grouped-matches (`grep`) shape. */
@@ -214,11 +200,7 @@ function rowKey(row: SearchRow): string {
  * @returns the search block element.
  */
 export function SearchBlock(props: SearchBlockProps) {
-  const { truncated, total, maxLines = DEFAULT_SEARCH_MAX_LINES, className, labels } = props
-  const copy = useMemo<SearchBlockLabels>(
-    () => (labels === undefined ? DEFAULT_LABELS : { ...DEFAULT_LABELS, ...labels }),
-    [labels],
-  )
+  const { truncated, total, maxLines = DEFAULT_SEARCH_MAX_LINES, className, labels: copy } = props
   const [expanded, setExpanded] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set())
 

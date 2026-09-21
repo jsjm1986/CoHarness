@@ -112,6 +112,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
       <RiskConfirmation
         open={confirmingFullAccess}
         title={t('confirm.title')}
+        closeLabel={t('close')}
         description={t('confirm.description')}
         acknowledgeLabel={t('confirm.acknowledge')}
         cancelLabel={t('confirm.cancel')}

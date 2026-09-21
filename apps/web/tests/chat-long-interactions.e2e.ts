@@ -158,7 +158,7 @@ describe('web e2e: long Chat interaction contract', () => {
     // below could not number its child. One cold read writes the row back,
     // exactly as the fuller read ladder does for an opened session.
     const seededLog = await scaffold.ctx.sessionPersistence.load(SessionId(SESSION_ID))
-    await scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(seededLog.meta, seededLog.inheritedEventCount, seededLog.events)
+    scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(seededLog.meta, seededLog.inheritedEventCount, seededLog.events)
     browser = await chromium.launch()
     page = await newEnglishPage(browser, 900)
     tripwire = watchConsole(page)

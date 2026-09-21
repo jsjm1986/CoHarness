@@ -56,7 +56,7 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, inspect,
       variant={model.variant}
       toolName={toolName}
       icon={VARIANT_ICONS[model.variant]}
-      title={model.title}
+      title={t(model.titleKey)}
       // A terminal presenter's description is the contract's above-card text, so
       // it outranks the args-derived summary here exactly as it does in BashRow;
       // a search result view's replacement title outranks it the same way.

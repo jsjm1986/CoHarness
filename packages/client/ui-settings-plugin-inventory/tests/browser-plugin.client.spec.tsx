@@ -9,6 +9,7 @@ import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, NS } from '../src/client/index.ts'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInventorySettingsTab.tsx'
+import { apply as nodeApply } from '../src/index.ts'
 
 usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
@@ -89,5 +90,11 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)
     expect(() => b.locale.register(NS, 'zh', {})).not.toThrow()
     await b.ctx.fiber.dispose()
+  })
+})
+
+describe('ui-settings-plugin-inventory node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

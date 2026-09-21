@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TrajectoryMobileFeed, type TrajectoryMobileFeedItem } from '../src/client/TrajectoryMobileFeed.tsx'
 import type { TrajectoryCellProps } from '../src/client/trajectory-record.ts'
+import { t } from './locale.client.ts'
 
 const cell = (over: Partial<TrajectoryCellProps> = {}): TrajectoryCellProps => ({
   index: 1,
@@ -40,6 +41,7 @@ function mount(items: readonly TrajectoryMobileFeedItem[] = [item()]) {
   const onToggleAssistant = vi.fn()
   const view = render(
     <TrajectoryMobileFeed
+      t={t}
       items={items}
       logicalCount={items.length}
       scrollReady

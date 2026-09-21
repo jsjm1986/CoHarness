@@ -15,7 +15,7 @@
 export type ContextRole = 'inject' | 'recall'
 
 /** Role and producer name presented for one logged non-user message. */
-export interface ContextProvenanceView {
+export interface ContextProducerView {
   /** The role this context plays in the model-facing conversation. */
   role: ContextRole
   /**
@@ -81,7 +81,7 @@ export function sessionRecallLabels(source: unknown): string[] {
  * @param source - the logged `user/message` source, exactly as recorded.
  * @returns the role and producer name to present for this context.
  */
-export function contextProvenance(source: unknown): ContextProvenanceView {
+export function contextProducer(source: unknown): ContextProducerView {
   const record = asRecord(source)
   const kind = record === null ? null : readString(record, 'kind')
   if (record === null || kind === null) return { role: 'inject', label: null }

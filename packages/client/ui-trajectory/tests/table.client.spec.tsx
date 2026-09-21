@@ -3,8 +3,52 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { TrajectoryTable } from '../src/client/TrajectoryTable.tsx'
+import type { ComponentProps } from 'react'
+import { TrajectoryTable as LocalizedTrajectoryTable } from '../src/client/TrajectoryTable.tsx'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
+import { t } from './locale.client.ts'
+
+function TrajectoryTable(
+  props: Omit<ComponentProps<typeof LocalizedTrajectoryTable>, 't'>,
+) {
+  const inferred: Array<NonNullable<typeof props.requestNumbers>[number] & { firstIndex: number }> = []
+  for (const turn of props.turns) {
+    for (const group of turn.groups) {
+      const step = /^Step (\d+)$/.exec(group.title)?.[1]
+      const compaction = /^Compaction (\d+)$/.exec(group.title)?.[1]
+      const firstIndex = group.cells[0]?.index ?? Number.MAX_SAFE_INTEGER
+      if (compaction !== undefined) {
+        inferred.push({
+          turn: turn.turn,
+          step: 0,
+          seq: Number(compaction),
+          group: group.title,
+          number: 0,
+          purpose: 'compaction',
+          firstIndex,
+        })
+      } else if (step !== undefined && turn.turn !== null) {
+        inferred.push({
+          turn: turn.turn,
+          step: Number(step),
+          group: group.title,
+          number: 0,
+          firstIndex,
+        })
+      }
+    }
+  }
+  const requestNumbers = props.requestNumbers ?? inferred
+    .sort((left, right) => left.firstIndex - right.firstIndex)
+    .map(({ firstIndex: _firstIndex, ...request }, index) => ({ ...request, number: index + 1 }))
+  return (
+    <LocalizedTrajectoryTable
+      {...props}
+      requestNumbers={requestNumbers}
+      t={t}
+    />
+  )
+}
 
 afterEach(() => {
   cleanup()

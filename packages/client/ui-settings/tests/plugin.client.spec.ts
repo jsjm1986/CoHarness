@@ -10,6 +10,7 @@ import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject } from '../src/client/index.ts'
 import { SettingsSchemaService } from '../src/client/schema.ts'
 import { SettingsScopeBinder } from '../src/client/settings-scope.ts'
+import { apply as nodeApply } from '../src/index.ts'
 
 /** Boot the browser half over a fake connection and test remote events. */
 function bench(isLoopback = true) {
@@ -63,5 +64,11 @@ describe('settings domain base plugin', () => {
     ctx.emit('connection/reset')
     await Promise.resolve()
     expect(describeCall).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ui-settings node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

@@ -3,8 +3,14 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { useRef, type ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CodeBlock } from '../src/markdown/CodeBlock.tsx'
+import type { ComponentProps } from 'react'
+import { CodeBlock as LocalizedCodeBlock } from '../src/markdown/CodeBlock.tsx'
 import { useViewportHighlighting } from '../src/markdown/useViewportHighlighting.ts'
+import { markdownLabels } from './labels.client.ts'
+
+function CodeBlock(props: Omit<ComponentProps<typeof LocalizedCodeBlock>, 'copyLabel' | 'copiedLabel'>) {
+  return <LocalizedCodeBlock {...props} {...markdownLabels.code} />
+}
 
 class IntersectionObserverStub {
   static instances: IntersectionObserverStub[] = []

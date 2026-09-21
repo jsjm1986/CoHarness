@@ -19,30 +19,23 @@ import {
   collectReferenceTargets, createReferenceTargets, renderBlocks, renderFootnoteSection,
   wrapBlockChildren,
 } from './render.tsx'
-import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
+import type { MarkdownFileMentions, MarkdownLabels, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
 import 'katex/dist/katex.min.css'
 import css from './MarkdownText.module.css'
 
 export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels } from './render.tsx'
 
-const DEFAULT_LABELS: MarkdownLabels = {
-  code: { copyLabel: '复制', copiedLabel: '复制成功' },
-  footnotes: 'Footnotes',
-}
-
 /** One settled full render: parse with math, resolve references, append the footnote section. */
 function renderSettled(
   text: string,
-  codeLabels: MarkdownCodeLabels | undefined,
+  labels: MarkdownLabels,
   fileMentions: MarkdownFileMentions | undefined,
-  labels: MarkdownLabels = DEFAULT_LABELS,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
   collectReferenceTargets(root.children, targets)
   const context: MarkdownRenderContext = {
     streaming: false,
-    codeLabels,
     labels,
     fileMentions,
     targets,
@@ -74,11 +67,8 @@ class StreamingRenderer {
   private lastText: string | null = null
   private lastRendered: ReactNode[] = []
 
-  /** @param codeLabels - Fence copy labels baked into cached elements; the owner replaces the renderer when they change. */
-  constructor(
-    private readonly codeLabels: MarkdownCodeLabels | undefined,
-    private readonly labels: MarkdownLabels = DEFAULT_LABELS,
-  ) {}
+  /** @param labels - Localized Markdown chrome baked into cached elements; the owner replaces the renderer when it changes. */
+  constructor(private readonly labels: MarkdownLabels) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -110,7 +100,6 @@ class StreamingRenderer {
     if (newlyFrozen.length > 0) {
       const frozenContext: MarkdownRenderContext = {
         streaming: true,
-        codeLabels: this.codeLabels,
         labels: this.labels,
         fileMentions: undefined,
         targets: frameTargets,
@@ -129,7 +118,6 @@ class StreamingRenderer {
     }
     const tailContext: MarkdownRenderContext = {
       streaming: true,
-      codeLabels: this.codeLabels,
       labels: this.labels,
       fileMentions: undefined,
       targets: frameTargets,
@@ -153,8 +141,8 @@ class StreamingRenderer {
  * Render untrusted assistant-authored Markdown as semantic React elements.
  * @param props - Markdown source text preserved by the session projection;
  * `streaming` renders fences and TeX plain (highlighting and KaTeX land on
- * the finalize swap) and parses incrementally across chunks; `codeLabels`
- * forwards localized copy-button labels to fence CodeBlocks — pass a
+ * the finalize swap) and parses incrementally across chunks; `labels` is the
+ * localized Markdown chrome baked into rendered elements — pass a
  * reference-stable object (memoized per locale revision), because a new
  * identity discards the streaming render cache mid-message. `fileMentions`
  * links inline-code tokens its resolver recognizes as real files; this is
@@ -165,37 +153,27 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, labels = DEFAULT_LABELS, fileMentions }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels, fileMentions }: {
   text: string
   streaming?: boolean
-  codeLabels?: MarkdownCodeLabels | undefined
-  labels?: MarkdownLabels
+  labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
 }) {
-  const effectiveLabels = useMemo(
-    () => (labels === DEFAULT_LABELS && codeLabels !== undefined
-      ? { ...DEFAULT_LABELS, code: codeLabels }
-      : labels),
-    [codeLabels, labels],
-  )
   const streamRef = useRef<StreamingRenderer | null>(null)
-  const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
-  const streamFullLabelsRef = useRef<MarkdownLabels>(effectiveLabels)
+  const streamLabelsRef = useRef<MarkdownLabels>(labels)
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, codeLabels, fileMentions, effectiveLabels)
+      return renderSettled(text, labels, fileMentions)
     }
     if (
       streamRef.current === null
-      || streamLabelsRef.current !== codeLabels
-      || streamFullLabelsRef.current !== effectiveLabels
+      || streamLabelsRef.current !== labels
     ) {
-      streamRef.current = new StreamingRenderer(codeLabels, effectiveLabels)
-      streamLabelsRef.current = codeLabels
-      streamFullLabelsRef.current = effectiveLabels
+      streamRef.current = new StreamingRenderer(labels)
+      streamLabelsRef.current = labels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, codeLabels, effectiveLabels, fileMentions])
+  }, [text, streaming, labels, fileMentions])
   return <div className={css.markdown}>{children}</div>
 })

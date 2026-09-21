@@ -118,7 +118,7 @@ export {
   readApiResponseText,
 } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type {
-  AssistantBlock, AssistantMessageNode, AssistantProvenanceView, AssistantRequestConfig,
+  AssistantBlock, AssistantMessageNode, AssistantProviderMetadataView, AssistantRequestConfig,
   AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
   CommandNode, CompactionSummaryNode, ComposerPhase,
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
@@ -133,14 +133,14 @@ export {
 } from './sessions/conversation.ts'
 export { emptyAssistantBlock, IncrementalAssistantBlocks } from './sessions/partial.ts'
 export { isTokenDelta } from './sessions/assistant-timing.ts'
-export { contextForm, contextProvenance, sessionRecallLabels } from './sessions/context-provenance.ts'
+export { contextForm, contextProducer, sessionRecallLabels } from './sessions/context-producer.ts'
 export { displayFailureMessage, isSessionPersistenceFailureMessage } from './sessions/failure-display.ts'
 export type {
   ConversationContext, ConversationContextOriginKind,
 } from './sessions/conversation-context.ts'
 export type {
-  ContextProvenanceView, ContextRole, KnownContextForm,
-} from './sessions/context-provenance.ts'
+  ContextProducerView, ContextRole, KnownContextForm,
+} from './sessions/context-producer.ts'
 export type {
   ConversationPromptSnapshot, RequestInspectionSnapshot, RequestPromptChange, RequestView,
 } from './sessions/request-inspection.ts'

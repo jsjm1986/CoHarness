@@ -5,6 +5,7 @@ import type { ConversationViewportSnapshot, SessionId } from '@deepseek-ai/dsh-c
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '../src/client/apply.ts'
 import type { WorkbenchCatalog, WorkbenchConversation } from '../src/client/catalog.ts'
+import { apply as nodeApply } from '../src/index.ts'
 
 const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
@@ -324,5 +325,11 @@ describe('workspace file serving', () => {
       // isLoopback hosts serve files natively, so the in-app action stays hidden.
       expect(pane.filesAvailable()).toBe(false)
     } finally { await none.ctx.fiber.dispose(); await h.ctx.fiber.dispose() }
+  })
+})
+
+describe('ui-workbench node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

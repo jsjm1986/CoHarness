@@ -27,10 +27,10 @@ it.each([0, 200])('serves a cold pending queue after %s turns without activating
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ type: 'client-request', rpcId: 'cold-inbox-history', method: 'session.history', payload: { sessionId: id, maxMessages: 1 } }),
     })
-    const body = await response.json() as { result: { ok: boolean; value: { projections: { values: { inbox: unknown } } } } }
+    const body = await response.json() as { result: { ok: boolean; value: { projections: { values: { queuedInbox: unknown } } } } }
     expect(response.status).toBe(200)
     expect(body.result.ok).toBe(true)
-    expect(body.result.value.projections.values.inbox).toMatchInlineSnapshot(`
+    expect(body.result.value.projections.values.queuedInbox).toMatchInlineSnapshot(`
       [
         {
           "id": "cold-pending-message",

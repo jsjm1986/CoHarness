@@ -82,7 +82,7 @@ describe('PlanChip', () => {
       .mockRejectedValueOnce('socket closed')
     setup({ active: true, pending: false }, exitPlanMode)
     fireEvent.click(chip())
-    expect((await screen.findByText('failed to exit plan mode')).getAttribute('title')).toBe('host said no')
+    expect((await screen.findByText('退出 plan mode 失败')).getAttribute('title')).toBe('host said no')
     expect(chip()).toBeTruthy()
 
     fireEvent.click(chip())

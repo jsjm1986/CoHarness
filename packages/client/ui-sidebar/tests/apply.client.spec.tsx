@@ -5,6 +5,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { apply as nodeApply } from '../src/index.ts'
 
 async function bench(declare = true) {
   const ctx = new Context()
@@ -71,5 +72,11 @@ describe('ui-sidebar apply', () => {
     expect(b.slots.spec('sidebar.workspaces')).toBeUndefined()
     expect(b.slots.spec('sidebar.settings.action')).toBeUndefined()
     expect(b.slots.spec('sidebar.footer.action')).toBeUndefined()
+  })
+})
+
+describe('ui-sidebar node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

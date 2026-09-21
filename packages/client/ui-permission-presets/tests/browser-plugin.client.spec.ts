@@ -47,9 +47,12 @@ async function bench() {
   // mutable stub so a spec can republish the host's option table.
   const remote = new TestRemote(ctx)
   let catalog: PermissionCatalog = CATALOG
+  let catalogError: { code: string; message: string } | undefined
   Object.assign(remote, {
     permissionPresets: {
-      catalog: () => Promise.resolve({ ok: true as const, value: catalog }),
+      catalog: () => Promise.resolve(catalogError === undefined
+        ? { ok: true as const, value: catalog }
+        : { ok: false as const, error: catalogError }),
     },
   })
   ctx.slots.register({
@@ -106,6 +109,10 @@ async function bench() {
       catalog = next
       remote.$dispatch('permission-presets/catalog-changed', [])
     },
+    failCatalog: (error: { code: string; message: string }) => {
+      catalogError = error
+      remote.$dispatch('permission-presets/catalog-changed', [])
+    },
     decoration: () => decoration,
     permissionRow: () => ctx.slots.entries('settings.general.item')
       .find(entry => entry.component === PermissionRow),
@@ -158,6 +165,10 @@ describe('ui-permission browser plugin', () => {
     // A projection that vanished between availability and open rejects.
     await expect(c.ui.options({ sessionId: sid('ghost') }, new AbortController().signal))
       .rejects.toThrow(/not available on this host/)
+    // A rejected catalog read surfaces the wire error instead of an empty popup.
+    b.failCatalog({ code: 'unavailable', message: 'host offline' })
+    await expect(c.ui.options(proj, new AbortController().signal))
+      .rejects.toThrow(/permission catalog read failed: unavailable: host offline/)
   })
 
   it('a pick submits the /permission line; rejection and unmatched throw', async () => {

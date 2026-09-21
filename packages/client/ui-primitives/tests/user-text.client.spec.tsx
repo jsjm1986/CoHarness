@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectUserText } from '../src/user-text.tsx'
 
 afterEach(cleanup)
@@ -80,5 +80,40 @@ describe('projectUserText', () => {
   it('falls back to the raw label when the path basename is empty', () => {
     const { container } = render(<>{projectUserText('root @/ here', [])}</>)
     expect(chips(container)).toEqual([{ label: '/', kind: 'folder', title: '@/' }])
+  })
+
+  it('opens decoded files and loaded skills without activating session, folder, or command references', () => {
+    const openFile = vi.fn()
+    const openSkill = vi.fn()
+    const view = render(<div>{projectUserText(
+      '@src/a.ts @"notes a.md" /review @history @dir/ @"dir a/"', ['history'], ['review'], 'skill',
+      { openFile, openSkill },
+    )}</div>)
+    fireEvent.click(view.getByRole('button', { name: 'a.ts' }))
+    fireEvent.click(view.getByRole('button', { name: 'notes a.md' }))
+    fireEvent.click(view.getByRole('button', { name: '/review' }))
+    expect(openFile.mock.calls).toEqual([['src/a.ts'], ['notes a.md']])
+    expect(openSkill).toHaveBeenCalledWith('review')
+    expect(view.container.querySelectorAll('button')).toHaveLength(3)
+    const command = render(<div>{projectUserText('/help', [], ['help'], 'command', { openFile, openSkill })}</div>)
+    expect(command.container.querySelector('button')).toBeNull()
+  })
+
+  it('preserves text-selection gestures and keyboard activation', () => {
+    const openFile = vi.fn()
+    const view = render(<div>{projectUserText('@notes.md', [], [], 'skill', { openFile, openSkill: vi.fn() })}</div>)
+    const button = view.getByRole('button', { name: 'notes.md' })
+    const selection = document.getSelection()!
+    const range = document.createRange()
+    range.selectNodeContents(button)
+    selection.addRange(range)
+    fireEvent.click(button, { detail: 1 })
+    expect(openFile).not.toHaveBeenCalled()
+    fireEvent.click(button, { detail: 0 })
+    expect(openFile).toHaveBeenCalledWith('notes.md')
+    selection.removeAllRanges()
+    openFile.mockClear()
+    fireEvent.click(button, { detail: 2 })
+    expect(openFile).not.toHaveBeenCalled()
   })
 })

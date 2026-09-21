@@ -15,6 +15,7 @@ import type { AssistantBlock } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
+import { markdownLabels } from '../markdown-labels.ts'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import css from './AssistantMarkdown.module.css'
 
@@ -37,7 +38,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
 }: AssistantMarkdownProps) {
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
-  const codeLabels = useMemo(() => ({ copyLabel: t('copy'), copiedLabel: t('copied') }), [t])
+  const labels = useMemo(() => markdownLabels(t), [t])
   const last = blocks.length - 1
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
@@ -57,7 +58,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
             key={i}
             text={block.text}
             streaming={streaming}
-            codeLabels={codeLabels}
+            labels={labels}
             fileMentions={mentions}
           />,
         )

@@ -4,7 +4,7 @@ import type {
   SteeringMessageNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  contextForm, contextProvenance,
+  contextForm, contextProducer,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-agent/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
@@ -134,7 +134,7 @@ const trajectoryMessageDefinition: ConversationNodeDefinition<MessageNode> = {
         time: event.time,
         content: event.data.content,
         source: event.data.source,
-        provenance: contextProvenance(event.data.source),
+        producer: contextProducer(event.data.source),
         form: contextForm(event.data.source),
       }
     }

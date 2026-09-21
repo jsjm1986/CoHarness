@@ -201,14 +201,14 @@ export function TrajectoryView({
         const turn = request?.turn ?? node?.turn
         const step = request?.step ?? node?.step
         if (turn === undefined || step === undefined) continue
-        const provider = request?.provenance?.provider ?? node?.provenance?.provider
-        const model = request?.provenance?.model ?? node?.provenance?.model
+        const provider = request?.providerMetadata?.provider ?? node?.providerMetadata?.provider
+        const model = request?.providerMetadata?.model ?? node?.providerMetadata?.model
         const requestConfig = request?.requestConfig ?? node?.requestConfig
         numbered.push({
           seq: entry.seq,
           turn,
           step,
-          group: `Step ${step}`,
+          group: t('group.step', { step }),
           number: index + 1,
           ...(request?.status === undefined ? {} : { status: request.status }),
           ...(request?.startedAt === undefined ? {} : { startedAt: request.startedAt }),
@@ -233,7 +233,7 @@ export function TrajectoryView({
         seq: request.startSeq,
         turn: request.turn,
         step: 0,
-        group: `Compaction ${request.startSeq}`,
+        group: t('group.compaction', { seq: request.startSeq }),
         number: index + 1,
         purpose: 'compaction',
         status: request.status,
@@ -241,12 +241,12 @@ export function TrajectoryView({
         completedAt: request.completedAt,
         ...(request.error === undefined ? {} : { error: request.error }),
         resultSeq: request.startSeq,
-        ...(request.provenance?.provider === undefined
+        ...(request.providerMetadata?.provider === undefined
           ? {}
-          : { provider: request.provenance.provider }),
-        ...(request.provenance?.model === undefined
+          : { provider: request.providerMetadata.provider }),
+        ...(request.providerMetadata?.model === undefined
           ? {}
-          : { model: request.provenance.model }),
+          : { model: request.providerMetadata.model }),
         ...(request.requestConfig === undefined ? {} : { requestConfig: request.requestConfig }),
         ...(usage === undefined ? {} : { usage }),
         ...(cumulativeUsage === undefined ? {} : { cumulativeUsage }),
@@ -255,7 +255,7 @@ export function TrajectoryView({
 
     return numbered
   }, [
-    nodes, requests,
+    nodes, requests, t,
   ])
   const partialTurn = partial?.turn ?? null
   const partialStep = partial?.step ?? null
@@ -269,11 +269,11 @@ export function TrajectoryView({
       runningCalls,
       requests,
       callSchemas,
-    })
+    }, t)
     return { turns, lastIndex: lastCellIndex(turns) }
   }, [
     nodes, eventLocations, partialTurn, partialStep,
-    runningCalls, requests, callSchemas,
+    runningCalls, requests, callSchemas, t,
   ])
   const timelinePartialSignature = partialStructureSignature(partial)
   const timelinePartial = useMemo<ConversationSnapshot['partial']>(() => partial === null
@@ -285,15 +285,15 @@ export function TrajectoryView({
     },
   [partialStep, partialTurn, timelinePartialSignature])
   const timelineTurns = useMemo(
-    () => appendTrajectoryPartialLayout(finalized.turns, timelinePartial, finalized.lastIndex),
-    [finalized, timelinePartial],
+    () => appendTrajectoryPartialLayout(finalized.turns, timelinePartial, finalized.lastIndex, t),
+    [finalized, timelinePartial, t],
   )
   const timelineMode: TrajectoryTimelineMode = actualDuration
     ? actualTime ? 'actual' : 'duration'
     : actualTime ? 'time' : 'sequence'
   const partialSearchTurns = useMemo(
-    () => appendTrajectoryPartialLayout([], partial, finalized.lastIndex),
-    [finalized.lastIndex, partial],
+    () => appendTrajectoryPartialLayout([], partial, finalized.lastIndex, t),
+    [finalized.lastIndex, partial, t],
   )
   const searchLayouts = useMemo(
     () => [finalized.turns, partialSearchTurns] as const,
@@ -473,6 +473,7 @@ export function TrajectoryView({
         t={t}
       />
       <TrajectoryTimeline
+        t={t}
         turns={timelineTurns}
         mode={timelineMode}
         range={timelineRange}
@@ -486,6 +487,7 @@ export function TrajectoryView({
       />
       <div className={css.ledger}>
         <TrajectoryTable
+          t={t}
           compact={compact}
           requestNumbers={requestNumbers}
           turns={timelineTurns}

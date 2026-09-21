@@ -4,8 +4,12 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { UsageAlert } from '../src/client/UsageAlert.tsx'
 import { apply, inject, type UsageAlertInjected, type UsageView } from '../src/client/index.ts'
+import { zh } from '../src/client/locales.ts'
+
+const t = makeTranslate(zh)
 import { apply as nodeApply } from '../src/index.ts'
 
 afterEach(() => {
@@ -16,6 +20,7 @@ afterEach(() => {
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
+  ctx.provide('locale', { register: () => () => {} })
   ctx.slots.register({
     name: 'root',
     children: { 'shell.overlay': { kind: 'list', scope: 'global' } },
@@ -38,6 +43,7 @@ function deferred<T>() {
 }
 
 const kit = {
+  t,
   useSessions: (() => { throw new Error('unused by usage alert') }) as never,
   useWorkspaces: (() => { throw new Error('unused by usage alert') }) as never,
 }

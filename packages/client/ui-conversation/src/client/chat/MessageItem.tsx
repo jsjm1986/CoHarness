@@ -102,7 +102,7 @@ function ModelRetryItem({ node, active, t }: {
       <div className={css.retryDetails}>
         <div>
           <span className={css.retryDetailLabel}>{t('message.retry.delay')}</span>
-          {Math.round(node.delayMs)}ms
+          {t('duration.milliseconds', { milliseconds: Math.round(node.delayMs) })}
         </div>
         <div>
           <span className={css.retryDetailLabel}>{t('message.retry.failure')}</span>
@@ -369,7 +369,7 @@ export const ContextMessageNodeView = memo(function ContextMessageNodeView({ nod
     <ContextInjectionRow
       content={data.content}
       source={data.source}
-      provenance={data.provenance}
+      producer={data.producer}
       form={data.form}
       t={t}
     />

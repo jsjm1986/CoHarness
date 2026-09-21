@@ -35,18 +35,23 @@ function navIcon(id: string) {
   return <IconSettingsOutline16 className={css.navIcon} size={16} />
 }
 
+/** Compact-rail label keys per known section id; other ids show their full label. */
+const COMPACT_NAV_KEYS = {
+  general: 'nav.compact.general',
+  models: 'nav.compact.models',
+  plugins: 'nav.compact.plugins',
+  'agent-presets': 'nav.compact.presets',
+} as const
+
 /** Short labels keep the compact tab rail scannable on 320px phones. */
-function compactNavLabel(id: string, label: string): string {
-  if (id === 'general') return label === '通用设置' ? '通用' : 'General'
-  if (id === 'models') return label === '模型' ? '模型' : 'Models'
-  if (id === 'plugins') return label === '插件' ? '插件' : 'Plugins'
-  if (id === 'agent-presets') return label === 'Agent 预设' ? '预设' : 'Presets'
-  return label
+function compactNavLabel(id: string, label: string, t: PanelProps['t']): string {
+  return id in COMPACT_NAV_KEYS ? t(COMPACT_NAV_KEYS[id as keyof typeof COMPACT_NAV_KEYS]) : label
 }
 
 type PanelProps = {
   rows: readonly SettingsSectionRow[]
   renderSlot: SettingsRootComponentProps['renderSlot']
+  t: SettingsRootComponentProps['t']
   activeId: string | undefined
   onSelect: (id: string) => void
   onClose: () => void
@@ -59,7 +64,7 @@ type PanelProps = {
  * header button, a mask click, and document-level Escape (mounted only while
  * open, so the listener lifetime is the panel's).
  */
-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, settingsScope, projectId }: PanelProps) {
+function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, settingsScope, projectId }: PanelProps) {
   // Entries can unmount underneath the requested id, so the render-time
   // projection falls back to the first row when the id is gone.
   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
@@ -126,7 +131,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, settings
                 {navIcon(row.id)}
                 <span className={css.navLabel}>
                   <span className={css.navLabelFull}>{row.label}</span>
-                  <span className={css.navLabelCompact}>{compactNavLabel(row.id, row.label)}</span>
+                  <span className={css.navLabelCompact}>{compactNavLabel(row.id, row.label, t)}</span>
                 </span>
               </button>
             ))}
@@ -272,6 +277,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
         <SettingsPanel
           rows={rows}
           renderSlot={renderSlot}
+          t={t}
           activeId={activeId}
           onSelect={setActiveId}
           onClose={close}

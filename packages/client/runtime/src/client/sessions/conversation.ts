@@ -16,7 +16,7 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type { PendingInteraction } from './pending.ts'
-import type { ContextProvenanceView, KnownContextForm } from './context-provenance.ts'
+import type { ContextProducerView, KnownContextForm } from './context-producer.ts'
 import type {
   ChatConversationViewNode, ConversationTimelineSnapshot, ConversationViewSnapshotStore,
 } from '../contract/conversation.ts'
@@ -35,7 +35,7 @@ export interface AssistantRequestConfig {
 }
 
 /** Stable provider/model identity reported for one completed request. */
-export interface AssistantProvenanceView {
+export interface AssistantProviderMetadataView {
   provider: string
   model: string
 }
@@ -142,7 +142,7 @@ export interface AssistantMessageNode {
   step: number
   blocks: readonly AssistantBlock[]
   usage?: unknown
-  provenance?: AssistantProvenanceView
+  providerMetadata?: AssistantProviderMetadataView
   requestConfig?: AssistantRequestConfig
   /** Timing derived from the recorded step/chunk/message event sequence. */
   timing?: AssistantTiming
@@ -172,8 +172,8 @@ export interface ContextMessageNode {
   time: number
   content: readonly ContentBlock[]
   source: unknown
-  /** Role and producer name projected from `source` ({@link contextProvenance}). */
-  provenance: ContextProvenanceView
+  /** Role and producer name projected from `source` ({@link contextProducer}). */
+  producer: ContextProducerView
   /** Producer-declared information form ({@link contextForm}); null presents as opaque. */
   form: KnownContextForm | null
 }

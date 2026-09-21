@@ -20,6 +20,7 @@ import {
   workflowRunDefinition, type WorkflowRunChatData,
 } from '../src/client/workflow-definition.ts'
 import type {} from '../src/client/index.ts'
+import { apply as nodeApply } from '../src/index.ts'
 
 afterEach(cleanup)
 
@@ -869,4 +870,10 @@ describe('plugin lifecycle', () => {
     await replacement.dispose()
   })
 
+})
+
+describe('ui-workflow-run node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
+  })
 })

@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
+import { productWebBundleIsolation } from './product-isolation.ts'
 
 const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url))
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
@@ -137,7 +138,7 @@ function npmPackageOf(id: string): string | undefined {
 }
 
 export default defineConfig({
-  plugins: [rejectStandaloneServe(), clientDocumentTitle(), react()],
+  plugins: [rejectStandaloneServe(), clientDocumentTitle(), react(), productWebBundleIsolation(src('../..'), src('.'))],
   build: {
     sourcemap: true,
     rollupOptions: {

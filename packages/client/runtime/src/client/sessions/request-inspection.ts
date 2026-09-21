@@ -1,10 +1,10 @@
 import type { ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm/types'
 import type {
-  AssistantProvenanceView, AssistantRequestConfig,
+  AssistantProviderMetadataView, AssistantRequestConfig,
 } from './conversation.ts'
 
 export type {
-  AssistantProvenanceView, AssistantRequestConfig,
+  AssistantProviderMetadataView, AssistantRequestConfig,
 } from './conversation.ts'
 
 /** Complete model-visible request header in force for an ordinary generation. */
@@ -37,7 +37,7 @@ interface RequestViewBase {
   completedAt: number | null
   status: 'running' | 'complete' | 'error'
   error?: string
-  provenance?: AssistantProvenanceView
+  providerMetadata?: AssistantProviderMetadataView
   requestConfig?: AssistantRequestConfig
   usage?: unknown
   /** Assistant message or compaction summary sequence produced by this request. */

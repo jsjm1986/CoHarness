@@ -21,11 +21,11 @@ import { CONVERSATION_NS as NS } from '../../locale.ts'
 /** Full row props: the toolview runtime share plus the standard locale seat. */
 type WebRowProps = ToolCallViewProps & PropsLocale<'conversation'>
 
-/** web_fetch reads one URL; web_search queries. Titles are figma literals. */
-const WEB_TITLES: Record<string, string> = {
-  web_search: 'Search',
-  web_fetch: 'Fetch',
-}
+/** web_fetch reads one URL; web_search queries. */
+const WEB_TITLE_KEYS = {
+  web_search: 'tool.title.webSearch',
+  web_fetch: 'tool.title.webFetch',
+} as const
 
 /**
  * Web row: icon + Search/Fetch · {summary} in the shared ToolRow chrome, with
@@ -43,7 +43,9 @@ export function WebRow({ toolName, block, inspect, t }: WebRowProps) {
       variant={model.variant}
       toolName={toolName}
       icon={icon}
-      title={WEB_TITLES[toolName] ?? model.title}
+      title={t(toolName === 'web_search'
+        ? WEB_TITLE_KEYS.web_search
+        : toolName === 'web_fetch' ? WEB_TITLE_KEYS.web_fetch : model.titleKey)}
       summary={model.summary}
       bodyRaw={null}
       output={model.output}

@@ -10,6 +10,7 @@ import {
 import type { TrajectoryCellKind, TrajectoryCellProps } from './trajectory-record.ts'
 import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
 import { trajectoryPreviewText } from './trajectory-preview.ts'
+import type { TrajectoryKey, TrajectoryTranslate } from './locales.ts'
 import css from './TrajectoryMobileFeed.module.css'
 
 /** Minimal record projection consumed by the compact event feed. */
@@ -52,6 +53,8 @@ export interface TrajectoryMobileRequestSelection {
 
 /** Compact feed presenter props. */
 export interface TrajectoryMobileFeedProps {
+  /** Trajectory locale seat. */
+  t: TrajectoryTranslate
   items: readonly TrajectoryMobileFeedItem[]
   logicalCount: number
   scrollReady: boolean
@@ -71,14 +74,14 @@ export interface TrajectoryMobileFeedProps {
 
 type RecordState = 'complete' | 'running' | 'error'
 
-const KIND_LABEL: Record<TrajectoryCellKind, string> = {
-  system: 'SYSTEM',
-  user: 'USER',
-  context: 'CONTEXT',
-  compacted: 'COMPACTED',
-  message: 'ASSISTANT',
-  tool: 'TOOL',
-  subtool: 'SUBTOOL',
+const KIND_LABEL_KEY: Record<TrajectoryCellKind, TrajectoryKey> = {
+  system: 'kind.system',
+  user: 'kind.user',
+  context: 'kind.context',
+  compacted: 'kind.compacted',
+  message: 'kind.assistant',
+  tool: 'kind.tool',
+  subtool: 'kind.subtool',
 }
 
 function ToolIcon(): ReactNode {
@@ -161,10 +164,10 @@ function stateOf(record: TrajectoryMobileRecord): RecordState {
   return 'complete'
 }
 
-function statusLabel(state: RecordState): string {
-  if (state === 'error') return 'Failed'
-  if (state === 'running') return 'Pending'
-  return 'Completed'
+function statusLabel(state: RecordState, t: TrajectoryTranslate): string {
+  if (state === 'error') return t('status.failed')
+  if (state === 'running') return t('status.pending')
+  return t('status.completed')
 }
 
 function displayText(cell: TrajectoryCellProps): string {
@@ -208,9 +211,11 @@ function timeLabel(cell: TrajectoryCellProps): string | undefined {
   })
 }
 
-function requestLabel(item: TrajectoryMobileFeedItem): string | undefined {
+function requestLabel(item: TrajectoryMobileFeedItem, t: TrajectoryTranslate): string | undefined {
   if (item.request === undefined) return undefined
-  return `Request #${item.request}${item.requestInfo?.purpose === 'compaction' ? ' · Compaction' : ''}`
+  return t(item.requestInfo?.purpose === 'compaction' ? 'request.labelCompaction' : 'request.label', {
+    request: item.request,
+  })
 }
 
 function turnLabel(record: TrajectoryMobileRecord): string | undefined {
@@ -236,6 +241,7 @@ function requestMarkerClass(item: TrajectoryMobileFeedItem): string {
 
 /** Render one compact event stream while keeping the ledger controller in the parent. */
 export function TrajectoryMobileFeed({
+  t,
   items,
   logicalCount,
   scrollReady,
@@ -258,13 +264,13 @@ export function TrajectoryMobileFeed({
       data-trajectory-feed=""
       data-scroll-ready={scrollReady || undefined}
       role="list"
-      aria-label="Trajectory events"
+      aria-label={t('feed.aria')}
       aria-setsize={logicalCount}
     >
       {historyLoading && (
         <div className={css.loading} role="status" aria-live="polite">
           <span className={css.spinner} aria-hidden="true" />
-          Loading trajectory…
+          {t('history.loadingTrajectory')}
         </div>
       )}
       {hasOlderRecords && (
@@ -275,14 +281,14 @@ export function TrajectoryMobileFeed({
             disabled={olderBusy || onLoadOlder === undefined}
             onClick={onLoadOlder}
           >
-            {olderBusy ? 'Loading earlier history…' : 'Load earlier history'}
+            {olderBusy ? t('history.loadingEarlier') : t('history.loadEarlier')}
           </button>
         </div>
       )}
       {virtualTop > 0 && <div className={css.virtualSpacer} style={{ height: virtualTop }} aria-hidden="true" />}
       {items.map((item) => {
         const record = item.record
-        const request = requestLabel(item)
+        const request = requestLabel(item, t)
         const state = stateOf(record)
         const selected = selectedIndex === record.cell.index
         const outside = timelineFocusIndexes !== null
@@ -300,13 +306,13 @@ export function TrajectoryMobileFeed({
         }
         const result = resultText(record.cell)
         const time = timeLabel(record.cell)
-        const duration = formatElapsedSeconds(record.cell.timeSeconds)
+        const duration = formatElapsedSeconds(record.cell.timeSeconds, t)
         const turn = turnLabel(record)
         const ariaLabel = [
           request,
-          KIND_LABEL[record.cell.kind],
+          t(KIND_LABEL_KEY[record.cell.kind]),
           titleOf(record),
-          statusLabel(state),
+          statusLabel(state, t),
           duration === '—' ? undefined : duration,
           time,
         ].filter(value => value !== undefined && value !== '').join(', ')
@@ -368,12 +374,12 @@ export function TrajectoryMobileFeed({
               </span>
               <span className={css.copy}>
                 <span className={css.primaryLine}>
-                  <span className={css.kindLabel}>{KIND_LABEL[record.cell.kind]}</span>
+                  <span className={css.kindLabel}>{t(KIND_LABEL_KEY[record.cell.kind])}</span>
                   <span className={css.title} title={titleOf(record)}>{titleOf(record)}</span>
                 </span>
                 <span className={css.metaLine}>
                   <span className={`${css.statusDot} ${css[`status${state}`]}`} aria-hidden="true" />
-                  <span>{statusLabel(state)}</span>
+                  <span>{statusLabel(state, t)}</span>
                   {duration !== '—' && <span>· {duration}</span>}
                   {time !== undefined && <span>· {time}</span>}
                   {result !== undefined && result !== '' && !summary && (

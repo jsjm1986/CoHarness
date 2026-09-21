@@ -125,7 +125,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
       )}
       {rawBytes !== undefined && imageType === undefined && !denied && (
         <pre className={css.filePreviewText} data-workspace-file-bytes>
-          {labels.binary}\n{rawBytes}
+          {labels.binary}{'\n'}{rawBytes}
         </pre>
       )}
       {!denied && state.value !== undefined && page !== undefined && rawBytes === undefined && (

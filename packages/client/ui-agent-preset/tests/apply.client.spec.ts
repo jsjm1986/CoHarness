@@ -21,6 +21,7 @@ import { AgentPresetSection } from '../src/client/AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from '../src/client/AgentPresetSection.tsx'
 import { AgentPresetSeat } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
+import { apply as nodeApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -616,4 +617,10 @@ it('treats a missing host description as no native-open support', async () => {
   // The section loads its roster even when the host cannot open paths.
   await section.load()
   expect(section.hooks.agentPresetSection.getSnapshot().status).toBe('ready')
+})
+
+describe('ui-agent-preset node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
+  })
 })
