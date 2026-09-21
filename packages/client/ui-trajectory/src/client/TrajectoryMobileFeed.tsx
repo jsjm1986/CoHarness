@@ -8,7 +8,11 @@ import {
   IconUserOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TrajectoryCellKind, TrajectoryCellProps } from './trajectory-record.ts'
-import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
+import {
+  formatElapsedSeconds, trajectoryDisplayHead, trajectoryRecordId,
+  trajectoryRecordState, trajectoryStatusLabel,
+} from './trajectory-record.ts'
+import { CompactedIcon, InformationIcon } from './trajectory-kind-icons.tsx'
 import { trajectoryPreviewText } from './trajectory-preview.ts'
 import type { TrajectoryKey, TrajectoryTranslate } from './locales.ts'
 import css from './TrajectoryMobileFeed.module.css'
@@ -72,8 +76,6 @@ export interface TrajectoryMobileFeedProps {
   onToggleAssistant: (id: string) => void
 }
 
-type RecordState = 'complete' | 'running' | 'error'
-
 const KIND_LABEL_KEY: Record<TrajectoryCellKind, TrajectoryKey> = {
   system: 'kind.system',
   user: 'kind.user',
@@ -102,81 +104,21 @@ function ToolIcon(): ReactNode {
   )
 }
 
-function InformationIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="6.7" />
-      <circle cx="8" cy="5.5" r=".85" fill="currentColor" stroke="none" />
-      <path d="M8 7.75v3.4" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function CompactedIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m2.5 2.5 3.75 3.75M3 6.25h3.25V3" />
-      <path d="m13.5 2.5-3.75 3.75M13 6.25H9.75V3" />
-      <path d="m2.5 13.5 3.75-3.75M3 9.75h3.25V13" />
-      <path d="m13.5 13.5-3.75-3.75M13 9.75H9.75V13" />
-    </svg>
-  )
-}
-
 function kindIcon(kind: TrajectoryCellKind): ReactNode {
   switch (kind) {
     case 'system': return <IconSettingsOutline16 size={16} />
     case 'user': return <IconUserOutline16 size={16} />
-    case 'context': return <InformationIcon />
-    case 'compacted': return <CompactedIcon />
+    case 'context': return <InformationIcon size={16} />
+    case 'compacted': return <CompactedIcon size={16} />
     case 'message': return <IconSparkle16 size={16} />
     case 'tool':
     case 'subtool': return <ToolIcon />
   }
 }
 
-function stateOf(record: TrajectoryMobileRecord): RecordState {
-  if (record.cell.isError) return 'error'
-  if (record.cell.kind === 'compacted' && record.cell.timeSeconds === null) return 'running'
-  if (
-    (record.cell.kind === 'tool' || record.cell.kind === 'subtool')
-    && record.cell.outputDetail === undefined
-  ) return 'running'
-  return 'complete'
-}
-
-function statusLabel(state: RecordState, t: TrajectoryTranslate): string {
-  if (state === 'error') return t('status.failed')
-  if (state === 'running') return t('status.pending')
-  return t('status.completed')
-}
-
 function displayText(cell: TrajectoryCellProps): string {
-  if (cell.previewMarkdown !== undefined) {
-    const preview = trajectoryPreviewText(cell.previewMarkdown)
-    if (cell.text === '') return preview
-    return preview === '' ? cell.text : `${cell.text} · ${preview}`
-  }
-  if (cell.text !== '') return cell.text
+  const head = trajectoryDisplayHead(cell)
+  if (head !== undefined) return head
   const markdown = cell.kind === 'user' || cell.kind === 'context'
     ? cell.inputDetail
     : cell.kind === 'message' || cell.kind === 'compacted'
@@ -229,7 +171,7 @@ function itemClass(item: TrajectoryMobileFeedItem, selected: boolean, outside: b
   if (outside) classes.push(css.itemOutside)
   if (item.record.collapsedSummaryKind !== undefined) classes.push(css.itemSummary)
   if (item.record.cell.isError) classes.push(css.itemError)
-  if (stateOf(item.record) === 'running') classes.push(css.itemRunning)
+  if (trajectoryRecordState(item.record) === 'running') classes.push(css.itemRunning)
   return classes.join(' ')
 }
 
@@ -289,7 +231,7 @@ export function TrajectoryMobileFeed({
       {items.map((item) => {
         const record = item.record
         const request = requestLabel(item, t)
-        const state = stateOf(record)
+        const state = trajectoryRecordState(record)
         const selected = selectedIndex === record.cell.index
         const outside = timelineFocusIndexes !== null
           && record.collapsedSummaryKind === undefined
@@ -312,7 +254,7 @@ export function TrajectoryMobileFeed({
           request,
           t(KIND_LABEL_KEY[record.cell.kind]),
           titleOf(record),
-          statusLabel(state, t),
+          trajectoryStatusLabel(state, t),
           duration === '—' ? undefined : duration,
           time,
         ].filter(value => value !== undefined && value !== '').join(', ')
@@ -379,7 +321,7 @@ export function TrajectoryMobileFeed({
                 </span>
                 <span className={css.metaLine}>
                   <span className={`${css.statusDot} ${css[`status${state}`]}`} aria-hidden="true" />
-                  <span>{statusLabel(state, t)}</span>
+                  <span>{trajectoryStatusLabel(state, t)}</span>
                   {duration !== '—' && <span>· {duration}</span>}
                   {time !== undefined && <span>· {time}</span>}
                   {result !== undefined && result !== '' && !summary && (

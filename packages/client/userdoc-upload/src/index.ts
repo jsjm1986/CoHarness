@@ -290,18 +290,23 @@ function abortError(signal: AbortSignal | undefined): Error {
     : new DOMException('The operation was aborted.', 'AbortError')
 }
 
-function xhrChunk(
-  url: string,
-  body: Blob,
-  start: number,
-  end: number,
-  total: number,
-  digest: string,
-  signal: AbortSignal | undefined,
-  networkError: (status: number) => Error,
-  responseError: (status: number, body: unknown) => Error,
-  onProgress: (loaded: number) => void,
-): Promise<void> {
+interface ChunkRequest {
+  url: string
+  body: Blob
+  start: number
+  end: number
+  total: number
+  digest: string
+  signal: AbortSignal | undefined
+  networkError: (status: number) => Error
+  responseError: (status: number, body: unknown) => Error
+  onProgress: (loaded: number) => void
+}
+
+function xhrChunk(request: ChunkRequest): Promise<void> {
+  const {
+    url, body, start, end, total, digest, signal, networkError, responseError, onProgress,
+  } = request
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     let settled = false
@@ -403,25 +408,14 @@ async function delay(ms: number, signal?: AbortSignal): Promise<void> {
   })
 }
 
-async function uploadChunkWithRetry(
-  url: string,
-  body: Blob,
-  start: number,
-  end: number,
-  total: number,
-  digest: string,
-  signal: AbortSignal | undefined,
-  networkError: (status: number) => Error,
-  responseError: (status: number, body: unknown) => Error,
-  onProgress: (loaded: number) => void,
-): Promise<void> {
+async function uploadChunkWithRetry(request: ChunkRequest): Promise<void> {
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await xhrChunk(url, body, start, end, total, digest, signal, networkError, responseError, onProgress)
+      await xhrChunk(request)
       return
     } catch (error) {
       if (!retryable(error) || attempt >= RETRY_LIMIT) throw error
-      await delay(Math.min(4000, 250 * (2 ** attempt)), signal)
+      await delay(Math.min(4000, 250 * (2 ** attempt)), request.signal)
     }
   }
 }
@@ -460,20 +454,17 @@ export async function resumableUpload(
       await deleteResumeRecord(key)
     }
   }
-  session ??= checkedSession(await options.requestJson<UserDocUploadSession>(endpoint(root, '/uploads', query), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ version: 1, name: file.name, directory: directoryId, bytes: file.size, fingerprint }),
-    ...(signal === undefined ? {} : { signal }),
-  }), file, options.responseError, directoryId)
-  if (session.state === 'failed') {
-    await deleteResumeRecord(key)
-    session = checkedSession(await options.requestJson<UserDocUploadSession>(endpoint(root, '/uploads', query), {
+  const createUploadSession = async (): Promise<UserDocUploadSession> =>
+    checkedSession(await options.requestJson<UserDocUploadSession>(endpoint(root, '/uploads', query), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version: 1, name: file.name, directory: directoryId, bytes: file.size, fingerprint }),
       ...(signal === undefined ? {} : { signal }),
     }), file, options.responseError, directoryId)
+  session ??= await createUploadSession()
+  if (session.state === 'failed') {
+    await deleteResumeRecord(key)
+    session = await createUploadSession()
     if (session.state === 'failed') {
       await deleteResumeRecord(key)
       throw options.responseError(422, session)
@@ -503,11 +494,18 @@ export async function resumableUpload(
     finalHash.update(data)
     if (start >= session.receivedBytes) {
       let sent = 0
-      await uploadChunkWithRetry(
-        endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}/chunks/${String(index)}`, query),
-        new Blob([data]), start, endExclusive - 1, file.size, digest, signal, options.networkError, options.responseError,
-        (loaded) => { sent = loaded; onProgress?.(uploaded + sent, file.size) },
-      )
+      await uploadChunkWithRetry({
+        url: endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}/chunks/${String(index)}`, query),
+        body: new Blob([data]),
+        start,
+        end: endExclusive - 1,
+        total: file.size,
+        digest,
+        signal,
+        networkError: options.networkError,
+        responseError: options.responseError,
+        onProgress: (loaded) => { sent = loaded; onProgress?.(uploaded + sent, file.size) },
+      })
       uploaded = endExclusive
       onProgress?.(uploaded, file.size)
     }

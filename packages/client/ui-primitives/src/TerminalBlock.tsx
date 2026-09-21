@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { parseAnsiLines, type AnsiLine } from './ansi.ts'
 import { headTailCap } from './head-tail-cap.ts'
+import { ExpandButton } from './ExpandButton.tsx'
 import { useCopyFeedback } from './use-copy-feedback.ts'
 import { Pill } from './Pill.tsx'
 import { StateDot, type StateDotState } from './StateDot.tsx'
@@ -244,17 +245,7 @@ export function TerminalBlock({
             {(capped ? lines.slice(0, headLines) : lines).map((line, index) => (
               <div key={index} className={css.line}>{renderLine(line)}</div>
             ))}
-            {hidden > 0 && (
-              <button
-                type="button"
-                className={css.expand}
-                aria-expanded={expanded}
-                aria-label={expanded ? copy.collapseAria : copy.expandAria(hidden)}
-                onClick={onToggle}
-              >
-                {expanded ? copy.collapse : copy.expand(hidden)}
-              </button>
-            )}
+            <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
             {capped && lines.slice(lines.length - tailLines).map((line, index) => (
               <div key={index} className={css.line}>{renderLine(line)}</div>
             ))}

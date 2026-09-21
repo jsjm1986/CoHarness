@@ -192,6 +192,30 @@ interface ServerPageRecord {
   readonly cachedAt?: number
 }
 
+/**
+ * Assemble one cached metadata page from a listing response's paging fields.
+ * @param response - browse response carrying paging metadata.
+ * @param body - resolved row fields for the page.
+ * @returns the cache record.
+ */
+function serverPageRecordFrom(
+  response: {
+    readonly parentDirectoryId?: UserDocDirectoryIdType
+    readonly limits?: UserDocLimits
+    readonly totalDocuments?: number
+    readonly nextCursor?: string
+  },
+  body: Pick<ServerPageRecord, 'documents' | 'directories' | 'directoryId'>,
+): ServerPageRecord {
+  return {
+    ...body,
+    ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
+    limits: response.limits ?? null,
+    totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
+    ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
+  }
+}
+
 interface LegacyListingRecord {
   readonly documents: readonly UserDocRef[]
   readonly directories: readonly UserDocDirectoryRef[]
@@ -199,6 +223,16 @@ interface LegacyListingRecord {
   readonly limits: UserDocLimits | null
   /** Timestamp when this metadata listing entered the mounted manager's cache. */
   readonly cachedAt?: number
+}
+
+interface ScopeListingResponse {
+  readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
+  readonly directories?: readonly UserDocDirectoryRef[]
+  readonly directoryId?: UserDocDirectoryIdType
+  readonly parentDirectoryId?: UserDocDirectoryIdType
+  readonly limits?: UserDocLimits
+  readonly totalDocuments?: number
+  readonly nextCursor?: string
 }
 
 type CacheFreshness = 'fresh' | 'stale'
@@ -705,6 +739,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     setSelectedRecords(new Map())
   }
 
+  const dropSelection = (docId: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.delete(docId)
+      return next
+    })
+    setSelectedRecords((prev) => {
+      if (!prev.has(docId)) return prev
+      const next = new Map(prev)
+      next.delete(docId)
+      return next
+    })
+  }
+
   const selectedDocumentList = (): UserDocRef[] => {
     const result: UserDocRef[] = []
     for (const id of selected) {
@@ -794,6 +842,46 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     setTotalDocuments(pageRecord.totalDocuments)
     setServerTotalDocuments(pageRecord.totalDocuments)
     setServerNextCursor(pageRecord.nextCursor)
+  }
+
+  const applyScopeListingResponse = (
+    response: ScopeListingResponse,
+    fallbackDirectoryId: UserDocDirectoryIdType,
+    scope: UserDocScope,
+  ): void => {
+    const nextDirectoryId = response.directoryId ?? fallbackDirectoryId
+    const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
+    const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
+    const key = emptyListingKey(scope, nextDirectoryId)
+    setDocuments(nextDocuments)
+    setDirectories(nextDirectories)
+    setCurrentDirectoryId(nextDirectoryId)
+    setLimits(response.limits ?? null)
+    setTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : nextDocuments.length)
+    if (isServerPage(response)) {
+      const pageRecord = serverPageRecordFrom(response, {
+        documents: nextDocuments,
+        directories: nextDirectories,
+        directoryId: nextDirectoryId,
+      })
+      rememberServerPage(key, 1, pageRecord)
+      serverLoadedKey.current = key
+      setServerPaging(true)
+      setServerTotalDocuments(pageRecord.totalDocuments)
+      setServerNextCursor(pageRecord.nextCursor)
+      serverPagingRef.current = true
+    } else {
+      rememberLegacyListing(key, {
+        documents: nextDocuments,
+        directories: nextDirectories,
+        directoryId: nextDirectoryId,
+        limits: response.limits ?? null,
+      })
+      setServerPaging(false)
+      setServerTotalDocuments(null)
+      setServerNextCursor(undefined)
+      serverPagingRef.current = false
+    }
   }
 
   const applyCachedListing = (cached: CachedListing<ServerPageRecord>): void => {
@@ -1054,15 +1142,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       if (isServerPage(response)) {
         const requestQuery = query.trim()
         const requestSort = wireSort(parseSort(sortValue))
-        const pageRecord: ServerPageRecord = {
+        const pageRecord = serverPageRecordFrom(response, {
           documents: response.documents,
           directories: response.directories ?? [],
           directoryId: response.directoryId ?? directoryId,
-          ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
-          limits: response.limits ?? null,
-          totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
-          ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
-        }
+        })
         const resolvedScope = scopeResolutionPending.current || scopeCache.current === null
           ? undefined
           : documentScopeOf(scopeCache.current)
@@ -1692,17 +1776,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         } else {
           await userDocs.current.remove(doc.docId)
         }
-        setSelected((prev) => {
-          const next = new Set(prev)
-          next.delete(doc.docId)
-          return next
-        })
-        setSelectedRecords((prev) => {
-          if (!prev.has(doc.docId)) return prev
-          const next = new Map(prev)
-          next.delete(doc.docId)
-          return next
-        })
+        dropSelection(doc.docId)
         setProgress({
           current: index + 1,
           total: targets.length,
@@ -1796,53 +1870,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       limit: PAGE_SIZE, query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
     }, requestSignal).then((rawResponse) => {
       if (requestSignal.aborted || generation !== loadGeneration.current) return
-      const response = rawResponse as {
-        readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
-        readonly directories?: readonly UserDocDirectoryRef[]
-        readonly directoryId?: UserDocDirectoryIdType
-        readonly parentDirectoryId?: UserDocDirectoryIdType
-        readonly limits?: UserDocLimits
-        readonly totalDocuments?: number
-        readonly nextCursor?: string
-      }
+      const response = rawResponse as ScopeListingResponse
       const nextDirectoryId = response.directoryId ?? directoryId
-      const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
-      const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
       const nextKey = emptyListingKey(selectedScope, nextDirectoryId)
       serverLoadedKey.current = nextKey
-      setDocuments(nextDocuments)
-      setDirectories(nextDirectories)
-      setCurrentDirectoryId(nextDirectoryId)
-      setLimits(response.limits ?? null)
-      setTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : nextDocuments.length)
-      if (isServerPage(response)) {
-        const pageRecord: ServerPageRecord = {
-          documents: nextDocuments,
-          directories: nextDirectories,
-          directoryId: nextDirectoryId,
-          ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
-          limits: response.limits ?? null,
-          totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
-          ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
-        }
-        rememberServerPage(nextKey, 1, pageRecord)
-        serverLoadedKey.current = nextKey
-        setServerPaging(true)
-        setServerTotalDocuments(pageRecord.totalDocuments)
-        setServerNextCursor(pageRecord.nextCursor)
-        serverPagingRef.current = true
-      } else {
-        rememberLegacyListing(emptyListingKey(selectedScope, nextDirectoryId), {
-          documents: nextDocuments,
-          directories: nextDirectories,
-          directoryId: nextDirectoryId,
-          limits: response.limits ?? null,
-        })
-        setServerPaging(false)
-        setServerTotalDocuments(null)
-        setServerNextCursor(undefined)
-        serverPagingRef.current = false
-      }
+      applyScopeListingResponse(response, directoryId, selectedScope)
       listingReadyRef.current = true
     }).catch((cause: unknown) => {
       if (generation === loadGeneration.current && !isAbortError(cause, requestSignal)) {
@@ -2033,17 +2065,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       for (const [index, doc] of targets.entries()) {
         if (remoteScopeView) await userDocs.current.moveInScope(selectedScope, doc.docId, moveDirectoryId)
         else await userDocs.current.move(doc.docId, moveDirectoryId)
-        setSelected((prev) => {
-          const next = new Set(prev)
-          next.delete(doc.docId)
-          return next
-        })
-        setSelectedRecords((prev) => {
-          if (!prev.has(doc.docId)) return prev
-          const next = new Map(prev)
-          next.delete(doc.docId)
-          return next
-        })
+        dropSelection(doc.docId)
         const remaining = targets.slice(index + 1)
         setMoveTargets(remaining.length === 0 ? null : remaining)
         setProgress({
@@ -2362,53 +2384,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         const target = selectedScope
         const response = await fetchScopeListing(target, currentDirectoryId, {
           limit: PAGE_SIZE, query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
-        }, requestSignal) as {
-          readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
-          readonly directories?: readonly UserDocDirectoryRef[]
-          readonly directoryId?: UserDocDirectoryIdType
-          readonly parentDirectoryId?: UserDocDirectoryIdType
-          readonly limits?: UserDocLimits
-          readonly totalDocuments?: number
-          readonly nextCursor?: string
-        }
+        }, requestSignal) as ScopeListingResponse
         if (requestSignal.aborted || generation !== loadGeneration.current) return
-        const nextDirectoryId = response.directoryId ?? currentDirectoryId
-        const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
-        const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
-        const key = emptyListingKey(target, nextDirectoryId)
-        setDocuments(nextDocuments)
-        setDirectories(nextDirectories)
-        setCurrentDirectoryId(nextDirectoryId)
-        setLimits(response.limits ?? null)
-        setTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : nextDocuments.length)
-        if (isServerPage(response)) {
-          const pageRecord: ServerPageRecord = {
-            documents: nextDocuments,
-            directories: nextDirectories,
-            directoryId: nextDirectoryId,
-            ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
-            limits: response.limits ?? null,
-            totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
-            ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
-          }
-          rememberServerPage(key, 1, pageRecord)
-          serverLoadedKey.current = key
-          setServerPaging(true)
-          setServerTotalDocuments(pageRecord.totalDocuments)
-          setServerNextCursor(pageRecord.nextCursor)
-          serverPagingRef.current = true
-        } else {
-          rememberLegacyListing(emptyListingKey(target, nextDirectoryId), {
-            documents: nextDocuments,
-            directories: nextDirectories,
-            directoryId: nextDirectoryId,
-            limits: response.limits ?? null,
-          })
-          setServerPaging(false)
-          setServerTotalDocuments(null)
-          setServerNextCursor(undefined)
-          serverPagingRef.current = false
-        }
+        applyScopeListingResponse(response, currentDirectoryId, target)
         listingReadyRef.current = true
         clearSelection()
         setQuery('')
@@ -3387,6 +3365,28 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     )
     : undefined
 
+  const filterControls = (
+    <>
+      <Input
+        className={css.search as string}
+        icon={<IconSearchOutline16 size={16} />}
+        placeholder={t('modal.search')}
+        value={query}
+        onChange={(event) => { setQuery(event.target.value) }}
+      />
+      {!phone && (
+        <>
+          <select className={css.select} aria-label={t('modal.type')} value={typeFilter} onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}>
+            {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+          </select>
+          <select className={css.select} aria-label={t('modal.sort')} value={sortValue} onChange={(event) => { setSortValue(event.currentTarget.value) }}>
+            {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+          </select>
+        </>
+      )}
+    </>
+  )
+
   return (
     <>
       <Modal
@@ -3462,23 +3462,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                       <Button type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{t('modal.refresh')}</Button>
                     </div>
                   </header>
-                  <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>
-                    <Input
-                      className={css.search as string}
-                      icon={<IconSearchOutline16 size={16} />}
-                      placeholder={t('modal.search')}
-                      value={query}
-                      onChange={(event) => { setQuery(event.target.value) }}
-                    />
-                    {!phone && <>
-                      <select className={css.select} aria-label={t('modal.type')} value={typeFilter} onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}>
-                        {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
-                      </select>
-                      <select className={css.select} aria-label={t('modal.sort')} value={sortValue} onChange={(event) => { setSortValue(event.currentTarget.value) }}>
-                        {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
-                      </select>
-                    </>}
-                  </div>
+                  <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
                   {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
                   {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewFiltered.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
                     <div className={css.overviewList} role="list" data-documents-scrollport="overview">
@@ -3629,39 +3613,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                 )}
 
                 <div className={css.toolbar}>
-                  <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>
-                    <Input
-                      className={css.search as string}
-                      icon={<IconSearchOutline16 size={16} />}
-                      placeholder={t('modal.search')}
-                      value={query}
-                      onChange={(event) => { setQuery(event.target.value) }}
-                    />
-                    {!phone && (
-                      <>
-                        <select
-                          className={css.select}
-                          aria-label={t('modal.type')}
-                          value={typeFilter}
-                          onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
-                        >
-                          {TYPE_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>{t(option.label)}</option>
-                          ))}
-                        </select>
-                        <select
-                          className={css.select}
-                          aria-label={t('modal.sort')}
-                          value={sortValue}
-                          onChange={(event) => { setSortValue(event.currentTarget.value) }}
-                        >
-                          {SORT_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>{t(option.label)}</option>
-                          ))}
-                        </select>
-                      </>
-                    )}
-                  </div>
+                  <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
                   <div className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`} role="group" aria-label={t('modal.actions')}>
                     <input
                       ref={fileInputRef}

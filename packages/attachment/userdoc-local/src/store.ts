@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { constants, type Stats } from 'node:fs'
 import { lstat, link, mkdir, open, readdir, realpath, rename, rmdir, unlink } from 'node:fs/promises'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import {
   DOCUMENT_DELETE_FAILED_CODE,
@@ -35,6 +35,7 @@ import type {
 import { mediaTypeFor } from './media-type.ts'
 import {
   assertInside,
+  assertNestedDirectories,
   directoryIdFor,
   docIdFor,
   parentDirectoryId,
@@ -58,21 +59,7 @@ async function assertRealParent(root: string, path: string): Promise<void> {
     realpath(dirname(path)),
   ])
   assertInside(canonicalRoot, canonicalParent)
-  // A canonical parent can still be reached through a symlink below the
-  // document root. Walk the lexical components and refuse link-shaped ones so
-  // a replacement between the realpath check and unlink/rename cannot redirect
-  // the operation to another subtree.
-  const nested = relative(resolve(root), resolve(dirname(path)))
-  if (nested !== '' && !nested.startsWith(`..${sep}`) && nested !== '..') {
-    let current = resolve(root)
-    for (const part of nested.split(sep).filter(Boolean)) {
-      current = join(current, part)
-      const entry = await lstat(current)
-      if (entry.isSymbolicLink() || !entry.isDirectory()) {
-        throw new UserDocError('Document directory not found.', DOCUMENT_DIRECTORY_NOT_FOUND_CODE)
-      }
-    }
-  }
+  await assertNestedDirectories(root, dirname(path), DOCUMENT_DIRECTORY_NOT_FOUND_CODE)
 }
 
 async function openDocument(root: string, path: string) {

@@ -1,19 +1,10 @@
 import { deepFreeze, snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { SessionFormatError } from './error.ts'
+import { sessionFormatCount } from './json.ts'
 import type { SessionFormatArtifact, SessionFormatHeader, SessionFormatJsonObject } from './legacy-types.ts'
 
-/** Require a non-negative safe integer.
- * @param value - candidate value.
- * @param label - diagnostic label.
- * @returns the validated integer.
- */
-export function sessionFormatCount(value: unknown, label: string): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 0 || Object.is(value, -0)) {
-    throw new SessionFormatError(`${label} must be a non-negative safe integer`)
-  }
-  return value as number
-}
+export { sessionFormatCount }
 
 /** Read and validate a version without inspecting body rows.
  * @param value - candidate header.

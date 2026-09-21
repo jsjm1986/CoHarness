@@ -4,23 +4,19 @@
  */
 
 import { zstdDecompressSync } from 'node:zlib'
-import type { ZstdFrameDecoder, ZstdFrameRange } from './zstd.ts'
+import type { ZstdFrameRange } from './zstd.ts'
+import { ZstdFrameDecoderBase } from './zstd-decoder-base.ts'
 import { ZstdOutputLimitError } from './zstd-errors.ts'
 
 /** Multi-frame adapter built exclusively from Node's supported one-shot API. */
-export class PublicZstdFrameDecoder implements ZstdFrameDecoder {
-  private started = false
-  private closed = false
-
+export class PublicZstdFrameDecoder extends ZstdFrameDecoderBase {
   /** @inheritdoc */
   public *decode(
     source: Buffer,
     frames: readonly ZstdFrameRange[],
     maxOutputBytes?: number,
   ): Generator<Buffer, void, void> {
-    if (this.started) throw new Error('Zstandard frame decoder was already started')
-    if (this.closed) throw new Error('cannot start a closed Zstandard frame decoder')
-    this.started = true
+    this.assertStartable()
     try {
       let totalOutputBytes = 0
       for (const { start, end } of frames) {
@@ -50,10 +46,5 @@ export class PublicZstdFrameDecoder implements ZstdFrameDecoder {
     } finally {
       this.close()
     }
-  }
-
-  /** @inheritdoc */
-  close(): void {
-    this.closed = true
   }
 }

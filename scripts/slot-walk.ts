@@ -104,20 +104,26 @@ function readIfPresent(abs: string): string | undefined {
   }
 }
 
-export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): ScannedFile[] {
-  const out: ScannedFile[] = []
-  const names = new Map<string, string>()
+function* globbedSources(
+  scanRoot: string,
+  patterns: readonly string[],
+): Generator<{ rel: string; text: string; sf: ts.SourceFile }> {
   const rels = [...new Set(globSync(patterns as string[], { cwd: scanRoot })
     .map(path => path.split(sep).join('/')))].sort()
   for (const rel of rels) {
     const abs = resolve(scanRoot, rel)
     const text = readIfPresent(abs)
-    if (text === undefined || (!MERGE_HEAD.test(text) && !REGISTER_HEAD.test(text))) continue
-    out.push({
-      rel,
-      package: packageNameOf(scanRoot, rel, names),
-      sf: ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel)),
-    })
+    if (text === undefined) continue
+    yield { rel, text, sf: ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel)) }
+  }
+}
+
+export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): ScannedFile[] {
+  const out: ScannedFile[] = []
+  const names = new Map<string, string>()
+  for (const { rel, text, sf } of globbedSources(scanRoot, patterns)) {
+    if (!MERGE_HEAD.test(text) && !REGISTER_HEAD.test(text)) continue
+    out.push({ rel, package: packageNameOf(scanRoot, rel, names), sf })
   }
   return out
 }
@@ -134,13 +140,7 @@ export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): Sc
 export function indexExportedTypes(scanRoot: string, patterns: readonly string[]): Map<string, TypeDeclaration> {
   const index = new Map<string, TypeDeclaration>()
   const ambiguous = new Set<string>()
-  const rels = [...new Set(globSync(patterns as string[], { cwd: scanRoot })
-    .map(path => path.split(sep).join('/')))].sort()
-  for (const rel of rels) {
-    const abs = resolve(scanRoot, rel)
-    const text = readIfPresent(abs)
-    if (text === undefined) continue
-    const sf = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel))
+  for (const { rel, sf } of globbedSources(scanRoot, patterns)) {
     for (const statement of sf.statements) {
       if (!ts.isInterfaceDeclaration(statement) && !ts.isTypeAliasDeclaration(statement)) continue
       if (!statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue

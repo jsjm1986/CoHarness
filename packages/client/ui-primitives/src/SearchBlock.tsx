@@ -11,6 +11,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { headTailCap } from './head-tail-cap.ts'
+import { ExpandButton } from './ExpandButton.tsx'
 import { useCopyFeedback } from './use-copy-feedback.ts'
 import css from './SearchBlock.module.css'
 
@@ -282,17 +283,7 @@ export function SearchBlock(props: SearchBlockProps) {
             {head.map(row => (
               <div key={rowKey(row)}>{renderRow(row)}</div>
             ))}
-            {hidden > 0 && (
-              <button
-                type="button"
-                className={css.expand}
-                aria-expanded={expanded}
-                aria-label={expanded ? copy.collapseAria : copy.expandAria(hidden)}
-                onClick={onToggle}
-              >
-                {expanded ? copy.collapse : copy.expand(hidden)}
-              </button>
-            )}
+            <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
             {tailHeader !== undefined && (
               <div key={`tailHeader:${rowKey(tailHeader)}`}>{renderRow(tailHeader)}</div>
             )}

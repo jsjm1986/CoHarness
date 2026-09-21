@@ -133,6 +133,9 @@ interface PreparedStoredLog extends StoredLogBase {
 type StoredLog = CurrentStoredLog | PreparedStoredLog
 
 /** Deep-freeze one acyclic stored JSON event without recursive calls. */
+/* jscpd:ignore-start -- each durable-store package keeps its own stack-safe
+ * iterative deep-freeze; sharing core/session's private copy or pulling a new
+ * utility dependency is not worth an 8-line idiom. */
 function freezeStoredEvent(event: SessionEvent): void {
   const pending: object[] = [event]
   while (pending.length > 0) {
@@ -146,6 +149,7 @@ function freezeStoredEvent(event: SessionEvent): void {
     }
   }
 }
+/* jscpd:ignore-end */
 
 /** Establish immutable sharing for one decoded event graph and report that state. */
 function freezeStoredEvents(events: SessionEvent[]): FrozenStoredEvents {

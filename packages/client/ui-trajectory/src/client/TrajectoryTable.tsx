@@ -20,7 +20,11 @@ import type {
 import type {
   AssistantMetricDetail, TrajectoryCellKind, TrajectoryCellProps, TrajectorySourceBlock,
 } from './trajectory-record.ts'
-import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
+import {
+  formatElapsedSeconds, trajectoryDisplayHead, trajectoryRecordId,
+  trajectoryRecordState, trajectoryStatusLabel, type TrajectoryRecordState,
+} from './trajectory-record.ts'
+import { CompactedIcon, InformationIcon } from './trajectory-kind-icons.tsx'
 import {
   groupTrajectoryVirtualRows, trajectoryVirtualRecordKey,
 } from './trajectory-virtual-rows.ts'
@@ -75,53 +79,11 @@ function ToolWrenchIcon(): ReactNode {
   )
 }
 
-function InformationIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      data-role-icon="information"
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="6.7" />
-      <circle cx="8" cy="5.5" r=".85" fill="currentColor" stroke="none" />
-      <path d="M8 7.75v3.4" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function CompactedIcon(): ReactNode {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      data-role-icon="compacted"
-      aria-hidden="true"
-    >
-      <path d="m2.5 2.5 3.75 3.75M3 6.25h3.25V3" />
-      <path d="m13.5 2.5-3.75 3.75M13 6.25H9.75V3" />
-      <path d="m2.5 13.5 3.75-3.75M3 9.75h3.25V13" />
-      <path d="m13.5 13.5-3.75-3.75M13 9.75H9.75V13" />
-    </svg>
-  )
-}
-
 const KIND_ICON: Record<TrajectoryCellKind, ReactNode> = {
   system: <IconSettingsOutline16 size={13} />,
   user: <IconUserOutline16 size={13} />,
-  context: <InformationIcon />,
-  compacted: <CompactedIcon />,
+  context: <InformationIcon size={14} roleIcon="information" />,
+  compacted: <CompactedIcon size={13} roleIcon="compacted" />,
   message: <IconSparkle16 size={13} />,
   tool: <ToolWrenchIcon />,
   subtool: <ToolWrenchIcon />,
@@ -177,7 +139,7 @@ type DetailTab =
   | 'usage'
   | 'timing'
   | 'diff'
-export type RecordState = 'complete' | 'running' | 'error'
+export type RecordState = TrajectoryRecordState
 
 interface DetailTabItem {
   id: DetailTab
@@ -710,22 +672,6 @@ function collapseAssistantRecords(
   return out
 }
 
-function stateOf(record: TableRecord): RecordState {
-  if (record.cell.isError) return 'error'
-  if (record.cell.kind === 'compacted' && record.cell.timeSeconds === null) return 'running'
-  if (
-    (record.cell.kind === 'tool' || record.cell.kind === 'subtool')
-    && record.cell.outputDetail === undefined
-  ) return 'running'
-  return 'complete'
-}
-
-function statusLabel(state: RecordState, t: TrajectoryTranslate): string {
-  if (state === 'error') return t('status.failed')
-  if (state === 'running') return t('status.pending')
-  return t('status.completed')
-}
-
 function TokenRows({ cell, t }: { cell: TrajectoryCellProps; t: TrajectoryTranslate }) {
   const content = cell.output !== undefined && cell.think !== undefined
     ? Math.max(0, cell.output - cell.think)
@@ -976,12 +922,8 @@ function detailTabs(record: TableRecord): readonly DetailTabItem[] {
 
 function recordDisplayText(cell: TrajectoryCellProps, t: TrajectoryTranslate): string {
   if (isToolCallOnly(cell, t)) return ''
-  if (cell.previewMarkdown !== undefined) {
-    const preview = trajectoryPreviewText(cell.previewMarkdown)
-    if (cell.text === '') return preview
-    return preview === '' ? cell.text : `${cell.text} · ${preview}`
-  }
-  if (cell.text !== '') return cell.text
+  const head = trajectoryDisplayHead(cell)
+  if (head !== undefined) return head
   const markdown = cell.kind === 'user' || cell.kind === 'context'
     ? cell.inputDetail
     : cell.kind === 'message'
@@ -1957,18 +1899,22 @@ export function TrajectoryTable({
     () => indexRequestBoundaryRuns(records, requestGroups),
     [records, requestGroups],
   )
+  const requestForRecord = (record: TableRecord, isCollapsedSummary: boolean) => {
+    const key = requestKey(record.turn, record.group)
+    const request = requestBoundaries.get(key) === record.cell.index
+      && !isCollapsedSummary
+      && (record.turn === null || !collapsedTurns.has(record.turn))
+      ? requestNumbers.get(key)
+      : undefined
+    const requestInfo = request === undefined
+      ? undefined
+      : sessionRequestNumbers?.find(candidate => candidate.number === request)
+    return { request, requestInfo }
+  }
   const mobileItems = useMemo<readonly TrajectoryMobileFeedItem[]>(() => {
     return renderedRecords.map(({ record, position, terminalRequestBoundary }) => {
       const isCollapsedSummary = record.collapsedSummary !== undefined
-      const key = requestKey(record.turn, record.group)
-      const request = requestBoundaries.get(key) === record.cell.index
-        && !isCollapsedSummary
-        && (record.turn === null || !collapsedTurns.has(record.turn))
-        ? requestNumbers.get(key)
-        : undefined
-      const requestInfo = request === undefined
-        ? undefined
-        : sessionRequestNumbers?.find(candidate => candidate.number === request)
+      const { request, requestInfo } = requestForRecord(record, isCollapsedSummary)
       return {
         record,
         position,
@@ -1988,7 +1934,7 @@ export function TrajectoryTable({
     ? selected.cell.previousPromptDetail
     : undefined
   const promptSelected = selectedPrompt !== undefined
-  const selectedState = selected === undefined ? undefined : stateOf(selected)
+  const selectedState = selected === undefined ? undefined : trajectoryRecordState(selected)
   const detailsOpen = selectedRequest !== null
     || promptSelected
     || (selected !== undefined && selectedState !== undefined)
@@ -2037,7 +1983,7 @@ export function TrajectoryTable({
       ?? (selectedRequestAssistant?.cell.assistantMetrics?.completedTime === null
         ? 'running'
         : selectedRequestAssistant === undefined
-          && selectedRequestRecords.some(record => stateOf(record) === 'running')
+          && selectedRequestRecords.some(record => trajectoryRecordState(record) === 'running')
           ? 'running'
           : 'complete')
   const selectedRequestToolCalls = selectedRequestRecords.filter(
@@ -2491,15 +2437,7 @@ export function TrajectoryTable({
                     const isRequestOnly = record.cell.requestOnly === true
                     const isInitialSystem = record.cell.kind === 'system'
                 && record.cell.index === allRecords[0]?.cell.index
-                    const key = requestKey(record.turn, record.group)
-                    const request = requestBoundaries.get(key) === record.cell.index
-                && !isCollapsedSummary
-                && (record.turn === null || !collapsedTurns.has(record.turn))
-                      ? requestNumbers.get(key)
-                      : undefined
-                    const requestInfo = request === undefined
-                      ? undefined
-                      : sessionRequestNumbers?.find(candidate => candidate.number === request)
+                    const { request, requestInfo } = requestForRecord(record, isCollapsedSummary)
                     const requestStatus = requestInfo?.status
                 ?? (record.cell.isError === true ? 'error' : undefined)
                     const requestRunIndex = requestBoundaryRuns.get(record.cell.index) ?? 0
@@ -2547,7 +2485,7 @@ export function TrajectoryTable({
                         data-group-start={record.groupStart || undefined}
                         data-turn-start={record.turnStart || undefined}
                         data-error={record.cell.isError || undefined}
-                        data-running={stateOf(record) === 'running' || undefined}
+                        data-running={trajectoryRecordState(record) === 'running' || undefined}
                         data-turn-end={record.turnEnd || undefined}
                         data-collapsed-summary={record.collapsedSummaryKind}
                         data-selected={!isCollapsedSummary && selectedIndex === record.cell.index || undefined}
@@ -2940,7 +2878,7 @@ export function TrajectoryTable({
                     <div>
                       <dt>{t('details.status')}</dt>
                       <dd className={selectedRequestState === 'error' ? css.error : undefined}>
-                        {statusLabel(selectedRequestState, t)}
+                        {trajectoryStatusLabel(selectedRequestState, t)}
                       </dd>
                     </div>
                     {selectedRequestInfo?.purpose === 'compaction' && (
@@ -3100,7 +3038,7 @@ export function TrajectoryTable({
                     <div>
                       <dt>{t('details.status')}</dt>
                       <dd className={selectedState === 'error' ? css.error : undefined}>
-                        {statusLabel(selectedState, t)}
+                        {trajectoryStatusLabel(selectedState, t)}
                       </dd>
                     </div>
                     <div>
@@ -3212,7 +3150,7 @@ export function TrajectoryTable({
                     <div>
                       <dt>{t('details.status')}</dt>
                       <dd className={selectedState === 'error' ? css.error : undefined}>
-                        {statusLabel(selectedState, t)}
+                        {trajectoryStatusLabel(selectedState, t)}
                       </dd>
                     </div>
                     {selected.cell.kind === 'message' && (

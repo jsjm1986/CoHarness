@@ -2202,11 +2202,41 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   /** Force-enders for currently open stream generators (timing hook: simulated connection loss). */
   const streamBreakers = new Set<() => void>()
   /** Retry scenarios opened by timing hooks and completed in a later browser assertion phase. */
-  const retryScenarios = new Map<SessionId, {
+  interface ModelRetryScenario {
     turn: number
     attemptId: LlmAttemptId | undefined
     chunks: StreamChunk[]
-  }>()
+  }
+  const retryScenarios = new Map<SessionId, ModelRetryScenario>()
+
+  /** Settle a scenario's open stream attempt as a committed assistant/attempt record. */
+  const commitScenarioAttempt = (sessionId: SessionId, scenario: ModelRetryScenario, clear: boolean): void => {
+    if (scenario.attemptId === undefined) return
+    append(sessionId, {
+      type: 'assistant/attempt',
+      data: { turn: scenario.turn, step: 1, stream: streamRecords(scenario.chunks) },
+    })
+    streamEnd(sessionId, scenario.attemptId, scenario.chunks.length, {
+      kind: 'committed', eventType: 'assistant/attempt', seq: logOf(sessionId).length - 1,
+    })
+    if (clear) {
+      scenario.attemptId = undefined
+      scenario.chunks = []
+    }
+  }
+
+  /** Record the fixture's standard transport-failure retry decision for a scenario. */
+  const appendModelRetry = (sessionId: SessionId, scenario: ModelRetryScenario, retry: number, delayMs: number): void => {
+    append(sessionId, {
+      type: 'llm/retry',
+      data: {
+        turn: scenario.turn, step: 1,
+        provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
+        retry, maxRetries: 2, delayMs,
+        failure: { code: 'TRANSPORT', message: '连接被重置' },
+      },
+    })
+  }
   /** The single opt-in browser stress producer; normal fixture journeys never start it. */
   let activeReasoningChunkStorm: ReasoningChunkStormState | null = null
 
@@ -2333,58 +2363,29 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       if (scenario === undefined) throw new Error(`fixture: no model retry scenario for ${id}`)
       // Settle this round's failed attempt: a live one lands through its end
       // frame; a direct round emits the durable attempt record only.
-      const chunks = scenario.attemptId !== undefined
-        ? scenario.chunks
-        : [
-          { type: 'block-start', index: 0, blockType: 'text' },
-          { type: 'text-delta', index: 0, text: `第 ${String(retry)} 次应撤回的回复` },
-        ] as StreamChunk[]
-      append(sessionId, {
-        type: 'assistant/attempt',
-        data: { turn: scenario.turn, step: 1, stream: streamRecords(chunks) },
-      })
-      if (scenario.attemptId !== undefined) {
-        streamEnd(sessionId, scenario.attemptId, chunks.length, {
-          kind: 'committed', eventType: 'assistant/attempt', seq: logOf(sessionId).length - 1,
+      if (scenario.attemptId === undefined) {
+        append(sessionId, {
+          type: 'assistant/attempt',
+          data: {
+            turn: scenario.turn, step: 1,
+            stream: streamRecords([
+              { type: 'block-start', index: 0, blockType: 'text' },
+              { type: 'text-delta', index: 0, text: `第 ${String(retry)} 次应撤回的回复` },
+            ] as StreamChunk[]),
+          },
         })
-        scenario.attemptId = undefined
-        scenario.chunks = []
+      } else {
+        commitScenarioAttempt(sessionId, scenario, true)
       }
-      const failure = { code: 'TRANSPORT', message: '连接被重置' }
-      append(sessionId, {
-        type: 'llm/retry',
-        data: {
-          turn: scenario.turn, step: 1,
-          provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
-          retry, maxRetries: 2, delayMs, failure,
-        },
-      })
+      appendModelRetry(sessionId, scenario, retry, delayMs)
     },
     /** Record one retry decision, then cancel its source turn before the retry starts. */
     cancelModelRetryDuringBackoff(id: string, delayMs = 450): void {
       const sessionId = sid(id)
       const scenario = retryScenarios.get(sessionId)
       if (scenario === undefined) throw new Error(`fixture: no model retry scenario for ${id}`)
-      if (scenario.attemptId !== undefined) {
-        append(sessionId, {
-          type: 'assistant/attempt',
-          data: { turn: scenario.turn, step: 1, stream: streamRecords(scenario.chunks) },
-        })
-        streamEnd(sessionId, scenario.attemptId, scenario.chunks.length, {
-          kind: 'committed', eventType: 'assistant/attempt', seq: logOf(sessionId).length - 1,
-        })
-        scenario.attemptId = undefined
-        scenario.chunks = []
-      }
-      const failure = { code: 'TRANSPORT', message: '连接被重置' }
-      append(sessionId, {
-        type: 'llm/retry',
-        data: {
-          turn: scenario.turn, step: 1,
-          provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
-          retry: 1, maxRetries: 2, delayMs, failure,
-        },
-      })
+      commitScenarioAttempt(sessionId, scenario, true)
+      appendModelRetry(sessionId, scenario, 1, delayMs)
       append(sessionId, { type: 'step/end', data: { turn: scenario.turn, step: 1 } })
       append(sessionId, { type: 'turn/end', data: { turn: scenario.turn, reason: { kind: 'aborted', reason: { kind: 'user' } },
       } })
@@ -2397,15 +2398,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       const scenario = retryScenarios.get(sessionId)
       if (scenario === undefined) throw new Error(`fixture: no model retry scenario for ${id}`)
       retryScenarios.delete(sessionId)
-      if (scenario.attemptId !== undefined) {
-        append(sessionId, {
-          type: 'assistant/attempt',
-          data: { turn: scenario.turn, step: 1, stream: streamRecords(scenario.chunks) },
-        })
-        streamEnd(sessionId, scenario.attemptId, scenario.chunks.length, {
-          kind: 'committed', eventType: 'assistant/attempt', seq: logOf(sessionId).length - 1,
-        })
-      }
+      commitScenarioAttempt(sessionId, scenario, false)
       const chunks: StreamChunk[] = [
         { type: 'block-start', index: 0, blockType: 'text' },
         { type: 'text-delta', index: 0, text: '重试后的完整回复' },

@@ -11,6 +11,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { writeClipboard } from './clipboard.ts'
+import { ExpandButton } from './ExpandButton.tsx'
 import css from './DiffBlock.module.css'
 
 /**
@@ -194,17 +195,7 @@ export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className,
         {head.map((row, index) => (
           <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
         ))}
-        {hidden > 0 && (
-          <button
-            type="button"
-            className={css.expand}
-            aria-expanded={expanded}
-            aria-label={expanded ? copy.collapseAria : copy.expandAria(hidden)}
-            onClick={onToggle}
-          >
-            {expanded ? copy.collapse : copy.expand(hidden)}
-          </button>
-        )}
+        <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
         {tail.map((row, index) => (
           <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
         ))}

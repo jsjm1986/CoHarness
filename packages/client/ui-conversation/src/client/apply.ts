@@ -215,29 +215,25 @@ export function apply(ctx: Context): void {
       setBusyEnter: (behavior) => { submissionPolicy.setBusyEnter(behavior) },
     }),
   }, EnterBehaviorRow))
+  const displaySettingsInject = (): DisplaySettingsRowInjected => ({
+    hooks: { displaySettings },
+    setWidth: (value) => { displaySettings.setWidth(value) },
+    setFullWidth: (value) => { displaySettings.setFullWidth(value) },
+    setFontSize: (value) => { displaySettings.setFontSize(value) },
+  })
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
     id: 'conversation-display',
     order: 30,
     locale: NS,
-    inject: (): DisplaySettingsRowInjected => ({
-      hooks: { displaySettings },
-      setWidth: (value) => { displaySettings.setWidth(value) },
-      setFullWidth: (value) => { displaySettings.setFullWidth(value) },
-      setFontSize: (value) => { displaySettings.setFontSize(value) },
-    }),
+    inject: displaySettingsInject,
   }, DisplaySettingsRow))
   // Same display-settings face inside the workbench sidebar panel: the hole is
   // declared by ui-workbench's sidebar registration and owned by this package.
   ctx.slots.inject('conversation.workbench.display', () => ctx.slots.register({
     name: 'conversation.workbench.display',
     locale: NS,
-    inject: (): DisplaySettingsRowInjected => ({
-      hooks: { displaySettings },
-      setWidth: (value) => { displaySettings.setWidth(value) },
-      setFullWidth: (value) => { displaySettings.setFullWidth(value) },
-      setFontSize: (value) => { displaySettings.setFontSize(value) },
-    }),
+    inject: displaySettingsInject,
   }, WorkbenchDisplayRow))
 
   // Chat semantic reader positions by session, surviving view switches and

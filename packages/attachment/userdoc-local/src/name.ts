@@ -1,5 +1,6 @@
 /** Upload-name sanitization and target resolution. */
 
+import { lstat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
   DOCUMENT_NAME_EXHAUSTED_CODE,
@@ -10,7 +11,7 @@ import {
   UserDocDirectoryId,
   UserDocId,
 } from '@deepseek-ai/dsh-userdoc'
-import type { UserDocDirectoryId as UserDocDirectoryIdType, UserDocTarget } from '@deepseek-ai/dsh-userdoc'
+import type { UserDocDirectoryId as UserDocDirectoryIdType, UserDocErrorCode, UserDocTarget } from '@deepseek-ai/dsh-userdoc'
 
 /** Maximum bytes of a sanitized leaf name, the common filesystem limit. */
 const MAX_NAME_BYTES = 255
@@ -123,6 +124,32 @@ export function isInside(root: string, candidate: string): boolean {
 export function assertInside(root: string, candidate: string): void {
   if (!isInside(root, candidate)) {
     throw new UserDocError('Document path lies outside the document root.', INVALID_DOCUMENT_REF_CODE)
+  }
+}
+
+/**
+ * Refuse a parent directory that remains reachable through a symlink below
+ * the document root.
+ *
+ * A canonical parent can pass `realpath` yet still be reached through a
+ * symlink below the document root, letting a replacement between the realpath
+ * check and a later unlink/rename redirect the operation to another subtree.
+ * Walk the lexical components and refuse link-shaped ones.
+ * @param root - absolute document root.
+ * @param parent - absolute parent directory at or below the root.
+ * @param code - error code carried by the refusal.
+ * @throws UserDocError when a component is a link or not a directory.
+ */
+export async function assertNestedDirectories(root: string, parent: string, code: UserDocErrorCode): Promise<void> {
+  const nested = relative(resolve(root), resolve(parent))
+  if (nested === '' || nested === '..' || nested.startsWith(`..${sep}`)) return
+  let current = resolve(root)
+  for (const part of nested.split(sep).filter(Boolean)) {
+    current = join(current, part)
+    const entry = await lstat(current)
+    if (entry.isSymbolicLink() || !entry.isDirectory()) {
+      throw new UserDocError('Document directory not found.', code)
+    }
   }
 }
 

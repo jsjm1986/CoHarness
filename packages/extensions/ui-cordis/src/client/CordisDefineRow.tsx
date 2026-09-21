@@ -157,6 +157,10 @@ export function CordisDefineRow({
               <pre className={css.output} data-error={card.state === 'error' || undefined}>{card.output}</pre>
             </section>
           )}
+          {/* jscpd:ignore-start -- parallel inspect-row surfaces share the
+           * inspect-button disclosure tail by design (ui-tool's ToolRow ends
+           * the same way; plugin packages may not import each other's
+           * internals). */}
           {card.pluginId !== null && <div className={css.panelHint}>{t('panel.hint')}</div>}
           {inspect !== undefined && (
             <button type="button" className={css.inspectButton} onClick={inspect}>
@@ -164,6 +168,7 @@ export function CordisDefineRow({
               {t('row.inspect')}
             </button>
           )}
+          {/* jscpd:ignore-end */}
         </div>
       </DisclosureRow>
     </div>

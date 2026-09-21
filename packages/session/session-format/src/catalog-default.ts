@@ -148,6 +148,9 @@ class LegacyNormalizationStage implements SessionFormatMigrationStage {
   }
 }
 
+/* jscpd:ignore-start -- the catalog embeds this migration body intentionally:
+ * the published migration packages already depend on session-format, so
+ * importing them back would close a dependency cycle. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -397,9 +400,6 @@ function addLegacyCompactionId(
   return { ...event, data: { ...data, compactionId } }
 }
 
-/* jscpd:ignore-start -- the same normalization applied to two event
- * universes: SessionFormatEvent here, SessionEvent in session-persistence's
- * migrateLegacyMessageEvent; the layers' types and id minting differ. */
 /** Early message carriers lacked the `message` envelope or `id`/`role` fields. */
 function normalizeLegacyMessage(
   event: SessionFormatEvent,
@@ -471,7 +471,6 @@ function normalizeLegacyMessage(
       return event
   }
 }
-/* jscpd:ignore-end */
 
 /** Legacy message lists inside `inserted`/`messages` payloads lacked `id`/`role`. */
 function normalizeLegacyMessageLists(
@@ -1196,6 +1195,8 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
 
 /** Validate the JSON containers owned by message carriers before migration rewrites them. */
 function assertV2CarrierShape(event: SessionFormatEvent): void {
+/* jscpd:ignore-end */
+
   const data = event.data
   if (event.type === 'assistant/attempt') {
     if (data === null || typeof data !== 'object' || Array.isArray(data)

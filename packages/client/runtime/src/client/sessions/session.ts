@@ -301,18 +301,7 @@ export class Session implements SessionFace {
   leaveStage(): void {
     if (!this.stageActive) return
     this.stageActive = false
-    this.openGeneration++
-    this.historyAbortController?.abort()
-    this.historyAbortController = null
-    this.resetHistoryNavigation()
-    this.historyExpansionPromise = null
-    this.openPromise = null
-    this.openState = 'cold'
-    this.openError = null
-    this.events = []
-    this.views = []
-    this.omittedSpans = []
-    this.baseSeq = 0
+    this.resetOpenWindow()
     this.hasMore = false
     this.loadingOlder = false
     this.historyDetail = 'conversation'
@@ -670,18 +659,7 @@ export class Session implements SessionFace {
       await this.repairGap()
       return
     }
-    this.openGeneration++
-    this.historyAbortController?.abort()
-    this.historyAbortController = null
-    this.resetHistoryNavigation()
-    this.historyExpansionPromise = null
-    this.openPromise = null
-    this.openState = 'cold'
-    this.openError = null
-    this.events = []
-    this.views = []
-    this.omittedSpans = []
-    this.baseSeq = 0
+    this.resetOpenWindow()
     if (this.historyDetail !== 'conversation') this.historyDetail = 'full'
     this.fillPromise = null
     // Superseded, not settled: the baseline replay re-sends still-pending requested frames verbatim
@@ -878,6 +856,22 @@ export class Session implements SessionFace {
   }
 
   // ---- Private ----
+
+  /** Drop every open-window field back to its pre-open baseline before a fresh open or stage exit. */
+  private resetOpenWindow(): void {
+    this.openGeneration++
+    this.historyAbortController?.abort()
+    this.historyAbortController = null
+    this.resetHistoryNavigation()
+    this.historyExpansionPromise = null
+    this.openPromise = null
+    this.openState = 'cold'
+    this.openError = null
+    this.events = []
+    this.views = []
+    this.omittedSpans = []
+    this.baseSeq = 0
+  }
 
   /** Requested-frame arrival: the wait enters the pending map under its own key. */
   private mint(wait: PendingInteraction): void {

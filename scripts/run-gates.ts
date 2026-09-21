@@ -292,12 +292,7 @@ export function gatesForMode(selected: Mode): Gate[] {
       // the suite; per-file coverage thresholds stay a `test:coverage` gate.
       return [
         lintGate(),
-        pnpmScript('coverage-exclusions', 'verify-coverage-exclusions', { label: 'coverage exclusions' }),
-        pnpmScript('test-honesty', 'verify-test-honesty', { label: 'test honesty' }),
-        pnpmScript('ci-consumers', 'verify-ci-consumers', { label: 'consumer entry references' }),
-        pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
-        pnpmScript('upgrade-records', 'verify-upgrade-records', { label: 'upgrade records' }),
-        pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
+        ...staticPolicyGates(),
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
         pnpmScript('test', 'test'),
@@ -327,6 +322,29 @@ export function gatesForMode(selected: Mode): Gate[] {
   }
 }
 
+function staticPolicyGates(): Gate[] {
+  return [
+    pnpmScript('coverage-exclusions', 'verify-coverage-exclusions', { label: 'coverage exclusions' }),
+    pnpmScript('test-honesty', 'verify-test-honesty', { label: 'test honesty' }),
+    pnpmScript('ci-consumers', 'verify-ci-consumers', { label: 'consumer entry references' }),
+    pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
+    pnpmScript('upgrade-records', 'verify-upgrade-records', { label: 'upgrade records' }),
+    pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
+  ]
+}
+
+function consumerSurfaceGates(): Gate[] {
+  return [
+    pnpmScript('optional-dependency-imports', 'verify-optional-dependency-imports', {
+      label: 'optional dependency imports',
+    }),
+    pnpmScript('client-packages', 'verify-client-packages', { label: 'client packages' }),
+    pnpmScript('client-ui-i18n', 'verify-client-ui-i18n', { label: 'client UI i18n' }),
+    pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
+    pnpmScript('no-bare-dispatcher', 'verify-no-bare-dispatcher', { label: 'proxy-aware dispatchers' }),
+  ]
+}
+
 function pluginTestGates(): Gate[] {
   return ['dsh-directory-guard', 'dsh-model-governance'].map(plugin =>
     pnpmExec(`test-${plugin}`, ['vitest', 'run', '--config', `plugins/${plugin}/vitest.config.ts`]),
@@ -337,12 +355,7 @@ function ciSharedStaticGates(): Gate[] {
   return [
     pnpmScript('vendored-links', 'verify-vendored-links', { label: 'vendored links' }),
     pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
-    pnpmScript('coverage-exclusions', 'verify-coverage-exclusions', { label: 'coverage exclusions' }),
-    pnpmScript('test-honesty', 'verify-test-honesty', { label: 'test honesty' }),
-    pnpmScript('ci-consumers', 'verify-ci-consumers', { label: 'consumer entry references' }),
-    pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
-    pnpmScript('upgrade-records', 'verify-upgrade-records', { label: 'upgrade records' }),
-    pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
+    ...staticPolicyGates(),
     pnpmScript('default-product-isolation', 'verify-default-product-isolation', { label: 'default product isolation' }),
     pnpmScript('application-entrypoints', 'verify-application-entrypoints', { label: 'application entrypoints' }),
     pnpmScript('constraints', 'constraints'),
@@ -350,13 +363,7 @@ function ciSharedStaticGates(): Gate[] {
     pnpmScript('dsh-package-licenses', 'verify-dsh-package-licenses', { label: 'DSH package licenses' }),
     pnpmScript('package-invariants', 'verify-package-invariants', { label: 'package invariants' }),
     pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
-    pnpmScript('optional-dependency-imports', 'verify-optional-dependency-imports', {
-      label: 'optional dependency imports',
-    }),
-    pnpmScript('client-packages', 'verify-client-packages', { label: 'client packages' }),
-    pnpmScript('client-ui-i18n', 'verify-client-ui-i18n', { label: 'client UI i18n' }),
-    pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
-    pnpmScript('no-bare-dispatcher', 'verify-no-bare-dispatcher', { label: 'proxy-aware dispatchers' }),
+    ...consumerSurfaceGates(),
     pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
   ]
 }
@@ -825,13 +832,7 @@ function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
       label: 'node-next types',
       ...artifactOptions,
     }),
-    pnpmScript('optional-dependency-imports', 'verify-optional-dependency-imports', {
-      label: 'optional dependency imports',
-    }),
-    pnpmScript('client-packages', 'verify-client-packages', { label: 'client packages' }),
-    pnpmScript('client-ui-i18n', 'verify-client-ui-i18n', { label: 'client UI i18n' }),
-    pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
-    pnpmScript('no-bare-dispatcher', 'verify-no-bare-dispatcher', { label: 'proxy-aware dispatchers' }),
+    ...consumerSurfaceGates(),
   ]
 }
 

@@ -79,6 +79,9 @@ function withSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
       finish(() => { reject(signal.reason instanceof Error ? signal.reason : new Error('collaboration request cancelled', { cause: signal.reason })) })
     }
     signal.addEventListener('abort', onAbort, { once: true })
+    /* jscpd:ignore-start -- the settled-once promise settle tail is a standard
+     * async idiom also used by the apiproxy body reader; each helper carries
+     * its own abort/grace semantics and the packages share no runtime module. */
     void promise.then(
       (value) => { finish(() => { resolve(value) }) },
       (error: unknown) => {
@@ -87,6 +90,7 @@ function withSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
         })
       },
     )
+    /* jscpd:ignore-end */
   })
 }
 
