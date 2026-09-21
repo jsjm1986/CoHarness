@@ -181,6 +181,11 @@ describe('TypertRegistry', () => {
       package: '@fixture/schema-name',
       schemas: [{ name: 'bad#name', create: () => z.string() }],
     })).toThrow('invalid schema name')
+    expect(() => ctx.typert.register({
+      ...toolsContribution(),
+      package: '@fixture/schema-factory',
+      schemas: [{ name: 'NoFactory' } as never],
+    })).toThrow('has no create() factory')
 
     expect(ctx.typert.list({ package: '@fixture/absent' })).toEqual([])
     expect(ctx.typert.list({ face: 'client' })).toEqual([])
@@ -291,6 +296,19 @@ describe('TypertRegistry', () => {
     expect(ctx.typert.remotes.get('goals/create')).toBe(descriptor)
     await dispose()
 
+    // A Context receiver occupies its own wire field; a free wire registers.
+    const contextReceiver: InvocationDescriptor = {
+      ...invocation('@fixture/remote#goals/attach'),
+      method: 'attach',
+      invocation: { kind: 'context', context: 'fixture', wire: 'scopeCtx', codec: { mode: 'src-json' } },
+    }
+    const disposeContext = ctx.typert.remotes.register({
+      package: '@fixture/context',
+      descriptors: [contextReceiver],
+    })
+    expect(ctx.typert.remotes.get('goals/attach')).toBe(contextReceiver)
+    await disposeContext()
+
     const cases: readonly [InvocationDescriptor, string][] = [
       [{
         ...descriptor,
@@ -301,6 +319,15 @@ describe('TypertRegistry', () => {
           codec: { mode: 'src-json' },
         },
       }, 'Context receiver cannot declare a direct scope projection'],
+      [{
+        ...invocation('@fixture/remote#goals/dup-wire'),
+        invocation: {
+          kind: 'context',
+          context: 'fixture',
+          wire: 'request',
+          codec: { mode: 'src-json' },
+        },
+      }, 'repeats wire field "request"'],
       [{ ...descriptor, scope: { context: 'fixture', wire: 'missingId' } }, 'must select its only lookup parameter'],
       [{
         ...descriptor,

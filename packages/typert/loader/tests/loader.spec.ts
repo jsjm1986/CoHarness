@@ -97,6 +97,23 @@ function invocationTypertSource(pkgName: string): string {
   ].join('\n')
 }
 
+/** Boot without PluginPackages so package lookup falls back to plain require. */
+async function bootWithoutResolver(): Promise<Context> {
+  context = new Context()
+  context.baseUrl = pathToFileURL(join(root as string, 'cordis.yml')).href
+  await context.plugin(TypertRegistry)
+  await context.plugin(Loader)
+  const fixtureRequire = createRequire(context.baseUrl)
+  context.loader.internal = {
+    version: 'v2',
+    async import(specifier: string) {
+      const module: unknown = await import(pathToFileURL(fixtureRequire.resolve(specifier)).href)
+      return module
+    },
+  } as unknown as NonNullable<typeof context.loader.internal>
+  return context
+}
+
 /** Boot a real Loader over a fixture root; plugin modules resolve from its node_modules. */
 async function boot(): Promise<Context> {
   context = new Context()
@@ -146,6 +163,17 @@ describe('typert loader', () => {
 
     await fiber.dispose()
     expect(ctx.typert.getPackage('@fixture/nested')).toBeUndefined()
+  })
+
+  it('resolves a configured package through require when no resolver service is mounted', LOADER_TEST_TIMEOUT, async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-typert-loader-'))
+    await linkZod(root)
+    await writePackage(root, '@fixture/nested', { typertSource: typertSource('@fixture/nested', 'Nested') })
+    const ctx = await bootWithoutResolver()
+
+    const fiber = mountTypertLoader(ctx, { packages: ['@fixture/nested'] })
+    await fiber
+    expect(ctx.typert.get('@fixture/nested#Nested')).toBeDefined()
   })
 
   it('registers a strict invocation into the local registry and withdraws it with the loader', LOADER_TEST_TIMEOUT, async () => {

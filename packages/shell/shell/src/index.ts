@@ -20,6 +20,7 @@ import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } fr
  */
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 
+/** Settings namespace under which shell providers declare their user-facing fields. */
 export const SHELL_SETTINGS_NAMESPACE = settingsNamespace('shell')
 
 export { DSH_ENV_PREFIX } from './types.ts'

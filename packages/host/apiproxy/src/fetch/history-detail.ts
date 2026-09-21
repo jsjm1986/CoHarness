@@ -24,7 +24,7 @@ export interface HistoryDetailPage {
  * it — the step frame, retries, and superseded `assistant/attempt` records —
  * plus the message itself; other messages carry `sourceEventSeqs` citations
  * whose earliest seq opens the group. Walks sources pairwise so a long
- * provenance list does not expand into a variadic `Math.min`.
+ * source-event list does not expand into a variadic `Math.min`.
  * @param entries - one ordered history page containing the event.
  * @param index - position of the append-origin message within `entries`.
  * @returns the group's first seq.

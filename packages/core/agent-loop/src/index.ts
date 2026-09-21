@@ -449,18 +449,10 @@ export class AgentLoop extends Service implements AgentFactory {
       const meta = cwd === undefined ? {} : { cwd }
       if (resumeSessionId === undefined || resumeSessionId === '') {
         const configuredId = sessionId ?? SessionId(`${id}-session-${randomUUID()}`)
-        const persistence = sessionId === undefined ? undefined : ctx.get('sessionPersistence')
-        if (persistence === undefined) {
-          const startup = this.create(configuredId, options, meta).then(() => undefined, (error: unknown) => {
-            this.reportConfiguredStartupFailure(id, 'restore', configuredId, error)
-          })
-          this.ownership.trackStartup(startup)
-        } else {
-          const startup = this.restoreOrCreateConfigured(ctx, persistence, configuredId, options, meta).catch((error: unknown) => {
-            this.reportConfiguredStartupFailure(id, 'restore', configuredId, error)
-          })
-          this.ownership.trackStartup(startup)
-        }
+        const startup = this.startConfigured(ctx, configuredId, sessionId, options, meta).catch((error: unknown) => {
+          this.reportConfiguredStartupFailure(id, 'restore', configuredId, error)
+        })
+        this.ownership.trackStartup(startup)
         continue
       }
       ctx.effect(() => {
@@ -751,8 +743,45 @@ export class AgentLoop extends Service implements AgentFactory {
    * @param signal - optional cancellation forwarded to the backend create.
    * @returns the owned handle and stored cursor, or `undefined` without a backend.
    */
+  /**
+   * Start one fresh-or-restored configured agent. Persistence is resolved after
+   * pending mounts settle, so an entry listed later in the tree cannot race the
+   * startup-time service read into an unpersisted session or a false create.
+   */
+  private async startConfigured(
+    ownerCtx: Context,
+    configuredId: SessionId,
+    sessionId: SessionId | undefined,
+    options: AgentOptions,
+    meta: Pick<SessionHeader, 'cwd'>,
+  ): Promise<void> {
+    const persistence = sessionId === undefined ? undefined : await this.resolveSessionPersistence()
+    if (persistence === undefined) {
+      await this.create(configuredId, options, meta)
+      return
+    }
+    await this.restoreOrCreateConfigured(ownerCtx, persistence, configuredId, options, meta)
+  }
+
+  /**
+   * Read the optional persistence backend, waiting out in-flight Loader mounts
+   * once when absent. Sibling entries mount concurrently, so a backend whose
+   * module resolves after this fiber's injected dependencies would otherwise be
+   * invisible to a startup-time `ctx.get`.
+   * @returns the registered backend, or `undefined` when the settled
+   *   composition has none.
+   */
+  private async resolveSessionPersistence(): Promise<SessionPersistence | undefined> {
+    const existing = this.runtime.ctx.get('sessionPersistence')
+    if (existing !== undefined) return existing
+    const loader = this.runtime.ctx.get('loader') as { await(): Promise<void> } | undefined
+    if (loader === undefined) return undefined
+    await loader.await()
+    return this.runtime.ctx.get('sessionPersistence')
+  }
+
   private async createStoredSession(session: Session, signal?: AbortSignal): Promise<StoredSession | undefined> {
-    const persistence = this.runtime.ctx.get('sessionPersistence')
+    const persistence = await this.resolveSessionPersistence()
     if (persistence === undefined) return undefined
     const handle = await persistence.create(session.header, {
       inheritedEventCount: session.inheritedEventCount,

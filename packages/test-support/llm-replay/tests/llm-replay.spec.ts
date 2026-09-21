@@ -136,11 +136,11 @@ describe('parseSessionLog', () => {
     const decoded = parseSessionLog(sessionJsonl(events))
     const end = decoded.find(e => e.type === 'step/end')
     // The v2→v3 stage inserts a system/message after step/start, so the decoded
-    // [0, 1, 2] provenance remaps to [0, 1, 3] tracking the moved event.
+    // [0, 1, 2] source events remap to [0, 1, 3] tracking the moved event.
     expect((end as unknown as { sourceEventSeqs?: unknown }).sourceEventSeqs).toEqual([0, 1, 3])
   })
 
-  it('reports malformed range provenance with its source line', () => {
+  it('reports a malformed source-event range with its source line', () => {
     const event = {
       ...attemptEvent(SessionSeq(4), 1, 1, TEXT_CHUNKS),
       sourceEventSeqs: [[3, 1]],

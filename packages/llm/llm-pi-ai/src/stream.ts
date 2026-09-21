@@ -291,8 +291,9 @@ export function mapStopReason(
  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
  * @param parseTextThinkingOrCallerSignal - legacy text-thinking switch or the
  *   canonical caller cancellation signal.
- * @param response - read the HTTP response metadata captured for this stream
- *   (legacy fourth argument); the canonical form passes the request model here.
+ * @param responseOrRequestedModel - read the HTTP response metadata captured
+ *   for this stream (legacy fourth argument); the canonical form passes the
+ *   request model here.
  * @param callerSignal - caller cancellation signal for the legacy argument form.
  * @param requestedModel - request model identity recorded for durable replay
  *   (canonical fourth argument; legacy form uses the sixth).

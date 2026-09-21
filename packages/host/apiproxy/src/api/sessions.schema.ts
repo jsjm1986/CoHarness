@@ -332,7 +332,7 @@ export const promptContentPartSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('document'), docId: z.string().min(1) as unknown as z.ZodType<UserDocIdType> }),
 ])
 
-/** session.prompt request payload, including optional browser-local request provenance. */
+/** session.prompt request payload, including optional browser-local request metadata. */
 export const sessionPromptRequestSchema = z.object({
   sessionId: sessionIdSchema,
   mode: z.union([z.literal('queue'), z.literal('steer')]),

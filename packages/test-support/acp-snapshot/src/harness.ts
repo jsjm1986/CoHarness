@@ -30,6 +30,7 @@ import {
   type SessionNotification,
 } from '@agentclientprotocol/sdk'
 import { clearedProxyEnv } from '@deepseek-ai/dsh-http-proxy'
+import { parseSessionFormatLogFilename } from '@deepseek-ai/dsh-session-format'
 import {
   launchAcpTestAgent,
   type AcpTestClient,
@@ -767,9 +768,10 @@ function latestOpenTurn(content: string): number | undefined {
  * `parentSession`) leads, then each subagent child by ascending `createdAt`.
  *
  * Snapshot configs select the JSONL backend's raw mode, which lays sessions
- * out as `<root>/<project>/<session-id>/session.jsonl`. Recursive collection
- * catches the primary and every child session. Returns `[]` if no log was
- * produced (a no-session scenario).
+ * out as `<root>/<project>/<session-id>/session.v<generation>.jsonl` (the
+ * version-zero generation keeps the unversioned `session.jsonl` name).
+ * Recursive collection catches the primary and every child session. Returns
+ * `[]` if no log was produced (a no-session scenario).
  */
 async function harvestSessionLogs(root: string): Promise<HarvestedLog[]> {
   let files: string[]
@@ -778,9 +780,19 @@ async function harvestSessionLogs(root: string): Promise<HarvestedLog[]> {
   } catch {
     return []
   }
-  const logs: HarvestedLog[] = []
+  // Immutable-generation rules retain a migrated predecessor beside its
+  // version-named successor, so one session directory can hold several
+  // generations; only the highest is the session's current log.
+  const currentByDir = new Map<string, { file: string; version: number }>()
   for (const file of files) {
-    if (basename(file) !== 'session.jsonl') continue
+    const version = parseSessionFormatLogFilename(basename(file))
+    if (version === undefined) continue
+    const dir = dirname(file)
+    const seen = currentByDir.get(dir)
+    if (seen === undefined || version > seen.version) currentByDir.set(dir, { file, version })
+  }
+  const logs: HarvestedLog[] = []
+  for (const { file } of currentByDir.values()) {
     const content = await readFile(join(root, file), 'utf8')
     const firstLine = content.split('\n').find(line => line.trim().length > 0) ?? '{}'
     const header = JSON.parse(firstLine) as { id?: unknown; createdAt?: unknown; parentSession?: unknown }

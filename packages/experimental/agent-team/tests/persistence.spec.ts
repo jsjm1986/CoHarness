@@ -118,7 +118,7 @@ function provisioning(childId: SessionId, name: string): TeamMemberSnapshot {
   }
 }
 
-function persistedChild(
+async function persistedChild(
   ctx: Context,
   rootId: SessionId,
   childId: SessionId,
@@ -142,6 +142,14 @@ function persistedChild(
     start: 0,
     inserted: [message],
   })
+  await ctx.sessions.flush(child)
+  if (await ctx.sessionPersistence.stat(childId) === undefined) {
+    // The handle-based backend (JSONL) persists only through a write handle;
+    // coordinator-backed backends already drained the session/flush route.
+    const handle = await ctx.sessionPersistence.create(child.header)
+    await handle.append(child.snapshotEvents())
+    await handle.close()
+  }
   return child
 }
 
@@ -245,7 +253,7 @@ for (const backend of backends) {
         content: [{ type: 'text', text: 'durably pending initial task' }],
         source: { kind: 'user' },
       })
-      const child = persistedChild(first.ctx, rootId, childId, initial)
+      const child = await persistedChild(first.ctx, rootId, childId, initial)
       await Promise.all([
         first.ctx.sessions.flush(root.session),
         first.ctx.sessions.flush(child),
@@ -458,7 +466,7 @@ for (const backend of backends) {
           senderName: 'lead',
         },
       })
-      const child = persistedChild(first.ctx, rootId, childId, pending)
+      const child = await persistedChild(first.ctx, rootId, childId, pending)
       await Promise.all([
         first.ctx.sessions.flush(root.session),
         first.ctx.sessions.flush(child),

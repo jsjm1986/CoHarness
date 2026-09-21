@@ -286,6 +286,37 @@ describe('profile resolution generation', { concurrent: false }, () => {
     expect(await importFrom('resolution-lib', parent)).toMatchObject({ marker: 1 })
   })
 
+  it('prefers ambient TypeScript-source results over routed artifact entries', async () => {
+    const f = fixture()
+    const ambient = join(f.root, 'node_modules', 'ambient-lib')
+    file(join(ambient, 'package.json'), JSON.stringify({
+      name: 'ambient-lib',
+      version: '2.0.0',
+      type: 'module',
+      exports: { import: './index.ts' },
+    }))
+    file(join(ambient, 'index.ts'), 'export const marker = 2\n')
+    const routed = pkg(join(f.root, 'install', 'node_modules', 'ambient-lib'), 'ambient-lib', 1)
+    const generation: ProfileResolutionGeneration = {
+      profilesDir: join(f.root, 'profiles'),
+      profileDir: f.profile.dir,
+      localPackageNames: [],
+      entries: [Object.freeze({
+        name: 'ambient-lib',
+        packageDir: dirname(routed),
+        version: '1.0.0',
+        declarer: f.installAnchor,
+        scope: 'installation' as const,
+      })],
+    }
+    const registration = installProfileResolution(generation)
+    registrations.push(registration)
+    const parent = pathToFileURL(join(generation.profilesDir, 'entry.mjs')).href
+    expect(resolveFrom('ambient-lib', parent)).toBe(pathToFileURL(join(ambient, 'index.ts')).href)
+    expect(resolveFrom('ambient-lib', parent, { type: 'javascript' }))
+      .toBe(pathToFileURL(join(ambient, 'index.ts')).href)
+  })
+
   it('routes a scoped CommonJS package through its containing node_modules directory', async () => {
     const f = fixture('@scope/resolution-lib')
     const registration = installProfileResolution(await generationOf(f))

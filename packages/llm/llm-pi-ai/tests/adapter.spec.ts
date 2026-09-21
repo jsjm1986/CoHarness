@@ -1247,6 +1247,40 @@ describe('provider profile lifecycle', () => {
     expect(new LlmError('x', 'X')).toBeInstanceOf(Error)
   })
 
+  it('reports a deferred catalog failure as the route error', async () => {
+    // Stored profiles resolve deferred so one route's catalog loss does not
+    // take down the rest; the retained diagnostic surfaces at dispatch.
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'acme-gateway': {
+          api: 'openai-completions',
+          baseURL: 'https://acme.test',
+          modelOverrides: { m: { name: 'x' } },
+        },
+      }, 'deferred'),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+    })
+    await expect(adapter.resolveModel('acme-gateway', 'm'))
+      .rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    await expect(adapter.resolveModel('acme-gateway', 'm'))
+      .rejects.toThrow(/a declared route spells every model out/)
+  })
+
+  it('reports a deferred per-model diagnostic before provider I/O', async () => {
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        deepseek: { modelOverrides: { 'no-such-model': { name: 'ghost' } } },
+      }, 'deferred'),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+    })
+    await expect(adapter.resolveModel('deepseek', 'no-such-model'))
+      .rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    await expect(adapter.resolveModel('deepseek', 'no-such-model'))
+      .rejects.toThrow(/installed catalog does not describe/)
+  })
+
   it('keeps a catalog protocol outside the URL toggle set on its declared endpoint', async () => {
     const profiles = resolveProfiles({ mistral: {} })
     const model = profiles.get('mistral')?.piProvider?.getModels()[0]

@@ -599,6 +599,9 @@ async function readDecision(stream: AsyncIterable<StreamChunk>): Promise<AutoRev
       }
     }
   }
+  /* v8 ignore next -- ctx.llm.stream terminates every adapter stream with a
+     finish chunk (the text-thinking guard synthesizes a missing terminal), so
+     a no-finish stream cannot arrive through the only caller. */
   if (!finished) throw new Error('auto-review: reviewer emitted no terminal finish')
   const blocks = assembler.blocks()
   const final = blocks.at(-1)

@@ -213,12 +213,16 @@ it('re-derives launcher patches against every read generation', () => {
   const patchPath = join(dir, 'application.patch.yml')
   const context = {
     name: 'test', dir, patchPath, installAnchor, home, cwd: home,
-    startedBundles: ['base'], overlays: [], telemetryDisabledEnv: undefined,
+    startedBundles: ['base'],
+    // Non-string ids parsed from YAML inserts (e.g. `id: 5`) stay out of the
+    // rows map; only string-id rows feed derivePatches.
+    overlays: [], telemetryDisabledEnv: undefined,
     derivePatches: (rows: ReadonlyMap<string, { config?: unknown }>) => {
       const config = rows.get('roster')?.config as { default?: string } | undefined
       return config === undefined ? [] : [{ id: 'roster', config: { marker: config.default } }]
     },
   }
+  writeFileSync(patchPath, '- insert:\n  - id: 5\n    name: numeric\n')
   const first = composeEntries([readProfilePatches('test', context)]).find(row => row.id === 'roster')
   expect((first?.config as { marker?: string }).marker).toBe('a')
   writeFileSync(patchPath, '- id: roster\n  config:\n    default: b\n')

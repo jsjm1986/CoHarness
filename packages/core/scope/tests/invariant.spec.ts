@@ -86,6 +86,7 @@ describe('scoped-dispatch invariants', () => {
       ['tools/post-execute', [{ callId: 'c', name: 't', arguments: {}, agent }, { content: [], isError: false }, () => Promise.resolve({ kind: 'accept' })]],
       ['tools/pre-execute', [{ callId: 'c', name: 't', arguments: {}, agent }, () => Promise.resolve({ kind: 'allow' })]],
       ['tools/result', [{ callId: 'c', name: 't', arguments: {}, agent }, { content: [], isError: false }]],
+      ['user-questions/request', [{ agent, questions: [] }, () => Promise.resolve({})]],
     ]
 
     for (const [event, args] of rows) {

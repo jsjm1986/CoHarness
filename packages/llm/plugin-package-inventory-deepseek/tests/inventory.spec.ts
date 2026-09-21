@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -118,6 +118,7 @@ describe('DeepSeek plugin package inventory', () => {
     const id = SessionId('bare-agent')
     const agentScope = createScope(ctx, {})
     ctx.agents.register({ id, ctx: agentScope.ctx, session: { id } } as unknown as Agent)
+    await vi.waitFor(() => { expect(ctx.agents.get(id)).toBeDefined() })
     const bare = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL, sessionId: id })
     expect(bare.fields.dsh_plugin_packages?.packages).toEqual([{ name: 'host-only', version: '3.0.0' }])
   })

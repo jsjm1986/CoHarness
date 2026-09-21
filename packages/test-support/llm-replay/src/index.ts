@@ -15,7 +15,7 @@ import type {} from '@deepseek-ai/dsh-compaction'
 import { decodeSeqRanges, decodeStorageRecord, isChunkRow, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
 import {
-  sessionFormatCatalog,
+  sessionFormatCatalog as sessionFormatMigrationCatalog,
   type SessionFormatHeader,
   type SessionFormatMigrationStream,
 } from '@deepseek-ai/dsh-session-format/legacy'
@@ -231,7 +231,7 @@ function parseSessionFixture(text: string): ParsedSessionFixture {
       const cut = seedLength === undefined ? undefined : SessionLogOffset(seedLength)
       const header = { ...record, version: sourceVersion, isSeeded: seeded }
       try {
-        stream = sessionFormatCatalog.createStream(header as unknown as SessionFormatHeader, cut, {
+        stream = sessionFormatMigrationCatalog.createStream(header as unknown as SessionFormatHeader, cut, {
           emitEvent: (event) => { events.push(event as unknown as SessionEvent) },
         })
       } catch (error) {
@@ -247,7 +247,7 @@ function parseSessionFixture(text: string): ParsedSessionFixture {
       if (Object.hasOwn(record, 'sourceEventSeqs')) {
         record['sourceEventSeqs'] = decodeSeqRanges(record['sourceEventSeqs'])
       }
-      decoded = sourceVersion < sessionFormatCatalog.currentVersion
+      decoded = sourceVersion < sessionFormatMigrationCatalog.currentVersion
         ? decodeStorageRecord(record)
         : [record as unknown as SessionEvent]
     } catch (error) {
@@ -280,17 +280,40 @@ function parseSessionFixture(text: string): ParsedSessionFixture {
 }
 
 /**
+ * Field order of one physical Session header line, mirroring the released
+ * current-format encoder. `seedLength` is absent on purpose: it is a legacy
+ * physical seed marker the current writer never emits — the inherited cut is
+ * recovered from the event stream instead.
+ */
+const SESSION_HEADER_FIELD_ORDER = [
+  'type', 'version', 'id', 'createdAt', 'cwd', 'parentSession',
+  'isSeeded', 'origin', 'delegationDepth', 'agentPreset',
+] as const
+
+/**
  * Re-encode one committed session fixture at the current format generation for
  * snapshot comparison. The fixture parses through the same migration catalog
  * as {@link parseSessionLog}, so an older-generation file projects to the same
- * logical event stream a live run persists; the migrated header and events
- * serialize one JSON object per line with dense envelopes.
+ * logical event stream a live run persists; the migrated header prints in the
+ * canonical physical field order and every row prints one JSON object per
+ * line. Committed fixtures carry `{{cwd}}`-style placeholders, so the header
+ * serializes here rather than through the validating current encoder.
  * @param text - the raw `.jsonl` fixture contents.
  * @returns the fixture rewritten at the current Session format generation.
  */
 export function prepareSessionSnapshotFixtureForComparison(text: string): string {
   const { header, events } = parseSessionFixture(text)
-  const output = [JSON.stringify(header), ...events.map(event => JSON.stringify(event))]
+  const { seedLength: _seedMarker, ...fields } = header
+  const projected: Record<string, unknown> = {}
+  for (const key of SESSION_HEADER_FIELD_ORDER) {
+    if (Object.hasOwn(fields, key)) projected[key] = fields[key]
+  }
+  // Fields unknown to this projection stay visible as trailing entries, so a
+  // header drift surfaces as a mismatch instead of being silently dropped.
+  for (const key of Object.keys(fields)) {
+    if (!Object.hasOwn(projected, key)) projected[key] = fields[key]
+  }
+  const output = [JSON.stringify(projected), ...events.map(event => JSON.stringify(event))]
   return `${output.join('\n')}\n`
 }
 
@@ -618,7 +641,7 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
   // the header off the JSONL when it exists, else use a stable default so an
   // override-only fixture (header-less) still orders first as the primary.
   const primaryHeader = existsSync(config.file)
-    ? parseSessionHeader(readFileSync(config.file, 'utf8'))
+    ? readPrimaryHeader(config.file)
     : { id: '', createdAt: 0 }
   const primary: SessionScript = {
     recordedId: primaryHeader.id, createdAt: primaryHeader.createdAt, entries: primaryEntries, primary: true,
@@ -644,6 +667,24 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
   // XXX(concurrent-subagents): concurrent children need an explicit first-call ordinal.
   children.sort((a, b) => a.createdAt - b.createdAt || a.recordedId.localeCompare(b.recordedId))
   return [primary, ...children]
+}
+
+/**
+ * Read a primary fixture's ordering facts. `file` may itself be an override
+ * doc (a JSON array, not a session log) — it carries no header, so the
+ * fixture keeps the stable defaults. A corrupt header line still fails loud
+ * inside {@link parseSessionHeader}.
+ */
+function readPrimaryHeader(file: string): { id: string; createdAt: number } {
+  const text = readFileSync(file, 'utf8')
+  const firstLine = text.split('\n').find(line => line.trim().length > 0)
+  if (firstLine === undefined) return { id: '', createdAt: 0 }
+  const value = JSON.parse(firstLine) as unknown
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { id: '', createdAt: 0 }
+  }
+  const header = parseSessionHeader(text)
+  return { id: header.id, createdAt: header.createdAt }
 }
 
 /** Replay adapter that makes a configured provider catalog discoverable without provider I/O. */

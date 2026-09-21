@@ -412,7 +412,7 @@ function projectSessionSnapshot(rawLog: string): string {
 /**
  * Normalize and project persisted session JSONL for a committed fixture.
  * The logical event stream is projected after normalization so separate
- * persistence flushes produce one stable fixture layout; provenance ranges are
+ * persistence flushes produce one stable fixture layout; source-event ranges are
  * emitted as ordinary logical sequence arrays.
  * @param rawLog - persisted or already-projected session JSONL.
  * @param ctx - the run's volatile values to scrub.
@@ -427,6 +427,13 @@ function declaresSessionFormatVersion(rawLog: string): boolean {
   return typeof header.version === 'number'
 }
 
+/**
+ * Normalize a raw session `.jsonl` capture into its comparable golden form.
+ * @param rawLog - the raw session log content.
+ * @param ctx - the run-specific values replaced by stable tokens.
+ * @param options - platform spelling controls for tokenized paths.
+ * @returns the normalized session snapshot text.
+ */
 export function normalizeSessionSnapshot(
   rawLog: string,
   ctx: NormalizeContext,

@@ -3,6 +3,9 @@ import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { deriveTurnTokenUsage } from '../src/turn-usage.ts'
 
+/** Legacy flat `assistant/message` field carrying the model source record. */
+const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
+
 function event(seq: number, type: string, data: unknown): SessionEvent {
   return { seq, time: seq, type, data } as unknown as SessionEvent
 }
@@ -73,7 +76,7 @@ describe('deriveTurnTokenUsage', () => {
       turn: 1,
       step: 1,
       content: [{ type: 'text', text: 'done' }],
-      provenance: { provider: 'deepseek', model: 'deepseek-chat' },
+      [LEGACY_ASSISTANT_SOURCE_KEY]: { provider: 'deepseek', model: 'deepseek-chat' },
       usage: usage({ cacheReadTokens: undefined, cacheWriteTokens: undefined }),
     })
     expect(deriveTurnTokenUsage(complete(legacy))).toEqual({

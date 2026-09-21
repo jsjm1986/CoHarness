@@ -537,6 +537,16 @@ describe('OutputCollector', () => {
     expect(out.truncated).toBe(true)
   })
 
+  it('snapshot copies the retained tail with its pre-truncation byte total', () => {
+    const collector = new OutputCollector(4, 100, 'test', spillDir)
+    collector.push(Buffer.from('aabbcc'))
+    const snap = collector.snapshot()
+    expect(snap.totalBytes).toBe(6)
+    expect(snap.bytes.toString('utf8')).toBe('bbcc')
+    snap.bytes.write('XX')
+    expect(collector.readFrom(0).text).toBe('bbcc')
+  })
+
   it('readFrom returns increments and flags lossy reads', () => {
     const collector = new OutputCollector(10, 100, 'test', spillDir)
     collector.push(Buffer.from('aaaaa'))

@@ -287,7 +287,7 @@ describe('mux live view computation', () => {
     expect(page.map(event => event.seq)).toEqual(page.map((_event, index) => third.seq + index))
   })
 
-  it('paginates a message with many provenance sources without variadic argument expansion', async () => {
+  it('paginates a message with many source events without variadic argument expansion', async () => {
     const { ctx } = await harness()
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
     const session = ctx.sessions.create()
@@ -317,7 +317,7 @@ describe('mux live view computation', () => {
     })
     try {
       const response = await api.sessions.history({
-        rpcId: RpcId('t-hist-large-provenance'),
+        rpcId: RpcId('t-hist-large-source-events'),
         payload: { sessionId: session.id, maxMessages: 1 },
       })
       if (!response.result.ok) throw new Error('unreachable')

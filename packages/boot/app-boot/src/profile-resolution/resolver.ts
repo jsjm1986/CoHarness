@@ -278,6 +278,38 @@ function isUnselectedPackageMiss(error: unknown): boolean {
   return failure.code === 'MODULE_NOT_FOUND' && failure.path === undefined
 }
 
+/** Ambient result URL that marks a TypeScript source-plane loader (tsx paths). */
+const SOURCE_PLANE_URL = /\.(?:ts|tsx|mts|cts)(?:[?#].*)?$/
+
+/**
+ * Resolve a request through the ambient loader and keep the result only when it
+ * lands on a TypeScript source artifact. Routed lookups anchor on the
+ * declarer's manifest inside `node_modules`, which source-plane loaders do not
+ * remap — without this probe a profile launch under `pnpm dsh` loads plugin
+ * entries from `lib/` while their own imports resolve to `src/`, splitting
+ * per-module identity such as `Symbol`-keyed service facets.
+ * @returns the ambient result on the source plane, or `undefined` when ambient
+ *   resolution fails or stays on built JavaScript.
+ */
+function ambientSourceResult(
+  native: EsmResolve, request: string, parent: string, attributes: ImportAttributes,
+): ResolveResult | Promise<ResolveResult | undefined> | undefined {
+  let resolved: ResolveResult | Promise<ResolveResult>
+  try {
+    resolved = native(request, parent, attributes)
+  } catch {
+    return undefined
+  }
+  /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
+  if (resolved instanceof Promise) {
+    return resolved.then(
+      result => SOURCE_PLANE_URL.test(result.url) ? result : undefined,
+      () => undefined,
+    )
+  }
+  return SOURCE_PLANE_URL.test(resolved.url) ? resolved : undefined
+}
+
 function sameResolution(left: string, right: string): boolean {
   if (left === right) return true
   const leftPath = left.startsWith('file:') ? fileURLToPath(left) : left
@@ -691,54 +723,69 @@ export function installProfileResolution(
         return result
       }
       const routedParent = pathToFileURL(route.kind === 'fallback' ? route.entry.declarer : route.parent).href
-      if (behavior === 'enforce') {
+      const routed = (): ResolveResult | Promise<ResolveResult> => {
+        if (behavior === 'enforce') {
+          const previous = delegatedEsm
+          delegatedEsm = { parent: routedParent, request }
+          const restoreImporter = (error: unknown): never => throwWithImporter(error, routedParent, parent)
+          try {
+            let result: ResolveResult | Promise<ResolveResult>
+            try {
+              result = native(request, routedParent, attributes)
+            } catch (error) {
+              return restoreImporter(error)
+            }
+            /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
+            if (result instanceof Promise) return result.catch(restoreImporter)
+            if (cacheable) state.esm = result
+            return result
+          } finally {
+            delegatedEsm = previous
+          }
+        }
+        const actual = native(request, parent, attributes)
         const previous = delegatedEsm
         delegatedEsm = { parent: routedParent, request }
         const restoreImporter = (error: unknown): never => throwWithImporter(error, routedParent, parent)
         try {
-          let result: ResolveResult | Promise<ResolveResult>
+          let expected: ResolveResult | Promise<ResolveResult>
           try {
-            result = native(request, routedParent, attributes)
+            const result = native(request, routedParent, attributes)
+            expected = result
+            /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
+            if (result instanceof Promise) expected = result.catch(restoreImporter)
           } catch (error) {
             return restoreImporter(error)
           }
-          /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
-          if (result instanceof Promise) return result.catch(restoreImporter)
-          if (cacheable) state.esm = result
-          return result
+          /* v8 ignore start -- Node 22 is the asynchronous adapter and is covered by the external version matrix */
+          if (expected instanceof Promise || actual instanceof Promise) {
+            return Promise.all([actual, expected]).then(([resolved, wanted]) => {
+              assertEquivalent(resolved.url, wanted.url, request, parent)
+              if (cacheable) state.esm = resolved
+              return resolved
+            })
+          }
+          /* v8 ignore stop */
+          assertEquivalent(actual.url, expected.url, request, parent)
+          if (cacheable) state.esm = actual
+          return actual
         } finally {
           delegatedEsm = previous
         }
       }
-      const actual = native(request, parent, attributes)
-      const previous = delegatedEsm
-      delegatedEsm = { parent: routedParent, request }
-      const restoreImporter = (error: unknown): never => throwWithImporter(error, routedParent, parent)
-      try {
-        let expected: ResolveResult | Promise<ResolveResult>
-        try {
-          const result = native(request, routedParent, attributes)
-          expected = result
-          /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
-          if (result instanceof Promise) expected = result.catch(restoreImporter)
-        } catch (error) {
-          return restoreImporter(error)
-        }
-        /* v8 ignore start -- Node 22 is the asynchronous adapter and is covered by the external version matrix */
-        if (expected instanceof Promise || actual instanceof Promise) {
-          return Promise.all([actual, expected]).then(([resolved, wanted]) => {
-            assertEquivalent(resolved.url, wanted.url, request, parent)
-            if (cacheable) state.esm = resolved
-            return resolved
-          })
-        }
-        /* v8 ignore stop */
-        assertEquivalent(actual.url, expected.url, request, parent)
-        if (cacheable) state.esm = actual
-        return actual
-      } finally {
-        delegatedEsm = previous
+      /* A source-plane loader (tsx tsconfig paths) remaps workspace specifiers to
+         src but skips parents inside node_modules, so a routed lookup anchored on
+         the declarer's linked manifest would still land on lib while the
+         plugin's own imports reach src — splitting per-module identity such as
+         `Symbol`-keyed service facets. Ambient source results win. */
+      const ambient = ambientSourceResult(native, request, parent, attributes)
+      if (ambient !== undefined) {
+        /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
+        if (ambient instanceof Promise) return ambient.then(resolved => resolved ?? routed())
+        if (cacheable) state.esm = ambient
+        return ambient
       }
+      return routed()
     }
     return adapted
   }

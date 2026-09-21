@@ -269,9 +269,9 @@ describe('canonical event-local surface metadata', () => {
     })
   }
 
-  it('retains opaque ignorable metadata on unknown types without deriving messages', () => {
+  it.each(['extension/event', 'tool/code-dispatch', 'tool/code-dispatch-start'])('retains opaque ignorable %s metadata without deriving messages', (type) => {
     const event = {
-      type: 'extension/event', seq: SessionSeq(0), time: 1, data: { nested: { retained: true } }, ignorable: true,
+      type, seq: SessionSeq(0), time: 1, data: { nested: { retained: true } }, ignorable: true,
       surfaceOp: { opaque: ['not', 'placement'] }, sourceEventSeqs: { opaque: [null, true] },
     } as unknown as SessionEvent
     for (const [path, accept] of Object.entries(entryPaths)) {
@@ -284,7 +284,7 @@ describe('canonical event-local surface metadata', () => {
     expect(session.deriveMessages()).toEqual([])
   })
 
-  it.each(['turn/start', 'assistant/attempt', 'request/context', 'session/title', 'tool/ptc-dispatch', 'tool/code-dispatch'])('rejects known log-only %s metadata even when ignorable', (type) => {
+  it.each(['turn/start', 'assistant/attempt', 'request/context', 'session/title', 'tool/ptc-dispatch'])('rejects known log-only %s metadata even when ignorable', (type) => {
     for (const metadata of [{ surfaceOp: 'append' }, { sourceEventSeqs: [0] }]) {
       const event = {
         type, seq: SessionSeq(0), time: 1, data: { turn: 1, step: 1, stream: [] }, ignorable: true, ...metadata,

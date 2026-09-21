@@ -834,6 +834,14 @@ describe('modelOverrides', () => {
       deepseek: { modelOverrides: { [deepseekModel().id]: smuggled } },
     })).toThrow(/sets "id", which is the dict key/)
   })
+
+  it('retains a per-model diagnostic for a missing referent on deferred reads', () => {
+    const profile = resolveProfiles({
+      deepseek: { modelOverrides: { 'no-such-model': { name: 'ghost' } } },
+    }, 'deferred').get('deepseek')
+    expect(profile?.modelErrors.get('no-such-model'))
+      .toContain('which the installed catalog does not describe')
+  })
 })
 
 describe('compat switches', () => {

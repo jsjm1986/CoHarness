@@ -252,9 +252,10 @@ declare module '@deepseek-ai/cordis' {
      * creation and skips later listeners. Disposal retains the scope and session
      * until dispatch settles; listeners must not await agent.whenIdle() or their
      * own owner's disposal.
-     * @param payload.agent - the newly registered agent with its live session and completed setup.
-     * @param payload.source - fresh creation, resume, clear, or compaction source.
-     * @param payload.signal - factory initialization cancellation signal, when provided.
+     * @param payload - .agent - the newly registered agent with its live
+     *   session and completed setup; .source - fresh creation, resume, clear,
+     *   or compaction source; .signal - factory initialization cancellation
+     *   signal, when provided.
      * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
      * @mode serial
      */

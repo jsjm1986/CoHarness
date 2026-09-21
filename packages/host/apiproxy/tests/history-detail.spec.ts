@@ -9,7 +9,7 @@ import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { HistoryEntry } from '../src/api/sessions.ts'
-import { applyHistoryDetail, clipOmittedSpans } from '../src/fetch/history-detail.ts'
+import { appendOriginGroupStart, applyHistoryDetail, clipOmittedSpans } from '../src/fetch/history-detail.ts'
 
 function messageId(seq: number): ReturnType<typeof MessageId> {
   return MessageId(`00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`)
@@ -181,6 +181,15 @@ describe('applyHistoryDetail', () => {
     const result = applyHistoryDetail(events, 'conversation')
     expect(result.events).toEqual(events)
     expect(result.omittedSpans).toBeUndefined()
+  })
+})
+
+describe('appendOriginGroupStart', () => {
+  it('ignores citations that do not precede the message', () => {
+    const message = assistant(4)
+    message.event.sourceEventSeqs = [SessionSeq(2), SessionSeq(9)]
+    const entries = [user(1), attempt(2), attempt(3), message]
+    expect(appendOriginGroupStart(entries, 3)).toBe(2)
   })
 })
 

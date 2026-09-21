@@ -28,8 +28,11 @@ import type { PtcBindingFunction, PtcJsonValue, PtcRunResult } from '@deepseek-a
  * records the same race and solves it with argv-based identity; recording the
  * mkdtempSync results is the fs-mock equivalent.
  */
-const { failNextCopyOf, stagedDirs, tempDirs, tempFiles } = vi.hoisted(() => ({
+const { failNextCopyOf, procStat, stagedDirs, tempDirs, tempFiles } = vi.hoisted(() => ({
   failNextCopyOf: { value: undefined as string | undefined },
+  // Set to a string to answer `/proc/<pid>/stat` reads with it, to an Error
+  // to throw it; undefined leaves the real readFileSync in place.
+  procStat: { value: undefined as string | Error | undefined },
   stagedDirs: [] as string[],
   // Test-created temp dirs/files, registered by the helpers below and removed
   // after each test: a suite run over real python3 subprocesses must not
@@ -54,6 +57,13 @@ vi.mock('node:fs', async (importOriginal) => {
       const dir = actual.mkdtempSync(prefix)
       if (basename(prefix).startsWith('dsh-ptc-runtime-python-')) stagedDirs.push(dir)
       return dir
+    },
+    readFileSync(path: unknown, ...rest: never[]): unknown {
+      if (procStat.value !== undefined && String(path).startsWith('/proc/')) {
+        if (procStat.value instanceof Error) throw procStat.value
+        return procStat.value
+      }
+      return (actual.readFileSync as (path: unknown, ...args: never[]) => unknown)(path, ...rest)
     },
   }
 })
@@ -93,6 +103,8 @@ function makeTempDirSync(prefix: string): string {
 // Remove every fixture this file created, so repeated runs do not accumulate
 // `dsh-*` directories and wrappers in the shared tmpdir.
 afterEach(() => {
+  procStat.value = undefined
+  vi.restoreAllMocks()
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
   for (const file of tempFiles.splice(0)) rmSync(file, { force: true })
 })
@@ -790,6 +802,18 @@ describe('PythonPtcRuntime — process identity', () => {
       // fork per signal.
       expect(own).toBeUndefined()
     }
+  })
+
+  it('reads the Linux start-time field and degrades read failures to undefined', () => {
+    // The /proc parse itself is platform-shaped, so pin it through the fs stub
+    // rather than a second Linux-only test: coverage lanes off Linux (macOS
+    // dev hosts, the Windows gate) otherwise cannot see this body run at all.
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    // Fields after `) ` are stat positions 3+; position 22 is index 19 here.
+    procStat.value = `4242 (python3) S ${Array.from({ length: 18 }, () => '0').join(' ')} 9999`
+    expect(readProcessStart(4242)).toBe('9999')
+    procStat.value = Object.assign(new Error('gone'), { code: 'ENOENT' })
+    expect(readProcessStart(4242)).toBeUndefined()
   })
 })
 
