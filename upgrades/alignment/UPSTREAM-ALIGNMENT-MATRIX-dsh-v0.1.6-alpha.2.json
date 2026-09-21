@@ -9193,7 +9193,7 @@
     },
     {
       "area": "packages/e2b/e2b",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/e2b/e2b",
       "commitScope": [
         "packages/e2b/e2b/"
@@ -9222,12 +9222,13 @@
         "area": "packages/e2b/e2b",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "note": "Upstream removed this package after the sync baseline; absent from the dsh-v0.1.6-alpha.2 tree. Nothing local consumes it — no package to carry."
     },
     {
       "area": "packages/e2b/fs-e2b",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/e2b/fs-e2b",
       "commitScope": [
         "packages/e2b/fs-e2b/"
@@ -9250,12 +9251,13 @@
         "area": "packages/e2b/fs-e2b",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "note": "Upstream removed this package after the sync baseline; absent from the dsh-v0.1.6-alpha.2 tree. Nothing local consumes it — no package to carry."
     },
     {
       "area": "packages/e2b/subprocess-e2b",
-      "status": "adapt",
+      "status": "reject",
       "localOwner": "packages/e2b/subprocess-e2b",
       "commitScope": [
         "packages/e2b/subprocess-e2b/"
@@ -9284,8 +9286,9 @@
         "area": "packages/e2b/subprocess-e2b",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "targetAssessment": "not-carried",
+      "localSovereignty": "upstreamOnly",
+      "note": "Upstream removed this package after the sync baseline; absent from the dsh-v0.1.6-alpha.2 tree. Nothing local consumes it — no package to carry."
     },
     {
       "area": "packages/experimental/agent-team",

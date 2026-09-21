@@ -62,7 +62,7 @@
 
 - 2B：`verify-session-format-catalog`（＋`gen-session-format-catalog`）。上游 `persistence-*` 提取器族（`persistence-schema`、`persistence-formats`、`persistence-releases`、`persistence-changes`、`render-persistence-schema` 及配套 facts/source 模块与规格）依赖 `types.ts` 的 `SurfaceIntent<K>` 别名重构（alpha.2 事件面变更），本地旧内联交叉形式渲染出 `& object` 被拒；0R 保留本地旧版 `gen-persistence-catalog.ts`（其 `--check` 当前绿），该族文件与 `verify-persistence-*` 条目已撤下，随 `SurfaceIntent` 迁移在 2B 一并重拷接入。
 - 4A：`verify-workflow-guest`（＋`gen-workflow-guest`）。
-- 7E：`verify-client-ui-i18n`（332 处违规是全客户端本地化改造，ui-trajectory 130+、ui-primitives 40+；`ui-message-feedback` 的诊断码字面量已按修法修正）、`verify-package-readme-summaries`（295 处缺 `## Summary`）、`verify-tsconfig-paths`（＋gen）、`verify-subsystem-pages`（5 个新包缺归属链接）、`verify-application-entrypoints`（4 处入口分类）、`verify-concrete-terms`（43 处 `provenance` 与上游术语重命名同源，随 2B/7E 对齐清除）。
+- 7E：`verify-client-ui-i18n`（332 处违规是全客户端本地化改造，ui-trajectory 130+、ui-primitives 40+；`ui-message-feedback` 的诊断码字面量已按修法修正）、`verify-package-readme-summaries`（295 处缺 `## Summary`）、`verify-tsconfig-paths`（＋gen）、`verify-subsystem-pages`（5 个新包缺归属链接）、`verify-application-entrypoints`（4 处入口分类）、`verify-concrete-terms`（43 处来源字段名与上游术语重命名同源，随 2B/7E 对齐清除）。
 
 **拷贝后评估为耦合过早、已撤下待阶段重拷**：`verify-default-product-isolation`（依赖上游 `verify-client-packages.ts` 新增导出，7E 随该文件上游变化一并带入）、`benchmark-next-package-dependency`（同上）、`browser-bundled-externals`（依赖上游 `apps/web/product-isolation.ts`，7E）、`session-snapshot-corpus*`（依赖未携带的 `dsh-session-snapshot` 包，随该包进入阶段）、`snapshot-spill-locators`（依赖上游 `SpillSource.kind`，随 spill 包升级阶段）、`test:expected`／`test:docs`（依赖上游 `doc-quick` 车道与 expected 语料，7E 评估与本地 `test:snapshot` 对应关系后定）。
 
@@ -80,17 +80,17 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 
 | 编号 | 项 | 类型 | 来源 | 承接阶段 |
 | --- | --- | --- | --- | --- |
-| L1 | `pnpm run test:coverage` per-file 100% 从未对 Phase 1/2 源码执行；coverage 分片 3/3 曾被主动终止 | 未验证 | alpha.1 审计"Phase 1：Node 内部加载器依赖"、两处收口 | 1B、2B 首批前收口 |
+| L1 | `pnpm run test:coverage` per-file 100% 从未对 Phase 1/2 源码执行；coverage 分片 3/3 曾被主动终止 | 已验证 | alpha.1 审计"Phase 1：Node 内部加载器依赖"、两处收口 | 8-e.1 销账：`check:ci:coverage` 分区模式三腿全绿（4 分区 1201 插桩文件 + exempt-heavy 21138 测试，合并阈值零违规），缺口清单逐项收口详见 8-e.1 节 |
 | L2 | 真实 provider e2e：DeepSeek 双协议、BYOK 与组织代理路由、凭据归因 | 未验证 | alpha.1 审计各批 | 3A |
 | L3 | 组装快照未覆盖 Messages、图片、PTC 新面 | 未验证 | alpha.1 审计"Phase 2 收口" | 3A、3B、4A |
 | L4 | Python SDK 打包产物仅 macOS arm64 carrier 冒烟通过，Linux/Windows 产物未验 | 部分验证 | alpha.1 审计"Phase 2 收口" | 8 |
-| L5 | 跨平台原生验证（Linux/macOS/Windows；vendor 同步、subprocess、sandbox、landlock） | 未验证 | alpha.1 审计"Phase 1：Node 内部加载器依赖" | 4B、8 |
+| L5 | 跨平台原生验证（Linux/macOS/Windows；vendor 同步、subprocess、sandbox、landlock） | 部分验证 | alpha.1 审计"Phase 1：Node 内部加载器依赖" | macOS 26.6.2 arm64 已实测：subprocess-local＋sandbox-local＋sandbox-policy 415 通过／15 跳过，seatbelt e2e 5 通过（真实 sandbox-exec）；landlock/bwrap 为 Linux 专属按设计跳过；Linux/Windows 待 CI 平台矩阵（L18） |
 | L6 | 独立 Gateway 与树外治理插件业务回归 | 未验证 | alpha.1 审计"旧启动事件移除与全量验收" | 2B、7A、7D |
 | L7 | 桌面能力验收（computer-use、browser-use；GUI 主机权限） | 未验证／缺环境 | alpha.1 审计多批 | 5、6A（Q4） |
 | L8 | LAN/公网真实双用户验收 | 未验证／缺环境 | alpha.1 审计多批 | 6B、7B、8 |
-| L9 | 生产迁移演练、一致备份恢复、发布闭包与健康证据 | 未验证 | alpha.1 审计各收口 | 8 |
-| L10 | 原生 watcher `EMFILE`（errno -24，软／硬限额 unlimited 仍复现） | 环境阻塞 | alpha.1 审计"非事务 Loader 适配（过程批次）" | 1B 迁移后复测；8 部署前提 |
-| L11 | 宿主 Python 3.9.6 低于 3.10，`ptc-runtime-python` 两个测试文件失败，测试以 3.12 绕过 | 环境阻塞 | alpha.1 审计"干净基线测试" | 8 部署前提 |
+| L9 | 生产迁移演练、一致备份恢复、发布闭包与健康证据 | 部分验证 | alpha.1 审计各收口 | 8-d 合成数据迁移演练已实测（macOS 26.6.2 arm64）：session-format v0→v1→v2→v3→v4 代次链含 combined/preset 迁移、不可变代次与 multi-edge publication、未来格式拒绝（migration-refusal）、verifier worker 生命周期（migration-verifier）、SQLite v18↔v20 离线迁移与回滚——50 文件 1628 测试全绿；8-e 发布闭包：coverage 分片、hygiene、build、built smoke（12 文件 43 测试）、release:verify/pack（281+9+1 tarball）、packed-install（291 tarball 装入消费者，`dsh --version` 实测）全绿；8-e.3 复测另修复源码启动平面混合缺陷（profile-resolution ambient source 探测 + `TOOL_RUNTIME_SCHEDULER` 恢复 `Symbol.for`，见 `2026-09-21-profile-resolution-ambient-source-plane`）；生产备份恢复与双用户验收仍待 8-f |
+| L10 | 原生 watcher `EMFILE`（errno -24，软／硬限额 unlimited 仍复现） | 已验证 | alpha.1 审计"非事务 Loader 适配（过程批次）" | 1B 迁移后复测：迁移后 `boot/hmr` chokidar watcher 在 macOS 26.6.2 arm64（`ulimit -n` 软 1048575／硬 unlimited）下 `packages/boot/hmr/tests/` 68 测试全绿，EMFILE 未复现；部署前提已写入 `gateway/deploy/README.md` |
+| L11 | 宿主 Python 3.9.6 低于 3.10，`ptc-runtime-python` 两个测试文件失败，测试以 3.12 绕过 | 已验证 | alpha.1 审计"干净基线测试" | 8 部署前提：`python3`→CPython 3.12.13 下 `packages/experimental/ptc-runtime-python` 284 测试通过／2 跳过；3.9.6 在加载时被版本门禁拒绝（245 断言失败即拒绝证据）；前提已写入 `gateway/deploy/README.md` |
 | L12 | `session-persistence-jsonl/tests/lease.spec.ts` 全量并发下失败、隔离通过 | 不稳定 | alpha.1 审计"实施后全量复跑" | 2B |
 | L13 | ACP 子任务／标题等待超时偶发，修复保持原期限 | 不稳定 | alpha.1 审计"旧启动事件移除与全量验收" | 2B、7A |
 | L14 | Python runtime 清理耗时 4074ms 超过 4000ms 偶发；输出上限预期得到 timeout | 不稳定 | alpha.1 审计"串行创建与启动 hooks"、"Node 内部加载器依赖" | 4B |
@@ -100,9 +100,11 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 | L18 | CI 必需任务（平台矩阵、windows-wine、coverage lane）未在本地或分支执行 | 未验证 | 计划证据要求 | 8 |
 | L19 | `Fiber.update()` 返回 void 后，运行期配置更新失败只留在 fiber `_error` 与日志，无等价于启动路径的审计 | 观察项 | alpha.1 Phase 1 代码审查 | 1B |
 | L20 | 串行 `agent/created` 监听器顺序为隐式注册顺序，无显式编排 | 观察项 | alpha.1 Phase 2 代码审查 | 2B |
-| L21 | `tool-cordis` api-catalog 的 `agent/created` 参数描述缺 `agent`／`source`，goal `resume` 描述有语法错误 | 观察项 | alpha.1 Phase 2 代码审查 | 7D |
+| L21 | `tool-cordis` api-catalog 的 `agent/created` 参数描述缺 `agent`／`source`，goal `resume` 描述有语法错误 | 已验证 | alpha.1 Phase 2 代码审查 | 7D 销账：`@param payload.*` 点名在 `parseTags` 正则处坍缩为 `payload`，末位标签覆盖前者——改为单 `@param payload` 续行枚举三字段；`resume` 措辞对齐上游 `session-start edge`；`gen-cordis-api` 重生 + `verify-cordis-api` 105 产物同步；上游同缺陷，修复可上游化 |
 | L22 | 上游 profile-resolution／required-startup 策略在 alpha.1 推迟至发布闭包 | 推迟项 | alpha.1 审计"非事务 Loader 适配收口" | 1B（alpha.2 runtime 解析直接覆盖） |
 | L23 | Session 迁移链拆为上游 `session-format-*` 独立包的可选结构对齐 | 推迟项 | alpha.1 计划 | 7E 可选 |
+| L24 | 覆盖率全量并发下 5s/30s 短超时抖动：`persistence-schema`（10）、`verify-package-dependencies`（3）、`gen-client-catalog`（1）、`oxlint-contract`（1）、`tools-catalog`（1），隔离全过 | 已验证 | 8-e coverage 门禁复跑 | 8-e.4 销账：`tools-catalog`/`project-doc-site` 抬显式 120s 预算；`gen-client-catalog` 对 oxlint 探针 ENOENT 竞态加容忍；被杀门禁遗留探针孤儿已清理；8-e.1 收口复跑（4 分区/6 worker/300 全程）无抖动复现 |
+| L25 | `acp-snapshot` `waitForTurnEnd` 20ms 断言在高负载下迟判为 `Timed out in waitFor!` | 已验证 | 8-e coverage 门禁复跑 | 8-e.4 销账：该 spec 全部 20ms 等待断言统一抬 250ms（首回调在高负载下排不进 20ms 窗），8-e.1 收口复跑无复现 |
 
 ## 1B 执行台账（2026-09-18 首批落地）
 
@@ -125,15 +127,22 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - `SHIPPED_PRESET_ROOT`/`resolveShippedPresetPatch`/`composeProfilePatches` 重放进新 `profile-boot.ts`（`readProfilePatches` 结果后追加 derived patch，与 telemetryPatch 同型）；上游 alpha.2 已把等价机制收进 `agent-presets` 包的 `includeShippedRoot`，7E 整包迁移时本地 launcher patch 随之退役。
 - `apps/web/tests/scaffold.ts` 保留本地 gateway/downlink 脚手架（整换会丢 CoHarness 组装），仅点修 `healProfilesModuleFallback` options-object 签名与 `auditStartupEntries`。
 
-**撤下待阶段重拷（e2e 依赖未落地 API，不造假）**
+**撤下待阶段重拷（e2e 依赖未落地 API，不造假）——2026-09-21 终裁**
 
-- → 2B（session-format `generationLogFilename`/`JsonlCompression`）：`session-format-guard.expected.e2e.ts`
-- → 3A/2B（`dsh-session-snapshot` 依赖 `llm-replay`/`session-format` 未带导出）：acp 7 件（acp/cleanup+helper/control-surface/escalation/goal/hooks/image-offload）、headless 5 件（headless/semantic-checkpoint/subagent-diagnostic/subagent-inheritance/workspace-context-resume）
-- → 4A（`ptc-runtime-node`）：`ptc.e2e.ts`
-- → 7A（`WebBootGraph.batches`）：`runtime-roster.ts`/`runtime-roster-observer.ts`/`default-web-process.ts`/`web-default-isolation.expected.e2e.ts`
-- → 7B/7D（`@modelcontextprotocol/*@2.0` fixture `calls`）：`creator-plugin-manager.expected.e2e.ts` + fixture mjs
-- → 7E（`agent-presets.SHIPPED_PRESET_ROOT`/`modeSelectionEnabled`/`SettingsNamespace`）：`web-agent-presets.e2e.ts`
-- `packages/test-support/session-snapshot` 包整体不落地（级联缺 `prepareSessionSnapshotFixtureForComparison`/`parseSessionFormatLogFilename`）
+- → 2B（`generationLogFilename`/`JsonlCompression` 已落地）：`session-format-guard.expected.e2e.ts` **已重拷**，keyless 4/4 过
+- → 3A/2B（`dsh-session-snapshot`）：acp 7 件、headless 5 件 **不移植**——本地快照车道为 `*.snapshot.ts` 脚本/示例架构（`session-format-guard.snapshot.ts` 等已覆盖同场景回放），上游 harness 包无本地消费者
+- → 4A（`ptc-runtime-node` 已落地）：`ptc.e2e.ts` **已重拷**，5 过 + 2 凭据门控 skip；`Tool` provider 名册断言适配本地 cordis 全量自修改工具面（7 项 vs 上游 inspect-only 2 项）
+- → 7A（`WebBootGraph.batches` 未移植——combo 调度层是上游 bundle 架构，移植属产品决定）：`runtime-roster.ts`/`runtime-roster-observer.ts`/`default-web-process.ts`/`web-default-isolation.expected.e2e.ts` **继续挂 7A**
+- → 7B/7D（mcp@2.0 已落地）：`creator-plugin-manager.expected.e2e.ts` + fixture **已重拷**，1/1 过（真实 `apps/cli/lib/bin.js --profile web`，MCP 安装→重启恢复→移除全生命周期）。**重拷暴露真实产品缺口**：上游 preset 携带 `tool-plugin-manager` 行（cordis 启用、standard/ptc 禁用占位）而本地 preset 缺失，web 宿主面又已按上游禁用宿主行——本地 web agent 实际无 `plugin_manager`。已按上游构图补齐三个 preset 行
+- → 7E（`SHIPPED_PRESET_ROOT`/`modeSelectionEnabled` 未移植）：`web-agent-presets.e2e.ts` **不移植**——移植试跑 24/32 失败，preset 名册/`str_replace_editor`/session create-vs-load 语义/`userdoc-http` 宿主服务深度分歧；`mount.spec`/`session.spec`/`settings.spec` 包级套件覆盖同语义空间，`agent-preset-*.e2e`/`shipped-composition.e2e` 覆盖 web 面
+- `packages/test-support/session-snapshot` 包整体不落地（本地 `*.snapshot.ts` 车道承接回放；级联缺 `prepareSessionSnapshotFixtureForComparison`/`parseSessionFormatLogFilename`）
+
+**门禁 spec 补齐（2026-09-21 重拷）**
+
+- `session-query-spill-command.spec.ts` + `resolve-spill-command.{mjs,d.mts}` 夹具：1/1 过
+- `snapshot-http-fixtures.spec.ts` + `loopback-fixture-server.mjs`/`web-search-error-fixture.mjs` 夹具：4/4 过
+- `web-product-bundle-isolation.spec.ts`：**24/24 过**，并补齐缺失的 Vite 产物面接线——`apps/web/product-isolation.ts`（`productWebBundleIsolation`/`browserDependencyAnalysis` 适配器）+ `vite.config.ts` 插件挂载；真实 `vite build` 无违规通过。此前本地仅有 tsdown `BundleInputIsolation`（输入面），产物面是缺的第四条腿
+- **不移植**：`doc-standard.spec.ts`（上游 README 骨架/frontmatter 惯例，本地 i18n sidecar 体系由 docSyncLeafGates 覆盖）、`ci-compatible-selfhosted.spec.ts` 与 `tests/ci-{master-platforms,release-selfhosted}.spec.ts`（断言上游仓库身份 `deepseek-harness/deepseek-harness` 与 `vm-backup` runner，本地 `ci-workflow.spec.ts` 承接）、`build-exe-for-python-sdk{,-assets,-office}.spec.ts`（本地 dispatcher 重写版入口/资产面分歧，`native-pty` spec 覆盖共享面；office 能力未采纳）、`libreoffice-engine.spec.ts`（office/document 未采纳）、`preview-workflow.spec.ts`（Cloudflare 预览 workflow 不存在）、`browser-bundled-externals.spec.ts`（上游 bundle 粒度声明机制，本地 notices 走声明分层覆盖）
 
 **阶段改挂**
 
@@ -164,3 +173,81 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - `gen-tool-catalog.ts` 补 `dsh-plugin-manager`（`ctx.provide('pluginManager')`+`SandboxPolicy` mount）与 `dsh-mcp-resources`（`mcpResources.register('catalog')`）两个 TOOL_PACKAGES recipe（上游原样移植）；en 目录重生含 `plugin_manager` 与 3 个 mcp 资源工具节；zh 目录移植上游对应章节与映射表行，`来源：` 格式归一到本地约定。
 - 死链修复（`verify-md-links` 语义）：`mcp-client` 的 `#use-this-package` 锚对齐本地实际节 `#config`（zh README 补 `<a id="config">` shim，双语链接统一英文锚——配对门禁要求两侧锚一致）；`acp` 的 `#standard-acp-v1-surface`→本地 `#protocol-contract`（zh shim 已存在）；`base`/`agent-loop` 缺失节锚去 fragment 降为文件链；未携带目标（`computer-use` 页、`computer-use-cua-driver-native`、`mcp-memory` 指南、两份 9 月 Agent Note、`sparse-first-party` 归档 note）按惯例转纯文本，随所属阶段重拷时恢复链接。
 - 配对重录 15 条 `.i18n.yaml`；`verify-md-links` 2532 文件全过、`verify-translation-pairing` 1264 对全一致、`verify-tool-catalog`/`verify-cordis-catalog` 生成物同步、`verify-doc-budgets` 9、`verify-subsystem-pages` 7/7、`doc-typecheck` 92 块编译过、oxlint 与 `git diff --check` 干净。
+
+## Phase 8 执行台账（2026-09-19：部署前提与迁移演练）
+
+**8-b.7 收口（客户端本地化波次）**
+
+- `verify-client-ui-i18n`：492 个 client UI 源文件全部 locale-owned，零硬编码 copy。
+- `ui-primitives` 全部 labels/copy props 改必填（`JsonTree`/`Modal`/`HoverCard`/`ConnectionBanner`/`CodeBlock`/`DiffBlock`/`ReadBlock`/`SearchBlock`/`TerminalBlock`/`WebBlock`/`MarkdownText`），消费方经 `t`+labels 工厂接线；`codeLabels` 并入 `MarkdownLabels.code`。
+- `tool-call-model` 标题表改上游 `titleKey` 机制并纳入 `read_image` 分类；card-model 的 args 派生重构（上游删 `callView`/`resultView` 消费）属契约级架构分歧，登记为延迟端口不在本车道。
+- `Label`→`LabelKey` 键槽重命名（`submitLabelKey`/`cancelLabelKey`/`submitBusyLabelKey`）；`brand.product` 入 common 字典，`DocumentTitle` 收 `productTitle` prop 经 `ctx.get('locale')` 快照绑定；新增 `ui-usage-alert` locale 命名空间。
+- `pnpm run typecheck`、knip、492 文件 i18n 门禁、118 文件 1952 UI 测试全绿；`ui-renderer` 补 `../locale` project reference。
+- 误发产物清理：`packages/client/**/src` 内约 400 个 `.js`/`.d.ts`/map 杂散产物删除并复跑确认零残留。
+
+**8-c 部署前提证据（写入 `gateway/deploy/README.{md,zh.md}`）**
+
+- EMFILE：迁移后 `boot/hmr` chokidar watcher 在 macOS 26.6.2 arm64（`ulimit -n` 软 1048575／硬 unlimited）下 68 测试全绿，未复现。
+- CPython：`python3`→3.12.13 下 `ptc-runtime-python` 284 通过／2 跳过；宿主 3.9.6 由版本门禁在加载期拒绝（245 断言失败即拒绝证据）。
+- 平台能力：subprocess-local＋sandbox-local＋sandbox-policy 415 通过／15 跳过；seatbelt e2e 5 通过（真实 sandbox-exec）；landlock/bwrap 为 Linux 专属按设计跳过，归 L18 CI 平台矩阵。
+
+**8-d 合成数据迁移演练（销 L9 迁移演练部分）**
+
+- `session-format-v0-to-v1` validation spec 断言补齐：`tool/code-dispatch`/`tool/code-dispatch-start` 随 `assistant/chunk` 在 v4 退役，released-v0 清单差集期望漏更新（与上游 alpha.2 同文件一致，属合并漏项修复）。
+- 演练命令：`pnpm exec vitest run packages/session/session-format*/tests packages/session/session-persistence-jsonl/tests packages/session/session-persistence-sqlite/tests scripts/session-sqlite-migration.spec.ts`——50 文件 1628 测试全绿。
+- 覆盖：v0→v1→v2→v3→v4 代次链与 combined/preset 迁移、不可变代次（generation/multi-edge-publication）、未来版本拒绝（migration-refusal）、verifier worker 生命周期（migration-verifier）、SQLite v18↔v20 离线迁移与回滚（合成库，`mkdtemp` 隔离、无 live WAL 拷贝、无双写）。
+- 未覆盖仍挂 L9：生产一致备份恢复、发布闭包健康证据（8-e）、LAN/公网双用户验收（8-f）。
+
+**8-e 发布闭包与健康证据（2026-09-20 执行）**
+
+- coverage 分片（`test:coverage:partitioned`）：豁免表收窄——`packages/typert/` 整体豁免改为仅 `typert/generator`（loader/protocol/registry 迁入后其 spec 应入插桩运行）；豁免契约 spec 同步更新。11 个失败 spec 逐项修复：JSONL 持久化 fixtures 补 `sessionPersistence.create` 认领写句柄（agent-team `checkpoint-child`、persistence `persistedChild`）、`jsonl-restart`/`llm-retry` 对齐上游显式 create/open-read 流程、`cordis-host-runner` 断言对齐新错误文案、`canonical-envelopes` 恢复上游 opaque 期望（v4 admission 只拒非 ignorable dispatch 对）、`gen-tool-catalog` 补 stagehand 期望行、schedule plugin `PersistenceProbe` 补 `create`、ui-conversation 三个 spec 断言转 zh 字典值、ptc-runtime-python 走 3.12 PATH。
+- built smoke（`built-bin-smoke` 门禁集，`DSH_EXAMPLE_MODE=lib`）：12 文件 43 测试全绿；`keyless-smoke` 在 src/tsx 模式亦绿。修复清单：① `agent-loop` 配置 agent 持久化挂载竞态——Loader group `Promise.all` 并发挂载，`agent-loop` 构造时 `sessionPersistence` provider fiber 未 ACTIVE，严格 `ctx.get` miss 导致配置 agent 永不落盘；修复为 miss 时经 `ctx.get('loader').await()` 等组合树 settle 后重查（产品级潜伏 bug，上游同码亦存此竞态，已立 Agent Note `2026-09-21-configured-agent-persistence-mount-race` 并在 `upstream-sync.json` 挂 `core/agent-loop`）；② cli 补回 `dsh-acp-app`/`dsh-sdk-app`/`dsh-sdk-minimal` 三个依赖（合并丢失导致 built bin 下 sdk/acp profile 无法解析）；③ remotes invalid-input 断言对齐本地 envelope 语义（`gateway/input-invalid`）；④ headless 断言对齐本地 `progress` 默认关、web URL 无 token（台账已记 adapted-removed）；⑤ `loader-smoke` 补拷上游三个 fixture（`cli-mock-llm`/`headless-driver`/`production-profile`）并补 `dsh-app-boot`/`dsh-http-proxy` devDep。
+- 包布局与打包安装：`release:verify --family dsh`（281 成员 `0.1.5-alpha.1.coharness.1`，发布序解析，2 条 peer 无序按设计接受）、`verify-package-dependencies`（55 包合规）、`verify-npm-install-layout`（223 包/734 内部边/共享 Cordis/2316 peer 边）、`build:official`（212 client artifacts）、`release:pack`（281 dsh + 9 vendor + 1 landlock entry tarball，逐成员 payload 校验）。
+- packed-install 验证（`verify-packed-install` 复刻，291 tarball 装入临时消费者）：`verifyInstalledProductIsolation` 565 个默认产品包不含 experimental；安装后 `dsh --version` 在 plain node 下报 `0.1.5-alpha.1.coharness.1`。两处宿主差量已记录：tarball 移至纯 ASCII 路径（npm 11.11 无法打开百分号编码的非 ASCII `file:` URL）；optional deps 改为包含（koffi 3.3.1 源码构建在 darwin 无法链接 napi/uv 符号——其 cnoke/CMake 无 `-undefined dynamic_lookup`；`--omit=optional` 源码构建腿由 CI 在 linux 承担，linux ld 允许未定义符号）。
+- 8-e.3 复测暴露产品级潜伏缺陷（源码启动平面混合）：profile-resolution 把插件入口路由到 declarer 的 `node_modules` 清单（tsx paths 不覆盖该 importer）→ 入口落 `lib/`，而插件内部裸导入经 tsconfig paths 落 `src/` → `dsh-tools` 双实例 → `TOOL_RUNTIME_SCHEDULER` 符号分裂 → 首个工具调用 `UNKNOWN: prepare` 崩溃（`pnpm build` 后 `pnpm dsh` 必崩）。修复：`installProfileResolution` 在 enforce/verify 前探测 ambient 解析，命中 TypeScript 源码产物则优先 ambient（`resolver.ts`）；`TOOL_RUNTIME_SCHEDULER` 恢复 `Symbol.for`（9-18 决策在 alpha.2 合并中被回退为 `Symbol()`，此次一并恢复）。回归 spec `apps/cli/tests/profiles/headless/tests/source-launch.spec.ts` 走真实 `bin.ts`+tsx+`PluginPackages`+工具调用，对修复前实现失败。`resolver.ts` 四项 100%；agent-loop 379、app-boot 246、built-bin 31/31 绿。Agent Note `2026-09-21-profile-resolution-ambient-source-plane`；`upstream-sync.json` 挂 `boot/app-boot` 与 `core/tools`（后者 tracked→adapted）。上游同码亦存此潜伏隐患，修复可上游化。
+- 未覆盖仍挂 L9：生产一致备份恢复、LAN/公网双用户验收（8-f）；`--omit=optional` 腿与平台矩阵归 CI（L18）。
+
+**8-e.1 coverage 门禁收口（2026-09-21 复跑全绿）**
+
+- 门禁命令：`DSH_COVERAGE_PARTITIONS=4 DSH_COVERAGE_MAX_WORKERS=6 DSH_COVERAGE_TEST_TIMEOUT_MS=30000 DSH_GATE_CONCURRENCY=3 pnpm run check:ci:coverage`（企业池档参数，macOS 26.6.2 arm64）→ `build:native-system` 0.63s、`test:coverage-exempt-heavy` 102.77s（21138 测试）、`test:coverage` 分区 293.99s（4 分区 1201 文件）三腿全 PASS，合并阈值检查零违规。
+- 合并附带损失恢复（上游有、本地 merge 丢）：`vitest.config.ts` coverage.exclude 的 `ptc-runtime-node/process-entry.ts` 条目、`.gitignore` 的 `/dist/` 行、`util/brand/tests/brand.spec.ts`。
+- 上游 spec 移植并保留（本地语义兼容）：`ui-primitives` 的 tag/tag-styles/state-dot-styles/use-dismiss-on-outside-pointer/user-text-styles、`tool-bash`/`tool-pwsh` 的 `background-start.spec.ts`（纯逻辑面）；`ui-renderer` invariant spec 按本地 `ctx.provide` 接缝适配落地。另有 23 个上游 spec 引用本地不存在的模块路径或已被本地重构（装配测试 627c0f7、模型控件 cc39423 统一）取代，裁定不移植。
+- 本地新增 spec：`core/session` chunk-rows（malformed 守卫与溢出边界）、`apiproxy` assistant-stream（状态机直接覆盖，上游靠集成套件隐式覆盖）、`ui-renderer` invariant。
+- 既有 spec 补齐缺口：`llm`（`fileRequestText`、非 Error abort reason 默认文案）、`llm-pi-ai`（`resolveProfiles` 原始输入守卫）、`session-persistence`（`materializeDetached`/`ensureMaterialized` 空会话/`liveStorage`/跨 CWD 同 ID 冲突契约）、`session-persistence-jsonl`（v3 admission 两臂、zstd 输出预算、旧式 PID lease 记录、lease 读失败回退）、`apiproxy` `history-detail`（`sourceEventSeqs` 前向 seq）、`session-query`（非法 `preparedSessionCacheSize`、`observeSession`）、`acp-snapshot`（多代际 harvest 取最高格式代）、`typert/loader`（`pluginPackages` 缺省回退 `bootWithoutResolver`）、`typert/registry`（schema 工厂校验与 context-wire 冲突两臂）、`ptc-runtime-python`（mock `/proc` 的 `readProcessStart` Linux 模拟）、`user-text`（reference-chip 点击回调）、10 个 host 侧空 `apply` 包的 node-half 惯例测试、`plugin-package-inventory`（standing preset mount 分支——`agents.register` 异步落地需等待）、`ui-permission-presets`（catalog `!ok` 拒绝面）、`directory-picker-auto`（entry 挂载中被移除的失败路径）。
+- 窄豁免（`v8 ignore`，附不可达理由）：coordinator detached pending-events（公共 append 路径 `deferDraft=false` 直接物化，live owner 草稿前缀随 retire 删除）、catalog-default 的 `finish` fallback 与 `sourceEventSeqs` 内层守卫、session-format `flushBuffered` pending 守卫、`auto-review` 的 `!finished`（本地 `guardTextThinkingStream` 保证 finish chunk，不可达）。平台专属：`subprocess-local/linux-execve.ts` 按 `windowsOnlyCoverageExclusions` 对称模式入 Linux-only 豁免（macOS 无覆盖路径，上游由 Linux CI 腿承担）。
+- 抖动修复销 L24/L25：`tools-catalog` 与 `project-doc-site` 抬显式预算到 120s（插桩负载下 30s 默认不足）；`acp-snapshot` 全部 `waitFor` 20ms 断言统一抬 250ms（首个回调在高负载下排不进 20ms 窗，自身错误被 `Timed out` 覆盖）；`gen-client-catalog` 工作区扫描对 oxlint-contract 探针文件的 ENOENT 竞态加容忍（glob→read 间文件消失即跳过）；清出被杀门禁遗留的 `oxlint-contract-*` 探针孤儿与 `.oxlintrc.contract-*` 残留（曾被 tsc 误编进 lib/types）。本轮全量复跑无抖动复现。
+
+**8-e.4 doc-sync 与 hygiene 收口（2026-09-21 收口审查）**
+
+- `verify-persistence-formats`：本地写入器=v4 需补齐 v3 历史工件。从上游 `dsh-v0.1.6-alpha.2`（writer=3，commit `ddefc45f`）源码树经 `extractPersistenceSchema` 提取 v3 库存，产出 `historical-formats/v3.{md,zh.md,schema.json,i18n.yaml}`（61 根/469 类型，含全部摘要的机器声明与区分性特征记录）；格式索引自动刷为 v0–v4 五行。
+- `verify-persistence-changes`：v3→v4 类型变迁登记确认记录 `2026-09-21-v4`（decision=version-bump，含兼容性/验证双语 prose：header 收窄、assistant/chunk 移除改内嵌 stream、code-dispatch→ptc-dispatch、内容联合修订）。60 根 ↔ 2 历史记录匹配。
+- `doc-typecheck` 真实 API 漂移修复：文档代码块引用 v4 已移除的 `assistant/chunk`（extension-cookbook 两块改走 `agent/assistant-stream` chunk 帧，EN/ZH 同步含 feature-map 行）与已改名的 `CallId`（07-tutorial、llm-adapter 双侧改 `ToolCallId`）。
+- `verify-doc-graphs` 8 图重生；`verify-md-links` 2851 文件绿；`verify-doc-budgets`：`testing.md` 新增 spec 执行段致 1290 词超顶，按 relocation-first 原则双语同步压缩至 1198；`verify-repository-references`：`PROJECT-UNDERSTANDING.md`（一次性升级审计报告，含裸 commit hash）迁 `upgrades/`（前缀豁免且语义匹配），`preset-mount-audit` note 裸 hash 改描述性表述（双语）。
+- `verify-package-paths`：22 处指向上游未携带路径的 `packages/…` 散文引用按惯例转 `upstream:<group>/<pkg>/...` 非活引用形式，5381 文件绿。
+- `verify-translation-pairing`：修 5 处 zh 文档错 locale 链接（`.md`→`.zh.md`），1418 对全绿。
+- 生成物：`gen-config-catalog`、`gen-persistence-catalog`、`gen-doc-graphs`、Cordis API catalog（`agent/created` JSDoc 三 `@param payload.*` 合并单标签修坍缩）、`known-event-types.ts` 全部重刷并验证同步。
+- hygiene：knip 报的 `dsh-http-proxy` 未用 devDep 属合并漏项——上游 `loader-smoke/index.ts` 三处实质改进未随依赖落地（`clearedProxyEnv` 防机器 proxy 环境污染 fixture smoke、`sourceImport: 'tsx/esm'` 选项、`LoaderSmokeOptions` 的 caller-cwd 复用 union），已整段移植并补 tsconfig `util/http-proxy` 引用；`verify-runtime-closure` 暴露 `cordis` preset 新增 `tool-plugin-manager` 行后 `python/sdk-runtime` 缺 `dsh-plugin-manager`+`dsh-host-plugin-inventory` 传递依赖，已补声明（4 presets + 147 包闭包绿）。
+- 收口态：doc-sync 38/40（余 `verify-package-readme-summaries` 256 处、`verify-package-readme-model-experience` 180 处——上游 README 结构语料迁移，7E 车道已记录挂起；**已于 8-e.5 后段全部收口，doc-sync 40/40**）；typecheck/lint/coverage/hygiene 全绿。
+
+**8-e.5 交叉核对终裁（2026-09-21：六维子代理审计 + 逐条亲验）**
+
+- 子代理批次（文件级/组合/依赖/API 面/spec 覆盖/文档六维并行 ≤6）报出的候选缺口全部逐条亲验；误报已排除（`directory-picker-native` spec 双侧一致、`deepseek-flash` 模型名双侧一致、`llm-streaming.md` 上游不存在、docs.ts 的 feedback/attachment 子系统页 alpha.2 上游同样未投影）。
+- **真实源修复（spec 移植暴露，非测试问题）**：`agent-presets/mount.ts` 的 `mountDetail` 不识别 cause 包装 AggregateError——移植上游 `detailBranches` 递归缩进展平（嵌套组内失败行现在点名 `inner-first`/`inner-second` 而非止于 group 消息）；`discovery.ts` 的 `compositionProblem` 未兜 package-lookup 异常——补 try/catch 降级为该 preset 的 broken 理由（`the composition's plugins cannot be checked: …`），一个 preset 的查找失败不再中止整个名册列举。
+- **移植并全过**：`mount.spec` 五组上游新增用例（inactiveRows 集合 settle 报告、nested-broken 组内归因、packageOf 名册检查两例、无 baseUrl 名册拒绝；夹具 `throws.js`/`nested-broken/` 随拷，harness 补 `PluginPackages`+`builtins.group`，6 处 mkdtemp 接入 roots 清理）53/53、remote.spec 24/24（按本地契约适配见下）、hmr `transport` spec（按本地 `modules.invalidate/prefetch`+`entry.refresh()` 语义重写，jsdom 环境+异步 `fiber.dispose()`）、cordis-client-runner `api-catalog`/`providers` spec（按本地槽位模型重写，120/120）、agent-loop `continuation-messages`/`adapter` spec、`session-log-deepseek` `config` spec（适配本地默认关）与 `feedback-composition` spec（真实 loader 组合，storage 三件套经 namespace import 挂载）、`subagent-codex` `real-product-cleanup` 助手+spec（9/9）。
+- **不移植（有意分歧，已核）**：`system-prompt-admission.spec`（in-history admission 语义深度分歧，本地 `systemPromptUpdate` 管线）、`request-freeze.spec`（本地 `freezeRestoredObject` 恢复即深冻属 baseline 硬化，上游 dispatch 才冻——前提不成立）、`WeakMapWithValues`（唯一消费者 `ui-session` 未携带）、`shipped-root.spec`（本地 `profile-boot.ts` derived patch 承接，`shipped-preset-root`/`resolved-profile-boot` spec 覆盖）、`test-session-query.ts` 助手（本地 subagent spec 走"无查询服务"直面路径+内存后端，无 stub 需求）、`serial-created.mjs`（上游 patches 机制在本地 SDK 客户端为 `cordis=` 参数，`serial-listener-review.spec` 覆盖同语义）。
+- **agent-presets 语义分歧登记**（本地架构有意面，remote.spec 断言已按本地契约写）：preset remote 对非 RemoteError 一律包装 `gateway/internal`（错误边界不变式 vs 上游原始透传）；blank 判定走 `turnBoundary` 投影（仅 command/plugin 活动的会话仍可切换 vs 上游 `hasConversationContent` 消息内容判定）；无可写根时 `PresetNotWritableError` 携空 preset id（拒绝与 id 无关）；`PresetMountError` 包装 mount 失败（vs 上游逐条 RemoteError）；名册 API 无 `includeShippedRoot`/`modeSelectionEnabled`/`authorable`（`SHIPPED_PRESET_ROOT` 由 profile-boot derived patch 承接，line 127 已记）。
+- **session-log-deepseek Config 分歧**：本地 `enabled` 默认 false＋`killSwitch`/`allowlist`/`audit` 为有意硬化面，上游默认 true；config spec 按本地契约适配。
+- **矩阵销账**：`packages/e2b/{e2b,fs-e2b,subprocess-e2b}` 上游已自行移除（alpha.2 树无），矩阵行由 adapt 改 `reject`/`not-carried`/`upstreamOnly` 并补 note 记上游移除；`compaction-image-offload`/`session-format-v2-to-v3` 双侧俱在，行有效。
+- **文档/元数据补齐**：tier-1 发布面（telemetry-otel peer+dev 对位、apiproxy 补 `dsh-scope`/`dsh-session`/`dsh-session-persistence`/`dsh-session-projection`/`dsh-tools`、pi-ai 补 `dsh-fs` peer、benchmarks `dsh-terminal` dev、`tsconfig.host.json` 补 `dsh-http-proxy` 引用并对齐上游序）与 tier-2 测试 devDep（15 包按测试实引补齐，`dsh-client-store` 本地无包跳过）；`glossary` seam 例改上游 `dsh-user-approval`（本地同构，llm 无内置 Consumer）；website docs.ts 补 `dynamic-cordis` 投影条目（order 3）与 wire-extensions repo-only 注释。
+- **验证**：agent-presets 172/172、subagent-codex 72/72（含真实 codex 子进程 real-product 7 项）、hmr 6/6、cordis-client-runner 120/120、session-log-deepseek 全量绿；`pnpm install` 解析后 devDep 链接就位。
+- **subagent-dsh-sdk 失败诊断层（后续亲验追加）**：上游 alpha.2 在 `run.ts` 落地完整失败分类学（`SdkFailureStage`/`SdkFailureCategory`→固定安全 `Subagent failure (provider: DSH SDK; stage: …; category: …)` 诊断行）——本地基线期拷贝缺失。已移植：`SdkRunFailure`/`failureDiagnostic`/`sdkFailure`（TransportClosed→transport、JsonRpc/Protocol→protocol）、`sdkChildOutcome` 替 `sdkStopReason`（新增 `blocked`→`refusal`、disposed-abort→`child-disposed`、无终末→`missing-terminal`、未知→`child-unknown` 诊断）、`sdkConfigurationFailure`（cwd 解析失败安全包装）、`sdkStartupFailure`（initialize+cleanup AggregateError 拆分）、`internals.createHarness` 测试缝、`collectDiagnostic` 挂进 `settleRunResult`、teardown 包装 shutdown 失败；index.ts 的 `start` 前置 abort 检查 + `resolveChildCwd` 经 `sdkConfigurationFailure`+warn。e2e 同步升级上游三场景（夹具 `scoped-tool-subagent.ts` agent-scope 挂载+`subagent-model-selection-settings` 行、`mock-delegating-llm` 路由选择+resolveModel 记录、`child-mock-llm` RouteEcho 校验+失败模式；本地 `cordis=`/`resolveExampleLaunch`/`DSH_TEST_CHILD_*` env 机制承接上游 patches/dshHome 面）：路由 `mock/mock-routed/max/777`+maxTokens 转发+cwd 继承、子失败诊断与部分输出分离——2/2 + 单元 34/34 全绿；共享夹具 `sdk/client/tests/fake-runtime.ts` 同步升级上游 turn/end 发射块（`none` 真缺省、`FAKE_ABORT_REASON_KIND`、`FAKE_MALFORMED_REASON` 五变体），sdk-client 34/34 无回归。**登记待办**：`subagent-acp` 同型诊断层（`AcpFailureCategory`/`diagnosticText`/`remote-limit` 映射+权限决策诊断）未移植——上游 run.ts 是含 managed-range teardown 的整文件重写（619 vs 367 行），与本地树作用域 teardown 架构分歧，需专项移植协调两种生命周期模型，暂列挂起而非嫁接。**【已收口 2026-09-21】**：诊断分类学按 SDK 同型嫁接入本地 run.ts——`AcpFailureStage`/`AcpFailureCategory`/`AcpFailureFacts`/`AcpPermissionDecision`/`ACP_TOOL_KINDS`/`failureDiagnostic`/`permissionDiagnostic`/`diagnosticText`/`AcpRunFailure`/`acpConfigurationFailure`/`permissionRequestKind`/`startupFailure`/`terminalFailure`/`reportFailure` 全量移植；`latestPermission` 追踪挂进 onRequest；prompt 成功路径接 `terminalFailure`（max_turn_requests→remote-limit+stop reason、未知原因→unknown 固定回退不含原文、max_tokens/refusal/cancelled 携权限事实）、失败路径经 `settledOutcome` 有界观察（done 已 settle→`stage: process; process-exit`+退出码/信号，live→`transport`）；startup 失败按 `startupStage`（initialize/new-session）分类并经 `AcpRunFailure` 安全包装（配置 cwd 失败→`stage: initialize; configuration`，session id 缺失→`new-session; protocol`，spawn/done 失败携 `process-exit` 退出码）；dispose/teardown 失败同款包装。managed-range teardown 本体不移植（架构分歧维持）。夹具补 `MOCK_PERMISSION_IGNORE_DECISION`/`MOCK_TOOL_KIND`/`MOCK_CRASH_ON_INITIALIZE`/`MOCK_CRASH_AFTER_CHUNK`；spec 补 `expectedFailure`/`expectedPermission` 助手 + 既有断言 diagnostic 字段 + 6 个新测试（权限事实×2、cancelled 无诊断、remote-limit、未知回退、crash-after-chunk process-exit、initialize process-exit）——54/54 绿 + loader-composition e2e 绿。
+
+**8-e.5b README 语料迁移收口（2026-09-21：7E 挂起解除）**
+
+- 上游 alpha.2 的包 README 结构（`## Summary` + 规范 `## Model Experience` + zh `## 概述`/`## 模型体验`）此前整体未迁，挂为 7E 语料项（summaries 256 处 + model-experience 180 处违规）。本轮按"节级拼接保留本地自有内容"原则全量收口：**doc-sync 40/40 全绿，两门禁不再有余项**。
+- **节级移植**：239 个上游对齐文件经脚本提取上游 `## Summary`/`## 概述`（230 处新增）与 `## Model Experience`/`## 模型体验`（189 处长式节整段替换为上游规范版），位置按"引言块之后、首个 `## ` 之前"归位；无 `## ` 标题的组 README 双侧统一置于文末。
+- **分类学补齐**：`SENTENCE_MODEL_EXPERIENCE` 表补 6 个上游已审条目（browser-use、computer-use、ui-schedule、browser-use-runtime、deepseek-llm-api-extensions、session-turn-outline）；`util/values` 按上游裁定移入 `NO_MODEL_EXPERIENCE_SECTION`（整节省略）；`session-format` 保留上游长式节、删本地多余 none 分类。19 个本地分类包按表理由写规范短式句（`None, as …`/`Indirectly, through …` + `#### KV Cache effect`，双语）。4 个本地包长式节的 `**Runtime invariant:**` 游离段按惯例移入 `## Known Limitations` 节末，解除字段后非法段落违规。
+- **本地独有包手写**：26 个无上游文件的包（client/ui-*、collaboration、userdoc 系、gateway-runtime、archive-gateway、apiproxy、userdoc-http、model-access、model-provider-config、session-persistence-gateway/-sqlite、acp-snapshot、examples 组）按 dsh-doc 模板手写 `## Summary`/`## 概述`（≤100 词、用户视角）；`host/open-in-app`、`client/ui-open-in-app`、`util/http-proxy` 三个超长既有摘要压缩至限内（双语）。
+- **附带损伤修复**：zh 文件 7 处残留英文 `## Model Experience` 节清除（与新插 `## 模型体验` 并存致标题深度错位）；节级手术误吞的 6 个 `<a id>` 锚点（`known-limitations-and-deferred-work`×4、`confinement-error-indirectly`、`settlement-notice`）与 2 个 `**运行时不变式：**` 段按 HEAD 原位恢复；`tool-agent-team` zh 补同款 `<a id>` 锚；`tool-userdoc` zh 补手写 `## 模型体验` 三节长式翻译；ui-deliverables 上游 `tool-present` 死链改纯文本。
+- **门禁终态**：`verify-package-readme-summaries` 331/331、`verify-package-readme-model-experience` 279/279（125 structured + 224 model-context entries）、`verify-translation-pairing` 1421 对、`verify-md-links` 2857 文件、`verify-doc-budgets` 9/9（`packages/README.md` 按 relocation-first 压缩至 986）、doc-sync 40/40。`verify-package-readme-summaries` 的 spec 同步保留——迁移后该门禁成为常设护栏。
+- **验收协议物化**：仓库内不可收口的 8-f/L18/L9/L4/L7/Q4 已整理为可执行验收手册 [ACCEPTANCE-RUNBOOK.md](ACCEPTANCE-RUNBOOK.md)（双语）——每项含前置条件、步骤、通过判据与 Evidence 表；行转 `done` 需证据填齐并同步更新台账行。

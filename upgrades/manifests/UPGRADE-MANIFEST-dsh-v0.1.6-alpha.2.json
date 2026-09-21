@@ -21,7 +21,127 @@
   "status": "decisions-confirmed-increment-implementation-pending",
   "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.2.md",
   "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
-  "verification": [],
+  "verification": [
+    {
+      "phase": "7E",
+      "command": "pnpm exec tsx scripts/verify-client-ui-i18n.ts",
+      "exitCode": 0,
+      "note": "492 client source files locale-owned; zero hard-coded copy"
+    },
+    {
+      "phase": "7E",
+      "command": "pnpm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "phase": "7E",
+      "command": "pnpm exec knip --config knip.config.ts --treat-config-hints-as-errors",
+      "exitCode": 0
+    },
+    {
+      "phase": "7E",
+      "command": "pnpm exec vitest run packages/client/ui-*/tests",
+      "exitCode": 0,
+      "passed": 1952
+    },
+    {
+      "phase": "8",
+      "command": "pnpm exec vitest run packages/boot/hmr/tests",
+      "exitCode": 0,
+      "passed": 68,
+      "environment": "macOS 26.6.2 arm64, ulimit -n soft 1048575/hard unlimited; EMFILE not reproduced on the migrated chokidar watcher"
+    },
+    {
+      "phase": "8",
+      "command": "PATH=/tmp/py312bin:$PATH pnpm exec vitest run packages/experimental/ptc-runtime-python",
+      "exitCode": 0,
+      "passed": 284,
+      "skipped": 2,
+      "environment": "macOS 26.6.2 arm64, python3 -> CPython 3.12.13; host system python3 3.9.6 is rejected at load by the version gate"
+    },
+    {
+      "phase": "8",
+      "command": "pnpm exec vitest run packages/subprocess/subprocess-local/tests packages/sandbox/sandbox-local/tests/local.spec.ts packages/sandbox/sandbox-policy/tests",
+      "exitCode": 0,
+      "passed": 415,
+      "skipped": 15,
+      "environment": "macOS 26.6.2 arm64"
+    },
+    {
+      "phase": "8",
+      "command": "pnpm exec vitest run --config vitest.e2e.config.ts packages/sandbox/sandbox-local/tests/seatbelt.e2e.ts",
+      "exitCode": 0,
+      "passed": 5,
+      "environment": "macOS 26.6.2 arm64, real sandbox-exec"
+    },
+    {
+      "phase": "8-d",
+      "command": "pnpm exec vitest run packages/session/session-format*/tests packages/session/session-persistence-jsonl/tests packages/session/session-persistence-sqlite/tests scripts/session-sqlite-migration.spec.ts",
+      "exitCode": 0,
+      "files": 50,
+      "passed": 1628,
+      "environment": "macOS 26.6.2 arm64",
+      "note": "Synthetic migration rehearsal: v0→v1→v2→v3→v4 generation chain + combined/preset migrations, immutable-generation and multi-edge publication rules, future-version refusal (migration-refusal.spec), verifier worker lifecycle (migration-verifier.spec), SQLite v18↔v20 offline migration and rollback on synthetic stores; no live WAL copy, no dual writers"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run hygiene",
+      "exitCode": 0,
+      "note": "rescope-vendor:check + knip + publint + constraints + licenses + package-invariants + built-package-invariants + cordis-config + node-next-types + optional-dependency-imports + runtime-closure + package-dependencies + client-packages + plugin-surfaces + vendored-links all green"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run build",
+      "exitCode": 0,
+      "note": "tsc host/client lib + tsdown runtime bundles + web frontend; 212 client artifacts"
+    },
+    {
+      "phase": "8-e",
+      "command": "DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts <built-bin-smoke gate file set>",
+      "exitCode": 0,
+      "files": 12,
+      "passed": 43,
+      "environment": "macOS 26.6.2 arm64",
+      "note": "Full built-smoke gate set green in lib mode; keyless-smoke also verified in src (tsx) mode. Fixed en route: configured-agent persistence mount race in agent-loop (loader group mounts entries concurrently; strict ctx.get missed a not-yet-active sessionPersistence provider) — agent now settles the loader before resolving optional persistence; restored cli deps dsh-acp-app/dsh-sdk-app/dsh-sdk-minimal; stale assertions updated to intentional local semantics (envelope gateway/input-invalid, no URL token, progress-off-by-default); loader-smoke fixtures copied + missing devDeps declared"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run release:verify --family dsh",
+      "exitCode": 0,
+      "note": "281 members at 0.1.5-alpha.1.coharness.1, publish order resolved, 2 unordered peer declarations (dsh-api-remotes peers, accepted by design)"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run verify-package-dependencies && pnpm run verify-npm-install-layout",
+      "exitCode": 0,
+      "note": "55 packages match published dependency policy; 223 DSH packages per release, 734 internal edges, one shared Cordis install, 2316 peer edges matched"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run build:official",
+      "exitCode": 0,
+      "note": "native-system + lib + web official profile; 212 client artifacts recorded with 4 public values"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run release:pack --family dsh --out dist/npm && pnpm run release:pack --family vendor --out dist/npm-vendor && pnpm --dir native/system run build:ts && pnpm --dir native/system/packages/entry pack --pack-destination dist/npm-landlock",
+      "exitCode": 0,
+      "note": "281 dsh + 9 vendor + 1 landlock-entry tarballs; per-member payload validation passed"
+    },
+    {
+      "phase": "8-e",
+      "command": "packed-install replica of pnpm run release:verify-packed-install --family dsh --from <staged dist/npm{,-vendor,-landlock}>",
+      "exitCode": 0,
+      "environment": "macOS 26.6.2 arm64, node 25.8.1, npm 11.11.0",
+      "note": "291 tarballs installed into a throwaway consumer; verifyInstalledProductIsolation: 565 default-product packages exclude experimental packages; installed @deepseek-ai/dsh --version reports 0.1.5-alpha.1.coharness.1 under plain node. Local-host deltas vs the CI gate: tarballs staged under an ASCII-only path because npm 11.11 cannot open percent-encoded non-ASCII file: tarball URLs, and optional deps were included because koffi 3.3.1's source build cannot link napi/uv symbols on darwin (its cnoke/CMake carries no -undefined dynamic_lookup); the --omit=optional source-build leg is exercised by CI on linux where ld permits undefined symbols"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm exec vitest run packages/boot/app-boot/tests --coverage && pnpm exec vitest run apps/cli/tests/profiles/headless/tests/source-launch.spec.ts && pnpm dsh --profile headless <mock round trip>",
+      "exitCode": 0,
+      "note": "Built-smoke 8-e.3 surfaced a product-level latent defect on the source launch: profile-resolution routed plugin entries to lib/ through the declarer's node_modules manifest (invisible to tsx paths) while each plugin's own imports fell back to src/ via tsconfig paths — two dsh-tools copies, TOOL_RUNTIME_SCHEDULER identity split, UNKNOWN prepare crash on the first tool call after pnpm build. Fix: installProfileResolution probes ambient resolution and prefers TypeScript-source results (packages/boot/app-boot/src/profile-resolution/resolver.ts); TOOL_RUNTIME_SCHEDULER restored to Symbol.for per note 2026-09-18 (alpha.2 merge had reverted it to Symbol()). New regression spec apps/cli/tests/profiles/headless/tests/source-launch.spec.ts boots real bin.ts+tsx+PluginPackages and completes a tool call — fails pre-fix. resolver.ts at 100% all metrics; agent-loop suite 379, app-boot suite 246, built-bin 31/31 green. Agent Note 2026-09-21-profile-resolution-ambient-source-plane; upstream-sync.json notes on boot/app-boot and core/tools. Upstream carries the identical latent hazard (upstream-applicable fix)."
+    }
+  ],
   "decisions": [
     {
       "id": "foundation",
