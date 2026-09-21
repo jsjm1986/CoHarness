@@ -68,6 +68,10 @@ function clientModel(model: CordisCatalogModel): CordisCatalogModel {
 function main(): void {
   const { projector, model } = projectCordisCatalog(root, {
     ...CORDIS_CATALOG_POLICY,
+    // The client face has a real browser TimerService at `ctx.timer`; the
+    // policy's curated host-side timer entry would collide with it under the
+    // same key, so this projection keeps the discovered browser service only.
+    runtimeServices: [],
     runtimeDeclarationMaxChars: 4_096,
   }, 'client')
   const destination = resolve(root, CLIENT_OUT)

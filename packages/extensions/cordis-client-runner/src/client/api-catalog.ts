@@ -304,43 +304,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
-    key: 'timer',
-    summary: 'Disposable timer helpers mixed into Cordis contexts.',
-    description: 'Disposable timer helpers mixed into Cordis contexts.',
-    methods: [
-      {
-        signature: 'timeout(callback: () => void, delay: number): () => void',
-        description: 'Run a callback once and return its disposer.',
-        parameters: [],
-      },
-      {
-        signature: 'timeout(delay: number): Promise<void>',
-        description: 'Resolve after a delay; disposal rejects the pending promise.',
-        parameters: [],
-      },
-      {
-        signature: 'interval(callback: () => void, delay: number): () => void',
-        description: 'Run a callback repeatedly and return its disposer.',
-        parameters: [],
-      },
-      {
-        signature: 'interval<R = any>(delay: number): AsyncIterableIterator<void, R, void>',
-        description: 'Return an async iterator of timer ticks.',
-        parameters: [],
-      },
-      {
-        signature: 'throttle<F extends (...args: any[]) => void>(callback: F, delay: number, noTrailing?: boolean): F & { dispose: () => void }',
-        description: 'Return a throttled function whose timer is disposed with the current fiber.',
-        parameters: [],
-      },
-      {
-        signature: 'debounce<F extends (...args: any[]) => void>(callback: F, delay: number): F & { dispose: () => void }',
-        description: 'Return a debounced function whose timer is disposed with the current fiber.',
-        parameters: [],
-      },
-    ],
-  },
-  {
     key: 'workspaces',
     summary: 'The workspaces-service face injected as `ctx.workspaces`.',
     description: 'The workspaces-service face injected as `ctx.workspaces`.',
