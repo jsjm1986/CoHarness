@@ -17,15 +17,26 @@
  *                        `result` must still settle `aborted` on its own and
  *                        `dispose()` must still kill the process.
  * - `MOCK_PERMISSION`  — if `1`, the agent calls `session/request_permission`
+ *                        before answering, to exercise the client's auto-answer.
+ * - `MOCK_NO_ALLOW`    — with MOCK_PERMISSION, offer only reject-shaped options
+ *                        so an `allow`-policy client still ends up denying.
  * - `MOCK_PERMISSION_IGNORE_DECISION` — if `1`, continue after a denied
  *                        permission so the terminal failure can carry the
  *                        provider's fixed permission fact.
  * - `MOCK_TOOL_KIND`   — a ToolKind to report on the permission toolCall.
+ * - `MOCK_THOUGHT`     — if `1`, stream an `agent_thought_chunk` before the
+ *                        assistant text.
+ * - `MOCK_SESSION_ID`  — a fixed `sessionId` to return from `session/new`
+ *                        (default: a fresh randomUUID).
+ * - `MOCK_NEWSESSION_READY` + `MOCK_NEWSESSION_GO` — `session/new` touches READY
+ *                        then polls for GO before answering (a deterministic
+ *                        cancel-during-new-session window).
  * - `MOCK_CRASH_ON_INITIALIZE` — exit while the unpublished initialize
  *                        operation is active.
+ * - `MOCK_CRASH_ON_PROMPT` — exit immediately when `session/prompt` arrives.
+ * - `MOCK_CRASH_ON_CANCEL` — exit when `session/cancel` arrives.
  * - `MOCK_CRASH_AFTER_CHUNK` — exit after streaming the assistant chunk, so
  *                        the parent preserves partial output with process facts.
- *                        before answering, to exercise the client's auto-answer.
  * - `MOCK_ECHO_CWD`    — if `1`, ignore MOCK_TEXT and stream two lines instead:
  *                        the agent PROCESS's `process.cwd()` and the `cwd` the
  *                        client announced in `session/new` — so a test can assert
@@ -51,6 +62,8 @@
  *                         exercising dispose's middle tier (exit during the SIGTERM
  *                         grace, before the SIGKILL escalation). Touches
  *                         MOCK_READY_FILE once armed.
+ * - `MOCK_TRAP_SIGTERM` — with MOCK_IGNORE_EOF, survive SIGTERM too (SIGKILL-rung
+ *                         probe).
  *
  * It is not a test spec: the specs launch this protocol-only fixture through
  * the mode-aware example resolver (tsx in source mode, Node type stripping in
@@ -171,6 +184,8 @@ function makeAgent(conn: AgentClient): Agent {
           },
           options,
         })
+        // The backend's deny answer is `{ outcome: 'cancelled' }`; a client that
+        // denied by selecting a reject_once option would not land here.
         if (decision.outcome.outcome === 'cancelled' && !IGNORE_PERMISSION_DECISION) {
           return { stopReason: 'cancelled' }
         }

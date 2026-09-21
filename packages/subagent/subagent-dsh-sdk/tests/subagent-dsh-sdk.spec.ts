@@ -6,7 +6,7 @@
  * quiescent disposal are all exercised end to end. No model, no key.
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -33,6 +33,12 @@ function request(text = 'p', signal = new AbortController().signal) {
   return { label: text, prompt: [{ type: 'text' as const, text }], parent: fakeParent, signal }
 }
 
+/** Every setup() Context, disposed after each test (dispose is idempotent). */
+const contexts: Context[] = []
+afterEach(async () => {
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
+})
+
 /** Mount the SDK backend pointed at the fake runtime, scripted by `fakeEnv`. */
 async function setup(fakeEnv: Record<string, string> = {}, config: Partial<sdk.Config> = {}) {
   const ctx = new Context()
@@ -49,6 +55,7 @@ async function setup(fakeEnv: Record<string, string> = {}, config: Partial<sdk.C
     env: fakeEnv,
     ...config,
   })
+  contexts.push(ctx)
   return ctx
 }
 
@@ -161,7 +168,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   })
 
   it('maps a max-tokens child turn end', async () => {
-    const ctx = await setup({ FAKE_REASON_KIND: 'max-tokens', FAKE_STATUS: 'error' })
+    const ctx = await setup({ FAKE_REASON_KIND: 'max-tokens' })
     const run = await ctx.subagents.start('dsh-sdk', request())
     expect((await run.result).stopReason).toBe('max-tokens')
     await run.dispose()
@@ -169,7 +176,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   })
 
   it('flattens a child turn error into stopReason error and keeps partial text', async () => {
-    const ctx = await setup({ FAKE_REASON_KIND: 'error', FAKE_STATUS: 'error', FAKE_TEXT: 'partial answer' })
+    const ctx = await setup({ FAKE_REASON_KIND: 'error', FAKE_TEXT: 'partial answer' })
     const run = await ctx.subagents.start('dsh-sdk', request())
     const result = await run.result
     expect(result.stopReason).toBe('error')
@@ -195,6 +202,36 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     const result = await run.result
     expect(result.stopReason).toBe('error')
     expect(result.diagnostic).toBe('Subagent failure (provider: DSH SDK; stage: session-run; category: child-unknown)')
+    await run.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('classifies a malformed turn/end reason as a protocol failure', async () => {
+    const ctx = await setup({ FAKE_MALFORMED_REASON: 'aborted' })
+    const run = await ctx.subagents.start('dsh-sdk', request())
+    const result = await run.result
+    expect(result.stopReason).toBe('error')
+    expect(result.diagnostic).toBe('Subagent failure (provider: DSH SDK; stage: session-run; category: protocol)')
+    await run.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('classifies a turn/end with no data member as a protocol failure', async () => {
+    const ctx = await setup({ FAKE_MALFORMED_REASON: 'no-data' })
+    const run = await ctx.subagents.start('dsh-sdk', request())
+    const result = await run.result
+    expect(result.stopReason).toBe('error')
+    expect(result.diagnostic).toBe('Subagent failure (provider: DSH SDK; stage: session-run; category: protocol)')
+    await run.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('maps a child-side disposed abort to aborted with a child-disposed diagnostic', async () => {
+    const ctx = await setup({ FAKE_REASON_KIND: 'aborted', FAKE_ABORT_REASON_KIND: 'disposed' })
+    const run = await ctx.subagents.start('dsh-sdk', request())
+    const result = await run.result
+    expect(result.stopReason).toBe('aborted')
+    expect(result.diagnostic).toBe('Subagent failure (provider: DSH SDK; stage: session-run; category: child-disposed)')
     await run.dispose()
     await ctx.fiber.dispose()
   })
@@ -225,7 +262,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   })
 
   it('reports a settled-without-turn child as an error', async () => {
-    const ctx = await setup({ FAKE_REASON_KIND: 'none', FAKE_STATUS: 'error' })
+    const ctx = await setup({ FAKE_REASON_KIND: 'none' })
     const run = await ctx.subagents.start('dsh-sdk', request())
     const result = await run.result
     expect(result.stopReason).toBe('error')

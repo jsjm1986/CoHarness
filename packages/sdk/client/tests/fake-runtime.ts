@@ -4,17 +4,16 @@
  * env vars — no model, no network, no harness imports. Speaks the runtime's
  * newline-delimited JSON-RPC protocol on stdio: answers `initialize`,
  * `session/prompt` (streaming scripted `session.event` notifications, then
- * `session.finished`, then the response), and `shutdown`.
+ * `session.status` idle and the response), and `shutdown`.
  *
  * Script vocabulary (all optional):
  * - `FAKE_TEXT`: assistant text for each turn (default `hello from fake runtime`).
- * - `FAKE_STATUS`: the `session.finished` status (default `ok`).
- * - `FAKE_REASON_KIND`: the `session.finished` reason kind (default `completed`; `none` omits the reason).
+ * - `FAKE_REASON_KIND`: the `turn/end` reason kind (default `completed`; `none` omits the reason).
  * - `FAKE_SUBAGENT`: also emit a child session (subagent.started + child event + subagent.finished).
  * - `FAKE_ECHO_CWD`: prefix the assistant text with the process cwd.
  * - `FAKE_ECHO_ENV`: comma-separated env names to echo as `name=value` lines in the assistant text.
- * - `FAKE_MALFORMED`: `initialize` returns `{}` (no serverInfo); `prompt` returns `{}` (no accepted).
- * - `FAKE_MALFORMED_PROMPT`: `initialize` is normal; only `prompt` returns `{}` (no accepted).
+ * - `FAKE_MALFORMED`: `initialize` returns `{}` (no serverInfo); `prompt` returns `{}` (no messageId).
+ * - `FAKE_MALFORMED_PROMPT`: `initialize` is normal; only `prompt` returns `{}` (no messageId).
  * - `FAKE_INIT_ERROR`: `initialize` answers a JSON-RPC error response with code 7.
  * - `FAKE_INIT_ERROR_ONCE_FILE`: fail `initialize` (code 7) only when this
  *   marker file does NOT exist yet, creating it — so the first runtime
@@ -26,7 +25,7 @@
  *   the event; `FAKE_MALFORMED_MESSAGE`: assistant/message content is not an
  *   array; `FAKE_MESSAGE_WITHOUT_DATA`: assistant/message with no data
  *   member; `FAKE_MALFORMED_REASON`: the `turn/end` carries a bare reason
- *   (`1`), an aborted reason without its cause (`aborted`), an unknown abort
+ *   (`'not-a-reason-envelope'`), an aborted reason without its cause (`aborted`), an unknown abort
  *   cause (`abort-unknown`), a hook cause without its reason (`hook`), or no
  *   `data` member (`no-data`) — wire-validation probes.
  * - `FAKE_EMPTY_MESSAGE`: the turn streams a text chunk, then records an empty
@@ -37,7 +36,7 @@
  *   cancel-during-handshake window).
  * - `FAKE_HANG_PROMPT`: never answer `session/prompt` (for timeout/dispose tests).
  * - `FAKE_STREAM_THEN_MALFORMED`: stream a text chunk for the prompt, then
- *   answer `{}` (no accepted) — same-pipe ordering makes the chunk arrive
+ *   answer `{}` (no messageId) — same-pipe ordering makes the chunk arrive
  *   before the protocol failure (partial-output retention probe).
  * - `FAKE_IGNORE_EOF` + `FAKE_SIGTERM_FILE`: keep running after stdin EOF; touch the file on SIGTERM (ladder probe).
  * - `FAKE_TRAP_SIGTERM`: with `FAKE_IGNORE_EOF`, survive SIGTERM too (SIGKILL-rung probe).

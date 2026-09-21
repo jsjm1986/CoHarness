@@ -9,7 +9,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
 import { HarnessClient, isRecord, SdkProtocolError } from './client.ts'
 import type { ContentBlock, DeepSeekHarnessOptions, HarnessClientOptions, HarnessNotification, RunResult } from './types.ts'
 
@@ -90,7 +90,14 @@ export class DeepSeekHarness implements AsyncDisposable {
         })
       } catch (error) {
         this.initialized = undefined
-        await this.clientInstance.close()
+        try {
+          await this.clientInstance.close()
+        } catch (cleanupError: unknown) {
+          throw new AggregateError(
+            [error, cleanupError],
+            'DeepSeek Harness initialization and cleanup failed',
+          )
+        }
         if (!this.closed) this.clientInstance = new HarnessClient(this.launch)
         throw error
       }
@@ -236,6 +243,33 @@ export function normalizeInput(input: string | ContentBlock[]): ContentBlock[] {
   return typeof input === 'string' ? [{ type: 'text', text: input }] : input
 }
 
+/** Validate the provider-read fields of one wire turn-end reason. */
+function validatedTurnEndReason(value: unknown): TurnEndReason {
+  if (!isRecord(value) || typeof value.kind !== 'string') {
+    throw new SdkProtocolError(`turn/end carried no reason envelope: ${JSON.stringify(value)}`)
+  }
+  if (value.kind === 'aborted') {
+    if (!isRecord(value.reason) || typeof value.reason.kind !== 'string') {
+      throw new SdkProtocolError(`turn/end carried a malformed aborted reason: ${JSON.stringify(value)}`)
+    }
+    switch (value.reason.kind) {
+      case 'user':
+      case 'parent':
+      case 'disposed':
+      case 'legacy':
+        break
+      case 'hook':
+        if (typeof value.reason.reason !== 'string') {
+          throw new SdkProtocolError(`turn/end carried a malformed hook abort reason: ${JSON.stringify(value)}`)
+        }
+        break
+      default:
+        throw new SdkProtocolError(`turn/end carried an unknown abort reason: ${JSON.stringify(value)}`)
+    }
+  }
+  return value as unknown as TurnEndReason
+}
+
 /** Validate the fields in a wire `session.event` envelope before returning the typed result. */
 function validatedSessionEvent(value: unknown): SessionEvent {
   if (!isRecord(value) || typeof value.type !== 'string') {
@@ -250,6 +284,13 @@ function validatedSessionEvent(value: unknown): SessionEvent {
     if (!Array.isArray(content) || !content.every(block => isRecord(block) && typeof block.type === 'string')) {
       throw new SdkProtocolError(`assistant/message event carried malformed content: ${JSON.stringify(value)}`)
     }
+  }
+  if (value.type === 'turn/end') {
+    const data = isRecord(value.data) ? value.data : undefined
+    if (data === undefined) {
+      throw new SdkProtocolError(`turn/end event carried malformed data: ${JSON.stringify(value)}`)
+    }
+    validatedTurnEndReason(data.reason)
   }
   return value as unknown as SessionEvent
 }

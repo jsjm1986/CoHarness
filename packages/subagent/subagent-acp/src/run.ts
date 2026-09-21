@@ -354,13 +354,19 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
   // Keep diagnostics on parent stderr ('inherit'); only ACP output contributes
   // to the result. The seam's scrub drops ambient credentials and DSH_* names
   // while spec.env (the child's own key, its deployment facts) merges after it.
-  const child = spec.spawn({
-    argv: [spec.command, ...spec.args],
-    cwd: spec.cwd,
-    stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' },
-    graceMs: spec.disposeGraceMs,
-    env: spec.env,
-  })
+  let child: SubprocessHandle
+  try {
+    child = spec.spawn({
+      argv: [spec.command, ...spec.args],
+      cwd: spec.cwd,
+      stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' },
+      graceMs: spec.disposeGraceMs,
+      env: spec.env,
+    })
+  } catch (error: unknown) {
+    reportFailure(spec, error)
+    throw new AcpRunFailure({ stage: 'process', category: 'process-start' }, error)
+  }
   /* v8 ignore start -- 'pipe' dispositions expose both streams by the seam contract; defensive. */
   if (child.stdin === undefined || child.stdout === undefined) {
     throw new Error('subagent-acp: subprocess implementation dropped a piped protocol stream')
