@@ -15,12 +15,12 @@ export interface ProviderAcceptance {
   anthropic: 'required' | 'unsupported'
 }
 
-/** Impact on provider verification that is outside the supported acceptance scope. */
+/** Impact on provider verification that is outside the supported acceptance scope or withheld from an untrusted actor. */
 interface UnsupportedPrProof {
-  proof: 'piAi'
-  status: 'unsupported'
+  proof: 'piAi' | 'provider'
+  status: 'unsupported' | 'withheld'
   affected: boolean
-  providers: readonly ['azure-openai', 'anthropic']
+  providers: readonly string[]
   reasons: readonly string[]
 }
 
@@ -101,10 +101,12 @@ function matchesWorkflow(path: string, patterns: readonly string[]): boolean {
  * @param paths - Complete changed paths, including both sides of renames.
  * @param candidate - Candidate CI classification from the shared scope policy.
  * @param root - Repository holding the existing workflow input definitions.
+ * @param options - `untrustedActor` withholds credential-bound proofs (GitHub keeps secrets from forks and Dependabot).
  * @returns Required proofs, unsupported provider impact and their justification. Unknown inputs affect every proof.
  */
 export function classifyCiPrProofs(
   paths: readonly string[], candidate: Pick<CiPrScope, 'reason'>, root = resolve(import.meta.dirname, '..'),
+  options: { readonly untrustedActor?: boolean } = {},
 ): CiPrProofs {
   const providerAcceptance = parseProviderAcceptance(scopePolicy.providerAcceptance)
   const reasons: Record<PrProofName, string[]> = {
@@ -152,17 +154,27 @@ export function classifyCiPrProofs(
     if (!known) for (const proof of NAMES) add(proof, `unknown-impact:${path}`)
   }
   if (changed.length === 0) for (const proof of NAMES) add(proof, 'unknown-or-empty-diff')
+  const withheldProofs: UnsupportedPrProof[] = options.untrustedActor === true
+    ? (['provider', 'piAi'] as const).flatMap(proof => reasons[proof].length === 0 ? [] : [{
+      proof, status: 'withheld' as const, affected: true,
+      providers: proof === 'provider' ? ['deepseek'] : ['azure-openai', 'anthropic'],
+      reasons: [...reasons[proof]],
+    }])
+    : []
   return {
     releasePack: reasons.releasePack.length > 0, vendorPack: reasons.vendorPack.length > 0,
     nativePack: reasons.nativePack.length > 0, sandbox: reasons.sandbox.length > 0,
-    provider: reasons.provider.length > 0,
-    piAi: providerAcceptance.azureOpenai === 'required' && reasons.piAi.length > 0,
+    provider: options.untrustedActor !== true && reasons.provider.length > 0,
+    piAi: options.untrustedActor !== true && providerAcceptance.azureOpenai === 'required' && reasons.piAi.length > 0,
     nativeWindows: reasons.nativeWindows.length > 0,
     reasons,
     providerAcceptance,
-    unsupportedProofs: providerAcceptance.azureOpenai === 'unsupported' ? [{
-      proof: 'piAi', status: 'unsupported', affected: reasons.piAi.length > 0,
-      providers: ['azure-openai', 'anthropic'], reasons: [...reasons.piAi],
-    }] : [],
+    unsupportedProofs: [
+      ...(providerAcceptance.azureOpenai === 'unsupported' ? [{
+        proof: 'piAi' as const, status: 'unsupported' as const, affected: reasons.piAi.length > 0,
+        providers: ['azure-openai', 'anthropic'], reasons: [...reasons.piAi],
+      }] : []),
+      ...withheldProofs,
+    ],
   }
 }

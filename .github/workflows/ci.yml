@@ -107,6 +107,11 @@ jobs:
 
       - name: Classify pull-request scope
         id: scope
+        env:
+          # GitHub withholds repo secrets from fork and Dependabot events, so
+          # credential-bound proofs can never satisfy their required result on
+          # those PRs; record them withheld instead of selecting doomed lanes.
+          DSH_CI_UNTRUSTED_ACTOR: ${{ github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]' }}
         run: pnpm exec tsx scripts/ci-pr-scope.ts "${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Summarize golden changes and replay status
