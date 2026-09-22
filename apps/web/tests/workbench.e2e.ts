@@ -91,7 +91,7 @@ describe('web: Cordis Workspace workbench', () => {
     // The conversation viewport boots in single-session mode; entering the
     // workbench is an explicit gesture through the toolbar's chooser, which
     // switches the viewport and mounts the default layout's (empty) panes.
-    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
     await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     await page.locator('[data-workbench-empty-content]').waitFor({ timeout: 30_000 })
     for (const workspaceId of workspaceIds) {
@@ -139,11 +139,11 @@ describe('web: Cordis Workspace workbench', () => {
     await page.reload({ waitUntil: 'load' })
     await page.locator('[data-session-pane]').waitFor({ timeout: 30_000 })
     await expect.poll(() => page.locator('[data-session-pane] textarea').first().inputValue()).toBe('Delta draft survives pane changes')
-    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
     await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
     expect(await page.locator('[data-session-pane]').count()).toBe(0)
     expect(await page.locator('textarea').first().inputValue()).toBe('Delta draft survives pane changes')
-    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
     await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     expect(await toolbar.getByRole('tab').count()).toBe(3)
     expect(tripwire.pageErrors).toEqual([])

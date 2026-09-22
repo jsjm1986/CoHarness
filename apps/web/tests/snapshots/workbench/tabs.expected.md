@@ -1,4 +1,4 @@
-- button "选择工作台":
+- button "Select workbench":
   - text: 我的工作台
   - img
 - text: 3/4

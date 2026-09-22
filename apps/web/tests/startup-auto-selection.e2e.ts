@@ -157,7 +157,10 @@ describe('web e2e: startup auto-selection', () => {
     expect(await page.locator('textarea').first().isVisible()).toBe(true)
 
     releaseHistory()
-    await page.locator('textarea:enabled[placeholder="Describe what you want to build"]')
+    // The auto-selected blank session parks the composer on its workspace
+    // prompt until a workspace is chosen; waiting for that stable state
+    // proves the composer resolved instead of hanging on the open.
+    await page.locator('textarea[placeholder="Choose a workspace to start"]')
       .waitFor({ timeout: 15_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
 

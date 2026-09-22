@@ -220,7 +220,9 @@ describe('web e2e: settings modal and General preferences', () => {
       })
       expect(state).toEqual({
         attr: true,
-        background: 'rgb(21, 21, 23)',
+        // The alias-token sheet lives in the held plugin bundle, so the boot
+        // page resolves its own fallback chain to the dark-scheme Canvas.
+        background: 'rgb(18, 18, 18)',
         colorScheme: 'dark',
       })
     } finally {

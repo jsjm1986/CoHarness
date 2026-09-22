@@ -18,7 +18,7 @@
     - img
     - text: Close
   - text: Agent preset Applies to sessions you start from now on. Running sessions keep the preset they began with.
-  - button "Standard mode":
+  - button "Standard mode" [disabled]:
     - text: Standard mode
     - img
   - text: Permission Choose the default permission mode for new sessions

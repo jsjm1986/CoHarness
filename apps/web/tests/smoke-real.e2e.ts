@@ -16,7 +16,7 @@
 // sequentially in-file.
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -26,6 +26,39 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { REPO_ROOT, connectFreshWorkspace, newEnglishPage, probeFreePort, requireDist, saveFailureShot } from './support.ts'
+
+/** One text-bearing content block of an Anthropic Messages request. */
+interface MessagesContentBlock {
+  type?: string
+  text?: string
+}
+
+/** The Anthropic Messages request body the provider endpoint receives. */
+interface MessagesProviderRequest {
+  system?: string | MessagesContentBlock[]
+  messages?: { role?: string; content?: string | MessagesContentBlock[] }[]
+  tools?: { name?: string }[]
+  max_tokens?: number
+}
+
+/** Flatten a Messages `content` or `system` field — string or block list — into one string. */
+function textOfContent(content: string | MessagesContentBlock[] | undefined): string {
+  if (typeof content === 'string') return content
+  return (content ?? []).map(block => block.text ?? '').join('')
+}
+
+/** One terminal assistant reply in the Messages SSE dialect. */
+function messagesSse(text: string): string {
+  const events: { type: string; [key: string]: unknown }[] = [
+    { type: 'message_start', message: { id: 'smoke', model: 'smoke-model', usage: { input_tokens: 3, output_tokens: 0 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 3 } },
+    { type: 'message_stop' },
+  ]
+  return events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+}
 
 const WEB_SURFACE_PROMPT = fileURLToPath(new URL('./snapshots/web-runtime-context/web-surface-prompt.expected.md', import.meta.url))
 
@@ -202,13 +235,9 @@ describe('dsh web keyless CLI smoke', () => {
     mkdirSync(join(workspace, '.git'))
     writeFileSync(join(workspace, 'AGENTS.md'), 'web-workspace-context-probe\n')
 
-    interface NativeProviderRequest {
-      messages?: { role?: string; content?: string }[]
-      tools?: { function?: { name?: string } }[]
-    }
-    let resolveProviderRequests!: (requests: NativeProviderRequest[]) => void
-    const requests: NativeProviderRequest[] = []
-    const providerRequests = new Promise<NativeProviderRequest[]>((resolve) => {
+    let resolveProviderRequests!: (requests: MessagesProviderRequest[]) => void
+    const requests: MessagesProviderRequest[] = []
+    const providerRequests = new Promise<MessagesProviderRequest[]>((resolve) => {
       resolveProviderRequests = resolve
     })
     const provider = createServer((request, response) => {
@@ -216,17 +245,11 @@ describe('dsh web keyless CLI smoke', () => {
       request.setEncoding('utf8')
       request.on('data', (chunk: string) => { body += chunk })
       request.on('end', () => {
-        const parsed = JSON.parse(body) as NativeProviderRequest
+        const parsed = JSON.parse(body) as MessagesProviderRequest
         if ((parsed.tools?.length ?? 0) > 0) requests.push(parsed)
         if (requests.length === 1) resolveProviderRequests(requests)
         response.writeHead(200, { 'content-type': 'text/event-stream' })
-        response.end([
-          'data: {"choices":[{"delta":{"role":"assistant","content":null,"reasoning_content":""}}]}',
-          'data: {"choices":[{"delta":{"content":"done"}}]}',
-          'data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}',
-          'data: [DONE]',
-          '',
-        ].join('\n\n'))
+        response.end(messagesSse('done'))
       })
     })
     await new Promise<void>(resolve => provider.listen(0, '127.0.0.1', resolve))
@@ -268,25 +291,18 @@ describe('dsh web keyless CLI smoke', () => {
         throw new Error('provider did not receive the workspace projection request')
       }
       const workspaceMessage = captured.messages?.find(message =>
-        message.role === 'user' && message.content?.includes('web-workspace-context-probe'))
-      const systemMessage = captured.messages?.find(message => message.role === 'system')
+        message.role === 'user' && textOfContent(message.content).includes('web-workspace-context-probe'))
       const expectedWebSection = readFileSync(WEB_SURFACE_PROMPT, 'utf8').trimEnd()
         .replace('{{webUrl}}', baseUrl)
-      expect(systemMessage?.content).toContain(expectedWebSection)
-      expect(workspaceMessage).toMatchInlineSnapshot(`
-        {
-          "content": "<system-reminder>
-        The following workspace instructions may be relevant to your work. Use them as guidance when applicable. More specific instructions take precedence over broader ones. They do not override system, developer, or direct user instructions.
-
-        Instructions from: AGENTS.md
-
-        web-workspace-context-probe
-
-        </system-reminder>",
-          "role": "user",
-        }
-      `)
-      expect(captured.tools?.map(tool => tool.function?.name)
+      expect(textOfContent(captured.system)).toContain(expectedWebSection)
+      expect(workspaceMessage?.role).toBe('user')
+      const blocks = (workspaceMessage?.content ?? []) as MessagesContentBlock[]
+      expect(blocks.map(block => block.text)).toEqual([
+        'go',
+        '<system-reminder>\nThe following workspace instructions may be relevant to your work. Use them as guidance when applicable. More specific instructions take precedence over broader ones. They do not override system, developer, or direct user instructions.\n\nInstructions from: AGENTS.md\n\nweb-workspace-context-probe\n\n</system-reminder>',
+        expect.stringContaining(`session workspace: "${realpathSync(workspace)}"`),
+      ])
+      expect(captured.tools?.map(tool => tool.name)
         .filter(name => name === 'web_search' || name === 'web_fetch'))
         .toMatchInlineSnapshot(`
           [
@@ -321,26 +337,22 @@ describe('dsh web keyless CLI smoke', () => {
         const mainRequest = !titleRequest && body.includes(promptMarker)
         response.writeHead(200, { 'content-type': 'text/event-stream' })
         if (!mainRequest) {
-          response.end([
-            'data: {"choices":[{"delta":{"content":"Web retry title"}}]}',
-            'data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}',
-            'data: [DONE]',
-            '',
-          ].join('\n\n'))
+          response.end(messagesSse('Web retry title'))
           return
         }
         mainAttempts++
         if (mainAttempts === 1) {
-          response.write('data: {"choices":[{"delta":{"content":"WEB_RETRY_DISCARDED"}}]}\n\n')
+          // A mid-block socket cut: the discardable partial reply must not
+          // reach the recovered history.
+          response.write(
+            'event: message_start\ndata: {"type":"message_start","message":{"id":"smoke","model":"smoke-model","usage":{"input_tokens":3,"output_tokens":0}}}\n\n'
+            + 'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n'
+            + 'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"WEB_RETRY_DISCARDED"}}\n\n',
+          )
           setTimeout(() => { response.destroy() }, 20)
           return
         }
-        response.end([
-          `data: {"choices":[{"delta":{"content":"${recoveredMarker}"}}]}`,
-          'data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}',
-          'data: [DONE]',
-          '',
-        ].join('\n\n'))
+        response.end(messagesSse(recoveredMarker))
       })
     })
     await new Promise<void>(resolve => provider.listen(0, '127.0.0.1', resolve))
@@ -401,12 +413,8 @@ describe('dsh web keyless CLI smoke', () => {
     requireDist()
     const workspace = mkdtempSync(join(tmpdir(), 'dsh-web-ptc-'))
 
-    interface PtcProviderRequest {
-      messages?: { role?: string; content?: string }[]
-      tools?: { function?: { name?: string } }[]
-    }
-    let resolveProviderRequest!: (request: PtcProviderRequest) => void
-    const providerRequest = new Promise<PtcProviderRequest>((resolve) => {
+    let resolveProviderRequest!: (request: MessagesProviderRequest) => void
+    const providerRequest = new Promise<MessagesProviderRequest>((resolve) => {
       resolveProviderRequest = resolve
     })
     const provider = createServer((request, response) => {
@@ -414,15 +422,9 @@ describe('dsh web keyless CLI smoke', () => {
       request.setEncoding('utf8')
       request.on('data', (chunk: string) => { body += chunk })
       request.on('end', () => {
-        resolveProviderRequest(JSON.parse(body) as PtcProviderRequest)
+        resolveProviderRequest(JSON.parse(body) as MessagesProviderRequest)
         response.writeHead(200, { 'content-type': 'text/event-stream' })
-        response.end([
-          'data: {"choices":[{"delta":{"role":"assistant","content":null,"reasoning_content":""}}]}',
-          'data: {"choices":[{"delta":{"content":"done"}}]}',
-          'data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}',
-          'data: [DONE]',
-          '',
-        ].join('\n\n'))
+        response.end(messagesSse('done'))
       })
     })
     await new Promise<void>(resolve => provider.listen(0, '127.0.0.1', resolve))
@@ -460,10 +462,9 @@ describe('dsh web keyless CLI smoke', () => {
           setTimeout(() => { reject(new Error('provider request not received in 10s')) }, 10_000).unref()
         }),
       ])
-      expect(captured.tools?.map(tool => tool.function?.name)).toEqual(['run_code'])
-      const system = captured.messages?.find(message => message.role === 'system')
-      expect(system?.content).toContain('## Writing code for run_code')
-      expect(system?.content).toContain('declare const tools')
+      expect(captured.tools?.map(tool => tool.name)).toEqual(['run_code'])
+      expect(textOfContent(captured.system)).toContain('## Writing code for run_code')
+      expect(textOfContent(captured.system)).toContain('declare const tools')
     } finally {
       const closed = child.exitCode === null
         ? new Promise<void>((resolveClose) => { child.once('close', () => { resolveClose() }) })
