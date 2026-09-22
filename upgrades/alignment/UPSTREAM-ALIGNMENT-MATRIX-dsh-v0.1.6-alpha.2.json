@@ -2052,6 +2052,16 @@
             "apps/web/tests/markdown-cjk-strong.e2e.ts",
             "apps/web/tests/lifecycle-chrome.e2e.ts"
           ]
+        },
+        {
+          "path": "apps/web/tests/workspace-management.e2e.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "bec77985d33f65e75bc0853587f5c932535b6eff",
+          "replay": "Scope archive assertions to the owned Session, its durable archive marker and retained log. Preserve unrelated Session rows before and after reload; a valid New Session placeholder need not disappear with another archived Session.",
+          "regressions": [
+            "apps/web/tests/workspace-management.e2e.ts"
+          ],
+          "retireWhen": "Upstream assertions preserve unrelated session rows and the complete archive journey passes without this adaptation."
         }
       ]
     },
