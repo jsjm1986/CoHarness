@@ -35,6 +35,7 @@ describe('assembled workbench', () => {
     const runtime = await SlotTestRuntime.create()
     runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
     runtime.provide('remote', { $on: () => () => {} })
+    runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn() })
     const locale = new LocaleRuntime(runtime.ctx)
@@ -99,6 +100,7 @@ describe('assembled workbench sidebar panel', () => {
       hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
     })
     runtime.provide('remote', { $on: () => () => {} })
+    runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => scope.scope } as never)
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn() })
     const locale = new LocaleRuntime(runtime.ctx)

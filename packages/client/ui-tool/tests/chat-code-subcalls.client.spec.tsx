@@ -166,6 +166,7 @@ async function bench(snapshot: ConversationSnapshot) {
   } as never)
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
+  ctx.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) } as never)
   ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
