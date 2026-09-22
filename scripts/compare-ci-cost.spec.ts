@@ -1,7 +1,6 @@
 /** Synthetic comparison fixtures exercise the evaluator; they are not CI performance measurements. */
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -36,7 +35,7 @@ function cli(input: unknown, malformed = false): { exit: number | null; result: 
   const path = join(root, 'samples.json')
   writeFileSync(path, malformed ? '{' : JSON.stringify(input))
   const result = spawnSync(process.execPath, [
-    '--import', createRequire(import.meta.url).resolve('tsx/esm'),
+    '--import', import.meta.resolve('tsx/esm'),
     fileURLToPath(new URL('./compare-ci-cost.ts', import.meta.url)), path,
   ], { cwd: root, encoding: 'utf8', timeout: 15_000 })
   expect(result.error).toBeUndefined()

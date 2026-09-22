@@ -482,7 +482,7 @@ export async function resolveNpmPackageLock(
   } finally {
     server.closeAllConnections()
     await close(server)
-    rmSync(consumer, { recursive: true, force: true })
+    rmSync(consumer, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 })
   }
 }
 

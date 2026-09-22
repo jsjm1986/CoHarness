@@ -181,13 +181,20 @@ function generatedFiles(root: string, directory: string, tracked: ReadonlySet<st
   return [child]
 }
 
+/** Git resolves 8.3 spellings (RUNNER~1) to the long name; realpathSync.native canonicalizes both sides the same way. */
+function sameCheckoutRoot(declared: string, given: string): boolean {
+  if (process.platform !== 'win32') return declared === given
+  return realpathSync.native(declared).toLowerCase() === realpathSync.native(given).toLowerCase()
+}
+
 /** Capture a complete build's identities and bytes; this does not assert that tests passed.
  * @param root - clean committed checkout with a completed official build.
  * @returns manifest suitable for transport beside the generated files.
  */
 export function createBuildArtifactManifest(root: string): BuildArtifactManifest {
   root = realpathSync(root)
-  if (realpathSync(git(root, ['rev-parse', '--show-toplevel'])) !== root) throw new Error('build artifacts: root must be the Git checkout root')
+  const declaredRoot = realpathSync(git(root, ['rev-parse', '--show-toplevel']))
+  if (!sameCheckoutRoot(declaredRoot, root)) throw new Error(`build artifacts: root must be the Git checkout root (declared ${declaredRoot}, got ${root})`)
   if (git(root, ['status', '--porcelain', '--untracked-files=all']) !== '') throw new Error('build artifacts: source tree must be clean and committed')
   const commit = git(root, ['rev-parse', 'HEAD'])
   const tree = git(root, ['rev-parse', 'HEAD^{tree}'])
