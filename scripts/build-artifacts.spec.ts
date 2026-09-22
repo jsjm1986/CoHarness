@@ -1,7 +1,6 @@
 /** Actual create/verify commands over private committed source and generated-output fixtures. */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,7 +9,7 @@ import { officialClientBuildEnvironment, writeClientBuildRecord } from './client
 import type { BuildArtifactManifest } from './build-artifacts.ts'
 
 const script = fileURLToPath(new URL('./build-artifacts.ts', import.meta.url))
-const tsx = createRequire(import.meta.url).resolve('tsx/esm')
+const tsx = import.meta.resolve('tsx/esm')
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 5 }) })
 
