@@ -6,7 +6,7 @@ import type { CiPrScope } from './ci-pr-scope.ts'
 import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 
 /** Existing proof owners joined by the PR's required summary. */
-export type PrProofName = 'releasePack' | 'vendorPack' | 'nativePack' | 'sandbox' | 'provider' | 'piAi' | 'nativeWindows'
+type PrProofName = 'releasePack' | 'vendorPack' | 'nativePack' | 'sandbox' | 'provider' | 'piAi' | 'nativeWindows'
 
 /** Provider acceptance scope; unsupported does not disable the corresponding product API. */
 export interface ProviderAcceptance {
@@ -16,7 +16,7 @@ export interface ProviderAcceptance {
 }
 
 /** Impact on provider verification that is outside the supported acceptance scope. */
-export interface UnsupportedPrProof {
+interface UnsupportedPrProof {
   proof: 'piAi'
   status: 'unsupported'
   affected: boolean
