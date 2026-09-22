@@ -17,7 +17,7 @@ The surrounding runtime also loads JSONL session persistence and automatic conte
 
 | Variable | Purpose |
 |---|---|
-| `DEEPSEEK_API_KEY` | Credential passed to the OpenAI-compatible host endpoint |
+| `DEEPSEEK_API_KEY` | Credential passed to the Anthropic-Messages-compatible host endpoint |
 | `DEEPSEEK_BASE_URL` | Host endpoint used by `dsh-llm-deepseek` |
 | `DSH_CWD` | Agent workspace for bash and filesystem tools |
 | `DSH_CONTEXT_WINDOW` | Context capacity recorded for the `DSH_MODEL` catalog entry in the minimal variant |

@@ -23,3 +23,5 @@ Status: implemented
 ## 后果
 
 通用 agent 使用 `read`、`write` 和 `edit` 完成文件系统修改，minimal agent 保留 `str_replace_editor`。preset 组合测试固定其不会出现在 standard 清单、Cordis 清单及 PTC mode SDK 中，同时 minimal 断言继续固定其存在。
+
+基于共享 base 的应用 profile 采用同样的取舍：base 清单保留该条目，使交互式组合和用户自建 profile 可以继续使用，而 [`headless`](../../../../packages/bundle/headless/cordis.patch.yml) 与 [`sdk`](../../../../packages/bundle/sdk-app/cordis.patch.yml) 应用补丁将其禁用。SDK profile 冒烟测试同时固定默认缺席与显式插入的开启路径。

@@ -13,6 +13,17 @@ const configPath = fileURLToPath(new URL('../cordis.yml', import.meta.url))
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
 const decompress = promisify(zstdDecompress)
 
+/** Frame one text response from the local Messages endpoint. */
+function messagesResponse(text: string, stopReason: 'end_turn' | 'max_tokens'): string {
+  return [
+    { type: 'message_start', message: { id: 'jsonrpc-smoke-response', model: 'deepseek-v4-pro', usage: { input_tokens: 3, output_tokens: 0 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: stopReason }, usage: { output_tokens: 1 } },
+    { type: 'message_stop' },
+  ].map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+}
+
 function waitForLine(
   lines: string[],
   predicate: (value: Record<string, unknown>) => boolean,
@@ -60,10 +71,7 @@ describe('jsonrpc-agent keyless smoke', () => {
       request.on('end', () => {
         modelRequests.push(JSON.parse(body) as Record<string, unknown>)
         response.writeHead(200, { 'content-type': 'text/event-stream' })
-        response.write('data: {"choices":[{"delta":{"role":"assistant","content":null}}]}\n\n')
-        response.write('data: {"choices":[{"delta":{"content":"done"}}]}\n\n')
-        response.write('data: {"choices":[{"delta":{},"finish_reason":"length"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}\n\n')
-        response.end('data: [DONE]\n\n')
+        response.end(messagesResponse('done', 'max_tokens'))
       })
     })
     await new Promise<void>(resolve => modelServer.listen(0, '127.0.0.1', resolve))
@@ -143,9 +151,9 @@ describe('jsonrpc-agent keyless smoke', () => {
           },
         },
       })
-      const tools = modelRequests[0]?.tools as { function?: { name?: string } }[]
+      const tools = modelRequests[0]?.tools as { name?: string }[]
       expect(modelRequests[0]?.max_tokens).toBe(1234)
-      expect(tools.map(tool => tool.function?.name).sort()).toEqual([
+      expect(tools.map(tool => tool.name).sort()).toEqual([
         'bash',
         'edit',
         'read',
@@ -195,8 +203,8 @@ describe('jsonrpc-agent keyless smoke', () => {
 
     expect(exitCode, stderr).toBe(1)
     expect(stdout).toBe('')
-    expect(stderr).toContain('plugin tree failed to load')
-    expect(stderr).toContain('failed to apply loader entry sdk-jsonrpc-server (@deepseek-ai/dsh-sdk-jsonrpc-server)')
+    expect(stderr).toContain('startup failed:')
+    expect(stderr).toContain('sdk-jsonrpc-server (required)\n    Package: @deepseek-ai/dsh-sdk-jsonrpc-server\n    SyntaxError')
     expect(stderr).toContain('sometimes')
   }, 30_000)
 })
