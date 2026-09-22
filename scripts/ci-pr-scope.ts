@@ -644,7 +644,9 @@ function main(): void {
   const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
   const plans = resolveCiPrScopePlans(paths, diff, process.cwd())
   const result = plans.execution
-  const proofs = classifyCiPrProofs(paths, plans.candidate, process.cwd())
+  const proofs = classifyCiPrProofs(paths, plans.candidate, process.cwd(), {
+    untrustedActor: process.env.DSH_CI_UNTRUSTED_ACTOR === 'true',
+  })
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const baseline = execFileSync('git', ['rev-parse', `${base}^{commit}`], { encoding: 'utf8' }).trim()
   mkdirSync('.artifacts/gates', { recursive: true })

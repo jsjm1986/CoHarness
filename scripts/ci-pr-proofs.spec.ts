@@ -128,6 +128,18 @@ describe('reusable proof workflows', () => {
     }
   })
 
+  it('withholds credential-bound proofs from untrusted actors without dropping unkeyed lanes', () => {
+    const paths = ['pnpm-lock.yaml']
+    const trusted = proofs(paths)
+    expect(trusted).toMatchObject({ provider: true, sandbox: true, nativeWindows: true })
+    const untrusted = classifyCiPrProofs(paths, classifyCiPrScope(paths, ''), undefined, { untrustedActor: true })
+    expect(untrusted).toMatchObject({ provider: false, piAi: false, sandbox: true, nativeWindows: true })
+    expect(untrusted.reasons.provider).toEqual(trusted.reasons.provider)
+    expect(untrusted.unsupportedProofs).toContainEqual(expect.objectContaining({
+      proof: 'provider', status: 'withheld', providers: ['deepseek'],
+    }))
+  })
+
   it('retains manual execution for providers outside the current acceptance scope', () => {
     expect(workflow('pi-ai-provider-e2e.yml').on).toHaveProperty('workflow_dispatch')
     const result = proofs(['.github/workflows/pi-ai-provider-e2e.yml'])
