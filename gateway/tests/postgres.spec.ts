@@ -2347,7 +2347,7 @@ describePg('PostgreSQL baseline', () => {
       if (granted.result.status !== 'granted' || queued.result.status !== 'queued') throw new Error('unexpected acquire outcome')
 
       const retry = await first.acquire(holderA, { ...resource, requestId: 'r-a' })
-      expect(retry.status === 'granted' || retry.status === 'held').toBe(true)
+      expect(retry.status).toBe(a.status === 'granted' ? 'held' : 'queued')
 
       await first.release(granted.holder, granted.result.grantId)
       const promoted = await second.status(queued.holder, { ...resource, requestId: queued.holder === holderA ? 'r-a' : 'r-b' })
