@@ -272,10 +272,8 @@ class MockModelHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
-        chunks = completion_chunks(body)
-        for chunk in chunks:
-            self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode())
-        self.wfile.write(b"data: [DONE]\n\n")
+        for event in completion_chunks(body):
+            self.wfile.write(f"event: {event['type']}\ndata: {json.dumps(event)}\n\n".encode())
         self.wfile.flush()
 
     def log_message(self, _format: str, *_args: object) -> None:
@@ -291,9 +289,10 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
     if not isinstance(latest, dict):
         raise AssertionError(f"model request has an invalid latest message: {body}")
 
-    if latest.get("role") == "tool":
-        call_id, tool_name = latest_tool_call(messages)
-        tool_text = message_text(latest.get("content"))
+    latest_result = latest_tool_result(latest)
+    if latest_result is not None:
+        call_id, tool_name = latest_tool_call(messages, latest_result)
+        tool_text = tool_result_text(latest_result)
         mcp = mcp_tool_followup(call_id, tool_name, tool_text)
         if mcp is not None:
             return mcp
@@ -568,73 +567,80 @@ def advanced_tool_followup(
 
 
 def text_chunks(text: str) -> list[dict[str, object]]:
-    """Build a complete streaming text response."""
+    """Build a complete Messages-protocol streaming text response."""
     return [
-        {"choices": [{"delta": {"role": "assistant", "content": None, "reasoning_content": ""}}]},
-        {"choices": [{"delta": {"content": text}}]},
-        {
-            "choices": [{"delta": {"content": ""}, "finish_reason": "stop"}],
-            "usage": {"prompt_tokens": 3, "completion_tokens": 3},
-        },
+        {"type": "message_start", "message": {"id": "smoke", "model": "smoke-model", "usage": {"input_tokens": 3, "output_tokens": 0}}},
+        {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}},
+        {"type": "content_block_stop", "index": 0},
+        {"type": "message_delta", "delta": {"stop_reason": "end_turn"}, "usage": {"output_tokens": 3}},
+        {"type": "message_stop"},
     ]
 
 
 def tool_call_chunks(call_id: str, name: str, arguments: dict[str, object]) -> list[dict[str, object]]:
-    """Build a complete streaming function-call response."""
+    """Build a complete Messages-protocol streaming tool_use response."""
     return [
-        {"choices": [{"delta": {"role": "assistant", "content": None, "reasoning_content": ""}}]},
-        {
-            "choices": [{
-                "delta": {
-                    "tool_calls": [{
-                        "index": 0,
-                        "id": call_id,
-                        "type": "function",
-                        "function": {"name": name, "arguments": json.dumps(arguments)},
-                    }],
-                },
-            }],
-        },
-        {
-            "choices": [{"delta": {"content": ""}, "finish_reason": "tool_calls"}],
-            "usage": {"prompt_tokens": 3, "completion_tokens": 3},
-        },
+        {"type": "message_start", "message": {"id": "smoke", "model": "smoke-model", "usage": {"input_tokens": 3, "output_tokens": 0}}},
+        {"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": call_id, "name": name, "input": {}}},
+        {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": json.dumps(arguments)}},
+        {"type": "content_block_stop", "index": 0},
+        {"type": "message_delta", "delta": {"stop_reason": "tool_use"}, "usage": {"output_tokens": 3}},
+        {"type": "message_stop"},
     ]
 
 
-def latest_tool_call(messages: list[object]) -> tuple[str, str]:
-    """Find the assistant call id and name paired with the latest tool result."""
+def latest_tool_result(message: dict[str, object]) -> dict[str, object] | None:
+    """Return the tool_result block when the latest message is a tool reply."""
+    content = message.get("content")
+    if message.get("role") != "user" or not isinstance(content, list):
+        return None
+    results = [
+        block for block in content
+        if isinstance(block, dict) and block.get("type") == "tool_result"
+    ]
+    if not results:
+        return None
+    if len(results) != 1 or len(content) != 1:
+        raise AssertionError(f"unexpected multi-block tool reply: {content}")
+    return results[0]
+
+
+def latest_tool_call(messages: list[object], result: dict[str, object]) -> tuple[str, str]:
+    """Find the assistant tool_use id and name paired with the latest result."""
+    wanted = result.get("tool_use_id")
     for message in reversed(messages[:-1]):
-        if not isinstance(message, dict):
+        if not isinstance(message, dict) or message.get("role") != "assistant":
             continue
-        calls = message.get("tool_calls")
-        if not isinstance(calls, list):
+        content = message.get("content")
+        if not isinstance(content, list):
             continue
-        for call in reversed(calls):
-            if not isinstance(call, dict):
+        for block in reversed(content):
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
                 continue
-            function = call.get("function")
-            call_id = call.get("id")
-            if (
-                isinstance(call_id, str)
-                and isinstance(function, dict)
-                and isinstance(function.get("name"), str)
-            ):
-                return call_id, function["name"]
+            call_id = block.get("id")
+            name = block.get("name")
+            if isinstance(call_id, str) and isinstance(name, str) and call_id == wanted:
+                return call_id, name
     raise AssertionError(f"tool result has no preceding assistant tool call: {messages}")
 
 
 def message_text(content: object) -> str:
-    """Read OpenAI text content in either string or block-list form."""
+    """Read Messages-protocol text blocks from one message's content."""
     if isinstance(content, str):
         return content
     if isinstance(content, list):
         return "".join(
-            block.get("text", "")
+            block["text"]
             for block in content
-            if isinstance(block, dict) and isinstance(block.get("text"), str)
+            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str)
         )
     return ""
+
+
+def tool_result_text(result: dict[str, object]) -> str:
+    """Read the text inside one tool_result block's content."""
+    return message_text(result.get("content"))
 
 
 def advertised_tool_names(body: dict[str, object]) -> set[str]:
@@ -644,11 +650,8 @@ def advertised_tool_names(body: dict[str, object]) -> set[str]:
         raise AssertionError(f"model request advertised no tools: {body}")
     names: set[str] = set()
     for tool in tools:
-        if not isinstance(tool, dict):
-            continue
-        function = tool.get("function")
-        if isinstance(function, dict) and isinstance(function.get("name"), str):
-            names.add(function["name"])
+        if isinstance(tool, dict) and isinstance(tool.get("name"), str):
+            names.add(tool["name"])
     return names
 
 
@@ -1102,14 +1105,16 @@ def build_minimal_snapshot_files(
         messages = body.get("messages")
         if not isinstance(messages, list):
             raise AssertionError(f"minimal model request has no messages: {body}")
-        snapshot.append({
-            "tools": minimal_snapshot_text(body.get("tools"), cwd),
-            "messages": [
-                minimal_snapshot_message(message, cwd)
-                for message in messages
-                if not is_runtime_context_message(message)
-            ],
-        })
+        rows = []
+        system = body.get("system")
+        if isinstance(system, str) and system:
+            rows.append({"role": "system", "text": minimal_snapshot_text(system, cwd)})
+        rows.extend(
+            minimal_snapshot_message(message, cwd)
+            for message in messages
+            if not is_runtime_context_message(message)
+        )
+        snapshot.append({"tools": minimal_snapshot_tools(body.get("tools"), cwd), "messages": rows})
     return {"model-visible.json": json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n"}
 
 
@@ -1122,28 +1127,49 @@ def is_runtime_context_message(message: object) -> bool:
     )
 
 
+def minimal_snapshot_tools(tools: object, cwd: Path) -> object:
+    """Project advertised tool schemas to their protocol-independent surface."""
+    if not isinstance(tools, list):
+        return minimal_snapshot_text(tools, cwd)
+    return minimal_snapshot_text(
+        [
+            {
+                "name": tool.get("name"),
+                "description": tool.get("description"),
+                "parameters": tool.get("input_schema"),
+            }
+            for tool in tools
+            if isinstance(tool, dict)
+        ],
+        cwd,
+    )
+
+
 def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
     """Reduce one model-visible message to its stable, behavior-carrying parts."""
     if not isinstance(message, dict):
         raise AssertionError(f"minimal model request has an invalid message: {message}")
     role = message.get("role")
-    if role in ("system", "user"):
+    if role == "system":
         return {"role": role, "text": minimal_snapshot_text(message_text(message.get("content")), cwd)}
     if role == "assistant":
-        calls = message.get("tool_calls")
-        if not isinstance(calls, list):
-            raise AssertionError(f"minimal assistant message has no tool calls: {message}")
+        content = message.get("content")
+        if not isinstance(content, list):
+            raise AssertionError(f"minimal assistant message has no content blocks: {message}")
         return {
             "role": role,
             "toolCalls": [
-                {"id": call.get("id"), "name": (call.get("function") or {}).get("name")}
-                for call in calls
-                if isinstance(call, dict)
+                {"id": block.get("id"), "name": block.get("name")}
+                for block in content
+                if isinstance(block, dict) and block.get("type") == "tool_use"
             ],
         }
-    if role == "tool":
-        return {"role": role, "toolCallId": message.get("tool_call_id"), "text": "{{tool-result}}"}
-    raise AssertionError(f"minimal model request has an unexpected message role: {message}")
+    if role != "user":
+        raise AssertionError(f"minimal model request has an unexpected message role: {message}")
+    results = latest_tool_result(message)
+    if results is not None:
+        return {"role": "tool", "toolCallId": results.get("tool_use_id"), "text": "{{tool-result}}"}
+    return {"role": role, "text": minimal_snapshot_text(message_text(message.get("content")), cwd)}
 
 
 def minimal_snapshot_text(value: object, cwd: Path) -> object:
