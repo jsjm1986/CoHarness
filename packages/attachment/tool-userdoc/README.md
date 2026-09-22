@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Model-facing discovery and read tools for the personal document workspace. The package consumes `ctx.userDocs`, registers `userdoc_list` and `userdoc_read`, and does not change the agent loop, storage provider, or browser document routes.
 
+## Summary
+
+Use `dsh-tool-userdoc` to give the agent `userdoc_list` and `userdoc_read` tools over the personal document workspace provided by `ctx.userDocs`. The agent can list folders and read document text through the same storage the browser document manager uses, without a separate retrieval channel. The package registers only tools and prompt guidance; it does not change the agent loop, the storage provider, or the document HTTP routes.
+
+
 ## Installation
 
 Mount this function plugin in an Agent preset that already exposes `ctx.userDocs`, `ctx.tools`, and `ctx.systemPrompt`. The shipped Web `standard`, `ptc`, and `cordis` presets include the row; a minimal preset can omit it to keep personal-document access out of its tool catalog.
@@ -92,3 +97,5 @@ Each call and result is an append-only tool exchange after the reusable prompt p
 - Search matches names and root-relative ids, not document contents. A content index can be added behind the same Consumer when its scope, byte budget, and authorization semantics are defined.
 - `userdoc_read` accepts UTF-8 text only. PDF, Office, image, and other binary readers belong in optional format-specific Consumers rather than this generic storage package.
 - The package is read-only. Saving, editing, versioning, and native desktop opening require separate model-facing or Host Consumers with their own approval and concurrency contracts.
+
+**Runtime invariant:** No companion is published. The package owns only tool and prompt registrations; execution results and storage containment are validated by their owning seams.

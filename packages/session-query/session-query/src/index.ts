@@ -38,11 +38,14 @@ import type {
 } from './types.ts'
 import {
   SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
+  SESSION_QUERY_DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   SESSION_QUERY_READ_WINDOW_MAX,
   SessionQueryError,
   type Config,
 } from './config.ts'
 import { SessionCorpus } from './corpus.ts'
+import { SessionObservationReader } from './observation.ts'
+import type { SessionObservation, SessionObservationOptions } from './observation.ts'
 import { buildSessionEventSearchDocuments } from './documents.ts'
 import {
   filterSessionEventDocuments,
@@ -61,6 +64,8 @@ export {
   SESSION_QUERY_READ_WINDOW_MAX,
   SessionQueryError,
 } from './config.ts'
+export { readColdSessionLog } from './cold-read.ts'
+export type { ColdSessionLog } from './cold-read.ts'
 export { extractSessionEventText } from './extraction.ts'
 export { buildSessionEventRecords, buildSessionEventSearchDocuments } from './documents.ts'
 export {
@@ -71,6 +76,7 @@ export {
   materializeSessionResultFilters,
 } from './filters.ts'
 export { assertSessionHeadersCompatible } from './sources.ts'
+export type { SessionObservation, SessionObservationOptions } from './observation.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -90,6 +96,7 @@ export abstract class SessionQueryEngine extends Service {
 
   private readonly _readWindowMax: number
   private readonly _corpus: SessionCorpus
+  private readonly _observations: SessionObservationReader
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'sessionQuery')
@@ -108,7 +115,29 @@ export abstract class SessionQueryEngine extends Service {
         'SESSION_QUERY_INVALID_CONFIG',
       )
     }
+    const preparedSessionCacheSize = config.preparedSessionCacheSize
+      ?? SESSION_QUERY_DEFAULT_PREPARED_SESSION_CACHE_SIZE
+    if (!Number.isSafeInteger(preparedSessionCacheSize) || preparedSessionCacheSize < 1) {
+      throw new SessionQueryError(
+        'session-query: preparedSessionCacheSize must be a positive safe integer',
+        'SESSION_QUERY_INVALID_CONFIG',
+      )
+    }
     this._corpus = new SessionCorpus(ctx, persistedReadConcurrency)
+    this._observations = new SessionObservationReader(ctx, preparedSessionCacheSize)
+  }
+
+  /**
+   * Observe one exact live or prepared Session without a persistence listing preflight.
+   * @param sessionId - logical Session identity.
+   * @param options - cancellation and projection selection for this read.
+   * @returns a caller-owned observation lease.
+   */
+  observeSession(
+    sessionId: SessionId,
+    options: SessionObservationOptions = {},
+  ): Promise<SessionObservation> {
+    return this._observations.read(sessionId, options)
   }
 
   /**

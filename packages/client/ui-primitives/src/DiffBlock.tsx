@@ -11,6 +11,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { writeClipboard } from './clipboard.ts'
+import { ExpandButton } from './ExpandButton.tsx'
 import css from './DiffBlock.module.css'
 
 /**
@@ -52,16 +53,6 @@ export interface DiffBlockLabels {
   files: (count: number) => string
 }
 
-const DEFAULT_LABELS: DiffBlockLabels = {
-  copy: '复制',
-  copied: '复制成功',
-  collapseAria: '收起差异',
-  expandAria: hidden => `展开其余 ${hidden} 行差异`,
-  collapse: '收起',
-  expand: hidden => `… 其余 ${hidden} 行`,
-  files: count => `${count} file${count === 1 ? '' : 's'}`,
-}
-
 export interface DiffBlockProps {
   /** One entry per applied hunk, in file order; empty renders nothing. */
   diffs: DiffHunk[]
@@ -69,8 +60,8 @@ export interface DiffBlockProps {
   maxLines?: number | undefined
   /** Extra class merged onto the wrapper (callers position; this component draws). */
   className?: string | undefined
-  /** Localized display copy; omitted fields keep the built-in defaults. */
-  labels?: Partial<DiffBlockLabels> | undefined
+  /** Localized display copy supplied by the owning render site. */
+  labels: DiffBlockLabels
 }
 
 /** A single rendered body line and its role, so the height cap slices a flat list. */
@@ -168,12 +159,8 @@ function copyText(rows: DiffRow[]): string {
  * @param props - see {@link DiffBlockProps}.
  * @returns the diff block element.
  */
-export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className, labels }: DiffBlockProps) {
+export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className, labels: copy }: DiffBlockProps) {
   const { rows, added, removed, files } = useMemo(() => buildRows(diffs), [diffs])
-  const copy = useMemo<DiffBlockLabels>(
-    () => (labels === undefined ? DEFAULT_LABELS : { ...DEFAULT_LABELS, ...labels }),
-    [labels],
-  )
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -208,17 +195,7 @@ export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className,
         {head.map((row, index) => (
           <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
         ))}
-        {hidden > 0 && (
-          <button
-            type="button"
-            className={css.expand}
-            aria-expanded={expanded}
-            aria-label={expanded ? copy.collapseAria : copy.expandAria(hidden)}
-            onClick={onToggle}
-          >
-            {expanded ? copy.collapse : copy.expand(hidden)}
-          </button>
-        )}
+        <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
         {tail.map((row, index) => (
           <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
         ))}

@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 ACP automation server app: the default agent spine, client-created agents through [`@deepseek-ai/dsh-acp`](../../acp/acp/README.md), JSONL persistence, and semantic checkpointing behind one JSON-RPC stdio bin. Programmatic clients create fresh sessions; this package mounts no human UI.
 
+## Summary
+
+Use `dsh-acp-demo` as the ACP automation server app: the default agent spine, client-created agents through `dsh-acp`, JSONL persistence, and semantic checkpointing behind one JSON-RPC stdio bin. Programmatic clients create fresh sessions; the package mounts no human UI.
+
+
 ## Composition
 
 | Plugin | Role |
@@ -29,7 +34,6 @@ The app does not install commands, user interaction, session navigation, configu
 | `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home shared by bash and local skill discovery. |
 | `sessionTitle` | spine example limits | Durable fallback-title limits; titles remain off the ACP wire. |
 | `persistenceRoot` | `./.sessions` | JSONL backend root and parent directory of the derived `session-query.db` index. |
-| `packChunks` | `true` | Pack consecutive delta-chunk events in storage. |
 | `persistenceCompression` | `zstd` | Checksummed Zstandard frames or raw `none`. |
 | `workspaceContext` | required | Workspace-instruction byte budget/config, or `false`. |
 | `skills` | owner defaults | Skill registry, local provider, and model-facing skill tool. |
@@ -44,13 +48,17 @@ The shipped [`examples/acp-agent/cordis.yml`](../../../examples/acp-agent/cordis
 
 `dsh-acp-demo [--config path-to-cordis.yml]` (short form `-c`; default `./cordis.yml`) loads the gitignored `.env`, except in replay mode; `DSH_SNAPSHOT=replay` selects the sibling `cordis.snapshot.yml`; stdin EOF disposes the context and flushes sessions before exit. Loader's installed optional `node-addon-require-builtin` peer resolves bare plugin specifiers for the built bin under plain Node. Diagnostics use stderr because stdout is the ACP wire.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The demo wires existing plugins behind one bin; session state belongs to the composed runtime and the ACP server package.
+
 ## Model Experience
 
-Indirectly, through `dsh-agent-spine-demo` and the leaf's model-facing plugins. ACP prompt text becomes the ordinary logged user message; protocol metadata and permission choices do not enter the model request.
+Indirectly, through dsh-agent-spine-demo and dsh-acp, which own request composition for the bundle.
 
 #### KV Cache effect
 
-Append-only per session; the app adds no request-prefix content itself.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

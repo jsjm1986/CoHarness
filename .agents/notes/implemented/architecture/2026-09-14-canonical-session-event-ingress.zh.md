@@ -23,4 +23,4 @@ Status: implemented
 
 ## 后果
 
-`assistant/message` 在每个 surface 事件上保留 CoHarness 的 `sourceEventSeqs` chunk 溯源；上游的禁止性规则不采纳，因为 `agent-loop` 在每条完成或中断的 assistant 消息上写入被引用的 chunk 集合。畸形事件先按它违反的载荷规则失败，再轮到 provider/model 或消息形态检查；被拒绝的 append 或 seed 不发布任何内容且不改动派生状态。v3 之前的工件只经格式链抵达这些规则，其 v2→v3 步骤把 `header.system` 迁入 `system/message` 头；直接写入当前代次日志的录制 fixture 必须事先省略该字段。`canonical-envelopes.spec.ts` 在全部五条入口路径上检验每个不变量。
+`assistant/message` 把提供方流嵌入 `data.stream`，不能携带 `sourceEventSeqs`；其余 surface 事件类型保留 `sourceEventSeqs` 引用用于替换覆盖。畸形事件先按它违反的载荷规则失败，再轮到 provider/model 或消息形态检查；被拒绝的 append 或 seed 不发布任何内容且不改动派生状态。v3 之前的工件只经格式链抵达这些规则，其 v2→v3 步骤把 `header.system` 迁入 `system/message` 头；直接写入当前代次日志的录制 fixture 必须事先省略该字段。`canonical-envelopes.spec.ts` 在全部五条入口路径上检验每个不变量。

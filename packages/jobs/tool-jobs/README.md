@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The model-facing controller for `ctx.jobs`: three kind-independent tools, completion notices, and one background-work prompt section. Loading the plugin attaches the controller required by `ctx.jobs.start()`.
 
+## Summary
+
+Use `dsh-tool-jobs` to inspect and control background commands, PTY work, and subagents through `job_output`, `job_list`, and `job_kill`. Reads can wait within a configured timeout, list results identify each job's kind and status, and cancellation settles only after the work stops. When owned work finishes, the agent receives an in-session notice: busy agents receive it in their next step, while idle agents may be woken by a bounded follow-up turn. Configuration controls wait limits, completion delivery, and consecutive wakeups. Stream output is consumed by one reader, and pending notices do not survive owner disposal.
+
 ## Tools
 
 - `job_output(job_id, wait?, timeout_ms?)` reads without blocking by default. Stream jobs return only the next delta; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. `wait: true` waits up to the configured cap and leaves a still-running job alive on timeout.
@@ -36,6 +40,10 @@ One host registry may carry several mounts of this plugin — one per agent pres
 | `maxConsecutiveWakes` | `3` | turns one owner may open by wake before notices degrade to injection |
 
 A default above the cap fails at load.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools and notices are registrations over the `ctx.jobs` registry; job records are owned by the mounted registry provider.
 
 ## Model Experience
 
@@ -77,7 +85,7 @@ Prefix-stable while tool definitions and visibility are unchanged. Registration 
 
 #### What the model sees
 
-Reads return output or `(no new output)` followed by `[status: <status>]` and optional detail. An empty list returns `(no background jobs)`. Kill returns `requested cancellation of job <id>` or the existing terminal status. Unreported owned completion uses the notice above.
+Reads return output or `(no new output)` followed by `[status: <status>]` and optional detail. An empty list returns `(no background jobs)`. Kill returns `requested cancellation of job <id>` or the existing terminal status. An unreported owned completion uses the notice above.
 
 #### Token effect
 
@@ -85,7 +93,7 @@ Results and notices remain in parent history until compaction. Stream reads do n
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 

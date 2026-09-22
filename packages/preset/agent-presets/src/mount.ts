@@ -286,22 +286,34 @@ export function serviceForAgent<K extends string & keyof Context>(
 /**
  * Rows that did not reach a usable state, each rendered as one diagnostic line.
  *
- * A row whose module failed to import or whose plugin threw already rejects the
- * mount through the loader; what remains observable here is a row still waiting
- * for a service the composition never supplies.
+ * A row whose module failed to import never gains a fiber; a row whose config
+ * or plugin threw settles its fiber into failure, which `fiber.await()`
+ * rethrows here. What remains is a row still waiting for a service the
+ * composition never supplies.
  * @param tree - the mounted subtree.
  * @returns one line per unusable row, empty when every enabled row is usable.
  */
-export function inactiveRows(tree: EntryTree): string[] {
+export async function inactiveRows(tree: EntryTree): Promise<string[]> {
+  // Settle the whole tree first: late-registered group rows land in the shared
+  // store while their parent's _init is still running, and a one-shot snapshot
+  // would either miss them or read them before their fiber exists.
+  await tree.await()
   const lines: string[] = []
   for (const entry of tree.entries()) {
     if (entry.disabled) continue
     const fiber = entry.fiber
-    /* v8 ignore next 4 -- the loader rejects an entry whose module or plugin failed,
-       so a settled tree never holds an enabled fiber-less entry; the branch exists
-       only because `Entry.fiber` is declared optional. */
+    // A post-import failure (e.g. `registry.plugin` throwing on an unknown
+    // builtin name) leaves an enabled entry with no fiber at all.
     if (fiber === undefined) {
       lines.push(`${entry.options.id} (${entry.options.name}): never started`)
+      continue
+    }
+    try {
+      // Settle in-flight activation so a failed row reports its own error
+      // rather than passing as momentarily pending.
+      await fiber.await()
+    } catch (error) {
+      lines.push(`${entry.options.id} (${entry.options.name}): ${mountDetail(error)}`)
       continue
     }
     const missing = Object.keys(fiber.inject).filter(name => fiber.ctx.get(name) === undefined)
@@ -313,22 +325,58 @@ export function inactiveRows(tree: EntryTree): string[] {
 }
 
 /**
+ * The causes of `error` whose detail its own message does not already carry.
+ *
+ * Aggregate errors carry separate member messages, and a wrapper can preserve
+ * an aggregate as its cause without including those messages in its own text.
+ * Walk the whole cause chain: members of every aggregate reached count as
+ * branches, whether the aggregate is the error itself or wrapped behind plain
+ * Error causes.
+ * @param error - the failure to read branches from.
+ * @param seen - errors already rendered; breaks cyclic cause/member graphs.
+ * @returns the branches to render beneath `error.message`, possibly empty.
+ */
+function detailBranches(error: Error, seen: Set<unknown>): readonly unknown[] {
+  const branches: unknown[] = []
+  let current: unknown = error.cause
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current)
+    if (current instanceof AggregateError) branches.push(...(current.errors as unknown[]))
+    current = current.cause
+  }
+  return branches
+}
+
+/**
  * The reportable text of a mount failure.
  *
- * The loader reports several failed rows as one `AggregateError`, whose own
- * message names none of them; without flattening, a composition that fails on
- * two rows says only "loader entries failed to apply" and the operator has
- * nothing to act on.
+ * A plugin may reject with an aggregate or wrap one as its cause. Include its
+ * member messages beneath the row diagnostic so each failure is visible.
  * @param error - the value the mount rejected with.
+ * @param seen - errors already rendered; breaks cyclic cause/member graphs.
  * @returns a single-line-per-cause description.
  */
-function mountDetail(error: unknown): string {
+function mountDetail(error: unknown, seen: Set<unknown> = new Set()): string {
   /* v8 ignore next -- every path into the mount's catch throws an Error: the loader
      wraps a row's thrown value before it propagates, and this module's own
      rejections are Errors. The fallback keeps a hostile value readable. */
   if (!(error instanceof Error)) return String(error)
-  if (!(error instanceof AggregateError)) return error.message
-  return [error.message, ...error.errors.map(cause => `- ${mountDetail(cause)}`)].join('\n')
+  if (seen.has(error)) return error.message
+  seen.add(error)
+  if (error instanceof AggregateError) {
+    return [
+      error.message,
+      ...error.errors
+        .filter(branch => !seen.has(branch))
+        .map(branch => `- ${mountDetail(branch, seen).replaceAll('\n', '\n  ')}`),
+    ].join('\n')
+  }
+  const branches = detailBranches(error, seen)
+  if (branches.length === 0) return error.message
+  return [
+    error.message,
+    ...branches.map(branch => `- ${mountDetail(branch, seen).replaceAll('\n', '\n  ')}`),
+  ].join('\n')
 }
 
 /**
@@ -366,7 +414,7 @@ export async function mountPreset(agentCtx: Context, preset: AgentPreset): Promi
     /* v8 ignore next -- the subclass constructor runs before `await()` settles for every mounted tree */
     if (subtree === undefined) throw new Error('mounted subtree did not publish its entry tree')
     const { tree, fiber } = subtree
-    const unusable = inactiveRows(tree)
+    const unusable = await inactiveRows(tree)
     if (unusable.length > 0) {
       throw new Error(`${String(unusable.length)} row(s) did not activate:\n${unusable.join('\n')}`)
     }

@@ -24,8 +24,10 @@
  * legacy contender still sees a live owner instead of a missing file. A
  * legacy file with a dead or unreadable record is safe to lock in place: a
  * kernel-lock holder always has a live pid, so a dead record can only be
- * legacy residue. New acquisitions write the record before publishing.
- * Release never removes the POSIX lock file: keeping it preserves the stable
+ * legacy residue. New acquisitions write the record before publishing, and
+ * release clears it: a released file's stale live pid would read as a held
+ * lock to every later acquirer for the releaser's remaining uptime. Release
+ * never removes the POSIX lock file: keeping it preserves the stable
  * inode later lockers verify against, and an unlocked file excludes nobody.
  * @module @deepseek-ai/dsh-session-persistence-jsonl/lease
  */
@@ -176,6 +178,13 @@ export class SessionWriteLease {
       return
     }
     /* v8 ignore stop */
-    await this.held.handle.close()
+    try {
+      // The owner record describes a live holder only while the lock is held;
+      // a released file that still carries a live pid would keep refusing
+      // contenders for the whole life of the releasing process.
+      await this.held.handle.truncate(0)
+    } finally {
+      await this.held.handle.close()
+    }
   }
 }

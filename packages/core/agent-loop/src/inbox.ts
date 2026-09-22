@@ -13,6 +13,7 @@ import type {
   Inbox as InboxContract,
   InboxState,
   InboxTarget,
+  InboxWireState,
 } from '@deepseek-ai/dsh-agent'
 import { z } from 'zod'
 
@@ -24,11 +25,10 @@ const inboxProjectionSchema = z.object({
 
 /**
  * Standard fold that reconstructs pending input and rejects invalid durable
- * splice history. Host-only: the client-visible `inbox` projection carries
- * its own attributed queue shape, so this unit stays out of snapshots.
+ * splice history.
  */
-const inboxProjectionDefinition = {
-  key: 'agentInbox',
+export const inboxProjectionDefinition = {
+  key: 'inbox',
   stateSchema: inboxProjectionSchema,
   init: (): InboxState => ({ 'next-turn': [], 'next-step': [] }),
   apply(state: InboxState, event) {
@@ -57,8 +57,15 @@ const inboxProjectionDefinition = {
       throw new Error(`invalid persisted inbox splice at session seq ${event.seq}`, { cause: error })
     }
   },
+  wire: {
+    // The wire value is the fold state itself: every pending message already
+    // round-trips the session log as lossless JSON. Only the static type
+    // narrows to the JSON-safe projection table entry.
+    viewSchema: inboxProjectionSchema as unknown as z.ZodType<InboxWireState>,
+    view: (state: InboxState) => state as unknown as InboxWireState,
+  },
   stateVersion: 1,
-} satisfies Omit<ProjectionDefinition<'agentInbox', InboxState>, 'wire'>
+} satisfies ProjectionDefinition<'inbox', InboxState>
 
 const textEncoder = new TextEncoder()
 
@@ -93,7 +100,7 @@ function resolveLimit(value: number | undefined, name: string): number | undefin
 /**
  * Driver-owned durable Inbox implementation used by ReactLoopAgent and focused
  * provider tests.
- * @param projections - registry that owns the standard Inbox projection.
+ * @param projections - registry with the agent inbox projection registered by AgentLoop.
  * @param session - session whose durable events store pending input.
  * @param dispatch - agent-scoped notifications for Inbox lifecycle events.
  * @param limits - optional admission quota applied before each durable commit.
@@ -110,7 +117,6 @@ export class ReactLoopInbox implements InboxContract {
   ) {
     this.maxMessages = resolveLimit(limits.maxMessages, 'inbox maxMessages')
     this.maxBytes = resolveLimit(limits.maxBytes, 'inbox maxBytes')
-    this.projections.register(inboxProjectionDefinition)
   }
 
   /** Prompts awaiting individual turns. */
@@ -220,8 +226,7 @@ export class ReactLoopInbox implements InboxContract {
 
   /** Read the current durable projection state. */
   private current(): InboxState {
-    const state = this.projections.stateOf(this.session, 'agentInbox')
-    /* v8 ignore next -- the constructor registers this key before any read */
+    const state = this.projections.stateOf(this.session, 'inbox')
     if (state === undefined) {
       throw new Error(
         `agent "${this.session.id}" cannot read inbox state: its projection registration is not active`,

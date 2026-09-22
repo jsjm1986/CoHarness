@@ -4,6 +4,10 @@
 
 [`@deepseek-ai/dsh-jobs`](../jobs/README.zh.md) 注册表约定的进程本地实现：`LocalJobRegistry` 把每条记录保存在内存中，按 kind 签发 `<kind>-N` id，并且只交出全新快照，从不交出实时状态。作为插件加载后即注册为 `ctx.jobs`。
 
+## 概述
+
+`dsh-jobs-local` 在 harness 进程内运行后台任务：工作会在 agent（智能体）继续推进的同时保持运行，拥有它的 agent 可以读取、等待、列出和取消它；同时挂载 `dsh-tool-jobs` 时，完成以会话内通知送达。它用内存记录实现 `dsh-jobs` 约定，并且只交出全新快照，从不交出实时状态。按所有者的并发上限（默认 10）约束一个 agent 同时处于运行或停止中的任务数量；任务会随 harness 进程终止而消失，无法跨重启持久。
+
 ## 准入
 
 `maxConcurrentJobsPerOwner` 必须是正的安全整数，默认值为 `10`。调用生产方之前，`start()` 会统计确切 owner 的 `running` 与 `stopping` 记录；所有无 owner 任务共享另一个独立的服务级桶。终止历史不占用容量，处于 `stopping` 的任务只有在生产方 `done` 结算后才释放名额。
@@ -22,9 +26,13 @@
 
 控制器与监听器按注册方所在的 scope 分层，形状与 tools 注册表一致：一次注册归档到其注册上下文的 scope，一次读取则把全局层与所有者的 scope 链求并集。因此一个进程级注册表能逐所有者地回答逐所有者的问题——对自身组合未附加任何控制器的所有者，无论其他组合附加了多少，`start()` 都会拒绝并抛出 `background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)`；一次结算也只会抵达其所有者所属组合注册的监听器。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。记录是只以快照形式分发的私有内存状态，其 issue/snapshot 语义由单元规格断言；执行所有权留在 shell 与工具 seam。
+
 ## 模型体验
 
-通过生产方插件和 [`dsh-tool-jobs`](../tool-jobs/README.zh.md) 间接影响；它们会呈现 job id、输出、状态、取消和完成通知。
+通过生产方插件与 `dsh-tool-jobs` 间接影响模型，注册表后端把全部模型渲染委托给它们。
 
 #### KV Cache 影响
 

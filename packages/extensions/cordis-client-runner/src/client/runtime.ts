@@ -159,6 +159,9 @@ function moduleIdOf(id: CordisDynamicPluginId): string {
   return `dyn/${id}`
 }
 
+/* jscpd:ignore-start -- client and host runner halves keep symmetric wiring;
+ * the evaluation-timeout race is intentionally mirrored in each half rather
+ * than exported across the plugin boundary. */
 async function withEvaluationTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
@@ -170,6 +173,7 @@ async function withEvaluationTimeout<T>(operation: Promise<T>, timeoutMs: number
     if (timer !== undefined) clearTimeout(timer)
   }
 }
+/* jscpd:ignore-end */
 
 /** One live package's contribution summary in this page. */
 export interface DynamicCordisLivePackage {

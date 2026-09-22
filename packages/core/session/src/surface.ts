@@ -17,7 +17,6 @@ import type {
   SessionEventType,
   SessionSeqCursor,
   SurfaceEvent,
-  SurfaceEventType,
   SurfaceOp,
 } from './types.ts'
 
@@ -64,7 +63,8 @@ export function isSurfaceEligibleType(type: string): boolean {
  */
 export function isSurfaceEvent(event: SessionEvent): event is SurfaceEvent {
   if (!SESSION_SURFACE_EVENT_TYPES.has(event.type)) return false
-  return (event as SessionEvent<SurfaceEventType>).surfaceOp !== undefined
+  const raw: { surfaceOp?: unknown } = event
+  return raw.surfaceOp !== undefined
 }
 
 /**
@@ -278,7 +278,7 @@ function isLegacyReplaceOp(value: object): boolean {
 
 /** Validate event-local surface eligibility and return its operation. */
 function surfaceOpOf(event: SessionEvent): SurfaceOp | undefined {
-  const raw = event as SessionEvent & { surfaceOp?: unknown; sourceEventSeqs?: unknown }
+  const raw: { surfaceOp?: unknown; sourceEventSeqs?: unknown } = event
   if (!isSurfaceEligibleType(event.type)) {
     // Unknown ignorable records retain opaque metadata without affecting history.
     if (!KNOWN_SESSION_EVENT_TYPES.has(event.type) && event.ignorable === true) return
@@ -317,24 +317,28 @@ function assertSourceEventReferences(
   event: SessionEvent,
   shadowedSeqs: readonly SessionSeq[],
 ): void {
-  const raw = (event as SessionEvent & { sourceEventSeqs?: unknown }).sourceEventSeqs
+  const raw: { sourceEventSeqs?: unknown } = event
+  if (event.type === 'assistant/message' && raw.sourceEventSeqs !== undefined) {
+    throw new Error('assistant/message embeds its source stream and cannot carry sourceEventSeqs')
+  }
   const sources = new Set<SessionSeq>()
-  if (raw !== undefined) {
-    if (!Array.isArray(raw)) {
+  const refs = raw.sourceEventSeqs
+  if (refs !== undefined) {
+    if (!Array.isArray(refs)) {
       throw new Error(`sourceEventSeqs on event at seq ${event.seq} must be an array when present`)
     }
-    if (raw.length === 0 && event.type !== 'assistant/message') {
-      throw new Error('sourceEventSeqs must not be empty except on assistant/message')
+    if (refs.length === 0) {
+      throw new Error('sourceEventSeqs must not be empty')
     }
     let nonEarlierSource: SessionSeq | undefined
-    for (const source of raw) {
+    for (const source of refs) {
       if (!isEventSeq(source)) {
         throw new Error(`session event "${event.type}" sourceEventSeqs must densely contain non-negative safe integers`)
       }
       sources.add(source)
       if (nonEarlierSource === undefined && source >= event.seq) nonEarlierSource = source
     }
-    if (sources.size !== raw.length) {
+    if (sources.size !== refs.length) {
       throw new Error('sourceEventSeqs must not contain duplicates')
     }
     if (nonEarlierSource !== undefined) {

@@ -6,9 +6,17 @@ web GUI 宿主的工作区目录选择是一项能力 seam。抽象的 `Director
 
 浏览原语失败时会抛出带类型的 `DirectoryPickerError`（`directory-unreadable`／`directory-exists`／`directory-create-failed`，各自携带出错对象的 `path`），消费网关将其 1:1 映射为协议错误码。`DirectoryEntry` 行携带宿主判定的 `hidden` 标志（POSIX 点前缀约定），展示策略留在客户端；`DirectoryListing.crumbs` 是从文件系统根开始的祖先链，每个 crumb 都是跳转目标。设计依据、与 `ctx.fs` 的切分、策略裁决见 [目录选择能力 seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.zh.md)。
 
+## 概述
+
+web GUI 让操作者通过 OS 选择器或应用内浏览器选择工作区目录。操作者能接触宿主屏幕时使用原生选项；远程客户端或需要在应用内列举和创建目录时使用浏览选项。消费方会获得交互类型，并能呈现匹配的工作流。目录选择仅限 GUI 宿主，不会影响 agent loop（智能体循环）。浏览工作流一次只公开一棵目录树；不支持多根目录。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 声明能力并集；交互与进程状态由各后端拥有。
+
 ## 模型体验
 
-无。该 seam 服务于 GUI 宿主的目录选择；这里没有任何内容进入模型请求。
+无。GUI 宿主的目录选择 seam 不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

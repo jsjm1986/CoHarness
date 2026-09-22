@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
@@ -32,7 +32,7 @@ function expectCode(code: SessionQueryErrorCode): Error {
 
 describe('session-query semantic extraction', () => {
   it('extracts first-party message, tool, todo, and failure detail', () => {
-    const callId = CallId('call')
+    const callId = ToolCallId('call')
     const messageContent: SessionEvent<'user/message'>['data']['content'] = [
       { type: 'text', text: ' visible ' },
       { type: 'reasoning', text: 'thought' },
@@ -50,6 +50,7 @@ describe('session-query semantic extraction', () => {
         content: messageContent, source: { kind: 'user' },
       }), surfaceOp: 'append' },
       { type: 'assistant/message', seq: SessionSeq(1), time: 2, data: {
+        stream: [],
         turn: 1, step: 1,
         message: createMessage({
           role: 'assistant',
@@ -102,6 +103,7 @@ describe('session-query semantic extraction', () => {
       seq: SessionSeq(9),
       time: 10,
       data: {
+        stream: [],
         turn: 1,
         step: 1,
         message: createMessage({
@@ -136,7 +138,7 @@ describe('session-query semantic extraction', () => {
       { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
       { type: 'step/start', seq: SessionSeq(1), time: 1, data: { turn: 1, step: 1 } },
       { type: 'step/end', seq: SessionSeq(2), time: 1, data: { turn: 1, step: 1 } },
-      { type: 'assistant/chunk', seq: SessionSeq(3), time: 1, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'raw' } } },
+      { type: 'assistant/attempt', seq: SessionSeq(3), time: 1, data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', index: 0, text: 'raw' } }] } },
       { type: 'request/header', seq: SessionSeq(4), time: 1, data: { header: { config: { provider: 'test', model: 'test' } }, reason: 'initial' } },
       { type: 'future/event', seq: SessionSeq(5), time: 1, data: { text: 'hidden' } } as never,
     ]
@@ -149,18 +151,11 @@ describe('session-query document and filter helpers', () => {
     { type: 'user/message', seq: SessionSeq(0), time: 10, data: createUserMessage({
       content: [{ type: 'text', text: 'Hello\n(AI)+' }], source: { kind: 'user' },
     }), surfaceOp: 'append' },
-    { type: 'assistant/chunk', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'raw' } } },
-    { type: 'assistant/message', seq: SessionSeq(2), time: 12, data: {
-      turn: 1, step: 1,
-      message: createMessage({
-        role: 'assistant',
-        content: [{ type: 'text', text: 'replacement' }],
-        source: {
-          kind: 'model',
-          ...{ provider: 'mock', model: 'mock' },
-        },
-      }),
-    }, surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
+    { type: 'assistant/attempt', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 11, chunk: { type: 'text-delta', index: 0, text: 'raw' } }] } },
+    { type: 'user/message', seq: SessionSeq(2), time: 12, data: createUserMessage({
+      content: [{ type: 'text', text: 'replacement' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    }), surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
     { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'interrupted' } } },
   ]
 
@@ -232,6 +227,7 @@ describe('session-query document and filter helpers', () => {
       seq: SessionSeq(0),
       time: 1,
       data: {
+        stream: [],
         turn: 1, step: 1,
         message: createMessage({
           role: 'assistant',

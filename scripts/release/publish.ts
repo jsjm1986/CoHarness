@@ -20,6 +20,7 @@ import { parseArgs } from 'node:util'
 import { releaseFamily } from './families.ts'
 import { attempt, attemptEchoed, isEntry } from './process.ts'
 import { packedIdentity, readPublishOrder } from './tarball.ts'
+import { releaseCandidateVersion, verifyConfiguredReadiness } from './readiness.ts'
 
 /**
  * Registry codes that answer a write which did not settle, rather than a
@@ -93,10 +94,15 @@ function registryState(name: string, version: string): RegistryState {
  * @param tarball - absolute tarball path.
  * @param name - package name the tarball declares.
  * @param version - package version the tarball declares.
+ * @param distTag - explicit npm dist-tag, or undefined for npm's `latest` default.
  */
-async function publishTarball(tarball: string, name: string, version: string): Promise<void> {
-  // A prerelease version never takes the latest dist-tag.
-  const tagArgs = version.includes('-') ? ['--tag', 'next'] : []
+async function publishTarball(
+  tarball: string,
+  name: string,
+  version: string,
+  distTag: string | undefined,
+): Promise<void> {
+  const tagArgs = distTag === undefined ? [] : ['--tag', distTag]
   for (let tries = 1; tries <= PUBLISH_ATTEMPTS; tries += 1) {
     // No --access: the sequences do not share one access level, so a
     // command-line flag could not serve both and would override the manifest
@@ -140,6 +146,11 @@ async function main(): Promise<void> {
   // one counter answers "how far along is this run" for whoever is watching a
   // release that takes minutes per family.
   const order = readPublishOrder(directory)
+  const members = family.members(process.cwd())
+  family.verifyVersions(members)
+  const candidateVersion = releaseCandidateVersion(family, members, process.env.GITHUB_REF ?? '')
+  await verifyConfiguredReadiness(process.cwd(), family.id, candidateVersion, 'publish',
+    order.map(filename => join(directory, filename)))
   const total = String(order.length)
   let published = 0
   let skipped = 0
@@ -164,7 +175,7 @@ async function main(): Promise<void> {
     // Space out the writes: the gap belongs between publishes, so a run that
     // only skips does not wait at all.
     if (published > 0) await sleep(PUBLISH_SPACING_MS)
-    await publishTarball(tarball, name, version)
+    await publishTarball(tarball, name, version, family.distTagForVersion(version))
     console.log(`release publish: ${progress} ${name}@${version} published`)
     published += 1
   }

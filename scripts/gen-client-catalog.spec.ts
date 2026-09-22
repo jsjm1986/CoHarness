@@ -134,6 +134,14 @@ describe('client slot projection', () => {
       .toContain('built in')
   })
 
+  it('names the Factory definition that declares an ordinary child seat', () => {
+    const factory = registration({ key: 'demo.factory', children: ['demo.seat'], factory: true })
+    const [entry] = resolveSlotEntries([declaration()], [factory], OWNER_TYPES, kits)
+    expect(entry?.declaredBy)
+      .toContain("factory 'demo.factory' (client-demo)")
+    expect(entry?.occupants).toEqual([])
+  })
+
   it('reports an open keyed domain and the keys already taken', () => {
     const [entry] = resolveSlotEntries(
       [declaration({ kind: 'keyed' })],

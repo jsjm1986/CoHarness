@@ -4,6 +4,10 @@
 
 遥测（telemetry）Service Definition 声明 `SessionTelemetrySink` 后端约定，捕获协调器把会话记录传给实现该约定的任意上报 SDK 后端。捕获侧可跟随实时会话事件，也可按需回放权威会话日志前缀。本包调用 `emit()` 后就停止处理：批处理、重试、排队与丢失策略都属于后端自身的 SDK，本包既不规定也不包装。设计依据与被否决的替代方案见[复活 Agent Note](../../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.zh.md)、[反馈门控投递](../../../.agents/notes/implemented/feature/2026-08-05-feedback-gated-session-telemetry.zh.md)与[无缓冲反馈回放](../../../.agents/notes/implemented/simplification/2026-08-06-buffer-free-feedback-telemetry.zh.md)。
 
+## 概述
+
+会话遥测让部署方发送会话活动的有序副本用于上报，同时保留权威会话日志。部署方选择一个上报后端，并可在投递前脱敏每个外发副本；如果没有脱敏规则，捕获的数据将原样离开进程。交接以非阻塞方式完成，因此上报不会延迟会话处理。投递采用尽力而为方式；如果进程崩溃，队列中的记录可能丢失。
+
 ## 后端约定
 
 `SessionTelemetrySink` 有三个成员：`emit(record)` 必须入队且不能阻塞，因为它会在 `session/event` 或显式权威日志回放期间同步执行；可选的 `flush()` 是轮次结束后的提示，调用方不等待结果，多数后端省略它并使用 SDK 的常规批处理计划；`shutdown()` 排空已入队记录，并在 SDK 停止后结束，dispose（资源释放）会等待它。提供 `flush()` 的实现必须安排并发 flush 与 `shutdown()` 最终排空的先后顺序。`SessionTelemetryBackend` 将此 API 注册在 `sessionTelemetry` 上下文键下：每个上下文只允许一个实现，重复加载会抛出异常。后端以 `live` 或 `on-demand` 捕获构造 `SessionTelemetryCoordinator`，并在自己选择的触发器中调用 `captureSession(session, throughSeq?)`。
@@ -38,9 +42,13 @@
 
 `SessionTelemetryRecord` 包含：`channel`（`ledger` | `ops`）、`time`（epoch 毫秒）、`severity`（预先映射好的严重级别：`tool/result.isError`、`turn/end` 的错误原因与 `agent-error` 映射为 ERROR，其他已捕获记录映射为 INFO，而 `sessionTelemetry/record` 策略可以指定 WARN）、只含身份信息的 `attributes`（`session.id`、`event.type`、`event.seq`、`session.format_version`，header 中存在时再加 `session.cwd`/`session.parent_id`/`session.seed_length`），以及作为 `body` 的完整深拷贝 `event.data`，且以脱敏后的内容为准。运维记录携带 `sessionTelemetry.op`（`agent-error` | `shutdown`）和 `session.id`，并刻意不带 `event.seq`/`event.type`：它们是用来告警的信号，不是用来累加的条目；`agent-error` 会把任意抛出值规范化为稳定的 `{ name, message }` 记录主体。交接之后的投递由后端 SDK 负责；重复仍然可能出现（无游标的重新收养、SDK 重试），因此接收端基于 `(session.id, event.seq)` 去重。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。捕获把每条会话记录交给已挂载的 sink；批处理、重试与丢失策略属于后端 SDK，因此该 seam 不持有遥测关系。
+
 ## 模型体验
 
-无。本包只观察会话流，并把脱敏后的副本交给上报后端；它绝不向模型请求贡献任何内容。
+无，因为该 seam 观察会话流并把脱敏后的副本交给外部；它不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

@@ -9,15 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
       "path": "../../core/agent"
     },
     {
@@ -27,16 +18,31 @@
       "path": "../../core/system-prompt"
     },
     {
-      "path": "../../interaction/user-questions"
+      "path": "../../core/tools"
     },
     {
       "path": "../../interaction/commands"
     },
     {
-      "path": "../../session/session-projection"
+      "path": "../../interaction/user-questions"
+    },
+    {
+      "path": "../../llm/llm"
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

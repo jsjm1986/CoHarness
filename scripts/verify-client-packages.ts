@@ -13,11 +13,12 @@ const GATE = 'verify-client-packages'
 const CLIENT_MANIFEST_GLOB = 'packages/*/*/package.json'
 const MANIFEST_GLOBS = ['packages/*/*/package.json', 'apps/*/package.json', 'vendor/*/package.json']
 const CONFIG_GLOB = 'packages/*/*/tsdown.config.ts'
-const PLATFORM_SOURCE = 'packages/client/web/src/platform.ts'
+export const PLATFORM_SOURCE = 'packages/client/web/src/platform.ts'
 const PARSER_PRELOAD_SOURCE = 'packages/client/modules/src/index.ts'
 const STATIC_PRESET_SOURCE = 'packages/client/tsdown.client.ts'
 const CORDIS = '@deepseek-ai/cordis'
 const DSH_PREFIX = '@deepseek-ai/dsh-'
+export const DSH_INVARIANTS = '@deepseek-ai/dsh-invariants'
 const CLIENT_WEB = '@deepseek-ai/dsh-client-web'
 
 /** One workspace package's browser-module declaration. */
@@ -30,6 +31,10 @@ export interface ClientDeclaration {
   readonly dynamic: boolean
   /** Exact module-table specifiers requested by the row. */
   readonly external: readonly string[]
+  /** Production source locations grouped by runtime-imported package name. */
+  readonly runtimeSourceUses: Readonly<Record<string, readonly string[]>>
+  /** Exact runtime specifiers used to validate `dsh.client.external` declarations. */
+  readonly runtimeSourceSpecifiers: Readonly<Record<string, readonly string[]>>
   /** Informational package dependencies declared by the row. */
   readonly inject: readonly string[]
 }
@@ -40,8 +45,6 @@ export interface ClientPackage extends ClientDeclaration {
   readonly staticLinked: boolean
   /** Production source locations grouped by imported package name. */
   readonly sourceUses: Readonly<Record<string, readonly string[]>>
-  /** Production source locations grouped by runtime-imported package name. */
-  readonly runtimeSourceUses: Readonly<Record<string, readonly string[]>>
   /** Installed implementation dependencies. */
   readonly dependencies: Readonly<Record<string, string>>
   /** Consumer-supplied dependencies. */
@@ -84,7 +87,7 @@ export interface ClientDeclarations {
  */
 export function collectSourcePackageUses(path: string, source: string): Set<string> {
   const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
-  return collectSourceFilePackageUses(sourceFile, false)
+  return collectSourceFileUses(sourceFile, false, 'package')
 }
 
 /**
@@ -95,7 +98,41 @@ export function collectSourcePackageUses(path: string, source: string): Set<stri
  */
 export function collectRuntimeSourcePackageUses(path: string, source: string): Set<string> {
   const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
-  return collectSourceFilePackageUses(sourceFile, true)
+  return collectSourceFileUses(sourceFile, true, 'package')
+}
+
+/**
+ * Collect exact bare specifiers retained by one production source file.
+ * @param path - File path used to select TypeScript's parser mode.
+ * @param source - Source text to inspect.
+ * @returns Exact specifiers retained by runtime imports, exports, requires, or JSX.
+ */
+export function collectRuntimeSourceSpecifiers(path: string, source: string): Set<string> {
+  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
+  return collectSourceFileUses(sourceFile, true, 'specifier')
+}
+
+/**
+ * Collect relative module specifiers used to follow one source entry's local closure.
+ * @param path - File path used to select TypeScript's parser mode.
+ * @param source - Source text to inspect.
+ * @returns Relative imports, exports, requires, and import types.
+ */
+export function collectLocalSourceSpecifiers(path: string, source: string): Set<string> {
+  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
+  return collectSourceFileUses(sourceFile, false, 'local')
+}
+
+/**
+ * Collect local module specifiers retained by one production source file.
+ * @param path - File path used to select TypeScript's parser mode.
+ * @param source - Source text to inspect.
+ * @param includeRootRelative - Include absolute paths, such as Vite's Web-root imports.
+ * @returns Local imports, exports, and requires that survive compilation.
+ */
+export function collectRuntimeLocalSourceSpecifiers(path: string, source: string, includeRootRelative = false): Set<string> {
+  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
+  return collectSourceFileUses(sourceFile, true, 'local', includeRootRelative)
 }
 
 function importCarriesRuntimeValue(node: ts.ImportDeclaration): boolean {
@@ -117,12 +154,22 @@ function exportCarriesRuntimeValue(node: ts.ExportDeclaration): boolean {
   return clause.elements.length === 0 || clause.elements.some(element => !element.isTypeOnly)
 }
 
-function collectSourceFilePackageUses(sourceFile: ts.SourceFile, runtimeOnly: boolean): Set<string> {
+function collectSourceFileUses(
+  sourceFile: ts.SourceFile,
+  runtimeOnly: boolean,
+  key: 'local' | 'package' | 'specifier',
+  includeRootRelative = false,
+): Set<string> {
   const uses = new Set<string>()
 
   const add = (specifier: ts.Expression | undefined): void => {
-    if (specifier === undefined || !ts.isStringLiteral(specifier) || !isBareSpecifier(specifier.text)) return
-    uses.add(packageNameOf(specifier.text))
+    if (specifier === undefined || !ts.isStringLiteralLike(specifier)) return
+    if (key === 'local') {
+      if (specifier.text.startsWith('.') || includeRootRelative && specifier.text.startsWith('/')) uses.add(specifier.text)
+      return
+    }
+    if (!isBareSpecifier(specifier.text)) return
+    uses.add(key === 'package' ? packageNameOf(specifier.text) : specifier.text)
   }
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node)) {
@@ -137,9 +184,10 @@ function collectSourceFilePackageUses(sourceFile: ts.SourceFile, runtimeOnly: bo
       && (node.expression.kind === ts.SyntaxKind.ImportKeyword
         || ts.isIdentifier(node.expression) && node.expression.text === 'require')) {
       add(node.arguments[0])
-    } else if (!runtimeOnly && ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
+    } else if (!runtimeOnly && key !== 'local' && ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
       add(node.name)
-    } else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) {
+    } else if (key !== 'local'
+      && (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node))) {
       uses.add('react')
     }
     ts.forEachChild(node, visit)
@@ -219,15 +267,13 @@ export function fixClientPackageManifests(root: string, facts: ClientPackageFact
     ) || target.changed
   }
 
-  const staticInputs = new Set([
-    ...facts.staticLinkedPackages,
-    ...facts.platformModules.map(packageNameOf),
-  ])
+  const platformModuleNames = new Set(facts.platformModules.map(packageNameOf))
+  const staticInputs = new Set([...facts.staticLinkedPackages, ...platformModuleNames])
   staticInputs.delete(CORDIS)
   const inferredRanges = dependencyRangeCandidates(root)
   for (const pkg of facts.packages) {
     const target = document(pkg.manifest)
-    const expected = expectedSections(pkg, staticInputs)
+    const expected = expectedSections(pkg, staticInputs, platformModuleNames)
     for (const [name, rule] of expected) {
       const range = preferredRange(target.manifest, name, rule.kind, inferredRanges)
       if (range === undefined) continue
@@ -444,14 +490,12 @@ interface ExpectedRule {
 
 function collectDependencyViolations(facts: ClientPackageFacts): string[] {
   const violations: string[] = []
-  const staticInputs = new Set([
-    ...facts.staticLinkedPackages,
-    ...facts.platformModules.map(packageNameOf),
-  ])
+  const platformModuleNames = new Set(facts.platformModules.map(packageNameOf))
+  const staticInputs = new Set([...facts.staticLinkedPackages, ...platformModuleNames])
   staticInputs.delete(CORDIS)
 
   for (const pkg of [...facts.packages].sort((left, right) => left.manifest.localeCompare(right.manifest))) {
-    const expected = expectedSections(pkg, staticInputs)
+    const expected = expectedSections(pkg, staticInputs, platformModuleNames)
     for (const [name, rule] of [...expected].sort(([left], [right]) => left.localeCompare(right))) {
       const actual = declaredSections(pkg, name)
       if (rule.kind === 'dependency') {
@@ -517,7 +561,11 @@ function collectDependencyViolations(facts: ClientPackageFacts): string[] {
   return violations
 }
 
-function expectedSections(pkg: ClientPackage, staticInputs: ReadonlySet<string>): Map<string, ExpectedRule> {
+function expectedSections(
+  pkg: ClientPackage,
+  staticInputs: ReadonlySet<string>,
+  platformModuleNames: ReadonlySet<string>,
+): Map<string, ExpectedRule> {
   const expected = new Map<string, ExpectedRule>([
     [CORDIS, { kind: 'peer-dev', origins: new Set(['client package baseline']) }],
   ])
@@ -525,7 +573,12 @@ function expectedSections(pkg: ClientPackage, staticInputs: ReadonlySet<string>)
     if (pkg.name === CLIENT_WEB) return expected
     for (const [name, locations] of Object.entries(pkg.runtimeSourceUses)) {
       if (name === pkg.name || name === CORDIS || isInternalDsh(name)) continue
-      expected.set(name, { kind: 'dependency', origins: new Set(locations) })
+      // The shell seeds PLATFORM_MODULES entries into the module table, so a
+      // statically linked artifact resolves them there instead of through npm.
+      expected.set(name, {
+        kind: platformModuleNames.has(name) ? 'dev' : 'dependency',
+        origins: new Set(locations),
+      })
     }
     return expected
   }
@@ -542,6 +595,13 @@ function expectedSections(pkg: ClientPackage, staticInputs: ReadonlySet<string>)
     for (const location of locations) add(name, location)
   }
   for (const name of pkg.inject) add(name, 'dsh.client.inject')
+  const invariantsRule = expected.get(DSH_INVARIANTS)
+  // An invariant companion is checked by the in-repo diagnostics harness, so
+  // importing dsh-invariants only from src/invariant.ts is a dev relationship.
+  if (invariantsRule !== undefined
+    && [...invariantsRule.origins].every(origin => origin.endsWith('/src/invariant.ts'))) {
+    expected.set(DSH_INVARIANTS, { kind: 'dev', origins: invariantsRule.origins })
+  }
   return expected
 }
 
@@ -583,6 +643,20 @@ function collectModuleViolations(facts: ClientPackageFacts): string[] {
       if (supplier === pkg.name) {
         violations.push(pkg.manifest + ': dsh.client.external names its own row ' + JSON.stringify(specifier))
       } else if (supplier !== undefined) {
+        if (pkg.manifest.startsWith('packages/client/')) {
+          violations.push(
+            pkg.manifest + ': client feature package requests runtime external ' + JSON.stringify(specifier)
+            + '; import shared types only or call an injected Cordis service',
+          )
+          continue
+        }
+        if (pkg.runtimeSourceSpecifiers[specifier] === undefined) {
+          violations.push(
+            pkg.manifest + ': dsh.client.external ' + JSON.stringify(specifier)
+            + ' has no runtime import or re-export in production source; remove the stale declaration',
+          )
+          continue
+        }
         edges.push({ from: pkg.name, to: supplier, specifier })
       } else {
         const owner = stripClientSuffix(specifier)
@@ -673,17 +747,25 @@ function readDeclaration(
   const dsh = isRecord(manifest.dsh) ? manifest.dsh : undefined
   const rawClient = dsh?.client
   if (rawClient === undefined) {
-    return { name: manifest.name, manifest: manifestPath, dynamic: false, external: [], inject: [] }
+    return {
+      name: manifest.name, manifest: manifestPath, dynamic: false, external: [],
+      runtimeSourceUses: {}, runtimeSourceSpecifiers: {}, inject: [],
+    }
   }
   if (!isRecord(rawClient)) {
     malformed.push(manifestPath + ': ' + manifest.name + ' dsh.client must be an object')
-    return { name: manifest.name, manifest: manifestPath, dynamic: false, external: [], inject: [] }
+    return {
+      name: manifest.name, manifest: manifestPath, dynamic: false, external: [],
+      runtimeSourceUses: {}, runtimeSourceSpecifiers: {}, inject: [],
+    }
   }
   return {
     name: manifest.name,
     manifest: manifestPath,
     dynamic: true,
     external: stringArray(rawClient.external, manifest.name, manifestPath, 'external', malformed),
+    runtimeSourceUses: {},
+    runtimeSourceSpecifiers: {},
     inject: stringArray(rawClient.inject, manifest.name, manifestPath, 'inject', malformed),
   }
 }
@@ -734,7 +816,7 @@ function unwrapExpression(expression: ts.Expression): ts.Expression {
   return current
 }
 
-function readStringLiteralArray(root: string, sourcePath: string, name: string): string[] {
+export function readStringLiteralArray(root: string, sourcePath: string, name: string): string[] {
   const path = resolve(root, sourcePath)
   const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
   const constants = new Map<string, string>()
@@ -766,10 +848,42 @@ function readStringLiteralArray(root: string, sourcePath: string, name: string):
 }
 
 async function readFacts(root: string): Promise<ClientPackageFacts> {
-  const { declarations, malformed } = readClientDeclarations(root)
-  const byManifest = new Map(declarations.map(entry => [entry.manifest, entry]))
+  const { declarations: bareDeclarations, malformed } = readClientDeclarations(root)
   const staticLinkedPackages = await readStaticLinkedRoster(root)
   const project = new TypeScriptProject(root, 'client')
+  const sourceFiles = project.sourceFiles()
+  const declarations = bareDeclarations.map((declaration): ClientDeclaration => {
+    const runtimeSourceUses = new Map<string, Set<string>>()
+    const runtimeSourceSpecifiers = new Map<string, Set<string>>()
+    const sourcePrefix = dirname(declaration.manifest) + '/src/'
+    for (const sourceFile of sourceFiles) {
+      if (sourceFile.isDeclarationFile) continue
+      const file = project.relativePath(sourceFile)
+      if (!file.startsWith(sourcePrefix)) continue
+      for (const name of collectSourceFileUses(sourceFile, true, 'package')) {
+        const locations = runtimeSourceUses.get(name) ?? new Set<string>()
+        locations.add(file)
+        runtimeSourceUses.set(name, locations)
+      }
+      for (const specifier of collectSourceFileUses(sourceFile, true, 'specifier')) {
+        const locations = runtimeSourceSpecifiers.get(specifier) ?? new Set<string>()
+        locations.add(file)
+        runtimeSourceSpecifiers.set(specifier, locations)
+      }
+    }
+    return {
+      ...declaration,
+      runtimeSourceUses: Object.fromEntries(
+        [...runtimeSourceUses].sort(([left], [right]) => left.localeCompare(right))
+          .map(([name, locations]) => [name, [...locations].sort()]),
+      ),
+      runtimeSourceSpecifiers: Object.fromEntries(
+        [...runtimeSourceSpecifiers].sort(([left], [right]) => left.localeCompare(right))
+          .map(([name, locations]) => [name, [...locations].sort()]),
+      ),
+    }
+  })
+  const byManifest = new Map(declarations.map(entry => [entry.manifest, entry]))
   const packages: ClientPackage[] = []
 
   const browserManifestPaths = globSync(CLIENT_MANIFEST_GLOB, { cwd: root })
@@ -785,22 +899,16 @@ async function readFacts(root: string): Promise<ClientPackageFacts> {
     const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), 'utf8')) as Manifest
     if (typeof manifest.name !== 'string') throw new Error(GATE + ': ' + manifestPath + ' has no package name')
     const sourceUses = new Map<string, Set<string>>()
-    const runtimeSourceUses = new Map<string, Set<string>>()
     const packageDirectory = dirname(manifestPath)
     const sourcePrefix = packageDirectory + '/src/'
-    for (const sourceFile of project.sourceFiles()) {
+    for (const sourceFile of sourceFiles) {
       if (sourceFile.isDeclarationFile) continue
       const file = project.relativePath(sourceFile)
       if (!file.startsWith(sourcePrefix)) continue
-      for (const name of collectSourceFilePackageUses(sourceFile, false)) {
+      for (const name of collectSourceFileUses(sourceFile, false, 'package')) {
         const locations = sourceUses.get(name) ?? new Set<string>()
         locations.add(file)
         sourceUses.set(name, locations)
-      }
-      for (const name of collectSourceFilePackageUses(sourceFile, true)) {
-        const locations = runtimeSourceUses.get(name) ?? new Set<string>()
-        locations.add(file)
-        runtimeSourceUses.set(name, locations)
       }
     }
     packages.push({
@@ -808,10 +916,6 @@ async function readFacts(root: string): Promise<ClientPackageFacts> {
       staticLinked: staticLinkedPackages.has(declaration.name),
       sourceUses: Object.fromEntries(
         [...sourceUses].sort(([left], [right]) => left.localeCompare(right))
-          .map(([name, locations]) => [name, [...locations].sort()]),
-      ),
-      runtimeSourceUses: Object.fromEntries(
-        [...runtimeSourceUses].sort(([left], [right]) => left.localeCompare(right))
           .map(([name, locations]) => [name, [...locations].sort()]),
       ),
       dependencies: manifest.dependencies ?? {},

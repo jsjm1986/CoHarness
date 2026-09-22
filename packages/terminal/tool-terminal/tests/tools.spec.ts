@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -10,9 +10,9 @@ import type { ToolSdkSchema } from '@deepseek-ai/dsh-tools/src/ts-types.ts'
 import TerminalSessionService, { TerminalSessionId } from '@deepseek-ai/dsh-terminal'
 import type { TerminalBackend, TerminalBackendSession, TerminalSendOperation, TerminalSendRequest, TerminalSessionStatus, TerminalSignal } from '@deepseek-ai/dsh-terminal'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
-import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
+import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
-import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
+import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 async function fakeAgent(ctx: Context, rawId: string): Promise<Agent> {
   const scope = ctx.plugin(() => {})
@@ -114,7 +114,7 @@ async function setupBase(jobs: boolean) {
   ctx.terminals.registerBackend(stub.backend)
   if (jobs) {
     await ctx.plugin(LocalJobRegistry)
-    await ctx.plugin(ToolTasks)
+    await ctx.plugin(ToolJobs)
   }
   return { ctx, stub, agent: await fakeAgent(ctx, jobs ? 'with-tasks' : 'foreground') }
 }
@@ -123,11 +123,11 @@ let callNumber = 0
 const TOOL_NAMES = ['terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list'] as const
 const testToolSignal = new AbortController().signal
 function call(ctx: Context, name: string, args: unknown, agent?: Agent) {
-  return ctx.tools.execute({ signal: testToolSignal, callId: CallId(`pty-call-${++callNumber}`), name, arguments: args, ...agent ? { agent } : {} })
+  return ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId(`pty-call-${++callNumber}`), name, arguments: args, ...agent ? { agent } : {} })
 }
 
 function callWithSignal(ctx: Context, name: string, args: unknown, agent: Agent, signal: AbortSignal) {
-  return ctx.tools.execute({ callId: CallId(`pty-call-${++callNumber}`), name, arguments: args, agent, signal })
+  return ctx.tools.execute({ callId: ToolCallId(`pty-call-${++callNumber}`), name, arguments: args, agent, signal })
 }
 
 function text(result: { content: { type: string; text?: string }[] }): string {
@@ -187,7 +187,7 @@ describe('tool-terminal foreground API', () => {
     expect(empty).toMatchObject({ isError: false, value: [] })
   })
 
-  it('projects every terminal DTO into the generated PTC output map', async () => {
+  it('projects every terminal DTO into the generated PTC mode output map', async () => {
     const { ctx } = await setup(false)
     const schemas = TOOL_NAMES.map((toolName): ToolSdkSchema => {
       const definition = ctx.tools.get(toolName)

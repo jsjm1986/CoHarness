@@ -14,6 +14,10 @@ This package owns the Service Definition role of the LSP capability:
 
 The seam exposes exactly four semantic operations — `goToDefinition`, `findReferences`, `goToImplementation`, `hover` — and no generic JSON-RPC escape hatch, so no protocol payload or unreviewed command/mutation reaches a provider through `ctx.lsp`.
 
+## Summary
+
+Use `dsh-lsp` to give agents language-server navigation for definitions, references, implementations, and hover documentation. Queries select the configured provider by file extension and return normalized results with structured failures, so backend changes do not alter the navigation request or model-visible response. Navigation is read-only and deliberately excludes generic JSON-RPC access, rename, formatting, diagnostics, and symbol lists. This package must be combined with a provider such as `dsh-lsp-stdio` and the model-facing `dsh-tool-lsp`; alone it provides no navigation.
+
 ## Service API (`ctx.lsp`)
 
 | Member | Semantics |
@@ -29,9 +33,13 @@ Providers register **capabilities**, not tools. `dsh-tool-lsp` is the only owner
 
 `LspQueryRequest` (`operation`, `filePath`, `position`, `workspaceRoot`) — every field required, so no field needs implementation defaulting and there is no `resolve()` step. Positions and ranges are zero-based UTF-16, matching the protocol; the tool owns the one-based cursor convention. `findReferences` always includes declarations — providers enforce this internally, so callers get no flag. `LspQueryResult` is a CLOSED discriminated union: `{ kind: 'locations'; locations; resolvedWorkspaceUri }` for navigation, `{ kind: 'hover'; hover }` for hover (content or `null`) — consumers `switch` to exhaustiveness so a new arm breaks compilation until handled. `resolvedWorkspaceUri` is the provider's canonical workspace `file:` URI; callers relativize location URIs against it instead of applying host-platform path rules to the possibly symlinked request root. See `src/types.ts` for the full contracts and `src/index.ts` for the `LspError` codes, including `LSP_DISPOSED` and `LSP_MALFORMED_RESPONSE`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam defines the navigation contract; providers own server processes, documents, and caches.
+
 ## Model Experience
 
-Indirectly, through `dsh-tool-lsp`, which owns the model-facing `lsp` schema, prompt, and rendered results while this registry contributes no prompt or schema itself.
+Indirectly, through `dsh-tool-lsp`, which owns the model-facing `lsp` schema, prompt guidance, and rendered results while this registry contributes no prompt or schema itself.
 
 #### KV Cache effect
 

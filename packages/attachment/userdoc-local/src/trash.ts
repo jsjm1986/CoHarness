@@ -15,7 +15,7 @@ import {
   type UserDocRef,
   type UserDocTrashRef,
 } from '@deepseek-ai/dsh-userdoc'
-import { docIdFor, isInside, pathForDirectoryId, pathForDocId, resolveTargetIn } from './name.ts'
+import { assertNestedDirectories, docIdFor, isInside, pathForDirectoryId, pathForDocId, resolveTargetIn } from './name.ts'
 import { mediaTypeFor } from './media-type.ts'
 
 const TRASH_DIRECTORY = '.dsh-trash'
@@ -173,17 +173,7 @@ async function assertRealParent(root: string, path: string): Promise<void> {
     if (!isInside(canonicalRoot, canonicalParent)) {
       throw new UserDocError('Document path lies outside the document root.', DOCUMENT_NOT_FOUND_CODE)
     }
-    const nested = relative(resolve(root), resolve(join(path, '..')))
-    if (nested !== '' && nested !== '..' && !nested.startsWith(`..${sep}`)) {
-      let current = resolve(root)
-      for (const part of nested.split(sep).filter(Boolean)) {
-        current = join(current, part)
-        const entry = await lstat(current)
-        if (entry.isSymbolicLink() || !entry.isDirectory()) {
-          throw new UserDocError('Document directory not found.', DOCUMENT_NOT_FOUND_CODE)
-        }
-      }
-    }
+    await assertNestedDirectories(root, join(path, '..'), DOCUMENT_NOT_FOUND_CODE)
   } catch (error) {
     if (error instanceof UserDocError) throw error
     throw new UserDocError('Document not found.', DOCUMENT_NOT_FOUND_CODE, { cause: error })

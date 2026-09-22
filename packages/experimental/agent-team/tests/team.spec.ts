@@ -228,9 +228,10 @@ describe('Team identity and provisioning', () => {
     const { ctx, lead } = await setup([])
     const internal = teamInternals(ctx).roster
     let liveSession: Session | undefined
-    const liveFiber = await ctx.plugin(Object.assign(function checkpointFixture(childCtx: Context) {
+    const liveFiber = await ctx.plugin(Object.assign(async function checkpointFixture(childCtx: Context) {
       liveSession = childCtx.sessions.create(SessionId('checkpoint-child'))
-    }, { inject: ['sessions'] }))
+      await childCtx.sessionPersistence.create(liveSession.header)
+    }, { inject: ['sessions', 'sessionPersistence'] }))
     if (liveSession === undefined) throw new Error('checkpoint fixture did not create its Session')
     const initial = createUserMessage({ content: content('checkpoint me'), source: { kind: 'user' } })
     const checkpoint = internal.checkpointInitialPrompt(liveSession.id, initial.id, SIGNAL)

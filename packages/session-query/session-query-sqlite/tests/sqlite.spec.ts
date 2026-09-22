@@ -13,7 +13,7 @@ import SessionStore, {
 } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@deepseek-ai/dsh-session'
 import SessionPersistence, { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
-import type { SessionEventSuffix, SessionInspection, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionEventSuffix, SessionInspection, SessionPersistenceSnapshot , SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import SqliteSessionPersistence from '@deepseek-ai/dsh-session-persistence-sqlite'
 import SqliteSessionQueryEngine, {
   SESSION_QUERY_SQLITE_SCHEMA_VERSION,
@@ -72,6 +72,10 @@ function replaceCursorOffset(
 }
 
 class TestPersistence extends SessionPersistence {
+
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
   override readonly supportsRawArtifacts = false
 
   static entries = new Map<SessionIdType, {
@@ -96,7 +100,7 @@ class TestPersistence extends SessionPersistence {
   static snapshotOverride: (() => SessionPersistenceSnapshot[]) | undefined
   static failure: unknown
 
-  locate(_meta: SessionHeader): undefined {
+  override locate(_meta: SessionHeader): undefined {
     return undefined
   }
 
@@ -130,7 +134,7 @@ class TestPersistence extends SessionPersistence {
     this.revisions.set(entry.meta.id, ++this.nextRevision)
   }
 
-  create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
+  override createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
     TestPersistence.set({
       meta,
       ...inheritedEventCount === undefined ? {} : { inheritedEventCount },
@@ -139,7 +143,7 @@ class TestPersistence extends SessionPersistence {
     return Promise.resolve()
   }
 
-  append(id: SessionIdType, events: readonly SessionEvent[]): Promise<void> {
+  override append(id: SessionIdType, events: readonly SessionEvent[]): Promise<void> {
     const entry = TestPersistence.entries.get(id)
     if (entry === undefined) return Promise.reject(new Error('missing test session'))
     entry.events.push(...structuredClone(events))
@@ -147,7 +151,7 @@ class TestPersistence extends SessionPersistence {
     return Promise.resolve()
   }
 
-  async load(id: SessionIdType): Promise<SessionInspection> {
+  override async load(id: SessionIdType): Promise<SessionInspection> {
     TestPersistence.loads.set(id, (TestPersistence.loads.get(id) ?? 0) + 1)
     if (TestPersistence.failure !== undefined) throw TestPersistence.failure
     const entry = TestPersistence.entries.get(id)
@@ -164,7 +168,7 @@ class TestPersistence extends SessionPersistence {
     }
   }
 
-  async inspect(id: SessionIdType, signal?: AbortSignal): Promise<SessionInspection> {
+  override async inspect(id: SessionIdType, signal?: AbortSignal): Promise<SessionInspection> {
     TestPersistence.inspections.set(id, (TestPersistence.inspections.get(id) ?? 0) + 1)
     TestPersistence.inspectSignals.push(signal)
     if (TestPersistence.failure !== undefined) throw TestPersistence.failure
@@ -178,7 +182,7 @@ class TestPersistence extends SessionPersistence {
     }
   }
 
-  async readFrom(
+  override async readFrom(
     id: SessionIdType,
     fromSeq: SessionLogOffset,
     signal?: AbortSignal,
@@ -187,7 +191,7 @@ class TestPersistence extends SessionPersistence {
     return { ...whole, fromSeq, events: whole.events.filter(event => event.seq >= fromSeq) }
   }
 
-  async list(): Promise<SessionHeader[]> {
+  override async listStored(): Promise<SessionHeader[]> {
     TestPersistence.listStarted?.()
     await TestPersistence.listGate
     if (TestPersistence.failure !== undefined) throw TestPersistence.failure
@@ -195,7 +199,7 @@ class TestPersistence extends SessionPersistence {
   }
 
 
-  async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+  override async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     TestPersistence.snapshotSignals.push(signal)
     TestPersistence.listStarted?.()
     await TestPersistence.listGate
@@ -406,6 +410,7 @@ describe('SQLite session search', () => {
     session.append(
       'assistant/message',
       {
+        stream: [],
         turn: 1,
         step: 1,
         message: createAssistantMessage({
@@ -437,7 +442,7 @@ describe('SQLite session search', () => {
       { type: 'user/message', seq: SessionSeq(0), time: 10, data: createUserMessage({
         content: [{ type: 'text', text: 'needle original' }], source: { kind: 'user' },
       }), surfaceOp: 'append' },
-      { type: 'assistant/chunk', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'needle raw' } } },
+      { type: 'assistant/attempt', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 11, chunk: { type: 'text-delta', index: 0, text: 'needle raw' } }] } },
       { type: 'user/message', seq: SessionSeq(2), time: 12, data: createUserMessage({
         content: [{ type: 'text', text: 'needle summary' }], source: { kind: 'plugin', plugin: 'test' },
       }), surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
@@ -1824,7 +1829,7 @@ describe('SQLite schema, cancellation, and real persistence integration', () => 
     const persistence = await ctx.plugin(SqliteSessionPersistence, { path: persistencePath })
     const search = await ctx.plugin(SqliteSessionQueryEngine, { path: searchPath })
     const meta = header('real', 10, { cwd: '/work' })
-    await ctx.sessionPersistence.create(meta)
+    await ctx.sessionPersistence.createStored(meta)
     await ctx.sessionPersistence.append(meta.id, messageEvents('real SQLite needle'))
 
     await expect(ctx.sessionQuery.searchSessions({ query: 'SQLite needle' }))
@@ -1847,7 +1852,7 @@ describe('SQLite schema, cancellation, and real persistence integration', () => 
     const first = new Context()
     await first.plugin(SessionStore)
     const persistenceA = await first.plugin(SqliteSessionPersistence, { path: persistencePathA })
-    await first.sessionPersistence.create(shared)
+    await first.sessionPersistence.createStored(shared)
     await first.sessionPersistence.append(shared.id, messageEvents('alpha source'))
     const inspectA = vi.spyOn(first.sessionPersistence, 'inspect')
     const searchA = await first.plugin(SqliteSessionQueryEngine, { path: searchPath })
@@ -1871,7 +1876,7 @@ describe('SQLite schema, cancellation, and real persistence integration', () => 
     const second = new Context()
     await second.plugin(SessionStore)
     const persistenceB = await second.plugin(SqliteSessionPersistence, { path: persistencePathB })
-    await second.sessionPersistence.create(shared)
+    await second.sessionPersistence.createStored(shared)
     await second.sessionPersistence.append(shared.id, messageEvents('bravo source'))
     const inspectB = vi.spyOn(second.sessionPersistence, 'inspect')
     const searchB = await second.plugin(SqliteSessionQueryEngine, { path: searchPath })

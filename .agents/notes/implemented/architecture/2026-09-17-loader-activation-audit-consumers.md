@@ -16,7 +16,7 @@ The vendored Cordis upgrade removed the transactional Loader promise: a plugin t
 
 ## Decision
 
-Consumers observe activation instead of catching rollback, mirroring app-boot's `inactiveEntries()` audit:
+Consumers observe activation instead of catching rollback, mirroring app-boot's startup audit (`auditStartupEntries` since dsh-v0.1.6-alpha.2, which adopted the same model upstream as `StartupError` plus structured `inactiveEntries` diagnostics):
 
 - `packages/client/web/src/boot-client.ts` keeps the failure path inside the audit: a row whose module cannot be imported records the failure in the Loader, the boot page reports the row `failed`, and `assertEntriesActive` rejects boot with the `N entr… did not activate` report.
 - `packages/todo/tool-todo/tests/loader-composition.spec.ts` pins misconfiguration without rollback: with `allowParallelInProgress` missing or non-boolean, the tool entry's fiber reaches `FiberState.FAILED` while the rest of the tree activates, so `todo_write` never mounts.

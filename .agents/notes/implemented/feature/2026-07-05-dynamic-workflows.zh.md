@@ -22,7 +22,7 @@ harness 可以通过 `dsh-tool-subagent` 将一个任务委派给一个子 agent
 
 `ctx.workflowEngine` 是 bash 形态的抽象 `WorkflowEngine`——每个上下文一个引擎，无命名提供方注册表（引擎是部署级替换，不是共存者）。`start(request)` 对无法启动的脚本同步抛出；返回的 `WorkflowRun` 的 `result` 永不 reject（失败时结算为 `stopReason: 'error' | 'cancelled'`）。`workflow/*` 事件是仅观察的 emit，携带数据快照（id + meta；`workflow/end` 省略 result 值），按监听器隔离，与 `subagent/start`/`subagent/end` 对称——控制权留在 run 的持有者手中。词汇详情见 [subsystems/workflow.md](../../../../docs/subsystems/workflow.zh.md)。
 
-### 引擎（dsh-workflow-worker-thread）：每次运行一个 worker 线程
+### 引擎（dsh-workflow-ptc）：每次运行一个 worker 线程
 
 **信任前提**：工作流脚本与模型的 bash 访问具有相同的信任级别。引擎会约束有缺陷脚本的影响，并保证结果已 settled、值可安全表示为 JSON、取消后完全停稳；它不防御恶意代码。vm 上下文和 worker 线程不是安全边界：脚本可以逃逸到具有进程级权限的 Node API。沙箱化需要在此 seam 背后使用独立进程或 isolated-vm 引擎。
 

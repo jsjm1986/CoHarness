@@ -42,6 +42,11 @@ Bare package and package-subpath specifiers resolve through Node's package searc
 The version-1 `dsh_plugin_packages` field contains only `{ name, version }` pairs. Disabled, pending, failed, disposed, unloading, structural `cordis:` rows, ordinary dependencies, loose files without an owning package identity, programmatically mounted child fibers, and in-memory dynamic plugins are excluded.
 
 <a id="model-experience"></a>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The `dsh_plugin_packages` field is computed per request from the live Loader inventory; no inventory copy is retained.
+
 ## Model Experience
 
 ### Package inventory metadata
@@ -62,7 +67,7 @@ None; package lifecycle changes do not alter the model-visible prefix.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Loader package provenance only** — programmatic child fibers and in-memory dynamic plugins do not have authoritative npm name/version provenance and remain outside this inventory.
+- **Loader-backed package identity only** — programmatic child fibers and in-memory dynamic plugins do not have authoritative npm name/version identity and remain outside this inventory.
 - **Loose modules are omitted** — a relative file without a named and versioned owning manifest is a plugin module, not a plugin package.
 - **In-place package replacement requires restart** — manifest identities are cached for the process lifetime. Loader enable, disable, mount, unmount, and ordinary source HMR still refresh the active entry set, but replacing a mounted package's manifest with another version in the same process is not a supported upgrade path.
 

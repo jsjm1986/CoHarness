@@ -15,6 +15,10 @@
 
 该拆分是一个标准的能力 seam（[capability-seams Agent Note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md)）：`dsh-bash-sandbox` 是位于同一 Service Definition 之后的沙箱执行器——Consumer 检测其 `sandboxMode` 能力并添加升权字段，无需导入提供方——容器化或远程执行器也可以同样接入。
 
+## 概述
+
+使用 `ctx.shell` 运行输出有界的前台 shell 命令，或异步准备后台进程后取得句柄。配置文件可选择本地或沙箱化的 Bash 或 PowerShell 执行方式，而无需更改调用方。执行前解析每个请求，以显式确定工作目录、超时和输出上限。命令完成、非零退出、超时和调用方中止都会作为结果返回；只有基础设施故障才会 reject，而模型可见的渲染与沙箱指引由 `bash` 和 `pwsh` 工具负责。
+
 ## 服务 API（`ctx.shell`）
 
 | 成员 | 语义 |
@@ -39,13 +43,17 @@
 
 导出的 `parseExitStatus`（连同 `ParsedExitStatus`）是 shell 工具共享渲染约定的另一半：`dsh-tool-bash` 的 `renderResult` 与 `dsh-tool-pwsh` 的 `renderPwshResult` 追加的 `[exit code: N]`／`[killed by signal: X]` marker 的逆解析。两个工具的 `presentResult` 都用它把渲染文本拆成 terminal 卡的输出正文与其退出状态 pill；它放在 Service Definition 中，两个工具便永远不会在 marker 约定上漂移。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 定义执行器契约；job id、所有权与取消属于通用 `ctx.jobs` 运行时。
+
 ## 模型体验
 
 通过 `dsh-tool-bash` 间接影响；该工具会将执行器输出与沙箱事实转为指引和保留的工具结果 token。
 
 #### KV Cache 影响
 
-不会直接导致 KV Cache 失效；请求前缀变更由具名消费方负责。
+不会直接导致 KV Cache 失效；请求前缀的任何变更由具名消费方负责。
 
 ## 已知限制与暂缓事项
 

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The ACP provider runs each subagent in a fresh subprocess and drives it as an Agent Client Protocol client. It is the out-of-process alternative to spawn and fork: the child has its own runtime, session, model configuration, and tools.
 
+## Summary
+
+Use this package to delegate a task to an ACP-compatible agent running in a fresh subprocess with its own runtime, session, model, and tools. Each run shares only the selected working directory, sends the task over ACP, and returns the child's final answer or a safe error; intermediate messages and tool traffic stay outside the parent conversation. Permission prompts are answered by configured policy without human interaction. Choose it when delegation needs process isolation or a non-Harness ACP agent, and choose an in-process backend when the child must share parent capabilities.
+
 ## Start and ownership
 
 `start(request)` resolves the child's working directory, then performs `spawn` → ACP `initialize` → `newSession` before it fulfills. Fulfillment therefore means a remote session is ready and ownership has transferred to the caller. A spawn, initialization, new-session, or pre-publication cancellation failure rejects only after the subprocess has been reaped; a working-directory resolution failure rejects before anything is spawned.
@@ -61,13 +65,17 @@ The child spawns through the [`dsh-subprocess`](../../subprocess/subprocess/READ
 
 The package has no default export. Cordis loader unwrapping would otherwise hide the named `inject` metadata; see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run drives one child over the ACP wire; the child's runtime owns its session and the provider holds only the in-flight client.
+
 ## Model Experience
 
 ### Child-agent request
 
 #### What the model sees
 
-The remote child receives the standalone task content through ACP plus its own process's configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for persona, tool filtering, depth enforcement, or structured output instead of silently omitting them.
+The remote child receives the standalone task content through ACP plus its own process's configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for `agentOptions`, persona, tool filtering, depth enforcement, or structured output instead of silently omitting them.
 
 #### Token effect
 
@@ -81,7 +89,7 @@ Independent of the parent request cache. Each ACP child can reuse only prefixes 
 
 #### What the model sees
 
-Through `dsh-tool-subagent`, the parent receives only the child's final streamed assistant text or that consumer's exact stop-reason error, not intermediate messages or tool traffic. A request already cancelled before publication becomes exactly `Error: subagent request was aborted before the ACP child started`; other start failures pass through as `Error: <message>`.
+Through `dsh-tool-subagent`, the parent receives only the child's final streamed assistant text or that consumer's exact stop-reason error, not intermediate messages or tool traffic. Non-completed results present the safe diagnostic before separately preserved partial assistant output. A request already cancelled before publication becomes exactly `Error: subagent request was aborted before the ACP child started`; another start failure contains only the fixed `Subagent failure (...)` line.
 
 #### Token effect
 

@@ -58,6 +58,14 @@
           }
         ],
         "no-useless-constructor": "error",
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "crypto",
+            "property": "randomUUID",
+            "message": "browsers withhold crypto.randomUUID outside secure contexts (plain-HTTP LAN pages); mint through @deepseek-ai/dsh-util-crypto instead"
+          }
+        ],
         "typescript/await-thenable": "error",
         "typescript/ban-ts-comment": [
           "error",
@@ -196,6 +204,19 @@
         "scripts/**/*.spec.{ts,tsx}"
       ],
       "rules": {
+        // Session assertions inspect the log; other deprecated APIs remain errors.
+        "typescript/no-deprecated": [
+          "error",
+          {
+            "allow": [
+              {
+                "from": "file",
+                "name": ["snapshotEvents", "eventAt", "ownEvents"],
+                "path": "packages/core/session/src/index.ts"
+              }
+            ]
+          }
+        ],
         "typescript/no-invalid-void-type": "error",
         "typescript/no-non-null-assertion": "off", // Assertions commonly follow an expect() that proves presence.
         "typescript/no-unnecessary-condition": "off",

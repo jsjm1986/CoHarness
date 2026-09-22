@@ -6,6 +6,11 @@ The Cordis browser plugin that presents up to four existing Workspace Sessions a
 
 The plugin never imports ConversationRoot, ChatView, InputBar, or another presentation implementation. The conversation slot owner renders each pane through an explicit SessionProvider, so every pane receives the ordinary Session standard kit, session-scoped stores, projections, and injected actions from the same object layer. Root-slot injected controls resolve the active pane at render time; a cached root injection never owns a fixed Session or runtime target.
 
+## Summary
+
+Use `dsh-client-ui-workbench` to present up to four existing Workspace sessions as one multi-pane conversation workbench, with a session chooser plus pane selection, ordering, ratio, and mode controls. Each pane renders through the ordinary conversation slot owner under an explicit session scope, so injected controls always resolve the active pane rather than a cached target.
+
+
 ## Composition
 
 `apply()` waits for `conversationViewport` and registers the workbench controls through `ctx.slots.inject()`. The sidebar panel lists the staged panes with focus and close actions, offers Add and equalize-ratios actions bound to the same chooser store and viewport capability, exits back to single-session mode, and declares the `conversation.workbench.display` hole that ui-conversation fills with a compact display-preferences row. The provider owns a bounded Session stage set; removing this plugin releases additional history windows and leaves the ordinary current-session view available. The Gateway supplies an ACL-filtered account catalog, while each selected project runtime receives its own target-aware transport and principal assertion. In cloud Web, `workspace/resource-open` asks a preview consumer to accept an explicitly targeted file. The toolbar browses direct Workspace directories, uses shared resource metadata and version-guarded `workspaceFiles.read` pages, and falls back to bounded Base64 windows for binary files. Changed files require reload, transient reconnects retain content, and access denial hides it. Local loopback uses `host.openPath` only when the owning connection advertises native opening. No Session JSONL, persistence format, or Collaboration authorization semantics change.
@@ -18,13 +23,17 @@ Desktop uses equal or ratio-adjusted columns, with two rows when four columns ca
 
 The conversation chooser excludes archived roots and inactive blank drafts. Personal rows use the same `workspace.list.archivedSessionIds` snapshot as the sidebar; project rows exclude archive-index entries, and opening a target rechecks its live Workspace archive set. An account catalog response is authoritative and is never supplemented with excluded local rows.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Pane selection, order, and ratios are component state over the `conversationViewport` capability; sessions remain owned by the runtime.
+
 ## Model Experience
 
-None, as this plugin arranges existing conversation views and contributes no prompt, tool schema, or Session event.
+None, as browser-only pane controls register nothing model-facing; the existing conversation submission path owns all model-visible content.
 
 #### KV Cache effect
 
-None; the plugin does not assemble or send a model request.
+None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 

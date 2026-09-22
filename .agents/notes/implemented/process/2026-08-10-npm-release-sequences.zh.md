@@ -60,7 +60,7 @@ tag 只是 commit 指针，不是发布成功的证明。bump 会向 registry �
 
 ### 发布只在 GitHub 执行，由 registry 状态决定发什么
 
-发布只从 GitHub Actions 执行，没有本机发布路径。publish 不读 tag、不读任何「本次发布包含什么」的清单，而是对每个打包好的 tarball 拿版本与 registry 比对，分三态：
+发布先验证 tag 对应的候选、已验收上游记录及已测试产物证据，然后访问注册表。每个 tarball 的现有幂等比较仍有三种结果：
 
 | 状态 | 处置 |
 |---|---|
@@ -168,7 +168,9 @@ dsh 的验证会一并安装 vendored 族的 pack 产物。harness 的包把 ven
 - **变更判据依赖 tag 可见。** shallow clone 或未拉 tag 会把 vendored 族的判据退化成「全部首发」。`fetch-depth: 0` 是前提，不是优化。
 - **协议改写触及 1504 处依赖声明。** 它不改变本机解析（pnpm 本来就从 workspace 解析），但改变了发布出去的范围写法。
 - **私有包需要凭据才能安装。** 任何消费方——CI、沙箱 e2e、外部使用者——都要持有 scope 凭据，Landlock 三包也在其中；它们从未发布过，所以没有切断既有的匿名安装路径。
-- **`repository` 指向的组织与运行 workflow 的组织不同。** 用 token 发布不受影响；npm provenance（OIDC）要求二者一致，届时要么把 `repository` 改指过去，要么从它指向的组织发布。
+- **`repository` 指向的组织与运行 workflow 的组织不同。** 用 token 发布不受影响；npm OIDC attestation要求二者一致，届时要么把 `repository` 改指过去，要么从它指向的组织发布。
 - **字节可复现性是假定的，没有实测。** 「integrity 相同则跳过」这一态建立在「同一 commit 两次 pack 得到相同字节」之上。目前没有任何东西测量过它：若构建嵌入了绝对路径或时间，重跑会误报失败。在第一次可能被重跑的发布之前实测，若不成立就退到比对 tarball 内逐文件内容哈希。
 - **用较旧的 artifact 重跑 publish 会把 `latest` 拉回旧版。** 发布是按版本决定的，所以在较新版本之后重发较旧的一批，会让稳定 dist-tag 再次指向旧版。排练用的是预发布版本，它永远不占 `latest`。
 - **首发是一次大步。** 九个 vendored 包与整个 dsh 集一次发出，任何 payload 缺陷都会集中在同一次发布里暴露——这正是先用预发布版本把完整链路走一遍的理由。
+
+[候选提交绑定的证据决策](2026-09-21-candidate-bound-gate-evidence.zh.md)扩展消费方选检和发布验收，同时保留本注记的覆盖率与版本规则。

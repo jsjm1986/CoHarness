@@ -12,13 +12,21 @@ Request versions live below `<DSH_HOME>/attachments/v1/request-images/`. `readIm
 
 The instance compression limiter keeps queued transformations in a head-indexed FIFO, so its configured concurrency remains bounded without repeated array-head copies during a burst.
 
+## Summary
+
+Store images and generic file attachments durably below `DSH_HOME` on the machine running DSH. Images are validated, normalized for model requests, and cached per route; generic files are preserved byte-for-byte without admission limits. Identical bytes are stored once even when uploads use different display names, reads verify file length and content, and admitted images remain readable if limits later tighten. The shipped `dsh` composition uses this package without configuration. Objects remain local to one machine and are never deleted automatically.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Published objects are immutable files addressed by content hash, and the staged atomic-publish path is asserted by filesystem-level specs; the provider keeps no mutable index of its own.
+
 ## Model Experience
 
-Indirectly, through durable replay of historical user images and structured model image output after restart and fork.
+Indirectly, through request descriptors. A mapped execution filesystem lets the model see each image's identity, dimensions, media type, read-only process path, writable-copy extension, and normalization warning alongside the request bytes. Generic files project as text handles naming their identity and read-only process path; when no mapping exists, the handle states that the execution environment cannot read the file.
 
 #### KV Cache effect
 
-Normalization and request projection are deterministic. An unchanged attachment and route policy reuse identical cached request bytes on later turns.
+Normalization and request projection are deterministic. An unchanged attachment and route policy reuse identical cached request bytes on later turns; execution-world path mapping can change descriptor text without changing those bytes or their `variantId`.
 
 ## Known Limitations and Deferred Work
 

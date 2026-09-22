@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 `dsh-schedule` gives future live root Agents three Session-scoped tools for durable reminders. Version 1 accepts positive safe-integer `after_seconds` delays, explicit absolute `at` targets, and fixed-rate `every_seconds` intervals of at least five minutes. The Session event log owns reminder state; timers, tool values, and model follow-ups are disposable projections of that log.
 
+## Summary
+
+Schedule lets you ask the model for durable reminders that return as ordinary follow-up messages in the same conversation. Create one-time reminders for a delay or absolute time, repeat them at fixed intervals, list pending reminders, and cancel them. Reminders survive restarts, but delivery requires a live root agent: closed sessions keep reminders overdue until resumed. Delivery never uses email, SMS, push, or browser notifications. Enable the Schedule overlay to expose the reminder tools and active-reminder catalog; sidebar alarms are best-effort indicators of known active reminders, not proof that reminder delivery is currently running.
+
 ## Composition
 
 Load this function plugin after `ctx.sessions`, `ctx.agents`, `ctx.tools`, `ctx.sessionPersistence`, and the persistence listener that implements Session flushes. Static injection makes a missing persistence service a composition error. The plugin listens only to later `agent/created` events, installs on runtime roots, and registers all tools through the exact `agent.ctx`. Agents that already existed when the plugin loaded and runtime children do not receive Schedule.
@@ -52,7 +56,7 @@ Framing or synchronous follow-up failure writes no dispatch. An append failure f
 
 #### What the model sees
 
-The model sees the three generated tool schemas only in a live root Agent created after this plugin loads. Tool results contain the canonical JSON values described above.
+The model sees the three generated tool schemas only in a live root Agent created after this plugin loads; the [generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-schedule) owns the exact argument and result schemas. Tool results contain the canonical JSON values described above.
 
 #### Token effect
 

@@ -91,10 +91,15 @@ function packageInstalled(name: string, base: string): boolean {
   }
 }
 
+/** Package lookup injected into preset discovery. */
+type PackageResolves = (specifier: string, base: string) => boolean
+
 /** Check one classified row without importing or evaluating its module. */
-async function rowResolves(row: RowSpecifier, presetBase: string, harnessBase: string): Promise<boolean> {
+async function rowResolves(
+  row: RowSpecifier, presetBase: string, harnessBase: string, resolves: PackageResolves,
+): Promise<boolean> {
   if (row.kind === 'builtin') return true
-  if (row.kind === 'package') return isBuiltin(row.specifier) || packageInstalled(row.specifier, harnessBase)
+  if (row.kind === 'package') return isBuiltin(row.specifier) || resolves(row.specifier, harnessBase)
   const url = row.kind === 'file' ? new URL(row.specifier) : new URL(row.specifier, presetBase)
   return await isFile(fileURLToPath(url))
 }
@@ -109,6 +114,7 @@ async function unresolvableRows(
   rows: readonly unknown[],
   presetBase: string,
   harnessBase: string,
+  resolves: PackageResolves,
   at = '',
 ): Promise<UnresolvableRow[]> {
   const found: UnresolvableRow[] = []
@@ -123,10 +129,10 @@ async function unresolvableRows(
     if (Boolean(row.disabled)) continue
     const positional = at === '' ? `row ${String(index + 1)}` : `${at} row ${String(index + 1)}`
     if (row.group === true) {
-      found.push(...await unresolvableRows(row.config as readonly unknown[], presetBase, harnessBase, positional))
+      found.push(...await unresolvableRows(row.config as readonly unknown[], presetBase, harnessBase, resolves, positional))
       continue
     }
-    if (await rowResolves(classifyRowSpecifier(row.name), presetBase, harnessBase)) continue
+    if (await rowResolves(classifyRowSpecifier(row.name), presetBase, harnessBase, resolves)) continue
     const label = typeof row.id === 'string' && row.id !== '' ? `row "${row.id}"` : positional
     found.push({ label, name: row.name })
   }
@@ -141,9 +147,12 @@ async function unresolvableRows(
  * @param path - absolute path of the composition file.
  * @param harnessBase - URL used to resolve package-name rows. Omit for the
  * legacy shape-only helper behavior used by isolated callers.
+ * @param resolves - package lookup selected by the owning caller.
  * @returns one human-readable reason, or undefined when the file is loadable.
  */
-async function compositionProblem(path: string, harnessBase?: string): Promise<string | undefined> {
+async function compositionProblem(
+  path: string, harnessBase?: string, resolves: PackageResolves = packageInstalled,
+): Promise<string | undefined> {
   let content: string
   try {
     content = await readFile(path, 'utf8')
@@ -165,7 +174,13 @@ async function compositionProblem(path: string, harnessBase?: string): Promise<s
   const shape = entryListProblem(rows)
   if (shape !== undefined || harnessBase === undefined) return shape
   const presetBase = new URL('.', pathToFileURL(path)).href
-  const unresolved = await unresolvableRows(rows as readonly unknown[], presetBase, harnessBase)
+  let unresolved: UnresolvableRow[]
+  try {
+    unresolved = await unresolvableRows(rows as readonly unknown[], presetBase, harnessBase, resolves)
+  } catch (error) {
+    const full = error instanceof Error ? error.message : String(error)
+    return `the composition's plugins cannot be checked: ${full.replace(/\n[\s\S]*$/, '')}`
+  }
   const first = unresolved[0]
   if (first === undefined) return undefined
   if (unresolved.length === 1) {
@@ -205,9 +220,12 @@ async function isFile(path: string): Promise<boolean> {
  * presets would teach users to ignore the marker.
  * @param root - the directory and the trust its presets inherit.
  * @param harnessBase - URL used to resolve package-name rows.
+ * @param resolves - package lookup selected by the owning caller.
  * @returns the root's presets ordered by id.
  */
-export async function scanRoot(root: PresetRoot, harnessBase?: string): Promise<AgentPreset[]> {
+export async function scanRoot(
+  root: PresetRoot, harnessBase?: string, resolves: PackageResolves = packageInstalled,
+): Promise<AgentPreset[]> {
   const dir = resolve(expandHomePath(root.path))
   let children
   try {
@@ -222,7 +240,7 @@ export async function scanRoot(root: PresetRoot, harnessBase?: string): Promise<
     const directory = join(dir, child.name)
     const path = join(directory, COMPOSITION_FILE)
     const broken = await isFile(path)
-      ? await compositionProblem(path, harnessBase)
+      ? await compositionProblem(path, harnessBase, resolves)
       : `the composition file ${COMPOSITION_FILE} is missing — the directory still occupies the id; delete it or restore the file`
     // Display text only, and never fatal: a preset with unreadable metadata
     // still mounts, it just shows its id.
@@ -244,12 +262,15 @@ export async function scanRoot(root: PresetRoot, harnessBase?: string): Promise<
  * Scan every root in precedence order.
  * @param roots - roots in precedence order; an earlier root wins a duplicate id.
  * @param harnessBase - URL used to resolve package-name rows.
+ * @param resolves - package lookup selected by the owning caller.
  * @returns every discovered preset, first-root-wins per id.
  */
-export async function discoverPresets(roots: readonly PresetRoot[], harnessBase?: string): Promise<AgentPreset[]> {
+export async function discoverPresets(
+  roots: readonly PresetRoot[], harnessBase?: string, resolves: PackageResolves = packageInstalled,
+): Promise<AgentPreset[]> {
   const byId = new Map<string, AgentPreset>()
   for (const root of roots) {
-    for (const preset of await scanRoot(root, harnessBase)) {
+    for (const preset of await scanRoot(root, harnessBase, resolves)) {
       if (byId.has(preset.id)) continue
       byId.set(preset.id, preset)
     }

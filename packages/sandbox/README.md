@@ -13,3 +13,8 @@ This family applies per-session confinement policy to process execution. It cove
 See the [sandbox decision](../../.agents/notes/implemented/feature/2026-07-06-sandbox.md) for the capability boundary and the [filesystem integration decision](../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.md) for cross-family policy use.
 
 The subsystem reference — modes and enforcement, per-call policy, wrapped-argv dialects, fail-closed errors — is [docs/subsystems/sandbox.md](../../docs/subsystems/sandbox.md); the boundary and the cross-family phase live in the [sandbox](../../.agents/notes/implemented/feature/2026-07-06-sandbox.md) and [cross-family fs sandbox](../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.md) Agent Notes.
+
+
+## Summary
+
+The `sandbox/` group confines subprocess execution to a file-effect policy: commands run `read-only`, write only under the session workspace (`workspace-write`), or run unrestricted (`danger-full-access`). Four packages deliver it: the confinement service (`sandbox/`), the per-platform backends for Linux, macOS, and Windows (`sandbox-local/`), the shared policy resolver (`sandbox-policy/`), and the Windows write-restriction backend (`sandbox-windows-acl/`). A confined call that a policy denies can retry through a user-approved one-time escalation. Confinement is same-world only: it shares the host kernel and filesystem, while containers, microVMs, and remote executors replace whole capabilities instead of registering here.

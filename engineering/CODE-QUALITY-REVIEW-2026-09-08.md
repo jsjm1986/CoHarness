@@ -133,14 +133,14 @@
 ### C3. core 文档陈旧
 - `core/agent/README.zh.md:15` `installAgentLlmTarget` 不存在（真实为 `installModelSelection`，`model-selection.ts:39`）。
 - `core/agent-loop/README.md:44-45`（zh 同）inbox 默认 `256 / 8MiB`，代码为 `10_000 / 16MiB`（`constants.ts:9,12`）。
-- `core/agent-tool-presentation/src/index.ts:14` 死链 `code-runtime-worker/README.md`（实为 `code-runtime-worker-thread`）。
+- `core/agent-tool-presentation/src/index.ts:14` 死链 `ptc-runtime-worker/README.md`（实为 `ptc-runtime-node`）。
 
 ### C4. 多包 README 陈旧（均为实现变更后未同步）
 - `e2b` README 钉 `e2b@2.29.1`，构建为 `2.38.2`；`composition.e2e.ts` 导入 5 个未声明 devDeps。
 - `subagent-codex` README `0.147.0` vs 代码固定 `0.149.1`。
 - `llm-deepseek/README.md:93` overstate `x-deepseek-harness-user-id`（Files API 请求实际不带）。
 - `tool-bash/README.md:125` 后台禁用文案过期（实际 `run_in_background is disabled...`）。
-- `workflow-worker-thread/README` API 示例遗漏 `provider`。
+- `workflow-ptc/README` API 示例遗漏 `provider`。
 - `tool-cordis` README 声称 5 个工具、实为 7 个（含死代码 `present.ts` 两个未用导出）；`ackTimeoutMs` 不存在。
 - `compaction/README:31` 的 `ManualCompactionError.code` closed set 漏 `cancelled`。
 - `permission-presets` README `permissionPresets/preset` vs 实际 `permission/preset`。
@@ -162,7 +162,7 @@
 ## 5. 门禁复核确认的绿灯项（值得信任的方面）
 
 - `verify-md-links` 2,380 文件全通过；`verify-doc-budgets` 9 文档全过；`verify-package-invariants` 251 伴生符合；`verify-export-jsdoc` 全通过；`verify-cordis-config` 138 配置全过；`typecheck` 构建通过。
-- 核心运行时防御达到高标准：`code-runtime-python`/`worker-thread` 的 hostile-peer 帧处理、UTF-8/代理项记账、进程组静默回收与内存边界；`subprocess` 的 env 擦除/TOCTOU；`apiproxy`/`client-connection` 的信任栅栏与 SSRF pinning；`fs`/`attachment`/`credentials` 的路径/符号链接/权限纪律。均有针对性测试。
+- 核心运行时防御达到高标准：`ptc-runtime-python`/`worker-thread` 的 hostile-peer 帧处理、UTF-8/代理项记账、进程组静默回收与内存边界；`subprocess` 的 env 擦除/TOCTOU；`apiproxy`/`client-connection` 的信任栅栏与 SSRF pinning；`fs`/`attachment`/`credentials` 的路径/符号链接/权限纪律。均有针对性测试。
 
 ---
 

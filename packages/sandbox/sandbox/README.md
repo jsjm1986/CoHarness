@@ -12,13 +12,21 @@ Policy rides the call, not the provider: two consumers may confine under differe
 
 Implementations: [`@deepseek-ai/dsh-sandbox-local`](../sandbox-local/) (Linux: `bwrap`, else the per-platform Landlock launcher; macOS: `sandbox-exec`/Seatbelt). Consumers: [`@deepseek-ai/dsh-bash-sandbox`](../../shell/bash-sandbox/) (wraps `['bash', '-c', command]`).
 
+## Summary
+
+Use `dsh-sandbox` to run a subprocess and everything it spawns under a per-call file-access policy. A command can run without writes (`read-only`), write only inside its workspace (`workspace-write`), or run unrestricted (`danger-full-access`). If the requested mode cannot be enforced, the call fails with `SANDBOX_UNAVAILABLE` instead of running unconfined. After a denied call, the model can request one strictly wider mode for human approval. This is same-world confinement: the process still shares the host kernel and filesystem; use a container, microVM, or remote executor when the whole environment must be isolated.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam declares the confinement contract and shared vocabulary; providers own enforcement and probe state.
+
 ## Model Experience
 
 ### Confinement error, indirectly
 
 #### What the model sees
 
-Through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md) and [`dsh-tool-bash`](../../shell/tool-bash/README.md), failure to enforce a requested mode produces code `SANDBOX_UNAVAILABLE` and the exact error below. An execution-time runner failure adds ` Runner failure: <detail>`.
+Through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md) and [`dsh-tool-bash`](../../shell/tool-bash/README.md), a requested confined mode with no usable backend produces code `SANDBOX_UNAVAILABLE` and the exact error below; an execution-time runner failure appends ` Runner failure: <detail>`.
 
 ##### Exact error
 
@@ -32,7 +40,21 @@ Conditional error text is visible for that call and retained in history until co
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+
+### Escalation request and outcome
+
+#### What the model sees
+
+A denied call surfaces the marker `[sandbox: file access denied under <mode> mode]` and, where the composition advertises escalation, the hint `[sandbox: escalation available — retry this exact <subject> once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the approval prompt asks the user]`. The retry carries `sandbox_permissions` and a `justification`; the user's `allowed-once` / `rejected` / `cancelled` decision becomes the call's result text.
+
+#### Token effect
+
+Only the denied call's error and any escalation outcome text are visible; both are retained in history until compaction.
+
+#### KV Cache effect
+
+Append-only; escalation text follows the retained prefix and does not invalidate cached entries.
 
 ## Known Limitations and Deferred Work
 

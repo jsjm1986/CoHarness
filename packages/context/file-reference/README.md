@@ -8,13 +8,21 @@ File-reference discovery seam and browser-safe `@file` grammar shared by host-ba
 
 Selecting a candidate does not read or attach file contents. The exported `FILE_REFERENCE_PROMPT` is stable guidance that a provider may install when the addressed agent can call `read`.
 
+## Summary
+
+Host-backed user interfaces use `dsh-file-reference` to offer `@file` completion: a UI asks for path candidates for the addressed agent, the model types `@path` or `@"path with spaces"`, and picking a candidate inserts the matching mention as ordinary prompt text. The seam itself owns no filesystem access — a concrete provider such as `@deepseek-ai/dsh-file-reference-local` supplies candidates, ranking, caching, and invalidation. Selecting a candidate never reads or attaches file contents; the model must call a filesystem tool to inspect a file. Session Controller exposes the same discovery to browser consumers through the `fileReferences/list` Remote.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam defines the list contract and `@file` grammar; providers own indexing, caching, and invalidation.
+
 ## Model Experience
 
-Indirectly, through `@deepseek-ai/dsh-file-reference-local`, which conditionally contributes this package's stable file-reference guidance.
+Indirectly, through the composed provider, which owns the file-reference guidance that this package's discovery seam and grammar delegate to it.
 
 #### KV Cache effect
 
-The interface and grammar add no request tokens themselves; a provider-owned prompt section determines cache behavior.
+The interface and grammar add no request tokens; a provider-owned prompt section determines whether the reusable prefix changes.
 
 ## Known Limitations and Deferred Work
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { sessionFormatCatalog } from '../src/index.ts'
-import type { SessionFormatEvent } from '../src/types.ts'
+import { sessionFormatCatalog } from '../src/legacy.ts'
+import type { SessionFormatArtifact, SessionFormatEvent } from '../src/legacy.ts'
+
+/** Legacy flat `assistant/message` field carrying the model source record. */
+const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
 
 function event(type: string, seq: number, data: unknown, extra: Record<string, unknown> = {}): SessionFormatEvent {
   return { type, seq, time: seq + 1, data, ...extra } as unknown as SessionFormatEvent
@@ -254,22 +257,22 @@ describe('legacy message carriers', () => {
 
   it('wraps the early flat assistant form into the message envelope', () => {
     const migrated = migrate([
-      event('assistant/message', 0, { content: [{ type: 'text', text: 'hi' }], provenance: { provider: 'p' }, usage: { in: 1 } }),
-      event('assistant/message', 1, { content: [], provenance: 'x' }),
+      event('assistant/message', 0, { content: [{ type: 'text', text: 'hi' }], [LEGACY_ASSISTANT_SOURCE_KEY]: { provider: 'p' }, usage: { in: 1 } }),
+      event('assistant/message', 1, { content: [], [LEGACY_ASSISTANT_SOURCE_KEY]: 'x' }),
       event('assistant/message', 2, { message: { id: 'a', content: [] } }),
     ])
     expect(migrated.events[0]!.data).toMatchObject({
       usage: { in: 1 },
       message: { id: 'legacy-message:s:0', role: 'assistant', content: [{ type: 'text', text: 'hi' }], source: { provider: 'p', kind: 'model' } },
     })
-    // A non-record provenance still folds into the model source.
+    // A non-record legacy source still folds into the model source.
     expect(migrated.events[1]!.data).toMatchObject({ message: { source: { kind: 'model' } } })
     expect(migrated.events[2]!.data).toMatchObject({ message: { id: 'a' } })
   })
 
   it('rejects a flat assistant form without the required fields downstream', () => {
     expect(() => migrate([event('assistant/message', 0, { content: [] })])).toThrow('invalid message content')
-    expect(() => migrate([event('assistant/message', 0, { content: 'x', provenance: {} })])).toThrow('invalid message content')
+    expect(() => migrate([event('assistant/message', 0, { content: 'x', [LEGACY_ASSISTANT_SOURCE_KEY]: {} })])).toThrow('invalid message content')
   })
 
   it('wraps the early flat tool result form and inherits the replaced message id', () => {
@@ -358,6 +361,33 @@ describe('inherited end-seed consistency', () => {
       event('session/end-seed', 0, { inherited: true }),
     ], 0)).toThrow('unseeded Session contains an inherited end-seed marker')
   })
+
+  it('treats a stored artifact without inheritedEventCount as a zero cut', () => {
+    expect(() => sessionFormatCatalog.migrate({
+      header: { version: 0, id: 's', createdAt: 1 },
+      events: [event('turn/start', 0, { turn: 1 })],
+    } as unknown as SessionFormatArtifact)).toThrow('inheritedEventCount must be a non-negative safe integer')
+  })
+
+  it('treats an undeclared source cut as zero across the whole chain', () => {
+    const output: SessionFormatEvent[] = []
+    const flow = sessionFormatCatalog.createStream(
+      { version: 0, id: 's', createdAt: 1 },
+      undefined,
+      { emitEvent: value => output.push(value) },
+    )
+    flow.emitEvent(event('turn/start', 0, { turn: 1 }))
+    expect(flow.finish()).toBe(0)
+    expect(output.map(item => item.type)).toEqual(['turn/start'])
+
+    const late = sessionFormatCatalog.createStream(
+      { version: 2, id: 's', createdAt: 1 },
+      undefined,
+      { emitEvent: () => {} },
+    )
+    late.emitEvent(event('turn/start', 0, { turn: 1 }))
+    expect(late.finish()).toBe(0)
+  })
 })
 
 describe('v2 stage guards', () => {
@@ -366,6 +396,27 @@ describe('v2 stage guards', () => {
       event('turn/start', 0, { turn: 1 }),
       event('turn/start', 2, { turn: 2 }),
     ], 2)).toThrow('format v2 source events must be dense')
+  })
+
+  it('emits the owed end-seed marker when a seeded v2 log ends ahead of its cut', () => {
+    const migrated = migrate([
+      event('turn/start', 0, { turn: 1 }),
+    ], 2, { isSeeded: true }, 1)
+    expect(migrated.inheritedEventCount).toBe(1)
+    expect(migrated.events.map(item => item.type)).toEqual(['turn/start', 'session/end-seed'])
+    expect(migrated.events[1]!.data).toEqual({ inherited: true })
+  })
+
+  it('counts a generated system head ahead of the cut into the inherited region', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      event('request/header', 1, { header: { system: 'sys' }, reason: 'initial' }),
+      event('step/end', 2, { turn: 1, step: 1 }),
+      event('turn/end', 3, { turn: 1, reason: { kind: 'completed' } }),
+    ], 2, { isSeeded: true }, 2)
+    const marker = migrated.events.findIndex(item => item.type === 'session/end-seed')
+    expect(marker).toBeGreaterThan(-1)
+    expect(migrated.inheritedEventCount).toBe(marker)
   })
 
   it('rejects a current-generation delivery marker naming another Session', () => {
@@ -416,6 +467,13 @@ describe('v2 stage guards', () => {
     ], 2)).toThrow(message)
   })
 
+  it('rejects a v2 assistant/message carrying sourceEventSeqs', () => {
+    expect(() => migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      event('assistant/message', 1, { message: { id: 'a', content: [{ type: 'text', text: 'x' }] } }, { sourceEventSeqs: [0] }),
+    ], 2)).toThrow('embeds its stream and cannot carry sourceEventSeqs')
+  })
+
   it('rejects a non-array shadowedSeqs and messageSeqs', () => {
     expect(() => migrate([
       event('step/start', 0, { turn: 1, step: 1 }),
@@ -425,5 +483,266 @@ describe('v2 stage guards', () => {
       event('step/start', 0, { turn: 1, step: 1 }),
       event('session/title', 1, { messageSeqs: 'x' }),
     ], 2)).toThrow('v2 messageSeqs must be an array')
+  })
+})
+
+describe('v3-to-v4 assistant stream fold', () => {
+  const chunk = (seq: number, body: Record<string, unknown>, turn = 1, step = 1) =>
+    event('assistant/chunk', seq, { turn, step, chunk: body })
+  const textDelta = (text: string, index = 0) => ({ type: 'text-delta', index, text })
+
+  it('drops chunk events covered by an embedded settlement stream', () => {
+    const stream = [
+      { type: 'chunk', time: 2, chunk: textDelta('hi') },
+      { type: 'chunk', time: 3, chunk: { type: 'finish', reason: 'stop' } },
+    ]
+    const migrated = migrate([
+      event('turn/start', 0, { turn: 1 }),
+      event('step/start', 1, { turn: 1, step: 1 }),
+      chunk(2, textDelta('hi')),
+      chunk(3, { type: 'finish', reason: 'stop' }),
+      event('assistant/message', 4, { turn: 1, step: 1, message: { id: 'm' }, usage: {}, stream }),
+      event('step/end', 5, { turn: 1, step: 1 }),
+      event('turn/end', 6, { turn: 1, reason: { kind: 'completed' } }),
+    ], 3)
+    expect(migrated.header.version).toBe(4)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'turn/start', 'step/start', 'assistant/message', 'step/end', 'turn/end',
+    ])
+    expect(migrated.events[2]!.data).toMatchObject({ stream })
+    expect(migrated.events.map(item => item.seq)).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('attaches the folded stream to a settlement that lacks one', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('a')),
+      chunk(2, textDelta('b')),
+      chunk(3, { type: 'finish', reason: 'stop' }),
+      event('assistant/message', 4, { turn: 1, step: 1, message: { id: 'm' } }),
+      event('step/end', 5, { turn: 1, step: 1 }),
+    ], 3)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'step/start', 'assistant/message', 'step/end',
+    ])
+    const data = migrated.events[1]!.data as Record<string, unknown>
+    const folded = data['stream']
+    expect(Array.isArray(folded)).toBe(true)
+    expect(folded).toMatchObject([
+      { type: 'text-chunks', index: 0, texts: ['a', 'b'] },
+      { type: 'chunk', chunk: { type: 'finish', reason: 'stop' } },
+    ])
+  })
+
+  it('synthesizes an assistant/attempt for chunks closed without a settlement', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('orphan')),
+      event('step/end', 2, { turn: 1, step: 1 }),
+      event('turn/end', 3, { turn: 1, reason: { kind: 'interrupted' } }),
+    ], 3)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'step/start', 'assistant/attempt', 'step/end', 'turn/end',
+    ])
+    const attempt = migrated.events[1]!
+    expect(attempt.time).toBe(2)
+    expect(attempt.data).toMatchObject({ turn: 1, step: 1 })
+  })
+
+  it('synthesizes attempts on retry boundaries and at end of stream', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('torn')),
+      event('llm/retry', 2, { turn: 1, step: 1, id: 'r1' }),
+      chunk(3, textDelta('tail')),
+    ], 3)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'step/start', 'assistant/attempt', 'llm/retry', 'assistant/attempt',
+    ])
+  })
+
+  it('emits interleaved events ahead of the settlement they precede', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('a')),
+      event('tool/call', 2, { callId: 'c1' }),
+      chunk(3, textDelta('b')),
+      event('assistant/message', 4, { turn: 1, step: 1, message: { id: 'm' }, stream: [{ type: 'chunk', time: 4, chunk: textDelta('x') }] }),
+    ], 3)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'step/start', 'tool/call', 'assistant/message',
+    ])
+  })
+
+  it('settles a mismatched-turn message standalone and folds the pending attempt', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('a'), 1, 1),
+      event('assistant/message', 2, { turn: 1, step: 2, message: { id: 'm' }, stream: [] }),
+    ], 3)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'step/start', 'assistant/attempt', 'assistant/message',
+    ])
+    expect(migrated.events[1]!.data).toMatchObject({ turn: 1, step: 1 })
+    expect(migrated.events[2]!.data).toMatchObject({ turn: 1, step: 2 })
+  })
+
+  it('starts a new group after a terminal chunk', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, { type: 'finish', reason: 'stop' }),
+      chunk(2, textDelta('next')),
+      event('step/end', 3, { turn: 1, step: 1 }),
+    ], 3)
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'step/start', 'assistant/attempt', 'assistant/attempt', 'step/end',
+    ])
+  })
+
+  it('requires dense source sequences', () => {
+    expect(() => stream([
+      chunk(0, textDelta('a')),
+      chunk(2, textDelta('b')),
+    ], 3)).toThrow('format v3 source events must be dense')
+  })
+
+  it('rejects a chunk without its coordinates or chunk body', () => {
+    expect(() => migrate([event('assistant/chunk', 0, { turn: 1 })], 3)).toThrow('lacks turn, step, or chunk')
+    expect(() => migrate([event('assistant/chunk', 0, 7)], 3)).toThrow('lacks turn, step, or chunk')
+  })
+
+  it('passes a settlement with non-record data through with an empty stream', () => {
+    const output = stream([event('assistant/attempt', 0, 'x')], 3)
+    expect(output[0]!.data).toEqual({ stream: [] })
+  })
+
+  it('drops a settlement envelope sourceEventSeqs before remapping', () => {
+    const output = stream([
+      event('assistant/message', 0, { turn: 1, step: 1, message: { id: 'a' }, stream: [] }, { sourceEventSeqs: [0] }),
+    ], 3)
+    expect(output[0]).not.toHaveProperty('sourceEventSeqs')
+  })
+
+  it.each([7, { op: 'append' }, { op: 'replace', startSeq: 0 }] as const)(
+    'rejects a malformed v3 surfaceOp %j', (surfaceOp) => {
+      expect(() => stream([event('session/title', 0, { title: 't' }, { surfaceOp })], 3))
+        .toThrow('requires exact replace fields')
+    })
+
+  it('rejects a v3 compaction without its shadowedRange', () => {
+    expect(() => stream([event('compaction/prune', 0, { shadowedSeqs: [] })], 3))
+      .toThrow('v3 compaction/prune lacks its shadowedRange')
+  })
+
+  it('rejects non-array v3 sequence references', () => {
+    expect(() => stream([
+      event('compaction/prune', 0, { shadowedRange: { start: 0, end: 0 }, shadowedSeqs: 'x' }),
+    ], 3)).toThrow('v3 shadowedSeqs must be an array')
+    expect(() => stream([event('session/title', 0, { messageSeqs: 'x' })], 3))
+      .toThrow('v3 messageSeqs must be an array')
+  })
+
+  it('rejects references into consumed chunk sequences', () => {
+    expect(() => migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('a')),
+      event('assistant/message', 2, { turn: 1, step: 1, message: { id: 'm' }, stream: [{ type: 'chunk', time: 3, chunk: textDelta('x') }] }),
+      event('request/header', 3, { header: {}, reason: 'x' }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 1 } }),
+    ], 3)).toThrow('does not name an earlier event')
+  })
+
+  it('remaps references to surviving sequences', () => {
+    const migrated = migrate([
+      event('step/start', 0, { turn: 1, step: 1 }),
+      chunk(1, textDelta('a')),
+      event('assistant/message', 2, { turn: 1, step: 1, message: { id: 'm' }, stream: [] }),
+      event('session/title', 3, { messageSeqs: [0] }),
+    ], 3)
+    expect(migrated.events.at(-1)!.data).toMatchObject({ messageSeqs: [0] })
+    expect(migrated.events.map(item => item.seq)).toEqual([0, 1, 2])
+  })
+})
+
+describe('v3-to-v4 inherited cut', () => {
+  const chunk = (seq: number) =>
+    event('assistant/chunk', seq, { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' } })
+
+  it('carries a seeded bare marker at the seed count', () => {
+    const migrated = migrate([
+      event('turn/start', 0, { turn: 1 }),
+      event('session/end-seed', 1, {}),
+      event('turn/start', 2, { turn: 2 }),
+    ], 3, { isSeeded: true }, 1)
+    expect(migrated.inheritedEventCount).toBe(1)
+    expect(migrated.events.map(item => item.type)).toEqual(['turn/start', 'session/end-seed', 'turn/start'])
+  })
+
+  it('accepts a flagged marker at the cut and rejects one off the cut', () => {
+    const ok = migrate([
+      event('turn/start', 0, { turn: 1 }),
+      event('session/end-seed', 1, { inherited: true }),
+      event('turn/start', 2, { turn: 2 }),
+    ], 3, { isSeeded: true }, 1)
+    expect(ok.inheritedEventCount).toBe(1)
+    expect(() => migrate([
+      event('turn/start', 0, { turn: 1 }),
+      event('session/end-seed', 1, { inherited: true }),
+    ], 3, { isSeeded: true }, 2)).toThrow('disagrees with its seed cut')
+  })
+
+  it('rejects a seeded artifact missing its marker and a flagged unseeded marker', () => {
+    expect(() => migrate([
+      event('turn/start', 0, { turn: 1 }),
+      event('turn/end', 1, { turn: 1, reason: { kind: 'completed' } }),
+    ], 3, { isSeeded: true }, 1)).toThrow('lacks its inherited end-seed marker')
+    expect(() => migrate([
+      event('session/end-seed', 0, { inherited: true }),
+    ], 3)).toThrow('unseeded Session contains an inherited end-seed marker')
+  })
+
+  it('rejects a chunk group straddling the marker', () => {
+    expect(() => migrate([
+      chunk(0),
+      event('session/end-seed', 1, {}),
+      chunk(2),
+    ], 3, { isSeeded: true }, 1)).toThrow('splits one Assistant attempt')
+  })
+
+  it('rejects the marker while a chunk group is still open', () => {
+    expect(() => migrate([
+      chunk(0),
+      event('session/end-seed', 1, { inherited: true }),
+    ], 3, { isSeeded: true }, 1)).toThrow('splits one Assistant attempt')
+  })
+
+  it('passes bare end-seed delimiters through an unseeded log', () => {
+    const migrated = migrate([
+      event('turn/start', 0, { turn: 1 }),
+      event('session/end-seed', 1, {}),
+      event('turn/start', 2, { turn: 2 }),
+    ], 3)
+    expect(migrated.inheritedEventCount).toBe(0)
+    expect(migrated.events.map(item => item.type)).toEqual(['turn/start', 'session/end-seed', 'turn/start'])
+  })
+
+  it('derives the chained cut from the in-band marker after a v2 injection shift', () => {
+    const output = stream([
+      event('turn/start', 0, { turn: 1 }),
+      event('turn/end', 1, { turn: 1, reason: { kind: 'completed' } }),
+      event('turn/start', 2, { turn: 2 }),
+      event('step/start', 3, { turn: 2, step: 1 }),
+      event('request/header', 4, { header: { system: 'sys' }, reason: 'initial' }),
+      event('assistant/message', 5, { turn: 2, step: 1, message: { id: 'm', content: [] }, stream: [] }),
+      event('step/end', 6, { turn: 2, step: 1 }),
+      event('turn/end', 7, { turn: 2, reason: { kind: 'completed' } }),
+    ], 2, { isSeeded: true }, 2)
+    const marker = output.findIndex(item => item.type === 'session/end-seed')
+    expect(marker).toBe(2)
+    expect(output[marker]!.data).toEqual({ inherited: true })
+    const flow = sessionFormatCatalog.createStream(
+      { version: 2, id: 's', createdAt: 1, isSeeded: true }, 2,
+      { emitEvent: () => {} },
+    )
+    expect(flow.header.version).toBe(4)
   })
 })

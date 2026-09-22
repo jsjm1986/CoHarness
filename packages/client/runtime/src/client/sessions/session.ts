@@ -8,7 +8,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   HistoryEntry, HistoryOmittedSpan, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
-  RpcId, RpcResponse, RpcResult, SessionId, SubagentAddress, SubagentPromptRequestId, ToolEventView,
+  RpcId, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame, SessionId,
+  SubagentAddress, SubagentPromptRequestId, ToolEventView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
@@ -16,6 +17,7 @@ import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   BeginSubmissionInput, PendingSubmissionRetirement, SessionFace, SubmissionHandle,
 } from '../contract/session.ts'
+import { ClientAssistantStream } from './assistant-stream.ts'
 import { ConversationNodeAssembler } from './conversation-assembler.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { ConversationEventInput, ConversationPublication } from '../contract/conversation.ts'
@@ -166,8 +168,11 @@ export class Session implements SessionFace {
   private removed = false
   private promptError: PromptError | null = null
   private lastAgentError: string | null = null
-  /** Live events buffered during open/resync and stitched by sequence once history lands. */
-  private liveBuffer: { event: SessionEvent; view: ToolEventView | undefined }[] = []
+  /** Live items buffered during open/resync and stitched by sequence once history lands. */
+  private liveBuffer: (
+    | { event: SessionEvent; view: ToolEventView | undefined }
+    | { frame: SessionAssistantStreamFrame }
+  )[] = []
   /** Gap repair in flight; live events detour to the buffer until the tail page lands. */
   private stitching = false
   /** The in-flight repair, shared with callers that request one while it runs. */
@@ -176,6 +181,12 @@ export class Session implements SessionFace {
   private repairRequested = false
   /** subscribed.lastSeq baseline (gap detection; null when no subscribed frame arrived — degrade to the liveBuffer dedup path). */
   private subscribedLastSeq: number | null = null
+  /** Fold joining transient assistant-stream frames to their durable settlement; owns the visible window. */
+  private readonly assistantStream = new ClientAssistantStream()
+  /** Latest `session/subscribed` assistant baseline, consumed by the next window install. */
+  private pendingStreamBaseline: SessionAssistantStreamBaseline | undefined
+  /** Views of durable assistant settlements the fold stages until their `end` frame. */
+  private readonly stagedViews = new Map<number, ToolEventView | undefined>()
   /** Local submission echoes retained until their durable event or queue occurrence is observed. */
   private pendingSubmissions: readonly PendingSubmission[] = []
   /** Settlement latches prevent queue and durable observations retiring one echo twice. */
@@ -235,15 +246,15 @@ export class Session implements SessionFace {
       this.snapshotCache = this.buildSnapshot()
     })
     this.snapshotCache = this.buildSnapshot()
-    this.disposeInboxProjection = this.projections.faceOf('inbox').subscribe(() => {
-      const inbox = this.projections.values().inbox
+    this.disposeInboxProjection = this.projections.faceOf('queuedInbox').subscribe(() => {
+      const inbox = this.projections.values().queuedInbox
       if (inbox !== undefined) {
         this.queueMirror.replace(inbox)
         this.observeSubmissionQueue(inbox)
         this.notifier.markDirty()
       }
     })
-    const inbox = this.projections.values().inbox
+    const inbox = this.projections.values().queuedInbox
     if (inbox !== undefined) {
       this.queueMirror.replace(inbox)
       this.snapshotCache = this.buildSnapshot()
@@ -290,18 +301,7 @@ export class Session implements SessionFace {
   leaveStage(): void {
     if (!this.stageActive) return
     this.stageActive = false
-    this.openGeneration++
-    this.historyAbortController?.abort()
-    this.historyAbortController = null
-    this.resetHistoryNavigation()
-    this.historyExpansionPromise = null
-    this.openPromise = null
-    this.openState = 'cold'
-    this.openError = null
-    this.events = []
-    this.views = []
-    this.omittedSpans = []
-    this.baseSeq = 0
+    this.resetOpenWindow()
     this.hasMore = false
     this.loadingOlder = false
     this.historyDetail = 'conversation'
@@ -659,18 +659,7 @@ export class Session implements SessionFace {
       await this.repairGap()
       return
     }
-    this.openGeneration++
-    this.historyAbortController?.abort()
-    this.historyAbortController = null
-    this.resetHistoryNavigation()
-    this.historyExpansionPromise = null
-    this.openPromise = null
-    this.openState = 'cold'
-    this.openError = null
-    this.events = []
-    this.views = []
-    this.omittedSpans = []
-    this.baseSeq = 0
+    this.resetOpenWindow()
     if (this.historyDetail !== 'conversation') this.historyDetail = 'full'
     this.fillPromise = null
     // Superseded, not settled: the baseline replay re-sends still-pending requested frames verbatim
@@ -717,6 +706,10 @@ export class Session implements SessionFace {
         this.acceptLiveEvent(frame.event, frame.view)
         return
       }
+      case 'session/assistant-stream': {
+        this.acceptStreamFrame(frame.frame)
+        return
+      }
       case 'session/queue': {
         this.queueMirror.replace(frame.items)
         this.observeSubmissionQueue(frame.items)
@@ -725,11 +718,12 @@ export class Session implements SessionFace {
       }
       case 'session/subscribed': {
         this.subscribedLastSeq = frame.lastSeq
+        this.pendingStreamBaseline = frame.assistantStream
         // New mux-generation baseline: the host pushes this session's queue
         // snapshot AFTER the subscribed frame on the same stream, so the
         // stale mirror clears here — race-free against onConnected/resync
         // timing (clearing there could wipe a baseline that already landed).
-        const inbox = this.projections.values().inbox
+        const inbox = this.projections.values().queuedInbox
         if (inbox !== undefined) {
           this.queueMirror.replace(inbox)
           this.notifier.markDirty()
@@ -862,6 +856,22 @@ export class Session implements SessionFace {
   }
 
   // ---- Private ----
+
+  /** Drop every open-window field back to its pre-open baseline before a fresh open or stage exit. */
+  private resetOpenWindow(): void {
+    this.openGeneration++
+    this.historyAbortController?.abort()
+    this.historyAbortController = null
+    this.resetHistoryNavigation()
+    this.historyExpansionPromise = null
+    this.openPromise = null
+    this.openState = 'cold'
+    this.openError = null
+    this.events = []
+    this.views = []
+    this.omittedSpans = []
+    this.baseSeq = 0
+  }
 
   /** Requested-frame arrival: the wait enters the pending map under its own key. */
   private mint(wait: PendingInteraction): void {
@@ -1047,12 +1057,31 @@ export class Session implements SessionFace {
     if (visible !== undefined) this.markConversationContent(visible.seq)
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     for (const event of this.events) this.observeSubmissionEvent(event)
-    this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
+    this.conversation.replaceWindow(this.rebuildWindowInputs(), hasMore)
     if (projections !== undefined) this.projections.seed(projections)
     const buffered = this.liveBuffer
     this.liveBuffer = []
-    for (const item of buffered) this.appendLive(item.event, item.view)
+    for (const item of buffered) this.stitchBuffered(item)
     this.notifier.markDirty()
+  }
+
+  /** Rebuild the stream fold over the durable spine and return its visible window as assembler inputs. */
+  private rebuildWindowInputs(): ConversationEventInput[] {
+    const bySeq = new Map<number, ToolEventView | undefined>()
+    this.events.forEach((event, index) => bySeq.set(event.seq, this.views[index]))
+    const baseline = this.pendingStreamBaseline
+    this.pendingStreamBaseline = undefined
+    this.stagedViews.clear()
+    return this.assistantStream.replace(this.events, baseline).map(entry => ({
+      event: entry.event,
+      view: entry.event.type === 'assistant/live-chunk' ? undefined : bySeq.get(entry.event.seq),
+    }))
+  }
+
+  /** Replay one buffered live item in arrival order after a window install or tail merge. */
+  private stitchBuffered(item: { event: SessionEvent; view: ToolEventView | undefined } | { frame: SessionAssistantStreamFrame }): void {
+    if ('frame' in item) this.applyStreamFrame(item.frame)
+    else this.appendLive(item.event, item.view)
   }
 
   /** Seq-guarded append shared by stitching and the open-state live path. */
@@ -1066,8 +1095,70 @@ export class Session implements SessionFace {
     if (event.type === 'turn/end') this.scheduleHistoryNavigationRefresh()
     const queueChanged = this.queueMirror.acceptDurable(event)
     this.observeSubmissionEvent(event)
-    const publication = this.conversation.append({ event, view })
+    const folded = this.assistantStream.acceptDurable(event)
+    let publication: ConversationPublication
+    switch (folded?.type) {
+      case undefined:
+        // Staged settlement: the durable spine records it now; the
+        // conversation window gains it when the attempt's `end` frame
+        // releases it through settleAssistant.
+        this.stagedViews.set(event.seq, view)
+        publication = 'none'
+        break
+      case 'rebaseline':
+        this.rebaselineAssistantStream()
+        publication = 'none'
+        break
+      default:
+        publication = this.conversation.append({ event, view })
+    }
     return queueChanged ? 'immediate' : publication
+  }
+
+  /** Land one assistant-stream frame; buffers while a window install or repair is in flight. */
+  private acceptStreamFrame(frame: SessionAssistantStreamFrame): void {
+    if (this.openState === 'loading' || this.stitching) {
+      this.liveBuffer.push({ frame })
+      return
+    }
+    if (this.openState !== 'open') return
+    this.applyStreamFrame(frame)
+  }
+
+  /** Apply one stream frame's fold decision to the conversation window. */
+  private applyStreamFrame(frame: SessionAssistantStreamFrame): void {
+    const result = this.assistantStream.acceptFrame(frame)
+    switch (result?.type) {
+      case 'transient':
+        this.scheduleConversation(this.conversation.append({ event: result.entry.event, view: undefined }))
+        return
+      case 'settlement': {
+        const view = this.stagedViews.get(result.entry.event.seq)
+        this.stagedViews.delete(result.entry.event.seq)
+        const pub = this.conversation.settleAssistant(result.attemptId, { event: result.entry.event, view })
+        this.scheduleConversation(pub)
+        return
+      }
+      case 'abandonment':
+        this.scheduleConversation(this.conversation.settleAssistant(result.attemptId))
+        return
+      case 'rebaseline':
+        this.rebaselineAssistantStream()
+        return
+      default:
+        return
+    }
+  }
+
+  /**
+   * Recover from an unreconcilable stream state: drop the fold's transient
+   * rows and staged settlements, republish the durable spine, and repair the
+   * tail so the attempt's durable settlement lands through the append path.
+   */
+  private rebaselineAssistantStream(): void {
+    this.conversation.replaceWindow(this.rebuildWindowInputs(), this.hasMore)
+    this.notifier.markDirty()
+    void this.repairGap()
   }
 
   /** Observe a durable user message carrying a browser submission identity. */
@@ -1428,14 +1519,11 @@ export class Session implements SessionFace {
       this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
       this.dropCoveredSpans()
       this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
-      this.conversation.replaceWindow(
-        this.events.map((event, index) => ({ event, view: this.views[index] })),
-        this.hasMore,
-      )
+      this.conversation.replaceWindow(this.rebuildWindowInputs(), this.hasMore)
     }
     const buffered = this.liveBuffer
     this.liveBuffer = []
-    for (const item of buffered) this.appendLive(item.event, item.view)
+    for (const item of buffered) this.stitchBuffered(item)
     this.notifier.markDirty()
   }
 

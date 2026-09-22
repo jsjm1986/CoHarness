@@ -114,10 +114,20 @@ interface ContentBlockMap {
   'text': TextBlock
   'reasoning': ReasoningBlock
   'image': ImageBlock
+  'file': FileBlock
   'tool-call': ToolCallBlock
   'tool-result': ToolResultBlock
 }
 ```
+
+```ts type-equiv
+/** Execution-world path that model tools can use to read one normalized attachment. */
+interface ImageAttachmentAccess {
+  /** Absolute path to immutable normalized bytes; callers must treat it as read-only. */
+  readonlyPath: string
+}
+```
+
 
 各块接口（完整字段见源码）：`TextBlock`（`text`）、`ReasoningBlock`（thinking，区别于可见文本）、`ImageBlock`（一个持久的[图片附件](attachment.zh.md)）、`ToolCallBlock`（`id: CallId`、`name`、原始 JSON `arguments`），以及 `ToolResultBlock`（`toolCallId`、嵌套 `content: ContentBlock[]`、`isError?`）。`ContentBlock = ContentBlockMap[ContentBlockType]`。仅当适配器、UI、压缩（compaction）和持久回放路径均支持某种新模态时，才将其纳入可合并扩展的 map。
 
@@ -127,7 +137,7 @@ interface ContentBlockMap {
 
 ```ts type-equiv
 /** Provider/model identity and adapter-private replay data for an assistant message. */
-interface AssistantProvenance {
+interface AssistantProviderMetadata {
   /** Provider route that produced the message. */
   provider: string
   /** Provider model id that produced the message. */
@@ -175,7 +185,7 @@ interface MessageSourceMap {
 ```ts type-equiv
 /**
  * The kind of information in producer-supplied context, declared by the
- * producer beside its provenance.
+ * producer in the same `MessageSource`.
  *
  * `MessageSource.kind` answers *who produced this*; `form` answers *what kind
  * of thing it is*, and the two axes are deliberately independent — several
@@ -323,6 +333,13 @@ interface LlmFailure {
   readonly providerRetryAfterMs?: number
   /** Opaque provider-issued request identifier for diagnostics. */
   readonly requestId?: ProviderRequestId
+  /**
+   * With code `IMAGE_OFFLOAD_REQUIRED`: how many more of the oldest retained
+   * image occurrences the route needs offloaded before the same request fits
+   * its exact byte accounting. `dsh-compaction-image-offload` records the
+   * selected occurrences in an `image/offload` event and retries the step.
+   */
+  readonly offloadImages?: number
 }
 ```
 
@@ -347,6 +364,41 @@ interface LlmFailure {
 ## `AppIdentity`：应用归属
 
 每个适配器都会向提供方发送的静态公开应用标识（[`packages/llm/llm/src/attribution.ts`](../../packages/llm/llm/src/attribution.ts)）。`attributionHeaders(identity?)` 只把它映射到标准 `User-Agent` header；该约定有意不支持 OpenRouter 特有的应用归属 header。默认 `APP_IDENTITY` 从包 manifest（元数据清单）获取版本；每个字段都是公开产品事实——不含 secret、路径、会话 id 或逐用户标识，且任何逐请求信息都不得影响这些值。设计理由见[强制 `User-Agent` 归属](../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.zh.md)。
+
+```ts type-equiv
+/**
+ * Request price of one ordered image occurrence under one exact model route's
+ * request projection. Every occurrence resolves to the pair the wire actually
+ * carries: provider visual tokens for a retained image, plus the model-visible
+ * text sent with or instead of it (request-preview handle, offload placeholder,
+ * or text-only substitution). The caller prices `text` with its own text
+ * estimator so provider pricing never fixes a text tokenization.
+ */
+interface LlmImageRequestPrice {
+  /** Provider visual tokens for the retained request image; 0 when only text represents this occurrence. */
+  visualTokens: number
+  /** Model-visible text sent for this occurrence, to be priced by the caller's text estimator. */
+  text: string
+}
+```
+
+```ts type-equiv
+/**
+ * Provider-side request-image pricing for one exact model route. Implemented
+ * by adapters whose provider charges visual tokens; consumers (the token
+ * meter) resolve it synchronously per measurement, so implementations must not
+ * perform I/O.
+ */
+interface LlmImageRequestPricing {
+  /**
+   * Price every image occurrence of one request projection.
+   * @param images - surface image blocks in request order, one entry per occurrence; an `offloaded` block
+   *   is priced as its placeholder text.
+   * @returns one price per occurrence, aligned by index with `images`.
+   */
+  priceImages(images: readonly ImageBlock[]): readonly LlmImageRequestPrice[]
+}
+```
 
 ```ts type-equiv
 /**
@@ -384,7 +436,13 @@ interface AppIdentity {
 interface TokenUsage {
   inputTokens: number
   outputTokens: number
-  /** Exact aggregate prompt plus output tokens when provider counts agree. */
+  /**
+   * Exact full-call total including aggregate prompt and output tokens.
+   *
+   * Adapters preserve a provider total or derive it from authoritative
+   * aggregate prompt/output counters; they omit it when unavailable or
+   * inconsistent.
+   */
   totalTokens?: number
   cacheReadTokens?: number
   cacheWriteTokens?: number
@@ -415,40 +473,40 @@ interface TokenUsage {
  */
 declare class BlockAssembler {
   /**
-   * Feed one chunk into the assembly state.
-   * @param chunk - the next raw chunk, in stream order.
-   */
+     * Feed one chunk into the assembly state.
+     * @param chunk - the next raw chunk, in stream order.
+     */
   push(chunk: StreamChunk): void;
   /**
-   * Assemble all blocks seen so far, in stream order.
-   * @returns one block per seen index, except that max-token truncation drops
-   *   tool calls that cannot be executed safely; an open block assembles from
-   *   its accumulated deltas (an unknown block type never closed by `block-end` throws).
-   */
+     * Assemble all blocks seen so far, in stream order.
+     * @returns one block per seen index, except that max-token truncation drops
+     *   tool calls that cannot be executed safely; an open block assembles from
+     *   its accumulated deltas (an unknown block type never closed by `block-end` throws).
+     */
   blocks(): ContentBlock[];
   /**
-   * Assemble the prefix an interrupted stream can safely finalize: closed and
-   * open text/reasoning blocks with non-whitespace content, in stream order.
-   * Tool calls are omitted because interruption precedes dispatch; retaining
-   * one would require a fabricated result. Open unknown blocks are also omitted.
-   * @returns the kept blocks; empty when nothing streamed before the interruption.
-   */
+     * Assemble the prefix an interrupted stream can safely finalize: closed and
+     * open text/reasoning blocks with non-whitespace content, in stream order.
+     * Tool calls are omitted because interruption precedes dispatch; retaining
+     * one would require a fabricated result. Open unknown blocks are also omitted.
+     * @returns the kept blocks; empty when nothing streamed before the interruption.
+     */
   interruptedBlocks(): ContentBlock[];
   /** Usage from the `usage` chunk; undefined until one arrives. */
   get usage(): TokenUsage | undefined;
   /** Finish reason from the `finish` chunk; `{kind: 'stop'}` when the stream ended without one. */
   get finish(): FinishReason;
   /**
-   * Replay metadata from the terminal finish chunk, if any, with per-block
-   * entries pruned in step with {@link blocks}. Undefined when the envelope's
-   * entries do not align with the emitted blocks.
-   */
+     * Replay metadata from the terminal finish chunk, if any, with per-block
+     * entries pruned in step with {@link blocks}. Undefined when the envelope's
+     * entries do not align with the emitted blocks.
+     */
   get replayState(): ReplayEnvelope | undefined;
   /**
-   * The assembled assistant message.
-   * @param source - producer attribution for the assembled message.
-   * @returns a frozen assistant-role message over `blocks()` (same open-block assembly rules).
-   */
+     * The assembled assistant message.
+     * @param source - producer attribution for the assembled message.
+     * @returns a frozen assistant-role message over `blocks()` (same open-block assembly rules).
+     */
   message(source: MessageSource = { kind: 'plugin', plugin: 'dsh-llm/assembler' }): Message;
 }
 ```
@@ -548,6 +606,8 @@ interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /** Configuration diagnostic for repair; unaffected models may remain serviceable. */
+  error?: string
   /** Optional ownership label supplied by a scoped configuration provider. */
   management?: 'personal' | 'organization' | 'project' | 'external'
   /** Public project id when this route belongs to a project. */
@@ -568,7 +628,7 @@ interface LlmModelInfo {
   description?: string
   /** Accepted request modalities; absent means unknown, while an explicit omission is negative capability. */
   inputModalities?: readonly ModelModality[]
-  /** Declared support for changing the system prompt in history. */
+  /** Declared mid-conversation system prompt handling; absent means only a leading system message is read. */
   systemPromptUpdate?: SystemPromptUpdate
 }
 ```
@@ -622,10 +682,10 @@ interface LlmResolvedModelInfo extends LlmModelInfo {
   context?: LlmModelContext
   /** Adapter-configured per-request output cap materialized when callers omit one. */
   defaultMaxTokens?: number
-  /** Declared support for changing the system prompt in history. */
-  systemPromptUpdate?: SystemPromptUpdate
   /** Adapter-owned selectable reasoning levels when exposed. */
   reasoning?: LlmModelReasoningInfo
+  /** Declared mid-conversation system prompt handling; absent means only a leading system message is read. */
+  systemPromptUpdate?: SystemPromptUpdate
 }
 ```
 
@@ -638,12 +698,16 @@ interface GenerateOptions {
   /** Adapter-owned reasoning effort selected for this exact model. */
   reasoningEffort?: ReasoningEffortId
   /**
-   * Ordered conversation messages, exactly as the provider sees them (after
-   * the `system` slot). A loop-built request assembles them as
-   * the derived history (dsh-agent-loop); a hand-built one-shot passes any list.
+   * Ordered conversation messages, exactly as the provider sees them. A
+   * loop-built request passes the derived history (dsh-agent-loop), whose
+   * leading system-role message carries the system prompt; a hand-built
+   * one-shot passes any list.
    */
   messages: Message[]
-  /** System prompt text (adapters map to the provider's system slot). */
+  /**
+   * System prompt text for one-shot callers; adapters map it to the provider's
+   * system slot ahead of `messages`. Loop-built requests leave it undefined.
+   */
   system?: string
   /** Tool schemas (adapters map to the provider's `tools` field). */
   tools?: ToolSchema[]
@@ -752,10 +816,7 @@ interface LlmDiscoveredModel {
   contextWindow?: number
   /** Maximum output tokens, when disclosed. */
   maxTokens?: number
-  /**
-   * Accepted request modalities, when disclosed; absent means unknown and a
-   * configuration surface should leave the declaration unset.
-   */
+  /** Accepted input types when disclosed by the catalog or endpoint; absent means unknown. */
   inputModalities?: readonly ModelModality[]
 }
 ```
@@ -839,62 +900,62 @@ interface PreparedLlmCall {
  */
 declare abstract class LlmAdapter {
   /**
-   * Describe one provider route owned by this adapter.
-   * @param provider - a route passed to `registerAdapter()` for this instance.
-   * @returns detached display metadata whose id must equal `provider`.
-   */
+     * Describe one provider route owned by this adapter.
+     * @param provider - a route passed to `registerAdapter()` for this instance.
+     * @returns detached display metadata whose id must equal `provider`.
+     */
   providerInfo(provider: string): LlmProviderInfo;
   /**
-   * Return the provider-owned retry policy captured with this route.
-   * @param _provider - a route passed to `registerAdapter()` for this instance.
-   * @returns a resolved policy, or `undefined` to use the normal defaults.
-   */
+     * Return the provider-owned retry policy captured with this route.
+     * @param _provider - a route passed to `registerAdapter()` for this instance.
+     * @returns a resolved policy, or `undefined` to use the normal defaults.
+     */
   providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;
   /**
-   * Resolve synchronous provider pricing for request images on one exact
-   * route. Adapters that do not declare a provider formula return `undefined`.
-   * @param _provider - registered provider route.
-   * @param _model - exact model id.
-   * @returns route-owned pricing, or `undefined` for neutral heuristic pricing.
-   */
+     * Resolve synchronous provider pricing for request images on one exact
+     * route. Adapters that do not declare a provider formula return `undefined`.
+     * @param _provider - registered provider route.
+     * @param _model - exact model id.
+     * @returns route-owned pricing, or `undefined` for neutral heuristic pricing.
+     */
   imageRequestPricing(_provider: string, _model: string): import('./types.ts').LlmImageRequestPricing | undefined;
   /**
-   * List models this adapter can currently advertise for one owned provider.
-   * The result is advisory: an adapter may accept unlisted model ids, and
-   * consumers must not turn absence into request rejection.
-   * @param _provider - one provider route owned by this adapter.
-   * @returns discoverable models in adapter-preferred order.
-   */
+     * List models this adapter can currently advertise for one owned provider.
+     * The result is advisory: an adapter may accept unlisted model ids, and
+     * consumers must not turn absence into request rejection.
+     * @param _provider - one provider route owned by this adapter.
+     * @returns discoverable models in adapter-preferred order.
+     */
   listModels(_provider: string): Promise<readonly LlmModelInfo[]>;
   /**
-   * Resolve all metadata available for one exact model. This query is
-   * independent of the advisory catalog and does not validate request routing.
-   * @param provider - one provider route owned by this adapter.
-   * @param model - exact model id passed to {@link GenerateOptions.model}.
-   * @param _signal - cancellation for this exact-model lookup; asynchronous
-   *   implementations must settle promptly after it aborts.
-   * @returns provider/model identity plus any context, call-default, and reasoning metadata.
-   */
+     * Resolve all metadata available for one exact model. This query is
+     * independent of the advisory catalog and does not validate request routing.
+     * @param provider - one provider route owned by this adapter.
+     * @param model - exact model id passed to {@link GenerateOptions.model}.
+     * @param _signal - cancellation for this exact-model lookup; asynchronous
+     *   implementations must settle promptly after it aborts.
+     * @returns provider/model identity plus any context, call-default, and reasoning metadata.
+     */
   resolveModel(
-    provider: string,
-    model: string,
-    _signal?: AbortSignal,
-  ): Promise<LlmResolvedModelInfo>;
+      provider: string,
+      model: string,
+      _signal?: AbortSignal,
+    ): Promise<LlmResolvedModelInfo>;
   /**
-   * Bind exact model metadata and the eventual request dispatch to one adapter generation.
-   * Dynamic adapters override this so settings changes between preparation and
-   * dispatch cannot combine one generation's capabilities with another's endpoint.
-   * @param provider - registered provider route.
-   * @param model - exact model id.
-   * @param signal - cancellation for model resolution.
-   * @returns model metadata and a one-generation stream entry point.
-   */
+     * Bind exact model metadata and the eventual request dispatch to one adapter generation.
+     * Dynamic adapters override this so settings changes between preparation and
+     * dispatch cannot combine one generation's capabilities with another's endpoint.
+     * @param provider - registered provider route.
+     * @param model - exact model id.
+     * @param signal - cancellation for model resolution.
+     * @returns model metadata and a one-generation stream entry point.
+     */
   async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;
   /**
-   * Stream one model call as raw chunks. The only required method.
-   * @param options - the fully-assembled request; implementations must honor `options.signal`.
-   * @returns the chunk stream, obeying the adapter contract documented on `StreamChunk`.
-   */
+     * Stream one model call as raw chunks. The only required method.
+     * @param options - the fully-assembled request; implementations must honor `options.signal`.
+     * @returns the chunk stream, obeying the adapter contract documented on `StreamChunk`.
+     */
   abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;
 }
 ```
@@ -1027,6 +1088,14 @@ providerRetryPolicy(provider: string): ResolvedRetryPolicy
 imageRequestPricing(provider: string, model: string): import('./types.ts').LlmImageRequestPricing | undefined
 
 /**
+ * Resolve the exact text one durable file occurrence contributes to every
+ * provider request in the current execution environment.
+ * @param ref - durable verbatim file reference from model history.
+ * @returns the same deterministic handle text used at adapter dispatch.
+ */
+fileRequestText(ref: FileAttachmentRef): string
+
+/**
  * Discover models advertised by one registered provider. Catalog membership
  * is advisory and never changes routing or request validation.
  * @param provider - registered provider route to inspect.
@@ -1080,6 +1149,8 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
  */
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
+
+Types: [FileAttachmentRef](attachment.zh.md)
 
 Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
 

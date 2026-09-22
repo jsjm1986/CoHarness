@@ -8,6 +8,10 @@ It owns **no termination**. The signal it hands out only *notifies*; actually st
 
 It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state, emits no events. A "timeout service" would have to understand how to stop every capability's work — exactly the knowledge a microkernel keeps out of shared layers.
 
+## Summary
+
+`dsh-timeout` lets callers apply bounded deadlines to work, distinguish local timeout from upstream cancellation, and monitor streamed reads for inactivity. `clampTimeout` fills a missing hint from a backend default, caps it at the allowed maximum, and rejects invalid values before work starts. `deadline` combines the chosen timeout with upstream cancellation in one signal, while the caller remains responsible for actually stopping its process, socket, or task. `idleWatchdog` counts only time spent waiting for provider reads, and zero remains reserved for backend-owned untimed work rather than public configuration.
+
 ## API
 
 ```ts
@@ -54,13 +58,17 @@ For a streamed transport, create one `idleWatchdog`, pass its stable `signal` in
 
 Local file `read`/`write`/`edit` take no `timeoutMs`: file IO runs untimed because a deadline would kill work the OS will still finish. See [the filesystem subsystem page](../../../docs/subsystems/filesystem.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A zero-dependency pure library; the signal and classification algebra is enforced by unit specs.
+
 ## Model Experience
 
-Indirectly, through consumers such as `dsh-tool-call-timeout-policy`, which may replace a provider result with a retained timeout error or suppress a late result.
+Indirectly, through the timeout consumers that render timeout outcomes.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the timeout consumers own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

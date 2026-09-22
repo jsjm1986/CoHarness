@@ -6,9 +6,17 @@ The web GUI host's workspace-directory picker is a capability seam. The abstract
 
 Browse primitives fail with the typed `DirectoryPickerError` (`directory-unreadable` / `directory-exists` / `directory-create-failed`, each carrying the subject `path`), which the consuming gateway maps 1:1 onto wire error codes. `DirectoryEntry` rows carry a host-owned `hidden` flag (POSIX dot convention) so display policy stays client-side; `DirectoryListing.crumbs` is the ancestor chain from the filesystem root, every crumb a jump target. Design rationale, the `ctx.fs` separation, and the policy decisions live in [the directory-picker capability seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md).
 
+## Summary
+
+The web GUI lets an operator choose a workspace directory with either an OS chooser or an in-app browser. Use the native option when the operator can reach the host display; use the browser option for remote clients or when directory listing and creation must stay in the app. Consumers receive the interaction kind and can present the matching workflow. Directory picking is limited to the GUI host and never affects the agent loop. The browser workflow exposes one directory tree at a time; multiple roots are unsupported.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam declares the capability union; backends own their interaction and process state.
+
 ## Model Experience
 
-None, as the seam serves the GUI host's directory selection; nothing here reaches a model request.
+None, as the GUI-host picking seam registers nothing model-facing.
 
 #### KV Cache effect
 

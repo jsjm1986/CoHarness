@@ -9,13 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../core/session"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../session/session-persistence"
     },
     {
       "path": "../../storage/storage"
@@ -24,16 +24,16 @@
       "path": "../../storage/storage-domain"
     },
     {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../session/session-persistence"
-    },
-    {
       "path": "../../util/brand"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

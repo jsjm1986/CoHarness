@@ -16,13 +16,21 @@ Neither surface keeps run state in component state — settling a define call mo
 
 The `/client` export surface is the plugin body (`apply`/`inject`) plus the injected face, run-state, port and event payload types.
 
+## Summary
+
+`dsh-client-ui-cordis` renders historical generated-plugin cards and a control panel for process-local definitions. Users can operate definitions supplied by programmatic consumers; persisted cards remain readable after restart without recreating those definitions. New Creator plugins use Plugin Manager.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The panel operates host-held definitions through the runner's remote surface and the card projects durable session events; it owns no definition state.
+
 ## Model Experience
 
-Indirectly, through the run and stop verbs these surfaces drive — the browser-side runner's orchestration for a run, and `dynamicCordisRunner.stop` for a stop, the same host verbs the model's `cordis_run` and `cordis_stop` tools reach — so whatever a running definition then contributes is the runner's effect while nothing model-visible originates in this package, which renders logged call/result slices and a host inventory read, adds no prompt content, writes no session event, and deliberately leaves no session-log trace of a person approving, declining, running or stopping anything.
+Indirectly, through the runner lifecycle actions that own session steering and permission outcomes; this package renders historical calls and results and adds no tools or prompt sections.
 
 #### KV Cache effect
 
-None: no prompt input originates here, and answering a run request neither extends nor rewrites the history tail.
+None directly: this package owns rendering; runner-originated steering changes the session history.
 
 ## Known Limitations and Deferred Work
 

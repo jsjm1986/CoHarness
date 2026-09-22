@@ -61,6 +61,38 @@ The reference records intrinsic dimensions and encoded length so clients can lay
 ## Commit and verified-read payloads
 
 ```ts type-equiv
+/**
+ * Browser-submitted prompt content accepted by Host prompt endpoints; the
+ * accepting Host promotes image parts to durable references through
+ * `ctx.attachments.admitPromptContent()` before any message is created, so a wire caller can
+ * never cite an attachment it did not upload.
+ */
+type PromptContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | {
+    readonly type: 'image'
+    readonly mediaType: ImageMediaType
+    readonly data: string
+    readonly name?: string
+  }
+```
+
+```ts type-equiv
+/** Host prompt content whose file receipts are resolved and whose image bytes await admission. */
+type AttachmentAdmissionPart =
+  | PromptContentPart
+  | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+```
+
+```ts type-equiv
+/** Host-admitted prompt content with every attachment represented by its durable reference. */
+type AdmittedPromptContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly attachment: ImageAttachmentRef }
+  | { readonly type: 'file'; readonly attachment: FileAttachmentRef }
+```
+
+```ts type-equiv
 /** Base64-encoded image upload accompanying one wire request. */
 interface EncodedImageAttachment {
   /** Declared media type, verified against the decoded bytes during admission. */
@@ -88,6 +120,48 @@ interface SaveImageAttachment {
 interface StoredImageAttachment {
   ref: ImageAttachmentRef
   data: Uint8Array
+}
+```
+
+```ts type-equiv
+/** Deterministic request-image target selected by one exact model route for one attachment. */
+interface ImageRequestTarget {
+  /** Target width in pixels; a target above the source keeps the source width. */
+  width: number
+  /** Target height in pixels; a target above the source keeps the source height. */
+  height: number
+  /** Encoded-byte target before base64 expansion or Files API upload; the smallest quality-ladder output is kept when no quality fits. */
+  maxBytes: number
+}
+```
+
+```ts type-equiv
+/** Integer width and height of one projected image. */
+interface ProjectedDimensions {
+  width: number
+  height: number
+}
+```
+
+```ts type-equiv
+/** Cached request version derived from one provider-independent normalized attachment. */
+interface RequestImageAttachment {
+  /** Cache and upload-index key over the attachment id, policy, and fixed encoder parameters. */
+  variantId: ImageVariantId
+  /** Durable normalized attachment from which this request version was derived. */
+  attachment: ImageAttachmentRef
+  /** Encoded request bytes. */
+  data: Uint8Array
+  mediaType: ImageMediaType
+  bytes: number
+  width: number
+  height: number
+  /** Provider-compatible sample depth proven after request encoding. */
+  depth: 'uchar'
+  /** Provider-compatible color space proven after request encoding. */
+  space: 'srgb'
+  /** Whether the encoded request version retains an alpha channel. */
+  hasAlpha: boolean
 }
 ```
 
@@ -125,12 +199,27 @@ async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly Image
 
 /**
  * Admit one Host prompt and replace each uploaded image with its durable reference.
- * Text parts pass through unchanged. A prompt without image parts performs no storage operation.
- * @param content - prompt parts in message order.
+ * Text and durable file references pass through unchanged. A prompt without image parts performs no storage operation.
+ * @param content - prompt parts in message order after file receipt resolution.
  * @returns admitted prompt parts in the same order as `content`.
  * @throws AttachmentError when the image batch is refused.
  */
 async admitPromptContent( content: readonly AttachmentAdmissionPart[], ): Promise<AdmittedPromptContentPart[]>
+
+/**
+ * Decode and durably commit one canonical base64 file upload.
+ * @param input - canonical base64 bytes and optional display name.
+ * @returns the durable content-addressed file reference.
+ * @throws AttachmentError when the encoding or storage operation is refused.
+ */
+admitEncodedFile(input: EncodedFileAttachment): Promise<FileAttachmentRef>
+
+/**
+ * Identify a failure emitted by this attachment capability by its stable code.
+ * @param error - value caught from an attachment operation.
+ * @returns whether the value is an attachment failure.
+ */
+isAttachmentError(error: unknown): error is AttachmentError
 
 /**
  * Validate and durably commit one image before its owning session event is appended.
@@ -152,21 +241,58 @@ abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
 abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
 
 /**
- * Locate the provider-owned normalized image in the host filesystem.
- * Providers that are not host-file-backed return `undefined`.
- * @param _ref - durable normalized attachment reference.
- * @returns an absolute host path, or `undefined` when no path is exposed.
+ * Locate the provider-owned normalized object in the harness host filesystem.
+ * @param ref - durable normalized attachment reference.
+ * @returns an absolute host path, or undefined when this backend is not host-file-backed.
+ * @throws an AttachmentError when the durable reference is invalid.
  */
-imageHostPath(_ref: ImageAttachmentRef): string | undefined
+imageHostPath(ref: ImageAttachmentRef): string | undefined
+
+/**
+ * Durably commit one file byte-for-byte before its owning session event is
+ * appended. Files carry no admission limits: any byte content and length is
+ * accepted, and the stored object is the exact submitted bytes. Backends
+ * without verbatim file storage keep this default rejection.
+ * @param input - exact bytes and optional display name.
+ * @returns the durable content-addressed file reference.
+ */
+saveFile(input: SaveFileAttachment): Promise<FileAttachmentRef>
+
+/**
+ * Durably commit one file byte-for-byte from bounded chunks. Providers must
+ * apply backpressure and must not collect the complete file in memory.
+ * Backends without streamed verbatim storage keep this default rejection.
+ * @param input - ordered exact bytes, optional cancellation, and display name.
+ * @returns the durable content-addressed file reference.
+ */
+saveFileStream(input: SaveFileStreamAttachment): Promise<FileAttachmentRef>
+
+/**
+ * Read and verify one verbatim stored file as bounded chunks. Providers must
+ * not collect the complete file in memory. Backends without verbatim file
+ * reads keep this default rejection.
+ * @param ref - durable reference from the session log.
+ * @param signal - optional cancellation for backend reads and verification work.
+ * @returns exact file bytes in order; integrity failures reject the iteration.
+ */
+async *readFileStream( ref: FileAttachmentRef, signal?: AbortSignal, ): AsyncIterable<Uint8Array>
+
+/**
+ * Locate the verbatim stored file object in the harness host filesystem.
+ * @param ref - durable file reference.
+ * @returns an absolute host path, or undefined when this backend is not host-file-backed.
+ * @throws an AttachmentError when the durable reference is invalid.
+ */
+fileHostPath(ref: FileAttachmentRef): string | undefined
 
 /**
  * Generate or read one deterministic model-request version from the stored normalized image.
  * @param ref - durable provider-independent normalized attachment reference.
- * @param policy - exact route pixel and encoded-byte budget.
+ * @param target - route-chosen dimensions and byte target; an unmet byte target yields the smallest ladder output.
  * @param signal - optional cancellation.
  * @returns request bytes and the cache/upload identity covering every transform input.
  */
-readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
+readImageRequest( ref: ImageAttachmentRef, target: ImageRequestTarget, signal?: AbortSignal, ): Promise<RequestImageAttachment>
 ```
 
 Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)

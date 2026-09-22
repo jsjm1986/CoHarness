@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The host half of model-mounted dynamic packages: the definition registry, the `node:vm` sandbox and fiber lifecycle for host halves, the invoke handler table, and the run round trip a browser page carries out. Provided as `ctx.dynamicCordisRunner`. The model-facing tools live in [`@deepseek-ai/dsh-tool-cordis`](../tool-cordis/README.md); the browser half is loaded by [`@deepseek-ai/dsh-cordis-client-runner`](../cordis-client-runner/README.md).
 
+## Summary
+
+`dsh-cordis-host-runner` exposes runtime inspection and keeps process-local dynamic definitions available to programmatic callers and browser controls. Host halves run in a `node:vm` realm; browser halves use the Client runner and approval UI. Definitions disappear on restart. Agents discover APIs through `tool-cordis` and install persistent bundles through Plugin Manager; no model tool creates dynamic definitions.
+
 ## What it does
 
 Two phases: `define` only records, and everything with an effect hangs off a run.
@@ -43,21 +47,25 @@ One field is all there is: a run request waits for a person, so the round trip h
 
 Service package: default-exports `DynamicCordisRunnerService` (service key `dynamicCordisRunner`), with `./types` carrying the payload shapes the `dynamicCordisRunner` remote namespace and its consumers share. The `define` / `undefine` shapes stay inside the package, because they never cross the wire.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Definitions and their sandboxed fibers are private registry state whose mount/invoke/retract lifecycle is asserted by the runner's specs; no independently observable projection is published.
+
 ## Model Experience
 
-### Refusals and teaching errors relayed by the cordis tools
+### Run outcomes, refusals, and diagnostics relayed to the owning session
 
 #### What the model sees
 
-Nothing directly: this package registers no tool and injects no prompt. Its refusals reach the model through the `cordis_*` tool results that call it — an unparseable half names the offending line, a missing definition explains that definitions live in memory only, a `rejected` or `cancelled` run reports that a person declined or the turn ended rather than that anything failed, and a failed browser-half load carries the answering page's own error text.
+This package registers no tool or prompt. Programmatic `run` calls and browser controls can steer the owning session with outcomes and diagnostics; stop and remove gestures inject a user message. Shipped model tools cannot create or update dynamic definitions.
 
 #### Token effect
 
-None of its own: every message above is carried by the calling tool's result.
+Conditional and data-dependent: messages arrive only when an event occurs, and each carries a bounded description of what happened; there is no fixed per-request cost.
 
 #### KV Cache effect
 
-A host half that registers tools changes the next request's tool view, which invalidates prefix reuse from the first changed schema token; running or stopping a package with no tool registrations is prefix-neutral.
+None of its own. A host half that registers tools changes the next request's tool view, which invalidates prefix reuse from the first changed schema token; running or stopping a package with no tool registrations is prefix-neutral.
 
 ## Known Limitations and Deferred Work
 

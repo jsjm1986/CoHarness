@@ -100,13 +100,30 @@ async function authorChild(
   inheritedEventCount = SessionLogOffset(0),
 ): Promise<SessionId> {
   const sessionId = SessionId(id)
-  await ctx.sessionPersistence.create({
+  const meta: SessionHeader = {
     version: SESSION_FORMAT_VERSION,
     id: sessionId,
     createdAt: 1,
     isSeeded: false,
     ...header,
-  }, header.isSeeded === true ? inheritedEventCount : undefined)
+  }
+  if (header.isSeeded === true) {
+    // A seeded log carries its tagged inherited cut marker at seq == inheritedEventCount,
+    // so the durable artifact must materialize with prefix and marker in one batch.
+    const stored = [
+      ...events.slice(0, inheritedEventCount),
+      { type: 'session/end-seed', seq: SessionSeq(inheritedEventCount), time: 0, data: { inherited: true } } as SessionEvent,
+      ...events.slice(inheritedEventCount).map(event => ({ ...event, seq: SessionSeq(event.seq + 1) })),
+    ]
+    const handle = await ctx.sessionPersistence.create(meta, { inheritedEventCount })
+    try {
+      await handle.append(stored)
+    } finally {
+      await handle.close()
+    }
+    return sessionId
+  }
+  await ctx.sessionPersistence.createStored(meta)
   await ctx.sessionPersistence.append(sessionId, events)
   return sessionId
 }
@@ -259,7 +276,7 @@ describe('SubagentRuntime.listChildren', () => {
     const { ctx } = await setup([])
     // A parent that exists only in persistence — the restart shape.
     const coldParent = SessionId('00000000-0000-4000-8000-00000000cccc')
-    await ctx.sessionPersistence.create({
+    await ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: coldParent,
       createdAt: 1,
@@ -421,7 +438,7 @@ describe('SubagentRuntime.listChildren', () => {
       seq: SessionSeq(3),
       time: 3,
       data: { version: SUBAGENT_DESCRIPTOR_VERSION, mode: 'continuable', provider: 7 },
-    } as SessionEvent)
+    } as unknown as SessionEvent)
     events[4] = { ...events[4]!, seq: SessionSeq(4) }
     const invalidated = await authorChild(ctx, '00000000-0000-4000-8000-00000000ad01', {
       parentSession: parent.id,
@@ -484,7 +501,7 @@ describe('SubagentRuntime.listChildren', () => {
   })
 
   it.each([
-    ['version', (meta: SessionHeader): SessionHeader => ({ ...meta, version: meta.version + 1 })],
+    ['version', (meta: SessionHeader): SessionHeader => ({ ...meta, version: (meta.version + 1) as SessionHeader['version'] })],
     ['id', (meta: SessionHeader): SessionHeader => ({ ...meta, id: SessionId('another-lifecycle') })],
     ['createdAt', (meta: SessionHeader): SessionHeader => ({ ...meta, createdAt: meta.createdAt + 1 })],
     ['cwd', (meta: SessionHeader): SessionHeader => ({ ...meta, cwd: '/elsewhere' })],
@@ -531,19 +548,15 @@ describe('SubagentRuntime.listChildren', () => {
 
   it('maps a child rejected by persistence inspection to unavailable', async () => {
     const { ctx, parent } = await setup([])
-    // The surface-eligible user/message lacks its required surfaceOp, so the
-    // first-party inspection rejects before any projection fold can run.
+    // An unseeded log carrying a tagged inherited cut marker is durable to
+    // write but rejects at read, so the first-party inspection fails before
+    // any projection fold can run.
     const invalid = await authorChild(ctx, '00000000-0000-4000-8000-0000000000ee', {
       parentSession: parent.id,
       origin: 'subagent',
     }, [
       { type: 'turn/start', seq: 0, time: 1, data: { turn: 1, trigger: { kind: 'message', source: { kind: 'user' } } } },
-      {
-        type: 'user/message',
-        seq: 1,
-        time: 2,
-        data: createUserMessage({ content: [{ type: 'text', text: 'work' }], source: { kind: 'user' } }),
-      },
+      { type: 'session/end-seed', seq: 1, time: 2, data: { inherited: true } },
       { type: 'subagent/descriptor', seq: 2, time: 3, data: descriptorPayload('broken surface') },
     ] as SessionEvent[])
     const entries = await ctx.subagents.listChildren(parent.id)
@@ -651,7 +664,7 @@ describe('SubagentRuntime.listChildren', () => {
   it('fails the whole enumeration when the persisted listing itself fails', async () => {
     const { ctx, parent } = await setup([textResponse('done')])
     await startChild(ctx, parent, 'never listed')
-    ctx.sessionPersistence.list = () => Promise.reject(new Error('backend listing failed'))
+    ctx.sessionPersistence.listHeaders = () => Promise.reject(new Error('backend listing failed'))
     // Without any abort in flight, the original backend failure propagates
     // as the operation failure — no cancellation mapping, no diagnostic rows.
     await expect(ctx.subagents.listChildren(parent.id)).rejects.toThrow('backend listing failed')
@@ -786,7 +799,7 @@ describe('SubagentRuntime.listChildren', () => {
     const childId = await startChild(ctx, parent, 'cached child')
     // The child's turn/end and disposal are the cache's mandatory checkpoint
     // points; both writes are fail-soft asynchronous, so wait for the row.
-    const header = (await ctx.sessionPersistence.list()).find(meta => meta.id === childId)
+    const header = (await ctx.sessionPersistence.listHeaders()).find(meta => meta.id === childId)
     await vi.waitFor(() => {
       expect(ctx.sessionProjectionCache.cachedSnapshot(header!, SessionLogOffset(0))?.values.subagent).toBeDefined()
     }, { timeout: 5_000 })
@@ -890,7 +903,7 @@ describe('SubagentRuntime.listChildren', () => {
     const { ctx, parent } = await setup([])
     const controller = new AbortController()
     controller.abort()
-    ctx.sessionPersistence.list = () => Promise.reject(new Error('must not be called'))
+    ctx.sessionPersistence.listHeaders = () => Promise.reject(new Error('must not be called'))
     await expect(ctx.subagents.listChildren(parent.id, controller.signal)).rejects.toThrow(
       expect.objectContaining({ code: 'CANCELLED' }) as Error,
     )
@@ -900,7 +913,7 @@ describe('SubagentRuntime.listChildren', () => {
     const { ctx, parent } = await setup([])
     const controller = new AbortController()
     const entered = Promise.withResolvers<undefined>()
-    ctx.sessionPersistence.list = (signal) => {
+    ctx.sessionPersistence.listHeaders = (signal) => {
       entered.resolve(undefined)
       return new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => {
@@ -925,7 +938,7 @@ describe('SubagentRuntime.listChildren', () => {
       parentSession: parent.id,
       origin: 'subagent',
     }))
-    ctx.sessionPersistence.list = async () => headers
+    ctx.sessionPersistence.listHeaders = async () => headers
     const inspect = vi.spyOn(ctx.sessionPersistence, 'inspect')
     await expect(ctx.subagents.listChildren(parent.id)).rejects.toThrow(
       expect.objectContaining({ code: 'SUBAGENT_LIST_CAPACITY_EXCEEDED' }) as Error,
@@ -944,7 +957,7 @@ describe('SubagentRuntime.listChildren', () => {
       parentSession: parent.id,
       origin: 'subagent',
     }))
-    ctx.sessionPersistence.list = async () => headers
+    ctx.sessionPersistence.listHeaders = async () => headers
     await expect(ctx.subagents.listChildren(parent.id)).rejects.toThrow(
       expect.objectContaining({ code: 'SUBAGENT_LIST_CAPACITY_EXCEEDED' }) as Error,
     )

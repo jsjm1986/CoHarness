@@ -4,7 +4,13 @@ English | [中文](README.zh.md)
 
 Domain data form for the DeepSeek Harness storage hub: exposes the injectable `ctx.storageDomain` service and the matching `ctx.storage.domain` projection after every configured backend is registered. A domain is declared once with `defineDomain` (zod record schemas, `z.infer`-derived types), opened through `DomainFacility.open`, and served from authoritative in-memory state — reads are synchronous, writes serialize on one per-domain chain, reach durability on the routed backend first, then update memory and emit `domain/changed`. The opening consumer owns the handle's lifecycle and releases it with `Domain.close()` (idempotent; typically its own `ctx.effect` disposer); domains still open when the plugin unmounts are closed by the facility.
 
+Beyond name, version, and table schemas, a spec may declare a storage `layout` (`single` default, or `per-record` when the routed backend supports it), a `compatibleVersions` set naming older stored versions the current schemas still accept, and an `invalidRecords` policy — the default is fail-loud, while `backup-and-skip` moves a schema-failing record aside via the backend's `backupRecord` and continues the open without it.
+
 Design rationale, open semantics, and the storage/domain layer split live in the [Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md).
+
+## Summary
+
+Use this package to declare schema-validated key-value domains and open them through `ctx.storageDomain` over a configured storage backend. Reads return synchronously from validated in-memory state, while each write becomes durable before it resolves and emits `domain/changed` in order. Product packages use domain handles instead of accessing storage backends directly. This host-side state does not add tools, prompts, or session events, so it remains invisible to the model and agent loop.
 
 ## Configuration
 
@@ -19,11 +25,11 @@ Design rationale, open semantics, and the storage/domain layer split live in the
 
 #### What the model sees
 
-Nothing. The package registers no tools, injects no prompts, and appends no session events; it stores non-session data (workspace records, future session sidecars) behind `ctx.storageDomain` and emits only the in-process `domain/changed` event, which reaches a model only if a Consumer package renders it through its own documented surface.
+Nothing. The package registers no tools, injects no prompts, and appends no session events; it stores non-session data behind `ctx.storageDomain` and emits only the in-process `domain/changed` event, which reaches a model only if a consumer renders it through its own documented surface.
 
 #### Token effect
 
-Zero. No text from this package enters any model request.
+Zero: no text from this package enters any model request.
 
 #### KV Cache effect
 

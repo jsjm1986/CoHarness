@@ -16,3 +16,8 @@ LLM（大语言模型）seam 及其提供方适配器。`llm` 包同时承担 Se
 适配器在 seam 上注册提供方路由；重试与 token 测量仍是独立消费方。子 README 负责路由、元数据、回放和提供方协议细节；[LLM 架构决策](../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.zh.md)说明设计原理。
 
 子系统参考——消息与内容块、模型请求、`StreamChunk` 协议、适配器约定（adapter contract）——见 [docs/subsystems/llm-streaming.md](../../docs/subsystems/llm-streaming.zh.md)（token 计量：[token-meter.md](../../docs/subsystems/token-meter.zh.md)）；另见[孪生适配器](../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.zh.md)、[回放 token 计量](../../.agents/notes/implemented/architecture/2026-07-15-replay-token-meter-service.zh.md)与[按路由模型上下文](../../.agents/notes/implemented/architecture/2026-07-20-routed-model-context-and-compaction-policy.zh.md) Agent Note。
+
+
+## 概述
+
+llm 组提供 harness 的模型调用能力：一个提供方无关的服务，任何组合都可以通过它向模型提供方发起流式请求，外加适配器、提供方专用请求元数据、重试执行与计量。核心 `llm` 包定义所有插件与会话日志使用的消息、内容块与流式分片词汇；提供方适配器把某个提供方的协议格式（wire format）翻译为该词汇；DeepSeek 请求扩展插件在模型输入之外贡献具有生命周期归属的元数据；`llm-retry` 在持久化的 agent（智能体）步骤边界上重跑失败的请求；`token-meter` 从持久化日志测量请求与上下文压力。本页列出该包组的组成；每个包 README 负责各自的包级约定。

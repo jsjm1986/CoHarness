@@ -1,19 +1,24 @@
 # Build and publish the @deepseek-ai/node-addon-landlock-run package family from the
 # harness source of record. Rehearsal and publication consume the same packed
 # tarballs; each native binary is built on its matching architecture.
-name: Landlock Run Release
+name: Node Addon System Release
 
 on:
   workflow_dispatch:
     inputs:
+      evidence_runs:
+        description: Comma-separated completed CI run IDs for this exact candidate. Required to publish.
+        required: false
+        type: string
       publish:
-        description: Publish packed tarballs to npm. Must run from a landlock-run-v* tag.
+        description: Publish packed tarballs to npm. Must run from a node-addon-system-v* tag.
         required: true
         type: boolean
         default: false
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   # Stable/prerelease dist-tags are shared registry state; serialize release
@@ -21,9 +26,13 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
+env:
+  DSH_RELEASE_READINESS: .artifacts/release-evidence/readiness.json
+  DSH_RELEASE_EVIDENCE_RUNS: ${{ inputs.evidence_runs }}
+
 defaults:
   run:
-    working-directory: native/landlock-run
+    working-directory: native/system
 
 jobs:
   matrix:
@@ -58,9 +67,10 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --filter @deepseek-ai/node-addon-landlock-run-workspace... --frozen-lockfile
+        run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
       - name: Install musl toolchain
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq musl-tools
@@ -75,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: native/landlock-run/${{ matrix.dir }}/bin/*
+          path: native/system/${{ matrix.dir }}/bin/*
           if-no-files-found: error
           retention-days: 7
 
@@ -85,6 +95,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6.0.10
         with:
@@ -97,7 +110,17 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --filter @deepseek-ai/node-addon-landlock-run-workspace... --frozen-lockfile
+        run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
+
+      - name: Install readiness tooling
+        working-directory: .
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify source readiness
+        if: inputs.publish
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family native --version "$(node -p 'require("./native/system/package.json").version')"
 
       - name: Build TypeScript
         run: pnpm build:ts
@@ -111,7 +134,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: prebuild-*
-          path: native/landlock-run/.release/prebuild-artifacts
+          path: native/system/.release/prebuild-artifacts
 
       - name: Assemble and verify prebuilds
         run: node ./scripts/assemble-prebuilds.mjs .release/prebuild-artifacts
@@ -129,11 +152,24 @@ jobs:
         env:
           NALR_REQUIRE_LANDLOCK: 1
 
+      - name: Record installed native tarball evidence
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-native-pack-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: Pack npm tarballs
+          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_GATE_ARTIFACT_GLOBS: '["native/system/dist/npm/*.tgz"]'
+        with:
+          external: native-pack
+          status: ${{ job.status }}
+          command: node native/system/scripts/verify-packed-install.mjs
+
       - name: Upload npm tarballs
         uses: actions/upload-artifact@v7
         with:
           name: npm-tarballs
-          path: native/landlock-run/dist/npm/*
+          path: native/system/dist/npm/*
           if-no-files-found: error
           retention-days: 7
 
@@ -145,12 +181,13 @@ jobs:
     environment: npm-publish
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
-      # The publish script is the only repository file this job needs, and it
-      # imports nothing outside Node's builtins, so there is no install step.
+      # The publisher consumes the pack job bytes and revalidates their evidence.
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: actions/setup-node@v7
@@ -158,11 +195,22 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
+      - uses: pnpm/action-setup@v6.0.10
+      - name: Install readiness tooling
+        working-directory: .
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Download npm tarballs
         uses: actions/download-artifact@v8
         with:
           name: npm-tarballs
-          path: native/landlock-run/dist/npm
+          path: native/system/dist/npm
+
+      - name: Verify publication readiness
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run release:prepare --family native --version "$(node -p 'require("./native/system/package.json").version')" --phase publish
 
       - name: Configure npm token fallback
         env:
@@ -177,4 +225,6 @@ jobs:
         # this job over the same artifact skips what already landed instead of
         # failing on it. A bare `npm publish` loop could not be retried: the
         # registry answers a repeat of an existing version permanently.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node ./scripts/publish-release.mjs dist/npm

@@ -6,6 +6,10 @@ A replay LLM plugin for keyless snapshot tests. It yields model streams reconstr
 
 Its consumers are the ACP and headless `stream-json` snapshot suites plus the Web browser e2e lane. Loader-driven suites mount this plugin in place of a real LLM adapter; the Web lane installs it directly to retain the teardown consumption handle.
 
+## Summary
+
+`dsh-llm-replay` lets snapshot tests run the real agent without an API key by replaying model streams from recorded Session JSONL fixtures. Each parent and subagent session receives its recorded script in first-call order, while calls within a session advance independently. A `replay.override.json` sidecar represents pre-chunk failures, cancellation, hangs, and injected retries that durable settlements cannot reconstruct. Use it for deterministic ACP, headless, and Web browser scenarios that need real loop behavior with fixed model output.
+
 ## How the fixture works
 
 The fixture IS the persisted session log (`<scenario>/session.jsonl`). Its `assistant/chunk` events carry every `StreamChunk`, so grouping them by `(turn, step)` reconstructs each agent-loop `stream()` call's chunk sequence. A successful compaction summarizer is logged differently: when `compaction/summary` carries `llmStreamCall: true` and its complete `rawOutput`, replay reconstructs a canonical successful stream at that event's position using one `block-start`/`block-end` pair per block, the recorded usage when present, and a terminal `stop`. Exact provider delta partitioning is not part of the durable compaction result. `rawOutput` without the marker does not imply a local LLM call because template and remote summarizers may retain complete output without using this context's adapter.
@@ -67,6 +71,10 @@ Replay keys every call by its calling session id (`GenerateOptions.sessionId`, s
 ## Plugin export shape
 
 Named `name` / `inject` / `Config` / `apply`, with **no default export**: the cordis Loader's `unwrapExports` does `exports.default ?? exports`, so a stray default would collapse the module to the bare function and drop the `inject` namespace (see [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)).
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The adapter replays one fixed recorded transcript per test; no live provider relation exists.
 
 ## Model Experience
 

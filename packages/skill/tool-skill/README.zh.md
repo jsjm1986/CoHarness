@@ -6,6 +6,10 @@
 
 需要 `ctx.agents`、`ctx.tools` 和 `ctx.skills`（`inject: ['agents', 'tools', 'skills']`）。
 
+## 概述
+
+agent 可以在会话期间发现并加载 skill。在首次请求前，如果存在模型可调用 skill 且 `skill` 工具可见，agent 会收到一份持久目录，列出可用 skill 的名称与有长度上限的描述，并可用 `skill` 工具加载完整指令。用户可以用 `/name` 调用某个用户可调用的 skill，把相同的指令注入该步骤。目录变更会追加一份完整替换，其中空目录会停用旧名称；可配置 `catalogDescriptionMaxLength` 来限制每条描述的长度。
+
 ## 目录生命周期
 
 每次符合条件的 `agent/pre-step`，该插件都会使用调用会话的 cwd 调用 `ctx.skills.snapshot()`，将 pre-step 中止信号转发到发现流程，应用 `skill` 工具的精确可见性，并按顺序渲染 `name` 和 `description` 条目。如果先前不存在目录且该视图非空，插件会向下游 `enter` 决策添加初始的持久用户角色 `<system-reminder>`。目录消息只包含这些摘要；skill 正文、路径、来源、提供方和 `whenToUse` 提示仍位于目录之外。
@@ -30,13 +34,17 @@
 
 工具执行不会添加合成上下文消息。新加载的结果已作为工具结果记录，并在下一个模型步骤可用，无需重复正文。只有目录投影会添加替换摘要。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。工具与目录读取 `ctx.skills` 注册表；提供方注册与内容留在 seam 之后。
+
 ## 模型体验
 
 ### 会话目录
 
-#### 模型看到的内容
+#### 模型看到什么
 
-如果存在模型可调用 skill，且可见的正是这个 `skill` 工具，agent 会在第一个请求之前收到下方目录模板，其中包含每个已排序 skill 的一条随数据而定的条目。该目录是一条持久的用户角色消息。后续成员关系、描述或可见性的变化会使用同一个 `<available_skills>` 信封追加完整替换；删除所有 skill 时，会追加一个空信封，并明确指示不得使用旧名称。模板的结尾一句是防止双重加载的规则：用户显式的手势边界（下文的 pre-step 监听器）会把同一份 `renderSkillContent` 输出（共享自 `@deepseek-ai/dsh-skill`）内联注入，目录则告诉模型遵循该块，而不是再经工具重新加载该 skill；替换目录模板的两个分支——包括清空后的目录——都携带同一句话。
+如果存在模型可调用 skill，且可见的正是这个 `skill` 工具，agent 会在第一个请求之前收到下方目录模板，其中包含每个已排序 skill 的一条随数据而定的条目。该目录是一条持久的用户角色消息。后续成员关系、描述或可见性的变化会使用同一个 `<available_skills>` 信封追加完整替换；删除所有 skill 时，会追加一个空信封，并明确指示不得使用旧名称。模板的结尾一句是防止双重加载的规则：用户显式的手势边界（下文的 pre-step 监听器）会把同一份 `renderSkillContent` 输出（共享自 `@deepseek-ai/dsh-skill`）内联注入，目录则告诉模型遵循该块，而不是再经工具重新加载该 skill；替换目录模板的两个分支——包括清空后的目录——都携带同一条防双重加载规则。
 
 ##### Skill 目录模板
 
@@ -63,7 +71,7 @@ A user may also invoke a skill directly; its <skill_content> block then appears 
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
 模型会看到生成的 [`skill` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-skill)。
 
@@ -77,7 +85,7 @@ A user may also invoke a skill directly; its <skill_content> block then appears 
 
 ### 工具结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
 成功调用使用下方结果模板，以及提供方管理的资源指引、目录资源指引、URL 资源指引或不透明资源指引。
 
@@ -133,7 +141,7 @@ Load referenced resources only as needed.
 
 ### 工具错误
 
-#### 模型看到的内容
+#### 模型看到什么
 
 无效或陈旧选择会精确返回 `Error: invalid skill name "<name>"`、`Error: skill "<name>" is unknown or no longer available` 或 `Error: skill "<name>" is not available for model invocation`。提供方抛出的查找文本取决于数据，并套用同一个 `Error: <message>` 包装层。
 
@@ -147,7 +155,7 @@ Load referenced resources only as needed.
 
 ### 用户显式调用注入
 
-#### 模型看到的内容
+#### 模型看到什么
 
 已认领用户消息中任意位置、以空白为界、指名工作区目录中某个用户可调用 skill 的 `/name` token，会把该 skill 的完整 `<skill_content>` 渲染（与上文结果模板完全相同的形态）作为 `user` 角色的指令上下文注入，追加在该步骤所有其他注入之后——背景在前，模型要着手处理的材料在最后。只扫描直接的用户输入，检查在已加载定义上进行，未知名称和用户不可调用的名称保持为普通行文。这是 `disable-model-invocation` skill 唯一的入口，目录和 `skill` 工具永不暴露这类 skill；目录的结尾一句会告诉模型遵循注入块，而不是重新加载它。
 

@@ -8,6 +8,10 @@
 
 只需加载它来替代 `dsh-fs-local`，并同时加载 [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/README.zh.md)，即可完成替换；面向模型的工具（`dsh-tool-fs`）无需改动。工具层把调用会话的模式和 cwd 解析为与 bash 相同的按调用策略，因此两个能力族绝不会约束到不同根目录。
 
+## 概述
+
+`dsh-fs-sandbox` 按各会话的沙箱模式限制模型对文件的写入与编辑，同时保留本地文件系统的读取行为。`read-only` 拒绝所有变更；`workspace-write` 只允许目标位于会话工作区或平台临时根目录内；`danger-full-access` 不限制变更。当会话需要将文件变更限制在工作区内时，使用它代替 `fs-local`，并加载 `ctx.sandboxPolicy`。被拒绝的操作返回 `FS_SANDBOX_DENIED`，文件系统工具会显示当前模式和同轮次升级提示。
+
 ## 围栏
 
 按调用策略携带有效模式（会话覆盖值或升级授权）和调用会话不可变的 cwd 根目录；只有没有会话的调用才回退到部署策略：
@@ -18,9 +22,13 @@
 
 ## 威胁模型：策略围栏，而非内核边界
 
-围栏是在可信代码中检查模型控制的路径。操作本身属于 seam（open、rename），只有目标路径不可信，因此「规范化后检查包含关系」就是该接口的完整答案。这与 `code-runtime` 的立场相同：提供约束，但不是安全边界。不可信代码的内核级隔离仍由 `ctx.shell` 负责（[`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)）。剩余 TOCTOU（在包含关系复查与系统调用之间替换祖先符号链接）会通过写入前立即重新规范化来缩小，并为该威胁模型所接受；内核严密边界需要 `openat2` 一类原语，其可移植性成本在此不值得。
+围栏是在可信代码中检查模型控制的路径。操作本身属于 seam（open、rename），只有目标路径不可信，因此「规范化后检查包含关系」就是该接口的完整答案。这与 `ptc-runtime` 的立场相同：提供约束，但不是安全边界。不可信代码的内核级隔离仍由 `ctx.shell` 负责（[`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)）。剩余 TOCTOU（在包含关系复查与系统调用之间替换祖先符号链接）会通过写入前立即重新规范化来缩小，并为该威胁模型所接受；内核严密边界需要 `openat2` 一类原语，其可移植性成本在此不值得。
 
 拒绝是结构化 `FsError`（`FS_SANDBOX_DENIED`，携带有效模式），不通过 stderr 文本推断（不同于 bash 的内核拒绝），因为进程内围栏准确知道自己拒绝了什么。面向模型的 `[sandbox: file access denied under <mode> mode]` 标记以及唯一一次获批的更宽权限重试位于工具层（`dsh-tool-fs`），与 bash 完全相同。见[跨能力族 fs 沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md)。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。围栏是针对注入策略的逐次调用模式检查；存储机制继承而来，文件系统保持权威。
 
 ## 模型体验
 
@@ -28,11 +36,11 @@
 
 #### 模型看到的内容
 
-策略归属方会贡献与具体能力无关的 `sandbox:policy` 上下文。作为间接影响，`dsh-tool-fs` 会把本后端的 `FS_SANDBOX_DENIED` 拒绝渲染为 `[sandbox: file access denied under <mode> mode]` 标记和同轮次升级提示。
+策略归属方贡献与具体能力无关的 `sandbox:policy` 上下文。作为间接影响，`dsh-tool-fs` 会把本后端的 `FS_SANDBOX_DENIED` 拒绝渲染为 `[sandbox: file access denied under <mode> mode]` 标记和同轮次升级提示。
 
 #### Token 影响
 
-该后端挂载期间，当前策略条款会增加一条简短的运行时上下文消息；拒绝则会把有界标记和升级提示追加到对话历史。
+该后端挂载期间，当前策略条款会增加一条简短的运行时上下文消息；拒绝则会把有界标记与升级提示追加到对话历史。
 
 #### KV Cache 影响
 

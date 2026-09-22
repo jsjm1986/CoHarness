@@ -224,7 +224,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     const workspace = await scaffold.ctx.workspaceRegistry.resolveByPath(scaffold.workspaceCwd)
     if (workspace === undefined) throw new Error('GUI did not register the existing project directory')
     await workspace.attachSession(SessionId(SEED_ID))
-    const header = (await scaffold.ctx.sessionPersistence.list())
+    const header = (await scaffold.ctx.sessionPersistence.listHeaders())
       .find(candidate => candidate.id === SEED_ID)
     if (header === undefined) throw new Error('seeded Session log disappeared before deletion')
     const logLocation = scaffold.ctx.sessionPersistence.locate(header)
@@ -606,15 +606,18 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // without a confirmation dialog (non-destructive: log + accounting stay).
     await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
     await page.getByRole('menuitem', { name: 'Archive session' }).click()
-    // The row disappears on the archive-set echo, and with it the Ungrouped
-    // bucket: blank sessions start inside their workspace group, so the stray
-    // was the bucket's only member.
-    await expect.poll(() => page.getByText(rowTitle, { exact: true }).count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(() => page.getByText('Independent sessions', { exact: true }).count(), { timeout: 10_000 }).toBe(0)
+    // The row disappears on the archive-set echo; the bucket itself may
+    // keep the provisional New Session a prior adoption left selected, so
+    // what must vanish is the archived row, not the group.
+    await expect.poll(async () => {
+      const bucket = page.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
+      return await bucket.locator('[role="treeitem"]').filter({ hasText: rowTitle }).count()
+    }, { timeout: 10_000 }).toBe(0)
     // Durable on the host: the registry-global set carries the id while the
     // session log itself stays in persistence untouched.
-    expect([...scaffold.ctx.workspaceRegistry.archivedSessionIds]).toEqual([SessionId(SEED_ID)])
-    expect((await scaffold.ctx.sessionPersistence.list()).map(header => header.id)).toContain(SessionId(SEED_ID))
+    await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds], { timeout: 10_000 })
+      .toEqual([SessionId(SEED_ID)])
+    expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id)).toContain(SessionId(SEED_ID))
     // Reload: the hidden state is rebuilt from the workspace.list baseline.
     const warningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })

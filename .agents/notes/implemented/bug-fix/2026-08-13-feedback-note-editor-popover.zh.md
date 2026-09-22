@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-消息反馈的 Web 界面（[#2262](https://github.com/deepseek-harness/deepseek-harness/pull/2262)）把控件贡献给 `conversation.chat.assistant-actions`，该槽位渲染在已定稿助手消息共享的 IconActions 行内。那一行是单条固定高度的 `flex` 线，`flex-wrap` 保持初始值 `nowrap` 且 `height: 28px`，按 28px 图标加一个时钟来定尺寸。备注编辑器作为一个内联组挂进去，内含 `width: 260px` 的 textarea 加 Save 与 Cancel。
+消息反馈的 Web 界面（[#2262](https://github.com/deepseek-ai/deepseek-harness/pull/2262)）把控件贡献给 `conversation.chat.assistant-actions`，该槽位渲染在已定稿助手消息共享的 IconActions 行内。那一行是单条固定高度的 `flex` 线，`flex-wrap` 保持初始值 `nowrap` 且 `height: 28px`，按 28px 图标加一个时钟来定尺寸。备注编辑器作为一个内联组挂进去，内含 `width: 260px` 的 textarea 加 Save 与 Cancel。
 
 一个 260px 输入框加两个按钮在任何窗口尺寸下都装不进那条线。对着已构建产物实测，编辑器打开时该行的可滚动溢出在 1680px 视口下是 168px，在 600px 下是 444px——这个缺陷从来不是窄窗口的边缘情况，在全屏桌面下就已存在。flex 溢出会溢出到线的末端之外，因此按 flex 顺序排在编辑器之后的项被挤出会话列：branch 操作在 600px 时离开列，时钟及其运行时长/TTFT/吞吐读数在 900px 时离开列。这些控件在不可见的同时仍可命中测试，所以没有任何行为断言发现它；已交付的 e2e 覆盖评分、备注、reload 与撤回，而 24 个 UI 快照是与宽度无关的 DOM。
 
@@ -24,7 +24,7 @@ Status: implemented
 
 ## Alternatives considered
 
-**行内展开：编辑器通过整行 flex basis 独占一行，并让行允许换行** — 这是本分支最初交付、在此否决的做法。它修好了几何（行在 1680px 到 600px 报告零溢出），但有可见代价：branch 与末尾时钟在编辑器打开时换行到编辑器下方，行占三行，交互与行本就占满的横向条带争空间。这一代价正是 [#2561](https://github.com/deepseek-harness/deepseek-harness/issues/2561) 在真实使用中反馈的问题——编辑器展开后这一行读起来是错位的——并提出改用 chat 界面已有的弹窗。浮层把编辑器完全移出行，因此无论编辑器是否打开，操作条与键盘 Tab 顺序都不受影响。
+**行内展开：编辑器通过整行 flex basis 独占一行，并让行允许换行** — 这是本分支最初交付、在此否决的做法。它修好了几何（行在 1680px 到 600px 报告零溢出），但有可见代价：branch 与末尾时钟在编辑器打开时换行到编辑器下方，行占三行，交互与行本就占满的横向条带争空间。这一代价正是 [#2561](https://github.com/deepseek-ai/deepseek-harness/issues/2561) 在真实使用中反馈的问题——编辑器展开后这一行读起来是错位的——并提出改用 chat 界面已有的弹窗。浮层把编辑器完全移出行，因此无论编辑器是否打开，操作条与键盘 Tab 顺序都不受影响。
 
 **不 portal 出列的绝对定位浮层** — 否决：会话列是 `overflow-y: auto` 的滚动容器，因此在列内布局的面板会被滚动边缘裁掉，且不随列滚动而跟住消息。portal 到 `document.body` 并从触发按钮矩形做固定定位，才让浮动面板可行，正如 `Menu` 的 portal 模式与 subagent catalog popover 已然做到的那样。
 

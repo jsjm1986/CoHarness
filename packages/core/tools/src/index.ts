@@ -8,50 +8,44 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { AnonymousEntries, NamedEntries, ScopedLayers, scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey, ScopeLayer, Scoped } from '@deepseek-ai/dsh-scope'
-import type { CallId, ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm'
-import { assertNever, deepFreeze, HarnessError } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId, ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { snapshotJsonValue } from '@deepseek-ai/dsh-session'
-import type { JsonValue, UserMessage } from '@deepseek-ai/dsh-session'
-import type { ToolProviderResult } from '@deepseek-ai/dsh-system-prompt'
-import type { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
+import type { UserMessage } from '@deepseek-ai/dsh-session'
+import { assertNever, deepFreeze, snapshotJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
+import type { PromptSection, ToolProviderResult } from '@deepseek-ai/dsh-system-prompt'
+import type { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 // Type-only: makes `ctx.get('approval')` resolve to the ApprovalService
 // augmentation. The seam stays optional at runtime — see `serviceAsk`.
 import type {} from '@deepseek-ai/dsh-user-approval'
 import type { ToolCallView, ToolResultView } from './presentation.ts'
 import { assertSupportedJsonSchema, validateJsonSchemaValue } from './json-schema.ts'
 import type { JsonSchemaNode } from './json-schema.ts'
-import { createRunCodeTool, RUN_CODE_NAME, SDK_SECTION_ORDER } from './ptc.ts'
-import type { CodeSdkLanguage } from './ptc.ts'
+import { createRunCodeTool, RUN_CODE_NAME } from './ptc.ts'
+import type { PtcSdkLanguage } from './ptc.ts'
 import { renderToolsSdk } from './ts-types.ts'
 import type { ToolSdkSchema } from './ts-types.ts'
 import { renderToolsSdkPy } from './py-types.ts'
 
 /**
  * Language → SDK-section renderer. The registry looks up the loaded
- * `ctx.codeRuntime.language` in this table when assembling the `tools:sdk`
+ * `ctx.ptcRuntime.language` in this table when assembling the `tools:sdk`
  * section under a non-native mode; a runtime whose language is not a key
  * fails the assembly loudly (same idiom as `toolOrder` violations). Adding a
- * new backend language is three parallel edits — a {@link CodeSdkLanguage}
+ * new backend language is three parallel edits — a {@link PtcSdkLanguage}
  * member, an entry here, and a `RUN_CODE_FLAVORS` entry in `ptc.ts` for
  * its `run_code` schema strings — plus the renderer function this table points
  * at. The `satisfies` clause pins this table's key set to that union, which
  * the flavor table is checked against too, so any of the three left out is a
  * typecheck failure. What no check reaches is the prose that names the values
- * instead of deriving them: the seam's `dsh-code-runtime` README pair, its
- * `CodeRuntime.language` JSDoc, and `docs/subsystems/code-runtime.md`
+ * instead of deriving them: the seam's `dsh-ptc-runtime` README pair, its
+ * `PtcRuntime.language` JSDoc, and `docs/subsystems/ptc-runtime.md`
  * with its zh pair, plus this package's own README pair and the
  * {@link Config.mode} JSDoc.
  */
 /**
- * Prompt order of the `code` collapse statement: after the persona and before
- * the 100-199 per-tool guidance band, so the model reads which tools it may
- * call before it reads what each one is for.
- */
-const COLLAPSE_SECTION_ORDER = 99
-
-/**
- * The model-facing statement of the `code` collapse. Names the consequence
+ * The model-facing statement of the `ptc` collapse. Names the consequence
  * (the call fails) and the route (inside the program), because a rule the
  * model can only discover by being denied is one it corrects too late.
  */
@@ -60,7 +54,7 @@ const PTC_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can call
 const SDK_RENDERERS: Record<string, (schemas: ToolSdkSchema[]) => string> = {
   typescript: renderToolsSdk,
   python: renderToolsSdkPy,
-} satisfies Record<CodeSdkLanguage, (schemas: ToolSdkSchema[]) => string>
+} satisfies Record<PtcSdkLanguage, (schemas: ToolSdkSchema[]) => string>
 
 export {
   defineTool,
@@ -98,7 +92,6 @@ export {
   type JsonSchemaScalar,
 } from './json-schema.ts'
 
-export type { JsonValue } from '@deepseek-ai/dsh-session'
 export type { PtcDispatchEventData, PtcDispatchStartEventData } from './types.ts'
 
 export { CodeRunFailedError, RUN_CODE_NAME } from './ptc.ts'
@@ -141,7 +134,8 @@ declare module '@deepseek-ai/cordis' {
 
   interface Events {
     /**
-     * Allow, deny, or ask before dispatch. `next()` delegates to allow; missing
+     * Allow, deny, cancel, or ask before dispatch. `next()` delegates to allow;
+     * `cancel` selects the canonical pre-dispatch cancellation result, and missing
      * approval support turns `ask` into denial. Async gates must observe
      * `exec.signal`; the registry rechecks cancellation after they settle but
      * never abandons their promise.
@@ -294,9 +288,10 @@ export interface ToolResult {
   /** Whether the call failed. */
   isError: boolean
   /**
-   * The tool-private presentation payload projected by its output declaration
-   * and threaded verbatim from the `tool/result` event. Absent when the tool
-   * declared no projector or the call was nested under a composite transport.
+   * The tool-private presentation payload projected by its output declaration.
+   * It is persisted verbatim on `tool/result` for Host presenters and Client
+   * renderers to narrow independently. Absent when the tool declared no
+   * projector or the call was nested under a composite transport.
    */
   meta?: JsonValue
 }
@@ -312,13 +307,15 @@ export type ToolExecutionToken = symbol & { readonly [toolExecutionTokenBrand]: 
  * callers do not choose that token.
  */
 export interface ToolExecutionInput {
-  readonly callId: CallId
+  readonly callId: ToolCallId
   /**
    * Root model-requested call owning this execution tree. Callers omit it for
    * a root execution; nested dispatchers propagate the enclosing value.
    */
-  readonly rootCallId?: CallId
+  readonly rootCallId?: ToolCallId
   readonly name: string
+  /** Binding-time tool schema for a PTC inner call; frozen by its producer and never logged. */
+  readonly schema?: ToolSchema
   /** Losslessly JSON-serializable parsed arguments (tools validate their own schema). */
   readonly arguments: unknown
   /** The agent on whose behalf the call runs (set by the agent loop). */
@@ -359,8 +356,8 @@ export interface PtcDispatchLog {
   readonly exec: ToolExecution
   /** The calling agent (the scope routing key and the spill owner), when the outer call has one. */
   readonly agent?: Agent
-  /** Deterministic sub-call id (`<parent>:ptc:<n>`). */
-  readonly subCallId: CallId
+  /** Opaque sub-call id; new calls use `<parent>:ptc:<n>`. */
+  readonly subCallId: ToolCallId
   /** The dispatched sub-tool name. */
   readonly name: string
   /** Whether the sub-call settled as an error. */
@@ -378,7 +375,7 @@ export interface PtcDispatchLog {
  */
 export interface ToolExecution extends ToolExecutionInput {
   /** Root model-requested call, resolved for every root and nested execution. */
-  readonly rootCallId: CallId
+  readonly rootCallId: ToolCallId
   /** Registry-assigned identity shared with nested calls only as their opaque `parent` token. */
   readonly token: ToolExecutionToken
 }
@@ -461,9 +458,11 @@ export interface ToolRuntimeScheduler {
 
 /**
  * Scheduler entry point omitted from the generated named service API.
+ * The process-global registry keeps the slot stable across independently
+ * bundled or installed copies of this package.
  * @internal
  */
-export const TOOL_RUNTIME_SCHEDULER: unique symbol = Symbol('@deepseek-ai/dsh-tools.scheduler')
+export const TOOL_RUNTIME_SCHEDULER: unique symbol = Symbol.for('@deepseek-ai/dsh-tools.scheduler')
 
 /** Canonical error code for cancellation after a tool body was invoked. */
 export const TOOL_ABORTED = 'ABORTED'
@@ -475,6 +474,8 @@ export const TOOL_ABORTED_BEFORE_DISPATCH = 'ABORTED_BEFORE_DISPATCH'
 export interface ToolErrorInfo {
   name: string
   code: string
+  /** Optional raw user-facing detail; durable projections preserve it but model-facing content does not include it. */
+  reason?: string
 }
 
 /** Canonical failure detail; internal routing information remains optional. */
@@ -580,14 +581,17 @@ export interface ToolExecutionFailure {
 export type ToolExecutionResult = ToolExecutionSuccess | ToolExecutionFailure
 
 /**
- * Pre-dispatch decision. `allow` runs the call; `deny` materializes an error;
- * `ask` runs only after an approval service returns `allowed-once` and otherwise
+ * Pre-dispatch decision. `allow` runs the call; `deny` materializes its
+ * model-facing reason and optional structured error identity; `cancel` selects
+ * the canonical cancellation result without presenting a policy denial; `ask`
+ * runs only after an approval service returns `allowed-once` and otherwise
  * denies. Input rewriting is excluded because arguments are already logged and
  * presented.
  */
 export type PreToolDecision =
   | { kind: 'allow' }
-  | { kind: 'deny'; reason: string }
+  | { kind: 'deny'; reason: string; info?: ToolErrorInfo }
+  | { kind: 'cancel' }
   | { kind: 'ask'; reason?: string }
 
 /**
@@ -650,14 +654,6 @@ function errorInfo(error: unknown): ToolErrorInfo | undefined {
 /** How the registry presents its tools to the model (see {@link Config.mode}). */
 export type ToolPresentationMode = 'native' | 'ptc' | 'both'
 
-/** Accepted spelling for presentation declarations: `code` resolves to `ptc`. */
-export type ToolPresentationModeInput = ToolPresentationMode | 'code'
-
-/** Normalize the canonical PTC spelling while retaining the historical alias. */
-function resolveToolPresentationMode(mode: ToolPresentationModeInput): ToolPresentationMode {
-  return mode === 'code' ? 'ptc' : mode
-}
-
 /** Plugin config: how the registered tools are presented to the model. */
 export interface Config {
   /**
@@ -665,13 +661,12 @@ export interface Config {
    * sends only `run_code` plus a generated SDK prompt and collapses the
    * executor to the same surface (a model-direct call may only name
    * `run_code`; `run_code` SDK sub-dispatches keep every visible tool); `both`
-   * sends both forms; legacy `code` input is accepted as an alias. PTC modes
-   * require a `ctx.codeRuntime` whose `language`
+   * sends both forms. PTC mode requires a `ctx.ptcRuntime` whose `language`
    * has a registered SDK renderer (TypeScript or Python) and fail prompt
-   * assembly when it is absent or has no renderer. Under `ptc` (or `code`),
-   * native names in `toolOrder` are invalid.
+   * assembly when it is absent or has no renderer. Under `ptc`, native names
+   * in `toolOrder` are invalid.
    */
-  mode?: ToolPresentationModeInput
+  mode?: ToolPresentationMode
   /**
    * Concurrency cap for a `run_code` program's overlapping sub-calls
    * (default 10, the loop scheduler's own default). Sub-calls follow the
@@ -680,13 +675,6 @@ export interface Config {
    * restores strictly serial dispatch. Must be a positive integer.
    */
   maxParallelSubCalls?: number
-  /**
-   * Maximum number of outstanding `run_code` sub-calls retained by one
-   * program, including queued, running, and model-order committing calls.
-   * Calls beyond this bound fail immediately so a fast producer cannot grow
-   * an unbounded in-memory queue. Must be a positive integer.
-   */
-  maxPendingSubCalls?: number
 }
 
 /**
@@ -796,15 +784,6 @@ function resolveMaxParallelSubCalls(value: number | undefined): number {
   return maxParallelSubCalls
 }
 
-/** Resolve the per-run outstanding sub-call bound at the owning config boundary. */
-function resolveMaxPendingSubCalls(value: number | undefined): number {
-  const maxPendingSubCalls = value ?? 100
-  if (!Number.isInteger(maxPendingSubCalls) || maxPendingSubCalls < 1) {
-    throw new Error('maxPendingSubCalls must be a positive integer')
-  }
-  return maxPendingSubCalls
-}
-
 /**
  * Tool registry and execution pipeline. Scoped registrations shadow globals;
  * one visibility resolver feeds presentation, lookup, and dispatch.
@@ -813,12 +792,8 @@ export class ToolRuntime extends Service {
   static inject = ['systemPrompt']
 
   static Config: z<Config> = z.object({
-    mode: z.transform(
-      z.union(['native', 'code', 'ptc', 'both'] as const),
-      mode => mode === 'code' ? 'ptc' : mode,
-    ).default('native'),
+    mode: z.union(['native', 'ptc', 'both'] as const).default('native'),
     maxParallelSubCalls: z.natural().min(1).default(10),
-    maxPendingSubCalls: z.natural().min(1).default(100),
   })
 
   /** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
@@ -844,11 +819,10 @@ export class ToolRuntime extends Service {
   /** Presentation for scopes that declare none; {@link presentAs} shadows it per scope. */
   private readonly defaultMode: ToolPresentationMode
   private readonly maxParallelSubCalls: number
-  private readonly maxPendingSubCalls: number
   /**
    * Reserved presentation transport, kept outside the filterable registration
    * layers. Built on first need rather than at construction: which agents run
-   * a PTC presentation is not known when the service is constructed, and the
+   * a PTC mode is no longer known when the service is constructed, and the
    * transport is stateless beyond its closures over `this`.
    */
   private ptcTransport: ToolDefinition | undefined
@@ -857,9 +831,8 @@ export class ToolRuntime extends Service {
     super(ctx, 'tools')
     // The schema already defaulted an omitted mode; the ?? narrows the
     // optional-input type for direct (non-Loader) construction in tests.
-    this.defaultMode = resolveToolPresentationMode(config.mode ?? 'native')
+    this.defaultMode = config.mode ?? 'native'
     this.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls)
-    this.maxPendingSubCalls = resolveMaxPendingSubCalls(config.maxPendingSubCalls)
     ctx.systemPrompt.tools(context => this.wireSchemas(context.scope))
     if (this.defaultMode !== 'native') {
       ctx.systemPrompt.section(this.collapseSection())
@@ -868,25 +841,24 @@ export class ToolRuntime extends Service {
   }
 
   /**
-   * The prompt statement of the `code` executor collapse, registered wherever
-   * {@link sdkSection} is and rendering empty outside an effective `code`.
+   * The prompt statement of the `ptc` executor collapse, registered wherever
+   * {@link sdkSection} is and rendering empty outside an effective `ptc`.
    *
    * Every tool contributes its own guidance section naming its tool, none of
-   * them qualify how that tool is reached, and they all render before the SDK
-   * (orders 100-199 against {@link SDK_SECTION_ORDER}). Without this the model
-   * reads a catalog of tools it is told to use and no statement that only
-   * `run_code` may be called, so it emits a native call, receives
-   * `UNKNOWN_TOOL` for a tool the prompt just declared, and concludes the
-   * deployment is inconsistent. {@link COLLAPSE_SECTION_ORDER} places the rule
-   * before that guidance rather than after it.
+   * them qualify how that tool is reached, and they all render before the SDK.
+   * Without this the model reads a catalog of tools it is told to use and no
+   * statement that only `run_code` may be called, so it emits a native call,
+   * receives `UNKNOWN_TOOL` for a tool the prompt just declared, and concludes
+   * the deployment is inconsistent. Its order places the rule before that
+   * guidance rather than after it.
    *
    * `both` renders empty: native calls do execute there, so the rule is false.
    * @returns the section registration.
    */
-  private collapseSection(): { name: string; order: number; text: (context: { scope?: ScopeKey }) => string } {
+  private collapseSection(): PromptSection {
     return {
       name: 'tools:ptc-only',
-      order: COLLAPSE_SECTION_ORDER,
+      order: this.ctx.systemPrompt.getSectionOrder('PTC_ONLY'),
       // The SAME predicate the executor denies by, so the prompt cannot state
       // a rule the registry does not enforce (see `collapses`).
       text: context => this.modeFor(context.scope) === 'ptc' ? PTC_ONLY_INSTRUCTION : '',
@@ -894,28 +866,29 @@ export class ToolRuntime extends Service {
   }
 
   /**
-   * The generated-SDK prompt section, registered globally by a PTC
+   * The generated-SDK prompt section, registered globally by a PTC mode
    * deployment and per scope by {@link presentAs}.
    *
    * The body regenerates from the CALLING scope, and renders empty for an
-   * agent presenting natively — an agent that opted out under a PTC
+   * agent presenting natively — an agent that opted out under a PTC mode
    * deployment still sees the global registration, and an empty section is
    * dropped from the rendered prompt.
    * @returns the section registration.
    */
-  private sdkSection(): { name: string; order: number; text: (context: { scope?: ScopeKey }) => string } {
+  private sdkSection(): PromptSection {
     return {
       name: 'tools:sdk',
-      order: SDK_SECTION_ORDER,
+      order: this.ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
+      interpolate: false,
       // Regenerate from the calling scope's visible tools in stable order.
       text: (context) => {
         const mode = this.modeFor(context.scope)
         if (mode === 'native') return ''
-        const runtime = this.requireCodeRuntime(mode)
+        const runtime = this.requirePtcRuntime(mode)
         // Own-property read: a language like `toString`/`constructor` would
         // otherwise resolve an inherited Object.prototype member as a renderer.
         const render = SDK_RENDERERS[runtime.language]
-        /* v8 ignore next -- requireCodeRuntime rejects an unknown language before this runs. */
+        /* v8 ignore next -- requirePtcRuntime rejects an unknown language before this runs. */
         if (render === undefined) throw new Error(`dsh-tools: no SDK renderer for ${runtime.language}`)
         return render(this.sdkSchemas(context.scope))
       },
@@ -950,15 +923,20 @@ export class ToolRuntime extends Service {
    * and only for scopes whose mode actually presents it.
    * @returns the shared transport definition.
    */
-  private requireCodeTransport(): ToolDefinition {
+  private requirePtcTransport(): ToolDefinition {
     this.ptcTransport ??= createRunCodeTool(this, {
-      requireRuntime: () => this.requireCodeRuntime(this.defaultMode),
+      requireRuntime: () => this.requirePtcRuntime(this.defaultMode),
+      peekApprover: () => this.ctx.get('approval'),
+      resolveSandboxPolicy: (exec) => {
+        const policy = this.ctx.get('sandboxPolicy')
+        if (policy === undefined) throw new Error('dsh-tools: confined PTC runtime requires sandboxPolicy')
+        return policy.resolve(exec.agent === undefined ? {} : { session: exec.agent.session })
+      },
       // The language-aware description/parameters getters read the runtime
       // without demanding one, so a native-default process can still project
-      // the transport for an agent that chose PTC.
-      peekRuntime: () => this.ctx.get('codeRuntime'),
+      // the transport for an agent that chose code.
+      peekRuntime: () => this.ctx.get('ptcRuntime'),
       maxParallel: this.maxParallelSubCalls,
-      maxPending: this.maxPendingSubCalls,
       shapeDispatchLog: dispatch => this.shapeDispatchLog(dispatch),
     })
     return this.ptcTransport
@@ -970,17 +948,16 @@ export class ToolRuntime extends Service {
    * declaration covers every agent joined under it.
    *
    * Scoped only, and one declaration per scope: this is how an agent preset
-   * composes PTC agents beside native ones in the same process, and a
+   * composes PTC mode agents beside native ones in the same process, and a
    * process-global override would be the `mode` config field instead.
    * @param mode - the presentation the covered agents' models see.
    * @returns the exact disposer that restores the deployment default.
    */
-  presentAs(mode: ToolPresentationModeInput): () => void {
+  presentAs(mode: ToolPresentationMode): () => void {
     const ctx = this.ctx
     if (scopeOf(ctx) === undefined) {
       throw new Error('tools.presentAs() requires a scoped context (agent.ctx): a context-global presentation is the `mode` config field on the tools row')
     }
-    const resolvedMode = resolveToolPresentationMode(mode)
     const dispose = ctx.effect(function* (this: ToolRuntime) {
       yield this.layers.effect(
         ctx,
@@ -988,21 +965,21 @@ export class ToolRuntime extends Service {
           if (layer.mode !== undefined) {
             throw new Error(`tools.presentAs("${mode}") conflicts with "${layer.mode}" already declared for this scope; one composition selects one presentation`)
           }
-          layer.mode = resolvedMode
+          layer.mode = mode
           return () => { layer.mode = undefined }
         },
         { label: 'tools.presentAs()' },
       )
       // The SDK and collapse sections are per scope for the same reason the
-      // mode is. Under a deployment that already defaults to PTC this
+      // mode is. Under a deployment that already defaults to PTC mode this
       // shadows the global registration with an identical body, which costs
       // nothing and keeps one rule instead of a case analysis.
-      if (resolvedMode !== 'native') {
+      if (mode !== 'native') {
         yield ctx.systemPrompt.section(this.collapseSection())
         yield ctx.systemPrompt.section(this.sdkSection())
       }
     }.bind(this), 'tools.presentAs()')
-    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous composite teardown; direct return preserves disposer identity
+    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous composite teardown
     return dispose
   }
 
@@ -1022,7 +999,7 @@ export class ToolRuntime extends Service {
     // flavor-table guard would otherwise surface first. This keeps the
     // renderer-table rejection the canonical assembly-time error for a
     // language with no SDK renderer.
-    this.requireCodeRuntime(mode)
+    this.requirePtcRuntime(mode)
     const schemas = [...view.visible.values()].map(definition => this.schemaOf(definition, false))
     if (mode === 'ptc') {
       return {
@@ -1034,25 +1011,23 @@ export class ToolRuntime extends Service {
   }
 
   /**
-   * Resolve the code runtime or throw the actionable misconfiguration error.
+   * Resolve the PTC runtime or throw the actionable misconfiguration error.
    * Read at use time (assembly / run_code execution), NOT via static
    * `inject`: an inject entry would hold `ctx.tools` — and every tool plugin
-   * behind it — hostage to a code runtime existing even under `mode:
-   * 'native'` (the loop's optional-backend idiom, same as
-   * `sessionPersistence`).
+   * behind it — hostage to a PTC runtime existing even under `mode:
+   * 'native'`.
    *
    * Assembly and `run_code` execution read separately, so the language is not
    * bound to a request. Harmless while one published backend exists — both
    * reads return the same flavor — but a reload that swapped in a second
    * language between them would hand a program written against one SDK to the
    * other. Binding it is deferred until a second backend ships (the first
-   * point it is testable); rationale in the
-   * [language-dispatch note](../../../../.agents/notes/implemented/feature/2026-07-31-ptc-language-dispatch.md).
+   * point it is testable).
    */
-  private requireCodeRuntime(mode: ToolPresentationMode): CodeRuntime {
-    const runtime = this.ctx.get('codeRuntime')
+  private requirePtcRuntime(mode: ToolPresentationMode): PtcRuntime {
+    const runtime = this.ctx.get('ptcRuntime')
     if (!runtime) {
-      throw new Error(`dsh-tools: mode "${mode}" requires a code runtime — load a ctx.codeRuntime implementation (e.g. @deepseek-ai/dsh-code-runtime-worker-thread) or set tools mode to "native"`)
+      throw new Error(`dsh-tools: mode "${mode}" requires a PTC runtime — load a ctx.ptcRuntime implementation (e.g. @deepseek-ai/dsh-ptc-runtime-node) or set tools mode to "native"`)
     }
     if (!Object.hasOwn(SDK_RENDERERS, runtime.language)) {
       const known = Object.keys(SDK_RENDERERS).map(name => JSON.stringify(name)).join(', ')
@@ -1081,7 +1056,7 @@ export class ToolRuntime extends Service {
       && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
       throw new TypeError(`tool "${name}" timeoutMs must be a positive finite number`)
     }
-    // Reserved unconditionally: any agent may select PTC for itself,
+    // Reserved unconditionally: any agent may select a code mode for itself,
     // so a name free to take under the deployment default would become a
     // collision the moment a preset mounted.
     if (name === RUN_CODE_NAME) {
@@ -1220,7 +1195,7 @@ export class ToolRuntime extends Service {
     // changes. Per scope: a native agent must not find `run_code` in its
     // dispatch table because some other agent in the process presents it.
     if (this.modeFor(scope) !== 'native') {
-      visible.set(RUN_CODE_NAME, this.requireCodeTransport())
+      visible.set(RUN_CODE_NAME, this.requirePtcTransport())
     }
     return { visible, knownNames, restrictableNames }
   }
@@ -1241,7 +1216,7 @@ export class ToolRuntime extends Service {
   /**
    * Resolve the definition that MAY EXECUTE for a call, applying the mode
    * collapse at the operation boundary that owns it. The registry view
-   * (`get`) is presentation-agnostic; here a MODEL-DIRECT call under `code`
+   * (`get`) is presentation-agnostic; here a MODEL-DIRECT call under `ptc`
    * may only name the reserved `run_code` transport, while a nested
    * sub-dispatch (a `parent` token set — the `run_code` SDK calling a tool
    * it bound) may call any visible tool. Denial surfaces as `UNKNOWN_TOOL`
@@ -1268,7 +1243,7 @@ export class ToolRuntime extends Service {
     return [...this.view(scope).visible.values()].map(definition => this.schemaOf(definition, true))
   }
 
-  /** Project visible callable tools onto the generated PTC SDK contract. */
+  /** Project visible callable tools onto the generated PTC mode SDK contract. */
   private sdkSchemas(scope?: ScopeKey): ToolSdkSchema[] {
     return [...this.view(scope).visible.values()]
       .filter(definition => definition.name !== RUN_CODE_NAME)
@@ -1339,13 +1314,13 @@ export class ToolRuntime extends Service {
   }
 
   /**
-   * Whether the `code` mode collapse denies a model-direct call: only the
+   * Whether the `ptc` mode collapse denies a model-direct call: only the
    * reserved `run_code` transport may be named. Nested sub-dispatches (a
    * `parent` token set) bypass the collapse. One home for the
    * security-relevant predicate, shared by {@link resolveExecution} and
    * {@link createExecution} so the two can never drift apart.
    *
-   * Resolved through {@link modeFor}, NOT `defaultMode`: an agent given `code`
+   * Resolved through {@link modeFor}, NOT `defaultMode`: an agent given `ptc`
    * by an agent preset under a native deployment is the composition
    * `dsh-agent-tool-presentation` exists for, and reading the deployment default would
    * leave exactly that agent uncollapsed — announcing one surface while
@@ -1404,7 +1379,7 @@ export class ToolRuntime extends Service {
     const parent = exec.parent
     const signal = exec.signal
     // Distinguish a mode-collapsed call (visible in the scope, denied only by
-    // the `code` collapse) from a genuinely unknown tool. A collapsed call is
+    // the `ptc` collapse) from a genuinely unknown tool. A collapsed call is
     // deterministically denied, so it terminates BEFORE the extensible policy
     // pipeline: pre-execute listeners, approval `ask`, and guards must never
     // observe — or worse, approve — a call that can only fail. An unknown tool
@@ -1421,6 +1396,7 @@ export class ToolRuntime extends Service {
       signal,
       ...agent !== undefined ? { agent } : {},
       ...parent !== undefined ? { parent } : {},
+      ...exec.schema !== undefined ? { schema: exec.schema } : {},
       deferContext(context: UserMessage): void {
         deferredContexts.push(context)
       },
@@ -1509,16 +1485,18 @@ export class ToolRuntime extends Service {
         carrier, 'tools/pre-execute', exec,
         () => Promise.resolve<PreToolDecision>({ kind: 'allow' }),
       )
-      const askResolution: ToolAskResolution = gate.kind === 'ask'
+      const askResolution = gate.kind === 'ask'
         ? await this.serviceAsk(exec, gate)
         : { decision: gate, approvalCancelled: false }
       const { decision } = askResolution
       if (this.callerCancelled(exec) && askResolution.approvalCancelled) {
         return await next({ kind: 'post-result', exec, result: toolAbortedBeforeDispatchResult() })
       }
-      const denialReason = decision.kind === 'allow'
-        ? this.guardReason(exec)
-        : decision.reason
+      if (decision.kind === 'cancel') {
+        return await next({ kind: 'post-result', exec, result: toolAbortedBeforeDispatchResult() })
+      }
+      const denialReason = decision.kind === 'allow' ? this.guardReason(exec) : decision.reason
+      const denialInfo = decision.kind === 'deny' ? decision.info : undefined
       if (denialReason !== undefined) {
         return await next({
           kind: 'post-result',
@@ -1526,7 +1504,7 @@ export class ToolRuntime extends Service {
           result: this.materializeFinalResult({
             content: [{ type: 'text', text: `Error: ${denialReason}` }],
             isError: true,
-            error: { message: denialReason },
+            error: { message: denialReason, ...denialInfo === undefined ? {} : { info: denialInfo } },
           }),
         })
       }

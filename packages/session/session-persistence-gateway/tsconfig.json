@@ -4,15 +4,30 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../../context/collaboration" },
-    { "path": "../../context/gateway-runtime" },
-    { "path": "../../core/session" },
-    { "path": "../session-format" },
-    { "path": "../session-persistence" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    {
+      "path": "../../context/collaboration"
+    },
+    {
+      "path": "../../context/gateway-runtime"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../session-format"
+    },
+    {
+      "path": "../session-persistence"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    }
   ]
 }

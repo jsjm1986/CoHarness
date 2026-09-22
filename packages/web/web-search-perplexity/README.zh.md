@@ -6,6 +6,10 @@
 
 这是一个**实现**包：它向 `ctx.web` 注册提供方，不拥有该键，也不注册面向模型的工具。与 `@deepseek-ai/dsh-llm-deepseek` 一样，它是函数／命名空间插件（`inject: ['web']`）。OpenAI 兼容协议格式（wire format）是提供方私有细节，并**不**使该提供方依赖 `ctx.llm`。
 
+## 概述
+
+有了 `dsh-web-search-perplexity`，harness 可以通过 Perplexity 搜索 web，一次调用同时获得模型生成的答案与可引用来源。当部署持有 Perplexity API 密钥、并希望获得生成答案时选择它。Perplexity 没有结果数量控制，因此返回的来源会在事后被截断到请求的上限。Perplexity 省略结构化结果元数据时，来源回退为只含 URL 的引用。面向模型的 `web_search` 工具位于 `dsh-tool-web`。
+
 ## 配置
 
 | 配置键 | 默认值 | 含义 |
@@ -28,6 +32,10 @@
 
 `content` ← `choices[0].message.content`（生成答案）。`sources[]` 优先使用结构化 `search_results[]`（`url`、`title`、`snippet`、`publishedAt` ← `date`），否则回退到只含 URL 的 `citations[]` 数组；仅当不存在 `search_results` 时才采取这条回退路径。这些源只携带 `url`，因此 seam 上的 `title`／`snippet`／`publishedAt` 是可选字段。提供方失败以 `WebError` `WEB_PROVIDER_ERROR` 呈现；中止请求以 `WEB_ABORTED` 呈现。HTTP 重定向会在访问 `Location` 指向的目标之前被拒绝，并以 `WEB_PROVIDER_ERROR` 呈现。Perplexity 没有结果数量控制，因此 seam 会强制执行 `maxResults`（截断 `sources[]` 并设置 `truncated`）。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次查询是一次映射为规范化结果的无状态提供方请求；调用之间不保留搜索状态。
+
 ## 模型体验
 
 ### 辅助 Perplexity 请求
@@ -38,7 +46,7 @@
 
 #### Token 影响
 
-每次搜索会产生独立的提供方 token；`maxTokens` 限制生成答案。
+每次搜索都会产生独立的提供方 token；`maxTokens` 限制生成答案。
 
 #### KV Cache 影响
 
@@ -48,11 +56,11 @@
 
 #### 模型看到的内容
 
-通过 [`dsh-tool-web`](../tool-web/README.zh.md)，会话模型会看到生成答案及结构化结果元数据，或只含 URL 的引用。该提供方确切的错误消息为 `Perplexity search aborted`、`Perplexity search request failed: <error>` 和 `Perplexity returned an unprocessable response body: <error>`；HTTP 失败保留提供方消息。错误包装层属于消费方。
+通过 `dsh-tool-web`，会话模型会看到生成答案及结构化结果元数据，或只含 URL 的引用。该提供方确切的错误消息为 `Perplexity search aborted`、`Perplexity search request failed: <error>` 和 `Perplexity returned an unprocessable response body: <error>`；HTTP 失败保留提供方消息。错误包装层属于消费方。
 
 #### Token 影响
 
-注册不会直接产生会话 token。答案与源 token 取决于数据，源数量受服务限制；保留的结果或错误会重复发送，直到发生压缩（compaction）。
+注册不会直接产生会话 token。答案与来源 token 取决于数据，来源数量受服务限制；保留的结果或错误会重复发送，直到发生压缩（compaction）。
 
 #### KV Cache 影响
 

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package provides the browser surface of the open-in-app feature: a Session-header split button whose main button opens the current session's workspace directory (the summary's `cwd`) in the remembered application, and whose chevron lists every catalog application the host probed as installed. Availability, icons, and launches come from the host routes of [`dsh-host-open-in-app`](../../host/open-in-app/README.md); mount the two packages together. A session without a workspace directory, or a host where nothing nameable is installed, renders no button at all.
+This package is the browser surface of open-in-app: a Session-header split button whose main action opens the session's workspace `cwd` in the remembered application and whose chevron lists every catalog application the host probed as installed. Availability, icons, and launches come from [`dsh-host-open-in-app`](../../host/open-in-app/README.md)'s routes; mount the pair together. A session without a workspace directory renders no button.
 
 Mount this only when the Web Host is the user's desktop. In a cloud-hosted deployment the browser and Host are separated from the user's local applications, so the feature must remain disabled until a remote-workspace bridge is provided.
 

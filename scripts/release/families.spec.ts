@@ -29,6 +29,7 @@ function write(path: string, content: string): void {
 function buildFixture(environment: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-release-build-'))
   roots.push(root)
+  write(join(root, 'package.json'), `${JSON.stringify({ version: environment.DSH_CLIENT_VERSION ?? '0.0.1' })}\n`)
   write(join(root, 'apps/web/dist/index.html'), '<main></main>')
   write(join(root, 'packages/client/example/lib/client.js'), 'module.exports = {}\n')
   writeClientBuildRecord(root, environment)
@@ -41,11 +42,33 @@ afterEach(() => {
 })
 
 describe('release families', () => {
-  it('excludes private experimental packages from the dsh release', () => {
+  it('publishes all current experimental packages', () => {
     const members = releaseFamily('dsh').members(resolve(import.meta.dirname, '../..'))
 
-    expect(members.some(member => member.directory.startsWith('packages/experimental/'))).toBe(false)
-    expect(members.map(member => member.name)).not.toContain('@deepseek-ai/dsh-experimental-agent-team')
+    expect(members
+      .filter(member => member.directory.startsWith('packages/experimental/'))
+      .map(member => member.name)).toEqual([
+      '@deepseek-ai/dsh-experimental-agent-team-profile',
+      '@deepseek-ai/dsh-experimental-agent-team',
+      '@deepseek-ai/dsh-experimental-auto-review',
+      '@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp',
+      '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp',
+      '@deepseek-ai/dsh-experimental-browser-use-runtime',
+      '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+      '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
+      '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native',
+      '@deepseek-ai/dsh-experimental-ptc-runtime-python',
+      '@deepseek-ai/dsh-experimental-tool-agent-team',
+    ])
+  })
+
+  it('excludes private applications from the publish set', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-release-private-'))
+    roots.push(root)
+    write(join(root, 'apps/public/package.json'), '{"name":"@deepseek-ai/dsh-public","version":"0.0.1"}\n')
+    write(join(root, 'apps/private/package.json'), '{"name":"@deepseek-ai/dsh-private","version":"0.0.1","private":true}\n')
+
+    expect(releaseFamily('dsh').members(root).map(entry => entry.name)).toEqual(['@deepseek-ai/dsh-public'])
   })
 
   it('bumps private dsh packages without adding release tags', () => {
@@ -106,14 +129,28 @@ describe('release families', () => {
     vi.stubEnv('DSH_CLIENT_COMMIT_HASH', officialEnvironment.DSH_CLIENT_COMMIT_HASH)
     const official = buildFixture(officialEnvironment)
     const defaultBuild = buildFixture({})
+    const missing = join(defaultBuild, 'missing')
+    write(join(missing, 'package.json'), `${JSON.stringify({ version: officialEnvironment.DSH_CLIENT_VERSION })}\n`)
 
     expect(() => { dsh.verifyBuildArtifacts(official) }).not.toThrow()
     expect(() => { dsh.verifyBuildArtifacts(defaultBuild) }).toThrow(/DSH_CLIENT_TITLE/)
-    expect(() => { dsh.verifyBuildArtifacts(join(defaultBuild, 'missing')) }).toThrow(/record.*missing/)
-    expect(() => { vendor.verifyBuildArtifacts(join(defaultBuild, 'missing')) }).not.toThrow()
+    expect(() => { dsh.verifyBuildArtifacts(missing) }).toThrow(/record.*missing/)
+    expect(() => { vendor.verifyBuildArtifacts(missing) }).not.toThrow()
 
     write(join(official, 'packages/client/example/lib/client.js'), 'module.exports = { changed: true }\n')
     expect(() => { dsh.verifyBuildArtifacts(official) }).toThrow(/artifacts differ/)
+  })
+
+  it('assigns alpha and canary dist-tags only to dsh releases', () => {
+    const dsh = releaseFamily('dsh')
+    const vendor = releaseFamily('vendor')
+
+    expect(dsh.distTagForVersion('0.0.2-alpha.1')).toBe('alpha')
+    expect(dsh.distTagForVersion('0.0.2-canary.1')).toBe('canary')
+    expect(dsh.distTagForVersion('0.0.2-rc.1')).toBe('next')
+    expect(dsh.distTagForVersion('0.0.2')).toBeUndefined()
+    expect(vendor.distTagForVersion('4.0.1-alpha.1')).toBe('next')
+    expect(vendor.distTagForVersion('4.0.1-canary.1')).toBe('next')
   })
 
   it('publishes a dependency before its consumer, and orders ties by name', () => {

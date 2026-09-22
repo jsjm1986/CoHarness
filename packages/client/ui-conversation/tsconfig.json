@@ -12,6 +12,81 @@
       "path": "../../attachment/attachment"
     },
     {
+      "path": "../../attachment/userdoc"
+    },
+    {
+      "path": "../connection/tsconfig.client.json"
+    },
+    {
+      "path": "../locale"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../ui-input-trigger"
+    },
+    {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-primitives"
+    },
+    {
+      "path": "../ui-settings"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../userdoc-upload"
+    },
+    {
+      "path": "../../compaction/compaction"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../goal/goal"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/llm-retry"
+    },
+    {
+      "path": "../../llm/token-meter"
+    },
+    {
+      "path": "../../plan/plan-mode"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/session-stats"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../todo/tool-todo"
+    },
+    {
       "path": "../../util/brand"
     },
     {
@@ -21,67 +96,7 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ui-slots"
-    },
-    {
-      "path": "../ui-primitives"
-    },
-    {
-      "path": "../runtime"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
-      "path": "../../interaction/commands"
-    },
-    {
-      "path": "../../session/session-projection"
-    },
-    {
-      "path": "../../session/session-stats"
-    },
-    {
-      "path": "../../llm/token-meter"
-    },
-    {
-      "path": "../../llm/llm-retry"
-    },
-    {
-      "path": "../../plan/plan-mode"
-    },
-    {
-      "path": "../../goal/goal"
-    },
-    {
-      "path": "../../todo/tool-todo"
-    },
-    {
-      "path": "../ui-input-trigger"
-    },
-    {
-      "path": "../ui-layout"
-    },
-    {
-      "path": "../locale"
-    },
-    {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../interaction/permission-presets"
-    },
-    {
-      "path": "../ui-settings"
-    },
-    {
-      "path": "../userdoc-upload"
+      "path": "../../../vendor/schemastery"
     }
   ],
   "exclude": [

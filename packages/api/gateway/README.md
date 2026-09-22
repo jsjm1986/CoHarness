@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host entry provides `ctx.typertGateway`, while `@deepseek-ai/dsh-api-gateway/client` provides `ctx.remote`; both consume the same generated `InvocationDescriptor` contract and leave business selection to API Remotes and transport, request correlation, trust, and response envelopes to Connection.
 
+## Summary
+
+Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host entry provides `ctx.typertGateway`, while `@deepseek-ai/dsh-api-gateway/client` provides `ctx.remote`; both consume the same generated `InvocationDescriptor` contract and leave business selection to API Remotes. Connection carries unary request correlation, trust, and response envelopes, while Gateway owns multiplexed Remote streams.
+
 ## Host service: `TypertGatewayService` (ctx key: `typertGateway`)
 
 `ctx.typertGateway.invoke()` resolves the current descriptor and Cordis Service for each call, validates exact named arguments, resolves registered object or Context identities, invokes the public business method, and validates its result. Business Services extend `TypertRemoteService` and mark methods with `@Remote` or `@RemoteScope` from [`dsh-typert-protocol`](../../typert/protocol/README.md); `bindTypertRemote()` remains available when another base class owns inheritance.
@@ -23,6 +27,10 @@ Each call validates positional inputs, constructs the descriptor's exact named `
 `ctx.remote.$on()` subscribes to one forwarded Host event. Its legal keys are exactly the Host assembly's forwarding selection, and the listener type is the owning package's own Cordis `Events` declaration, so no second signature can drift from it. Each subscription belongs to the calling fiber and disappears with it. Delivery is one-way and follows registration order; a listener that throws is logged and isolated from the remaining listeners, which never affects the frame pump. For the dynamic Cordis events, official `cordis/*` names and their `@deepseek-ai/cordis/*` counterparts form one delivery family: `$dispatch()` merges both names in global registration order, invokes the same listener once when it is registered under both aliases, and preserves repeated registrations under one exact name. `ctx.remote.$dispatch()` belongs to the carrier: the Client half owning the Host frame sink hands each decoded frame over, and an event family nobody subscribes to is dropped. A consumer subscribes and never calls it.
 
 Generated declaration merges provide the TypeScript API through the shared `TypertClientRemote` contract. The Client entry contains no Host Service or Host Cordis interface merge, and method lookup and invocation use ordinary objects and functions rather than a JavaScript Proxy.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Each invocation resolves the live descriptor, business Service, and codecs at call time; the gateway keeps no per-endpoint state that could diverge from the registered contributions.
 
 ## Model Experience
 

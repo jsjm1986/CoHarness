@@ -1,0 +1,173 @@
+## Collapsed
+
+- banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Inspect the protected operation, but" [disabled]
+  - button "Session log":
+    - text: Session log
+    - img
+- button "2 tool calls · 2 intermediate messages" [expanded]:
+  - text: 2 tool calls · 2 intermediate messages
+  - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: Inspect the protected operation, but do not run it unless authorized. {{date}} {{clock}}
+- button "Copy":
+  - img
+- text: Failed
+- button "Tool call Rejected by Auto review":
+  - img
+  - text: Tool call Rejected by Auto review
+- button "Code Catch an Auto-denied inner call":
+  - img
+  - img
+  - text: Code Catch an Auto-denied inner call
+- text: Failed
+- button "Bash Rejected by Auto review":
+  - img
+  - text: Bash Rejected by Auto review
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Auto"': Auto
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- button "1 turns · 2 steps":
+  - img
+  - text: 1 turns · 2 steps
+- separator "Adjust transcript content width"
+
+## Expanded
+
+- banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Inspect the protected operation, but" [disabled]
+  - button "Session log":
+    - text: Session log
+    - img
+- button "2 tool calls · 2 intermediate messages" [expanded]:
+  - text: 2 tool calls · 2 intermediate messages
+  - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: Inspect the protected operation, but do not run it unless authorized. {{date}} {{clock}}
+- button "Copy":
+  - img
+- text: Failed
+- button "Tool call Rejected by Auto review" [expanded]:
+  - img
+  - text: Tool call Rejected by Auto review
+- text: "OUT Tool was not executed. Reason: raw reason"
+- button "Inspect"
+- button "Code Catch an Auto-denied inner call":
+  - img
+  - img
+  - text: Code Catch an Auto-denied inner call
+- text: Failed
+- button "Bash Rejected by Auto review" [expanded]:
+  - img
+  - text: Bash Rejected by Auto review
+- text: "OUT Tool was not executed. Reason: ptc raw reason"
+- button "Inspect"
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Auto"': Auto
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- button "1 turns · 2 steps":
+  - img
+  - text: 1 turns · 2 steps
+- separator "Adjust transcript content width"
+
+## Trajectory
+
+- banner:
+  - tablist:
+    - tab "Chat"
+    - tab "Trajectory" [selected]
+  - navigation "Session hierarchy":
+    - button "Inspect the protected operation, but" [disabled]
+  - button "Session log":
+    - text: Session log
+    - img
+- toolbar "Trajectory toolbar":
+  - button "Use actual duration": Duration
+  - button "Collapse turns": Turns
+  - button "Collapse calls": Calls
+  - img
+  - searchbox "Search trajectory"
+- region "Trajectory timeline"
+- table:
+  - rowgroup:
+    - row "USER, Inspect the protected operation, but do not run it unless authorized.":
+      - cell "Turn 1 USER": USER
+      - cell "Inspect the protected operation, but do not run it unless authorized."
+    - row "Request 1, ASSISTANT, (tool call only)":
+      - 'cell "Request #1 ASSISTANT"':
+        - 'button "Request #1"'
+        - text: ASSISTANT
+      - cell "(tool call only)"
+    - 'row "TOOL, mystery {\"secret\":\"hidden-input\"}"':
+      - cell "TOOL"
+      - 'cell "mystery{\"secret\":\"hidden-input\"} → AUTO_REVIEW_DENIED"'
+    - row "Request 2, ASSISTANT, (tool call only)":
+      - 'cell "Request #2 ASSISTANT"':
+        - 'button "Request #2"'
+        - text: ASSISTANT
+      - cell "(tool call only)"
+    - 'row "TOOL, run_code {\"code\":\"try { await tools.bash({command: \"echo hidden-input-ptc\"}) } catch (error) { return \"denial caught\" }\",\"description\":\"Catch an Auto-denied inner call\"}"':
+      - cell "TOOL"
+      - 'cell "run_code{\"code\":\"try { await tools.bash({command: \"echo hidden-input-ptc\"}) } catch (error) { return \"denial caught\" }\",\"description\":\"Catch an Auto-denied inner call\"} → denial caught"'
+    - 'row "SUBTOOL, bash {\"command\":\"echo hidden-input-ptc\"}" [selected]':
+      - cell "SUBTOOL"
+      - 'cell "bash{\"command\":\"echo hidden-input-ptc\"} → AUTO_REVIEW_DENIED"'
+- complementary "Event details":
+  - separator "Resize event details"
+  - text: SUBTOOL Turn 1 · Step 2
+  - button "Close details"
+  - tablist "Event details":
+    - tab "Summary"
+    - tab "Payload"
+    - tab "Result" [selected]
+    - tab "Schema"
+    - tab "Timing"
+  - tabpanel "Result": "AutoReviewDeniedError: AUTO_REVIEW_DENIED Error: Auto review rejected tool \"bash\"; its body was not executed"
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Auto"': Auto
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- button "1 turns · 2 steps":
+  - img
+  - text: 1 turns · 2 steps
+- separator "Adjust transcript content width"

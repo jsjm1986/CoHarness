@@ -9,34 +9,49 @@
   ],
   "references": [
     {
-      "path": "../../core/session"
+      "path": "../agent"
     },
     {
-      "path": "../../code-runtime/code-runtime"
+      "path": "../scope"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../session"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/system-prompt"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/scope"
+      "path": "../system-prompt"
     },
     {
       "path": "../../interaction/user-approval"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../ptc-runtime/ptc-runtime"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../sandbox/sandbox"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

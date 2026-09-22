@@ -23,9 +23,9 @@
 // (the plugin-row path discards the ReplayHandle; the direct install keeps
 // assertConsumed for the teardown fixture-consumption check).
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Page } from 'playwright'
 import { expect } from 'vitest'
@@ -35,20 +35,20 @@ import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
 import { scrubRequestHeaders, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-acp-snapshot'
 import {
-  assertEntriesLoaded,
+  auditStartupEntries,
   composeEntries,
   healProfilesModuleFallback,
   loadOverlayPatches,
+  type Profile,
 } from '@deepseek-ai/dsh-app-boot'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
-import { LlmAdapter } from '@deepseek-ai/dsh-llm'
+import { AssistantStreamAccumulator, expandAssistantStream, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type {
-  LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
+  AssistantStreamRecord, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ReplayHandle } from '@deepseek-ai/dsh-llm-replay'
-import { installLlmReplay, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
+import { installLlmReplay, parseSessionLog, prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
 import SessionStore, {
-  packChunkRuns,
   SESSION_FORMAT_VERSION,
   SessionId,
   SessionSeq,
@@ -191,6 +191,11 @@ export interface LaunchOptions {
    * ordering.
    */
   extraOverlayPath?: string
+  /**
+   * Additional package manifests whose dependency closures supply experimental
+   * profile layers named by {@link extraOverlayPath}.
+   */
+  extraInstallAnchors?: string[]
   /**
    * Replay fixture (session.jsonl) served by the inserted dsh-llm-replay row
    * in replay/refresh modes; ignored in record mode (the real adapter
@@ -529,8 +534,33 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // The production module-resolution setup: an empty profile root inside the temp
     // harness home, with bare plugin names resolving through the flat module
     // fallback the launcher heals under <home>/profiles.
-    healProfilesModuleFallback(INSTALL_ANCHOR, harnessHome)
     const profileDir = join(harnessHome, 'profiles', 'scaffold')
+    const extraLayers: Profile['layers'] = await Promise.all((options.extraInstallAnchors ?? []).map(async (anchor) => {
+      const manifest = JSON.parse(await readFile(anchor, 'utf8')) as { name?: unknown }
+      if (typeof manifest.name !== 'string' || manifest.name === '') {
+        throw new Error(`web e2e scaffold: extra install anchor has no package name: ${anchor}`)
+      }
+      const packageDir = dirname(anchor)
+      // A real profile already has each bundle installed by `dsh plugin add`.
+      // Reproduce that link so a private bundle can import its own plugin.
+      const installedLink = join(profileDir, 'node_modules', manifest.name)
+      await mkdir(dirname(installedLink), { recursive: true })
+      await symlink(packageDir, installedLink, 'junction')
+      return {
+        packageName: manifest.name,
+        packageDir,
+        patchPath: join(packageDir, 'cordis.patch.yml'),
+        patches: [],
+      }
+    }))
+    const profile: Profile = {
+      name: 'scaffold',
+      dir: profileDir,
+      layers: extraLayers,
+      patchPath: join(profileDir, 'cordis.patch.yml'),
+      patches: [],
+    }
+    await healProfilesModuleFallback({ installAnchor: INSTALL_ANCHOR, home: harnessHome, profile })
     await mkdir(profileDir, { recursive: true })
     const rootConfig = join(profileDir, 'cordis.yml')
     await writeFile(rootConfig, '[]\n')
@@ -559,7 +589,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       config: { path: pathToFileURL(rootConfig).href, patches },
     })
     await ctx.loader.await()
-    assertEntriesLoaded(ctx, 'web e2e scaffold')
+    await auditStartupEntries(ctx, 'web e2e scaffold')
     const boundPort = ctx.get('webServer')?.port
     if (boundPort === undefined) {
       throw new Error('web e2e scaffold: webServer service missing after settled boot')
@@ -594,7 +624,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       }
       const recorded = parseSessionLog(fixtureText)
       const hasModelCall = recorded.some(event => (
-        event.type === 'assistant/chunk' || event.type === 'request/header' || event.type === 'tool/call'
+        event.type === 'assistant/message' || event.type === 'assistant/attempt'
+        || event.type === 'request/header' || event.type === 'tool/call'
       ))
       if (hasModelCall) {
         throw new Error('replayProvidersOnly fixture must record no model calls')
@@ -695,12 +726,12 @@ function rawSessionLog(session: Session): string {
       createdAt: header.createdAt,
       ...header.cwd === undefined ? {} : { cwd: header.cwd },
       ...header.parentSession === undefined ? {} : { parentSession: header.parentSession },
-      ...header.isSeeded ? { seedLength: Number(session.inheritedEventCount) } : {},
+      isSeeded: header.isSeeded,
       ...header.origin === undefined ? {} : { origin: header.origin },
       ...header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth },
       ...header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset },
     }),
-    ...packChunkRuns(session.snapshotEvents()).map(record => JSON.stringify(record)),
+    ...session.snapshotEvents().map(event => JSON.stringify(event)),
     '',
   ].join('\n')
 }
@@ -828,7 +859,23 @@ export async function seedSession(
   const header = JSON.parse(realized.split('\n', 1)[0]!) as { createdAt?: unknown }
   if (typeof header.createdAt !== 'number') throw new Error('seed fixture requires a numeric createdAt header')
   const timeAnchor = header.createdAt === 0 ? meta.createdAt : header.createdAt
-  const materializedEvents = events.map((event, index) => ({ ...event, time: timeAnchor + index }))
+  // Envelope times compress to one millisecond per event for deterministic
+  // goldens; embedded attempt streams must compress onto the same axis or
+  // timing derivations (decode duration) read a foreign clock. Stream members
+  // sit immediately before their settlement so firstToken stays inside the
+  // compressed window.
+  const materializedEvents = events.map((event, index) => {
+    const time = timeAnchor + index
+    const data = event.data as { stream?: readonly AssistantStreamRecord[] } | undefined
+    const stream = data?.stream
+    if (!Array.isArray(stream) || stream.length === 0) return { ...event, time }
+    const accumulator = new AssistantStreamAccumulator()
+    for (const member of expandAssistantStream(stream)) {
+      accumulator.push({ time: time - 1, chunk: member.chunk })
+    }
+    const repacked = { ...(event.data as Record<string, unknown>), stream: accumulator.snapshot() }
+    return { ...event, time, data: repacked } as SessionEvent
+  })
   await persistSeedSession(scaffold, meta, materializedEvents)
   return meta.id
 }
@@ -888,7 +935,7 @@ async function persistSeedSession(
     // Same root as the booted tree with the plugin's own default compression,
     // so the host's directory-scan list() sees one consistent encoding.
     await seeder.plugin(JsonlSessionPersistence, { root: scaffold.persistenceRoot })
-    await seeder.sessionPersistence.create(meta)
+    await seeder.sessionPersistence.createStored(meta)
     await seeder.sessionPersistence.append(meta.id, events)
   } finally {
     await seeder.fiber.dispose()
@@ -962,23 +1009,24 @@ export async function captureStableAria(page: Page, selector: string, workspaceC
 }
 
 /**
- * Rewrite a seed fixture through its decoded event list. Projected fixtures
- * omit `seq`/`time` and pack chunk runs into single rows, so a scenario that
- * trims or extends a recording must edit the decoded events rather than raw
- * lines; the result is re-serialized one event per row, which
+ * Rewrite a seed fixture through its migrated event list. The fixture parses
+ * through the Session format catalog, so the callback edits current-generation
+ * events (`assistant/message`/`assistant/attempt` with embedded streams) and
+ * the result is re-serialized under the migrated header, which
  * {@link parseSessionLog} reads back unchanged. Appended events take the next
  * positional seq; `time` may be left at zero because {@link seedSession}
  * materializes times from event order.
  * @param fixtureText - raw or realized session.jsonl contents.
  * @param edit - returns the full event list to serialize (kept + appended).
- * @returns the rewritten fixture text.
+ * @returns the rewritten fixture text at the current Session format.
  */
 export function rewriteSeedEvents(
   fixtureText: string,
   edit: (events: SessionEvent[]) => SessionEvent[],
 ): string {
-  const header = fixtureText.split(/\r?\n/, 1)[0]!
-  const events = edit(parseSessionLog(fixtureText))
+  const current = prepareSessionSnapshotFixtureForComparison(fixtureText)
+  const header = current.split(/\r?\n/, 1)[0]!
+  const events = edit(parseSessionLog(current))
   events.forEach((event, index) => {
     if (event.seq !== index) {
       throw new Error(`rewritten seed events must stay contiguous from 0: seq ${String(event.seq)} at index ${String(index)}`)

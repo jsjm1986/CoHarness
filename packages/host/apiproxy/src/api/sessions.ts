@@ -33,7 +33,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     sessionListMetadata: SessionListMetadata
     imageLimits: null
-    inbox: {
+    queuedInbox: {
       inheritedEventCount: number
       items: QueuedInboxItem[]
     }
@@ -43,7 +43,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 
   interface SessionProjectionMap {
     /** Durable pending input, reconstructed without activating the Session Agent. */
-    inbox: QueuedInboxItem[]
+    queuedInbox: QueuedInboxItem[]
     /**
      * Session-list hints persisted by the projection cache. `blank: false`
      * is monotonic and may suppress a cold-log probe; `blank: true` is only a
@@ -116,10 +116,10 @@ export interface HistoryEntry {
   view?: ToolEventView
 }
 
-/** History download gear: omit completed historical chunks, or keep every event. */
+/** History download gear: omit superseded historical attempts, or keep every event. */
 export type HistoryDetail = 'conversation' | 'full'
 
-/** Inclusive seq range of omitted historical `assistant/chunk` events. */
+/** Inclusive seq range of omitted historical `assistant/attempt` events. */
 export interface HistoryOmittedSpan {
   startSeq: number
   endSeq: number
@@ -404,11 +404,11 @@ export interface SessionsApi {
    * never resumes or publishes an Agent. Providers without the page capability
    * may use their compatibility inspection path.
    * `detail` selects the download gear after pagination: `'conversation'`
-   * omits historical `assistant/chunk` runs that sit under a completed
-   * append-origin `assistant/message` and reports them as `omittedSpans`;
-   * omitted or `'full'` returns every event on the page. In-flight and
-   * interrupted streams without that message keep their chunks. Persistence
-   * and model context are unchanged.
+   * omits `assistant/attempt` records whose turn and step completed with an
+   * append-origin `assistant/message` on the same page and reports them as
+   * `omittedSpans`; omitted or `'full'` returns every event on the page.
+   * Attempts without that message — failed steps, cancellations, the
+   * in-flight tail — stay. Persistence and model context are unchanged.
    * @param signal - optional in-process cancellation for the persistence read
    * and presenter derivation; it is never serialized on the wire.
    */
@@ -516,8 +516,9 @@ export interface SessionsApi {
   Promise<RpcResponse<{ attachment: ImageAttachmentRef; data: string }>>
 
   /**
-   * Edits, removes, or strictly steers one pending queued occurrence on an ordinary session.
-   * Session-backed subagents reject with `agent-busy`.
+   * Edits, removes, or strictly steers one pending queued occurrence on an
+   * ordinary session, resuming a cold Agent first so restored Inbox rows are
+   * readable. Session-backed subagents reject with `agent-busy`.
    */
   updateQueue(request: RpcRequest<{ sessionId: SessionId; itemId: MessageId; action: QueueAction }>):
   Promise<RpcResponse<{ accepted: true }>>

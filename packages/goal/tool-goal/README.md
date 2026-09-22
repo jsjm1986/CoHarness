@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The model-facing control tools for [`ctx.goals`](../goal/README.md): `get_goal`, `create_goal`, and `update_goal`. The [goal-tool Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-model-facing-goal-tools.md) owns the authority split and Codex-shaped UX.
 
+## Summary
+
+`dsh-tool-goal` lets a model read persisted goals and infer and create a long-running goal from a direct human request. Creating, editing, pausing, or resuming requires that direct request in a top-level agent turn; completing or blocking also works in an autonomous goal round. Updates require the exact goal id and revision returned by a prior read. `resume` rearms active-but-disarmed or blocked goals, while users resume durable paused goals through Web or `/goal resume`. Autonomous blocking requires the same condition for a configurable threshold of three consecutive rounds by default.
+
 ## Tools
 
 - `get_goal()` returns the current goal or `null`, including the compare-and-set id/revision, durable phase, admitted/capped goal rounds, any blocker reason, and current process-local activation.
@@ -35,13 +39,17 @@ Complete and blocked also accept the exact current goal round: a goal-sourced `u
 
 The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools are registrations over `ctx.goals`; goal state is owned by the goal domain.
+
 ## Model Experience
 
 ### System prompt
 
 #### What the model sees
 
-A fixed goal policy says when semantic human intent warrants creation, requires exact read-before-update refs, explains rearming after resume/fork, and limits completion/blocking claims. The configured threshold is interpolated into that guidance.
+A fixed goal policy says when semantic human intent warrants creation, requires exact read-before-update refs, explains rearming after resume/fork, and limits completion/blocking claims. Durable paused resume is rejected at execution with `GOAL_TOOL_RESUME_PAUSED`; the user-facing goal control owns that transition. The configured threshold is interpolated into that guidance.
 
 ##### Goal policy
 

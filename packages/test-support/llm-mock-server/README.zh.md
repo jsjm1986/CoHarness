@@ -6,6 +6,10 @@
 
 库入口导出 `startMockLlmServer(options)`、行为类型和遥测（telemetry）类型、默认随机压力权重、Node 定时器允许的上限，以及带有绑定 `baseURL`、自动生成或显式配置 `randomSeed`、已捕获请求和幂等 `close()` 的运行句柄。关闭会强制终止停滞连接。
 
+## 概述
+
+本包为测试与演示提供可编脚本的 OpenAI 兼容 HTTP／SSE（Server-Sent Events）端点，使其无需提供方密钥即可检验模型提供方的失败与成功。每个已接受的 `/chat/completions` 请求依次消费下一个脚本行为，包括重置、停滞、畸形分片、限流、服务器错误、补全与工具调用。测试作者可以通过 `pnpm run mock:llm` 运行服务器，也可以调用 `startMockLlmServer`，后者会返回捕获的请求供断言使用。带种子的 `random` 行为支持可复现的混合故障压力运行。
+
 ## 独立使用
 
 从本仓库运行源入口：
@@ -70,6 +74,10 @@ pnpm run mock:llm -- \
 ## 时序与内容控制
 
 CLI 公开 `--success-text`、`--partial-text`、`--reasoning-text`、`--chunk-size`、`--chunk-delay-ms`、`--disconnect-delay-ms`、`--retry-after-ms`、`--request-id`、`--tool-name` 和 `--tool-arguments`。毫秒延迟是 Node timer 范围内的有界整数；`retryAfterMs` 还必须为正数。库接受相同的 camel-case 选项。可选的 `apiKey` 会精确验证 `Authorization: Bearer <token>`；省略时接受任何 token。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。测试夹具，其脚本化行为按到达顺序被消费；其正确性由驱动它的套件强制。
 
 ## 模型体验
 

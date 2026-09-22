@@ -34,7 +34,7 @@ uv run --project python/sdk python scripts/smoke-python-runtime.py \
   --scenario sdk-minimal --exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64
 ```
 
-Two scenarios compare committed expected output under `scripts/snapshots/python-sdk-single-exe/`. `minimal/model-visible.json` pins the checked-in minimal composition's assembled system prompts, advertised tool schemas, and model-visible messages, so a plugin that contributes an unintended system section or user message fails the job; it drops the dynamic runtime-context snapshot, which the same composition emits on macOS and not on Linux ([#2488](https://github.com/deepseek-harness/deepseek-harness/issues/2488)). `advanced/` pins the SDK result and the persisted session logs. Rerun the owning scenario with `--update-snapshots` and review that diff before committing it.
+Two scenarios compare committed expected output under `scripts/snapshots/python-sdk-single-exe/`. `minimal/model-visible.json` pins the checked-in minimal composition's assembled system prompts, advertised tool schemas, and model-visible messages, so a plugin that contributes an unintended system section or user message fails the job; it drops the dynamic runtime-context snapshot, which the same composition emits on macOS and not on Linux ([#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)). `advanced/` pins the SDK result and the persisted session logs. Rerun the owning scenario with `--update-snapshots` and review that diff before committing it.
 
 An interactive smoke test needs `DEEPSEEK_API_KEY` in the environment or repository-root `.env`:
 
@@ -84,3 +84,9 @@ Label a pull request `python-release-dry-run`, or manually run the GitHub `Relea
 Public publication runs from the private automation repository; package metadata points to the separate read-only public source mirror, which does not run release Actions. The private repository defines the repository variable `PYPI_PUBLISHER_REPOSITORY` as its own `owner/name` and keeps `PUBLIC_PYPI_RELEASE_ENABLED=false` except during an intentional release.
 
 Separate runtime and SDK jobs let an SDK upload failure resume without resending immutable runtime files. They accept `publish=true` only when the workflow runs from the configured publisher repository at the matching `python-v*` tag and the protected `pypi-runtime` and `pypi` environments approve the runtime and SDK jobs, respectively. PyPI Trusted Publishing still supplies short-lived OIDC credentials, but public attestations are disabled because they would disclose the private publisher identity.
+
+## Static validation and typing
+
+Run `pnpm run check:python:static` from the repository root. The locked quality group pins Ruff and checks syntax, undefined names and selected definite errors without formatting the SDK. Python CI executes this check alongside pytest. Strict mypy remains outside the required lane; the SDK owner reassesses its recorded typing debt when public API types change or the next upstream SDK update arrives.
+
+Python publication also requires the exact-commit run IDs described in [release evidence](../scripts/release/README.md); both protected publishers revalidate the tested wheels before upload.

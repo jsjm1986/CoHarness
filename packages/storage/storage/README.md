@@ -4,11 +4,19 @@ English | [中文](README.zh.md)
 
 Storage hub (`ctx.storage`) for non-session data: a named backend registry plus mounted data-form facilities. The hub performs no IO itself — backends own media, and data forms own semantics. The [storage family overview](../README.md) maps those packages; the [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) records the design rationale.
 
+## Summary
+
+Use `dsh-storage` to keep typed application data durable without adding it to session history. Mount it with a supported storage medium and domain configuration, then callers can access records through the public `ctx.storageDomain` API. Choose it for workspace records, session sidecars, or other application state that must survive restarts without becoming session events. It is available only to host code and has no model-visible effect; compositions that do not need such data can omit it.
+
 ## Shape
 
 - `ctx.storage.backend` — name → backend table. Multiple backends stay mounted side by side (`json`, `sqlite`); which backend serves a consumer is that consumer's configuration (the domain layer's route table), never a hub-global choice. `register()` returns the disposer; duplicate names and unknown lookups fail loud.
 - `ctx.storage.mount(form, facility)` / `ctx.storage.form(form)` — data-form mounting. `StorageForms` is merge-extensible; the domain layer merges `domain` and is reached as `ctx.storage.domain`.
 - A backend owns one medium and exposes the data-shape facets it supports. `kv` is the current facet; `src/backend.ts` owns its exact contract.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The hub is a named registry of backends and mounted data forms; it performs no IO and owns no records.
 
 ## Model Experience
 
@@ -16,7 +24,7 @@ Storage hub (`ctx.storage`) for non-session data: a named backend registry plus 
 
 #### What the model sees
 
-Nothing. `ctx.storage` is a host-side registration table; the hub registers no tools, injects no prompts, and writes no session events.
+Nothing. `ctx.storage` is a host-side registration table: the hub registers no tools, injects no prompts, and writes no session events, so no request field ever carries this package's data.
 
 #### Token effect
 

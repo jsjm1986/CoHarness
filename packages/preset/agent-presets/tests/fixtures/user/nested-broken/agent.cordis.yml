@@ -1,0 +1,15 @@
+# Two failing rows inside a group. Each row's fiber settles FAILED with its
+# own error, so the mount audit must report both rows rather than stopping at
+# the group row or the first failure.
+- id: outer
+  name: cordis:group
+  group: true
+  config:
+    - id: inner-first
+      name: ../../plugins/throws.js
+      config:
+        message: inner first refuses
+    - id: inner-second
+      name: ../../plugins/throws.js
+      config:
+        message: inner second refuses

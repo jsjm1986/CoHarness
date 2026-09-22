@@ -4,20 +4,48 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cosmokit" },
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../collaboration" },
-    { "path": "../../util/output-retention" },
-    { "path": "../../llm/llm" },
-    { "path": "../../core/session" },
-    { "path": "../../core/agent" },
-    { "path": "../../compaction/compaction" },
-    { "path": "../../runtime-diagnostics/invariants" },
-    { "path": "../../session-query/session-query" },
-    { "path": "../../session/session-projection" },
-    { "path": "../../session/session-projection-cache" }
+    {
+      "path": "../../compaction/compaction"
+    },
+    {
+      "path": "../collaboration"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session-query/session-query"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../session/session-projection-cache"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/output-retention"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    }
   ]
 }

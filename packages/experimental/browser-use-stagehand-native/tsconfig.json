@@ -1,0 +1,42 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../browser-use/browser-use"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../browser-use-runtime"
+    },
+    {
+      "path": "../../mcp/mcp-client"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    }
+  ]
+}

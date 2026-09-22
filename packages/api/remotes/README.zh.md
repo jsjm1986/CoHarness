@@ -4,11 +4,15 @@
 
 为本应用选定的 Host Remote 能力提供双侧 BFF。Host 入口负责 Agent/Session 身份策略；Client 入口以运行时值形式导入生成的 `/remote` 产物，通过 `ctx.remote.$mount()` 挂载每项贡献，并重新导出对应的声明合并。Client 业务包依赖该外观，而不依赖 Gateway 实现或单独的 Remote 运行时入口。
 
-`createApiRemoteAgentResolver()` 会复用 live Agent、恢复普通冷会话、对并发恢复去重、保留 subagent ownership fence，并为 Typert `agent` 和 `session` lookup 配置同一个 resolver。标准 Web API Proxy 提供 Agent 默认值和 scope 设置，再将返回的 resolver 用于旧方法，使已迁移与未迁移方法共用同一份策略实现。
+`createApiRemoteAgentResolver()` 会复用 live Agent、恢复普通冷会话、对并发恢复去重、保留 subagent ownership fence，在写租约被另一个存活 Host 进程持有时应答 `session-writer-held`，并为 Typert `agent` 和 `session` lookup 配置同一个 resolver。标准 Web API Proxy 提供 Agent 默认值和 scope 设置，再将返回的 resolver 用于旧方法，使已迁移与未迁移方法共用同一份策略实现。
 
 当前 Client 组合挂载 Goal Remote 贡献和只读 Host 插件清单贡献（`pluginInventory/list`）。该组合卸载时，Cordis effect 的所有权机制会撤回所有贡献；`@deepseek-ai/dsh-api-gateway/client` 负责描述符校验、可追踪 namespace Service、直接与作用域方法、调用与取消。Client 入口通过 Cordis 消费共享的 `TypertClientRemote` 接口，不导入具体 Gateway；它只以 type-only 形式重新导出 Gateway Client face 的声明合并，因此消费端经由本外观取到转发事件词汇时，运行时不会多出一条通往 Gateway 实现的边。
 
 本包不包含传输逻辑或 Host 服务发现逻辑。Web 或未来的 TUI 只要提供同一份不依赖 React 的 `ctx.remote` 约定，均可复用其 Client face。
+
+## 概述
+
+为本应用选定的 Host Remote 能力提供双侧 BFF。Host 入口拥有转发事件名单并向 API Gateway 注册应用事件 source；Client 入口以运行时值形式导入生成的 `/remote` 产物，通过 `ctx.remote.$mount()` 挂载每项贡献，并重新导出对应的声明合并。Client 业务包依赖该外观，而不依赖 Gateway 实现或单独的 Remote 运行时入口。
 
 ## 转发的 Host 事件
 
@@ -27,9 +31,13 @@
 
 包内 `clientBundle(..., { hostPhase: true })` 让 Host tsdown 打包 Host 入口，让后续 Client tsdown 只打包 browser 入口。普通 Client 插件仍使用单一 Client project，并在 Client tsdown 阶段一起生成 Node loader 入口和 browser bundle；不得因一个包同时存在 `src/index.ts` 与 `src/client/index.ts` 就复制本包的拆分。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每个贡献都通过 `ctx.remote.$mount()` 挂载为随组装 fiber 撤回的 effect，身份解析是针对实时 Agent 注册表的逐次调用策略。
+
 ## 模型体验
 
-无，因为该 BFF 只选择 Remote 应用方法和身份策略，不注册任何模型接口。
+无，因为该 BFF 只选择 Remote 应用方法和转发事件，不注册任何模型接口。
 
 #### KV Cache 影响
 

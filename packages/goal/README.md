@@ -12,3 +12,8 @@ Durable objective state for an agent session, owned independently of the model-f
 | [`command-goal/`](command-goal/README.md) | Human-facing goal command | — |
 
 The subsystem reference — goal identity, lifecycle snapshots, activation, change records — is [docs/subsystems/goal.md](../../docs/subsystems/goal.md).
+
+
+## Summary
+
+The goal group lets one agent session pursue a durable completion objective across restarts, resumes, and forks. Agents can create and update the objective, while people can inspect or control it directly with `/goal` without spending a model turn. An optional continuation package can keep active work moving through sequential Rounds. Each session has only one current goal, and that goal records completion state rather than scheduling work; automatic continuation must therefore be enabled separately.

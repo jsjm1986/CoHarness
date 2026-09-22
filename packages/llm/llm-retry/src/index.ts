@@ -179,6 +179,7 @@ export function apply(ctx: Context, config: Config = {}, internals: RetryInterna
     }
 
     const policyKey = retryPolicyKey(policy)
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const priorPolicyRetry = agent.session.snapshotEvents().findLast((event): event is SessionEvent<'llm/retry'> =>
       event.type === 'llm/retry'
       && event.data.turn === turn

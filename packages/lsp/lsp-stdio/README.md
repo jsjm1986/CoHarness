@@ -6,6 +6,10 @@ A **generic stdio language-server backend** for `ctx.lsp`. One plugin instance a
 
 Namespace plugin (`name` / `inject` / `Config` / `apply`, no default export).
 
+## Summary
+
+Use `dsh-lsp-stdio` to give agents definitions, references, implementations, and hover from explicitly configured local language servers. It maps file extensions to language identifiers, starts one server per workspace on demand, and reads each queried file afresh without retaining document state between queries. Language-server processes and source reads share the mounted filesystem and subprocess environment. The package does not install servers or provide a sandbox: deployments supply commands, mappings, and any required confinement. Queries are serialized per server and workspace, while different workspaces can run in parallel.
+
 ## What it does
 
 - Resolves every server-local setting before registration; an invalid mapping or registration conflict rolls back earlier entries, so a failed load leaves no provider routes.
@@ -44,9 +48,13 @@ Initialization advertises `general.positionEncodings: ['utf-16']`, `workspace: {
 
 The provider trusts its configured server and claims no sandbox confinement. It delegates canonical identity, containment, regular-file streaming, UTF-8 validation, and file-URI encoding to `ctx.fs`; it rejects missing, non-regular, non-UTF-8, oversized, or canonically out-of-workspace query sources before server startup. Containment is evaluated before the stream opens and does not promise stable-handle identity across concurrent path replacement. Result locations may be external, but an external path cannot become a query source. A deployment must mount filesystem and subprocess providers for the same execution world; split-world composition is invalid.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each registered provider owns one language-server child through `ctx.subprocess`; lifecycle and isolation are covered by provider specs and the plugin keeps no cross-server state.
+
 ## Model Experience
 
-Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results; this host contributes no prompt or schema itself.
+Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results while this host contributes no prompt or schema itself.
 
 #### KV Cache effect
 

@@ -9,7 +9,7 @@ import SessionStore, {
 } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@deepseek-ai/dsh-session'
 import SessionPersistence, { SessionPersistenceCorruptionError, SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
-import type { SessionEventSuffix, SessionInspection } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionEventSuffix, SessionInspection , SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import SessionQueryEngine, {
   SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
   type SessionEventSurface,
@@ -35,6 +35,10 @@ function eventLog(text = 'hello'): SessionEvent<'user/message'>[] {
 }
 
 class TestPersistence extends SessionPersistence {
+
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
   override readonly supportsRawArtifacts = false
 
   static entries = new Map<SessionIdType, { meta: SessionHeader; events: SessionEvent[] }>()
@@ -66,27 +70,27 @@ class TestPersistence extends SessionPersistence {
     this.inspectSignals = []
   }
 
-  locate(_meta: SessionHeader): undefined {
+  override locate(_meta: SessionHeader): undefined {
     return undefined
   }
 
-  create(meta: SessionHeader): Promise<void> {
+  override createStored(meta: SessionHeader): Promise<void> {
     TestPersistence.entries.set(meta.id, { meta: structuredClone(meta), events: [] })
     return Promise.resolve()
   }
 
-  append(id: SessionIdType, events: readonly SessionEvent[]): Promise<void> {
+  override append(id: SessionIdType, events: readonly SessionEvent[]): Promise<void> {
     const entry = TestPersistence.entries.get(id)
     if (entry === undefined) return Promise.reject(new Error('missing test session'))
     entry.events.push(...structuredClone(events))
     return Promise.resolve()
   }
 
-  load(id: SessionIdType): Promise<SessionInspection> {
+  override load(id: SessionIdType): Promise<SessionInspection> {
     return this.inspect(id)
   }
 
-  inspect(
+  override inspect(
     id: SessionIdType,
     signal?: AbortSignal,
   ): Promise<SessionInspection> {
@@ -107,7 +111,7 @@ class TestPersistence extends SessionPersistence {
     return Promise.resolve(result)
   }
 
-  async readFrom(
+  override async readFrom(
     id: SessionIdType,
     fromSeq: SessionLogOffset,
     signal?: AbortSignal,
@@ -116,7 +120,7 @@ class TestPersistence extends SessionPersistence {
     return { ...whole, fromSeq, events: whole.events.filter(event => event.seq >= fromSeq) }
   }
 
-  list(signal?: AbortSignal): Promise<SessionHeader[]> {
+  override listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
     TestPersistence.listCalls += 1
     TestPersistence.listSignals.push(signal)
     if (TestPersistence.listOverride !== undefined) return TestPersistence.listOverride(signal)
@@ -127,7 +131,7 @@ class TestPersistence extends SessionPersistence {
   }
 
 
-  async listSnapshots() {
+  override async listSnapshots() {
     return [...TestPersistence.entries.values()].map(entry => ({
       header: structuredClone(entry.meta),
       revision: SessionPersistenceRevision(`events:${entry.events.length}`),
@@ -928,24 +932,17 @@ describe('session-query exact reads', () => {
       }),
       { surfaceOp: 'append' },
     )
-    session.append('assistant/chunk', {
+    session.append('assistant/attempt', {
       turn: 1,
       step: 1,
-      chunk: { type: 'text-delta', index: 0, text: 'draft' },
+      stream: [{ type: 'chunk', time: 0, chunk: { type: 'text-delta', index: 0, text: 'draft' } }],
     })
     session.append(
-      'assistant/message',
-      {
-        turn: 1, step: 1,
-        message: createMessage({
-          role: 'assistant',
-          content: [{ type: 'text', text: 'replacement' }],
-          source: {
-            kind: 'model',
-            ...{ provider: 'mock', model: 'mock' },
-          },
-        }),
-      },
+      'user/message',
+      createUserMessage({
+        content: [{ type: 'text', text: 'replacement' }],
+        source: { kind: 'plugin', plugin: 'test' },
+      }),
       { surfaceOp: { op: 'replace', startSeq: first.seq, endSeq: first.seq }, sourceEventSeqs: [first.seq] },
     )
 
@@ -963,10 +960,10 @@ describe('session-query exact reads', () => {
       }),
       { surfaceOp: 'append' },
     )
-    session.append('assistant/chunk', {
+    session.append('assistant/attempt', {
       turn: 1,
       step: 1,
-      chunk: { type: 'text-delta', index: 0, text: 'draft' },
+      stream: [{ type: 'chunk', time: 0, chunk: { type: 'text-delta', index: 0, text: 'draft' } }],
     })
     session.append(
       'user/message',
@@ -995,6 +992,7 @@ describe('session-query exact reads', () => {
     session.append(
       'assistant/message',
       {
+        stream: [],
         turn: 2, step: 1,
         message: createMessage({
           role: 'assistant',
@@ -1204,7 +1202,7 @@ describe('session-query exact reads', () => {
         data: createUserMessage({
           content: [{ type: 'text', text: 'hidden' }], source: { kind: 'user' },
         }),
-      }],
+      } as unknown as SessionEvent],
     }])
     const persistence = await ctx.plugin(TestPersistence)
     await expect(ctx.sessionQuery.listEvents(persisted.id))
@@ -1218,6 +1216,7 @@ describe('session-query exact reads', () => {
       { readWindowMax: -1 },
       { persistedReadConcurrency: 0 },
       { persistedReadConcurrency: Number.MAX_SAFE_INTEGER + 1 },
+      { preparedSessionCacheSize: 0 },
     ]) {
       const invalid = new Context()
       await invalid.plugin(SessionStore)
@@ -1233,6 +1232,21 @@ describe('session-query exact reads', () => {
     expect(ctx.sessionQuery).toBeInstanceOf(TestSessionQueryEngine)
     await fiber.dispose()
     expect(ctx.sessionQuery).toBeUndefined()
+  })
+
+  it('observes a live session through the service entry point', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(TestSessionQueryEngine)
+    try {
+      const session = ctx.sessions.create(SessionId('observed-live'))
+      session.append('turn/start', { turn: 1 })
+      using observed = await ctx.sessionQuery.observeSession(session.id, { projectionMode: 'none' })
+      expect(observed.source).toBe('live')
+      expect(observed.events.map(event => event.type)).toEqual(['turn/start'])
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('awaits optional-persistence child-fiber quiescence on disposal', async () => {

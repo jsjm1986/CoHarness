@@ -8,15 +8,11 @@
     "src"
   ],
   "references": [
-    { "path": "../../runtime-diagnostics/invariants" },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../host/open-in-app"
-    },
     {
       "path": "../locale"
+    },
+    {
+      "path": "../runtime"
     },
     {
       "path": "../ui-conversation"
@@ -28,10 +24,13 @@
       "path": "../ui-renderer"
     },
     {
-      "path": "../runtime"
+      "path": "../ui-slots"
     },
     {
-      "path": "../ui-slots"
+      "path": "../../host/open-in-app"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

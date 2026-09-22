@@ -17,6 +17,10 @@ Everything below it loses to the managed store, so a key written by the Models p
 
 Under the product CLI, resolution reads the launcher's frozen [environment snapshot](../../util/launch-environment/README.md) rather than `process.env`: only the snapshot can say whether a value came from the launching shell or from a file. A composition the product CLI did not boot has the inherited environment as its only layer, which keeps embedders on the semantics they already had.
 
+## Summary
+
+`dsh-credentials-local` keeps API keys and other secrets in a private file under your harness home. You can save credentials through the configuration UI or edit the file directly; changes reload automatically and saved values survive restarts. Credential lookup follows a fixed precedence: the launch environment wins, followed by the stored file, the project's `.env`, and the harness-home `.env`; a newly saved value immediately overrides older `.env` values. Only your OS user can read the file, but agent tool processes run as that same user, so this store cannot isolate secrets from the agent.
+
 ## Config
 
 | Field | Default | Meaning |
@@ -77,13 +81,17 @@ The document is `0600` under a `0700` directory, which stops other OS users — 
 
 That is discretion, not a boundary. A deployment that must keep provider keys away from its own agent cannot get there with file permissions; an OS-keychain provider — a store the model's processes cannot read at all — is the deferred answer and belongs beside this provider as a sibling package.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each resolution derives its answer from the layered sources at call time under the documented precedence; the file layer's behavior is asserted by specs and no credential cache is published.
+
 ## Model Experience
 
-Indirectly, through the consuming LLM adapters: stored values authorize their provider requests, and the adapter owns every model-visible surface.
+Indirectly, through the consumers of `ctx.credentials`, which own any model-facing behavior a stored value enables.
 
 #### KV Cache effect
 
-No direct invalidation; credentials never enter a request prefix.
+No direct invalidation; stored values never enter a request prefix.
 
 ## Known Limitations and Deferred Work
 

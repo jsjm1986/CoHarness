@@ -16,13 +16,21 @@ The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollb
 
 `gradient-shadow-text.css` owns the shadow scale (`--dsw-shadow-lv*`) and the elevation tokens: `--dsw-elevation-stroke` draws a 0.5px hairline through the rebindable `--dsw-elevation-stroke-color`, and `--dsw-elevation-panel`/`--dsw-elevation-prominent`/`--dsw-elevation-soft` (the composer's larger-blur, lower-alpha tier) layer two faint soft shadows over that stroke, so elevated surfaces set `border: 0` and carry no layout-consuming outline; the derived tokens are re-declared per element so a surface's stroke-color rebind takes effect. Flat widgets keep real borders at the `0.5px solid` hairline weight, and the elevation stylesheet spec scans every package stylesheet for both rules ([elevation note](../../../.agents/notes/implemented/feature/2026-09-01-web-elevation-stroke-shadows.md)).
 
+## Summary
+
+`dsh-client-ui-theme` lets Web GUI users choose `light`, `dark`, or `system` and set conversation content text from 12 to 17 px in Settings. A loopback client stores both values in the `ui-theme` settings namespace, which the local provider persists in `$DSH_HOME/settings.yaml` by default. The plugin resolves `system` through `prefers-color-scheme` and publishes immutable `ThemeSnapshot`s; ui-layout applies each snapshot to the document. The package also ships the `--dsw-*` token stylesheets and injects a synchronous bootstrap so the selected palette and font size apply before the shell loads. Third-party themes can register alias-token overrides through `ctx.theme`.
+
 ## Settings authority and compatibility
 
 Appearance controls render the account preference while a project policy may force the active light or dark scheme. The account-backed scope disables selection when it reports `loading`, `writable: false`, or a `saving` write; project and provider restrictions are shown inline, and the service refuses a direct `setTheme` call until a writable account view exists. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The preference's durable home is the Host settings namespace; `ThemeRuntime` keeps only the resolved snapshot, asserted by unit specs against pushed changes and reconnects.
+
 ## Model Experience
 
-None, as the theme service manages a browser preference; nothing here reaches a model request.
+None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 

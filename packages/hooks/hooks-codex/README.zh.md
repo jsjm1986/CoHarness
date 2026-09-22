@@ -14,6 +14,10 @@
 
 原生 Cordis 插件可以完成此桥接的所有工作，并且功能更强；该桥接只是已映射 Codex 子集的兼容路径（见 [拦截扩展点 Agent Note](../../../.agents/notes/implemented/feature/2026-06-30-interception-extension-points.zh.md)）。
 
+## 概述
+
+`dsh-hooks-codex` 在 agent（智能体）运行期间执行现有 Codex `hooks.json` 中的 command 钩子，让提示词与工具把关逻辑无需重写即可生效。它支持 5 个 Codex hook 点：会话开始、提示词提交、工具执行前后以及停止。钩子可以用模型可见的原因阻塞提示词或工具调用、添加对话上下文，或强制 agent 再执行一步。需要在 harness 中复用 Codex command 钩子时选择本包；超出这一受支持子集的行为应使用原生插件。
+
 ## 配置
 
 ```ts
@@ -59,17 +63,21 @@ hook 本身会在 agent（智能体）的会话工作区中运行：对 agent sc
 
 注入上下文携带显式 `{ kind: 'plugin', plugin: 'hooks-codex' }` 来源，因此持久消息绝不会被误认为用户提示词。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。桥接层把每次规范化拦截翻译为一次 Codex 钩子调用并把决定映射回来；钩子行为由规格固定，事件之间不保留关系。
+
 ## 模型体验
 
 ### Hook 提供的上下文
 
-#### 模型看到的内容
+#### 模型看到什么
 
-`SessionStart`、已接受提示词和工具后 hook 可以添加带源归因的上下文消息；阻塞 `Stop` hook 将其原因添加为下一步 steering（中途引导）。
+`SessionStart`、已接受提示词与工具后 hook 可以添加带源归因的上下文消息；阻塞 `Stop` hook 将原因添加为下一步 steering（中途引导）。
 
 #### Token 影响
 
-hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记录，并重发直到压缩（compaction）。
+hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记录，并在后续会话请求中重发，直到压缩（compaction）。
 
 #### KV Cache 影响
 
@@ -77,9 +85,9 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 
 ### 已阻塞提示词或工具结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-提供方提供的原因逐字传递。缺失原因时，已阻塞提示词精确使用 `blocked by UserPromptSubmit hook`，已拒绝工具变为 `Error: blocked by PreToolUse hook`，已阻塞工具后反馈精确为 `blocked by PostToolUse hook`，阻塞 stop 则精确添加 steering `continue: blocked by Stop hook`。Codex `systemMessage` 不会呈现。
+提供方提供的原因逐字传递。缺失原因时，已拒绝工具变为 `Error: blocked by PreToolUse hook`，已阻塞工具后反馈精确为 `blocked by PostToolUse hook`，阻塞 stop 则精确添加 steering `continue: blocked by Stop hook`；已阻塞提示词不会产生任何模型可见消息，而是以 `blocked` 结束该轮次。Codex `systemMessage` 不会呈现。
 
 #### Token 影响
 

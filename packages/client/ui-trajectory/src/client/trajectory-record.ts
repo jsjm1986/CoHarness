@@ -2,6 +2,8 @@
 
 import type { HTMLAttributes } from 'react'
 import type { ConversationPromptSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { TrajectoryTranslate } from './locales.ts'
+import { trajectoryPreviewText } from './trajectory-preview.ts'
 
 /** Closed set of trajectory record kinds. */
 export type TrajectoryCellKind =
@@ -112,19 +114,76 @@ export function trajectoryRecordId(cell: TrajectoryCellProps): string {
 /**
  * Format a duration in milliseconds with thousands separators.
  * @param milliseconds - Duration in milliseconds, or `null` when absent.
+ * @param t - Trajectory locale translator.
  * @returns `—` when unknown, otherwise an integer-millisecond label.
  */
-export function formatDurationMillis(milliseconds: number | null): string {
+export function formatDurationMillis(
+  milliseconds: number | null,
+  t: TrajectoryTranslate,
+): string {
   if (milliseconds === null || !Number.isFinite(milliseconds)) return '—'
   const integer = String(Math.round(milliseconds))
-  return `${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} ms`
+  return t('unit.milliseconds', {
+    value: integer.replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+  })
 }
 
 /**
  * Format an elapsed duration given in seconds as a millisecond label.
  * @param seconds - Duration seconds, or `null` when absent.
+ * @param t - Trajectory locale translator.
  * @returns `—` when unknown, otherwise an integer-millisecond label.
  */
-export function formatElapsedSeconds(seconds: number | null): string {
-  return formatDurationMillis(seconds === null ? null : seconds * 1000)
+export function formatElapsedSeconds(
+  seconds: number | null,
+  t: TrajectoryTranslate,
+): string {
+  return formatDurationMillis(seconds === null ? null : seconds * 1000, t)
+}
+
+/** Lifecycle state a record surface presents. */
+export type TrajectoryRecordState = 'complete' | 'running' | 'error'
+
+/**
+ * Derive the lifecycle state a record surface presents: an error flag wins,
+ * an open compacted row or a tool without its result still runs, anything
+ * else is complete.
+ * @param record - record projection carrying the cell.
+ * @returns the presented lifecycle state.
+ */
+export function trajectoryRecordState(record: { cell: TrajectoryCellProps }): TrajectoryRecordState {
+  if (record.cell.isError) return 'error'
+  if (record.cell.kind === 'compacted' && record.cell.timeSeconds === null) return 'running'
+  if (
+    (record.cell.kind === 'tool' || record.cell.kind === 'subtool')
+    && record.cell.outputDetail === undefined
+  ) return 'running'
+  return 'complete'
+}
+
+/**
+ * Localize a record lifecycle state label.
+ * @param state - derived record state.
+ * @param t - trajectory locale translator.
+ * @returns the status label.
+ */
+export function trajectoryStatusLabel(state: TrajectoryRecordState, t: TrajectoryTranslate): string {
+  if (state === 'error') return t('status.failed')
+  if (state === 'running') return t('status.pending')
+  return t('status.completed')
+}
+
+/**
+ * Resolve the preview-or-text head of a record's display text.
+ * @param cell - projected trajectory record.
+ * @returns the head text, or undefined when neither preview nor text exists
+ *   and the caller should fall back to a detail field of its choice.
+ */
+export function trajectoryDisplayHead(cell: TrajectoryCellProps): string | undefined {
+  if (cell.previewMarkdown !== undefined) {
+    const preview = trajectoryPreviewText(cell.previewMarkdown)
+    if (cell.text === '') return preview
+    return preview === '' ? cell.text : `${cell.text} · ${preview}`
+  }
+  return cell.text === '' ? undefined : cell.text
 }

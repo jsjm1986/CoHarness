@@ -12,6 +12,10 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 // freshness policy gate and @deepseek-ai/dsh-tool-fs to expose read/write/edit.
 ```
 
+## Summary
+
+Use `dsh-fs-local` to read, list, atomically write, and edit files on the host filesystem. Relative paths resolve from a configurable base directory, while absolute paths and parent traversal remain unrestricted. Paths and symlinks that reach the same file share one identity. Writes preserve file permissions, and optional version guards reject stale overwrites. Choose this package for direct host access; use `fs-sandbox` for confined mutations.
+
 ## Behavior
 
 - **`resolve(path, opts?)`** — a relative `path` resolves against `opts.cwd` when the caller supplies one (the model-facing tools pass the calling agent's session cwd — see [the per-session cwd Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.md)), else `config.cwd` (default `process.cwd()`); an absolute `path` ignores both. `opts.signal` is checked before and after local resolution, while a remote sibling backend may use it to abort its round-trip. The `targetKey` is the file's `realpath`, so two input paths reaching the same file through symlinks share one identity, and writes/edits land on the link target (preserving the link). A not-yet-existing path uses the realpathed parent directory plus basename when the parent exists; only an unresolvable parent falls back to the absolute path. `displayPath` is the absolute (un-resolved) path.
@@ -25,9 +29,13 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 
 The package-root SDK API is the default/named `LocalFileSystem` class plus `Config`. Raw I/O lives in `src/fsio.ts` (Cordis-free, independently unit-tested); `src/index.ts` is the thin service wiring.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each primitive delegates to the host filesystem, which is the sole authority; the provider keeps no shadow state.
+
 ## Model Experience
 
-Indirectly, through [`dsh-tool-fs`](../tool-fs/README.md), which renders this provider's line-windowed UTF-8 content, mutation acknowledgements, and exact provider messages in capped retained results while versions, atomic-write mechanics, and directory metadata remain internal.
+Indirectly, through `dsh-tool-fs`, which renders this provider's line-windowed UTF-8 content, mutation acknowledgements, and exact provider messages in capped retained results while versions, atomic-write mechanics, and directory metadata remain internal.
 
 #### KV Cache effect
 

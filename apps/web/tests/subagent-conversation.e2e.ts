@@ -121,7 +121,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     oneShotId = sessionId('recorded-one-shot')
     const oneShotDurationMs = 192 * 24 * 60 * 60 * 1_000
     const oneShotAt = Date.now() - oneShotDurationMs
-    await scaffold.ctx.sessionPersistence.create({
+    await scaffold.ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: oneShotId,
       createdAt: oneShotAt,
@@ -165,10 +165,11 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
         data: { turn: 1, reason: { kind: 'completed' } },
       },
     ] as SessionEvent[])
-    await scaffold.ctx.sessionProjectionCache.coldSnapshot(oneShotId)
+    const oneShotLog = await scaffold.ctx.sessionPersistence.load(oneShotId)
+    scaffold.ctx.sessionProjectionCache.coldSnapshot(oneShotLog.meta, oneShotLog.inheritedEventCount, oneShotLog.events)
     grandchildId = sessionId('recorded-grandchild')
     const authoredAt = Date.now()
-    await scaffold.ctx.sessionPersistence.create({
+    await scaffold.ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: grandchildId,
       createdAt: authoredAt,
@@ -212,7 +213,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
         data: { turn: 1, reason: { kind: 'completed' } },
       },
     ] as SessionEvent[])
-    await scaffold.ctx.sessionProjectionCache.coldSnapshot(grandchildId)
+    const grandchildLog = await scaffold.ctx.sessionPersistence.load(grandchildId)
+    scaffold.ctx.sessionProjectionCache.coldSnapshot(grandchildLog.meta, grandchildLog.inheritedEventCount, grandchildLog.events)
     expect(scaffold.ctx.agents.get(childId)).toBeUndefined()
     expect(scaffold.ctx.agents.get(oneShotId)).toBeUndefined()
     expect(scaffold.ctx.agents.get(grandchildId)).toBeUndefined()

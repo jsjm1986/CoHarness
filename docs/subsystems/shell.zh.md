@@ -107,11 +107,11 @@ interface ShellExecSpec {
 一次已完成（或被终止）的前台运行的结果。正交的结果**独立报告**：一个进程可以同时超时并以退出码 0 退出（因为它捕获了信号），因此 `timedOut`、`aborted`、`signal` 和 `exitCode` 各自独立为一个字段；调用方永远不会把一次被提前中断的运行误读为正常成功。
 
 ```ts type-equiv
-/** The outcome of one completed (or killed) foreground run. */
+/** The outcome of a foreground run, including timeout during preparation. */
 interface ShellRunResult {
-  /** Exit code; null when the process died from a signal. */
+  /** Exit code; null when preparation expired or the process died from a signal. */
   exitCode: number | null
-  /** Terminating signal (e.g. 'SIGTERM'); null on normal exit. */
+  /** Terminating signal, or null when none was reported, including preparation expiry. */
   signal: NodeJS.Signals | null
   /**
    * True when the executor's own timeout was the FIRST cause to cut the command
@@ -240,7 +240,7 @@ Abstract bash execution service. Subclass, implement the abstract methods, and l
 Implementations must honor these semantics:
 
 - run rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a ShellRunResult.
-- start returns immediately; no timeout applies to background processes. `done` settles at process close and never rejects; spawn failures settle as `killed` with the error on stderr.
+- start resolves after launch preparation; cancellation or setup failure rejects before publishing a handle. No timeout applies to background processes. Once published, `done` settles at process close and never rejects; subprocess provider failures settle as `killed` with the error on stderr.
 - ShellProcess.readOutput is incremental: consecutive reads never repeat output. Lossy reads report truncation and available spill files.
 - A still-running background process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a background process survives an executor-only reload.
 
@@ -254,19 +254,20 @@ Implementations must honor these semantics:
 abstract resolve(request: ShellExecRequest): ShellExecSpec
 
 /**
- * Run a command in the foreground; resolves when it finishes.
+ * Run preparation and the foreground command under the resolved timeout.
  * @param spec - a resolved spec from {@link resolve}, never a raw request.
  * @returns the outcome; nonzero exits, timeout kills, and abort kills
  *   resolve with a descriptive result rather than reject.
+ * @throws on preparation failure or caller cancellation before process publication.
  */
 abstract run(spec: ShellExecSpec): Promise<ShellRunResult>
 
 /**
- * Start a background process and return its handle immediately.
+ * Prepare a background process asynchronously and publish its live handle.
  * @param spec - a resolved spec from {@link resolve}, never a raw request.
- * @returns the live process handle (reads, kill, quiescence promise).
+ * @returns the live process handle after preparation; cancellation or setup failure rejects.
  */
-abstract start(spec: ShellExecSpec): ShellProcess
+abstract start(spec: ShellExecSpec): Promise<ShellProcess>
 ```
 
 Source: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)

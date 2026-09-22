@@ -1,0 +1,32 @@
+name: Preserve gate evidence
+description: Upload the actual runner reports and optional independent job result.
+inputs:
+  external:
+    description: Independent check ID; omit when run-gates already produced reports.
+    required: false
+    default: ''
+  status:
+    description: Current job status before evidence upload.
+    required: true
+  command:
+    description: Public command or workflow entry whose result is recorded.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - if: inputs.external != ''
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      env:
+        EVIDENCE_CHECK: ${{ inputs.external }}
+        EVIDENCE_STATUS: ${{ inputs.status }}
+        EVIDENCE_COMMAND: ${{ inputs.command }}
+      working-directory: ${{ github.workspace }}
+      run: node scripts/gate-evidence.ts
+    - uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.DSH_EVIDENCE_ARTIFACT_NAME }}
+        path: .artifacts/gates/
+        include-hidden-files: true
+        if-no-files-found: warn
+        retention-days: 14

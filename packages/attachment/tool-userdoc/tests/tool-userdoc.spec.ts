@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { CallId, HarnessError } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, HarnessError } from '@deepseek-ai/dsh-llm'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
@@ -104,7 +104,7 @@ let calls = 0
 function call(ctx: Context, agent: Agent, name: string, args: unknown) {
   return ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: CallId(`userdoc-call-${String(++calls)}`),
+    callId: ToolCallId(`userdoc-call-${String(++calls)}`),
     name,
     arguments: args,
     agent,
@@ -228,7 +228,7 @@ describe('userdoc_list', () => {
     const { ctx } = await setup()
     const noAgent = await ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: CallId('userdoc-no-agent'),
+      callId: ToolCallId('userdoc-no-agent'),
       name: 'userdoc_list',
       arguments: {},
     })

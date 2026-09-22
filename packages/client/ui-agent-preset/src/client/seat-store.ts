@@ -152,12 +152,14 @@ export class AgentPresetSeatController {
     const staged = this.staged
     const session = this.currentSession()
     if (staged === undefined || session === undefined) return
-    // A started session's history was produced under its own composition; the
-    // host refuses the swap, so the stage is no longer meaningful.
-    if (!session.blank || session.agentPreset === staged) {
+    if (session.agentPreset === staged) {
       this.staged = undefined
       return
     }
+    // A running session cannot take the pick — its history was composed
+    // elsewhere — but it also cannot consume it: the stage belongs to the
+    // next blank session and stays pending while a non-blank is current.
+    if (!session.blank) return
     this.set({ busy: true, error: null })
     try {
       const response = await this.remote.agentPresets.select(session.id, staged)

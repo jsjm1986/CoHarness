@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The fork provider creates an in-process child seeded with the parent's completed conversation turns. It shares all run mechanics with spawn; the session seed is the only behavioral difference.
 
+## Summary
+
+`dsh-subagent-fork-in-process` is an in-process subagent backend that seeds each child with the parent's completed conversation turns: the child sees every finished turn and none of the in-flight one, so follow-up work builds on the conversation without duplicating it. A delegation tool reaches it under the `fork` provider name, and its behavior matches the spawn backend except for the session seed. Choose it when a subtask continues this conversation; choose spawn when the child must stand alone. The seed is a one-time snapshot taken at fork time: later parent turns never reach the child.
+
 ## Seed boundary
 
 The parent's current tool-calling turn is still open when a subagent starts: its log contains the assistant tool call but not the matching tool result or `turn/end`. Copying that raw log would give the child an invalid, unbalanced session.
@@ -25,21 +29,25 @@ Fork advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, perso
 | `providerName` | Registry name on `ctx.subagents` (default `fork`). |
 See [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.md) for the run lifecycle, model inheritance, and depth tracking — all shared.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. All run mechanics live in the shared in-process driver; the provider contributes only the seeded-session fork entry.
+
 ## Model Experience
 
 ### Child-agent history and envelope
 
 #### What the model sees
 
-The child receives the parent's balanced completed-turn surface prefix, then the new task content verbatim. A configured persona shadows prompt text in the child's fresh scope; a tool restriction filters its global wire schemas, executable lookup, and PTC mode SDK bindings but not standalone guidance. The parent's tool view and authority are not inherited. An optional structured-output request adds its child-only contract. The parent's current in-flight turn is excluded.
+The child receives the parent's balanced completed-turn prefix, then the new task content verbatim. A configured persona shadows prompt text in the child's fresh scope; a tool restriction filters its global wire schemas, executable lookup, and PTC mode SDK bindings but not standalone guidance. The parent's tool view and authority are not inherited; an optional structured-output request adds a child-only contract; the parent's current in-flight turn is excluded.
 
 #### Token effect
 
-Forking duplicates retained completed history into separate child requests; the child then accumulates its own tokens independently. Persona changes repeated prompt cost, filtering changes schema or generated SDK cost, and a first-turn fork has no inherited history.
+Forking duplicates retained completed history into the child's request, which then accumulates its own tokens independently. A persona changes repeated prompt cost; filtering changes schema or generated SDK cost; a first-turn fork has no inherited history.
 
 #### KV Cache effect
 
-The child may reuse the inherited byte-identical prefix under the same provider and model. Persona, tool-filter, generated-SDK, or route changes may invalidate reuse before inherited history; later child history is append-only. Continuable messaging adds no child-only system-prompt section or tool schema: parent and child receive the same `send_message` definition and ordering, and the child's parent id and return guidance follow the inherited history in its initial user task, so both lifecycle bindings keep the prefix eligible ([the cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md)).
+The child may reuse the inherited byte-identical prefix under the same provider and model. Persona, tool-filter, generated-SDK, or route changes may invalidate reuse before inherited history; later child history is append-only. Continuable messaging adds no child-only system-prompt section or tool schema; the parent id and return guidance follow inherited history in the initial user task ([cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md)).
 
 ### Parent tool result, indirectly
 

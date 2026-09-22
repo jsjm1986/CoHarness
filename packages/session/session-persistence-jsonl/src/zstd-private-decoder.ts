@@ -5,7 +5,8 @@
 
 import { constants as bufferConstants } from 'node:buffer'
 import { createZstdDecompress } from 'node:zlib'
-import type { ZstdFrameDecoder, ZstdFrameRange } from './zstd.ts'
+import type { ZstdFrameRange } from './zstd.ts'
+import { ZstdFrameDecoderBase } from './zstd-decoder-base.ts'
 import { ZstdOutputLimitError } from './zstd-errors.ts'
 
 const DECODE_CHUNK_SIZE = 1024 * 1024
@@ -61,16 +62,15 @@ function privateZstdStream(
  * the stream's private handle contract to reuse its native context and output
  * chunks across frames.
  */
-export class NodePrivateZstdFrameDecoder implements ZstdFrameDecoder {
+export class NodePrivateZstdFrameDecoder extends ZstdFrameDecoderBase {
   private readonly output = Buffer.allocUnsafe(DECODE_CHUNK_SIZE)
   private decoderError?: Error
-  private started = false
-  private closed = false
 
   private constructor(
     private readonly stream: NodeZstdPrivateStream,
     private readonly errorKey: symbol,
   ) {
+    super()
     this.stream.on('error', (error: Error) => {
       this.decoderError ??= error
     })
@@ -100,9 +100,7 @@ export class NodePrivateZstdFrameDecoder implements ZstdFrameDecoder {
     frames: readonly ZstdFrameRange[],
     maxOutputBytes?: number,
   ): Generator<Buffer, void, void> {
-    if (this.started) throw new Error('Zstandard frame decoder was already started')
-    if (this.closed) throw new Error('cannot start a closed Zstandard frame decoder')
-    this.started = true
+    this.assertStartable()
     let totalOutputBytes = 0
     try {
       for (const frame of frames) {
@@ -182,7 +180,7 @@ export class NodePrivateZstdFrameDecoder implements ZstdFrameDecoder {
   }
 
   /** @inheritdoc */
-  close(): void {
+  override close(): void {
     if (this.closed) return
     this.closed = true
     this.stream.close()

@@ -1,5 +1,6 @@
 /** Published dsh web + pnpm dev:web → browser HMR, with no page reload. */
 
+import { randomUUID } from 'node:crypto'
 import { existsSync, globSync } from 'node:fs'
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -119,11 +120,10 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     page.on('pageerror', error => pageErrors.push(String(error)))
     await page.goto(baseUrl, { waitUntil: 'load' })
     await page.getByText(oldText, { exact: true }).waitFor({ timeout: 15_000 })
-    const pageIdentity = await page.evaluate(() => {
-      const identity = crypto.randomUUID()
+    const pageIdentity = await page.evaluate((identity: string) => {
       Object.defineProperty(window, '__dshHmrPageIdentity', { value: identity })
       return identity
-    })
+    }, randomUUID())
 
     await writeFile(sourcePath, updatedSource)
     await page.getByText(newText, { exact: true }).waitFor({ timeout: 30_000 })

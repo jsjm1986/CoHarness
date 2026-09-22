@@ -16,3 +16,8 @@
 [web 能力决策](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.zh.md)记录了搜索和抓取共用一项提供方选择服务的原因。
 
 子系统参考——搜索/抓取请求与结果、可用性、`WebError`——见 [docs/subsystems/web.md](../../docs/subsystems/web.zh.md)；依据（含延后的 SSRF 防护）见 [web 能力 seam Agent Note](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.zh.md)。
+
+
+## 概述
+
+`web/` 包让模型通过 `web_search` 与 `web_fetch` 工具搜索公共 web 和抓取 HTTP(S) 页面。部署可为搜索选择 Exa、Perplexity 或 DeepSeek，并通过匿名 HTTP(S) 访问抓取页面；可用性与资源上限取决于配置的提供方。该家族用于搜索和页面检索，不用于交互式浏览、内容提取或逐 URL 策略执行。提供方变化时，模型仍能获得一致的工具行为、取消与错误报告。

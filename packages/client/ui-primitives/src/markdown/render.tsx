@@ -30,9 +30,9 @@ import css from './MarkdownText.module.css'
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
 export interface MarkdownCodeLabels {
   /** Copy-button idle label. */
-  copyLabel?: string | undefined
+  copyLabel: string
   /** Copy-button label during the post-copy confirmation window. */
-  copiedLabel?: string | undefined
+  copiedLabel: string
 }
 
 /** Localized Markdown chrome shared by code fences and footnotes. */
@@ -128,10 +128,8 @@ export interface MarkdownFileMentions {
 export interface MarkdownRenderContext {
   /** Streaming arm: fences render plain and TeX stays literal. */
   readonly streaming: boolean
-  /** Localized fence copy-button labels. */
-  readonly codeLabels: MarkdownCodeLabels | undefined
-  /** Complete localized Markdown labels; optional for legacy internal callers. */
-  readonly labels?: MarkdownLabels
+  /** Localized Markdown chrome. */
+  readonly labels: MarkdownLabels
   /** Inside a blockquote's children: tables there always fill the quote's width. */
   readonly inBlockquote?: boolean
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
@@ -324,7 +322,7 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
   // The replaced pipeline recovered the grammar id from the hast class with
   // /language-([\w-]+)/, which truncates at the first non-word character.
   const lang = language === undefined ? undefined : /^[\w-]+/.exec(language)?.[0]
-  const labels = context.labels?.code ?? context.codeLabels ?? { copyLabel: '复制', copiedLabel: '复制成功' }
+  const labels = context.labels.code
   if (!context.streaming && lang === 'math') {
     // ```math fences render as display TeX once settled (rehype-katex parity);
     // its text extraction saw the code block's trailing newline.
@@ -605,7 +603,7 @@ export function renderFootnoteSection(context: MarkdownRenderContext): ReactNode
   if (items.length === 0) return null
   return (
     <section key="footnotes" data-footnotes className="footnotes">
-      <h2 id="footnote-label" className="sr-only">{context.labels?.footnotes ?? 'Footnotes'}</h2>
+      <h2 id="footnote-label" className="sr-only">{context.labels.footnotes}</h2>
       <ol>{items}</ol>
     </section>
   )

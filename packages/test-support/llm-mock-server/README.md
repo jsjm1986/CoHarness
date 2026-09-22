@@ -6,6 +6,10 @@ A scriptable OpenAI-compatible HTTP/SSE server for exercising real LLM adapters,
 
 The library entry exports `startMockLlmServer(options)`, behavior and telemetry types, the default random stress weights, the accepted Node timer bound, and a running handle with the bound `baseURL`, generated or configured `randomSeed`, captured requests, and idempotent `close()`. Closing force-terminates stalled connections.
 
+## Summary
+
+This package gives tests and demos a scriptable OpenAI-compatible HTTP/SSE endpoint, so they can exercise model-provider failures and successes without a provider key. Each accepted `/chat/completions` request consumes the next scripted behavior, including resets, stalls, malformed chunks, rate limits, server errors, completions, and tool calls. Test authors can run it with `pnpm run mock:llm` or call `startMockLlmServer`, which returns captured requests for assertions. Seeded `random` behavior supports reproducible mixed-failure stress runs.
+
 ## Standalone use
 
 Run the source entry from this repository:
@@ -70,6 +74,10 @@ When random weights include `stall`, configure the client under test with a shor
 ## Timing and content controls
 
 The CLI exposes `--success-text`, `--partial-text`, `--reasoning-text`, `--chunk-size`, `--chunk-delay-ms`, `--disconnect-delay-ms`, `--retry-after-ms`, `--request-id`, `--tool-name`, and `--tool-arguments`. Millisecond delays are bounded integers within Node's timer range; `retryAfterMs` must also be positive. The library accepts the same camel-case options. An optional exact `apiKey` validates `Authorization: Bearer <token>`; omission accepts any token.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. A test fixture whose scripted behaviors are consumed in arrival order; its correctness is enforced by the suites that drive it.
 
 ## Model Experience
 

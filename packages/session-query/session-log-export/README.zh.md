@@ -4,6 +4,10 @@
 
 Web Session 日志下载控制，使用 `dsh-host-apiproxy` 拥有的 Host 流式 ZIP 端点。Host 半包注册 `/export`；浏览器半包在桌面 Session Header 中提供 111×32 的 `Session log` 操作，在 compact AppFrame 顶栏提供纯图标操作，并让两个按钮与斜杠命令共用一个下载控制器和弹窗。ZIP 生成、原始 JSONL/zstd 读取、子 Session、附件、背压和 HTTP 错误语义仍由 [ApiProxy 下载实现](../../host/apiproxy/README.zh.md)负责。
 
+## 概述
+
+`dsh-session-log-export` 让 Web 界面可以下载会话的完整历史：Session Header 更多操作按钮下的 `下载 Session 日志` 菜单项与 `/export` 斜杠命令都会把会话树——会话本身、其子会话与附件——作为 ZIP 交给浏览器下载。本包拥有 Host 归档流、经过认证的 Fetch 路由以及浏览器控件和反馈。下载目标位置由浏览器选择。设置与用法在前，随后说明实现细节。
+
 ## 命令约定
 
 | 输入 | 结果 |
@@ -40,7 +44,7 @@ Web bundle 将本包与 `dsh-host-apiproxy`、`dsh-commands`、`dsh-client-ui-co
 
 #### KV Cache 影响
 
-无。仅日志命令生命周期和浏览器下载不会改变派生请求前缀。
+无。仅日志命令生命周期与浏览器下载不会改变派生请求前缀。
 
 ## 已知限制与暂缓事项
 

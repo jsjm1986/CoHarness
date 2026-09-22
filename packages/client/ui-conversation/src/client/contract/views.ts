@@ -1,10 +1,10 @@
 /** Shared conversation view, selection, and store-state contracts. */
 
 /** Tool call identity as carried on the wire (branded upstream in connection). */
-export type CallId = string
+export type ToolCallId = string
 
 /** Selection target for the details linkage channel (toolcall is the step special case). */
-export interface SelectionTarget { turnSeq: number; stepSeq?: number; callId?: CallId; toolName?: string }
+export interface SelectionTarget { turnSeq: number; stepSeq?: number; callId?: ToolCallId; toolName?: string }
 
 /**
  * One conversation view tab, projected from a 'conversation.view' slot
@@ -28,5 +28,5 @@ export interface ChatStoreState {
    * view consumes it and acknowledges by clearing. Read with `?? null` —
    * persisted snapshots from before this field rehydrate without it.
    */
-  inspect: { callId: CallId } | null
+  inspect: { callId: ToolCallId } | null
 }

@@ -5,7 +5,7 @@
  */
 
 import { mkdtempSync, writeFileSync } from 'node:fs'
-import { SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -30,6 +30,7 @@ import {
 import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { sessionBackedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const sid = (id: string): SessionId => id as SessionId
 
@@ -39,7 +40,7 @@ function request<P>(payload: P): RpcRequest<P> {
 }
 
 function header(id: string, createdAt: number, extra: Partial<SessionHeader> = {}): SessionHeader {
-  return { version: 0, id: sid(id), createdAt, cwd: '/proj', isSeeded: false, ...extra }
+  return { version: SESSION_FORMAT_VERSION, id: sid(id), createdAt, cwd: '/proj', isSeeded: false, ...extra }
 }
 
 const userMessage = (seq: number, body: string): SessionEvent => ({
@@ -96,7 +97,8 @@ describe('sessions.list cold merge', () => {
       throw new Error(`unexpected cold read: ${id}`)
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve(metas),
+      list: () => Promise.resolve((metas).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve(metas),
       locate: (meta: SessionHeader) => {
         if (meta.id === sid('large-unknown')) return { kind: 'jsonl', path: largePath }
         if (meta.id === sid('locationless')) return undefined
@@ -154,7 +156,8 @@ describe('sessions.list cold merge', () => {
     const meta = header('probe-disabled', 100)
     const readFrom = vi.fn()
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       locate: () => ({ kind: 'jsonl', path: '/not-read' }),
       readFrom,
     } as never)
@@ -184,7 +187,8 @@ describe('sessions.list cold merge', () => {
     const started = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       locate: () => ({ kind: 'jsonl', path }),
       readFrom: async () => {
         started.resolve(undefined)
@@ -290,7 +294,8 @@ describe('cold history recovery view', () => {
       throw new SessionPersistenceReadError('too-large', 'page limit reached')
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(SessionPersistenceRevision('page-errors:1')),
       locate: () => undefined,
@@ -363,7 +368,8 @@ describe('cold history recovery view', () => {
     })
     const revisionOf = vi.fn(async () => revision)
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       readPage,
       revision: revisionOf,
@@ -413,7 +419,8 @@ describe('cold history recovery view', () => {
       }
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(revision),
       locate: () => undefined,
@@ -436,12 +443,12 @@ describe('cold history recovery view', () => {
     const meta = header(sessionId, 1000)
     const revision = SessionPersistenceRevision('postgres:test:source-range')
     const chunk: SessionEvent = {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: SessionSeq(99),
       time: 2000,
-      data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'tail' } },
+      data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 2000, chunk: { type: 'text-delta', index: 0, text: 'tail' } }] },
     }
-    const message: SessionEvent = {
+    const message = {
       type: 'assistant/message',
       seq: SessionSeq(100),
       time: 2001,
@@ -452,7 +459,7 @@ describe('cold history recovery view', () => {
       },
       surfaceOp: 'append',
       sourceEventSeqs: [SessionSeq(98), SessionSeq(99)],
-    }
+    } as unknown as SessionEvent
     const readPage = vi.fn(async (_id: SessionId, pageRequest: { cursor?: string }): Promise<SessionPersistencePage> => {
       const first = pageRequest.cursor === undefined
       const events = first ? [chunk, message] : [{ ...chunk, seq: SessionSeq(98) }]
@@ -468,7 +475,8 @@ describe('cold history recovery view', () => {
       }
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(revision),
       locate: () => undefined,
@@ -510,7 +518,8 @@ describe('cold history recovery view', () => {
       throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(SessionPersistenceRevision('walk:1')),
       locate: () => undefined,
@@ -562,7 +571,8 @@ describe('cold history recovery view', () => {
       }
     })
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(revision),
       locate: () => undefined,
@@ -608,18 +618,23 @@ describe('cold history recovery view', () => {
       uncompressedBytes: 512,
     }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       readPage,
       revision: () => Promise.resolve(SessionPersistenceRevision('walk:1')),
       locate: () => undefined,
     } as never)
-    ctx.provide('sessionProjectionCache', {
-      coldSnapshot: async () => {
+    ctx.provide('sessionQuery', {
+      observeSession: async () => {
         ctx.sessions.create(sessionId, {
           seed: [userMessage(0, 'head'), userMessage(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
           meta: { cwd: '/proj', createdAt: 1000 },
         })
-        return { asOfSeq: 99 as never, values: {} }
+        return {
+          cursor: 99 as never,
+          projections: { asOfSeq: 99 as never, values: {} },
+          [Symbol.dispose]: () => undefined,
+        }
       },
     } as never)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
@@ -650,7 +665,8 @@ describe('cold history recovery view', () => {
     const inspect = vi.fn(async () => ({ meta, events }))
     const revisionOf = vi.fn(async () => revision)
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       revision: revisionOf,
       locate: () => undefined,
@@ -701,11 +717,14 @@ describe('cold history recovery view', () => {
       ),
       appendBatch: () => Promise.resolve(),
       commitRepair: () => Promise.resolve(),
-      list: () => Promise.resolve([structuredClone(meta)]),
+      listStored: () => Promise.resolve([structuredClone(meta)]),
     }
     const coordinator = new PersistenceCoordinator(ctx, backend)
     ctx.provide('sessionPersistence', {
-      list: (signal?: AbortSignal) => backend.list(signal),
+      listStored: (signal?: AbortSignal) => backend.listStored(signal),
+      listHeaders: (signal?: AbortSignal) => backend.listStored(signal),
+      list: (options?: { signal?: AbortSignal }) => backend.listStored(options?.signal)
+        .then(headers => headers.map(header => ({ header }))),
       inspect: (id: SessionId, signal?: AbortSignal) => coordinator.inspect(id, signal),
       locate: () => undefined,
     } as never)
@@ -742,6 +761,70 @@ describe('cold history recovery view', () => {
 })
 
 describe('Remote Agent and Session lookup policy', () => {
+  it('resumes a cold session before mutating a restored queue row', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-cold-queue-mutation')
+    const meta = header(sessionId, 1000)
+    const message = createUserMessage({
+      content: [{ type: 'text', text: 'survives restart' }],
+      source: { kind: 'user' },
+    })
+    const events = [{
+      type: 'agent/inbox/spliced',
+      seq: SessionSeq(0),
+      time: 1001,
+      data: { target: 'next-turn', start: 0, inserted: [message] },
+    }] as SessionEvent[]
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
+      inspect: () => Promise.resolve({ meta, events }),
+      locate: () => undefined,
+    } as never)
+    let resumedAgent: Agent | undefined
+    const resume = vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {
+      const session = ctx.sessions.create(sessionId, {
+        seed: events,
+        meta: { cwd: '/proj', createdAt: meta.createdAt },
+      })
+      resumedAgent = {
+        id: session.id,
+        session,
+        status: 'idle',
+        ctx,
+        send() {},
+        followup() {},
+        steer() {},
+        inject() {},
+        cancel() {},
+        runMaintenance: (task: (signal: AbortSignal) => unknown) => task(new AbortController().signal),
+        whenIdle: () => Promise.resolve(),
+      } as unknown as Agent
+      sessionBackedInbox(resumedAgent)
+      await ctx.agents.register(resumedAgent)
+      return { agent: resumedAgent, dispose: () => Promise.resolve() }
+    })
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.updateQueue(request({
+      sessionId,
+      itemId: message.id,
+      action: { kind: 'remove' },
+    }))
+
+    expect(response.result.ok).toBe(true)
+    if (response.result.ok) expect(response.result.value).toEqual({ accepted: true })
+    expect(resume).toHaveBeenCalledOnce()
+    expect(resumedAgent?.inbox.nextTurn).toEqual([])
+    expect(resumedAgent?.session.snapshotEvents().at(-1)).toMatchObject({
+      type: 'agent/inbox/spliced',
+      data: { target: 'next-turn', start: 0, removedCount: 1, inserted: [], outcome: 'canceled' },
+    })
+  })
+
   it('deduplicates a cold resume across Agent and Session parameters', async () => {
     const ctx = new Context()
     await ctx.plugin(TypertRegistry)
@@ -752,7 +835,8 @@ describe('Remote Agent and Session lookup policy', () => {
     const meta = header(sessionId, 1000)
     const inspect = vi.fn(() => Promise.resolve({ meta, events: [] as SessionEvent[] }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       locate: () => undefined,
     } as never)
@@ -797,7 +881,8 @@ describe('Remote Agent and Session lookup policy', () => {
     })
     const inspect = vi.fn(() => Promise.resolve({ meta: coldMeta, events: [] as SessionEvent[] }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([coldMeta]),
+      list: () => Promise.resolve(([coldMeta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([coldMeta]),
       inspect,
       locate: () => undefined,
     } as never)
@@ -866,7 +951,8 @@ describe('subagent ownership fence', () => {
     ] as SessionEvent[]
     const inspect = vi.fn(() => Promise.resolve({ meta, events }))
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect,
       locate: () => undefined,
     } as never)
@@ -923,7 +1009,8 @@ describe('subagent ownership fence', () => {
       },
     ] as SessionEvent[]
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({ meta, events }),
       locate: () => undefined,
     } as never)
@@ -1136,6 +1223,7 @@ describe('degenerate composition (no persistence, no factory)', () => {
     const inspect = vi.fn()
     ctx.provide('sessionPersistence', {
       list: () => Promise.resolve([]),
+      listHeaders: () => Promise.resolve([]),
       inspect,
     } as never)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
@@ -1144,6 +1232,22 @@ describe('degenerate composition (no persistence, no factory)', () => {
     expect(response.result.ok).toBe(false)
     if (!response.result.ok) expect(response.result.error.code).toBe('session-not-found')
     expect(inspect).not.toHaveBeenCalled()
+  })
+
+  it('answers updateQueue with queue-item-not-found when no persistence backend exists', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.updateQueue(request({
+      sessionId: sid('session-ghost'),
+      itemId: MessageId('queued-item'),
+      action: { kind: 'remove' },
+    }))
+    expect(response.result.ok).toBe(false)
+    if (!response.result.ok) expect(response.result.error.code).toBe('queue-item-not-found')
   })
 })
 
@@ -1246,7 +1350,8 @@ describe('sessions.prompt synchronous rejection', () => {
     const sessionId = sid('race-resume')
     const meta: SessionHeader = header('race-resume', 1000)
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([meta]),
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
       inspect: () => Promise.resolve({ meta, events: [] as SessionEvent[] }),
       locate: () => undefined,
     } as never)

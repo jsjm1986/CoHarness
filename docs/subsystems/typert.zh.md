@@ -46,7 +46,8 @@ type TypertCodec =
   | {
     readonly mode: 'strict'
     readonly typeSymbol: string
-    readonly schema: TypertSchema
+    /** Materialize and return the process-realm schema on first boundary use. */
+    readonly create: () => TypertSchema
   }
   | {
     readonly mode: 'src-json'
@@ -262,14 +263,14 @@ register(contribution: TypertContribution): TypertDisposer
 /**
  * Look up one schema by `<package>#<name>`.
  * @param key - global schema key.
- * @returns the live schema record, or `undefined` when absent.
+ * @returns a record containing the cached schema, or `undefined` when absent.
  */
 get(key: string): TypertSchemaRecord | undefined
 
 /**
  * Resolve one required schema.
  * @param key - global schema key.
- * @returns the live schema record.
+ * @returns a record containing the cached schema.
  * @throws when the key is malformed, the package face is absent, or the schema is not contributed.
  */
 resolve(key: string): TypertSchemaRecord
@@ -277,7 +278,7 @@ resolve(key: string): TypertSchemaRecord
 /**
  * Enumerate live schemas in registration order.
  * @param filter - optional package and face restriction.
- * @returns matching schema records.
+ * @returns matching records containing the cached schemas.
  */
 list(filter: TypertSchemaFilter = {}): TypertSchemaRecord[]
 

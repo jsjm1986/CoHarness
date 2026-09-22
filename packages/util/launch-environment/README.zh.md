@@ -12,6 +12,10 @@
 
 这些值同样会进入 `process.env`——用户自己的 `--config` 树和第三方库要读它——但那份压平的视图不是 harness 解析任何值的依据。
 
+## 概述
+
+使用 `@deepseek-ai/dsh-launch-environment` 解析启动时的环境值，无需信任压平的 `process.env`。它会冻结继承的进程值、调用目录的 `.env` 和 Harness 主目录的 `.env`，再按固定可信顺序返回胜出的值及其来源。调用方可以在敏感查找中排除某些层；无论之后顺序如何变化，被省略的层都不可达。快照不可变，但每一层仍会被复制到 `process.env`，因此它不隔离子进程。请把它作为库导入；不能从 `cordis.yml` 挂载它。
+
 ## 解析
 
 `get(name)` 按可信度从高到低搜索所有层。`getFrom(name, sources)` 只搜索指定的层，不改变这一可信顺序。
@@ -29,6 +33,8 @@ const endpoint = launchEnvironmentOf(ctx).get('DEEPSEEK_BASE_URL')?.value
 ```
 
 当产品 CLI（命令行界面）启动了这棵树时，`launchEnvironmentOf(ctx)` 返回启动器的快照；否则返回只含继承环境的那一层。该回退并不削弱规则：SDK 宿主或裸 `cordis.yml` 从未发现过任何文件，因此它拥有的一切确实就是它被启动时的环境。
+
+**运行时不变式：** 不发布伴生入口。快照在任何 fiber 启动前即已冻结，并且本包不拥有任何事件流或可变运行时数据；单元测试会强制检查其查找与拒绝规则。
 
 ## 已知限制与暂缓事项
 

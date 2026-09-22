@@ -6,6 +6,10 @@
 
 这是一个**实现**包：它向 `ctx.web` 注册提供方，通过可选的 `ctx.credentials` seam 为每次搜索解析凭据，若存在发起请求的 agent（智能体）会话，还会在其中记录该辅助请求，且不注册面向模型的工具。与 `@deepseek-ai/dsh-llm-deepseek` 一样，它是函数／命名空间插件（`inject: ['web']`）。Anthropic 协议格式（wire format）是提供方私有细节，并**不**使该提供方依赖 `ctx.llm`。
 
+## 概述
+
+有了 `dsh-web-search-deepseek`，harness 可以通过 DeepSeek 原生搜索检索 web，使用部署已有的 `DEEPSEEK_API_KEY`。当部署希望使用 DeepSeek 原生搜索、并接受一次搜索在延迟与 token 上消耗一个完整模型轮次时选择它，因为 DeepSeek 不提供专用搜索端点。结果来自 DeepSeek 返回的结构化搜索块，绝不会从回复文本中抓取。凭据缺失时调用以结构化错误失败；响应缺少搜索结果块时会明确报错，而非降级。面向模型的 `web_search` 工具位于 `dsh-tool-web`。
+
 ## 与专用搜索端点的区别
 
 Exa 和 Perplexity 提供专用搜索端点，DeepSeek 则没有。该提供方改为发起一次携带 `web_search` 服务器工具的**完整 Messages 模型调用**，因此一次搜索会产生完整模型轮次的延迟与 token 开销，比纯检索端点更重。DeepSeek 在服务器侧执行搜索，返回**结构化** `web_search_tool_result` 块；提供方解析这些块，**绝不会从模型文本中抓取 URL**。
@@ -49,6 +53,10 @@ DeepSeek 返回的提供方生成答案均不被该提供方信任为 `content`�
 
 由 agent 发起的搜索会在发出请求前一刻，向相应会话追加仅用于日志的 `web/deepseek-search-llm-request` 会话事件。其中包含已解析端点、API 版本，以及发送给 DeepSeek 且不含密钥的精确 JSON 请求体；不包含标头和凭据。发出请求前发生凭据处理失败或取消时不会创建事件；发出请求后才发生 HTTP 或响应失败时，本次请求尝试仍保留持久记录。在 agent 之外通过程序直接调用提供方时，没有发起会话可供记录。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次查询是一次映射为规范化结果的无状态提供方请求；调用之间不保留搜索状态。
+
 ## 模型体验
 
 ### 辅助 DeepSeek 搜索请求
@@ -69,11 +77,11 @@ DeepSeek 返回的提供方生成答案均不被该提供方信任为 `content`�
 
 #### 模型看到的内容
 
-通过 [`dsh-tool-web`](../tool-web/README.zh.md)，会话模型会看到结构化搜索块中去重后的 URL、标题、日期与引用 snippet；提供方文本不会作为答案受到信任。该提供方的错误消息包括带有处理指引的凭据缺失消息、`DeepSeek search credential resolution failed: <error>`、`DeepSeek search aborted`，以及保留实际端点和恢复指引的请求/HTTP/响应失败；错误包装属于消费方。
+通过 `dsh-tool-web`，会话模型会看到结构化搜索块中去重后的 URL、标题、日期与引用 snippet；提供方文本不会作为答案受到信任。该提供方的具体失败消息包括带有处理指引的凭据缺失消息、`DeepSeek search credential resolution failed: <error>` 和 `DeepSeek search aborted`。请求、HTTP、原生搜索和响应正文失败会追加已解析端点及前述条件式配置指引。错误包装属于消费方。
 
 #### Token 影响
 
-注册不会直接产生会话 token。结果 token 随返回源与 snippet 增长，随后 seam 会强制执行请求的源数量上限。
+注册不会直接产生会话 token。结果 token 随返回源与 snippet 增长，随后服务强制执行请求的来源上限。
 
 #### KV Cache 影响
 

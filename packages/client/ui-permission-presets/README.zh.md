@@ -8,9 +8,17 @@
 
 `/client` 导出面为插件本体（`apply`／`inject`）。
 
+## 概述
+
+为当前 Web 会话或未来会话选择权限预设。通用设置行只更改之后创建会话所用的默认值；composer 与 `/permission` 选择器切换当前会话。默认 Web 提供仅可查看、工作区内修改与完全权限。显式加载实验 Auto integration 后，当前会话选择器会增加带 `EXP` 标记的 Auto review。通过可见选项选择完全权限或 Auto 时，需要分别确认对应风险；完整的 `/permission <preset>` 命令直接执行。宿主通过 Session 投影确认每次变更。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该行绑定一个 Host 拥有的 Settings 描述符，preset 数据留在 host 权限域中；没有包拥有的持久内容可供比较。
+
 ## 模型体验
 
-通过两个界面写入的权限事实间接影响：Settings 行使未来会话带着全量值旋钮事件（`permission/preset`、`sandbox/mode`、`approval/policy`）启动，而 `/permission` 选择框切换当前会话时会追加相同的事实；这些事件决定后续工具调用解析到的沙箱模式与审批策略，选择框交互本身不添加任何提示词内容。
+间接影响。它的两个界面写入权限事实：设置行使未来会话带着全量值旋钮事件启动，而 `/permission` 选择器追加选中的当前会话预设。沙箱与审批消费方各自解析自己的旋钮事件；选择 `auto` 还会启用宿主 Auto integration 的独立逐调用 reviewer。
 
 #### KV Cache 影响
 

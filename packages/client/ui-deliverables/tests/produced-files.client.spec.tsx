@@ -26,7 +26,6 @@ import {
   type DeliverablesTurnData,
 } from '../src/client/turn-deliverables.ts'
 import { apply, inject } from '../src/client/index.ts'
-import { apply as applyInvariant } from '../src/invariant.ts'
 import { en, zh } from '../src/client/locales.ts'
 
 afterEach(() => {
@@ -388,20 +387,6 @@ describe('producedFileMentions resolver', () => {
     expect(resolver.resolve('style.css')).toBeUndefined()
     expect(resolver.resolve('notes.md')).toBeUndefined()
     expect(basename('a\\b\\c.txt')).toBe('c.txt')
-  })
-})
-
-describe('package shells', () => {
-  it('the invariant companion registers ownership', async () => {
-    const registered: string[] = []
-    const ctx = new Context()
-    ctx.provide('invariants')
-    ctx.set('invariants', {
-      register: (pkg: string) => { registered.push(pkg); return () => {} },
-    } as never)
-    const dispose = await applyInvariant(ctx)
-    expect(registered).toEqual(['@deepseek-ai/dsh-client-ui-deliverables'])
-    expect(dispose).toBeTypeOf('function')
   })
 })
 

@@ -261,7 +261,12 @@ function expectMergedPair(fixture: Fixture): void {
   )
 }
 
-describe('translation pairing merge composition', { timeout: 15_000 }, () => {
+// Every case in this suite drives real `git` invocations against a scratch
+// repository, so it is bound by process creation rather than by its assertions.
+// A describe-level value below DSH_COVERAGE_TEST_TIMEOUT_MS overrides the
+// coverage lane's --testTimeout grant for every case in the file, so this stays
+// above the lane value.
+describe('translation pairing merge composition', { timeout: 90_000 }, () => {
   it('rejects a pairing-record path outside the repository', () => {
     const fixture = createFixture(false)
 

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The SDK provider runs each subagent as a complete DeepSeek Harness runtime in a fresh subprocess, driven over stdio JSON-RPC through the [TypeScript SDK client](../../sdk/client/README.md). It is the second out-of-process backend beside [`subagent-acp`](../subagent-acp/README.md), differing in the wire and the child contract: the ACP backend drives any Agent Client Protocol agent; this backend drives specifically a harness SDK runtime (`dsh-jsonrpc-agent` bin or packaged executable), so the child is a full peer harness — own `cordis.yml`-decided composition, session persistence, model route, and tools.
 
+## Summary
+
+`dsh-subagent-dsh-sdk` runs each delegated task in a fresh DeepSeek Harness subprocess with its own profile, session, model route, and tools. The parent provides the task and working directory, while each child uses its configured runtime and remains isolated from the parent conversation. The parent receives the child's final assistant text or a safe error; intermediate messages and tool traffic stay inside the child process. Choose this backend when delegation needs a complete Harness runtime rather than shared in-process state, and accept the cost of starting a new process for every run.
+
 ## Start and ownership
 
 `start(request)` resolves the child's working directory, spawns the runtime through `DeepSeekHarness`, and completes the `initialize` handshake (with the configured `provider`/`model` route and optional `maxTokens` output cap) before it fulfills. Fulfillment therefore means the child runtime is ready and ownership has transferred to the caller. A spawn, handshake, or pre-publication cancellation failure rejects only after the subprocess has been reaped; a working-directory resolution failure rejects before anything is spawned.
@@ -16,7 +20,7 @@ The returned run id is minted in the parent namespace; the child runtime's sessi
 
 ## Stop-reason mapping
 
-The SDK client returns an owned child activity rather than a prompt result. The provider reads the last durable `turn/end` inside that activity and maps it into the seam vocabulary: `completed` → `completed`, `max-tokens` → `max-tokens`, `aborted` → `aborted`; everything else — `error`, `interrupted`, `disposed`, a future variant, or an activity with no turn — maps to `error`, so an unclean stop is never reported as success. Transport-level failures after publication flatten to `stopReason: 'error'` through the `onError` diagnostic sink (wired to `ctx.logger.warn`); the seam contract forbids `result` rejecting.
+The SDK client returns an owned child activity rather than a prompt result. The provider reads the last durable `turn/end` inside that activity and maps it into the seam vocabulary: `completed` → `completed`, `max-tokens` → `max-tokens`, `blocked` → `refusal`, `aborted` → `aborted` (a child-side `disposed` cause adds a `child-disposed` diagnostic); everything else — `error`, `interrupted`, a future variant, or an activity with no turn — maps to `error`, carrying a fixed safe diagnostic where one applies, so an unclean stop is never reported as success. Transport-level failures after publication flatten to `stopReason: 'error'` with a diagnostic through the `onError` diagnostic sink (wired to `ctx.logger.warn`); the seam contract forbids `result` rejecting.
 
 ## Capabilities and context
 
@@ -59,13 +63,17 @@ The child environment is the [`dsh-subprocess`](../../subprocess/README.md) seam
 
 The package has no default export. Cordis loader unwrapping would otherwise hide the named `inject` metadata; see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The child is a full peer runtime owning its composition and session; the provider drives it over stdio JSON-RPC and keeps no mirrored state.
+
 ## Model Experience
 
 ### Child-agent request
 
 #### What the model sees
 
-The child runtime's model receives the standalone task as its user message plus that runtime's own configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for persona, tool filtering, depth enforcement, or structured output instead of silently omitting them.
+The child runtime's model receives the standalone task as its user message plus that runtime's own configured system prompt, tools, and fresh session. It receives no parent conversation. A parent tool call may choose the child provider, model, and reasoning effort for this run; the selected route and any deployment-owned output cap are fixed for the new child process. Persona, tool filtering, depth enforcement, and structured output remain unsupported and are rejected instead of silently omitted.
 
 #### Token effect
 
@@ -79,7 +87,7 @@ Independent of the parent request cache. Each SDK child can reuse only prefixes 
 
 #### What the model sees
 
-Through `dsh-tool-subagent`, the parent receives only the child's final assistant text (or accumulated partial text) or that consumer's exact stop-reason error, not intermediate messages or tool traffic.
+Through `dsh-tool-subagent`, the parent receives only the child's final assistant text (or accumulated partial text) or that consumer's exact stop-reason error, not intermediate messages or tool traffic. A diagnostic-bearing non-completed result presents the safe diagnostic before separately preserved partial assistant output; startup and shutdown errors expose the same fixed facts without raw SDK text.
 
 #### Token effect
 

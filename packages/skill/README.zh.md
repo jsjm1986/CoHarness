@@ -14,3 +14,8 @@
 该能力位于核心控制主干之外，可以使用本地、嵌入式或远程提供方，而无需更改面向模型的约定。
 
 子系统参考——发现优先级、目录快照、`skill` 加载器——见 [docs/subsystems/skills.md](../../docs/subsystems/skills.zh.md)。
+
+
+## 概述
+
+skill 家族让 agent 和用户仅在需要时发现并加载可复用的任务指令。使用 `skill/` 合并目录并为每个名称提供一组指令；需要从项目、自定义或用户目录发现 skill 时选择 `skill-filesystem`，需要可选的官方徽章时选择 `skill-badge`，需要 Word、PowerPoint 和 Excel 工作流时选择 `skill-office`。需要让模型获得排序且持久的会话目录、通过 `skill` 工具加载完整指令，或接受 `/name` 直接调用时，请添加 `tool-skill`。不同来源生成相同的模型可见格式，启用模型访问前必须配置至少一个来源。

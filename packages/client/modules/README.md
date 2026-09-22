@@ -14,9 +14,13 @@ The Node half scans enabled Loader entries for web `dsh.client` packages, resolv
 
 `dsh.client.external` is an optional exact-specifier request list beyond the implicit baseline: shell-seeded React, Cordis, and static UI libraries plus parser-preloaded runtime. A request is answered by the dynamic package row it names or an exact static-table key; only a trailing `/client` aliases a package row, and there is no provider-alias declaration. Type-only imports are erased and create no request. Composition rejects malformed requests, missing suppliers, self-requests, and synchronous request cycles; import and prefetch recursively register dynamic suppliers before their consumers materialize. See [shared modules and the module graph](../AGENTS.md#shared-modules-and-the-module-graph).
 
+## Summary
+
+`dsh-client-modules` turns a plugin package's `dsh.client` declaration into a loadable browser bundle: the host half scans enabled Loader entries and composes the boot graph, an available Web carrier serves each bundle over `/plugins`, and a shell-owned carrier dispatches the same exact bundle responses through `fetchBundle()`. The browser half loads those bundles lazily on demand. Plugin bundles execute lazily — running a bundle only registers a factory, and module side effects run at materialization — so nothing runs until a plugin is first used. Everything here is browser-kernel machinery; the model never sees it.
+
 ## Model Experience
 
-None, as the module loader is browser-side kernel machinery; nothing here reaches a model request.
+None, as the module loader is browser-side kernel machinery that registers nothing model-facing.
 
 #### KV Cache effect
 

@@ -17,3 +17,8 @@
 叶节点 `cordis.yml` 选择一个执行器实现和所需的面向模型工具。沙箱化组合还会选择一个 `ctx.sandbox` 提供方；[ACP（Agent Client Protocol）示例](../../examples/acp-agent/)展示一套完整接线。
 
 子系统参考——请求/spec 词汇、结果、后台进程、服务与事件——见 [docs/subsystems/shell.md](../../docs/subsystems/shell.zh.md)。
+
+
+## 概述
+
+shell 组为 agent（智能体）提供命令执行能力：运行前台命令并读取其有界输出，或启动后台进程并轮询它——在 POSIX 上用 Bash，在 Windows 上用 PowerShell。每个组合恰好挂载一个执行器实现；沙箱执行器会通过沙箱能力限制每条命令，面向模型的 `bash` 与 `pwsh` 工具则位于所挂载执行器之上。POSIX 选择 Bash 执行器，Windows 选择 PowerShell 执行器；命令需要文件级隔离时选择沙箱变体。

@@ -219,6 +219,24 @@ export class ProjectModelsBridge {
         hasDocument: view.hasDocument,
       }
     })
+    const mutateNamespace = async (
+      payload: { expectedRevision?: number },
+      opsFor: (namespace: SettingsNamespaceView) => ProjectSettingsOp[],
+    ): Promise<RpcResponse<SettingsNamespaceView>> => {
+      const current = await this.read()
+      const namespace = current.namespaces[0]
+      if (namespace === undefined) throw new Error('project model settings namespace is unavailable')
+      if (payload.expectedRevision !== undefined && payload.expectedRevision !== namespace.revision) {
+        return conflict('llm-pi-ai', payload.expectedRevision, namespace.revision)
+      }
+      const ops = opsFor(namespace)
+      if (ops.length === 0) return ok(namespace)
+      const result = await this.transport.mutate(this.projectId, {
+        ops, expectedRevision: payload.expectedRevision ?? namespace.revision,
+      })
+      this.publish(result)
+      return ok(result.namespaces[0] as SettingsNamespaceView)
+    }
     const settings = {
       describe: async () => {
         const view = await this.read()
@@ -230,37 +248,15 @@ export class ProjectModelsBridge {
         })
       },
       openDocument: () => Promise.resolve(ok({ opened: true as const })),
-      update: async (payload: { patch: object; expectedRevision?: number }) => {
-        const current = await this.read()
-        const namespace = current.namespaces[0]
-        if (namespace === undefined) throw new Error('project model settings namespace is unavailable')
-        if (payload.expectedRevision !== undefined && payload.expectedRevision !== namespace.revision) {
-          return conflict('llm-pi-ai', payload.expectedRevision, namespace.revision)
-        }
+      update: async (payload: { patch: object; expectedRevision?: number }) => mutateNamespace(payload, () => {
         const ops: ProjectSettingsOp[] = []
         for (const [key, value] of Object.entries(payload.patch)) appendPatchOps(value, [key], ops)
-        if (ops.length === 0) return ok(namespace)
-        const result = await this.transport.mutate(this.projectId, {
-          ops, expectedRevision: payload.expectedRevision ?? namespace.revision,
-        })
-        this.publish(result)
-        return ok(result.namespaces[0] as SettingsNamespaceView)
-      },
-      replace: async (payload: { section: object; expectedRevision?: number }) => {
-        const current = await this.read()
-        const namespace = current.namespaces[0]
-        if (namespace === undefined) throw new Error('project model settings namespace is unavailable')
-        if (payload.expectedRevision !== undefined && payload.expectedRevision !== namespace.revision) {
-          return conflict('llm-pi-ai', payload.expectedRevision, namespace.revision)
-        }
-        const ops = providerOps(namespace.user, payload.section, true)
-        if (ops.length === 0) return ok(namespace)
-        const result = await this.transport.mutate(this.projectId, {
-          ops, expectedRevision: payload.expectedRevision ?? namespace.revision,
-        })
-        this.publish(result)
-        return ok(result.namespaces[0] as SettingsNamespaceView)
-      },
+        return ops
+      }),
+      replace: async (payload: { section: object; expectedRevision?: number }) => mutateNamespace(
+        payload,
+        namespace => providerOps(namespace.user, payload.section, true),
+      ),
       mutate: async (payload: { ns: string; ops: Array<{ op: 'set' | 'unset'; path: string[]; value?: unknown }>; expectedRevision?: number }) => {
         const next = await this.transport.mutate(this.projectId, payload)
         this.publish(next)

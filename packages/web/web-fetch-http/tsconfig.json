@@ -9,13 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../../util/http-proxy"
     },
     {
       "path": "../../util/timeout"
@@ -24,10 +18,13 @@
       "path": "../web"
     },
     {
-      "path": "../../util/http-proxy"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

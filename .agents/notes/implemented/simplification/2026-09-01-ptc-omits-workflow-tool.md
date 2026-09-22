@@ -12,7 +12,7 @@ The shipped Web `ptc` preset exposed the general `workflow` tool through its gen
 
 The shipped Web `ptc` preset disables its `tool-workflow` row. Its generated PTC mode SDK therefore omits the `workflow` binding, while the model-facing wire contract remains the single `run_code` tool.
 
-The preset retains `workflow-worker-thread` in its isolated workflow realm because `tool-ralph` consumes the same engine. `ralph` remains available through the PTC mode SDK. The Standard and Creator presets continue to expose `workflow`, and a user-authored preset may mount the tool explicitly.
+The preset retains `workflow-ptc` in its isolated workflow realm because `tool-ralph` consumes the same engine. `ralph` remains available through the PTC mode SDK. The Standard and Creator presets continue to expose `workflow`, and a user-authored preset may mount the tool explicitly.
 
 The workflow package and its durable Session event types remain installed. Existing workflow records continue to render; this default composition change only prevents new top-level workflow calls from agents using the shipped `ptc` preset.
 

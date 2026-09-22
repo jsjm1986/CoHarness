@@ -10,7 +10,7 @@ O(1) 的 `contextBreakdown` fold 用最后一条 `system/message` **事件**的�
 
 ## 决策
 
-投影用一个小的有序列表（`systems: {seq, tokens}`）精确追踪存活的 system 节点，按每条 system 写入自身的价格以及 surface 溯源规则更新——`sourceEventSeqs` 覆盖所有被遮蔽节点，因此无论是提示维护还是压缩，任何 replace 都会让它遮蔽的条目退役。`systemTokens` 取最新的存活非空节点估值；message 统计为非 system surface fold 加上被取代条目的估值，与上游分类一致（有效提示入 system，其余存活可见价格入 message）。遮蔽被追踪节点的非 system replace 会将其估值结转入 message 累加器，使 fold 的保值契约在 claimed 与 unclaimed 两种 replace 下都跨桶一致。
+投影用一个小的有序列表（`systems: {seq, tokens}`）精确追踪存活的 system 节点，按每条 system 写入自身的价格以及 surface 来源引用规则更新——`sourceEventSeqs` 覆盖所有被遮蔽节点，因此无论是提示维护还是压缩，任何 replace 都会让它遮蔽的条目退役。`systemTokens` 取最新的存活非空节点估值；message 统计为非 system surface fold 加上被取代条目的估值，与上游分类一致（有效提示入 system，其余存活可见价格入 message）。遮蔽被追踪节点的非 system replace 会将其估值结转入 message 累加器，使 fold 的保值契约在 claimed 与 unclaimed 两种 replace 下都跨桶一致。
 
 ## 备选方案
 

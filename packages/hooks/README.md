@@ -11,3 +11,8 @@ The hooks subsystem lets users extend the agent at lifecycle points the way Clau
 | [`hooks-codex/`](hooks-codex/README.md) | Codex hook bridge | plugin |
 
 The shared library owns common protocol behavior; each bridge owns its dialect-specific event mapping. The child READMEs document those contracts.
+
+
+## Summary
+
+The hooks group lets agent runs reuse shell hooks written for Claude Code or Codex. Point the matching integration at an existing `hooks.json` to run supported command hooks when sessions start, prompts arrive, tools run, or runs stop. These hooks can block prompts or tool calls with model-visible messages, add conversation context, or require the run to continue. Choose this group to preserve existing hook configurations; each integration supports only the command-hook subset documented by its source tool.

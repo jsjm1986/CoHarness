@@ -4,6 +4,11 @@
 
 供 Gateway 启动的 Harness 运行时使用的认证请求上下文和私有 loopback 传输。启动凭据将进程绑定到一个组织、一个个人或项目运行时身份，以及用于验证短期浏览器 principal 的 Gateway 密钥。
 
+## 概述
+
+使用 `dsh-gateway-runtime` 获得 Gateway 启动的 Harness 运行时的已认证请求上下文与私有 loopback 传输。启动凭据把进程绑定到一个组织与一个个人或项目运行时身份，并为其他协作包验证短生命周期浏览器主体。
+
+
 ## 运行时约定
 
 - 启动凭据必须且只能从 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE` 之一读取。它包含仅限 loopback 的 Gateway origin、运行时 bearer token、运行时 generation、组织和 Ed25519 公钥。
@@ -13,13 +18,17 @@
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
 - 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。启动凭据在进程生命周期内绑定一个固定身份；请求上下文逐次调用派生，因此不存在可供比较的可变内容。
+
 ## 模型体验
 
-没有影响，因为此包认证 Host 操作，不贡献模型输入、工具或文本记录行。
+没有直接影响；请求上下文仅完成宿主操作认证，不贡献任何模型输入。
 
 #### KV Cache 影响
 
-此包不组装模型请求，也不改变已经可复用的前缀。
+无；本包从不组装或发送提供方请求。
 
 ## 已知限制与延期工作
 

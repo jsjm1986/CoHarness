@@ -9,34 +9,34 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../llm/llm"
+      "path": "../../core/agent"
     },
     {
       "path": "../../core/session"
     },
     {
-      "path": "../../core/agent"
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../core/tools"
     },
     {
-      "path": "../../core/system-prompt"
-    },
-    {
       "path": "../goal"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

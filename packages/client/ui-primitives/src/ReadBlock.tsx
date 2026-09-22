@@ -12,6 +12,7 @@
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { writeClipboard } from './clipboard.ts'
+import { ExpandButton } from './ExpandButton.tsx'
 import {
   grammarLoadCount,
   highlightLines,
@@ -54,16 +55,6 @@ export interface ReadBlockLabels {
   expand: (hidden: number) => string
 }
 
-const DEFAULT_LABELS: ReadBlockLabels = {
-  window: (shown, total) => `显示 ${shown} / ${total} 行`,
-  copy: '复制',
-  copied: '复制成功',
-  collapseAria: '收起内容',
-  expandAria: hidden => `展开其余 ${hidden} 行`,
-  collapse: '收起',
-  expand: hidden => `… 其余 ${hidden} 行`,
-}
-
 export interface ReadBlockProps {
   /** Banner label (the file path, or a tool-supplied replacement title); omitted draws no label. */
   label?: string | undefined
@@ -77,8 +68,8 @@ export interface ReadBlockProps {
   maxLines?: number | undefined
   /** Extra class merged onto the wrapper (callers position; this component draws). */
   className?: string | undefined
-  /** Localized display copy; omitted fields keep the built-in defaults. */
-  labels?: Partial<ReadBlockLabels> | undefined
+  /** Localized display copy supplied by the owning render site. */
+  labels: ReadBlockLabels
 }
 
 /**
@@ -105,14 +96,10 @@ export function ReadBlock({
   lang,
   maxLines = DEFAULT_READ_MAX_LINES,
   className,
-  labels,
+  labels: copy,
 }: ReadBlockProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const highlighting = useViewportHighlighting(rootRef, lang)
-  const copy = useMemo<ReadBlockLabels>(
-    () => (labels === undefined ? DEFAULT_LABELS : { ...DEFAULT_LABELS, ...labels }),
-    [labels],
-  )
   // The raw text the copy control writes and the highlighter tokenizes: the
   // window's lines joined by newlines, without the file numbers or any chrome.
   // Highlighting the whole window in one call (not line by line) keeps grammar
@@ -195,17 +182,7 @@ export function ReadBlock({
       </div>
       <div className={css.body}>
         {rows(capped ? paired.slice(0, headLines) : paired)}
-        {hidden > 0 && (
-          <button
-            type="button"
-            className={css.expand}
-            aria-expanded={expanded}
-            aria-label={expanded ? copy.collapseAria : copy.expandAria(hidden)}
-            onClick={onToggle}
-          >
-            {expanded ? copy.collapse : copy.expand(hidden)}
-          </button>
-        )}
+        <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
         {capped && rows(paired.slice(paired.length - tailLines))}
       </div>
     </div>

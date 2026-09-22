@@ -5,6 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SqliteSessionPersistence from '@deepseek-ai/dsh-session-persistence-sqlite'
 import SessionTitleService, { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
@@ -23,31 +24,41 @@ afterEach(async () => {
 
 async function appendPersistedTitle(ctx: Context, id: ReturnType<typeof SessionId>): Promise<void> {
   const session = ctx.sessions.create(id)
-  session.append('turn/start', {
-    turn: 1,
-  })
-  session.append('user/message', createUserMessage({
-    content: [{ type: 'text', text: 'Persist this session title' }],
-    source: { kind: 'user' },
-  }), { surfaceOp: 'append' })
-  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
-  await ctx.sessionTitle.refresh(session)
+  const handle = await ctx.sessionPersistence.create(session.header)
+  try {
+    session.append('turn/start', {
+      turn: 1,
+    })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'Persist this session title' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await ctx.sessionTitle.refresh(session)
+  } finally {
+    await handle.close()
+  }
 }
 
 async function expectPersistedTitle(ctx: Context, id: ReturnType<typeof SessionId>): Promise<void> {
-  const loaded = await ctx.sessionPersistence.load(id)
-  expect(foldSessionTitle(loaded.events)).toMatchObject({
-    title: 'Persist this session title',
-    messageSeqs: [1],
-    source: { kind: 'fallback' },
-    eventSeq: 3,
-  })
-  expect(loaded.events.map(event => event.type)).toEqual([
-    'turn/start',
-    'user/message',
-    'turn/end',
-    'session/title',
-  ])
+  const handle = await ctx.sessionPersistence.open(id, 'read')
+  try {
+    const { events } = await handle.read()
+    expect(foldSessionTitle(events)).toMatchObject({
+      title: 'Persist this session title',
+      messageSeqs: [1],
+      source: { kind: 'fallback' },
+      eventSeq: 3,
+    })
+    expect(events.map(event => event.type)).toEqual([
+      'turn/start',
+      'user/message',
+      'turn/end',
+      'session/title',
+    ])
+  } finally {
+    await handle.close()
+  }
 }
 
 describe('session title persistence round trips', () => {
@@ -57,6 +68,7 @@ describe('session title persistence round trips', () => {
     const id = SessionId('title-jsonl')
     const writer = new Context()
     await writer.plugin(SessionStore)
+    await writer.plugin(SessionProjectionRegistry)
     await writer.plugin(JsonlSessionPersistence, { root, compression: 'none' })
     await writer.plugin(SessionTitleService, CONFIG)
     await appendPersistedTitle(writer, id)
@@ -64,6 +76,7 @@ describe('session title persistence round trips', () => {
 
     const reader = new Context()
     await reader.plugin(SessionStore)
+    await reader.plugin(SessionProjectionRegistry)
     await reader.plugin(JsonlSessionPersistence, { root, compression: 'none' })
     await expectPersistedTitle(reader, id)
     await reader.fiber.dispose()
@@ -76,6 +89,7 @@ describe('session title persistence round trips', () => {
     const id = SessionId('title-sqlite')
     const writer = new Context()
     await writer.plugin(SessionStore)
+    await writer.plugin(SessionProjectionRegistry)
     await writer.plugin(SqliteSessionPersistence, { path })
     await writer.plugin(SessionTitleService, CONFIG)
     await appendPersistedTitle(writer, id)
@@ -83,6 +97,7 @@ describe('session title persistence round trips', () => {
 
     const reader = new Context()
     await reader.plugin(SessionStore)
+    await reader.plugin(SessionProjectionRegistry)
     await reader.plugin(SqliteSessionPersistence, { path })
     await expectPersistedTitle(reader, id)
     await reader.fiber.dispose()

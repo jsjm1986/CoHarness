@@ -183,6 +183,67 @@ type MessageFeedbackDeleteResult =
   | MessageFeedbackRejected<MessageFeedbackSessionNotFound | MessageFeedbackVersionConflict>
 ```
 
+```ts type-equiv
+/** One of the fixed feedback categories; the ids are durable log vocabulary. */
+type FeedbackCategory =
+  | 'task-result'
+  | 'instruction-following'
+  | 'product-interaction'
+  | 'service-stability'
+  | 'resource-cost'
+  | 'security-privacy-permission'
+  | 'other'
+```
+
+```ts type-equiv
+/**
+ * One recorded human remark about a Session. Both members are optional: a
+ * submission with neither still records that the human asked for the
+ * Session to be reviewed, which is what authorizes log delivery.
+ */
+interface FeedbackRecord {
+  /** Free-text remark with surrounding whitespace removed; never empty when present. */
+  readonly text?: string
+  /** Category the human filed the remark under. */
+  readonly category?: FeedbackCategory
+}
+```
+
+```ts type-equiv
+/** Record one Session-level remark through the Host Remote. */
+interface SessionFeedbackRecordRequest {
+  /** Live Session the remark describes. */
+  readonly sessionId: SessionId
+  /** Free-text remark; blank text is recorded as absent. */
+  readonly text?: string
+  /** Category the human filed the remark under. */
+  readonly category?: FeedbackCategory
+}
+```
+
+```ts type-equiv
+/** Stable postcondition of a recorded remark. */
+interface SessionFeedbackRecordValue {
+  /** The remark is appended to the Session log; flushing follows the Session's own schedule. */
+  readonly recorded: true
+}
+```
+
+```ts type-equiv
+/** No live Session carries the requested id. */
+interface SessionFeedbackSessionNotFound {
+  readonly code: 'session-not-found'
+  readonly sessionId: SessionId
+}
+```
+
+```ts type-equiv
+/** Result returned by the `sessionFeedback.record` operation. */
+type SessionFeedbackRecordResult =
+  | { readonly ok: true; readonly value: SessionFeedbackRecordValue }
+  | { readonly ok: false; readonly error: SessionFeedbackSessionNotFound }
+```
+
 ## 数据与并发
 
 每个 Session 的一条伴随记录包含 header 身份 `{createdAt, cwd}` 和以 `MessageId` 为键的反馈条目。每个条目携带好评或差评、可选备注、Host 分配的 `createdAt`/`updatedAt` 时间戳及自己的 opaque version。version 只能用于相等比较，且只与目标消息比较；调用方不能排序或自行合成它。

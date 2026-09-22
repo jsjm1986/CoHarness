@@ -117,7 +117,7 @@ export interface ISession {
    */
   loadHistoryUntil?(targetSeq: number): Promise<boolean>
   /**
-   * Download omitted historical `assistant/chunk` events for the installed
+   * Download omitted historical `assistant/attempt` events for the installed
    * window. Trajectory and inspect handoff call this; Chat does not. No-op
    * when the window already has detail.
    * @returns when the current range is seq-complete, or when a fill request

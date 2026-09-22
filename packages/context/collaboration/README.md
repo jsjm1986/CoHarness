@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Service Definition for authenticated [project collaboration](../../../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md). Consumers capture one request-bound authority instead of reading mutable account state from a process-global service.
 
+## Summary
+
+Use `dsh-collaboration` as the Service Definition for authenticated project collaboration: Consumers capture one request-bound authority — participant identity and ACL decisions — instead of reading mutable account state from a process-global service.
+
+
 ## Runtime contract
 
 - `capture()` returns the authenticated participant, assertion expiry, provider lifetime signal, session authorization, batch readability filtering, and atomic approval/question claiming for the current request.
@@ -11,13 +16,17 @@ Service Definition for authenticated [project collaboration](../../../.agents/no
 - `withSessionCreation()` carries a project root conversation's `project` or `private` visibility through the asynchronous create operation; `currentCreation()` exposes it only inside that operation.
 - `CollaborationError` preserves stable denial codes for RPC and HTTP Consumers. Providers fail closed when membership, visibility, or their authorization backend cannot be established.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package declares a request-bound authority contract only; providers carry whatever account state exists.
+
 ## Model Experience
 
-Indirectly, through authorization Consumers whose durable participant attribution is owned by `dsh-collaboration-context`.
+Indirectly, through consumers that own participant attribution and other model-visible behavior for the authorization operations this service defines.
 
 #### KV Cache effect
 
-The Service Definition contributes no request tokens and does not alter an already-reusable prefix.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

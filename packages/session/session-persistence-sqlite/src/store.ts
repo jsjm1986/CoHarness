@@ -26,12 +26,7 @@ import {
   type StoredSuffix,
 } from '@deepseek-ai/dsh-session-persistence'
 import {
-  MAX_PACKED_ROW_MEMBERS,
-  packChunkRuns,
-} from './codec.ts'
-import {
   bindRecord,
-  decodeRow,
   scanRows,
   type BoundRecord,
 } from './compression.ts'
@@ -207,7 +202,7 @@ export class SqliteStore implements PersistenceBackend<number> {
       this.db.prepare(sql('delete-event-extensions-from')).run(id, 0)
       this.db.prepare(sql('delete-events-from')).run(id, 0)
       const insert = this.insertStatement()
-      for (const record of packChunkRuns(events)) this.insertRecord(insert, id, bindRecord(record))
+      for (const event of events) this.insertRecord(insert, id, bindRecord(event))
       this.writeRow(currentStorage)
       this.incrementRevision(id)
       this.db.exec(sql('commit'))
@@ -237,7 +232,7 @@ export class SqliteStore implements PersistenceBackend<number> {
       if (!isMaterialized) this.writeRow(storage)
 
       const insert = this.insertStatement()
-      for (const record of packChunkRuns(events)) this.insertRecord(insert, meta.id, bindRecord(record))
+      for (const event of events) this.insertRecord(insert, meta.id, bindRecord(event))
       this.incrementRevision(meta.id)
       this.db.exec(sql('commit'))
     } catch (error: unknown) {
@@ -303,7 +298,7 @@ export class SqliteStore implements PersistenceBackend<number> {
     }
   }
 
-  async list(signal?: AbortSignal): Promise<SessionHeader[]> {
+  async listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
     await this.observe(signal)
     const rows = this.sessionRows()
     signal?.throwIfAborted()
@@ -399,27 +394,13 @@ export class SqliteStore implements PersistenceBackend<number> {
     return this.physicalSpanFrom(id, (tail[0] as EventRow).seq).eventRows
   }
 
-  /** Select the bounded physical span that may represent `fromSeq`. */
+  /** Select the physical rows representing `fromSeq` onward. */
   private physicalSpanFrom(
     id: SessionId,
     fromSeq: number,
   ): { readonly base: number; readonly eventRows: EventRow[] } {
-    const packedFloor = Math.max(0, fromSeq - MAX_PACKED_ROW_MEMBERS + 1)
-    const packedPredecessors = this.db.prepare(sql('select-packed-predecessors'))
-      .all(id, packedFloor, fromSeq)
-      .map(decodeEventRow)
-    let base = fromSeq
-    for (const predecessor of packedPredecessors) {
-      try {
-        const last = decodeRow(predecessor).at(-1)
-        if (last !== undefined && last.seq >= fromSeq) base = Math.min(base, predecessor.seq)
-      } catch {
-        // A malformed bounded predecessor may cover fromSeq; include it so the scanner fails closed.
-        base = Math.min(base, predecessor.seq)
-      }
-    }
-    const eventRows = this.db.prepare(sql('select-events-from')).all(id, base).map(decodeEventRow)
-    return { base, eventRows }
+    const eventRows = this.db.prepare(sql('select-events-from')).all(id, fromSeq).map(decodeEventRow)
+    return { base: fromSeq, eventRows }
   }
 
   private logicalLastEvent(id: SessionId, tailRows: readonly EventRow[]): SessionEvent | undefined {

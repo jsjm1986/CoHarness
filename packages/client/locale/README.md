@@ -6,6 +6,10 @@ Locale plugin: LocaleRuntime — the preference stored as `locale.preference` in
 
 The package ships only `zh` and `en`. External client plugins add a selectable language with `ctx.effect(() => ctx.locale.addLanguage({ id, label, fallback }))` and add its dictionaries through `register(ns, locale, dict)`; definitions and dictionaries may register in either order. Unloading a definition removes it from the selector and returns an active selection to the available browser/default locale. External ids are ASCII BCP 47-style tags. A fallback must already be registered and its chain must terminate at `en`; unknown targets, duplicate ids, and cycles fail at registration. For each key, lookup walks the active language's chain in the namespace, repeats it in `common`, then displays the key. The typed `register(ns, { zh, en })` form remains checked against `LocaleNamespaceMap`.
 
+## Summary
+
+Use `dsh-client-locale` to switch the web GUI between the shipped English and Chinese locales or languages added by client plugins. User selections take effect immediately; loopback pages persist them in `$DSH_HOME/settings.yaml`, while non-loopback pages keep them only for the current process. New browsers use the first supported language requested by the browser until an allowed stored preference arrives. Plugin authors add typed namespace dictionaries and translate through the public locale API; slot-rendered copy updates without a reload.
+
 ## Language-pack registration
 
 Register the definition and each translated namespace as effects owned by the language-pack plugin:
@@ -29,9 +33,13 @@ export function apply(ctx) {
 
 The Language row follows the bound account-backed settings scope and disables selection while the first view is loading, the scope is unavailable, or its provider is read-only. A Gateway project runtime does not take ownership of this preference: the account transport persists it for the authenticated member, with a Host fallback only when the account route is explicitly unsupported. `LocaleRuntime.setLocale` applies the same writable-view guard, so programmatic callers cannot turn a disabled row into a mutation; failed writes are adopted back from the recovered value.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The active locale is one resolved value bound to the Host-owned settings namespace; provisional, saved, and pushed values follow a single precedence asserted by specs.
+
 ## Model Experience
 
-None, as the locale registry serves browser UI copy; nothing here reaches a model request.
+None, as the locale service is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 

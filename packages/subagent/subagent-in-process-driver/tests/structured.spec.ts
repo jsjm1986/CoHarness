@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, CallId, type ContentBlock, type GenerateOptions, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, type ContentBlock, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
+import type {} from '@deepseek-ai/dsh-system-prompt'
 import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
 import * as AgentInvariant from '@deepseek-ai/dsh-agent/invariant'
 import * as AgentLoopInvariant from '@deepseek-ai/dsh-agent-loop/invariant'
@@ -25,15 +26,6 @@ const testToolSignal = new AbortController().signal
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
-function systemText(request: GenerateOptions): string {
-  return request.messages
-    .filter(message => message.role === 'system')
-    .flatMap(message => message.content)
-    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-}
-
 async function mountInvariants(ctx: Context): Promise<void> {
   await ctx.plugin(InvariantRegistry)
   await ctx.plugin(SessionInvariant)
@@ -41,13 +33,13 @@ async function mountInvariants(ctx: Context): Promise<void> {
   await ctx.plugin(AgentLoopInvariant)
 }
 
-interface CodeRunRequestLike {
+interface PtcRunRequestLike {
   bindings: { global: string; functions: Record<string, (args: unknown) => Promise<unknown>> }[]
 }
 
 interface SetupOptions {
   toolMode?: ToolConfig['mode']
-  codeRun?: (request: CodeRunRequestLike) => Promise<{ logs: never[]; value?: unknown }>
+  codeRun?: (request: PtcRunRequestLike) => Promise<{ logs: never[]; value?: unknown }>
 }
 
 const SCHEMA: ObjectJsonSchema = {
@@ -67,10 +59,11 @@ async function setup(script: Script, options: SetupOptions = {}) {
   await mountAgentLoopTestDependencies(ctx, {
     tools: { mode: options.toolMode ?? 'native' },
   })
-  if (options.toolMode === 'code' || options.toolMode === 'both') {
-    ctx.provide('codeRuntime', {
+  if (options.toolMode === 'ptc' || options.toolMode === 'both') {
+    ctx.provide('ptcRuntime', {
       language: 'typescript',
       isolation: 'test',
+      resolve: (request: import('@deepseek-ai/dsh-ptc-runtime').PtcRunRequest) => ({ ...request, cwd: request.cwd ?? process.cwd(), timeoutMs: 120_000 }),
       run: options.codeRun ?? (() => Promise.resolve({ logs: [] })),
     } as never)
   }
@@ -79,7 +72,7 @@ async function setup(script: Script, options: SetupOptions = {}) {
   await ctx.plugin(SubagentRuntime)
   const disposeProvider = ctx.subagents.registerProvider({
     name: 'spawn',
-    capabilities: { outputSchema: true, depthLimit: true, toolFilter: false, persona: false },
+    capabilities: { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: false, persona: false },
     inheritsParentContext: false,
     start: (request: ResolvedSubagentStartRequest) => startInProcessRun(request, {}),
   })
@@ -102,6 +95,13 @@ function structuredRequest(parent: SubagentStartRequest['parent'], extra?: Parti
 /** The tool names of one recorded model request. */
 function toolNames(request: GenerateOptions): string[] {
   return (request.tools ?? []).map(tool => tool.name)
+}
+
+/** Text of a loop-built request's leading system message; `''` when the request has none. */
+function requestSystem(request: GenerateOptions): string {
+  const head = request.messages[0]
+  if (head?.role !== 'system') return ''
+  return head.content.filter(block => block.type === 'text').map(block => block.text).join('')
 }
 
 describe('in-process structured output', () => {
@@ -141,7 +141,7 @@ describe('in-process structured output', () => {
     const response = [
       ...toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 5 }).slice(0, -2),
       { type: 'block-start', index: 1, blockType: 'tool-call' },
-      { type: 'block-end', index: 1, block: { type: 'tool-call', id: CallId('c2'), name: 'side_effect', arguments: '{}' } },
+      { type: 'block-end', index: 1, block: { type: 'tool-call', id: ToolCallId('c2'), name: 'side_effect', arguments: '{}' } },
       { type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } },
       { type: 'finish', reason: { kind: 'tool-calls' } },
     ] as Script[number]
@@ -169,7 +169,7 @@ describe('in-process structured output', () => {
     const response = [
       ...toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 5 }).slice(0, -2),
       { type: 'block-start', index: 1, blockType: 'tool-call' },
-      { type: 'block-end', index: 1, block: { type: 'tool-call', id: CallId('c2'), name: 'side_effect', arguments: '{}' } },
+      { type: 'block-end', index: 1, block: { type: 'tool-call', id: ToolCallId('c2'), name: 'side_effect', arguments: '{}' } },
       { type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } },
       { type: 'finish', reason: { kind: 'tool-calls' } },
     ] as Script[number]
@@ -206,7 +206,7 @@ describe('in-process structured output', () => {
   it('leaves tool calls that PRECEDE the capture in the same response untouched', async () => {
     const response = [
       { type: 'block-start', index: 0, blockType: 'tool-call' },
-      { type: 'block-end', index: 0, block: { type: 'tool-call', id: CallId('c1'), name: 'side_effect', arguments: '{}' } },
+      { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId('c1'), name: 'side_effect', arguments: '{}' } },
       ...toolCallResponse('c2', STRUCTURED_OUTPUT_TOOL, { answer: 6 }).map(chunk =>
         'index' in chunk ? { ...chunk, index: 1 } : chunk),
     ] as Script[number]
@@ -384,19 +384,18 @@ describe('in-process structured output', () => {
     ctx.systemPrompt.section({ name: 'test:persona', order: 10, text: 'You are a counter.' })
     const run = await ctx.subagents.start('spawn', structuredRequest(parent))
     await run.result
-    const childRequest = adapter.requests.at(-1)!
-    const childSystem = systemText(childRequest)
+    const childSystem = requestSystem(adapter.requests.at(-1)!)
     expect(childSystem).toContain('You are a counter.')
     expect(childSystem.endsWith(STRUCTURED_OUTPUT_INSTRUCTION)).toBe(true)
     expect(childSystem.indexOf(STRUCTURED_OUTPUT_INSTRUCTION)).toBeGreaterThan(0)
     await run.dispose()
   })
 
-  it('keeps pure PTC at one wire tool and exposes structured capture through the SDK only', async () => {
+  it('keeps pure PTC mode at one wire tool and exposes structured capture through the SDK only', async () => {
     const { ctx, parent, adapter } = await setup([
       toolCallResponse('c1', RUN_CODE_NAME, { code: 'return await tools.structured_output({ answer: 12 })', description: 'Capture the structured answer' }),
     ], {
-      toolMode: 'code',
+      toolMode: 'ptc',
       codeRun: async (request) => {
         const capture = request.bindings.at(0)?.functions[STRUCTURED_OUTPUT_TOOL]
         if (!capture) throw new Error('structured_output binding missing')
@@ -410,12 +409,12 @@ describe('in-process structured output', () => {
     expect(result.structured).toEqual({ answer: 12 })
     const request = adapter.requests[0]!
     expect(toolNames(request)).toEqual([RUN_CODE_NAME])
-    const requestSystem = systemText(request)
-    expect(requestSystem).toContain('interface ToolArgsMap')
-    expect(requestSystem).toContain('interface ToolOutputMap')
-    expect(requestSystem).toContain('recorded: true;')
-    expect(requestSystem).toContain('Promise<ToolOutputMap[K]>')
-    expect(requestSystem).toContain(STRUCTURED_OUTPUT_INSTRUCTION)
+    const system = requestSystem(request)
+    expect(system).toContain('interface ToolArgsMap')
+    expect(system).toContain('interface ToolOutputMap')
+    expect(system).toContain('recorded: true;')
+    expect(system).toContain('Promise<ToolOutputMap[K]>')
+    expect(system).toContain(STRUCTURED_OUTPUT_INSTRUCTION)
     await run.dispose()
   })
 
@@ -424,7 +423,7 @@ describe('in-process structured output', () => {
       toolCallResponse('c1', RUN_CODE_NAME, { code: 'await tools.structured_output({ answer: 12 }); throw new Error("boom")', description: 'Capture then fail the program' }),
       textResponse('outer code failed'),
     ], {
-      toolMode: 'code',
+      toolMode: 'ptc',
       codeRun: async (request) => {
         const capture = request.bindings.at(0)?.functions[STRUCTURED_OUTPUT_TOOL]
         if (!capture) throw new Error('structured_output binding missing')
@@ -453,7 +452,7 @@ describe('in-process structured output', () => {
       toolCallResponse('c1', RUN_CODE_NAME, { code: 'return await tools.structured_output({ answer: 12 })', description: 'Capture the structured answer' }),
       textResponse('outer code was blocked'),
     ], {
-      toolMode: 'code',
+      toolMode: 'ptc',
       codeRun: async (request) => {
         const capture = request.bindings.at(0)?.functions[STRUCTURED_OUTPUT_TOOL]
         if (!capture) throw new Error('structured_output binding missing')
@@ -480,12 +479,12 @@ describe('in-process structured output', () => {
     ])
     parent.followup(createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }))
     await parent.whenIdle()
-    expect(adapter.requests[0]!.system ?? '').not.toContain(STRUCTURED_OUTPUT_INSTRUCTION)
+    expect(requestSystem(adapter.requests[0]!)).not.toContain(STRUCTURED_OUTPUT_INSTRUCTION)
     const run = await ctx.subagents.start('spawn', structuredRequest(parent))
     await run.result
     // The loop always assembles a base prompt (the harness identity section),
     // so the instruction APPENDS — never replaces.
-    const childSystem = systemText(adapter.requests.at(-1)!)
+    const childSystem = requestSystem(adapter.requests.at(-1)!)
     expect(childSystem.endsWith(STRUCTURED_OUTPUT_INSTRUCTION)).toBe(true)
     expect(childSystem.length).toBeGreaterThan(STRUCTURED_OUTPUT_INSTRUCTION.length)
     await run.dispose()
@@ -563,21 +562,25 @@ describe('in-process structured output', () => {
         toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 7 }),
       ])
       // A global tool sorts lexicographically after structured_output, while a
-      // global section above the 190 band follows the capture instruction.
+      // global section after the final-output slot follows the capture instruction.
       ctx.tools.register(defineContentToolFixture({
         name: 'zz_probe',
         description: 'probe',
         parameters: {},
         execute: () => Promise.resolve([{ type: 'text', text: 'x' }]),
       }))
-      ctx.systemPrompt.section({ name: 'after-band', order: 200, text: 'AFTER-BAND' })
+      ctx.systemPrompt.section({
+        name: 'after-band',
+        order: ctx.systemPrompt.getSectionOrder('STRUCTURED_OUTPUT') + 10,
+        text: 'AFTER-BAND',
+      })
       const run = await ctx.subagents.start('spawn', structuredRequest(parent))
       await run.result
       const request = adapter.requests[0]!
       const names = toolNames(request)
       expect(names.indexOf(STRUCTURED_OUTPUT_TOOL)).toBeGreaterThanOrEqual(0)
       expect(names.indexOf(STRUCTURED_OUTPUT_TOOL)).toBeLessThan(names.indexOf('zz_probe'))
-      const system = systemText(request)
+      const system = requestSystem(request)
       const instructionAt = system.indexOf(STRUCTURED_OUTPUT_INSTRUCTION)
       expect(instructionAt).toBeGreaterThanOrEqual(0)
       expect(system.indexOf('AFTER-BAND')).toBeGreaterThan(instructionAt)

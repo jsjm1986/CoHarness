@@ -10,7 +10,7 @@
  * @module @deepseek-ai/dsh-subagent/assistant-output
  */
 
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { joinAssistantStreamText, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 /**
@@ -25,16 +25,17 @@ export class AssistantOutputFold {
 
   /**
    * Fold one session event: a non-empty assistant message becomes the
-   * candidate final answer, and a `text-delta` chunk extends the streamed
-   * fallback; every other event contributes nothing.
+   * candidate final answer, while its embedded stream and any log-only attempt
+   * extend the streamed fallback; every other event contributes nothing.
    * @param event - the next observed session event.
    */
   push(event: SessionEvent): void {
     if (event.type === 'assistant/message') {
       const content = event.data.message.content
       if (content.length > 0) this.message = content
-    } else if (event.type === 'assistant/chunk' && event.data.chunk.type === 'text-delta') {
-      this.pushText(event.data.chunk.text)
+    }
+    if (event.type === 'assistant/message' || event.type === 'assistant/attempt') {
+      this.pushText(joinAssistantStreamText(event.data.stream))
     }
   }
 
@@ -64,14 +65,10 @@ export class AssistantOutputFold {
  * @returns the selected output, or `undefined` when the child produced none.
  */
 export function finalAssistantOutput(events: readonly SessionEvent[]): ContentBlock[] | undefined {
-  // The final non-empty message is authoritative. Scan backward first so a
-  // long continuable epoch does not rebuild every earlier text delta.
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index]
-    if (event?.type === 'assistant/message' && event.data.message.content.length > 0) {
-      return event.data.message.content
-    }
-  }
+  // TODO: this folds the complete suffix once per run/epoch settlement. If a
+  // long continuable epoch ever profiles hot here, scan backward with early
+  // exit for the last non-empty message and fold text deltas only on the
+  // no-message fallback.
   const fold = new AssistantOutputFold()
   for (const event of events) fold.push(event)
   return fold.collect()

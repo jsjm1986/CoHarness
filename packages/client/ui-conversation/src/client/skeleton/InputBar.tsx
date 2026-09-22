@@ -149,7 +149,7 @@ export type InputBarProps = ComposerBarProps
 export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addImages, addDocuments, removeImage, removeDocument, retryDocument, draftImages,
   resolveSubmitMode, toggleCommandMenu, stop, command, t,
-  renderSlot, useNotices, useLexicon, useMenuLauncher, useDocuments,
+  renderSlot, useNotices, useLexicon, useMenuLauncher, useDocuments, usePermissionCatalog,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
   placeholder, accessory, overlay, leftItems, rightItems, footer, active = true, compact = false,
@@ -246,6 +246,7 @@ export const InputBar = memo(function InputBar({
   // The Access seat's data: the host-computed permissions projection
   // (undefined = capability absent → the chip renders nothing).
   const permissions = useProjection('permissions')
+  const permissionCatalog = usePermissionCatalog(s => s)
 
   // A continuable child without its live parent cannot accept human input,
   // but its independent Stop below stays available while it runs.
@@ -703,6 +704,7 @@ export const InputBar = memo(function InputBar({
     : <PermissionSelect
       key={sessionId}
       value={permissions}
+      catalog={permissionCatalog}
       locked={locked}
       command={command}
       t={t}
@@ -739,6 +741,7 @@ export const InputBar = memo(function InputBar({
         : <PermissionSelect
           key={`${sessionId}-section`}
           value={permissions}
+          catalog={permissionCatalog}
           locked={locked}
           command={command}
           t={t}

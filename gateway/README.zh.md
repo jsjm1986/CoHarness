@@ -97,7 +97,7 @@ Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scop
 
 注销、密码或账户权限、项目成员关系、会话可见性或项目删除提交后，处理该变更的 Gateway 会关闭匹配的在途通用代理响应与 WebSocket，其他目标保持连接。该 registry 属于单个 Gateway 进程；其他 Gateway 进程或直接数据库写入产生的变化，通过操作授权与 principal 续期重新检查，不由此 registry 广播。
 
-文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把源溯源写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，代理操作和文档元数据／生命周期请求受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。文档请求停滞时会返回 HTTP 504 和 `DOCUMENT_SCOPE_TIMEOUT`，并释放 runtime lease；成功的内容流会持有 lease 直到 EOF 或取消，不受元数据截止时间截断。仅元数据的 transfer plan 五分钟后过期，并受进程（10,000 个计划／128 MiB）、企业（2,000 个计划／32 MiB）和操作者（100 个计划／8 MiB）三层的数量及序列化字节额度限制；计划被消费或过期时会释放全部三层计数。
+文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把来源身份写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，代理操作和文档元数据／生命周期请求受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。文档请求停滞时会返回 HTTP 504 和 `DOCUMENT_SCOPE_TIMEOUT`，并释放 runtime lease；成功的内容流会持有 lease 直到 EOF 或取消，不受元数据截止时间截断。仅元数据的 transfer plan 五分钟后过期，并受进程（10,000 个计划／128 MiB）、企业（2,000 个计划／32 MiB）和操作者（100 个计划／8 MiB）三层的数量及序列化字节额度限制；计划被消费或过期时会释放全部三层计数。
 
 浏览器使用的 `POST /api/documents/transfer/list` 由 Gateway 自己负责，而不再交给通用运行时代理。Gateway 先完成作用域检查，再向选定的目标运行时读取元数据；就绪检查使用一次性 nonce，以及由运行时 bearer token 和身份派生的 HMAC 证明，而不是接受端口上的任意 HTTP 响应；运行时启动失败会返回经过认证的 JSON 错误，绝不会把浏览器重定向到回环运行时端口。作为最后一道代理保护，其他上游响应中的回环 `Location` 也会在返回公网响应前转换为同源路径。
 

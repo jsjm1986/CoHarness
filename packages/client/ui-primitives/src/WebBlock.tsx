@@ -54,17 +54,6 @@ export interface WebBlockLabels {
   markdown: MarkdownLabels
 }
 
-const DEFAULT_LABELS: WebBlockLabels = {
-  noResults: '未找到结果',
-  sourcesTruncated: '来源列表已截断',
-  http: 'HTTP',
-  contentTruncated: '内容已截断',
-  markdown: {
-    code: { copyLabel: '复制', copiedLabel: '复制成功' },
-    footnotes: 'Footnotes',
-  },
-}
-
 /** A `web_search` card: an optional answer over a capped citation list. */
 export interface WebSearchBlockProps {
   kind: 'search'
@@ -76,8 +65,8 @@ export interface WebSearchBlockProps {
   truncated: boolean
   /** Extra class merged onto the wrapper (callers position; this component draws). */
   className?: string | undefined
-  /** Localized display copy; omitted fields keep the built-in defaults. */
-  labels?: Partial<WebBlockLabels> | undefined
+  /** Localized display copy supplied by the owning render site. */
+  labels: WebBlockLabels
 }
 
 /** A `web_fetch` card: the retrieval summary for one fetched URL. */
@@ -91,8 +80,8 @@ export interface WebFetchBlockProps {
   truncated: boolean
   /** Extra class merged onto the wrapper (callers position; this component draws). */
   className?: string | undefined
-  /** Localized display copy; omitted fields keep the built-in defaults. */
-  labels?: Partial<WebBlockLabels> | undefined
+  /** Localized display copy supplied by the owning render site. */
+  labels: WebBlockLabels
 }
 
 /** A completed web retrieval card, discriminated by `kind`. */
@@ -183,8 +172,7 @@ function SourceItem({ source, ordinal }: { source: WebSourceView; ordinal: numbe
  * @param props - see {@link WebSearchBlockProps}.
  * @returns the search card element.
  */
-function WebSearchBlock({ answer, sources, truncated, className, labels }: WebSearchBlockProps) {
-  const copy = { ...DEFAULT_LABELS, ...labels }
+function WebSearchBlock({ answer, sources, truncated, className, labels: copy }: WebSearchBlockProps) {
   // A provider may legitimately return no answer and no sources; the chat WebRow
   // does not show the raw result content, so without this the user would see an
   // empty card. Mirror the backend's `No results found.` render text.
@@ -211,8 +199,7 @@ function WebSearchBlock({ answer, sources, truncated, className, labels }: WebSe
  * @param props - see {@link WebFetchBlockProps}.
  * @returns the fetch card element.
  */
-function WebFetchBlock({ url, statusCode, truncated, className, labels }: WebFetchBlockProps) {
-  const copy = { ...DEFAULT_LABELS, ...labels }
+function WebFetchBlock({ url, statusCode, truncated, className, labels: copy }: WebFetchBlockProps) {
   return (
     <div className={clsx(css.block, css.fetch, className)} data-web="fetch">
       <SafeLink url={url} label={url} className={css.fetchUrl} />

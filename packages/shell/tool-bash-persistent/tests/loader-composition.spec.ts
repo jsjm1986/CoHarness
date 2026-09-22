@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
@@ -15,11 +15,12 @@ import * as TerminalLocal from '@deepseek-ai/dsh-terminal-bash'
 import SandboxProvider from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as ToolBashPersistent from '@deepseek-ai/dsh-tool-bash-persistent'
-import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
+import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 let root: string | undefined
 let context: Context | undefined
@@ -32,7 +33,7 @@ afterEach(async () => {
 })
 
 class PassthroughSandbox extends SandboxProvider {
-  confine(argv: readonly string[], _policy: SandboxPolicy): ConfinedArgv {
+  async confine(argv: readonly string[], _policy: SandboxPolicy): Promise<ConfinedArgv> {
     return { argv: [...argv], enforcement: 'full', denialSignatures: [], runnerFailureRules: [] }
   }
 }
@@ -40,7 +41,9 @@ class PassthroughSandbox extends SandboxProvider {
 async function agent(ctx: Context, cwd: string): Promise<Agent> {
   const id = SessionId('persistent-bash-loader-agent')
   const scope = ctx.plugin(() => {})
-  const session = Session.create(id, [], { version: 0, id, createdAt: 0, cwd, isSeeded: false })
+  const session = Session.create(id, [], {
+    version: SESSION_FORMAT_VERSION, id, createdAt: 0, cwd, isSeeded: false,
+  })
   const value: Agent = {
     id,
     options: {},
@@ -76,6 +79,7 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
       "- name: '@deepseek-ai/dsh-tools'",
       "- name: '@deepseek-ai/dsh-terminal'",
       "- name: '@deepseek-ai/dsh-test-sandbox'",
+      "- name: '@deepseek-ai/dsh-session-projection'",
       "- name: '@deepseek-ai/dsh-sandbox-policy'",
       '  config:',
       '    mode: danger-full-access',
@@ -109,6 +113,7 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
       ['@deepseek-ai/dsh-tools', ToolRuntime],
       ['@deepseek-ai/dsh-terminal', TerminalSessionService],
       ['@deepseek-ai/dsh-test-sandbox', PassthroughSandbox],
+      ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
       ['@deepseek-ai/dsh-sandbox-policy', SandboxPolicyService],
       ['@deepseek-ai/dsh-subprocess-local', LocalSubprocessRuntime],
       ['@deepseek-ai/dsh-terminal-bash', TerminalLocal],
@@ -128,7 +133,7 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
     const signal = new AbortController().signal
     const execute = (id: string, command: string) => context!.tools.execute({
       signal,
-      callId: CallId(id),
+      callId: ToolCallId(id),
       name: 'bash',
       arguments: { command },
       agent: owner,
@@ -153,6 +158,12 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
     ))
     expect(heredoc).toBe('alpha\nbeta\n[Command finished with exit code 0]')
 
+    const pipeline = text(await execute(
+      'pipeline',
+      '{ sleep 0.1; printf "delayed\\n"; } | cat',
+    ))
+    expect(pipeline).toBe('delayed\n[Command finished with exit code 0]')
+
     // Every trailing newline is dropped before the status trailer.
     const trailing = text(await execute('trailing-newlines', 'printf "tail\\n\\n\\n"'))
     expect(trailing).toBe('tail\n[Command finished with exit code 0]')
@@ -172,7 +183,6 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
 
     const exited = text(await execute('exit', 'exit'))
     expect(exited).toContain('next bash call starts from the workspace')
-    expect(text(await execute('after-exit', 'printf "%s\\n" "$PWD"')))
-      .toBe(`${root}\n[Command finished with exit code 0]`)
+    expect(text(await execute('after-exit', 'printf "%s\\n" "$PWD"'))).toBe(`${root}\n[Command finished with exit code 0]`)
   }, 20_000)
 })

@@ -6,6 +6,14 @@ Optional `ctx.sessionTitle` provider that summarizes the first eligible human me
 
 The plugin uses the complete required [shared LLM configuration](../session-title-llm/README.md#configuration). Omit both `provider` and `model` to inherit the exact route from the current logged main request, or set both to route title generation independently.
 
+## Summary
+
+`dsh-session-title-first-prompt-llm` summarizes the first eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `first-prompt` cadence, runs automatically only when a fresh non-fork session first creates its fallback, and attributes the result to that message's exact seq. An automatic failure retains the fallback and is retried only through `ctx.sessionTitle.refresh()`. It uses the complete required shared LLM configuration from `dsh-session-title-llm`, so route, prompt, budget, and cancellation behavior cannot drift. Automatic behavior and configuration come first; the implementation is a thin registration over the shared policy.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The summary is generated through `ctx.llm` and committed through the title seam against one exact seq; no title state is kept outside the committed result.
+
 ## Model Experience
 
 ### First-message title request

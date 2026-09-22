@@ -21,9 +21,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../../attachment/attachment"
     },
     {
@@ -42,13 +39,13 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../util/brand"
     },
     {
       "path": "../../util/crypto"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

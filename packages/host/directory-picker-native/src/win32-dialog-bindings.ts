@@ -53,6 +53,10 @@ const SIGDN_FILESYSPATH = 0x80058000 | 0
  */
 const DPI_AWARENESS_CONTEXTS = [-4, -3, -2]
 const WM_CLOSE = 0x10
+/** `VK_MENU`: the synthesized Alt press's virtual key. */
+const VK_MENU = 0x12
+/** `KEYEVENTF_KEYUP`: the synthesized Alt press's release flag. */
+const KEYEVENTF_KEYUP = 0x2
 
 /** IFileOpenDialog vtable slots (IUnknown 0-2, IModalWindow 3, IFileDialog 4+). */
 const SLOT_RELEASE = 2
@@ -99,6 +103,7 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
   const coCreateInstance = ole32.func('__stdcall', 'CoCreateInstance', 'int32', ['void *', 'void *', 'uint32', 'void *', 'void *'])
   const coTaskMemFree = ole32.func('__stdcall', 'CoTaskMemFree', 'void', ['void *'])
   const getCurrentThreadId = kernel32.func('__stdcall', 'GetCurrentThreadId', 'uint32', [])
+  const keybdEvent = user32.func('__stdcall', 'keybd_event', 'void', ['uint8', 'uint8', 'uint32', 'uintptr'])
 
   const protoShow = koffi.proto('int32 __stdcall DshDialogShow(void *self, void *owner)')
   const protoSetOptions = koffi.proto('int32 __stdcall DshDialogSetOptions(void *self, uint32 options)')
@@ -138,6 +143,10 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
       coUninitialize()
     },
     currentThreadId: () => getCurrentThreadId() as number,
+    pressAltForForeground: () => {
+      keybdEvent(VK_MENU, 0, 0, 0)
+      keybdEvent(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+    },
     createFolderDialog: (): Win32FolderDialog => {
       const out = Buffer.alloc(pointerSize)
       const created = coCreateInstance(CLSID_FILE_OPEN_DIALOG, null, CLSCTX_INPROC_SERVER, IID_IFILE_OPEN_DIALOG, out) as number

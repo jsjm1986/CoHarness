@@ -9,13 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../settings/settings"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../shell"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../subprocess/subprocess"
     },
     {
       "path": "../../util/brand"
@@ -24,16 +24,13 @@
       "path": "../../util/timeout"
     },
     {
-      "path": "../../shell/shell"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../subprocess/subprocess"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

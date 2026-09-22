@@ -95,7 +95,7 @@ afterEach(async () => {
 async function loadComposition(
   bindHost: '127.0.0.1' | '0.0.0.0',
   options: {
-    failImport?: { specifier: string; error: Error; once?: boolean }
+    failImport?: { specifier: string; error: Error; once?: boolean; onFail?: (ctx: Context) => void }
     observe?: (ctx: Context) => void
   } = {},
 ): Promise<{ ctx: Context; configPath: string }> {
@@ -128,6 +128,7 @@ async function loadComposition(
     async import(specifier: string) {
       if (options.failImport?.specifier === specifier && (!options.failImport.once || !importFailed)) {
         importFailed = true
+        options.failImport.onFail?.(context as Context)
         throw options.failImport.error
       }
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
@@ -246,6 +247,25 @@ describe('real Loader composition', () => {
       expect(ctx.get('directoryPicker')).toBeUndefined()
     },
   )
+
+  it('fails closed when the tree drops a mounting entry mid-create', { timeout: 60_000 }, async () => {
+    stubAttendedHost()
+    const { ctx } = await loadComposition('127.0.0.1', {
+      failImport: {
+        specifier: NATIVE,
+        error: new Error('import raced with tree removal'),
+        onFail: (host) => {
+          const victim = Object.entries(host.loader.store)
+            .find(([, entry]) => entry.options.name === NATIVE)?.[0]
+          if (victim !== undefined) host.loader.remove(victim)
+        },
+      },
+    })
+    const autoEntry = [...ctx.loader.entries()].find(entry => entry.options.name === AUTO)!
+    expect(autoEntry.fiber!.state).toBe(FiberState.FAILED)
+    await expect(autoEntry.fiber!.await()).rejects.toThrow(`entry did not start: ${NATIVE}`)
+    expect(ctx.get('directoryPicker')).toBeUndefined()
+  })
 
   it('fails closed after a transient import failure without retrying activation', async () => {
     stubAttendedHost()

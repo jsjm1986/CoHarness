@@ -55,16 +55,17 @@ export interface PromptSection {
   readonly name: string
   /**
    * Sections are concatenated in ascending order. Equal orders use code-unit
-   * name order. Repository-owned placements use
-   * {@link FIRST_PARTY_SECTION_ORDER}.
+   * name order.
    */
   readonly order: number
   /**
    * Static text or a provider evaluated at each assembly with that assembly's
    * {@link AssembleContext}. The text may reference `{{variable}}`s — they are
-   * interpolated later, by {@link renderPrompt}.
+   * interpolated later, by {@link renderPrompt}, unless `interpolate` is false.
    */
   readonly text: string | ((context: AssembleContext) => string)
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  readonly interpolate?: boolean
   /**
    * Treat this contribution as the complete system prompt. Assembly still
    * runs the cooperative waterfall so tools, contexts, and variables can be
@@ -90,6 +91,8 @@ export interface AssembledSection {
   name: string
   /** The resolved (but not yet interpolated) section text. */
   text: string
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  interpolate?: boolean
 }
 
 /** One resolved dynamic context contribution. */
@@ -119,11 +122,7 @@ export interface PromptAssembly {
   variables: Record<string, string | undefined>
 }
 
-/**
- * Sparse placements for repository-owned prompt sections. External plugins may
- * use any finite order; equal orders are ordered by section name.
- */
-export const FIRST_PARTY_SECTION_ORDER = {
+const SECTION_ORDERS = {
   HARNESS_IDENTITY: -1000,
   DEPLOYMENT_PERSONA_PREFIX: 0,
   PLAN_POLICY: 500,
@@ -149,6 +148,8 @@ export const FIRST_PARTY_SECTION_ORDER = {
   TOOL_RALPH: 2700,
   TOOL_SUBAGENT: 2800,
   TOOL_REPORT: 2900,
+  TOOL_COMPUTER_USE: 3000,
+  MCP_SERVERS: 3100,
   TOOLS_SDK: 5000,
   DELIVERABLE_FILE_REFERENCES: 9000,
   STRUCTURED_OUTPUT: 9900,
@@ -158,7 +159,24 @@ export const FIRST_PARTY_SECTION_ORDER = {
   DEPLOYMENT_PERSONA_SUFFIX: 10200,
 } as const
 
-/** The deployment persona prefix section name. */
+/** Name of a centrally allocated prompt-section position. */
+export type PromptSectionOrderName = keyof typeof SECTION_ORDERS
+
+const CONTEXT_ORDERS = {
+  SANDBOX_POLICY: 110,
+  APPROVAL_POLICY: 115,
+  SUBAGENT_DELEGATION: 120,
+} as const
+
+/** Name of a centrally allocated runtime-context position. */
+export type PromptContextOrderName = keyof typeof CONTEXT_ORDERS
+
+/**
+ * The deployment persona prefix's section name. Exported because a
+ * composition can replace this slot — an agent preset shadows the
+ * deployment's persona with its own — and both sides naming the same section
+ * is what makes the replacement work rather than duplicate.
+ */
 export const PERSONA_PREFIX_SECTION = 'deployment:persona-prefix'
 
 /** Deployment persona suffix section name shared by global and scoped contributions. */
@@ -211,17 +229,17 @@ function orderTools(tools: ToolSchema[], toolOrder: string[] | undefined, knownN
     name === TOOL_ORDER_REST ? rest : tools.filter(tool => tool.name === name))
 }
 
-/** Code-unit name comparison — locale-independent across machines. */
+/** Code-unit name comparison — locale-independent, so the order is identical on every machine. */
 function compareNames(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0
 }
 
-/** Order prompt sections by placement, then deterministically by name. */
+/** Order prompt sections by their explicit placement, then deterministically by name. */
 function comparePromptSections(a: PromptSection, b: PromptSection): number {
   return a.order - b.order || compareNames(a.name, b.name)
 }
 
-/** Lexicographic (code-unit) name comparison for tool schemas. */
+/** Order tool schemas lexicographically by name. */
 function compareToolNames(a: ToolSchema, b: ToolSchema): number {
   return compareNames(a.name, b.name)
 }
@@ -237,8 +255,6 @@ export interface Config {
    * `deployment:persona-prefix` shadows it; `{{variable}}` references are strict.
    */
   personaPrefix?: string
-  /** Legacy profile alias for personaPrefix. */
-  persona?: string
   /**
    * Persona suffix template after first-party guidance. A scoped `deployment:persona-suffix`
    * section shadows it; `{{variable}}` references are strict. Defaults to empty.
@@ -254,7 +270,8 @@ export interface Config {
 
 /**
  * Interpolate strict `{{variable}}` references, drop empty sections, and join
- * the rest with blank lines. Malformed, unknown, or undefined references throw;
+ * the rest with blank lines. Sections with `interpolate: false` retain literal
+ * text. Malformed, unknown, or undefined references in other sections throw;
  * a lone `{{` without any later `}}` is literal prose, and substituted values
  * are not scanned again.
  * @param assembly - the assembly whose sections and variables to render.
@@ -262,7 +279,7 @@ export interface Config {
  */
 export function renderPrompt(assembly: PromptAssembly): string {
   return assembly.sections
-    .map(section => interpolate(section, assembly.variables, 'section'))
+    .map(section => section.interpolate === false ? section.text : interpolate(section, assembly.variables, 'section'))
     .filter(text => text.length > 0)
     .join('\n\n')
 }
@@ -390,8 +407,7 @@ export class SystemPrompt extends Service {
   static Config: z<Config> = z.object({
     includeHarnessIdentity: z.boolean().default(true),
     includeRuntimeContext: z.boolean().default(true),
-    personaPrefix: z.string(),
-    persona: z.string(),
+    personaPrefix: z.string().default(''),
     personaSuffix: z.string().default(''),
     // Preserve omission because an explicit empty order lacks the rest marker.
     toolOrder: z.array(z.string()).default(undefined as unknown as string[]),
@@ -410,19 +426,19 @@ export class SystemPrompt extends Service {
     if (config.includeHarnessIdentity ?? true) {
       this.section({
         name: 'harness:identity',
-        order: FIRST_PARTY_SECTION_ORDER.HARNESS_IDENTITY,
+        order: this.getSectionOrder('HARNESS_IDENTITY'),
         text: 'You are an AI agent powered by DeepSeek Harness.',
       })
     }
     this.section({
       name: PERSONA_PREFIX_SECTION,
-      order: FIRST_PARTY_SECTION_ORDER.DEPLOYMENT_PERSONA_PREFIX,
+      order: this.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),
       // The fallback narrows the optional input type; the schema already defaults it.
-      text: config.personaPrefix ?? config.persona ?? '',
+      text: config.personaPrefix ?? '',
     })
     this.section({
       name: PERSONA_SUFFIX_SECTION,
-      order: FIRST_PARTY_SECTION_ORDER.DEPLOYMENT_PERSONA_SUFFIX,
+      order: this.getSectionOrder('DEPLOYMENT_PERSONA_SUFFIX'),
       text: config.personaSuffix ?? '',
     })
     if (!(config.includeRuntimeContext ?? true)) this.suppressRuntimeContext()
@@ -445,6 +461,24 @@ export class SystemPrompt extends Service {
       layer => layer.sections.insert(section.name, section),
       { label: 'systemPrompt.section()' },
     )
+  }
+
+  /**
+   * Resolve the centrally owned placement of a repository prompt section.
+   * @param name - stable section placement name.
+   * @returns the section's numeric sort order.
+   */
+  getSectionOrder(name: PromptSectionOrderName): number {
+    return SECTION_ORDERS[name]
+  }
+
+  /**
+   * Resolve the centrally owned placement of a repository runtime context.
+   * @param name - stable context placement name.
+   * @returns the context's numeric sort order.
+   */
+  getContextOrder(name: PromptContextOrderName): number {
+    return CONTEXT_ORDERS[name]
   }
 
   /**
@@ -570,6 +604,7 @@ export class SystemPrompt extends Service {
         const assembled = {
           name: section.name,
           text: typeof section.text === 'function' ? section.text(context) : section.text,
+          ...section.interpolate !== undefined ? { interpolate: section.interpolate } : {},
         }
         if (section.complete === true) completeSection = { ...assembled }
         return assembled

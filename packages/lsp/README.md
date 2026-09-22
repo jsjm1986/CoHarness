@@ -15,3 +15,8 @@ The Service Definition lives at `lsp/lsp/`. The seam exposes exactly four semant
 See the [LSP capability seam Agent Note](../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md) for the design rationale, including why documents open transiently per query, why the stdio host consumes the shared filesystem/subprocess execution world, and why extension ownership is exclusive within one runtime.
 
 The subsystem reference — operations, coordinates, requests/results, `LspError` — is [docs/subsystems/lsp.md](../../docs/subsystems/lsp.md); design rationale in the [LSP capability seam Agent Note](../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.md).
+
+
+## Summary
+
+The lsp group lets agents navigate code through configured language servers: go to definitions, find references and implementations, and read hover documentation. Use `lsp-stdio` to connect local stdio language-server commands and extension mappings, and `tool-lsp` to make those operations available to the model. The shared `lsp` package keeps provider choice and normalized results consistent, so changing servers does not change model requests. Deployments must supply and configure their language servers; this group ships none.

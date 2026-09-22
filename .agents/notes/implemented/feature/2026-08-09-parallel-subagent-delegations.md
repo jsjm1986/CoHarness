@@ -8,7 +8,7 @@ English | [中文](2026-08-09-parallel-subagent-delegations.zh.md)
 
 A model that wants fan-out batches several `subagent` calls into one assistant message — that batch is the parallel intent. The delegation tool declared no `isConcurrencySafe` classifier, so the fail-closed scheduler ([parallel tool-call Agent Note](2026-07-10-parallel-tool-call-execution.md)) treated every foreground delegation as an exclusive barrier: nine cards in the GUI, one child running, eight queued behind it for its full runtime.
 
-The original conservative stance — a unary classifier cannot prove that sibling delegations have disjoint workspace effects — had stopped protecting anything. `run_in_background: true` and continuable delegations already overlap with every later call, including writes; `dsh-workflow-worker-thread` already runs up to its concurrency ceiling of children through the same `ctx.subagents.start()` providers against the shared workspace. Only the foreground variant was serialized.
+The original conservative stance — a unary classifier cannot prove that sibling delegations have disjoint workspace effects — had stopped protecting anything. `run_in_background: true` and continuable delegations already overlap with every later call, including writes; `dsh-workflow-ptc` already runs up to its concurrency ceiling of children through the same `ctx.subagents.start()` providers against the shared workspace. Only the foreground variant was serialized.
 
 ## Decision
 

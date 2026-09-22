@@ -471,6 +471,86 @@ export function transferAdminDocumentOwnership(id: string, ownerUserId: number):
   })
 }
 
+export type AdminDesktopResource = {
+  resourceKey: string
+  node: string
+  desktop: string
+  fencingSeq: number
+  queueSeq: number
+  state: 'available' | 'unavailable'
+  stateNote: string | null
+  updatedAt: number
+}
+
+export type AdminDesktopGrant = {
+  grantId: string
+  resourceKey: string
+  fencing: number
+  holderKey: string
+  holderJson: string
+  requestId: string
+  state: 'held' | 'stopping' | 'pending-confirm' | 'released'
+  reason: string | null
+  acquiredAt: number
+  heartbeatAt: number
+  stoppingAt: number | null
+  releasedAt: number | null
+}
+
+export type AdminDesktopQueueEntry = {
+  queueId: string
+  resourceKey: string
+  position: number
+  holderKey: string
+  holderJson: string
+  requestId: string
+  state: 'queued' | 'cancelled' | 'expired' | 'promoted'
+  queuedAt: number
+  settledAt: number | null
+  grantId: string | null
+}
+
+export type AdminDesktopDetail = {
+  resource?: AdminDesktopResource
+  grants: AdminDesktopGrant[]
+  queue: AdminDesktopQueueEntry[]
+}
+
+/** Verified holder identity embedded in a grant or queue row. */
+export type DesktopHolder = {
+  organization: string
+  runtime: { kind: 'user' | 'project'; id: number; generation: number }
+  user: { id: number; username: string }
+  runId?: string
+}
+
+export function desktopHolderOf(row: { holderJson: string }): DesktopHolder | undefined {
+  try {
+    return JSON.parse(row.holderJson) as DesktopHolder
+  } catch {
+    return undefined
+  }
+}
+
+export function listDesktops(): Promise<{ resources: AdminDesktopResource[] }> {
+  return request('/admin/api/desktops')
+}
+
+export function getDesktopDetail(node: string, desktop: string): Promise<AdminDesktopDetail> {
+  return request(`/admin/api/desktops/detail?node=${encodeURIComponent(node)}&desktop=${encodeURIComponent(desktop)}`)
+}
+
+/** Apply one coordination action: revoke a held grant or clear an unavailable resource. */
+export function applyDesktopAction(
+  action: 'revoke' | 'clear',
+  target: { grantId?: string; node?: string; desktop?: string },
+): Promise<{ action: string; ok: boolean }> {
+  return request('/admin/api/desktops/actions', {
+    method: 'POST',
+    body: JSON.stringify({ action, ...target }),
+  })
+}
+
 export type ModelGovernanceRow = {
   provider: string
   model: string

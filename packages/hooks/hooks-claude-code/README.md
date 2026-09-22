@@ -6,6 +6,10 @@ A cordis plugin that runs the supported command-hook subset of a user's existing
 
 A native cordis plugin could do everything this bridge does — more powerfully, with typed returns and no serialization boundary. **The bridge exists only as a compatibility path for the mapped CC command-hook subset**; anything bespoke should be a native plugin on the same extension points (see [the interception extension-points Agent Note](../../../.agents/notes/implemented/feature/2026-06-30-interception-extension-points.md)).
 
+## Summary
+
+`dsh-hooks-claude-code` runs command hooks from your existing Claude Code `hooks.json` or settings file during agent runs, without requiring a rewrite. Supported hooks can run when sessions, prompts, tools, stops, or subagents reach matching moments. They can block prompts or tool calls with model-visible reasons, add conversation context, or force another model turn. Choose this package to reuse Claude Code command hooks in the harness; use a native plugin for behavior that has no Claude Code equivalent.
+
 ## Config
 
 ```ts
@@ -55,6 +59,10 @@ Every agent-scoped stdin payload carries `session_id` and string-shaped `transcr
 
 Injected context carries an explicit `{ kind: 'plugin', plugin: 'hooks-claude-code' }` source so the durable message is never mistaken for a user prompt.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The bridge translates each canonical interception into a Claude Code hook invocation and maps the outcome back; hook behavior is pinned by specs and no relation is retained between events.
+
 ## Model Experience
 
 ### Hook-provided context
@@ -75,7 +83,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Provider-supplied reasons pass through verbatim. When absent, a blocked prompt uses exactly `blocked by UserPromptSubmit hook`, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`. `systemMessage` and `updatedInput` are logged or warned but are not model-visible in this implementation.
+Provider-supplied reasons pass through verbatim. When absent, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`; a blocked prompt is discarded with no model-visible message, ending the turn as `blocked`. `systemMessage` and `updatedInput` are logged or warned but are not model-visible in this implementation.
 
 #### Token effect
 

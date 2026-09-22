@@ -6,12 +6,21 @@ Session persistence is a capability seam. The abstract `SessionPersistence` serv
 
 The persisted unit IS the existing `SessionEvent` (event-sourced model — the log is the single source of truth), so there is no parallel "persisted message" type. Metadata that is NOT replayable conversation state (format version, cwd, lineage, seed boundary, origin, delegation depth, and the transient browser-draft marker) travels separately as `SessionHeader`, owned by `dsh-session` and re-exported here.
 
+## Summary
+
+This package lets applications persist and resume session event logs through a backend-independent API. Readers can create, open, inspect, list, append to, read, flush, and close stored sessions while preserving contiguous append-only history. A completed flush is the durability barrier; readers never receive torn tails or invalid records, and only one writer per session is allowed within a backend instance. Use the shipped [JSONL backend](../session-persistence-jsonl/README.md) for one compressed log per session, or implement another backend with the same observable guarantees.
+
 ## Service API (`ctx.sessionPersistence`)
 
-`createHandle` and `openHandleAsync` are the additive ownership seam for the v2 migration. A write handle reserves one Session id in this process and lets a provider add a cross-process lock; JSONL uses an atomic root lock file. A read handle cannot append, and `close` releases every reservation idempotently. The synchronous `openHandle` remains for local in-memory providers and tests. Legacy service methods below remain available while existing providers and Consumers migrate.
+`create`/`open` return the per-session {@link SessionHandle} — the canonical channel with `read`/`write` access, offset/length reads, append, per-handle `flush`, and idempotent `close`/`AsyncDisposable`. A write handle claims single-writer ownership; a second writer rejects with `SESSION_ALREADY_OWNED`, and a read handle rejects `append`/`flush` with `SESSION_READ_ONLY`. `create` is lazy: the session is observable through `stat`/`list`/`open` in this process immediately, but no durable artifact exists until the first `append` or `flush`; closing a still-pending write handle erases the reservation. `createHandle`/`openHandleAsync`/`openHandle` remain as the legacy ownership seam while providers and Consumers migrate.
 
 | Method | Contract |
 |---|---|
+| `create(header, options?): Promise<SessionHandle>` | Create a new stored session lazily and return its `write` handle. `options.inheritedEventCount` is required for a seeded header and forbidden otherwise. Rejects `SESSION_ALREADY_EXISTS` for a duplicate id, including a concurrent create racing the check. |
+| `open(id, access, options?): Promise<SessionHandle>` | Open an existing session. `read` never takes ownership and works while another writer is active; `write` atomically claims ownership. Absent ids reject `SESSION_PERSISTENCE_NOT_FOUND`; taken write ownership rejects `SESSION_ALREADY_OWNED`. |
+| `flush(): Promise<void>` | Durability barrier over every active write handle owned by this instance: pending creates materialize. A concurrently-closing handle counts as flushed; failures aggregate into one `AggregateError`. |
+| `stat(id, options?): Promise<SessionPersistenceSnapshot \| undefined>` | Observe one session without reading its log or taking ownership — pending creates count before they materialize. |
+| `list(options?): Promise<readonly SessionPersistenceSnapshot[]>` | Every stored session visible to this process including unmaterialized pending creates, in no promised order. |
 | `locate(meta): SessionLocation \| undefined` | Resolve an absolute per-session artifact target without I/O or materialization. Backends without an independent local artifact return `undefined`. |
 | `supportsRawArtifacts: boolean` | State explicitly whether this backend exposes one verbatim artifact per session. Consumers check this capability before calling `readRaw`; `false` is not session absence. |
 | `readRaw(id, signal?): Promise<SessionRawArtifact \| undefined>` | Read a supported backend's own artifact text verbatim, decoded from its physical encoding but never reconstructed from events. `undefined` means only that the requested artifact is absent; an unsupported backend rejects. |
@@ -26,7 +35,7 @@ The persisted unit IS the existing `SessionEvent` (event-sourced model — the l
 | `readRevision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | Named lightweight revision lookup for callers that only need freshness. First-party providers use their per-id index; the default delegates to `revision()`. |
 | `readPage(id, request, signal?): Promise<SessionPersistencePage>` | Read one bounded ascending event range with `maxBytes` (512 KiB), `maxEvents` (2,000), and `maxGroups` (50) limits. Group accounting keeps assistant stream chunks from one turn/step together and keeps each tool call lifecycle independent, so token chunks do not consume one group each. A revision-bound cursor continues in the same direction and becomes invalid after an append or repair, reported as `dependency` like a revision that moves inside one page read; a cursor for another session or direction is a `protocol` fault. Providers classify `too-large`, `aborted`, `timeout`, `dependency`, and `protocol` failures; providers without a seek implementation retain the complete-read compatibility fallback. |
 | `readHistoryIndex(id, maxItems?, signal?): Promise<SessionHistoryIndex \| undefined>` | Read bounded turn ranges and short prompt/response previews without materializing event payloads. First-party indexed providers return at most 2,000 markers and bind the result to the source revision; `undefined` means the backend does not provide this optional acceleration, so callers keep ordinary paging. |
-| `list(signal?): Promise<SessionHeader[]>` | Lightweight listing from metadata, no full-log parse. The optional signal cancels backend listing work. A zero-event lazily-materialized session is absent from `list`. |
+| `listHeaders(signal?): Promise<SessionHeader[]>` | Lightweight listing from metadata, no full-log parse. The optional signal cancels backend listing work. A zero-event lazily-materialized session is absent from `list`. |
 | `revision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | Read one materialized log's opaque source-qualified revision without loading its events. First-party providers use their per-id storage lookup; `undefined` means the id is absent. The default implementation filters `listSnapshots` so a third-party provider remains compatible but may scan its catalog. |
 | `listSnapshots(signal?): Promise<SessionPersistenceSnapshot[]>` | Lightweight metadata plus an opaque branded per-log revision, without loading event logs. A revision stays equal while that log and its backing store are unchanged, changes after append or mutating load repair, and cannot collide solely because two stores use the same local counter. The optional signal requests cancellation of backend discovery work; first-party backends settle any started listing work before rejecting so an awaited call is quiescent. |
 | `reserveDraft(request): Promise<SessionDraftReservation \| undefined>` | Optionally reserve a browser draft before Agent creation. Gateway providers return one scope-qualified canonical Session id and an expiring lease; local providers return `undefined`. The request contains only ids, cwd, visibility, and preset metadata. |
@@ -72,13 +81,17 @@ The coordinator asserts the stored id and compares stored/live cwd before repair
 
 Re-exported from `dsh-session`: `SessionHeader` (immutable session metadata: `version`, `id`, `createdAt`, `cwd?`, `parentSession?`, `seedLength?`, `origin?`, `delegationDepth?`, `draft?`). `SessionPersistenceSnapshot.content`, when supplied by an authoritative backend, carries `blank`, `visibleContentSeq`, and `lastPromptAt` for cold list projections. `SessionLocation` is `{ readonly kind: string; readonly path: string }`; its path is an absolute backend target, not proof that the artifact exists or contains an unflushed turn.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The write coordinator's per-session controllers are private serialization state; durable truth is the stored log, and batching, repair, and adoption are asserted by coordinator specs.
+
 ## Model Experience
 
 ### Resumed conversation history
 
 #### What the model sees
 
-This seam adds no prompt or schema. Resume restores stored surface events as message history; stored request headers reconstruct earlier calls, while the new loop composes the current system prompt, tools, and session prefix for its next request. Crash repair marks an assistant request without a durable call as `TOOL_NOT_STARTED`; a durable call without a result becomes `TOOL_OUTCOME_UNKNOWN`, whose text lets the model retry read-only or idempotent work but directs it to verify side effects or ask the user instead of retrying blindly.
+The seam adds no prompt or schema. Resume restores stored surface events as message history; stored request headers reconstruct earlier calls, while the new loop composes the current system prompt, tools, and session prefix for its next request. Crash repair marks an assistant request without a durable call as `TOOL_NOT_STARTED`; a durable call without a result becomes `TOOL_OUTCOME_UNKNOWN`, whose text lets the model retry read-only or idempotent work but directs it to verify side effects or ask the user instead of retrying blindly.
 
 #### Token effect
 

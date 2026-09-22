@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The telemetry Service Definition declares the `SessionTelemetrySink` contract, and its capture coordinator passes session records to any reporting SDK backend that implements it. Capture can follow live session events or replay a canonical session-log prefix on demand. This package stops after it calls `emit()`: batching, retry, queueing, and loss policy belong to the backend's SDK and are neither specified nor wrapped. Rationale and rejected alternatives: [the revival Agent Note](../../../.agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md), [feedback-gated delivery](../../../.agents/notes/implemented/feature/2026-08-05-feedback-gated-session-telemetry.md), and [buffer-free feedback replay](../../../.agents/notes/implemented/simplification/2026-08-06-buffer-free-feedback-telemetry.md).
 
+## Summary
+
+Session telemetry lets deployments send ordered copies of session activity for reporting while preserving the canonical session log. Deployments choose one reporting backend and can redact each outbound copy before delivery; without redaction rules, captured data leaves the process unchanged. The handoff is non-blocking, so reporting does not delay session processing. Delivery is best effort, and queued records may be lost if the process crashes.
+
 ## The backend contract
 
 `SessionTelemetrySink` has three members: `emit(record)` MUST enqueue without blocking because it runs synchronously during `session/event` or explicit canonical-log replay; optional `flush()` is a fire-and-forget hint after a turn ends, and most backends omit it and use their SDK's normal batching schedule; `shutdown()` drains queued records and resolves when the SDK stops, and disposal awaits it. An implementation that provides `flush()` must order concurrent flushes with the final `shutdown()` drain. `SessionTelemetryBackend` registers this API under the `sessionTelemetry` context key; each context accepts one implementation, and a duplicate load throws. A backend constructs `SessionTelemetryCoordinator` with `live` or `on-demand` capture and calls `captureSession(session, throughSeq?)` at its chosen trigger.
@@ -34,13 +38,17 @@ Only the first `assistant/chunk` of each `(turn, step)` ships; the rest are drop
 
 `SessionTelemetryRecord`: `channel` (`ledger` | `ops`), `time` (epoch ms), `severity` (pre-mapped: ERROR for `tool/result.isError`, `turn/end` error reasons, and `agent-error`; INFO for other captured records, while `sessionTelemetry/record` policies may assign WARN), identity-only `attributes` (`session.id`, `event.type`, `event.seq`, `session.format_version`, plus `session.cwd`/`session.parent_id`/`session.seed_length` when the header has them), and the complete deep-copied `event.data` as `body` — post-redaction. Operational records carry `sessionTelemetry.op` (`agent-error` | `shutdown`) and `session.id`, and deliberately NO `event.seq`/`event.type` — signals to alert on, not entries to sum; `agent-error` normalizes its arbitrary thrown value into a stable `{ name, message }` body. Delivery downstream of the handoff is the backend SDK's; duplicates remain possible (cursor-less re-adoption, SDK retries), so receivers dedupe on `(session.id, event.seq)`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Capture passes each session record to the mounted sink; batching, retry, and loss policy belong to the backend SDK, so the seam holds no telemetry relation.
+
 ## Model Experience
 
-None, as this package only observes the session stream and hands redacted copies to a reporting backend; it never contributes to a model request.
+None, as the seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
+None; the package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

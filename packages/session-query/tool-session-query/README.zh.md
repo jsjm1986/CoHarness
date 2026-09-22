@@ -4,6 +4,10 @@
 
 位于 `ctx.sessionQuery` 之上、经工作区授权的模型工具。该 opt-in 包只依赖统一接口，并注册 `session_search`、`session_event_search`、`session_trace`、`session_event_trace` 和 `session_event_read`；已发布的宿主组合默认不挂载它。
 
+## 概述
+
+使用 `dsh-tool-session-query` 可让模型搜索既往会话、检查事件匹配、追踪会话或事件关系，并读取精确事件数据。它的五个只读工具返回无游标文本；只有目标会话的 `cwd` 与调用方完全匹配时才允许跨会话访问，没有 `cwd` 的调用方只能检查自己。搜索会排除调用方会话，并在达到部署结果上限时要求模型缩小查询。本包是 opt-in；启用后，每次模型请求都会增加固定指引与五个工具 schema。
+
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -19,11 +23,15 @@
 
 该包刻意不执行字节或字符截断，也不导入 spill 后端。需要限制内联输出的部署应挂载 `@deepseek-ai/dsh-spill-policy`，它可在执行后替换已渲染文本，同时保留完整结果。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。这些工具是 `ctx.sessionQuery` 之上的注册；语料状态留在查询 seam 之后。
+
 ## 模型体验
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
 模型会收到一个固定的既往历史指引章节。
 
@@ -39,27 +47,27 @@ Use session_search to find relevant work from prior sessions, or session_event_s
 
 #### KV Cache 影响
 
-插件和指引文本不变时，前缀稳定。
+插件与指引文本不变时，前缀稳定。
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-模型会看到生成的 [`session_search`、`session_event_search`、`session_trace`、`session_event_trace` 和 `session_event_read` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-session-query)。搜索过滤器会增加固定 schema token，而游标、工作区路径、输出分页和模型可控结果上限仍不存在。
+模型会看到生成的 [`session_search`、`session_event_search`、`session_trace`、`session_event_trace` 与 `session_event_read` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-session-query)。搜索过滤器会增加固定 schema token，而游标、工作区路径、输出分页与模型可控结果上限仍不存在。
 
 #### Token 影响
 
-可见期间，每次请求都会发送 5 个固定只读 schema。
+可见期间，每次请求都会发送五个固定只读 schema。
 
 #### KV Cache 影响
 
-工具可见性和定义不变时，前缀稳定。
+工具可见性与定义不变时，前缀稳定。
 
 ### 工具结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-每次成功调用都会发出一个纯文本块。搜索结果包含标题和最佳匹配摘录；跟踪包含全部已授权关系；事件读取包含未经删节的目标 JSON。通用 spill 策略可以将过大的内联文本替换为预览、不透明定位信息和取回指引。
+每次成功调用都会发出一个纯文本块。搜索结果包含标题与最佳匹配摘录；追踪包含全部已授权关系；事件读取包含未经删节的目标 JSON。通用 spill 策略可以用其预览、不透明定位信息与取回指引替换过大的内联文本。
 
 #### Token 影响
 

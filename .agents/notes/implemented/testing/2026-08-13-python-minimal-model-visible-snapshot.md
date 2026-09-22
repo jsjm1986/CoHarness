@@ -12,7 +12,7 @@ The Python lane never compared what the minimal composition actually shows the m
 
 The `sdk-minimal` scenario in [the packaged-runtime smoke](../../../../scripts/smoke-python-runtime.py) records `scripts/snapshots/python-sdk-single-exe/minimal/model-visible.json`: for every model request of the turn, the advertised tool schemas verbatim and the message list. System and user messages keep their full text with the scenario's temporary directory tokenized; assistant and tool messages keep only call identity, because their PTY and filesystem text differs across the platforms the expected output replays on.
 
-One model-visible message is excluded: the agent loop's dynamic runtime-context snapshot. The same composition emits it on macOS and not on Linux, which the required lane runs, so no single expected output can carry it. That difference is a defect in its own right ([#2488](https://github.com/deepseek-harness/deepseek-harness/issues/2488)) — this expected output covers every other model-visible message rather than waiting for it.
+One model-visible message is excluded: the agent loop's dynamic runtime-context snapshot. The same composition emits it on macOS and not on Linux, which the required lane runs, so no single expected output can carry it. That difference is a defect in its own right ([#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)) — this expected output covers every other model-visible message rather than waiting for it.
 
 The mock model no longer asserts the minimal scenario's tools and system prompts — the snapshot owns that surface and reports a complete diff instead of the first mismatch. Snapshot comparison takes its directory and file set as arguments, so the `minimal` and `advanced` expected outputs use one implementation, and `--update-snapshots` accepts `sdk-minimal`.
 
@@ -28,6 +28,6 @@ The mock model no longer asserts the minimal scenario's tools and system prompts
 
 A change to the minimal composition's model-visible surface — a system section, a tool, a tool description, or an added user message — now fails `python-runtime` with the exact diff, and landing it means rerunning `--scenario sdk-minimal --update-snapshots` and reviewing that diff. The minimal composition's tool descriptions become reviewed expected output.
 
-Assistant and tool message text is no longer compared, and the runtime-context snapshot is not compared at all. The scenario's own assertions continue to own persistent-shell state, editor output, and the final response; [#2488](https://github.com/deepseek-harness/deepseek-harness/issues/2488) owns the excluded message until its platform difference is resolved.
+Assistant and tool message text is no longer compared, and the runtime-context snapshot is not compared at all. The scenario's own assertions continue to own persistent-shell state, editor output, and the final response; [#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488) owns the excluded message until its platform difference is resolved.
 
 [AGENTS.md](../../../../AGENTS.md) and [the testing policy](../../../../docs/testing.md) now name both SDKs as independent projections of the agent loop, session lifecycle, and `SessionEventMap`, so a change to any of those carries updating both expected outputs rather than only the one a contributor happens to run.

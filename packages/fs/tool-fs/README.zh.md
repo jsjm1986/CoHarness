@@ -16,6 +16,10 @@ await ctx.plugin(ToolFs)                                  // this package — re
 
 `read_image` 只在持久 `ctx.attachments` 服务已挂载时注册。执行时还要求确切路由的模型声明 `image` 输入，通过 `ctx.llm.resolveModelInfo` 依次从会话最新请求 header 和 agent 选项解析。
 
+## 概述
+
+使用 `dsh-tool-fs` 可让模型带行号读取 UTF-8 文件、读取受支持的图片、创建或原子地替换文件，以及执行有针对性的字面量编辑。结果都有上限，失败会提供稳定错误码与恢复指令。当写入和编辑必须在成功读取后执行时，请添加 `dsh-fs-observation-policy`；省略它时，变更仍是原子的，但不受此条件约束。图片读取需要持久附件存储和支持图片输入的路由模型。glob 或 grep 搜索请选择同级的发现工具包。
+
 ## 配置
 
 所有键均为可选；默认值是随产品交付的读取上限。
@@ -61,13 +65,17 @@ await ctx.plugin(ToolFs)                                  // this package — re
 
 包根目录只导出 Cordis 插件约定（`name`、`inject`、`Config` 和 `apply`）。读取渲染（行窗口与输出格式化）位于 `src/read-render.ts`（不依赖 Cordis，单独进行单元测试）；`src/read.ts`/`read-image.ts`/`write.ts`/`edit.ts` 是工具执行器，`src/index.ts` 负责组合。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。这些工具对 `ctx.fs` 提供方的调用做校验、加窗口与格式化；所有文件状态属于已挂载后端。
+
 ## 模型体验
 
 ### 系统提示词
 
 #### 模型看到的内容
 
-该插件注册作用域内的每个请求都会收到下方独立注册的 read、write 与 edit 指导。作用域工具限制可以隐藏 schema，而不移除这些段。
+组装时，每个指导段落通过 `ctx.tools.get(name, scope)` 检查对应工具，仅在该 agent 可见时输出。write 段落仅在 edit 可见时推荐 edit。三个工具都可用时，下方原文保持不变；限制的施加、解除和工具注册变化在下次组装时生效。同一检查适用于直接限制 agent 和 subagent 的 `toolFilter`，也适用于通过 `run_code` 暴露的 PTC 能力。 write/edit 中的先读后改句子描述观察策略，并非要求调用名为 `read` 的工具。隐藏 `read` 时仍保留这些句子：策略继续保护修改操作，其他产生观察记录的操作（例如 `str_replace_editor` 的 `command: view`）也能建立同一文件观察记录。工具可见性不会禁用该前置条件。
 
 ##### Read 指导
 
@@ -89,11 +97,11 @@ Use the edit tool for targeted changes to existing UTF-8 text files. It replaces
 
 #### Token 影响
 
-插件启用期间，每个请求支付固定指导成本；即使限制隐藏了一个或多个工具也一样。
+指导成本取决于可见工具及其适用的跨工具推荐。
 
 #### KV Cache 影响
 
-只要插件作用域和指导文本不变，前缀就保持稳定。工具限制不会移除该段，但插件启用或 dispose（资源释放）可能从该段开始使复用失效。
+可见工具集合、插件作用域和指导文本不变时，前缀保持稳定。限制或插件生命周期变化可能从首个变化的段落开始使复用失效。
 
 ### 工具 schema
 
@@ -117,7 +125,7 @@ Use the edit tool for targeted changes to existing UTF-8 text files. It replaces
 
 #### Token 影响
 
-读取输出受 `readLimit`、`readMaxLineLength` 和 `readMaxBytes` 限制；保留的调用与结果会反复发送，直到上下文压缩（compaction）。
+读取输出受 `readLimit`、`readMaxLineLength` 与 `readMaxBytes` 限制；保留的调用与结果会反复发送，直到上下文压缩（compaction）。
 
 #### KV Cache 影响
 
@@ -155,7 +163,7 @@ Use the edit tool for targeted changes to existing UTF-8 text files. It replaces
 
 #### 模型看到的内容
 
-失败会规范化为 `Error: <message>`。本包稳定的校验和读取消息是 `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`old_string must be a non-empty string`、`old_string and new_string must differ`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`、`offset <offset> is out of range for "<path>" (<total> lines)`、`cannot read "<path>": read_image only accepts PNG/JPEG/WebP/GIF paths`、`cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`，以及类型不匹配的修复消息 `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats`。16-bit 转换失败会报告 `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`。提供方和策略模板在各自包的 README 中逐字列出。防护变更失败还会在消息中携带恢复指令，由本包面向模型的错误包装追加：`FS_STALE_VERSION` 追加 `re-read the file, then retry`，`FS_NOT_OBSERVED` 追加 `read the file, then retry`；结构化错误码保持不变。该次重新读取确认缺失后，edit 会报告 `FS_NOT_FOUND`，不会重复陈旧恢复指令；write 则使用带防护的创建。
+失败会规范化为 `Error: <message>`。本包稳定的校验和读取消息是 `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`old_string must be a non-empty string`、`old_string and new_string must differ`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`、`offset <offset> is out of range for "<path>" (<total> lines)`、`cannot read "<path>": the <ext> extension does not declare a supported image format; read_image accepts PNG/JPEG/WebP/GIF files, including extension-less files in those formats`、`cannot read "<path>": the file content is not a supported image format; read_image accepts PNG/JPEG/WebP/GIF`、`cannot read "<path>": the bytes do not decode as a supported PNG/JPEG/WebP/GIF image; the file may be truncated or corrupt`、`cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`，以及类型不匹配的修复消息 `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats`（无扩展名路径的不匹配报告 `cannot read "<path>": the file signature claims <type>, but the bytes decode as a different image format; the file may be corrupt`）。16-bit 转换失败会报告 `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`。提供方和策略模板在各自包的 README 中逐字列出。模型侧错误包装把所有 `FS_NOT_OBSERVED` 来源规范化为 `cannot modify "<path>": file has not been read — read the file, then retry`；`FS_STALE_VERSION` 保留提供方原因并追加 `— re-read the file, then retry`。两者都保留结构化错误码和原始原因。该次重新读取确认缺失后，`edit` 会报告 `FS_NOT_FOUND`，而不会重复陈旧恢复指令；`write` 则使用带防护的创建。
 
 #### Token 影响
 

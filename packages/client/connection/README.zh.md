@@ -8,6 +8,10 @@
 
 客户端 handle 还暴露可观察的连接状态与立即 `reconnect()` 操作。WebSocket 下行心跳允许连续两次 Pong 丢失后再安排终止，在保持卡顿主机可恢复的同时容忍一次繁忙事件循环。
 
+## 概述
+
+本包承载浏览器到 Host 的 Remote 调用、精确 Fetch 响应与 connection generation。Client 插件挂载 `ctx.connection`，其中包含当前页面的 loopback 状态、通用 RPC、当前 generation 及其 Host 信息、可观察的恢复状态、立即重连命令，以及单一 generation source 的注册点。source 报告 ready 后 generation 才可见；source 结束、失败、被撤回或显式 stop 都会清空它，再由 `ConnectionController` 执行重试策略。
+
 ## Host 配置
 
 `historyPageTargetBytes` 接受正整数，并设置每个完整、未压缩的 history RPC `server-response` JSON 正文以 UTF-8 字节计的目标大小。默认值为 131072 字节。分页会保留完整的 append 来源消息组，因此一个不可分割的消息组可能超过该目标。Fetch 历史响应仍打包剩余的 `assistant/chunk` 游程，并往返 `detail: 'conversation'` 的可选 `omittedSpans`；下载档见 [两档会话历史传输决策](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)。
@@ -29,6 +33,10 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
 
 `connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。连接状态按代限定作用域，并由每次 host 握手重建；消费方观察同一组已发布值，不存在第二个可能分歧的关系。
 
 ## 模型体验
 

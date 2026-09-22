@@ -1,6 +1,8 @@
-// PartialAccumulator: assistant/chunk accumulator.
+// PartialAccumulator: assistant stream-chunk accumulator.
 // Folds the six StreamChunk variants into AssistantBlock[] keyed by block index;
-// block-level immutability (a delta only swaps that block's reference).
+// block-level immutability (a delta only swaps that block's reference). Fed by
+// transient live chunks while streaming and by a settlement's expanded stream
+// on replay.
 
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
@@ -211,7 +213,7 @@ export function isVisibleAssistantChunk(type: string): boolean {
     || type === 'block-end'
 }
 
-/** assistant/chunk accumulator: folds StreamChunks into AssistantBlock[] with block-level immutability. */
+/** Assistant stream accumulator: folds StreamChunks into AssistantBlock[] with block-level immutability. */
 export class PartialAccumulator {
   private readonly accumulator: IncrementalAssistantBlocks
   private changed = true

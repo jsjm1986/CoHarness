@@ -4,6 +4,8 @@
 
 状态：Phase 1 底座与 Phase 2 已提交并入主线（`6bd418cba3` 为 Phase 1 收口，`6f0ec56328` 为文档修正），经 `cfb1949958` 与生产修复线合并后推送至 `origin/master`；Phase 3–8 待实施，整次升级与生产验收尚未完成。本计划是执行参考，不是已发布能力说明。
 
+后续执行入口为 [alpha.2 计划](UPGRADE-PLAN-dsh-v0.1.6-alpha.2.md)：本计划保留 alpha.1 阶段的实施与验收历史，剩余阶段以 alpha.2 计划为准，不再按 alpha.1 原样继续。
+
 本地起点为 `a901bff5f44bf9d51b99019b5c8085a0d93f248b`；已登记的上游基线为 `dsh-v0.1.5-rc.2`（`fb2c4b9e698e30edb738bca4cf0618587db7d203`）；目标固定为 `dsh-v0.1.6-alpha.1`（`0a15e36e7f82b6ed45af6fa9759f29b40dcd965d`）。树差异不证明共同祖先；逐提交归属核验尚待完成。发布版本暂拟 `0.1.6-alpha.1.coharness.1`，发布前核验 release families，不在 Phase 0 修改包版本。
 
 执行基线更新为 `master` 的 `409253c092961787576cd91b74e037a0d88fabce`；原计划来自 `ef13d3f068709a78418577fbd31689f26093b6da`，保留原始起点供追溯，不把不同提交历史视为祖先关系。两份本地树之间 Agent、AgentLoop、升级记录和同步配置无差异；其他主线变化仍在二开保护范围内。[基线及验证记录](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)区分实施前失败与本次结果。

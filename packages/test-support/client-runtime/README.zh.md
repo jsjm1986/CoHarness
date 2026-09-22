@@ -10,11 +10,19 @@
 
 不属于产品插件图（无 `dsh.client`）；feature 包仅以 `devDependencies` 依赖之。
 
+## 概述
+
+`SlotTestRuntime.create()` 让 Vitest 套件在 jsdom 中驱动生产 slot、store、带类型的 Session 与 Workspace fixture，并对局部 DOM 断言。面向插件激活、重载、重连与清理的测试，`createClientTest` 使用具名端点 Remote mock 启动 web profile 的 bundle roster，无需业务 Host。缺失服务与未打桩调用会明确失败。整机 fixture 拥有启动和销毁，局部 runtime 提供幂等销毁。通过 `devDependencies` 将本包用于客户端测试；它不是产品插件。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。围绕生产 slot 注册表的纯测试类型替身组装；它不拥有产品运行时状态。
+
 ## 模型体验
 
-无；本包是浏览器侧测试基础设施，无一物到达模型请求。
+无；本包是浏览器侧测试基础设施，不会发起任何模型请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
 无；本包既不组装也不发送提供方请求。
 

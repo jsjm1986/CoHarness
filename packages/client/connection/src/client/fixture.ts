@@ -9,9 +9,12 @@ import {
   createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
-  isTokenDelta,
 } from '@deepseek-ai/dsh-llm/message'
-import { CallId } from '@deepseek-ai/dsh-llm/brand'
+import { expandAssistantStream, isTokenDelta } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
+import { LlmAttemptId, ToolCallId } from '@deepseek-ai/dsh-llm/brand'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
+import type { SessionAssistantStreamFrame } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   AssistantMessage,
   ContentBlock,
@@ -23,6 +26,7 @@ import type {
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type {
+  JsonValue,
   SessionEvent,
   SessionId,
   TodoItem,
@@ -66,7 +70,7 @@ function assistantMessage(content: ContentBlock[], model = 'fx-1'): AssistantMes
 }
 
 function toolResultMessage(callId: string, content: ContentBlock[], isError: boolean): ToolResultMessage {
-  return createToolResultMessage({ callId: CallId(callId), content, isError })
+  return createToolResultMessage({ callId: ToolCallId(callId), content, isError })
 }
 
 /** Delay a fixture response without retaining a timer after transport abort. */
@@ -394,6 +398,7 @@ function buildAlphaLog(): SessionEvent[] {
       ? {
         ...e,
         data: {
+          stream: [],
           ...data,
           usage: fixtureUsage(data['turn'] as number, data['step'] as number),
         },
@@ -870,11 +875,14 @@ function usageSampleOf(event: SessionEvent): FixtureUsageSample | undefined {
       turn?: number
       step?: number
       usage?: TokenUsage
-      chunk?: { type?: string; usage?: TokenUsage }
+      stream?: AssistantStreamRecord[]
     }
   }
-  const usage = item.type === 'assistant/chunk' && item.data.chunk?.type === 'usage'
-    ? item.data.chunk.usage
+  const usage = item.type === 'assistant/attempt'
+    ? expandAssistantStream(item.data.stream ?? [])
+      .map(member => member.chunk)
+      .findLast((chunk): chunk is Extract<StreamChunk, { type: 'usage' }> => chunk.type === 'usage')
+      ?.usage
     : item.type === 'assistant/message'
       ? item.data.usage
       : undefined
@@ -917,6 +925,14 @@ function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection
   return totals
 }
 
+/** First token-delta timestamp inside one compact assistant stream, when present. */
+function firstTokenTime(stream: readonly AssistantStreamRecord[]): number | null {
+  for (const member of expandAssistantStream(stream)) {
+    if (isTokenDelta(member.chunk)) return member.time
+  }
+  return null
+}
+
 /** Fixture parallel of session-stats' whole-log counting and wall-time fold. */
 function sessionStatsOf(log: readonly SessionEvent[]): {
   turns: number
@@ -937,14 +953,15 @@ function sessionStatsOf(log: readonly SessionEvent[]): {
       case 'step/start':
         openStep = { turn: event.data.turn, step: event.data.step, startTime: event.time, firstTokenTime: null }
         break
-      case 'assistant/chunk':
+      case 'assistant/attempt':
         if (openStep !== null && openStep.turn === event.data.turn && openStep.step === event.data.step
-          && openStep.firstTokenTime === null && isTokenDelta(event.data.chunk)) {
-          openStep.firstTokenTime = event.time
+          && openStep.firstTokenTime === null) {
+          openStep.firstTokenTime = firstTokenTime(event.data.stream) ?? openStep.firstTokenTime
         }
         break
       case 'assistant/message': {
         if (openStep === null || openStep.turn !== event.data.turn || openStep.step !== event.data.step) break
+        openStep.firstTokenTime ??= firstTokenTime(event.data.stream)
         value.llmMs += Math.max(0, event.time - openStep.startTime)
         if (openStep.firstTokenTime !== null) {
           value.ttftMs += Math.max(0, openStep.firstTokenTime - openStep.startTime)
@@ -1837,7 +1854,12 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   }
   const append = (id: SessionId, e: Record<string, unknown>): void => {
     const log = logOf(id)
-    const event = { seq: SessionSeq(log.length), time: Date.now(), ...e } as unknown as SessionEvent
+    const data = e['data'] as Record<string, unknown> | undefined
+    const authored = (e['type'] === 'assistant/message' || e['type'] === 'assistant/attempt')
+      && data !== undefined && data['stream'] === undefined
+      ? { ...e, data: { ...data, stream: [] } }
+      : e
+    const event = { seq: SessionSeq(log.length), time: Date.now(), ...authored } as unknown as SessionEvent
     log.push(event)
     // Emission-time view derivation (mirrors the host's live path).
     const view = viewFor(event, log)
@@ -1850,6 +1872,32 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     // Host eager-drive parallel: a unit-advancing event pushes its finished value.
     for (const frame of projectionFramesOf(id, log, event)) emitMux(frame)
   }
+
+  /** Mint one live Assistant stream frame (host `agent/assistant-stream` → mux parallel). */
+  const streamFrame = (id: SessionId, frame: SessionAssistantStreamFrame): void => {
+    emitMux({ type: 'session/assistant-stream', sessionId: id, frame })
+  }
+  const streamStart = (id: SessionId, attemptId: LlmAttemptId, turn: number, step: number): void => {
+    streamFrame(id, {
+      type: 'start', attemptId, revision: 1,
+      startedAfterSeq: logOf(id).length - 1, turn, step,
+    })
+  }
+  const streamChunk = (id: SessionId, attemptId: LlmAttemptId, index: number, chunk: StreamChunk): void => {
+    // The provider chunk vocabulary crosses as JsonValue (same cast the host makes).
+    streamFrame(id, { type: 'chunk', attemptId, revision: 1, index, time: Date.now(), chunk: chunk as unknown as JsonValue })
+  }
+  const streamEnd = (
+    id: SessionId,
+    attemptId: LlmAttemptId,
+    index: number,
+    outcome: Extract<SessionAssistantStreamFrame, { type: 'end' }>['outcome'],
+  ): void => {
+    streamFrame(id, { type: 'end', attemptId, revision: 1, index, outcome })
+  }
+  /** Raw stream records for one durable Assistant event's `stream` payload. */
+  const streamRecords = (chunks: readonly StreamChunk[]): AssistantStreamRecord[] =>
+    chunks.map(chunk => ({ type: 'chunk', time: Date.now(), chunk }))
 
   /** Append one durable goal/change (host GoalService parallel). */
   const appendGoalChange = (id: SessionId, change: FxGoalChange): FxGoalProjection => {
@@ -1890,9 +1938,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         value: [
           { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-compact'), name: 'compact', description: 'fixture：压缩当前会话上下文' },
           { name: 'echo', description: 'fixture：回显参数', input: { hint: 'text to echo' } },
-          { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'set or view the goal for a long-running task', input: { hint: '<objective>', images: true } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'set or view the goal for a long-running task', input: { hint: '<objective>', attachments: true } },
           { definitionId: commandDefinitionId('@deepseek-ai/dsh-permission-presets'), name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
-          { definitionId: commandDefinitionId('@deepseek-ai/dsh-plan-mode'), name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', images: true } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-plan-mode'), name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', attachments: true } },
         ],
       }
     },
@@ -2154,7 +2202,41 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   /** Force-enders for currently open stream generators (timing hook: simulated connection loss). */
   const streamBreakers = new Set<() => void>()
   /** Retry scenarios opened by timing hooks and completed in a later browser assertion phase. */
-  const retryScenarios = new Map<SessionId, { turn: number; stepStarted: boolean }>()
+  interface ModelRetryScenario {
+    turn: number
+    attemptId: LlmAttemptId | undefined
+    chunks: StreamChunk[]
+  }
+  const retryScenarios = new Map<SessionId, ModelRetryScenario>()
+
+  /** Settle a scenario's open stream attempt as a committed assistant/attempt record. */
+  const commitScenarioAttempt = (sessionId: SessionId, scenario: ModelRetryScenario, clear: boolean): void => {
+    if (scenario.attemptId === undefined) return
+    append(sessionId, {
+      type: 'assistant/attempt',
+      data: { turn: scenario.turn, step: 1, stream: streamRecords(scenario.chunks) },
+    })
+    streamEnd(sessionId, scenario.attemptId, scenario.chunks.length, {
+      kind: 'committed', eventType: 'assistant/attempt', seq: logOf(sessionId).length - 1,
+    })
+    if (clear) {
+      scenario.attemptId = undefined
+      scenario.chunks = []
+    }
+  }
+
+  /** Record the fixture's standard transport-failure retry decision for a scenario. */
+  const appendModelRetry = (sessionId: SessionId, scenario: ModelRetryScenario, retry: number, delayMs: number): void => {
+    append(sessionId, {
+      type: 'llm/retry',
+      data: {
+        turn: scenario.turn, step: 1,
+        provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
+        retry, maxRetries: 2, delayMs,
+        failure: { code: 'TRANSPORT', message: '连接被重置' },
+      },
+    })
+  }
   /** The single opt-in browser stress producer; normal fixture journeys never start it. */
   let activeReasoningChunkStorm: ReasoningChunkStormState | null = null
 
@@ -2227,10 +2309,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         data: userMessage(text(`Reasoning chunk stress: ${String(chunkCount)} chunks.`)),
       })
       append(sessionId, { type: 'step/start', data: { turn, step: 0 } })
-      append(sessionId, {
-        type: 'assistant/chunk',
-        data: { turn, step: 0, chunk: { type: 'block-start', index: 0, blockType: 'reasoning' } },
-      })
+      const attemptId = LlmAttemptId(randomUuid())
+      streamStart(sessionId, attemptId, turn, 0)
+      streamChunk(sessionId, attemptId, 0, { type: 'block-start', index: 0, blockType: 'reasoning' })
 
       const startedAt = Date.now()
       const pump = (): void => {
@@ -2241,10 +2322,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           const chunkText = index === chunkCount - 1
             ? `\n${marker}`
             : index % 64 === 63 ? '推理\n' : '推理'
-          append(sessionId, {
-            type: 'assistant/chunk',
-            data: { turn, step: 0, chunk: { type: 'reasoning-delta', index: 0, text: chunkText } },
-          })
+          streamChunk(sessionId, attemptId, index + 1, { type: 'reasoning-delta', index: 0, text: chunkText })
         }
         state.emitted = end
         if (end < chunkCount) {
@@ -2265,49 +2343,49 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       const sessionId = sid(id)
       const turn = nextTurn.get(sessionId) ?? 0
       nextTurn.set(sessionId, turn + 1)
-      retryScenarios.set(sessionId, { turn, stepStarted: true })
+      const attemptId = LlmAttemptId(randomUuid())
+      const chunks: StreamChunk[] = [
+        { type: 'block-start', index: 0, blockType: 'text' },
+        { type: 'text-delta', index: 0, text: '应撤回的半截回复' },
+      ]
+      retryScenarios.set(sessionId, { turn, attemptId, chunks })
       setRunning(sessionId, true)
       append(sessionId, { type: 'turn/start', data: { turn } })
       append(sessionId, { type: 'user/message', surfaceOp: 'append', data: { content: text('请重试这个请求'), source: { kind: 'user' } } })
       append(sessionId, { type: 'step/start', data: { turn, step: 1 } })
-      append(sessionId, { type: 'assistant/chunk', data: { turn, step: 1, chunk: { type: 'block-start', index: 0, blockType: 'text' } } })
-      append(sessionId, { type: 'assistant/chunk', data: { turn, step: 1, chunk: { type: 'text-delta', index: 0, text: '应撤回的半截回复' } } })
+      streamStart(sessionId, attemptId, turn, 1)
+      chunks.forEach((chunk, index) => { streamChunk(sessionId, attemptId, index, chunk) })
     },
     /** Record one retry decision; the next attempt remains in the same step. */
     scheduleModelRetry(id: string, retry = 1, delayMs = 450): void {
       const sessionId = sid(id)
       const scenario = retryScenarios.get(sessionId)
       if (scenario === undefined) throw new Error(`fixture: no model retry scenario for ${id}`)
-      if (!scenario.stepStarted) {
-        append(sessionId, { type: 'assistant/chunk', data: { turn: scenario.turn, step: 1, chunk: { type: 'block-start', index: 0, blockType: 'text' } } })
-        append(sessionId, { type: 'assistant/chunk', data: { turn: scenario.turn, step: 1, chunk: { type: 'text-delta', index: 0, text: `第 ${String(retry)} 次应撤回的回复` } } })
-        scenario.stepStarted = true
+      // Settle this round's failed attempt: a live one lands through its end
+      // frame; a direct round emits the durable attempt record only.
+      if (scenario.attemptId === undefined) {
+        append(sessionId, {
+          type: 'assistant/attempt',
+          data: {
+            turn: scenario.turn, step: 1,
+            stream: streamRecords([
+              { type: 'block-start', index: 0, blockType: 'text' },
+              { type: 'text-delta', index: 0, text: `第 ${String(retry)} 次应撤回的回复` },
+            ] as StreamChunk[]),
+          },
+        })
+      } else {
+        commitScenarioAttempt(sessionId, scenario, true)
       }
-      const failure = { code: 'TRANSPORT', message: '连接被重置' }
-      append(sessionId, {
-        type: 'llm/retry',
-        data: {
-          turn: scenario.turn, step: 1,
-          provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
-          retry, maxRetries: 2, delayMs, failure,
-        },
-      })
-      scenario.stepStarted = false
+      appendModelRetry(sessionId, scenario, retry, delayMs)
     },
     /** Record one retry decision, then cancel its source turn before the retry starts. */
     cancelModelRetryDuringBackoff(id: string, delayMs = 450): void {
       const sessionId = sid(id)
       const scenario = retryScenarios.get(sessionId)
       if (scenario === undefined) throw new Error(`fixture: no model retry scenario for ${id}`)
-      const failure = { code: 'TRANSPORT', message: '连接被重置' }
-      append(sessionId, {
-        type: 'llm/retry',
-        data: {
-          turn: scenario.turn, step: 1,
-          provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
-          retry: 1, maxRetries: 2, delayMs, failure,
-        },
-      })
+      commitScenarioAttempt(sessionId, scenario, true)
+      appendModelRetry(sessionId, scenario, 1, delayMs)
       append(sessionId, { type: 'step/end', data: { turn: scenario.turn, step: 1 } })
       append(sessionId, { type: 'turn/end', data: { turn: scenario.turn, reason: { kind: 'aborted', reason: { kind: 'user' } },
       } })
@@ -2320,17 +2398,19 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       const scenario = retryScenarios.get(sessionId)
       if (scenario === undefined) throw new Error(`fixture: no model retry scenario for ${id}`)
       retryScenarios.delete(sessionId)
-      append(sessionId, { type: 'assistant/chunk', data: {
-        turn: scenario.turn,
-        step: 1,
-        chunk: { type: 'block-start', index: 0, blockType: 'text' },
-      } })
+      commitScenarioAttempt(sessionId, scenario, false)
+      const chunks: StreamChunk[] = [
+        { type: 'block-start', index: 0, blockType: 'text' },
+        { type: 'text-delta', index: 0, text: '重试后的完整回复' },
+        { type: 'block-end', index: 0, block: { type: 'text', text: '重试后的完整回复' } },
+      ]
       append(sessionId, {
         type: 'assistant/message',
         surfaceOp: 'append',
         data: {
           turn: scenario.turn,
           step: 1,
+          stream: streamRecords(chunks),
           message: assistantMessage(text('重试后的完整回复')),
         },
       })
@@ -2354,23 +2434,35 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   const startReply = (id: SessionId, turn: number, replyText: string): void => {
     const step = 0
     append(id, { type: 'step/start', data: { turn, step } })
-    append(id, { type: 'assistant/chunk', data: { turn, step, chunk: { type: 'block-start', index: 0, blockType: 'text' } } })
+    const attemptId = LlmAttemptId(randomUuid())
+    streamStart(id, attemptId, turn, step)
+    streamChunk(id, attemptId, 0, { type: 'block-start', index: 0, blockType: 'text' })
     /* v8 ignore next -- the ?? arm needs a null match, but every fixture reply is non-empty. */
     const pieces = replyText.match(/[\s\S]{1,6}/gu) ?? [replyText]
     let i = 0
     const finish = (aborted: boolean): void => {
       replays.delete(id)
       const done = pieces.slice(0, i).join('')
-      append(id, { type: 'assistant/chunk', data: { turn, step, chunk: { type: 'block-end', index: 0, block: { type: 'text', text: done } } } })
+      const chunks: StreamChunk[] = [
+        { type: 'block-start', index: 0, blockType: 'text' },
+        ...pieces.slice(0, i).map((piece): StreamChunk => ({ type: 'text-delta', index: 0, text: piece })),
+        { type: 'block-end', index: 0, block: { type: 'text', text: done } },
+      ]
+      streamChunk(id, attemptId, i + 1, { type: 'block-end', index: 0, block: { type: 'text', text: done } })
       append(id, {
         type: 'assistant/message',
         surfaceOp: 'append',
         data: {
           turn,
           step,
+          stream: streamRecords(chunks),
           message: assistantMessage(text(aborted ? `${done}（已中断）` : done)),
           usage: fixtureUsage(turn, step),
+          ...(aborted ? { interrupted: true as const } : {}),
         },
+      })
+      streamEnd(id, attemptId, i + 2, {
+        kind: 'committed', eventType: 'assistant/message', seq: logOf(id).length - 1,
       })
       append(id, { type: 'step/end', data: { turn, step } })
       append(id, { type: 'turn/end', data: { turn, reason: { kind: aborted ? 'cancelled' : 'completed' } } })
@@ -2383,7 +2475,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         return
       }
       i++
-      append(id, { type: 'assistant/chunk', data: { turn, step, chunk: { type: 'text-delta', index: 0, text: piece } } })
+      streamChunk(id, attemptId, i, { type: 'text-delta', index: 0, text: piece })
       replays.set(id, { timer: setTimeout(tick, 80), finish })
     }
     replays.set(id, { timer: setTimeout(tick, 80), finish })

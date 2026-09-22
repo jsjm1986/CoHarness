@@ -8,10 +8,8 @@
 
 import {
   decodeSeqRanges,
-  decodeStorageRecord,
-  packChunkRuns,
-  type SessionEvent,
 } from '@deepseek-ai/dsh-session'
+import { prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
 
 const SESSION_ID = '{{sessionId}}'
 const CWD = '{{cwd}}'
@@ -393,53 +391,58 @@ export function normalizeSessionLog(
 }
 
 /**
- * Repack normalized body records so persistence flush boundaries do not affect
- * committed snapshots. Synthetic envelopes exist only while the storage codec
- * reconstructs and packs the logical event stream; returned rows stay projected.
+ * Canonicalize projected body records. Compact streams are nested event data,
+ * so persistence flush boundaries cannot change the row layout.
  * @param rawLog - normalized projected session JSONL.
  * @returns the same header and a canonical projected body.
  */
-function repackSessionSnapshot(rawLog: string): string {
+function projectSessionSnapshot(rawLog: string): string {
   const lines = rawLog.split('\n').filter(line => line.trim().length > 0)
   const header = lines.shift()
   if (header === undefined) throw new Error('session snapshot must start with a session header')
 
-  let nextSeq = 0
-  const events = lines.flatMap((line) => {
+  const body = lines.map((line) => {
     const record = JSON.parse(line) as Record<string, unknown>
-    if (isPackedFixtureRow(record)) {
-      const decoded = decodeStorageRecord({ ...record, seq0: nextSeq, time0: 0 })
-      nextSeq += decoded.length
-      return decoded
-    }
-    const event = { ...record, seq: nextSeq, time: 0 } as SessionEvent
-    nextSeq += 1
-    return [event]
-  })
-  const body = packChunkRuns(events).map((stored) => {
-    const projected = { ...(stored as unknown as Record<string, unknown>) }
-    omitFixtureEnvelope(projected)
-    return JSON.stringify(projected)
+    omitFixtureEnvelope(record)
+    return JSON.stringify(record)
   })
   return [header, ...body, ''].join('\n')
 }
 
 /**
  * Normalize and project persisted session JSONL for a committed fixture.
- * The logical event stream is re-packed after normalization so separate
- * persistence flushes produce one stable fixture layout; provenance ranges are
+ * The logical event stream is projected after normalization so separate
+ * persistence flushes produce one stable fixture layout; source-event ranges are
  * emitted as ordinary logical sequence arrays.
  * @param rawLog - persisted or already-projected session JSONL.
  * @param ctx - the run's volatile values to scrub.
  * @param options - separator output controls.
  * @returns normalized committed session snapshot JSONL.
  */
+/** Whether a session log declares a released format generation and therefore migrates for comparison. */
+function declaresSessionFormatVersion(rawLog: string): boolean {
+  const firstLine = rawLog.split(/\r?\n/).find(line => line.trim().length > 0)
+  if (firstLine === undefined) throw new Error('session snapshot must start with a session header')
+  const header = JSON.parse(firstLine) as Record<string, unknown>
+  return typeof header.version === 'number'
+}
+
+/**
+ * Normalize a raw session `.jsonl` capture into its comparable golden form.
+ * @param rawLog - the raw session log content.
+ * @param ctx - the run-specific values replaced by stable tokens.
+ * @param options - platform spelling controls for tokenized paths.
+ * @returns the normalized session snapshot text.
+ */
 export function normalizeSessionSnapshot(
   rawLog: string,
   ctx: NormalizeContext,
   options: NormalizeOptions = {},
 ): string {
-  return repackSessionSnapshot(scrubSessionSnapshot(normalizeSessionLog(rawLog, ctx, options)))
+  const comparable = declaresSessionFormatVersion(rawLog)
+    ? prepareSessionSnapshotFixtureForComparison(rawLog)
+    : rawLog
+  return projectSessionSnapshot(scrubSessionSnapshot(normalizeSessionLog(comparable, ctx, options)))
 }
 
 /**

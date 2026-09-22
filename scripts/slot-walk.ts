@@ -1,7 +1,7 @@
 /**
  * AST helpers for the client slot surface: the `SlotMap` declaration merges
- * that type every slot, and the `slots.register` call sites that say who
- * already occupies one. Both readings are lexical (no type-checker program):
+ * that type every slot, and the `slots.register` / `slots.registerFactory`
+ * call sites that say who occupies or declares one. Both readings are lexical:
  * the client catalog generator consumes them, and the same scan doubles as its
  * own exhaustiveness backstop because it reads every source file rather than a
  * reachable-export closure.
@@ -17,8 +17,8 @@ const SLOTS_MODULE = '@deepseek-ai/dsh-client-ui-slots'
 /** Cheap textual prefilter for a slot-contract merge, quote-style agnostic. */
 const MERGE_HEAD = /declare module ['"]@deepseek-ai\/dsh-client-ui-slots['"]/
 
-/** Cheap textual prefilter for a registration call site. */
-const REGISTER_HEAD = /\.register\(/
+/** Cheap textual prefilter for a Slot or Factory registration call site. */
+const REGISTER_HEAD = /\.(?:register|registerFactory)\(/
 
 /** One `SlotMap` member: the slot's contract as its owning package declares it. */
 export interface SlotDeclaration {
@@ -44,7 +44,7 @@ export interface SlotDeclaration {
   source: string
 }
 
-/** One `slots.register({ name, … }, Component)` call site. */
+/** One `slots.register()` or `slots.registerFactory()` call site. */
 export interface SlotRegistration {
   /** Target SlotMap key the entry contributes into. */
   key: string
@@ -58,6 +58,8 @@ export interface SlotRegistration {
   entryKey?: string
   /** SlotMap keys this registration declares as children (they exist while it is mounted). */
   children: string[]
+  /** Whether this call installs a Factory definition instead of occupying an ordinary Slot. */
+  factory?: boolean
   /** Source pointer `packages/…/file.ts:line`. */
   source: string
 }
@@ -90,20 +92,38 @@ export interface ScannedFile {
  * @param patterns - glob(s) selecting the TypeScript/TSX files to scan.
  * @returns one entry per interesting file, in path order.
  */
-export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): ScannedFile[] {
-  const out: ScannedFile[] = []
-  const names = new Map<string, string>()
+/** Read a globbed file, tolerating entries that vanish between listing and read. */
+function readIfPresent(abs: string): string | undefined {
+  try {
+    return readFileSync(abs, 'utf8')
+  } catch (error) {
+    // A concurrent tree edit (for example a contract spec writing probe files
+    // into a real package directory) can remove a globbed path before the read.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
+function* globbedSources(
+  scanRoot: string,
+  patterns: readonly string[],
+): Generator<{ rel: string; text: string; sf: ts.SourceFile }> {
   const rels = [...new Set(globSync(patterns as string[], { cwd: scanRoot })
     .map(path => path.split(sep).join('/')))].sort()
   for (const rel of rels) {
     const abs = resolve(scanRoot, rel)
-    const text = readFileSync(abs, 'utf8')
+    const text = readIfPresent(abs)
+    if (text === undefined) continue
+    yield { rel, text, sf: ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel)) }
+  }
+}
+
+export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): ScannedFile[] {
+  const out: ScannedFile[] = []
+  const names = new Map<string, string>()
+  for (const { rel, text, sf } of globbedSources(scanRoot, patterns)) {
     if (!MERGE_HEAD.test(text) && !REGISTER_HEAD.test(text)) continue
-    out.push({
-      rel,
-      package: packageNameOf(scanRoot, rel, names),
-      sf: ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel)),
-    })
+    out.push({ rel, package: packageNameOf(scanRoot, rel, names), sf })
   }
   return out
 }
@@ -120,11 +140,7 @@ export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): Sc
 export function indexExportedTypes(scanRoot: string, patterns: readonly string[]): Map<string, TypeDeclaration> {
   const index = new Map<string, TypeDeclaration>()
   const ambiguous = new Set<string>()
-  const rels = [...new Set(globSync(patterns as string[], { cwd: scanRoot })
-    .map(path => path.split(sep).join('/')))].sort()
-  for (const rel of rels) {
-    const abs = resolve(scanRoot, rel)
-    const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(rel))
+  for (const { rel, sf } of globbedSources(scanRoot, patterns)) {
     for (const statement of sf.statements) {
       if (!ts.isInterfaceDeclaration(statement) && !ts.isTypeAliasDeclaration(statement)) continue
       if (!statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue
@@ -196,7 +212,7 @@ export function slotRegistrations(file: ScannedFile): SlotRegistration[] {
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)
       && ts.isPropertyAccessExpression(node.expression)
-      && node.expression.name.text === 'register'
+      && (node.expression.name.text === 'register' || node.expression.name.text === 'registerFactory')
       && isSlotsReceiver(node.expression.expression, file.sf)
       && node.arguments.length >= 1) {
       const options = node.arguments[0]
@@ -211,6 +227,7 @@ export function slotRegistrations(file: ScannedFile): SlotRegistration[] {
             component: componentText(node.arguments[1], file.sf),
             ...id === undefined ? {} : { id },
             ...entryKey === undefined ? {} : { entryKey },
+            ...node.expression.name.text === 'registerFactory' ? { factory: true } : {},
             children: childKeys(options),
             source: `${file.rel}:${String(lineOf(file.sf, node))}`,
           })

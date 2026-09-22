@@ -12,13 +12,16 @@
       "path": "../../core/agent"
     },
     {
-      "path": "../../llm/llm"
-    },
-    {
       "path": "../../core/session"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../util/http-proxy"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

@@ -28,6 +28,7 @@ export class TeamJournal {
    * @returns current replay state selected by the Lead Team id.
    */
   state(root: Agent): TeamFoldState {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return foldTeam(root.id, root.session.snapshotEvents())
   }
 

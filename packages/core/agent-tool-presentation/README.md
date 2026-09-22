@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The row an [agent preset](../../preset/agent-presets/README.md) carries to say which form of its tools the model sees: `native` (every schema), `ptc` (only `run_code` plus a generated TypeScript SDK), or `both`; `code` remains an accepted compatibility alias.
 
+## Summary
+
+Use `dsh-agent-tool-presentation` in an [agent preset](../../preset/agent-presets/README.md) to fix whether models see every native tool schema, only `run_code` with a generated SDK, or both forms. Each preset can choose independently, so native and PTC agents can share one process without sharing tool catalogs. Selecting `ptc` or `both` requires a compatible PTC runtime; a deployment without one rejects the preset at mount time before its first prompt. The `mode` field is required when this package is present, while omitting the package keeps the deployment default.
+
 ## Why a row rather than a registry
 
 The tool registry cannot move into a preset. Its consumers are all host-plane — [`dsh-agent-loop`](../agent-loop/README.md) reads its scheduler, [`dsh-apiproxy`](../../host/apiproxy/README.md) reads its presenters to render tool cards, and every tool plugin registers into it — and a service only moves down when all of its consumers move with it.
@@ -12,15 +16,19 @@ What a preset can own is the **presentation** of that registry. `ctx.tools.prese
 
 ## What it does
 
-`native` applies immediately. A PTC mode instead waits for `ctx.codeRuntime`, which is a host-plane service ([`dsh-code-runtime-worker-thread`](../../code-runtime/code-runtime-worker-thread/README.md)): a preset selecting PTC mode against a deployment composing no runtime then holds this row pending, and `dsh-agent-presets` refuses the mount naming this id. The alternative — applying optimistically — moves the failure to the session's first request, where the operator can act on neither the preset nor the composition.
+`native` applies immediately. A PTC mode instead waits for `ctx.ptcRuntime`, which is a host-plane service ([`dsh-ptc-runtime-node`](../../ptc-runtime/ptc-runtime-node/README.md)): a preset selecting PTC mode against a deployment composing no runtime then holds this row pending, and `dsh-agent-presets` refuses the mount naming this id. The alternative — applying optimistically — moves the failure to the session's first request, where the operator can act on neither the preset nor the composition.
 
 `mode` is required rather than defaulted, because a preset without this row already gets the deployment default; an omitted value would mean the row was composed for nothing.
 
 One agent declares one presentation. A second declaration in the same composition is refused rather than merged: two answers to "which form does the model see" is a contradiction, not an override.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes one declarative preset row consumed at composition time; it owns no runtime state.
+
 ## Model Experience
 
-Indirectly, through the projection it selects in `dsh-tools`: `ptc` presents `run_code` plus a generated SDK section and the rule that only `run_code` may be called directly, `native` presents every tool schema. The selection also decides what may EXECUTE: under `ptc` the registry resolves a model-direct call naming any other tool to `UNKNOWN_TOOL`, so this row is what keeps the announced surface and the callable surface the same for every agent it covers ([executor-collapse note](../../../.agents/notes/implemented/bug-fix/2026-08-07-ptc-executor-collapse.md)).
+Indirectly, through the tool presentation it selects in `dsh-tools` — the row only chooses between the two projections `dsh-tools` owns and registers no prompt, schema, or result of its own.
 
 #### KV Cache effect
 

@@ -15,6 +15,7 @@ import { searchCardModel } from '../models/search-card-model.ts'
 import { terminalCardModel, terminalFailed } from '../models/terminal-card-model.ts'
 import { webCardModel } from '../models/web-card-model.ts'
 import { toolRowModel, type ToolRowVariant } from '../models/tool-call-model.ts'
+import { localizeAutoReviewDenial } from '../models/auto-review-denial.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 
 /** Variant leading icons (figma table); all glyphs render at 14 inside the 16px leading box. */
@@ -46,13 +47,16 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, inspect,
     ? 'error'
     : model.state
   const singleFile = model.filePath !== undefined
+  const autoReview = model.autoReviewDenial === null
+    ? null
+    : localizeAutoReviewDenial(model.autoReviewDenial, t)
   return (
     <ToolRow
       t={t}
       variant={model.variant}
       toolName={toolName}
       icon={VARIANT_ICONS[model.variant]}
-      title={model.title}
+      title={t(model.titleKey)}
       // A terminal presenter's description is the contract's above-card text, so
       // it outranks the args-derived summary here exactly as it does in BashRow;
       // a search result view's replacement title outranks it the same way.
@@ -60,9 +64,11 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, inspect,
       // Single-file tools never expose an args body — the path link is the only
       // args interaction. A card is not an args body: a read/write/edit row is
       // single-file AND carries a card, so the card expands under the path link.
-      bodyRaw={singleFile ? null : model.bodyRaw}
-      output={model.output}
-      errorSummary={model.errorSummary}
+      // An Auto denial suppresses the args body the same way: the call never
+      // executed, so its input is not evidence of anything the agent did.
+      bodyRaw={singleFile || autoReview !== null ? null : model.bodyRaw}
+      output={autoReview?.output ?? model.output}
+      errorSummary={autoReview?.summary ?? model.errorSummary}
       terminal={terminal}
       diff={diff}
       read={read}

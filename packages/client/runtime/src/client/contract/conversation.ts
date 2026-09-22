@@ -1,13 +1,36 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import type { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import type { ToolEventView } from '@deepseek-ai/dsh-api-remotes/client'
 
 /* oxlint-disable typescript/no-duplicate-type-constituents, typescript/no-redundant-type-constituents --
  * The unaugmented declaration-merge maps intentionally resolve to never in the Runtime program;
  * installed business packages supply their concrete keys in consuming Client programs. */
 
+/**
+ * Client-only live chunk presentation folded from a process-local
+ * `session/assistant-stream` frame. Never durable — a committed
+ * `assistant/message` or `assistant/attempt` event settles the attempt's
+ * transient rows. `seq` orders the row between durable Session seqs.
+ */
+export interface AssistantLiveChunkEvent {
+  readonly type: 'assistant/live-chunk'
+  readonly seq: number
+  readonly time: number
+  readonly data: {
+    readonly attemptId: LlmAttemptId
+    readonly turn: number
+    readonly step: number
+    readonly chunk: StreamChunk
+  }
+}
+
+/** A durable Session event or one client-only live chunk presentation. */
+export type SessionEventLike = SessionEvent | AssistantLiveChunkEvent
+
 /** One raw log event plus its optional envelope-level presentation view. */
 export interface ConversationEventInput {
-  readonly event: SessionEvent
+  readonly event: SessionEventLike
   readonly view: ToolEventView | undefined
 }
 
@@ -177,7 +200,7 @@ export interface ConversationNodeDefinition<State = unknown> {
    * @param event - raw Session event; no Context or history access is available.
    * @returns identity and lifecycle role, or null when unrelated.
    */
-  match(event: SessionEvent): ConversationMatchResult | null
+  match(event: SessionEventLike): ConversationMatchResult | null
   /**
    * Create State from the unique start Match.
    * @param context - complete evidence currently collected for the Context.

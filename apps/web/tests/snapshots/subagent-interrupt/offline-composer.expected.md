@@ -14,9 +14,6 @@
   - button "Session log":
     - text: Session log
     - img
-- button "Process details" [expanded]:
-  - text: Process details
-  - img
 - button "System prompt":
   - img
   - img
@@ -28,7 +25,6 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
-- paragraph: partial
 - status: Deep diving...
 - textbox "Parent session offline; sending is unavailable but you can still stop the run" [disabled]
 - button "Add images or documents" [disabled]:

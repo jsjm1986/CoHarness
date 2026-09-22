@@ -36,13 +36,38 @@ export const RECORD_SCOPE = 'llm-pi-ai'
 export function recordKeyFor(providerId: string): CredentialKey {
   return credentialKey(RECORD_SCOPE, providerId)
 }
+
+/**
+ * The JSON image of one grant payload: plain objects lose their
+ * explicitly-undefined members and array entries JSON cannot hold become
+ * null, exactly as `JSON.stringify` would render them. pi-ai credentials
+ * idiomatically carry optional members as explicit `undefined` (a github.com
+ * Copilot grant holds `enterpriseUrl: undefined`), which the credential
+ * store's strict validator refuses as unrepresentable. Everything else —
+ * non-finite numbers and foreign prototypes included — passes through
+ * untouched, so a genuinely unstorable value still fails loud at the store.
+ * @param value - the value to render.
+ * @returns the value's JSON image.
+ */
+function jsonImage(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(entry => entry === undefined ? null : jsonImage(entry))
+  if (typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype) {
+    const image: Record<string, unknown> = {}
+    for (const [key, member] of Object.entries(value)) {
+      if (member !== undefined) image[key] = jsonImage(member)
+    }
+    return image
+  }
+  return value
+}
+
 /**
  * Translate a stored record into the credential pi-ai expects.
  *
  * An `api-key` record is structural on both sides, so it is rebuilt field by
- * field. A `grant` payload is pi-ai's own OAuth credential; it is stored as
- * the JSON image of the value so explicit `undefined` members cannot violate
- * the durable record validator.
+ * field. A `grant` payload is pi-ai's own OAuth credential, stored verbatim:
+ * the seam treats it as opaque JSON precisely so a library that owns a token
+ * format keeps owning it, refresh fields and all.
  * @param record - the stored record, or undefined when nothing is stored.
  * @returns the pi-ai credential, or undefined for an absent record.
  */
@@ -56,26 +81,6 @@ function toPiCredential(record: CredentialRecord | undefined): Credential | unde
     }
   }
   return record.payload as Credential
-}
-
-/**
- * Render one grant as the JSON-compatible value the credential store accepts.
- * Objects omit explicitly undefined members and arrays turn them into null,
- * matching `JSON.stringify`; foreign prototypes and non-finite values remain
- * untouched so a genuinely invalid payload still fails loudly at the store.
- * @param value - grant value to render.
- * @returns its JSON-compatible image.
- */
-function jsonImage(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(entry => entry === undefined ? null : jsonImage(entry))
-  if (typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype) {
-    const image: Record<string, unknown> = {}
-    for (const [key, member] of Object.entries(value)) {
-      if (member !== undefined) image[key] = jsonImage(member)
-    }
-    return image
-  }
-  return value
 }
 
 /**

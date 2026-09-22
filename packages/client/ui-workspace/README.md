@@ -26,9 +26,17 @@ Both target slots are declared by other plugins, so `apply` uses `slots.inject()
 
 The shared sidebar projection hides rows whose durable Session summary has `origin: 'subagent'`; users enter those conversations through the selected parent's subagent header catalog. Each visible ordinary row inherits the blue activity indicator while any descendant reached through uninterrupted subagent-origin lineage is running, and its hover and assistive text report the exact running-descendant count without describing an idle parent as running. Ordinary forks remain visible and terminate this aggregation because lineage alone does not set their origin. Pending user interaction outranks the session's own running state, and either remains the primary row status while descendant activity stays available as a separate hover and assistive status. With neither present, descendant activity outranks the green unviewed-completion reminder; the reminder returns once no descendant is running. The runtime keeps hidden rows available for conversation, title, and addressed transport state.
 
+## Summary
+
+This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion. Pending interactions appear as warning dots, active scheduled tasks as alarm markers, and subagent-origin Sessions remain hidden. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, the add action is unavailable.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Workspace and Session lists render from runtime mirrors and Host calls; the browser owns no workspace data.
+
 ## Model Experience
 
-None, as the picker is browser chrome; nothing here reaches a model request.
+None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 

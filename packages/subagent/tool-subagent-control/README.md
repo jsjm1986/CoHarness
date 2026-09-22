@@ -10,13 +10,21 @@ The tool performs no lifecycle routing — residency, cold resume, and authoriza
 
 `list_agents` takes one optional `scope` argument, derives the root id from the calling agent, and projects the service catalog to continuable children without a cursor. The default `children` scope reads `ctx.subagents.listChildren()`; `descendants` reads `ctx.subagents.listDescendants()`, whose one-corpus walk crosses ordinary sessions and one-shot children and renders surviving rows in stable pre-order with `parent=<id> depth=<n>`. The `parent` annotation is the durable direct-parent session id and may name an ordinary session omitted from the output. For the calling agent, only depth-1 child entries are `send_message` candidates; deeper child entries are `interrupt_agent` candidates only. Status comes from the live Agent registry: `running` (active driver), `idle` (resident between turns, possibly waiting on agents it started), or `ready` (storage only and resumable rather than terminal). The service result also contains one-shot session-backed subagents for consumers such as a UI, but those entries are omitted from this model tool because they cannot accept `send_message`. Diagnostics remain visible, with positions in the descendants scope. Durable identity and mode come from each child's descriptor, while delivery-time authority and Activation ownership checks remain the service's.
 
+## Summary
+
+`dsh-tool-subagent-control` adds the global control tools for continuable children: `send_message` steers between a direct parent and child, `interrupt_agent` stops a child's current turn while keeping its inbox and descendants intact, and `list_agents` (from the separately loadable `list-agents` plugin) lists continuable children by durable id and label. Parents and continuable children inherit the same `send_message` definition and ordering, so model communication adds no child-only tool schema. No tool's presence decides whether a delegation tool starts continuable work.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The controls are thin registrations over `ctx.subagents`; agent state belongs to the registry and its providers.
+
 ## Model Experience
 
 ### Tool schema
 
 #### What the model sees
 
-The generated [schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent-control): `send_message` takes `agent_id` and `message`, describing that a working target is steered at its nearest step while an idle one starts a turn, that this call returns no answer from the agent, and that a failure means the message was not delivered; `interrupt_agent` takes `agent_id`, describing that only the current turn stops, queued messages park, descendants keep running, and acceptance precedes the actual stop; `list_agents` takes the optional `scope` enum.
+The generated [schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent-control): `send_message` takes `agent_id` and `message`; `interrupt_agent` takes `agent_id`; `list_agents` takes the optional `scope` enum.
 
 #### Token effect
 
@@ -58,7 +66,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-One line per continuable child in stable catalog order: `<id> [<status>] — <label>` (`running` = active driver, `idle` = resident between turns, `ready` = storage only; resumable rather than terminal, not a result waiting to be collected — a direct child in that state can be resumed by `send_message`), plus `<id> [diagnostic: <reason>]` for a candidate that could not be read (`corrupt`, `unsupported`, or `unavailable`). The `descendants` scope inserts ` parent=<id> depth=<n>` before the label dash on every line, in pre-order. One-shot children are intentionally absent; `(no subagents)` means no continuable child or diagnostic survived the projection. Diagnostics never expose descriptor contents.
+One line per continuable child in stable catalog order: `<id> [<status>] — <label>` (`running` = active driver, `idle` = resident between turns, `ready` = storage only, resumable rather than terminal), plus `<id> [diagnostic: <reason>]` for a candidate that could not be read. The `descendants` scope inserts ` parent=<id> depth=<n>` before the label dash on every line, in pre-order. One-shot children are intentionally absent; `(no subagents)` means no continuable child or diagnostic survived the projection.
 
 #### Token effect
 

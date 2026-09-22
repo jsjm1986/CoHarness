@@ -4,9 +4,9 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { agentEvents } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SessionId, SessionLogOffset, type SessionHeader } from '@deepseek-ai/dsh-session'
+import type { LegacySessionHandle, SessionHandle, SessionPersistenceCreateOptions } from '@deepseek-ai/dsh-session-persistence'
 import * as toolSchedule from '../src/index.ts'
 
 class PersistenceProbe extends Service {
@@ -15,7 +15,7 @@ class PersistenceProbe extends Service {
   }
 
   /** Minimal handle surface for AgentLoop lifecycle tests without a backend. */
-  async createHandle(id: SessionId): Promise<SessionHandle> {
+  async createHandle(id: SessionId): Promise<LegacySessionHandle> {
     return {
       id,
       mode: 'write',
@@ -24,6 +24,22 @@ class PersistenceProbe extends Service {
       flush: async () => {},
       close: async () => {},
     }
+  }
+
+  /** Minimal create surface for AgentLoop publication; nothing durable is kept. */
+  async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandle> {
+    const handle: SessionHandle = {
+      id: header.id,
+      header,
+      inheritedEventCount: options?.inheritedEventCount ?? SessionLogOffset(0),
+      access: 'write',
+      read: async () => ({ eventState: 'detached', events: [] }),
+      append: async () => {},
+      flush: async () => {},
+      close: async () => {},
+      [Symbol.asyncDispose]: async () => {},
+    }
+    return handle
   }
 }
 
@@ -64,7 +80,7 @@ describe('Schedule plugin composition', () => {
 
     const created = await ctx.agents.withInitiator(root.agent, () => ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: CallId('schedule-plugin-create'),
+      callId: ToolCallId('schedule-plugin-create'),
       name: 'schedule_create',
       arguments: { prompt: 'future reminder', after_seconds: 3_600 },
       agent: root.agent,

@@ -9,8 +9,9 @@
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval/types'
 import type { Message } from '@deepseek-ai/dsh-llm/types'
-import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { CallId } from '@deepseek-ai/dsh-llm/brand'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { LlmAttemptId, MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { JsonValue, SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools/presentation'
 import type { RpcError, RpcId, RpcRequest } from './rpc.ts'
@@ -67,14 +68,86 @@ export interface EventsApi {
   host(request: RpcRequest<{}>, signal: AbortSignal): AsyncIterable<RpcRequest<HostFrame>>
 }
 
+/** One active assistant attempt inside a reconnect baseline. */
+export interface SessionAssistantStreamAttempt {
+  readonly attemptId: LlmAttemptId
+  /** Last durable Session seq observed when this attempt started. */
+  readonly startedAfterSeq: number
+  readonly turn: number
+  readonly step: number
+  /** Dense position expected for the next live chunk frame. */
+  readonly nextIndex: number
+  /** Compact detached stream accumulated at this baseline revision. */
+  readonly stream: readonly AssistantStreamRecord[]
+}
+
+/** Complete process-local assistant stream state at one subscribe point. */
+export interface SessionAssistantStreamBaseline {
+  readonly revision: number
+  readonly activeAttempt?: SessionAssistantStreamAttempt
+}
+
+/**
+ * Wire form of one process-local `agent/assistant-stream` frame. The start
+ * frame gains the durable cursor it was observed at; end carries its durable
+ * settlement or abandonment; chunk's provider vocabulary crosses as JsonValue.
+ */
+export type SessionAssistantStreamFrame =
+  | {
+    readonly type: 'start'
+    readonly attemptId: LlmAttemptId
+    readonly revision: number
+    /** Durable Session seq the attempt was observed after. */
+    readonly startedAfterSeq: number
+    readonly turn: number
+    readonly step: number
+  }
+  | {
+    readonly type: 'chunk'
+    readonly attemptId: LlmAttemptId
+    readonly revision: number
+    /** Dense zero-based position within the attempt. */
+    readonly index: number
+    readonly time: number
+    /** Provider chunk vocabulary crossing the wire as JSON. */
+    readonly chunk: JsonValue
+  }
+  | {
+    readonly type: 'end'
+    readonly attemptId: LlmAttemptId
+    readonly revision: number
+    /** Number of chunk frames emitted by this attempt. */
+    readonly index: number
+    /** Durable settlement committed before this marker, or live abandonment without one. */
+    readonly outcome:
+      | {
+        readonly kind: 'committed'
+        readonly eventType: 'assistant/message' | 'assistant/attempt'
+        readonly seq: number
+      }
+      | { readonly kind: 'abandoned' }
+  }
+
 /**
  * Mux stream frames: raw session-event passthrough + control frames +
  * approval/question frames (requested = answerable server-request, the rest are pure pushes).
  */
 export type MuxFrame =
   | { type: 'session/event'; sessionId: SessionId; event: SessionEvent; view?: ToolEventView }
-  | { type: 'session/subscribed'; sessionId: SessionId; lastSeq: number }
-  | { type: 'approval/requested'; sessionId: SessionId; approvalId: ApprovalRequestId; toolName: string; callId?: CallId; reason?: string }
+  /**
+   * Subscription opening for one session. `lastSeq` is the durable cursor the
+   * following `session/event` stream continues from. `assistantStream` is the
+   * process-local assistant baseline at this opening — live
+   * `session/assistant-stream` frames arriving after it replay cleanly over
+   * it; frames the baseline already covers or supersedes are never pushed.
+   */
+  | {
+    type: 'session/subscribed'
+    sessionId: SessionId
+    lastSeq: number
+    assistantStream?: SessionAssistantStreamBaseline
+  }
+  | { type: 'approval/requested'; sessionId: SessionId; approvalId: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string }
   | { type: 'approval/resolved'; sessionId: SessionId; approvalId: ApprovalRequestId; outcome: ApprovalOutcome }
   | { type: 'question/requested'; sessionId: SessionId; questions: AskUserQuestionItem[] }
   | { type: 'question/resolved'; sessionId: SessionId; questionRpcId: RpcId; outcome: 'answered' | 'cancelled' }
@@ -110,6 +183,14 @@ export type MuxFrame =
    * tail page's projections block.
    */
   | { type: 'session/projection'; sessionId: SessionId; key: string; value: unknown; seq: number }
+  /**
+   * One process-local assistant-stream frame for a subscribed session.
+   * Transient by contract — never logged; the durable `assistant/message` or
+   * `assistant/attempt` carrying the same stream arrives on `session/event`
+   * before its committed `end` frame. Only frames newer than the opening
+   * `session/subscribed` baseline are pushed.
+   */
+  | { type: 'session/assistant-stream'; sessionId: SessionId; frame: SessionAssistantStreamFrame }
   | { type: 'stream/error'; error: RpcError }
 
 /**

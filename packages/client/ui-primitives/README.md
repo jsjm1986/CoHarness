@@ -6,6 +6,10 @@ Pure React atoms (zero cordis): StateDot, DisclosureRow, ic_ds_* icons, Button/P
 
 `Menu` primary lists use their anchor placement on desktop. An optional `header` stays above the scrolling item viewport and an optional `footer` stays pinned below it; `listClassName` lets a consumer set list-level geometry such as a product-specific height cap. Below 768px, menus become safe-area phone sheets using `--dsw-mobile-sheet-*`, with a shared scrim and drag affordance; scrollable menus keep their header and footer outside the item scrollport, their rows remain selectable menu items, and outside-dismiss plus Escape behavior stay the same. `Modal` uses the same sheet presentation and keeps keyboard focus inside its dialog while it is open. Portal presenters should use `useMediaQuery('(max-width: 767px)')` when their information hierarchy needs a mobile-only branch; in-frame components should continue to use the shell's `data-viewport` stamp.
 
+## Summary
+
+Use `dsh-client-ui-primitives` to build web-client controls and render agent output with shared React UI. It includes standard controls, icons, anchored overlays, and renderers for Markdown with TeX, terminal output, file reads, diffs, search, web retrieval, and JSON. The renderers handle untrusted model output by dropping raw HTML, restricting links, and parsing ANSI escape sequences. The components import no Cordis runtime; callers supply localized labels, and theme-facing colors use `--dsw-*` design tokens.
+
 ## Hover cards
 
 `HoverCard` keeps its portaled preview reachable across the anchor gap with a pointer-leave grace. A consumer may also pass `copyText`: the card then exposes button semantics for pointer and keyboard activation, includes that value after the `copyLabel` prefix in its accessible name, writes the exact value through the package clipboard helper, and temporarily replaces its content with `copiedLabel` only after the host accepts the write. A non-collapsed text selection intersecting the card suppresses pointer-click activation, while success feedback retains the original card height and clears when the card closes or after one second. `copyLabel` and `copiedLabel` are label props because this zero-cordis atom cannot read the application locale; omitting `copyText` preserves the read/select-only card. Historical rationale: [the archived hover-card copy note](../../../.agents/notes/archived/feature/2026-07-31-hover-card-click-copy.md).
@@ -42,9 +46,13 @@ Pure React atoms (zero cordis): StateDot, DisclosureRow, ic_ds_* icons, Button/P
 
 `useMediaQuery` shares one native listener per query and falls back to `addListener`/`removeListener` for older WebViews. `holdInert` uses native `HTMLElement.inert` when available and also keeps `aria-hidden` plus tab stops safe while an overlay owns the page. Theme styles define a `100vh` viewport fallback before the layout plugin publishes its visual-viewport height.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Pure React atoms own no runtime state; their rendering contract is asserted by unit specs.
+
 ## Model Experience
 
-None, as the package renders pure React atoms in the browser; nothing here reaches a model request.
+None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 

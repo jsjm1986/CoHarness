@@ -260,11 +260,11 @@ describe('session.history projections block', () => {
     const history = await gateway.sessions.history(request({ sessionId: session.id }))
     expect(history.result.ok).toBe(true)
     if (!history.result.ok) throw new Error('unexpected history refusal')
-    expect(history.result.value.projections?.values.inbox).toMatchObject([{ id: message.id, message }])
+    expect(history.result.value.projections?.values.queuedInbox).toMatchObject([{ id: message.id, message }])
     const list = await gateway.sessions.list(request({}))
     expect(list.result.ok).toBe(true)
     if (!list.result.ok) throw new Error('unexpected list refusal')
-    expect(list.result.value.items[0]?.projections?.values.inbox).toBeUndefined()
+    expect(list.result.value.items[0]?.projections?.values.queuedInbox).toBeUndefined()
     await ctx.fiber.dispose()
   })
 
@@ -282,13 +282,13 @@ describe('session.history projections block', () => {
     }, { inject: ['sessions', 'agents', 'userQuestions', 'sessionProjections'] }))
     await fiber.await()
     await vi.waitFor(() => {
-      expect(ctx.sessionProjections.snapshot(session).values.inbox).toEqual([{ id: message.id, placement: 'queued', message }])
+      expect(ctx.sessionProjections.snapshot(session).values.queuedInbox).toEqual([{ id: message.id, placement: 'queued', message }])
     })
     expect(ctx.agents.get(session.id)).toBeUndefined()
     session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 1, inserted: [] })
-    expect(ctx.sessionProjections.snapshot(session).values.inbox).toEqual([])
+    expect(ctx.sessionProjections.snapshot(session).values.queuedInbox).toEqual([])
     await fiber.dispose()
-    expect(ctx.sessionProjections.snapshot(session).values.inbox).toBeUndefined()
+    expect(ctx.sessionProjections.snapshot(session).values.queuedInbox).toBeUndefined()
     await ctx.fiber.dispose()
   })
 
@@ -343,7 +343,8 @@ describe('session.list projections column', () => {
     const coldId = SessionId('session-cold-listing')
     const load = () => { throw new Error('list must not load event logs') }
     ctx.provide('sessionPersistence', {
-      list: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }],
+      list: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }].map(header => ({ header })),
+      listHeaders: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }],
       locate: () => undefined,
       load,
       inspect: load,
@@ -367,7 +368,8 @@ describe('session.list projections column', () => {
     const { ctx } = await harness(true)
     const coldId = SessionId('session-cold-uncached')
     ctx.provide('sessionPersistence', {
-      list: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }],
+      list: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }].map(header => ({ header })),
+      listHeaders: async () => [{ version: 0, id: coldId, createdAt: 5, cwd: '/tmp' }],
       locate: () => undefined,
     } as never)
     const response = await api(ctx).sessions.list(request({}))

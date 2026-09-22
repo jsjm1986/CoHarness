@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The model-facing **`workflow` tool**: run a JavaScript orchestration script that fans out subagents, and return the script's final value. This package owns the model-facing schema and run lifecycle over [`ctx.workflowEngine`](../workflow/README.md); script parsing, execution, caps, and cancellation live behind the seam, while the consumer retains ownership of the parent-facing schema and result envelope.
 
+## Summary
+
+`dsh-tool-workflow` lets a model run a JavaScript orchestration script that delegates work to many subagents and returns the script's final JSON value. Use it only when the user explicitly requests a workflow or large multi-agent orchestration; use plain subagent calls for one or two delegations. The parent turn waits until every delegated task settles, and cancellation or abnormal completion returns an error rather than partial success. Deployments can rename the tool and cap rendered result text through `toolName` and `maxResultChars`.
+
 ## What the model sees
 
 Three parameters: `meta` (required identity data: `name`, `description`, and optional progress annotations), `script` (required plain JavaScript body — no `export const meta` statement; the tool description carries the complete authoring contract), and `args` (optional JSON object exposed to the script as the `args` global; wrap a bare list in a field so the wire schema stays honest). The plugin also contributes a `tool:<toolName>` system-prompt section carrying the usage policy — use the tool only on an explicit user ask for a workflow / large orchestration; prefer plain subagent calls for one or two delegations — per the convention that tool guidance ships with the tool plugin, never in the deployment persona.

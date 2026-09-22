@@ -1,7 +1,10 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+// Type-only: pulls the locale plugin's Context merge (ctx.locale).
+import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { UsageAlert } from './UsageAlert.tsx'
+import { en, zh, NS } from './locales.ts'
 
 /** One durable quota threshold crossing returned by the Gateway account API. */
 export interface UsageAlert { metric: 'tokens' | 'company-cost'; threshold: 80 | 100; createdAt: number }
@@ -10,11 +13,13 @@ export interface UsageView { month: string; alerts: UsageAlert[] }
 /** Apply-side loader injected into the usage-alert presentation component. */
 export interface UsageAlertInjected { loadUsage: () => Promise<UsageView | null> }
 
-export const inject = ['slots']
+export const inject = ['slots', 'locale']
 export function apply(ctx: ClientContext): void {
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-usage-alert: dictionaries')
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'usage-alert',
+    locale: NS,
     inject: (): UsageAlertInjected => ({
       loadUsage: async () => {
         try {

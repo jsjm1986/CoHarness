@@ -4,6 +4,11 @@
 
 ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能体）主干、客户端通过 [`@deepseek-ai/dsh-acp`](../../acp/acp/README.zh.md) 创建的 agent、JSONL 持久化，以及语义检查点机制，并通过一个 JSON-RPC stdio bin 对外提供服务。程序化客户端创建新会话；此包不挂载人工交互 UI。
 
+## 概述
+
+使用 `dsh-acp-demo` 作为 ACP 自动化服务器应用：默认 agent 脊骨、经 `dsh-acp` 的客户端建代理、JSONL 持久化与语义检查点，合于一个 JSON-RPC stdio bin 之后。程序化客户端创建新会话；本包不挂载人机界面。
+
+
 ## 组合
 
 | 插件 | 角色 |
@@ -29,7 +34,6 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 | `dshHome` | `$DSH_HOME` 或 `~/.dsh` | bash 与本地 skill（技能）发现共享的 harness 主目录。 |
 | `sessionTitle` | 主干示例限制 | 持久后备标题限制；标题仍不会进入 ACP wire。 |
 | `persistenceRoot` | `./.sessions` | JSONL 后端根目录，以及派生 `session-query.db` 索引的父目录。 |
-| `packChunks` | `true` | 在存储中打包连续的增量分片事件。 |
 | `persistenceCompression` | `zstd` | 带校验和的 Zstandard 帧，或原始 `none`。 |
 | `workspaceContext` | 必填 | 工作区指令字节预算／配置，或 `false`。 |
 | `skills` | 拥有者默认值 | skill 注册表、本地提供方和面向模型的 skill 工具。 |
@@ -44,13 +48,17 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 
 `dsh-acp-demo [--config path-to-cordis.yml]`（短形式 `-c`；默认为 `./cordis.yml`）会加载 gitignore 排除的 `.env`，回放模式除外；`DSH_SNAPSHOT=replay` 选择同级 `cordis.snapshot.yml`；stdin EOF 会在退出前 dispose（资源释放）上下文并刷新会话。Loader 已安装的可选对等依赖（peer dependency）`node-addon-require-builtin` 使纯 Node 下构建后的 bin 可以解析裸插件说明符。诊断使用 stderr，因为 stdout 是 ACP wire。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 demo 把现有插件接线在一个 bin 之后；会话状态属于组合后的运行时与 ACP 服务器包。
+
 ## 模型体验
 
-模型体验由 `dsh-agent-spine-demo` 和叶节点的面向模型插件间接提供。ACP 提示词文本会成为普通的已记录用户消息；协议元数据与权限选择不会进入模型请求。
+经由 dsh-agent-spine-demo 与 dsh-acp 间接产生影响；该捆绑的请求组装由它们负责。
 
 #### KV Cache 影响
 
-每个会话仅追加；应用本身不添加请求前缀内容。
+无直接失效；消费方负责请求前缀的任何变化。
 
 ## 已知限制与暂缓事项
 

@@ -10,6 +10,10 @@
 
 插件还会提供 `tool:bash` 提示词段落（顺序 105）：检查每个结果中的 `[exit code: N]` 标记，发现失败时先调查原因再继续。
 
+## 概述
+
+`dsh-tool-bash` 让 agent（智能体）运行一次性 `bash` 命令，并接收 stdout、stderr 与退出标记。每次调用都使用全新 shell，因此 cwd、变量和函数不会保留；`run_in_background` 可启动长时间运行的工作，agent 能用 `job_output` 检查、用 `job_kill` 停止。命令会收到受管 `DSH_*` 环境；沙箱拒绝后，可携带更宽的 `sandbox_permissions`、一句 `justification` 并经用户批准重试一次。非零退出会作为结果报告，因此由 agent 决定如何响应；请使用 `dsh-bash-local` 或 `dsh-bash-sandbox` 等执行器，并加载 `dsh-shell-env`。
+
 ## 工具
 
 ### `bash`
@@ -21,7 +25,7 @@
 | `timeoutMs` | number | 以毫秒为单位覆盖超时时间。执行器会应用其配置的默认值和上限。 |
 | `workdir` | string | 本次调用的工作目录。默认为调用方 agent（智能体）会话 cwd 的文件系统标识（`session.header.cwd`），使每个会话都在自己的工作区中运行；相对 `workdir` 也以同一标识为基准解析。 |
 | `run_in_background` | boolean | 立即返回 job id；不应用超时。 |
-| `sandbox_permissions` | string enum | 仅当已挂载的执行器启用沙箱时才会公开（`ctx.shell.sandboxMode` 报告一个具有限制作用的默认值）：被拒命令所需的更宽模式，取自封闭的目标词汇 `workspace-write`/`danger-full-access`（绝不能缩减为执行器默认值；有效模式按会话确定，执行时会基于它检查是否严格拓宽，未拓宽的请求直接失败，不会向任何人发起提示）。 |
+| `sandbox_permissions` | string enum | 仅当已挂载的执行器启用沙箱时才会公开（`ctx.shell.sandboxMode` 报告一个具有限制作用的默认值）：被拒命令所需的更宽模式，取自封闭的目标词汇 `workspace-write`/`danger-full-access`（绝不能缩减为执行器默认值；有效模式按会话确定；更宽模式在执行时检查并审批，重复生效模式无需审批即可执行，更窄请求直接失败，不会向任何人发起提示）。 |
 | `justification` | string | 必须与 `sandbox_permissions` 一同提供（缺少任一项都会产生验证错误）：用一句话向用户解释此命令为何需要这项更宽权限。 |
 
 执行前，`command`、`workdir` 和 `timeoutMs` 会通过 `ctx.shell.resolve()` 依据执行器配置默认值完成解析，因此 Service Definition（`ShellExecSpec`）收到显式的 `workdir`/`timeoutMs` 值。工具层会根据调用方 agent 的 `session.header.cwd` 应用工作目录默认值，然后才调用 `resolve()`：由于 N 个会话共享一个执行器，逐会话 cwd 必须来自 `exec.agent`；只有无法取得会话 cwd 时，执行器才回退到自身配置／`process.cwd()`。存在沙箱策略时，工具会复用已经规范化的 `workspaceRoot` 作为工作目录基准，防止限制逻辑与进程启动过程对同一个会话路径拼写产生不同解析结果。
@@ -48,19 +52,23 @@
 
 除非启用沙箱的执行器（[`dsh-bash-sandbox`](../bash-sandbox/)）限制命令，否则命令以执行器的完整权限运行。仅拒绝型沙箱会把拒绝作为结果事实报告，并在此渲染为拒绝标记；逐调用的允许／拒绝／询问策略由 `tools/pre-execute` waterfall（瀑布式事件）负责（参见 docs/architecture.md）。
 
-需要升权的 bash 调用会在执行前解析 `ctx.approval`。`allowed-once` 只对该次调用应用请求模式；审批被拒、取消、不可用或缺少审批上下文时，命令完全不会执行，并返回不同的错误。发生真实拒绝后，模型可以在同一轮次中使用满足需要的最窄模式和理由重试同一命令一次；审批提示本身就是征求同意的步骤。升权绝不能预先推测，禁用或拒绝审批即为最终结果。其理由见 [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
+需要升权的 bash 调用会在执行前解析 `ctx.approval`。`allowed-once` 只对该次调用应用请求模式；审批被拒、取消、不可用或缺少审批上下文时，命令完全不会执行，并返回不同的错误。发生真实拒绝后，模型可以在同一轮次中使用满足需要的最窄模式和理由重试同一命令一次；审批提示本身就是征求同意的步骤。升权绝不能预先推测，禁用或拒绝审批即为最终结果。重复指定调用的生效模式无需审批即可执行，更窄目标则在执行前失败。其理由见 [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 
 ## 逐会话模式切换
 
 对于启用沙箱的执行器，每次调用依次按单次升权、会话覆盖、执行器默认值解析模式。未启用沙箱以及没有 agent 的调用不携带会话覆盖。策略归属方贡献当前且不区分具体能力的常驻模式；拒绝结果仍负责特定于该操作的有效模式与重试引导。参见 [`dsh-shell` 折叠计算](../shell/README.zh.md)和[沙箱切换约定](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。工具把模型调用适配到 `ctx.shell` 执行器与 `ctx.jobs` 运行时上；进程与 job 状态由那些服务拥有。
+
 ## 模型体验
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
-此插件注册作用域内的每个请求都包含下方 bash 指引。策略归属方通过自身的缓存安全运行时上下文贡献当前沙箱状态，而不改变此段落。作用域工具限制可以隐藏 schema，但不会移除这个独立注册的段落。
+以下 bash 指引会以第一方顺序值 1000 出现在该插件注册作用域内的每次请求中。策略归属方通过其缓存安全的运行时上下文贡献当前沙箱状态，而不修改本区段。按作用域实施的工具限制可以隐藏 schema，却不会移除这个独立注册的区段。
 
 ##### Bash 指引
 
@@ -70,17 +78,17 @@ Check the [exit code: N] marker on every bash result; investigate failures befor
 
 #### Token 影响
 
-插件活跃期间，每个请求都会产生少量固定输入开销，不受沙箱模式或模式切换影响。
+插件激活期间，每次请求都会产生少量固定的输入 token 开销，不随沙箱模式或模式切换而变。
 
 #### KV Cache 影响
 
-只要注册作用域和提示词文本不变，前缀即可稳定复用。插件激活或 dispose 可能从此提示词段落开始使复用失效；沙箱模式切换不会。
+只要注册作用域与提示词文本不变，前缀就保持稳定。插件激活或释放可能使从该提示词区段起的复用失效；沙箱模式切换不会。
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-模型会看到生成的 [`bash` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-bash)。仅当此生产方启用 `run_in_background` 时，该字段才会出现；仅当已挂载执行器声明支持沙箱时，`sandbox_permissions` 和 `justification` 才会出现。Agent 作用域的工具限制可以移除该 agent 的定义。
+模型会看到生成的 [`bash` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-bash)。仅当本生产方启用 `run_in_background` 时，该字段才会出现；仅当已挂载执行器声明支持沙箱时，`sandbox_permissions` 和 `justification` 才会出现。按 agent 作用域限制工具可以移除该 agent 的定义。
 
 #### Token 影响
 
@@ -88,41 +96,41 @@ Check the [exit code: N] marker on every bash result; investigate failures befor
 
 #### KV Cache 影响
 
-只要可见性、后台支持和执行器沙箱能力保持不变，前缀即可稳定复用。限制、配置或执行器发生变化时，可能从首个变化的工具定义开始使复用失效。
+只要可见性、后台支持与执行器沙箱能力不变，前缀就保持稳定。限制、配置或执行器发生变化时，可能从首个变化的工具定义开始使复用失效。
 
 ### 前台结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-renderer 先输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 和 stderr 尾部。没有输出时，它会精确输出 `(no output)`。条件行精确为 `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]`、`[timed out after <timeoutMs>ms]`、`[killed by signal: <signal>]` 和 `[exit code: <exitCode>]`；沙箱升权与 runner 故障行原文列于 [`dsh-bash-sandbox`](../bash-sandbox/README.zh.md)。
+renderer 输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 和 stderr 尾部。没有输出时，它精确输出 `(no output)`。条件行精确为 `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]`、`[timed out after <timeoutMs>ms]`、`[killed by signal: <signal>]` 与 `[exit code: <exitCode>]`；沙箱升权与 runner 故障行原文列于 [`dsh-bash-sandbox`](../bash-sandbox/README.zh.md)。
 
 #### Token 影响
 
-调用前结果 token 为零。每条流的输出有界，每个已输出行则会保留在历史中，直至压缩（compaction）。
+调用前的结果 token 为零。每条流的输出有界，每个已输出行则会保留在历史中，直至压缩（compaction）。
 
 #### KV Cache 影响
 
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
 ### 后台任务上下文与结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-启动会精确返回 `started background job <jobId>`。此生产方会向通用任务运行时提供增量进程输出、可选的 `[some output was dropped from memory; full output: <paths-or-(unavailable)>]`、沙箱事实，以及 `exit code: <exitCode>` 或 `signal: <signal>` 等终止详情。[`dsh-tool-jobs`](../../jobs/tool-jobs/README.zh.md) 负责模型可见的状态行、完成通知、列表和取消响应。
+启动会精确返回 `started background job <jobId>`。本生产方会向通用任务运行时提供增量进程输出、可选的 `[some output was dropped from memory; full output: <paths-or-(unavailable)>]`、沙箱事实，以及 `exit code: <exitCode>` 或 `signal: <signal>` 等终止详情。[`dsh-tool-jobs`](../../jobs/tool-jobs/README.zh.md) 负责模型可见的状态行、完成通知、列表和取消响应。
 
 #### Token 影响
 
-启动确认很短并会保留；收集到的输出依数据而定，并受执行器流缓冲区限制。消费式读取不会重复先前输出。
+启动确认很短且会保留；收集到的输出依数据而定，并受执行器流缓冲区限制。消费式读取不会重复先前输出。
 
 #### KV Cache 影响
 
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
 ### 工具错误
 
-#### 模型看到的内容
+#### 模型看到什么
 
-验证和策略失败统一为 `Error: <message>`。此包的稳定消息包括 `invalid command: expected a non-empty string`、`invalid description: expected a non-empty string`、`invalid timeoutMs: expected a positive number, got <value>`、`invalid escalation: sandbox_permissions requires a justification`、`invalid escalation: justification is only valid together with sandbox_permissions`、`invalid justification: expected a non-empty sentence`、`background execution is disabled for this bash tool`、`background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`、`sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`、`sandbox escalation to "<mode>" is not strictly wider than this call's current "<mode>" mode`、审批不可用／拒绝／取消变体，以及 `tool call aborted`。
+验证与策略失败统一为 `Error: <message>`。本包的稳定消息包括 `invalid command: expected a non-empty string`、`invalid description: expected a non-empty string`、`invalid timeoutMs: expected a positive number, got <value>`、升权配对失败、`run_in_background is disabled for this deployment (enableRunInBackground: false)`、`background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`、`sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`、审批不可用／拒绝／取消变体，以及 `tool call aborted`。
 
 #### Token 影响
 
@@ -130,7 +138,7 @@ renderer 先输出依数据而定的 stdout 尾部，再输出可选的 `[stderr
 
 #### KV Cache 影响
 
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
 ## 已知限制与延期工作
 

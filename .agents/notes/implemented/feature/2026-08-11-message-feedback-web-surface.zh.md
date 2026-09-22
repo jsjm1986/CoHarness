@@ -6,9 +6,9 @@ Status: implemented
 
 ## 问题
 
-[PR #2217](https://github.com/deepseek-harness/deepseek-harness/pull/2217) 交付了持久化的消息反馈 sidecar 及其三个 Host Remote 方法，但它明确只做后端：没有任何客户端包消费 `messageFeedback.list`、`put` 或 `delete`，因此 Web GUI 无法记录评价。它的 Agent Note 把「客户端 Remote aggregate 挂载与 UI」留给了另一个负责人。Issue #1326 要求的正是 Web 界面，却在该后端合并时被关闭，而用户可见的那一半并不存在。
+[PR #2217](https://github.com/deepseek-ai/deepseek-harness/pull/2217) 交付了持久化的消息反馈 sidecar 及其三个 Host Remote 方法，但它明确只做后端：没有任何客户端包消费 `messageFeedback.list`、`put` 或 `delete`，因此 Web GUI 无法记录评价。它的 Agent Note 把「客户端 Remote aggregate 挂载与 UI」留给了另一个负责人。Issue #1326 要求的正是 Web 界面，却在该后端合并时被关闭，而用户可见的那一半并不存在。
 
-更早的全栈尝试 [PR #1010](https://github.com/deepseek-harness/deepseek-harness/pull/1010) 带有 UI 层，但它基于自己的后端、形状不同：整个 Session 一个 `revision` 做 compare-and-swap，RPC 名为 `feedback.upsert`。#2217 最终交付的是逐条 `ifVersion` 与 `messageFeedback.put`，因此 #1010 的 controller 逻辑不再匹配契约；它的分支在结构上也已漂移（改动了 `packages/cordis/`，该目录已重命名为 `packages/extensions/`；新增的顶层 `packages/session-feedback/` 与整合后的 `packages/feedback/` 冲突）。它作为 superseded 关闭，而不是 rebase。
+更早的全栈尝试 [PR #1010](https://github.com/deepseek-ai/deepseek-harness/pull/1010) 带有 UI 层，但它基于自己的后端、形状不同：整个 Session 一个 `revision` 做 compare-and-swap，RPC 名为 `feedback.upsert`。#2217 最终交付的是逐条 `ifVersion` 与 `messageFeedback.put`，因此 #1010 的 controller 逻辑不再匹配契约；它的分支在结构上也已漂移（改动了 `packages/cordis/`，该目录已重命名为 `packages/extensions/`；新增的顶层 `packages/session-feedback/` 与整合后的 `packages/feedback/` 冲突）。它作为 superseded 关闭，而不是 rebase。
 
 任何 UI 的阻塞缺口在于浏览器无法指名一个反馈目标。Host 只接受以 `MessageId` 寻址的 append 来源 `assistant/message`，但 `AssistantMessageNode`——客户端表示已完成 assistant 输出的节点——只携带 `seq`、`turn`、`step`，没有消息身份。只有 `SteeringMessageNode` 有 `messageId`。
 

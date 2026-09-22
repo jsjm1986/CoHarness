@@ -23,6 +23,23 @@ Chat business rows are independent registry contributions rather than a closed b
 Approvals take over the composer through the chain this package declares: `ApprovalPanel` registers as a selector-routed `'conversation.composer'` entry (the ui-user-questions pattern) and occupies the composer in place of the InputBar while an approval wait is pending (amber strip, justification headline, paired command line from the running call's args, one-shot refuse/allow). The `PendingApproval` domain face in `contract/slots.ts` owns the wire encoding — the `ApprovalResponsePayload` value with the audit correlation — over the runtime's `PendingWait` carrier; the broadcast `approval/resolved` frame settles the wait and restores the composer. The runtime manager projects every approval or question wait through `SessionSummary.pendingInteraction`, including sessions never instantiated; `ui-workspace` owns its sidebar presentation. Pending waits leave the message flow entirely: questions (ui-user-questions) and approvals (ApprovalPanel) both answer through the composer takeover, so no display-only placeholder card remains. The composer's bottom-row Access seat mounts `PermissionSelect`, fed by the host-computed `permissions` projection through the standard-kit `useProjection` (key absence hides the chip); the chip opens a Menu-primitive dropdown whose built-in preset ids resolve through the active locale and whose deployment-defined names remain literal. Safe preset picks submit `/permission <preset>` immediately through the bar's injected `command` callback, while `danger-full-access` uses the localized full-access label and first opens an in-page Modal risk confirmation. The enabling action stays disabled until the user checks the acknowledgement; cancel, Escape, close, and mask click submit nothing.
 
 The session header renders the session-scoped `'conversation.session.header.actions'` list beside the title and the independent `'conversation.session.header.utilities'` list at the right edge. Session context and lineage controls remain in `actions`; optional Session utilities cannot reorder or move them. The composer chain currency includes the current conversation `session`; ui-subagent selects one-shot or parent-unavailable addressed sessions for reason-specific read-only copy, while the ordinary InputBar keeps every addressed child Send-only because the continuation service exposes no public per-Activation cancellation operation and `session.cancel` would bypass its ownership.
+```ts type-equiv
+/**
+ * Composer chain currency: what ConversationRoot dispatches at its
+ * renderSlotChain site. The owner declares the currency only — never a
+ * per-entry contract; takeover packages narrow it in their own selectors
+ * (`interactions.find(i => i.kind === ...)`), so new takeover kinds register
+ * with zero owner changes.
+ */
+interface ComposerChainProps {
+  /** Whether this pane may request automatic input focus. */
+  active?: boolean
+  interactions: readonly PendingInteraction[]
+  /** Current conversation facts for feature-owned takeover selectors. */
+  session: ConversationSnapshot | undefined
+}
+```
+
 
 Logged non-user messages render as a default-collapsed disclosure whose header names the role the runtime projected for the message — `上下文注入` for an injection, `跨会话召回` for a recalled session — followed by the producer name that projection read out of the durable source, so a reader distinguishes a skill catalog from a workspace instruction file or a recalled session without expanding. A direct message that cites another session precedes its recall row in durable order. The Chat snapshot associates exact labels only from that immediately following sourced recall, preserving multi-word titles without carrying one recall's labels onto a later direct message. Recall uses a chat-bubble glyph while other context keeps the document glyph; a source that names no producer shows the role alone. Composer and user-bubble references use the same inline language: a chat-bubble, file, or folder glyph plus business-color text, without a nested capsule. Like claimed slash commands, composer references keep their complete display text in the transparent textarea and use the aligned backdrop for color and the leading domain glyph; native text metrics own width, wrapping, selection, and caret placement. The occurrence range remains structured for serialization and boundary deletion, while an edit inside it converts the remaining characters to ordinary text. The session draft mirror stores each occurrence's clipboard projection, so a remount without the occurrence table restores canonical parseable reference text instead of a display-only label. The shared `DisclosureRow` primitive gives this context surface the same compact geometry as other flow rows while retaining context semantics: the expanded body follows its content height up to a 141px scrolling cap and synthesizes no tool state or summary ([historical disclosure decision](../../../.agents/notes/archived/feature/2026-07-30-web-context-injection-disclosure.md), [producer-label decision](../../../.agents/notes/implemented/feature/2026-08-04-web-context-source-and-steer-marks.md)). That body follows the form the producer declared on its durable source: `instructions` names the reconciled files above their text, `catalog` lists the entries the source recorded instead of the model-facing prose, and every other value — absent, unknown to this version, or carrying no usable fields — renders the opaque body, which shows the model-facing text with its real line breaks and the remaining source fields. The opaque body is the documented default, not a leftover: a resumed, forked, or foreign log must render whether or not its producer is mounted here. A durable or pending steering bubble shares the user bubble's presentation unadorned; its mid-turn position in the flow is the only steering signal the transcript shows.
 
@@ -64,17 +81,25 @@ The composer stats pills take their token accounting from the generic token-mete
 
 A finished turn materializes one ordered `turn-tail` Conversation Node. Its engine-owned `TurnLocation` supplies the closing Assistant and Turn data; the renderer places the `conversation.chat.turnTail` chain before that node's IconActions and dispatches `TurnTailOwnerProps` containing the Turn, closing seq, and `openFile`. This package owns only the hole; `@deepseek-ai/dsh-client-ui-deliverables` accumulates mutation-tool `locations` into Turn data and owns the produced-files row, chip cap, and copy, so composing that plugin out of cordis.yml turns the surface off while the hole renders empty at zero cost. The closing prose participates through the same off switch: the chat view asks the optional `chatFileMentions` service (ctx.get; provided by the same plugin) for a closing message's inline-code vocabulary and threads the result into MarkdownText's `fileMentions` seam — an absent service leaves the prose inert.
 
+## Summary
+
+`ui-conversation` owns target-neutral Conversation assembly and the shared browser shell. It consumes Session Controller `SessionEventLikeEntry` feeds, exposes React-free registries and per-Session bindings through `ctx.uiConversation`, and contributes the `useConversation`, `useInput`, and `inputActions` standard props through `ctx.uiSession`. It also owns the per-session durable image URL cache: `ctx.uiConversation.imageUrl(sessionId, attachment)` resolves one session-authorized browser URL per attachment and revokes it with the Session binding, so every Conversation target shares one `session.attachment` read. Concrete targets such as Chat are separate packages that register their own Definitions, snapshot builders, Views, and renderers.
+
 ## Settings authority
 
 The busy-state Enter preference and transcript display preferences are account-owned settings fields. Their rows use the account transport while a project is active, refuse changes until a ready writable view exists, show provider restrictions inline, and adopt the recovered value after a failed latest write. Width and font-size writes are numeric and share the same account revision fence as the Enter preference, so one field cannot poison another field's write state. The policy and display controller release their scope subscriptions with the conversation plugin, so HMR and teardown do not retain settings listeners. A compact variant of the display row fills the `conversation.workbench.display` hole that the workbench sidebar panel declares, bound to the same controller and account scope.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Conversation nodes, turns, and composer state are projected by the runtime and Host seams; the package contributes the views and controllers that render them.
+
 ## Model Experience
 
-None, as the conversation UI renders session history and streams in the browser; nothing here reaches a model request.
+None, as this package renders browser state and sends user-admitted inputs through Session Controller APIs without constructing model requests.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
+None; Conversation assembly and browser input state do not alter provider-side prompt caching.
 
 ## Known Limitations and Deferred Work
 

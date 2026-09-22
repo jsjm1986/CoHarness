@@ -28,6 +28,8 @@ import z from '@deepseek-ai/schemastery'
 import { bindScopeParent, createScope, scopeOf, type Scope, type ScopeKey, type ScopeParentBinding } from '@deepseek-ai/dsh-scope'
 // Type-only: resolves the `agent/created` lifecycle event this service watches.
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Type-only: resolves ctx.pluginPackages for the resolution-generation package lookup.
+import type {} from '@deepseek-ai/dsh-app-boot'
 import { collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import { hasConversationContent } from '@deepseek-ai/dsh-session/surface'
@@ -244,7 +246,14 @@ export class AgentPresets extends TypertRemoteService {
    * @returns the presets, first-root-wins per id.
    */
   async list(): Promise<AgentPreset[]> {
-    return await discoverPresets(this.resolvedRoots, this.harnessBase)
+    const packages = this.ctx.get('pluginPackages')
+    return packages === undefined
+      ? await discoverPresets(this.resolvedRoots, this.harnessBase)
+      : await discoverPresets(
+        this.resolvedRoots,
+        this.harnessBase,
+        (specifier, base) => packages.packageOf(specifier, base) !== undefined,
+      )
   }
 
   /**
@@ -574,6 +583,7 @@ export class AgentPresets extends TypertRemoteService {
     // Re-read inside the queue: an earlier switch may have run, and visible
     // content may have arrived, since this call was queued. Standalone plugin
     // events and empty turns keep a fresh session blank.
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     if (agent.session.snapshotEvents().some(hasConversationContent)) {
       throw new RemoteError(
         'agent-preset/locked',
@@ -793,12 +803,17 @@ export class AgentPresets extends TypertRemoteService {
         await mountPreset(scope.ctx, preset)
         return { key, scope, stamp }
       } catch (error) {
-        this.standing.delete(preset.id)
         await scope.dispose()
         throw error
       }
     })()
     this.standing.set(preset.id, created)
+    // Guarded delete: a copy/remove may have cleared this pointer and a later
+    // ensureStanding installed the next generation already — dropping THAT
+    // pointer would fork a third standing mount.
+    void created.catch(() => {
+      if (this.standing.get(preset.id) === created) this.standing.delete(preset.id)
+    })
     return created
   }
 }

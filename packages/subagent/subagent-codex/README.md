@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 This package registers a Profile-named Codex subagent provider whose default name is `codex`. Each accepted run starts the official package-local Codex wrapper with `app-server --stdio` in the delegating Session's workspace, creates one ephemeral Codex thread, submits one self-contained text task, and returns either the selected final answer or a separate safe failure diagnostic through the shared [`dsh-subagent`](../subagent/README.md) result contract.
 
+## Summary
+
+Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work should run in a genuine, unattended Codex session in the parent Session's workspace. Each delegation uses a fresh isolated Codex thread for one self-contained text task and returns only its final answer or a safe failure diagnostic. Native Codex configuration and authentication remain authoritative, while `permissionMode` selects the non-interactive approval and sandbox behavior. The Bundle supplies a compatible native Codex payload, but it exposes no model capability until a delegation tool is configured.
+
 ## Start and ownership
 
 `start(request)` accepts only a non-empty sequence of text blocks and derives the child cwd from the parent Session. It then spawns the fixed command through [`dsh-subprocess`](../../subprocess/subprocess/README.md), performs `initialize` → `initialized`, maps the Profile-selected mode into official `thread/start` approval/reviewer/sandbox fields beside `{ cwd, ephemeral: true }`, and publishes the run only after Codex returns a valid ephemeral thread. A failure or cancellation before publication closes the wire, terminates the managed process tree, waits for it to exit, and rejects `start()`. Non-cancellation rejections expose only the fixed `initialize` or `thread-start` stage plus an already observed process outcome; raw product and Host errors remain on internal cause chains.
@@ -100,13 +104,17 @@ Generated schema evidence and package tests pin all sixteen error-info variants,
 
 Installing with optional dependencies omitted, using an unsupported platform, or losing the selected payload makes the first delegation fail at `initialize` with the safe `unknown` category and any observed process outcome. Raw wrapper text remains on Host stderr; the provider neither probes a host CLI nor retries with one. An isolated wrapper fixture separately proves the native payload failure and absence of host fallback.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run submits one task to an ephemeral Codex thread in the delegating workspace and returns its result; no session state is retained between runs.
+
 ## Model Experience
 
 ### Child request
 
 #### What the model sees
 
-The Codex child receives the standalone text blocks as one turn in a fresh ephemeral thread. Its workspace is the parent Session cwd; its model, system instructions, tools, and authentication come from native Codex configuration, the selected Provider instance's Profile configuration fixes the thread's environment, non-interactive approval policy, and sandbox mode, and the executable version comes from the Bundle's pinned platform payload.
+The Codex child receives the standalone text blocks as one turn in a fresh ephemeral thread. Its workspace is the parent Session cwd; the selected Provider instance fixes any configured model, environment, non-interactive approval policy, and sandbox mode, while an omitted model and every other product setting come from native Codex configuration. The executable version comes from the Bundle's pinned platform payload.
 
 #### Token effect
 
@@ -120,7 +128,7 @@ Independent of the parent request cache. Reuse depends only on Codex's own provi
 
 #### What the model sees
 
-Through `dsh-tool-subagent`, a foreground call gives the parent the selected final Codex answer or an error containing the stop reason and optional safe diagnostic for a non-completed result. The diagnostic can distinguish the fixed error-info category, protocol stage, numeric HTTP status, and observed process outcome without copying product prose. A background call first returns a Job id; the generic job controls later deliver a completion notice, expose the same final answer or failed status detail through `job_output`, and let `job_kill` request cancellation. Codex commentary, reasoning, tool activity, raw stderr, workspace diffs, usage, product ids, commands, paths, and protocol payloads are not copied into the parent Session.
+Through `dsh-tool-subagent`, a foreground call gives the parent the selected final Codex answer or an error containing the stop reason and optional safe diagnostic for a non-completed result. The diagnostic can distinguish a coarse action category, protocol stage, applicable numeric HTTP status, and observed process outcome without copying product prose or stderr. A background call first returns a Job id; the generic job controls later deliver a completion notice, expose the same final answer or failed status detail through `job_output`, and let `job_kill` request cancellation. Codex commentary, reasoning, tool activity, raw stderr, workspace diffs, usage, product ids, commands, paths, and protocol payloads are not copied into the parent Session.
 
 #### Token effect
 

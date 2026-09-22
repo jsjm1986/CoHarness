@@ -21,7 +21,7 @@ describe('Session surface wire vocabulary', () => {
     ['assistant/message', true],
     ['tool/result', true],
     ['turn/start', false],
-    ['assistant/chunk', false],
+    ['assistant/attempt', false],
   ])('isSessionSurfaceEventType(%j) → %s', (type, expected) => {
     expect(isSessionSurfaceEventType(type)).toBe(expected)
   })

@@ -20,14 +20,27 @@
     command: !!js process.env.DSH_TEST_CHILD_COMMAND
     args: !!js JSON.parse(process.env.DSH_TEST_CHILD_ARGS ?? '[]')
     provider: mock
-    model: mock-echo
+    model: mock-routed
     env: !!js JSON.parse(process.env.DSH_TEST_CHILD_ENV ?? '{}')
 
-- id: tool-subagent
-  name: '@deepseek-ai/dsh-tool-subagent'
+- id: subagent-model-selection-settings
+  name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
+  config:
+    enabled: true
+    allowedModels:
+      - provider: mock
+        model: mock-routed
+
+# Agent-scoped mount: the delegation tool installs inside each Agent's scope
+# (not on the host), so the model-selection settings and per-agent options
+# reach the child through the same injection path a preset mount would use.
+- id: test-tool-subagent
+  name: './scoped-tool-subagent.ts'
   config:
     provider: dsh-sdk
     toolName: subagent
+    agentOptions:
+      maxTokens: 777
     # The SDK backend advertises no depthLimit: the child harness owns its own
     # recursion budget, so the local numeric default cannot apply here.
     maxDepth: 'provider-managed'

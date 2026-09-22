@@ -10,13 +10,21 @@ Web 后台任务特性的归属方：向 `conversation.session.header.actions` �
 
 Escape 关闭列表并把焦点交还触发器，在其外部按下指针同理。768px 以下同一列表会变为遵守安全区的手机 Sheet，复用共享遮罩并把行提升到触控尺寸。最后一个任务消失时先关闭列表再卸载控件，焦点因此不会从一个被移除的节点上凭空消失。样式只用 token；文案走本包自己的 `job` locale 命名空间。行为由 [Web 后台任务展示 Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.zh.md) 规定。
 
+## 概述
+
+本包渲染 Web GUI 的后台任务界面：一个会话头部动作，打开后以弹层列出本会话可见的任务。它经运行时提供的 `jobsBySession` 镜像读取宿主计算的注册表状态，自身不发任何 RPC。触发器只在会话至少有一个任务时出现，角标计数运行中与停止中的任务；终态行保持可见并弱化，直到注册表把它们丢弃。模型对同一批任务的视角属于 `dsh-tool-jobs`；本包是给人类看的只读投影。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。Job 记录完全经由运行时的 `jobsBySession` 镜像到达；本包不发起 RPC，只持有弹层可见性。
+
 ## 模型体验
 
-无，因为本包为人类渲染宿主计算出的注册表状态，不触及 prompt、消息、schema、流或工具结果。模型对同一批任务的视角仍属于 [`dsh-tool-jobs`](../../jobs/tool-jobs/README.zh.md)。
+无，因为本包为人类渲染宿主计算出的注册表状态，不触及提示词、消息、schema、流或工具结果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-无；本包从不组装或发送 provider 请求。
+无；本包从不组装或发送提供方请求。
 
 ## 已知限制与暂缓事项
 

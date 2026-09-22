@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage  , createSystemMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
@@ -40,9 +40,22 @@ async function seedReadOnlyParent(root: string, cwd: string): Promise<void> {
   }
   const events: SessionEvent[] = [
     { type: 'turn/start', seq: SessionSeq(0), time: 10, data: { turn: 1 } },
-    { type: 'user/message', seq: SessionSeq(1), time: 11, data: createUserMessage({ content: [{ type: 'text', text: 'Tighten this session to read-only.' }], source: { kind: 'user' } }), surfaceOp: 'append' },
-    { type: 'sandbox/mode', seq: SessionSeq(2), time: 12, data: { mode: 'read-only' } },
-    { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'step/start', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1 } },
+    {
+      type: 'system/message',
+      seq: SessionSeq(2),
+      time: 12,
+      data: {
+        turn: 1,
+        step: 1,
+        message: createSystemMessage('Seeded read-only parent system prompt.', '@deepseek-ai/dsh-system-prompt'),
+      },
+      surfaceOp: 'append',
+    },
+    { type: 'user/message', seq: SessionSeq(3), time: 13, data: createUserMessage({ content: [{ type: 'text', text: 'Tighten this session to read-only.' }], source: { kind: 'user' } }), surfaceOp: 'append' },
+    { type: 'sandbox/mode', seq: SessionSeq(4), time: 14, data: { mode: 'read-only' } },
+    { type: 'step/end', seq: SessionSeq(5), time: 15, data: { turn: 1, step: 1 } },
+    { type: 'turn/end', seq: SessionSeq(6), time: 16, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
   try {
     await ctx.sessionPersistence.create(meta)

@@ -29,7 +29,7 @@ The command never guesses or fetches a base. Supply the ref verified from curren
 There is no universal local baseline beyond the hooks. Every behavior change needs the narrowest available test or purpose-built check that would fail for its regression; add broader checks only for surfaces the diff actually reaches.
 
 - **Package or script behavior:** run the owning Vitest file or focused test name. Add adjacent package tests when a shared contract changes; leave repository-wide coverage to CI unless the change is genuinely cross-cutting or the user requests it.
-- **Documentation, Agent Notes, catalogs, or doc-linked comments:** run `pnpm run doc-sync`; run full lint when the documentation workflow requires it.
+- **Documentation, Agent Notes, catalogs, or doc-linked comments:** run `pnpm run test:docs` for the 19-leaf documentation quick pass; reserve `pnpm run doc-sync` for the full acceptance lane CI already runs.
 - **Model-, editor-, CLI-, or terminal-visible output:** run the focused keyless snapshot or real runnable-example scenario that owns the output.
 - **Package manifests, public exports, build configuration, worker/bin entries, or built runtime paths:** run `pnpm run build`, the relevant hygiene checks, and the owning built-artifact smoke.
 - **Real provider or agent behavior:** run the relevant `pnpm run test:e2e` target when credentials are available; never print secrets.

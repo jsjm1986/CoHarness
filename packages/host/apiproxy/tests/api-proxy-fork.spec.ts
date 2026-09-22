@@ -6,7 +6,7 @@ import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -25,7 +25,7 @@ function request<P>(payload: P): RpcRequest<P> {
 async function composed(workspaces: readonly Workspace[] = []): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
-  await ctx.plugin(SystemPrompt, { persona: '' })
+  await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(UserQuestionService)
   ctx.provide('workspaceRegistry', { list: () => workspaces } as never)
@@ -153,7 +153,7 @@ describe('sessions.fork', () => {
     const sourceId = sid('session-cold-subagent')
     const parentId = sid('session-cold-parent')
     const header: SessionHeader = {
-      version: 0,
+      version: SESSION_FORMAT_VERSION,
       id: sourceId,
       createdAt: 1, isSeeded: false,
       cwd: '/proj',
@@ -172,7 +172,8 @@ describe('sessions.fork', () => {
       { type: 'turn/end', seq: 2, time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
     ] as SessionEvent[]
     ctx.provide('sessionPersistence', {
-      list: () => Promise.resolve([header]),
+      list: () => Promise.resolve(([header]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([header]),
       inspect: () => Promise.resolve({ meta: header, events }),
     } as never)
     ctx.provide('sessionQuery', {

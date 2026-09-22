@@ -5,6 +5,7 @@
     patches:
       - id: llm-deepseek
         config:
+          protocol: messages
           baseURL: !!js process.env.DSH_SNAPSHOT_BASE_URL
           thinking: enabled
           reasoningEffort: low

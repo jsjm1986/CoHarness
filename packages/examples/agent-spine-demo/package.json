@@ -18,16 +18,11 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
-    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "lib/invariant.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
@@ -60,6 +55,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
     "@deepseek-ai/cordis-plugin-timer": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-agent-instructions": "workspace:^",
@@ -94,7 +90,7 @@
     "@deepseek-ai/dsh-tool-jobs": "workspace:^",
     "@deepseek-ai/dsh-tool-skill": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/node-addon-landlock-run": "workspace:^"
+    "@deepseek-ai/node-addon-system": "workspace:^"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:^"

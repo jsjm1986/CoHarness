@@ -11,8 +11,10 @@
         config:
           apiKeyEnv: DSH_SNAPSHOT_API_KEY
           baseURL: !!js process.env.DSH_SNAPSHOT_BASE_URL
+          protocol: !!js process.env.DSH_SNAPSHOT_PROTOCOL
           thinking: disabled
-          maxRequestImageBytes: 92
+          maxRequestFilesBytes: 92
+          imageOffloadByteQuantum: 1
           models:
             - id: deepseek-v4-flash-vision-exp
               contextWindow: 32768

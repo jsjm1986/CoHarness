@@ -4,6 +4,10 @@
 
 为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 `ctx.typertGateway`，`@deepseek-ai/dsh-api-gateway/client` 则提供 `ctx.remote`；两者使用同一份生成的 `InvocationDescriptor` 约定，并将业务选择交给 API Remotes，将传输、请求关联、信任和响应封装交给 Connection。
 
+## 概述
+
+为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 `ctx.typertGateway`，`@deepseek-ai/dsh-api-gateway/client` 则提供 `ctx.remote`；两者使用同一份生成的 `InvocationDescriptor` 约定，并将业务选择交给 API Remotes。Connection 承载一元调用的请求关联、信任和响应 envelope，Gateway 则拥有多路复用的 Remote 流。
+
 ## Host 服务：`TypertGatewayService`（ctx key：`typertGateway`）
 
 每次调用时，`ctx.typertGateway.invoke()` 都会解析当前的描述符和 Cordis 服务，校验具名参数是否完全匹配，解析已注册的对象或 Context 身份标识，调用公开的业务方法，并校验其结果。业务服务继承 [`dsh-typert-protocol`](../../typert/protocol/README.zh.md) 的 `TypertRemoteService`，并用 `@Remote` 或 `@RemoteScope` 标记方法；已有其他基类时仍可改用 `bindTypertRemote()`。
@@ -23,6 +27,10 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 `ctx.remote.$on()` 订阅一条被转发的 Host 事件。它的合法键恰好等于 Host 装配声明的转发选择，listener 类型就是事件所属包自己的 Cordis `Events` 声明，因此不存在会与之漂移的第二份签名。每个订阅归属发起调用的 fiber，并随该 fiber 一起消失。投递是单向的，并按注册顺序进行；抛错的 listener 会被记录并与其余 listener 隔离，绝不影响帧泵。对于动态 Cordis 事件，官方 `cordis/*` 名称与对应的 `@deepseek-ai/cordis/*` 名称属于同一投递组：`$dispatch()` 按全局注册顺序合并两种名称；同一个 listener 同时以两个别名注册时只调用一次；同一精确名称的重复注册仍然独立。`ctx.remote.$dispatch()` 属于载体：持有 Host 帧 sink 的 Client 半把每个解码后的帧交进来，收到无人订阅的事件组即丢弃。消费方只订阅，绝不调用它。
 
 生成的声明合并通过共享的 `TypertClientRemote` 约定提供 TypeScript API。Client 入口不包含 Host 服务或 Host Cordis 接口合并；方法查找和调用使用普通对象与函数，而不使用 JavaScript Proxy。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次调用都在调用时解析实时的描述符、业务 Service 与编解码器；网关不保留任何可能与已注册贡献产生分歧的按端点状态。
 
 ## 模型体验
 

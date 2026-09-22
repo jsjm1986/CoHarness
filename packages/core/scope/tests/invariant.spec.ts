@@ -55,6 +55,12 @@ describe('scoped-dispatch invariants', () => {
       'agent/pre-step': [{ agent, messages: [message], turn: 1, step: 1, signal }, () => Promise.resolve({ kind: 'enter', messages: [message] })],
       'agent/message-entered': [{ agent, event: { type: 'user/message', seq: SessionSeq(0), time: 1, data: message, surfaceOp: 'append' }, turn: 1, step: 1, signal }],
       'agent/request': [{ agent, turn: 1, step: 1, signal }, () => Promise.resolve(config)],
+      'agent/assistant-stream': [{
+        agent,
+        frame: {
+          type: 'start', attemptId: 'attempt-1' as never, revision: 1, turn: 1, step: 1,
+        },
+      }],
       'agent/request-error': [
         {
           agent,
@@ -80,6 +86,7 @@ describe('scoped-dispatch invariants', () => {
       ['tools/post-execute', [{ callId: 'c', name: 't', arguments: {}, agent }, { content: [], isError: false }, () => Promise.resolve({ kind: 'accept' })]],
       ['tools/pre-execute', [{ callId: 'c', name: 't', arguments: {}, agent }, () => Promise.resolve({ kind: 'allow' })]],
       ['tools/result', [{ callId: 'c', name: 't', arguments: {}, agent }, { content: [], isError: false }]],
+      ['user-questions/request', [{ agent, questions: [] }, () => Promise.resolve({})]],
     ]
 
     for (const [event, args] of rows) {

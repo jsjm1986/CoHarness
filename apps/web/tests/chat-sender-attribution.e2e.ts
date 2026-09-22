@@ -63,6 +63,7 @@ function buildSeed(): string {
     lines.push(JSON.stringify({ ...event, seq: seq++, time: time++ }))
   }
   at({ type: 'turn/start', data: { turn: 1 } })
+  at({ type: 'step/start', data: { turn: 1, step: 1 } })
   at({
     type: 'user/message',
     data: {
@@ -83,7 +84,6 @@ function buildSeed(): string {
     },
     surfaceOp: 'append',
   })
-  at({ type: 'step/start', data: { turn: 1, step: 1 } })
   at({
     type: 'assistant/message',
     data: {
@@ -96,12 +96,12 @@ function buildSeed(): string {
         source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
       },
     },
-    sourceEventSeqs: [],
     surfaceOp: 'append',
   })
   at({ type: 'step/end', data: { turn: 1, step: 1 } })
   at({ type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
   at({ type: 'turn/start', data: { turn: 2 } })
+  at({ type: 'step/start', data: { turn: 2, step: 1 } })
   at({
     type: 'user/message',
     data: {
@@ -122,7 +122,6 @@ function buildSeed(): string {
     },
     surfaceOp: 'append',
   })
-  at({ type: 'step/start', data: { turn: 2, step: 1 } })
   at({
     type: 'assistant/message',
     data: {
@@ -135,7 +134,6 @@ function buildSeed(): string {
         source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
       },
     },
-    sourceEventSeqs: [],
     surfaceOp: 'append',
   })
   at({ type: 'step/end', data: { turn: 2, step: 1 } })

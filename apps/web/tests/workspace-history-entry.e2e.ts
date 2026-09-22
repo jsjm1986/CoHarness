@@ -78,13 +78,13 @@ describe('web e2e: Workspace history-first entry', () => {
     await workspaceNew.click()
     await page.getByText('Into the Unknown', { exact: true }).waitFor({ timeout: 15_000 })
     await page.locator('textarea[placeholder="Describe what you want to build"]').waitFor({ timeout: 15_000 })
-    expect((await scaffold.ctx.sessionPersistence.list()).filter(session =>
+    expect((await scaffold.ctx.sessionPersistence.listHeaders()).filter(session =>
       session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
     // Repeated explicit New Session gestures reuse the same blank
     // reservation instead of minting another empty Session.
     await workspaceNew.click()
     await page.waitForTimeout(50)
-    expect((await scaffold.ctx.sessionPersistence.list()).filter(session =>
+    expect((await scaffold.ctx.sessionPersistence.listHeaders()).filter(session =>
       session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
     expect(opened.tripwire.pageErrors).toEqual([])
     await page.close()

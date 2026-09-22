@@ -32,6 +32,8 @@ export interface LlmErrorOptions extends ErrorOptions {
   providerRetryAfterMs?: number
   /** Non-empty opaque provider request id. */
   requestId?: ProviderRequestId
+  /** Positive count of additional oldest retained image occurrences to offload; only with `IMAGE_OFFLOAD_REQUIRED`. */
+  offloadImages?: number
 }
 
 /**
@@ -71,6 +73,7 @@ export class LlmError extends HarnessError {
       ...(options?.status === undefined ? {} : { status: options.status }),
       ...(options?.providerRetryAfterMs === undefined ? {} : { providerRetryAfterMs: options.providerRetryAfterMs }),
       ...(options?.requestId === undefined ? {} : { requestId: options.requestId }),
+      ...(options?.offloadImages === undefined ? {} : { offloadImages: options.offloadImages }),
     })
   }
 }
@@ -219,3 +222,12 @@ export function errorChain(value: unknown): string {
 export function isHarnessError(value: unknown): value is HarnessError {
   return value instanceof HarnessError
 }
+
+/**
+ * Canonical code for a request an image-capable route cannot send until more
+ * of its images are offloaded. The failure's `offloadImages` names how many
+ * more of the oldest retained occurrences must be offloaded;
+ * `dsh-compaction-image-offload` records an `image/offload` selection before
+ * the agent or summarizer retries with freshly derived input.
+ */
+export const IMAGE_OFFLOAD_REQUIRED_CODE = 'IMAGE_OFFLOAD_REQUIRED'

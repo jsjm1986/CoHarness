@@ -10,6 +10,14 @@ Confirming a directory is the picked path and dismissing the dialog is the cance
 
 The node half is an empty `apply`: it exists so the plugin appears in the host cordis.yml and Loader, while the browser half ships through `exports["./client"]` and is discovered through the `dsh.client` manifest declaration.
 
+## Summary
+
+This package provides the in-app directory-browsing surface for the Web GUI: a Select Workspace Directory dialog that lists, navigates, and creates folders through the local Host, with no operating-system chooser involved. It fills the two directory-flow slots declared by `ui-workspace`, composing the client side of the browse picking interaction in one cordis.yml row. Choose it when the browser is remote or in-process and no local OS chooser exists; local deployments may prefer the [`-native`](../ui-directory-picker-native/README.md) surface.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Every listing and creation is delegated to the Host directory-picker backend through `ctx.workspaces`; the dialog holds only transient interaction state.
+
 ## Model Experience
 
 None, as the directory browser is browser chrome; nothing here reaches a model request.

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The durable family around `core/session`'s live in-memory service: the persistence seam with its storage backends and checkpoint policy, the projection seam that serves whole log-derived values, log-backed titles, and outbound session telemetry. All **product** packages. `session-query/` remains a sibling group: the read/tool surface is consumed independently of persistence internals.
 
+## Summary
+
+The session group keeps conversations durable, restores released log formats, and makes committed history available after restart. Its storage and checkpoint packages protect requests, tool side effects, and completed steps; projection packages derive client-ready values; title packages name sessions; telemetry packages report activity. Start with the shipped JSONL storage, then add checkpointing and only the projections, title policy, or telemetry your deployment needs. Each package README owns its guarantees and configuration, while a sibling query group provides independent read and tool access.
+
 ## Persistence
 
 Durable session persistence, semantic checkpoint policy, and the shipped storage backends.

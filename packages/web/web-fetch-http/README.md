@@ -6,6 +6,10 @@ An anonymous public HTTP(S) `WebFetchProvider` for the harness [web capability s
 
 This is an **implementation** package: it registers a provider into `ctx.web`, it does not own the key and it does not register a model-facing tool. It is a function/namespace plugin (`inject: ['web']`).
 
+## Summary
+
+With `dsh-web-fetch-http`, the harness can fetch public HTTP(S) pages through the web service (`ctx.web`) and get their status code plus bounded, decoded content without sending credentials. Choose it when a composition needs safe retrieval with URL validation, public-address resolution, connection pinning, same-origin redirects, byte and character caps, and an explicit product `User-Agent`. It returns non-2xx responses as results rather than errors, and rejects non-public destinations, binary data, and unsupported content types. The model-facing `web_fetch` tool lives in `dsh-tool-web`, which renders this provider's bodies.
+
 ## Responsibility split
 
 The provider owns **safe resource retrieval**: URL validation, HTTP transport, redirect policy, a resource-backstop timeout, abort propagation, byte caps, charset decoding, content-type classification, and binary rejection. `@deepseek-ai/dsh-tool-web` owns **presentation** (HTML→markdown, truncation formatting). A non-2xx HTTP response is a *result* (status code + decoded body), not an error; `WebError` is reserved for failures to safely retrieve or represent the resource.
@@ -38,9 +42,13 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 
 The numeric limits are validated at plugin construction: every cap except `maxRedirects` must be a positive finite number, and `maxRedirects` must be a non-negative integer. An invalid value throws rather than silently constructing a provider with nonsensical limits.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each call performs one bounded anonymous fetch and returns decoded content; no connection or cache state is retained.
+
 ## Model Experience
 
-Indirectly, through [`dsh-tool-web`](../tool-web/README.md), which places this provider's `maxBodyChars`-bounded decoded text or markdown-shaped HTML under its fetch-result wrapper and retains provider failures while redirects, headers, and transport mechanics remain hidden.
+Indirectly, through `dsh-tool-web`, which renders this provider's `maxBodyChars`-bounded decoded text or markdown-shaped HTML under its fetch-result wrapper while redirects, headers, and transport limits remain hidden.
 
 #### KV Cache effect
 

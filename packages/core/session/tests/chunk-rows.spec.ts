@@ -1,259 +1,109 @@
-/**
- * Chunk-row codec tests: pack/expand round-trip losslessness (example-based and
- * property-based), run-boundary rules, whitelist fall-through, and decoder
- * validation failures.
- */
-
 import { describe, expect, it } from 'vitest'
-import fc from 'fast-check'
-import { CallId, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
-import { packChunkRuns, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { ChunkRow, SessionEvent, StorageRecord } from '@deepseek-ai/dsh-session'
-import { decodeChunkRow, decodeStorageRecord, isChunkRow } from '@deepseek-ai/dsh-session/chunk-rows'
+import { decodeChunkRow, decodeStorageRecord, isChunkRow } from '../src/index.ts'
+import type { SessionEvent } from '../src/index.ts'
 
-/** Build an `assistant/chunk` event with the exact live-append shape. */
-function chunkEvent(seq: SessionSeq, time: number, chunk: StreamChunk, turn = 1, step = 1): SessionEvent {
-  return { type: 'assistant/chunk', seq, time, data: { turn, step, chunk } }
+const textRow = {
+  type: 'text-chunks', seq0: 4, time0: 104,
+  data: { turn: 1, step: 1, index: 0, dt: [1, 1], texts: ['he', 'l', 'lo'] },
 }
 
-/** Sequential delta events (contiguous seqs, fixed 10ms gaps) of one kind. */
-function deltaRun(kind: 'text-delta' | 'reasoning-delta', count: number, seq0 = 0, index = 0): SessionEvent[] {
-  return Array.from({ length: count }, (_, k) =>
-    chunkEvent(SessionSeq(seq0 + k), 1000 + 10 * k, { type: kind, index, text: `t${k}` }))
+const toolRow = {
+  type: 'tool-call-chunks', seq0: 7, time0: 20,
+  data: { turn: 1, step: 1, index: 0, id: 'call-1', name: 'tool', dt: [5], args: ['{', '}'] },
 }
 
-/** Text-delta run with explicit member strings (contiguous seqs, fixed 10ms gaps). */
-function textRun(seq0: number, texts: string[], index = 0): SessionEvent[] {
-  return texts.map((text, k) =>
-    chunkEvent(SessionSeq(seq0 + k), 1000 + 10 * k, { type: 'text-delta', index, text }))
-}
-
-/** Decode a packed record list back to a flat event list. */
-function decodeAll(records: readonly StorageRecord[]): SessionEvent[] {
-  return records.flatMap(record => decodeStorageRecord(JSON.parse(JSON.stringify(record))))
-}
-
-describe('packChunkRuns', () => {
-  it('packs a text-delta run into one text-chunks row and round-trips it', () => {
-    const events = deltaRun('text-delta', 5)
-    const packed = packChunkRuns(events)
-    expect(packed).toHaveLength(1)
-    const row = packed[0] as ChunkRow
-    expect(row.type).toBe('text-chunks')
-    expect(row.seq0).toBe(0)
-    expect(row.time0).toBe(1000)
-    expect(row.data).toMatchObject({ turn: 1, step: 1, index: 0, dt: [10, 10, 10, 10], texts: ['t0', 't1', 't2', 't3', 't4'] })
-    expect(decodeAll(packed)).toStrictEqual(events)
+describe('chunk row decoding', () => {
+  it('recognizes only the three packed row tags on records', () => {
+    expect(isChunkRow('text-chunks')).toBe(false)
+    expect(isChunkRow(null)).toBe(false)
+    expect(isChunkRow({ type: 'assistant/chunk' })).toBe(false)
+    expect(isChunkRow(textRow)).toBe(true)
+    expect(isChunkRow({ ...textRow, type: 'reasoning-chunks' })).toBe(true)
+    expect(isChunkRow(toolRow)).toBe(true)
   })
 
-  it('packs reasoning and tool-call runs under their own tags', () => {
-    const reasoning = deltaRun('reasoning-delta', 3)
-    const toolCall = [4, 5, 6].map(seq =>
-      chunkEvent(SessionSeq(seq), 1000 + seq, { type: 'tool-call-delta', index: 1, id: ToolCallId('c1'), name: 'write', argumentsDelta: `a${seq}` }))
-    const packed = packChunkRuns([...reasoning, ...toolCall])
-    expect(packed.map(r => (r as ChunkRow).type)).toStrictEqual(['reasoning-chunks', 'tool-call-chunks'])
-    const row = packed[1] as ChunkRow & { type: 'tool-call-chunks' }
-    expect(row.data).toMatchObject({ id: 'c1', name: 'write', args: ['a4', 'a5', 'a6'] })
-    expect(decodeAll(packed)).toStrictEqual([...reasoning, ...toolCall])
+  it('expands text, reasoning, and tool-call rows into ordered v3 events', () => {
+    const text = decodeChunkRow(textRow)
+    expect(text.map(item => item.seq)).toEqual([4, 5, 6])
+    expect(text.map(item => item.time)).toEqual([104, 105, 106])
+    expect(text[0]!.data).toMatchObject({ turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'he' } })
+
+    const reasoning = decodeChunkRow({ ...textRow, type: 'reasoning-chunks' })
+    expect((reasoning[0]!.data as { chunk: { type: string } }).chunk.type).toBe('reasoning-delta')
+
+    const tool = decodeChunkRow(toolRow)
+    expect(tool.map(item => item.seq)).toEqual([7, 8])
+    expect(tool[0]!.data).toMatchObject({
+      chunk: { type: 'tool-call-delta', id: 'call-1', name: 'tool', argumentsDelta: '{' },
+    })
+
+    const anonymous = decodeChunkRow({
+      ...toolRow,
+      data: { turn: 1, step: 1, index: 0, id: 'call-1', dt: [5], args: ['{', '}'] },
+    })
+    expect((anonymous[0]!.data as { chunk: Record<string, unknown> }).chunk).not.toHaveProperty('name')
   })
 
-  it('packs a name-less tool-call run and round-trips field absence', () => {
-    const events = [0, 1, 2].map(seq =>
-      chunkEvent(SessionSeq(seq), 1000, { type: 'tool-call-delta', index: 0, id: ToolCallId('c1'), argumentsDelta: `a${seq}` }))
-    const packed = packChunkRuns(events)
-    expect(packed).toHaveLength(1)
-    expect(Object.hasOwn((packed[0] as ChunkRow).data, 'name')).toBe(false)
-    const decoded = decodeAll(packed)
-    expect(decoded).toStrictEqual(events)
-    expect(decoded.every(e => !Object.hasOwn((e.data as { chunk: object }).chunk, 'name'))).toBe(true)
-  })
-
-  it('leaves runs shorter than three events verbatim', () => {
-    const events = deltaRun('text-delta', 2)
-    expect(packChunkRuns(events)).toStrictEqual(events)
-  })
-
-  it('leaves non-delta chunks and non-chunk events verbatim between runs', () => {
-    const events: SessionEvent[] = [
-      chunkEvent(SessionSeq(0), 1000, { type: 'block-start', index: 0, blockType: 'text' }),
-      ...deltaRun('text-delta', 3, 1),
-      chunkEvent(SessionSeq(4), 1040, { type: 'block-end', index: 0, block: { type: 'text', text: 't0t1t2' } }),
-      { type: 'step/end', seq: SessionSeq(5), time: 1050, data: { turn: 1, step: 1 } },
-    ]
-    const packed = packChunkRuns(events)
-    expect(packed).toHaveLength(4)
-    expect((packed[1] as ChunkRow).type).toBe('text-chunks')
-    expect(decodeAll(packed)).toStrictEqual(events)
+  it('refuses a value that is not a packed chunk row', () => {
+    expect(() => decodeChunkRow({ type: 'assistant/chunk' })).toThrow('value is not a packed chunk row')
+    expect(() => decodeChunkRow(7)).toThrow('value is not a packed chunk row')
   })
 
   it.each([
-    ['a seq gap', deltaRun('text-delta', 3).map((e, k) => ({ ...e, seq: k === 2 ? SessionSeq(9) : e.seq }))],
-    ['a kind switch', [...deltaRun('text-delta', 2), ...deltaRun('reasoning-delta', 1, 2)]],
-    ['a block-index switch', [...deltaRun('text-delta', 2), ...deltaRun('text-delta', 1, 2, 7)]],
-    ['a step switch', deltaRun('text-delta', 3).map((e, k) => k === 2 ? chunkEvent(SessionSeq(e.seq), e.time, (e.data as { chunk: StreamChunk }).chunk, 1, 2) : e)],
-  ])('breaks a run on %s (both halves too short to pack)', (_label, events) => {
-    expect(packChunkRuns(events)).toStrictEqual(events)
-  })
-
-  it('breaks a tool-call run on call-id or name change', () => {
-    const call = (seq: SessionSeq, id: string, name?: string): SessionEvent =>
-      chunkEvent(seq, 1000, { type: 'tool-call-delta', index: 0, id: ToolCallId(id), ...name !== undefined ? { name } : {}, argumentsDelta: 'a' })
-    const idSwitch = [call(SessionSeq(0), 'c1', 'w'), call(SessionSeq(1), 'c1', 'w'), call(SessionSeq(2), 'c2', 'w')]
-    expect(packChunkRuns(idSwitch)).toStrictEqual(idSwitch)
-    const namePresence = [call(SessionSeq(0), 'c1', 'w'), call(SessionSeq(1), 'c1', 'w'), call(SessionSeq(2), 'c1')]
-    expect(packChunkRuns(namePresence)).toStrictEqual(namePresence)
-  })
-
-  it('stores an off-whitelist delta verbatim (extra field, bad type, fractional time)', () => {
-    const extraField = { ...chunkEvent(SessionSeq(0), 1000, { type: 'text-delta', index: 0, text: 'x' }), surfaceOp: 'append' }
-    const badText = chunkEvent(SessionSeq(1), 1001, { type: 'text-delta', index: 0, text: 7 as unknown as string })
-    const fractionalTime = chunkEvent(SessionSeq(2), 1001.5, { type: 'text-delta', index: 0, text: 'y' })
-    const events = [extraField, badText, fractionalTime] as SessionEvent[]
-    expect(packChunkRuns(events)).toStrictEqual(events)
-  })
-
-  it('breaks a run on a time gap beyond safe-integer range (subtraction would round)', () => {
-    // Both endpoints are safe integers, but their true difference (~2^54)
-    // exceeds exact double range: b - a rounds, so a + (b - a) !== b and a
-    // packed row would decode to a different timestamp.
-    const a = Number.MIN_SAFE_INTEGER
-    const b = Number.MAX_SAFE_INTEGER - 1
-    expect(a + (b - a)).not.toBe(b) // the rounding this guard exists for
-    const events = [
-      chunkEvent(SessionSeq(0), a, { type: 'text-delta', index: 0, text: 'x' }),
-      chunkEvent(SessionSeq(1), b, { type: 'text-delta', index: 0, text: 'y' }),
-      chunkEvent(SessionSeq(2), b + 1, { type: 'text-delta', index: 0, text: 'z' }),
-    ]
-    expect(packChunkRuns(events)).toStrictEqual(events) // split at the gap; halves too short
-    expect(decodeAll(packChunkRuns(events))).toStrictEqual(events)
-  })
-
-  it('stores a delta with an off-whitelist data envelope verbatim (parsed-fixture shapes)', () => {
-    const mk = (seq: SessionSeq, data: unknown): SessionEvent =>
-      ({ type: 'assistant/chunk', seq, time: 1000, data } as SessionEvent)
-    const events = [
-      mk(SessionSeq(0), 'not-an-object'),
-      mk(SessionSeq(1), { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' }, extra: 1 }),
-      mk(SessionSeq(2), { turn: 'x', step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' } }),
-      mk(SessionSeq(3), { turn: 1, step: 1, chunk: 'not-an-object' }),
-      mk(SessionSeq(4), { turn: 1, step: 1, chunk: { type: 'text-delta', index: 'x', text: 'a' } }),
-      mk(SessionSeq(5), { turn: 1, step: 1, chunk: { type: 'tool-call-delta', index: 0, id: 7, argumentsDelta: 'a' } }),
-      mk(SessionSeq(6), { turn: 1, step: 1, chunk: { type: 'tool-call-delta', index: 0, id: 'c', name: 7, argumentsDelta: 'a' } }),
-    ]
-    expect(packChunkRuns(events)).toStrictEqual(events)
-  })
-})
-
-describe('decodeChunkRow', () => {
-  it('decodes a packed row and rejects non-row values', () => {
-    const packed = packChunkRuns(textRun(0, ['你', '好', '🙂']))
-    const row = packed[0]
-    expect(isChunkRow(row)).toBe(true)
-    expect(decodeChunkRow(JSON.parse(JSON.stringify(row)))).toStrictEqual(textRun(0, ['你', '好', '🙂']))
-    expect(() => decodeChunkRow({ type: 'assistant/chunk' })).toThrow(/packed chunk row/)
-  })
-})
-
-describe('decodeStorageRecord', () => {
-  it('passes non-row values through after sequence admission', () => {
-    const event = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }
-    const decoded = decodeStorageRecord(event)
-    expect(decoded).toStrictEqual([event])
-    expect(decoded[0]).toBe(event)
-    expect(decodeStorageRecord('junk')).toStrictEqual(['junk'])
-    expect(decodeStorageRecord(null)).toStrictEqual([null])
-    const withoutSeq = { type: 'future/event', data: {} }
-    expect(decodeStorageRecord(withoutSeq)).toStrictEqual([withoutSeq])
-    expect(() => decodeStorageRecord({ ...event, seq: -0 })).toThrow(/SessionSeq/)
-  })
-
-  it('reconstructs timestamps through negative dt gaps (clock stepped back)', () => {
-    const events = [
-      chunkEvent(SessionSeq(0), 1000, { type: 'text-delta', index: 0, text: 'a' }),
-      chunkEvent(SessionSeq(1), 990, { type: 'text-delta', index: 0, text: 'b' }),
-      chunkEvent(SessionSeq(2), 995, { type: 'text-delta', index: 0, text: 'c' }),
-    ]
-    expect(decodeAll(packChunkRuns(events))).toStrictEqual(events)
+    [{ type: 'text-chunks' }, 'envelope must be exactly'],
+    [{ ...textRow, extra: 1 }, 'envelope must be exactly'],
+    [{ ...textRow, seq0: -1 }, 'seq0 must be a non-negative safe integer'],
+    [{ ...textRow, seq0: 1.5 }, 'seq0 must be a non-negative safe integer'],
+    [{ ...textRow, seq0: -0 }, 'seq0 must be a non-negative safe integer'],
+    [{ ...textRow, time0: 1.5 }, 'time0 must be a safe integer'],
+    [{ ...textRow, data: 'x' }, 'data must be an object'],
+  ] as const)('rejects a malformed envelope %#', (row, why) => {
+    expect(() => decodeChunkRow(row)).toThrow(`malformed text-chunks storage row: ${why}`)
   })
 
   it.each([
-    ['a non-object data', { type: 'text-chunks', seq0: 0, time0: 1, data: 'x' }],
-    ['an envelope with extra keys', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], texts: ['a'] }, extra: 1 }],
-    ['a negative seq0', { type: 'text-chunks', seq0: -1, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], texts: ['a'] } }],
-    ['a negative-zero seq0', { type: 'text-chunks', seq0: -0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], texts: ['a'] } }],
-    ['a non-finite time0', { type: 'text-chunks', seq0: 0, time0: Infinity, data: { turn: 1, step: 1, index: 0, dt: [], texts: ['a'] } }],
-    ['a fractional time0', { type: 'text-chunks', seq0: 0, time0: 1.5, data: { turn: 1, step: 1, index: 0, dt: [], texts: ['a'] } }],
-    ['a data shape mismatch', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], args: ['a'] } }],
-    ['a non-string member', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], texts: [7] } }],
-    ['an empty member list', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], texts: [] } }],
-    ['a dt arity mismatch', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [1, 2], texts: ['a', 'b'] } }],
-    ['a non-finite dt gap', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [NaN], texts: ['a', 'b'] } }],
-    ['a fractional dt gap', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [0.5], texts: ['a', 'b'] } }],
-    ['a member seq leaving safe range', { type: 'text-chunks', seq0: Number.MAX_SAFE_INTEGER, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [0, 0], texts: ['a', 'b', 'c'] } }],
-    ['a member time leaving safe range', { type: 'text-chunks', seq0: 0, time0: Number.MAX_SAFE_INTEGER, data: { turn: 1, step: 1, index: 0, dt: [1], texts: ['a', 'b'] } }],
-    ['a non-numeric turn', { type: 'text-chunks', seq0: 0, time0: 1, data: { turn: 'x', step: 1, index: 0, dt: [], texts: ['a'] } }],
-    ['a tool-call row without id', { type: 'tool-call-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, dt: [], args: ['a'] } }],
-    ['a tool-call row with non-string id', { type: 'tool-call-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, id: 7, dt: [], args: ['a'] } }],
-    ['a tool-call row with non-string name', { type: 'tool-call-chunks', seq0: 0, time0: 1, data: { turn: 1, step: 1, index: 0, id: 'c', name: 7, dt: [], args: ['a'] } }],
-  ])('throws on %s', (_label, row) => {
-    expect(() => decodeStorageRecord(row)).toThrow(/malformed .* storage row/)
+    [{ turn: 'x', step: 1, index: 0, dt: [1], texts: ['a', 'b'] }, 'turn/step/index must be numbers'],
+    [{ turn: 1, step: 1, index: 0, dt: [1], texts: [] }, 'texts must be a non-empty string array'],
+    [{ turn: 1, step: 1, index: 0, dt: [1], texts: ['a', 7] }, 'texts must be a non-empty string array'],
+    [{ turn: 1, step: 1, index: 0, dt: 'x', texts: ['a', 'b'] }, 'dt must be an array of safe integers'],
+    [{ turn: 1, step: 1, index: 0, dt: [1.5], texts: ['a', 'b'] }, 'dt must be an array of safe integers'],
+    [{ turn: 1, step: 1, index: 0, dt: [], texts: ['a', 'b'] }, 'dt length 0 does not match 2 members'],
+    [{ turn: 1, step: 1, index: 0, dt: [1] }, 'data must be exactly'],
+  ] as const)('rejects malformed run data %#', (data, why) => {
+    expect(() => decodeChunkRow({ ...textRow, data })).toThrow(`malformed text-chunks storage row: ${why}`)
+  })
+
+  it.each([
+    [{ turn: 1, step: 1, index: 0, dt: [5], args: ['{', '}'] }, 'data must be exactly {turn, step, index, id, name?, dt, args}'],
+    [{ turn: 1, step: 1, index: 0, id: 7, name: 'tool', dt: [5], args: ['{', '}'] }, 'id (and name when present) must be strings'],
+    [{ turn: 1, step: 1, index: 0, id: 'call-1', name: 7, dt: [5], args: ['{', '}'] }, 'id (and name when present) must be strings'],
+    [{ turn: 1, step: 1, index: 0, id: 'call-1', name: 'tool', dt: [5], args: ['{', 7] }, 'args must be a non-empty string array'],
+  ] as const)('rejects malformed tool-call data %#', (data, why) => {
+    expect(() => decodeChunkRow({ ...toolRow, data })).toThrow(`malformed tool-call-chunks storage row: ${why}`)
+  })
+
+  it('rejects reconstructions that leave the safe-integer range', () => {
+    expect(() => decodeChunkRow({
+      ...textRow,
+      seq0: Number.MAX_SAFE_INTEGER,
+      data: { turn: 1, step: 1, index: 0, dt: [1, 1], texts: ['a', 'b', 'c'] },
+    })).toThrow('member seqs must stay safe integers')
+    expect(() => decodeChunkRow({
+      ...textRow,
+      time0: Number.MAX_SAFE_INTEGER,
+      data: { turn: 1, step: 1, index: 0, dt: [1], texts: ['a', 'b'] },
+    })).toThrow('member times must stay safe integers')
   })
 })
 
-// --- Property: pack∘decode is the identity over arbitrary event batches ---
+describe('storage record decoding', () => {
+  it('expands chunk rows and passes other rows through with seq admission', () => {
+    expect(decodeStorageRecord(textRow)).toHaveLength(3)
 
-const deltaChunkArb: fc.Arbitrary<StreamChunk> = fc.oneof(
-  fc.record({ type: fc.constant<'text-delta'>('text-delta'), index: fc.nat(2), text: fc.string() }),
-  fc.record({ type: fc.constant<'reasoning-delta'>('reasoning-delta'), index: fc.nat(2), text: fc.string() }),
-  fc.record({
-    type: fc.constant<'tool-call-delta'>('tool-call-delta'),
-    index: fc.nat(2),
-    id: fc.constantFrom(CallId('c1'), CallId('c2')),
-    argumentsDelta: fc.string(),
-  }),
-  fc.record({
-    type: fc.constant<'tool-call-delta'>('tool-call-delta'),
-    index: fc.nat(2),
-    id: fc.constantFrom(CallId('c1'), CallId('c2')),
-    name: fc.constantFrom('write', 'read'),
-    argumentsDelta: fc.string(),
-  }),
-)
-
-const boundaryChunkArb: fc.Arbitrary<StreamChunk> = fc.oneof(
-  fc.record({ type: fc.constant<'block-start'>('block-start'), index: fc.nat(2), blockType: fc.constant<'text'>('text') }),
-  fc.record({ type: fc.constant<'finish'>('finish'), reason: fc.constant({ kind: 'stop' as const }) }),
-)
-
-/**
- * Batches with contiguous seqs, arbitrary timestamps, mixed chunk kinds and
- * turn/step placement. Times draw from the FULL safe-integer range (not just
- * realistic clocks) so the property exercises the gap-overflow guard: two safe
- * endpoints can differ by more than a double subtracts exactly.
- */
-const batchArb: fc.Arbitrary<SessionEvent[]> = fc.array(
-  fc.record({
-    chunk: fc.oneof({ weight: 4, arbitrary: deltaChunkArb }, { weight: 1, arbitrary: boundaryChunkArb }),
-    time: fc.oneof(
-      { weight: 4, arbitrary: fc.integer({ min: 995, max: 9000 }) },
-      { weight: 1, arbitrary: fc.integer({ min: Number.MIN_SAFE_INTEGER, max: Number.MAX_SAFE_INTEGER }) },
-    ),
-    turn: fc.nat(1),
-    step: fc.nat(1),
-  }),
-  { maxLength: 40 },
-  // JSON round-trip normalizes fast-check's null-prototype records into the
-  // plain objects real log events are (the log is JSON), so equality compares
-  // values, not prototypes.
-).map(entries => JSON.parse(JSON.stringify(
-  entries.map((entry, k) => chunkEvent(SessionSeq(k), entry.time, entry.chunk, entry.turn, entry.step)),
-)) as SessionEvent[])
-
-describe('chunk-row codec properties', () => {
-  it('JSON-serialized pack∘decode reproduces every batch exactly', () => {
-    fc.assert(fc.property(batchArb, (events) => {
-      expect(decodeAll(packChunkRuns(events))).toStrictEqual(events)
-    }))
+    const event = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } } as unknown as SessionEvent
+    expect(decodeStorageRecord(event)).toEqual([event])
+    expect(decodeStorageRecord('x')).toEqual(['x'])
+    expect(decodeStorageRecord({ type: 'custom' })).toEqual([{ type: 'custom' }])
+    expect(() => decodeStorageRecord({ type: 'custom', seq: -1 })).toThrow()
   })
 })

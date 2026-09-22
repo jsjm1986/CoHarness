@@ -4,6 +4,10 @@
 
 会话投影 Service Definition 与驱动注册表。它拥有 `ctx.sessionProjections`：该注册表在已提交的会话事件上驱动每个已注册的投影单元，并向载体提供完整的最终值，目前包括 api-proxy 历史尾页和 `session/projection` 推送帧。领域注册的只是纯数学；驱动权归框架。[session-projection RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md) 记录了设计理由。
 
+## 概述
+
+当客户端需要当前的逐会话状态（例如待办事项、目标或对话统计）而不应自行重放原始事件日志时，使用 `dsh-session-projection`。领域根据已提交的会话事件定义同步投影，客户端则通过快照与变更通知接收经过 schema 校验的完整 JSON 值。快照标明所有返回值共同反映到的最后一个事件，因此载体可以把状态与对应的历史切面配对。投影状态可以通过检查点加快冷读，而仅供 host 使用的投影不会暴露给客户端。
+
 ## 服务：`SessionProjectionRegistry`（ctx 键：`sessionProjections`）
 
 ### 公开 API
@@ -34,9 +38,13 @@
 
 本包承担能力 seam 的 Service Definition 与驱动角色：领域 host 插件（如 `dsh-tool-todo`）贡献单元，载体（`dsh-host-apiproxy`）消费快照与变更流，两侧互不相识。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。已注册单元是在已提交事件上驱动的纯折叠；驱动状态本身也从同一日志派生。
+
 ## 模型体验
 
-无——注册表只对已入日志的会话状态计算面向客户端的读模型，不触碰任何提示词、消息、schema、流或工具结果。
+无——注册表只为已入日志的会话状态提供面向客户端的读模型，不注册任何模型可见内容。
 
 #### KV Cache 影响
 

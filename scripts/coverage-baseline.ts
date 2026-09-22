@@ -66,10 +66,7 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/session/session-persistence-gateway/src/index.ts',
   // LLM adapters and usage accounting.
   'packages/llm/llm-deepseek/src/adapter.ts',
-  'packages/llm/llm-deepseek/src/files-api.ts',
   'packages/llm/llm-deepseek/src/index.ts',
-  'packages/llm/llm-deepseek/src/request-pricing.ts',
-  'packages/llm/llm-deepseek/src/translate.ts',
   'packages/llm/llm-pi-ai/src/auth.ts',
   'packages/llm/llm-pi-ai/src/index.ts',
   'packages/llm/llm-pi-ai/src/login.ts',

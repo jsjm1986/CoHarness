@@ -18,16 +18,11 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
-    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "lib/invariant.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
@@ -38,7 +33,6 @@
   "peerDependencies": {
     "@deepseek-ai/dsh-attachment": "workspace:^",
     "@deepseek-ai/dsh-fs": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-sandbox": "workspace:^",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
@@ -54,18 +48,21 @@
     "@deepseek-ai/dsh-agent-loop": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-attachment": "workspace:^",
+    "@deepseek-ai/dsh-attachment-local": "workspace:^",
     "@deepseek-ai/dsh-fs": "workspace:^",
     "@deepseek-ai/dsh-fs-local": "workspace:^",
     "@deepseek-ai/dsh-fs-observation-policy": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-llm-deepseek": "workspace:^",
+    "@deepseek-ai/dsh-ptc-runtime": "workspace:^",
     "@deepseek-ai/dsh-sandbox": "workspace:^",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
+    "@deepseek-ai/dsh-scope": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-projection": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-user-approval": "workspace:^"
+    "@deepseek-ai/dsh-user-approval": "workspace:^",
+    "@deepseek-ai/dsh-util-values": "workspace:^"
   }
 }

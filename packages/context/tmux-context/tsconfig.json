@@ -4,16 +4,18 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../core/agent"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../core/session"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../llm/llm"
@@ -22,16 +24,13 @@
       "path": "../../shell/shell"
     },
     {
-      "path": "../../core/agent"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../core/system-prompt"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../core/session"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

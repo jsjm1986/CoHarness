@@ -38,7 +38,7 @@ export function SessionTitleProviderId(id: string): SessionTitleProviderId {
 }
 
 /** Exact auxiliary model route that produced a title. */
-export interface SessionTitleModelProvenance {
+export interface SessionTitleModelIdentity {
   /** Registered LLM provider route. */
   readonly provider: string
   /** Provider model id. */
@@ -51,7 +51,7 @@ export type SessionTitleSource =
   | {
     readonly kind: 'provider'
     readonly provider: SessionTitleProviderId
-    readonly model?: SessionTitleModelProvenance
+    readonly model?: SessionTitleModelIdentity
   }
   | {
     /** Explicit user rename: pins the title — automatic generation stops scheduling. */
@@ -130,7 +130,7 @@ export interface SessionTitleProviderRequest {
   /** All eligible human messages through this generation revision. */
   readonly messages: readonly SessionTitleUserMessage[]
   /** Exact current logged main-request route, when one has been recorded. */
-  readonly route?: SessionTitleModelProvenance
+  readonly route?: SessionTitleModelIdentity
   /** Cancellation for supersession, disposal, timeout composition, or the explicit caller. */
   readonly signal: AbortSignal
 }
@@ -142,7 +142,7 @@ export interface SessionTitleProviderResult {
   /** Exact seqs from `request.messages` used by this result. */
   readonly messageSeqs: readonly SessionSeq[]
   /** Auxiliary LLM route, when generation used a model. */
-  readonly model?: SessionTitleModelProvenance
+  readonly model?: SessionTitleModelIdentity
 }
 
 /** One optional asynchronous title implementation registered with the service. */
@@ -386,6 +386,7 @@ export class SessionTitleService extends Service {
     // fresh session would have minted. Sessions entered empty are live
     // creates; their first human message drives the ordinary path.
     ctx.on('session/created', (session) => {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       if (session.snapshotEvents().length === 0) return
       this.defer(async () => {
         try {
@@ -426,6 +427,7 @@ export class SessionTitleService extends Service {
    * @returns latest title snapshot, or `undefined` before eligible input.
    */
   get(session: Session): SessionTitleSnapshot | undefined {
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return foldSessionTitle(session.snapshotEvents())
   }
 
@@ -476,6 +478,7 @@ export class SessionTitleService extends Service {
       throw new Error(`session "${session.id}" is not live in this store`)
     }
     const registration = this.registration
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const messages = eligibleTitleMessages(session.snapshotEvents())
     const latest = messages.at(-1)
     if (registration === undefined || registration.closing || latest === undefined) {
@@ -546,6 +549,7 @@ export class SessionTitleService extends Service {
     if (this.get(session)?.source.kind === 'user') return
     const registration = this.registration
     if (registration !== undefined && !registration.closing) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const messages = eligibleTitleMessages(session.snapshotEvents(), event.seq)
       const shouldSchedule = registration.provider.automatic === 'all-prompts'
         || (session.header.parentSession === undefined && messages.length === 1 && this.get(session) === undefined)
@@ -585,6 +589,7 @@ export class SessionTitleService extends Service {
     const state = session === undefined ? undefined : this.work.get(session)
     const pending = state?.pending
     if (session === undefined || state === undefined || pending === undefined) return
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const boundary = session.snapshotEvents().findLast(event => event.type === 'step/start' || event.type === 'step/end')
     const route = session.requestHeader()?.config
     if (boundary?.type !== 'step/start'
@@ -599,7 +604,7 @@ export class SessionTitleService extends Service {
     session: Session,
     state: SessionTitleWorkState,
     pending: PendingAutomaticWork,
-    route: SessionTitleModelProvenance,
+    route: SessionTitleModelIdentity,
   ): void {
     delete state.pending
     this.defer(async () => {
@@ -621,7 +626,7 @@ export class SessionTitleService extends Service {
   private startProvider(
     session: Session,
     work: ActiveProviderWork,
-    route?: SessionTitleModelProvenance,
+    route?: SessionTitleModelIdentity,
   ): Promise<SessionTitleSnapshot | undefined> {
     const run = Promise.resolve().then(() => this.runProvider(session, work, route))
     return this.track(run, work.registration)
@@ -631,12 +636,13 @@ export class SessionTitleService extends Service {
   private async runProvider(
     session: Session,
     work: ActiveProviderWork,
-    route?: SessionTitleModelProvenance,
+    route?: SessionTitleModelIdentity,
   ): Promise<SessionTitleSnapshot | undefined> {
     try {
       this.assertCurrent(session, work)
       await this.ensureFallback(session)
       this.assertCurrent(session, work)
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const messages = eligibleTitleMessages(session.snapshotEvents(), work.throughSeq)
       const result = await work.registration.provider.generate({
         session,
@@ -693,7 +699,7 @@ export class SessionTitleService extends Service {
       previous = index
     }
     const modelCandidate = candidate.model
-    let model: SessionTitleModelProvenance | undefined
+    let model: SessionTitleModelIdentity | undefined
     if (modelCandidate !== undefined) {
       if (modelCandidate === null || typeof modelCandidate !== 'object') {
         throw new Error('session-title provider result model must contain non-empty provider and model strings')
@@ -837,6 +843,7 @@ export class SessionTitleService extends Service {
     this.assertServiceActive()
     const current = this.get(session)
     if (current !== undefined) return current
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const [first] = eligibleTitleMessages(session.snapshotEvents())
     if (first === undefined) return undefined
     const title = fallbackSessionTitle(

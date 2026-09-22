@@ -22,13 +22,21 @@
 
 `/client` 入口导出插件主体（`apply`／`inject`）、`CommandUiRuntime`、目录类和 popup 类及其状态类型，以及固定的约定类型；外层组件本身是 overlay 注册的内部实现。
 
+## 概述
+
+键入 `/` 命令会打开已注册的弹窗、运行客户端动作、进入宿主命令的输入或直接执行，命令行不会被静默降级为普通提示词。业务包通过 `ctx.commandUi` 注册 popupSelect（`/model`、`/permission`）或 action，也可用这两种方式装饰既有宿主命令，同时保留其目录行与参数声明。空格与回车根据会话目录解析命令行：带 `input` 的宿主描述符是 `leadingInput`，注册了 `CommandUiSpec` 的是 `popupSelect` 或 `action`，其余是 `execute`。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。命令目录是按会话键控的缓存，经由所属命令界面重新拉取；它镜像 host 数据而非拥有一个关系。
+
 ## 模型体验
 
-间接影响，途径是本包的派发与 `claim.submit` 路径触发的 host `command.execute` RPC：匹配命中的命令，其 handler 会修改 host 领域状态，其他包再把该状态投影进下一个请求（`/plan` 的 handler 翻转 plan 模式，其归属包注入 `plan:policy` 系统提示词 section），而命令行本身、detached result 与所有菜单／notice 渲染都留在客户端，永不进入会话日志。
+派发路径通过其触发的宿主 `command.execute` RPC 间接影响模型：每个命令 handler 的宿主包拥有任何模型可见效果（`/plan` 的 handler 翻转 plan 模式，其归属包注入 policy 段），而命令行、分离结果与所有菜单和 notice 渲染都留在客户端，永不进入会话日志。
 
 #### KV Cache 影响
 
-无直接影响；该包既不组装也不发送提供方请求。它触发的命令 handler 可能改变归属 host 包对下一个请求系统提示词的贡献（某个 section 的出现或消失会替换较早的请求 token，并使提供方前缀从该点起失效），但这一影响由各命令的 host 包拥有并记录。
+无直接影响；该包既不组装也不发送提供方请求。它触发的命令 handler 可能改变归属宿主包对下一个请求系统提示词的贡献——某个 section 的出现或消失会替换较早的请求 token，并使提供方前缀从该点起失效——但这一影响由各命令的宿主包拥有并记录。
 
 ## 已知限制与暂缓事项
 

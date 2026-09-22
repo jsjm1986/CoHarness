@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import { RpcId } from '../src/api/rpc.ts'
 import type { RpcRequest } from '../src/api/rpc.ts'
 import { createApiProxy } from '../src/api-proxy.ts'
+import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 
 const sid = (value: string): SessionId => value as SessionId
 const PARENT = sid('parent')
@@ -48,7 +49,7 @@ function bench(options: {
     ])
     : Promise.reject(options.listError))
   const childHeader = {
-    version: 0, id: CHILD, createdAt: 1, cwd: '/proj', isSeeded: false, parentSession: options.historyParent ?? PARENT,
+    version: SESSION_FORMAT_VERSION, id: CHILD, createdAt: 1, cwd: '/proj', isSeeded: false, parentSession: options.historyParent ?? PARENT,
     ...options.agentPreset === undefined ? {} : { agentPreset: options.agentPreset },
   } satisfies SessionHeader
   const childEvents = (options.presenterHistory === true
@@ -87,7 +88,8 @@ function bench(options: {
       : undefined,
   })
   ctx.provide('sessionPersistence', {
-    list: () => Promise.resolve(options.storedChild === false ? [] : [childHeader]),
+    list: () => Promise.resolve((options.storedChild === false ? [] : [childHeader]).map(header => ({ header }))),
+    listHeaders: () => Promise.resolve(options.storedChild === false ? [] : [childHeader]),
     inspect,
     locate: () => undefined,
   })
@@ -277,7 +279,13 @@ describe('subagent gateway', () => {
         width: 1,
         height: 1,
       })))
-    ctx.provide('attachments', { saveImages } as never)
+    ctx.provide('attachments', {
+      saveImages,
+      admitPromptContent(parts: readonly unknown[]) {
+        return (AttachmentStore.prototype.admitPromptContent as (this: unknown, content: readonly unknown[]) => Promise<unknown[]>)
+          .call(this, parts)
+      },
+    } as never)
     const content = [
       { type: 'text' as const, text: 'see this' },
       { type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==', name: 'shot.png' },
@@ -309,7 +317,13 @@ describe('subagent gateway', () => {
       await gate.promise
       return []
     })
-    ctx.provide('attachments', { saveImages } as never)
+    ctx.provide('attachments', {
+      saveImages,
+      admitPromptContent(parts: readonly unknown[]) {
+        return (AttachmentStore.prototype.admitPromptContent as (this: unknown, content: readonly unknown[]) => Promise<unknown[]>)
+          .call(this, parts)
+      },
+    } as never)
     const content = [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==' }]
 
     const first = ctx.serial('subagent/prompt-admission', parent as never, content)

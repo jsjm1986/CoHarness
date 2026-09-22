@@ -148,7 +148,7 @@ export function SidebarRoot({
                 {renderSlot('sidebar.brand.name', {}, {
                   fallback: (
                     <>
-                      <span className={css.fallbackBrandName}>CoHarness</span>
+                      <span className={css.fallbackBrandName}>{t('brand.product')}</span>
                       {process.env.DSH_CLIENT_COMMIT_HASH
                         ? <span className={css.buildRevision}>{process.env.DSH_CLIENT_COMMIT_HASH}</span>
                         : null}

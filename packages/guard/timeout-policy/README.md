@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Tool-call timeout enforcer: a single `tools/execute` around-dispatch listener that arms a per-call cooperative deadline on `exec.signal` for a tool declaring `timeoutMs` on its `ToolDefinition` and returns a structured `TOOL_TIMEOUT` result when that deadline wins. The budget is read from the tool's own declaration (`ToolDefinition.timeoutMs`, set by the owning tool plugin), so this plugin is **zero-config**. It is the reference `tools/execute` wrapper and the enforcement home for model-facing tool-call budgets ([timeout-library Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md)).
 
+## Summary
+
+Use this package to give tool calls their configured cooperative time limits and return a clear timeout error to the model after cancellation settles. Calls that finish in time are unchanged. A tool that ignores or slowly handles cancellation can keep the caller waiting because the package cannot hard-stop downstream work. Each tool supplies its own limit; the package has no configuration and is enabled in the `dsh` base bundle.
+
 ## Plugin (namespace: `timeout-policy`)
 
 A function/namespace plugin (`name` / `inject` / `apply`), not a service. It registers no tool and takes no config — it consumes `ctx.tools`'s `tools/execute` waterfall (which the `dsh-tools` registry always provides) and reads each dispatched tool's declared `timeoutMs` from the registry (`ctx.tools.get(exec.name)`).
@@ -35,13 +39,17 @@ The derived signal only **notifies**; termination stays with the tool and the ca
 
 Multiple `tools/execute` listeners compose by cordis registration order. Combined with a future retry/sandbox/metrics wrapper, registration order chooses the semantics — "timeout covers the whole retry operation" (timeout registered outer) versus "timeout covers each attempt" (timeout registered inner).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each call arms a fresh cooperative deadline read from the tool's own declaration; no cross-call state exists.
+
 ## Model Experience
 
 ### Conditional tool result
 
 #### What the model sees
 
-This plugin adds no prompt or schema. If a declared deadline wins, it replaces the provider's outcome with `Error: tool call timed out after <ms>ms` plus structured `TOOL_TIMEOUT`; otherwise the original result passes through unchanged.
+This plugin adds no prompt or schema. If a declared deadline wins and downstream cancellation settles, it replaces the provider's outcome with `Error: tool call timed out after <ms>ms` plus the structured `TOOL_TIMEOUT` error; otherwise the original result passes through unchanged. A downstream call that never settles cannot produce a timeout result.
 
 #### Token effect
 
@@ -49,7 +57,7 @@ Zero tokens on non-timeout calls. A timeout adds one small retained error result
 
 #### KV Cache effect
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 

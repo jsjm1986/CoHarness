@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Workspace-authorized model tools over `ctx.sessionQuery`. The opt-in package depends only on the unified interface and registers `session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read`; shipped host compositions do not mount it by default.
 
+## Summary
+
+Use `dsh-tool-session-query` to let a model search earlier sessions, inspect event matches, trace session or event relationships, and read exact event data. Its five read-only tools return cursor-free text and authorize cross-session access only when the target session's `cwd` exactly matches the caller's; callers without a `cwd` can inspect only themselves. Search excludes the caller session and asks the model to narrow its query when the deployment result cap is reached. The package is opt-in, and enabling it adds fixed guidance plus five tool schemas to every model request.
+
 ## Configuration
 
 | Key | Default | Meaning |
@@ -18,6 +22,10 @@ The caller comes exclusively from `ToolExecution.exec.agent`. Cross-session acce
 Every trusted `ctx.sessionQuery` call crosses one model-boundary sanitizer. Caller cancellation is checked first and preserved exactly. Available corpus and provider diagnostics, including safely inspectable nested causes, are logged internally on a best-effort basis; unprintable failures use a fixed log placeholder. Diagnostic formatting and error classification are independently guarded, so an unprintable cause cannot escape or prevent a safely classified outer error, while unsafe classification or logging falls back to the fixed `SESSION_QUERY_TOOL_FAILED` code and message. Local argument-validation and authorization errors retain their precise tool-owned messages.
 
 The package deliberately performs no byte or character truncation and does not import a spill backend. Deployments that need bounded inline output mount `@deepseek-ai/dsh-spill-policy`, which can replace the rendered text after execution while retaining the complete result.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools are registrations over `ctx.sessionQuery`; corpus state stays behind the query seam.
 
 ## Model Experience
 

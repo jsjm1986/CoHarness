@@ -351,7 +351,7 @@ describe('MessageFeedbackController', () => {
 
     expect(await controller.ensure()).toEqual({
       ok: false,
-      error: { code: 'transport', message: 'message feedback list failed' },
+      error: { code: 'transport', message: 'socket string' },
     })
   })
 
@@ -362,7 +362,7 @@ describe('MessageFeedbackController', () => {
 
     expect(await controller.rate(MSG, 'positive')).toEqual({
       ok: false,
-      error: { code: 'transport', message: 'message feedback mutation failed' },
+      error: { code: 'transport', message: 'nope' },
     })
   })
 

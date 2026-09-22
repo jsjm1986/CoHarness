@@ -6,6 +6,10 @@ The tool-independent shell environment plugin: owns the `ctx.shellEnv` registry 
 
 The package root exports the Cordis plugin contract (`name`, `inject`, `Config`, `apply`) plus the `ShellEnvRegistry` service class and its contributor types; consumers use `ctx.shellEnv` after loading this plugin.
 
+## Summary
+
+`dsh-shell-env` provides the trusted `DSH_*` environment that every model shell call — bash or pwsh — runs with: built-in facts such as `DSH_HOME`, `DSH_SHELL=1`, and the agent's `DSH_SESSION_ID`. Plugin authors can register their own facts with declared keys, collected per execution and disposed with their plugin; duplicate ownership or undeclared runtime keys fail loudly instead of silently overwriting. The registry changes nothing else the model sees — the shell tools own their own schemas and prompts. Choose it in any composition that mounts a model shell tool; configuration only picks the Harness home directory.
+
 ## Config
 
 ```yaml
@@ -38,13 +42,17 @@ export function apply(ctx: Context): void {
 
 The overlay is computed from the current `ToolExecution` and passed through the dedicated `ShellExecRequest.dshEnv` channel. The local executors remove all inherited `DSH_*` before merging that snapshot, so nested harnesses and concurrent parent/child agents cannot leak stale identities. `process.env` is never modified. The shell tools' descriptions teach the generic `$DSH_*` convention rather than naming persistence-specific variables or adding a permanent system-prompt section.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The registry is a contribution set with effect-scoped disposal; collected variables are computed per shell call from the registered facts.
+
 ## Model Experience
 
-Indirectly, through the shell tools (`dsh-tool-bash`, `dsh-tool-pwsh`), which collect this registry's managed `DSH_*` snapshot into every shell-tool call.
+Indirectly, through the shell tools (`dsh-tool-bash`, `dsh-tool-pwsh`), which expose this registry's managed `DSH_*` facts in every shell-tool call.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumers own any request-prefix changes.
+The managed environment never enters the request prefix, so it does not invalidate provider cache reuse; the shell tools' definitions and the current request envelope own any prefix change.
 
 ## Known Limitations and Deferred Work
 

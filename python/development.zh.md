@@ -34,7 +34,7 @@ uv run --project python/sdk python scripts/smoke-python-runtime.py \
   --scenario sdk-minimal --exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64
 ```
 
-其中两个场景会比对 `scripts/snapshots/python-sdk-single-exe/` 下已提交的期望输出。`minimal/model-visible.json` 固定了签入的极简组合所组装的系统提示词、对外公布的工具 schema 以及模型可见消息，因此插件一旦贡献出计划外的系统分段或 user 消息，该任务即失败；它会丢弃动态运行时上下文快照——同一组合在 macOS 上会发出它，在 Linux 上不会（[#2488](https://github.com/deepseek-harness/deepseek-harness/issues/2488)）。`advanced/` 固定 SDK 结果与持久化的会话日志。重新运行对应场景时加上 `--update-snapshots`，并在提交前审阅该差异。
+其中两个场景会比对 `scripts/snapshots/python-sdk-single-exe/` 下已提交的期望输出。`minimal/model-visible.json` 固定了签入的极简组合所组装的系统提示词、对外公布的工具 schema 以及模型可见消息，因此插件一旦贡献出计划外的系统分段或 user 消息，该任务即失败；它会丢弃动态运行时上下文快照——同一组合在 macOS 上会发出它，在 Linux 上不会（[#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)）。`advanced/` 固定 SDK 结果与持久化的会话日志。重新运行对应场景时加上 `--update-snapshots`，并在提交前审阅该差异。
 
 交互式冒烟测试需要环境变量或仓库根目录 `.env` 中存在 `DEEPSEEK_API_KEY`：
 
@@ -84,3 +84,9 @@ pip install \
 公开发布从私有自动化仓库运行；包元数据指向独立的只读公开源码镜像，该镜像不运行发布 Actions。私有仓库把仓库变量 `PYPI_PUBLISHER_REPOSITORY` 定义为自身的 `owner/name`，并且只在有意发布期间把 `PUBLIC_PYPI_RELEASE_ENABLED` 从 `false` 改为 `true`。
 
 独立的运行时与 SDK 作业使 SDK 上传失败后可以继续执行，而无需重新发送不可变的运行时文件。只有工作流从配置的发布仓库、匹配的 `python-v*` 标签运行，且受保护的 `pypi-runtime` 和 `pypi` 环境分别批准运行时与 SDK 作业时，才接受 `publish=true`。PyPI Trusted Publishing 仍会提供短期 OIDC 凭据，但公开 attestation 会披露私有发布仓库身份，因此将其禁用。
+
+## 静态验证与类型检查
+
+在仓库根目录运行 `pnpm run check:python:static`。锁定的 quality 依赖组固定 Ruff 版本，检查语法、未定义名称和选定的确定错误，不格式化 SDK。Python CI 在 pytest 之外执行此检查。严格 mypy 不属于必需车道；公共 API 类型变化或下一次上游 SDK 更新时，由 SDK 负责人复评已记录的类型欠账。
+
+Python 发布还需要[发布证据](../scripts/release/README.zh.md)所述的同提交 run ID；两个受保护的发布器在上传前重新核对已测试的 wheel 包。

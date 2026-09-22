@@ -13,13 +13,23 @@
 # driven); the grouping is for readers.
 
 - insert:
+    - id: tool-plugin-manager
+      name: '@deepseek-ai/dsh-plugin-manager/tools'
+      disabled: true
+
+    - id: plugin-manager
+      name: '@deepseek-ai/dsh-plugin-manager'
+      disabled: !!js "!ctx.get('profileContext')"
+
     - id: timer
       name: '@deepseek-ai/cordis-plugin-timer'
 
+    # Profile configuration reloads by default; module roots are opt-in.
     - id: hmr
-      name: '@deepseek-ai/cordis-plugin-hmr'
+      name: '@deepseek-ai/dsh-hmr'
+      disabled: !!js "!ctx.get('profileContext')"
       config:
-        root: ['.']
+        root: []
 
     - id: llm
       name: '@deepseek-ai/dsh-llm'
@@ -346,8 +356,11 @@
         toolName: subagent_fork
         backgroundMode: one-shot
 
-    - id: workflow-worker-thread
-      name: '@deepseek-ai/dsh-workflow-worker-thread'
+    - id: ptc-runtime
+      name: '@deepseek-ai/dsh-ptc-runtime-node'
+
+    - id: workflow-ptc
+      name: '@deepseek-ai/dsh-workflow-ptc'
       config:
         provider: spawn
 
@@ -377,6 +390,11 @@
         thresholdChars: 8192
         headChars: 4096
         tailChars: 1024
+
+    # When an image-capable route rejects a request as over its image budget,
+    # replace the oldest images with placeholders on the surface and retry.
+    - id: image-offload
+      name: '@deepseek-ai/dsh-compaction-image-offload'
 
     - id: tool-todo
       name: '@deepseek-ai/dsh-tool-todo'
@@ -438,6 +456,9 @@
         fetch: true
         searchTimeoutMs: 60000
 
+    - id: mcp-resources
+      name: '@deepseek-ai/dsh-mcp-resources'
+
     # ── rows every mode mounts, whose values each overlay may state ──────────────
 
     # The tool registry. Presentation mode is a deployment choice; omitting it here
@@ -450,7 +471,7 @@
     - id: system-prompt
       name: '@deepseek-ai/dsh-system-prompt'
       config:
-        persona: ''
+        personaPrefix: ''
 
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.

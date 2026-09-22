@@ -112,7 +112,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async create(id: SessionId, options: AgentOptions = {}, meta: Pick<SessionHeader, \'cwd\'> = {}): Promise<Agent>',
-        description: 'Create an agent and session under one caller-supplied identity, owned by the accessing fiber. Constructor-driven config calls mint a fresh combined id before entering this boundary. When a persistence backend is mounted, the session\'s write handle is acquired before publication, so an already owned or already persisted id fails inside this call rather than racing the coordinator\'s write path later.',
+        description: 'Create an agent and session under one caller-supplied identity, owned by the accessing fiber. Constructor-driven config calls mint a fresh combined id before entering this boundary. When a persistence backend is mounted, the session\'s durable identity and any seed are stored before publication.',
         parameters: [{ name: 'id', description: 'shared agent/session identity.' }, { name: 'options', description: 'concrete loop options.' }, { name: 'meta', description: 'optional fresh-session workspace metadata.' }],
         returns: 'the published running agent.',
       },
@@ -256,7 +256,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'currentInitiator(): Agent | undefined',
-        description: 'Read the Agent that initiated the inherited asynchronous driver chain. Use this optional form for logging, tracing, metrics, or host attribution that also supports agentless calls. When a parent creates a child, setup reports the causal parent while the setup callback\'s explicit `agent` parameter identifies the child.',
+        description: 'Read the Agent that initiated the inherited asynchronous driver chain. Use this optional form for logging, tracing, metrics, or host attribution that also supports agentless calls. When a parent creates a child, setup reports the causal parent while the setup callback\'s Agent parameter identifies the child.',
         parameters: [],
         returns: 'the inherited Agent, or `undefined` outside an initiator boundary and inside an explicit clearing boundary.',
         throws: ['when this service instance has been disposed.'],
@@ -291,32 +291,32 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'async create(options: CreateAgentOptions): Promise<AgentHandle>',
         description: 'Create and publish a new agent through the registered factory. Distinct from register (which records an already-constructed agent): this constructs the agent and its session. Rejects if no factory is registered or creation/setup fails. The resolved AgentHandle lets the owner tear down exactly this agent.',
-        parameters: [{ name: 'options', description: 'shared identity, session seed/metadata, and agent options.' }],
+        parameters: [{ name: 'options', description: 'shared identity, optional live parent, session seed/metadata, and agent options.' }],
         returns: 'the handle after setup, rollback-covered publication, and loop start complete.',
       },
       {
         signature: 'async resume(options: ResumeAgentOptions): Promise<AgentHandle>',
         description: 'Load a persisted session and resume an agent on it through the registered factory. Rejects if no factory is registered; the factory rejects if session persistence is not configured or persistence/setup fails.',
-        parameters: [{ name: 'options', description: 'persisted identity, configuration, and optional setup.' }],
+        parameters: [{ name: 'options', description: 'persisted identity, optional live parent, configuration, and setup.' }],
         returns: 'the handle after setup, rollback-covered publication, and loop start complete.',
       },
       {
         signature: 'register(agent: Agent): ReturnType<Context[\'effect\']>',
-        description: 'Register a live agent with source `startup`. Rejects if the id is already registered or a serial `agent/created` listener fails. Emits `agent/disposed` when the calling fiber is disposed — both with the agent\'s scope carrier (`scopeTarget(agent, agent)`): the subject is the agent in hand, so the emits are scope-filtered regardless of which context invoked `register` (calling through `agent.ctx` scopes EFFECTS; dispatch scoping always requires passing the carrier). Await registration before using the agent.',
+        description: 'Register a live agent with source `startup`. Rejects if the id is already registered or a serial `agent/created` listener fails. Emits `agent/disposed` when the calling fiber is disposed — both with the agent\'s scope carrier (`scopeTarget(agent, agent)`): the subject is the agent in hand, so the emits are scope-filtered regardless of which context invoked `register` (calling through `agent.ctx` scopes EFFECTS; dispatch scoping always requires passing the carrier). The entry is a runtime root; factory-backed creation uses `options.parentAgent` for child ownership. Await the registration before using the agent.',
         parameters: [{ name: 'agent', description: 'the already-constructed agent to record in the store.' }],
-        returns: 'the exact awaitable Cordis effect disposer (single-shot; a repeat call returns undefined without awaiting an in-flight teardown). Exact identity is load-bearing: a composite (generator) effect that owns a teardown ORDER — the agent factory\'s lifecycle chain — must yield THIS function so Cordis nests the unregistration at that yield position; yielding a wrapper would leave it disposing as a concurrent sibling on owner unload, unregistering the agent (and emitting `agent/disposed`) while its final turn is still draining.',
+        returns: 'the awaitable Cordis effect disposer (single-shot; a repeat call returns undefined without awaiting an in-flight teardown). Exact identity is load-bearing: a composite (generator) effect that owns a teardown ORDER — the agent factory\'s lifecycle chain — must yield THIS function so Cordis nests the unregistration at that yield position; yielding a wrapper would leave it disposing as a concurrent sibling on owner unload, unregistering the agent (and emitting `agent/disposed`) while its final turn is still draining.',
       },
       {
         signature: 'enter(agent: Agent, owner: Agent | undefined): () => void',
         description: 'Insert an already-constructed agent without announcing it. This is the advanced ordered-lifecycle primitive used by the async agent factory: it first completes setup while the agent is unpublished, then assigns the returned detach closure into its pre-installed composite teardown before calling announce. Ordinary callers use register.',
-        parameters: [{ name: 'agent', description: 'the prepared, unpublished agent.' }, { name: 'owner', description: 'live agent whose scoped context created this agent, or undefined for a top-level runtime root. This is runtime ownership, not the resumed session\'s durable parent lineage.' }],
-        returns: 'an idempotent closure that removes this exact entry and emits `agent/disposed` with listener failures contained. When called from a `agent/created` listener, removal and disposal wait until the serial dispatch settles.',
+        parameters: [{ name: 'agent', description: 'the prepared, unpublished agent.' }, { name: 'owner', description: 'explicitly supplied live runtime owner, or undefined for a top-level runtime root. This is runtime ownership, not the resumed session\'s durable parent lineage.' }],
+        returns: 'an idempotent closure that removes this exact entry and emits `agent/disposed` with listener failures contained. When called from a `agent/created` listener, removal and disposal wait until the serial creation dispatch settles.',
       },
       {
         signature: 'async announce(agent: Agent, source: SessionStartSource, signal?: AbortSignal): Promise<void>',
         description: 'Announce an agent previously inserted with enter.',
         parameters: [{ name: 'agent', description: 'the live inserted agent to announce.' }, { name: 'source', description: 'fresh creation, resume, clear, or compaction source.' }, { name: 'signal', description: 'optional factory initialization cancellation signal passed to listeners.' }],
-        returns: 'completion of serial initialization; a listener failure rejects. The caller owns rollback through the detach closure from enter().',
+        returns: 'completion of the serial creation listeners; a listener failure rejects.',
         throws: ['if `agent` is not the exact live registry entry for its id, or its creation announcement already began (including a reentrant call from a creation listener).'],
       },
       {
@@ -503,10 +503,23 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async admitPromptContent( content: readonly AttachmentAdmissionPart[], ): Promise<AdmittedPromptContentPart[]>',
-        description: 'Admit one Host prompt and replace each uploaded image with its durable reference. Text parts pass through unchanged. A prompt without image parts performs no storage operation.',
-        parameters: [{ name: 'content', description: 'prompt parts in message order.' }],
+        description: 'Admit one Host prompt and replace each uploaded image with its durable reference. Text and durable file references pass through unchanged. A prompt without image parts performs no storage operation.',
+        parameters: [{ name: 'content', description: 'prompt parts in message order after file receipt resolution.' }],
         returns: 'admitted prompt parts in the same order as `content`.',
         throws: ['AttachmentError when the image batch is refused.'],
+      },
+      {
+        signature: 'admitEncodedFile(input: EncodedFileAttachment): Promise<FileAttachmentRef>',
+        description: 'Decode and durably commit one canonical base64 file upload.',
+        parameters: [{ name: 'input', description: 'canonical base64 bytes and optional display name.' }],
+        returns: 'the durable content-addressed file reference.',
+        throws: ['AttachmentError when the encoding or storage operation is refused.'],
+      },
+      {
+        signature: 'isAttachmentError(error: unknown): error is AttachmentError',
+        description: 'Identify a failure emitted by this attachment capability by its stable code.',
+        parameters: [{ name: 'error', description: 'value caught from an attachment operation.' }],
+        returns: 'whether the value is an attachment failure.',
       },
       {
         signature: 'abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>',
@@ -522,15 +535,41 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['the signal reason when aborted, or a storage error when verification fails.'],
       },
       {
-        signature: 'imageHostPath(_ref: ImageAttachmentRef): string | undefined',
-        description: 'Locate the provider-owned normalized image in the host filesystem. Providers that are not host-file-backed return `undefined`.',
-        parameters: [{ name: '_ref', description: 'durable normalized attachment reference.' }],
-        returns: 'an absolute host path, or `undefined` when no path is exposed.',
+        signature: 'imageHostPath(ref: ImageAttachmentRef): string | undefined',
+        description: 'Locate the provider-owned normalized object in the harness host filesystem.',
+        parameters: [{ name: 'ref', description: 'durable normalized attachment reference.' }],
+        returns: 'an absolute host path, or undefined when this backend is not host-file-backed.',
+        throws: ['an AttachmentError when the durable reference is invalid.'],
       },
       {
-        signature: 'readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>',
+        signature: 'saveFile(input: SaveFileAttachment): Promise<FileAttachmentRef>',
+        description: 'Durably commit one file byte-for-byte before its owning session event is appended. Files carry no admission limits: any byte content and length is accepted, and the stored object is the exact submitted bytes. Backends without verbatim file storage keep this default rejection.',
+        parameters: [{ name: 'input', description: 'exact bytes and optional display name.' }],
+        returns: 'the durable content-addressed file reference.',
+      },
+      {
+        signature: 'saveFileStream(input: SaveFileStreamAttachment): Promise<FileAttachmentRef>',
+        description: 'Durably commit one file byte-for-byte from bounded chunks. Providers must apply backpressure and must not collect the complete file in memory. Backends without streamed verbatim storage keep this default rejection.',
+        parameters: [{ name: 'input', description: 'ordered exact bytes, optional cancellation, and display name.' }],
+        returns: 'the durable content-addressed file reference.',
+      },
+      {
+        signature: 'async *readFileStream( ref: FileAttachmentRef, signal?: AbortSignal, ): AsyncIterable<Uint8Array>',
+        description: 'Read and verify one verbatim stored file as bounded chunks. Providers must not collect the complete file in memory. Backends without verbatim file reads keep this default rejection.',
+        parameters: [{ name: 'ref', description: 'durable reference from the session log.' }, { name: 'signal', description: 'optional cancellation for backend reads and verification work.' }],
+        returns: 'exact file bytes in order; integrity failures reject the iteration.',
+      },
+      {
+        signature: 'fileHostPath(ref: FileAttachmentRef): string | undefined',
+        description: 'Locate the verbatim stored file object in the harness host filesystem.',
+        parameters: [{ name: 'ref', description: 'durable file reference.' }],
+        returns: 'an absolute host path, or undefined when this backend is not host-file-backed.',
+        throws: ['an AttachmentError when the durable reference is invalid.'],
+      },
+      {
+        signature: 'readImageRequest( ref: ImageAttachmentRef, target: ImageRequestTarget, signal?: AbortSignal, ): Promise<RequestImageAttachment>',
         description: 'Generate or read one deterministic model-request version from the stored normalized image.',
-        parameters: [{ name: 'ref', description: 'durable provider-independent normalized attachment reference.' }, { name: 'policy', description: 'exact route pixel and encoded-byte budget.' }, { name: 'signal', description: 'optional cancellation.' }],
+        parameters: [{ name: 'ref', description: 'durable provider-independent normalized attachment reference.' }, { name: 'target', description: 'route-chosen dimensions and byte target; an unmet byte target yields the smallest ladder output.' }, { name: 'signal', description: 'optional cancellation.' }],
         returns: 'request bytes and the cache/upload identity covering every transform input.',
       },
     ],
@@ -574,6 +613,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'browserUse',
+    summary: 'Owns one optional provider registration in the shared browser-use service.',
+    description: 'Owns one optional provider registration in the shared browser-use service.',
+    methods: [
+      {
+        signature: 'register(name: BrowserUseProviderName): () => Promise<void>',
+        description: 'Reserve the sole provider slot until the contribution is disposed. A second registration fails even when it repeats the current name. Providers must stop their tools and await owned work before releasing this registration.',
+        parameters: [{ name: 'name', description: 'provider-owned name used in registration diagnostics.' }],
+        returns: 'the effect disposer for this exact registration.',
+      },
+    ],
+  },
+  {
     key: 'clientModules',
     summary: 'The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + structured index injection.',
     description: 'The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + structured index injection. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).',
@@ -607,29 +659,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Fires after any flush that recomposed the graph (row added/removed, or a rebuilt rev change). Pull model: listeners re-read graph.',
         parameters: [{ name: 'listener', description: 'notified with no payload.' }],
         returns: 'the unsubscriber.',
-      },
-    ],
-  },
-  {
-    key: 'codeRuntime',
-    summary: 'Registers one `ctx.codeRuntime` implementation.',
-    description: 'Registers one `ctx.codeRuntime` implementation. Program, budget, abort, and substrate failures resolve in CodeRunResult; only Service Definition contract misuse rejects. Implementations bridge structured-cloneable bindings, materialize each declared namespace rejection class, treat programs as hostile peers, isolate runs from one another, and terminate and await in-flight runs during disposal.',
-    methods: [
-      {
-        signature: 'abstract readonly language: string',
-        description: 'The source language run expects `program` to be written in, as a lowercase identifier. Informational, not gating — a consumer that generates language-specific presentation (typed SDK stubs, usage instructions) switches on it and fails loud on a language it cannot present. Well-known values: `\'typescript\'` and `\'python\'`, those `dsh-tools` presents; the TypeScript backend is released, the Python backend is experimental and private (not published).',
-        parameters: [],
-      },
-      {
-        signature: 'abstract readonly isolation: string',
-        description: 'The execution substrate, as a lowercase identifier. Informational, not gating — a descriptor so deployments and diagnostics can tell backends apart, not a security claim. Well-known values: `\'worker-thread\'`, `\'process\'`, `\'container\'`.',
-        parameters: [],
-      },
-      {
-        signature: 'abstract run(request: CodeRunRequest): Promise<CodeRunResult>',
-        description: 'Execute one program against the request\'s bindings and capture what it emitted. See the class doc for the resolution contract (error is a result field; rejection means Service Definition contract misuse only).',
-        parameters: [{ name: 'request', description: 'the program, its bindings, and the abort signal; the request carries everything the runtime acts on, with no hidden defaults.' }],
-        returns: 'the run\'s outcome: completion value (when transferable), the ordered log capture, and the failure (if any).',
       },
     ],
   },
@@ -670,6 +699,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the exact effect disposer that unregisters this definition.',
       },
       {
+        signature: 'registerFileReceiptResolver(resolver: CommandFileReceiptResolver): () => void',
+        description: 'Register the sole authority that resolves staged file receipts for command submissions.',
+        parameters: [{ name: 'resolver', description: 'Session-aware receipt resolver.' }],
+        returns: 'disposer that removes this exact resolver.',
+      },
+      {
         signature: '@Remote list(agent: Agent): readonly CommandDescriptor[]',
         description: 'List the effective immutable command descriptors for one agent.',
         parameters: [{ name: 'agent', description: 'exact receiving agent and scoped-layer key.' }],
@@ -682,9 +717,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the scoped shadow or global definition.',
       },
       {
-        signature: '@Remote async execute( agent: Agent, line: string, images: readonly EncodedImageAttachment[], signal: AbortSignal, ): Promise<CommandExecution | undefined>',
-        description: 'Parse and execute a known command without sending it to the model.\n\nA resolved command\'s lifecycle is logged: `command/run` is appended before the handler is invoked and `command/done` after settlement (a thrown or aborted handler settles as `kind: \'error\'`). Both are direct log-only appends — no turn wraps them, and persistence drains them at ordinary checkpoints. Admission misses (syntax or unknown name) log nothing — they never entered a handler. A `command/run` append failure fails the execution loud; a `command/done` append failure on the handler-failure path is contained so the handler\'s own error stays the reported failure.\n\nImage admission is enforced here, not in the composer: images sent to a command that does not declare `input.images`, an absent attachment store, and an exceeded attachment limit each settle as an error result before the handler runs, and a rejected batch publishes no durable object.',
-        parameters: [{ name: 'agent', description: 'exact receiving agent.' }, { name: 'line', description: 'complete slash-command line.' }, { name: 'images', description: 'base64-encoded composer images accompanying the line, in submission order; empty for a plain invocation.' }, { name: 'signal', description: 'cancellation signal owned by the UI request.' }],
+        signature: '@Remote async execute( agent: Agent, line: string, submittedAttachments: readonly CommandSubmitAttachment[], signal: AbortSignal, ): Promise<CommandExecution | undefined>',
+        description: 'Parse and execute a known command without sending it to the model.\n\nA resolved command\'s lifecycle is logged: `command/run` is appended before the handler is invoked and `command/done` after settlement (a thrown or aborted handler settles as `kind: \'error\'`). Both are direct log-only appends — no turn wraps them, and persistence drains them at ordinary checkpoints. Admission misses (syntax or unknown name) log nothing — they never entered a handler. A `command/run` append failure fails the execution loud; a `command/done` append failure on the handler-failure path is contained so the handler\'s own error stays the reported failure.\n\nAttachment admission is enforced here, not in the composer: attachments sent to a command that does not declare `input.attachments`, an absent attachment store, and an exceeded image limit each settle as an error result before the handler runs. Validation rejection starts no attachment writes; a storage failure can leave only unreachable content-addressed objects for deferred collection.',
+        parameters: [{ name: 'agent', description: 'exact receiving agent.' }, { name: 'line', description: 'complete slash-command line.' }, { name: 'submittedAttachments', description: 'encoded images and staged file receipts accompanying the line, in submission order; empty for a plain invocation.' }, { name: 'signal', description: 'cancellation signal owned by the UI request.' }],
         returns: 'the settled execution (result + lifecycle pairing id), or `undefined` when syntax or name does not resolve.',
       },
     ],
@@ -713,6 +748,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'start', description: 'first surface seq, inclusive.' }, { name: 'end', description: 'last surface seq, inclusive.' }, { name: 'agent', description: 'context whose session is mutated and whose routing options guide summarization.' }, { name: 'signal', description: 'optional cancellation; model-backed implementations must forward it.' }],
         returns: 'the appended event seqs, summary, replaced range, and token accounting.',
         throws: ['when compaction is active or the range is missing, reversed, or unbalanced.'],
+      },
+    ],
+  },
+  {
+    key: 'computerUse',
+    summary: 'Owns one optional provider registration in the shared computer-use service.',
+    description: 'Owns one optional provider registration in the shared computer-use service.',
+    methods: [
+      {
+        signature: 'register(name: ComputerUseProviderName): () => Promise<void>',
+        description: 'Reserve the sole provider slot until the contribution is disposed. A second registration fails even when it repeats the current name. Providers must stop their tools and await owned work before releasing this registration.',
+        parameters: [{ name: 'name', description: 'provider-owned name used in registration diagnostics.' }],
+        returns: 'the effect disposer for this exact registration.',
       },
     ],
   },
@@ -809,30 +857,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'The backend\'s interaction capability.',
         parameters: [],
         returns: 'the discriminated capability consumers switch on.',
-      },
-    ],
-  },
-  {
-    key: 'e2b',
-    summary: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal.',
-    description: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal. Creation begins at plugin construction; adapters await getSandbox before their first operation.',
-    methods: [
-      {
-        signature: 'readonly cwd: string',
-        description: 'Validated remote working directory shared by provider adapters.',
-        parameters: [],
-      },
-      {
-        signature: 'readonly runtimeRoot: string',
-        description: 'Remote directory reserved for adapter-owned process and terminal state.',
-        parameters: [],
-      },
-      {
-        signature: 'async getSandbox(): Promise<Sandbox>',
-        description: 'Return the shared live SDK handle.',
-        parameters: [],
-        returns: 'the created sandbox after the configured cwd exists.',
-        throws: ['when E2B rejects creation or the service is disposing.'],
       },
     ],
   },
@@ -1031,7 +1055,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote(\'resume\') resume(agent: Agent, ref: GoalRef): GoalView',
-        description: 'Resume and arm a stopped goal, or rearm an active goal after a agent initialization, while its round budget still has capacity.',
+        description: 'Resume and arm a stopped goal, or rearm an active goal after a session-start edge, while its round budget still has capacity.',
         parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }],
         returns: 'the active view.',
       },
@@ -1058,6 +1082,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Create one Goal through the remote boundary.',
         parameters: [{ name: 'agent', description: 'exact live Agent resolved from the wire identity.' }, { name: 'request', description: 'objective and optional round cap.' }],
         returns: 'the created Goal identity.',
+      },
+    ],
+  },
+  {
+    key: 'hmr',
+    summary: 'Hot reload service with Cordis-compatible module configuration and events.',
+    description: 'Hot reload service with Cordis-compatible module configuration and events.',
+    methods: [
+      {
+        signature: 'public baseDir: string',
+        description: 'Absolute base directory used to resolve module watch roots.',
+        parameters: [],
+      },
+      {
+        signature: 'runExclusive<T>(operation: () => Promise<T>): Promise<T>',
+        description: 'Serialize a caller-owned mutation with all automatic reload paths.',
+        parameters: [{ name: 'operation', description: 'Work that must not overlap module or configuration replacement.' }],
+        returns: 'The operation result after its asynchronous work completes.',
+      },
+      {
+        signature: 'async watchConfig(filename: string, refresh: () => Promise<void>): Promise<() => Promise<void>>',
+        description: 'Watch a configuration path through the same queue as module replacement.',
+        parameters: [{ name: 'filename', description: 'Absolute path, which may not exist yet.' }, { name: 'refresh', description: 'Rebuilds configuration from its current files and awaits Loader completion.' }],
+        returns: 'Disposer closing this registration and waiting for its pending refresh.',
+      },
+      {
+        signature: 'getOuterStack: () => string[] = () => []',
+        description: 'Omit internal HMR frames from module import diagnostics.',
+        parameters: [],
+        returns: 'The preserved outer stack frames.',
+      },
+      {
+        signature: 'async getLinked(url: string): Promise<string[]>',
+        description: 'Read direct module dependency URLs from the active Node loader.',
+        parameters: [{ name: 'url', description: 'Module URL.' }],
+        returns: 'Linked module URLs, or an empty list for an uncached module.',
       },
     ],
   },
@@ -1196,6 +1256,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'route-owned pricing, or `undefined` when unavailable.',
       },
       {
+        signature: 'fileRequestText(ref: FileAttachmentRef): string',
+        description: 'Resolve the exact text one durable file occurrence contributes to every provider request in the current execution environment.',
+        parameters: [{ name: 'ref', description: 'durable verbatim file reference from model history.' }],
+        returns: 'the same deterministic handle text used at adapter dispatch.',
+      },
+      {
         signature: 'async listModels(provider: string): Promise<LlmModelInfo[]>',
         description: 'Discover models advertised by one registered provider. Catalog membership is advisory and never changes routing or request validation.',
         parameters: [{ name: 'provider', description: 'registered provider route to inspect.' }],
@@ -1243,6 +1309,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Select a provider by the file\'s extension and run one query. Selection is per-query and order-independent; no match throws `LspError` `LSP_UNAVAILABLE`.',
         parameters: [{ name: 'request', description: 'the normalized query.' }, { name: 'signal', description: 'optional cancellation forwarded to the selected provider.' }],
         returns: 'the normalized, closed-union result.',
+      },
+    ],
+  },
+  {
+    key: 'mcpResources',
+    summary: 'Scoped resource access plus three tools shared by configured MCP servers.',
+    description: 'Scoped resource access plus three tools shared by configured MCP servers.',
+    methods: [
+      {
+        signature: 'register(server: string, provider: McpResourceProvider): () => void',
+        description: 'Register one server and expose resource tools while that scope has providers.',
+        parameters: [{ name: 'server', description: 'configured server name, unique in this scope.' }, { name: 'provider', description: 'connection-owned resource operations.' }],
+        returns: 'the effect disposer for this exact registration.',
       },
     ],
   },
@@ -1312,51 +1391,57 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'permissionPresets',
-    summary: 'Owns the deployment\'s permission presets and their write path.',
-    description: 'Owns the deployment\'s permission presets and their write path. Requires a confining `ctx.shell` executor and `ctx.approval`; unmatched knob values are reported as CUSTOM_PRESET, not an error.',
+    summary: 'Owns the deployment\'s configured permission presets, the fixed Auto integration hook, and their write path.',
+    description: 'Owns the deployment\'s configured permission presets, the fixed Auto integration hook, and their write path. Requires a confining `ctx.shell` executor and `ctx.approval`; unmatched knob values are reported as CUSTOM_PRESET, not an error.',
     methods: [
       {
-        signature: 'current(events: readonly SessionEvent[]): string',
-        description: 'Resolve the preset matching the effective knob values. A still-matching last selection wins shared-bundle ties; otherwise the first table match wins, or CUSTOM_PRESET when no entry matches.',
-        parameters: [{ name: 'events', description: 'the session\'s events in log order.' }],
+        signature: '@Remote(\'catalog\') catalog(): PermissionCatalog',
+        description: 'Read the complete process-level catalog exposed to current-session UI.',
+        parameters: [],
+        returns: 'every currently selectable preset in contribution order.',
+      },
+      {
+        signature: 'registerAuto(admit: () => void): () => Promise<void>',
+        description: 'Publish the fixed current-session Auto preset for the calling integration\'s effect lifetime.',
+        parameters: [{ name: 'admit', description: 'synchronous gate run before live Auto selection or restore.' }],
+        returns: 'the async effect disposer that removes Auto.',
+      },
+      {
+        signature: 'current(session: Session): string',
+        description: 'Resolve the preset matching the effective knob values. A still-matching last selection wins shared-bundle ties; otherwise the first configured match wins. Returns CUSTOM_PRESET when no available preset matches.',
+        parameters: [{ name: 'session', description: 'the session whose knob state is read.' }],
         returns: 'the effective preset name, or `custom` when nothing matches.',
       },
       {
-        signature: 'refreshDefaultForReuse(session: Session): void',
-        description: 'Advance one blank session after the host has confirmed it as the exact Web New Session reuse target. Only a still-effective default-origin selection advances; a started session, an explicit pick, legacy origin-less data, or independently changed knobs remain pinned. This is the permission-side half of the Web candidate selection and the host\'s blankness, membership, cwd, and archive verification.',
-        parameters: [{ name: 'session', description: 'the live session selected for Workspace blank reuse.' }],
-      },
-      {
-        signature: 'selectFor(state: KnobState): PermissionSelect',
-        description: 'Build the whole select value for one folded knob state: every table option in declaration order, `custom` appended exactly while derived.',
-        parameters: [{ name: 'state', description: 'the folded knob overrides.' }],
-        returns: 'the `permissions` projection payload.',
-      },
-      {
         signature: 'resolve(name: string): PresetSpec',
-        description: 'Resolve a preset\'s knob bundle.',
+        description: 'Resolve an available preset\'s knob bundle.',
         parameters: [{ name: 'name', description: 'the preset name to resolve.' }],
         returns: 'the configured bundle.',
-        throws: ['when `name` is not in the table.'],
+        throws: ['when `name` is neither configured nor the currently live Auto preset.'],
       },
       {
         signature: 'optionOf(name: string): PresetOption',
-        description: 'Build the client option for a table entry or CUSTOM_PRESET. A missing label falls back to the table key.',
-        parameters: [{ name: 'name', description: 'a table key, or `custom`.' }],
+        description: 'Build the client option for an available preset or CUSTOM_PRESET. A missing label falls back to the preset key.',
+        parameters: [{ name: 'name', description: 'a configured preset key, live `auto`, or `custom`.' }],
         returns: 'the option a client renders.',
-        throws: ['when `name` is neither a table key nor `custom`.'],
+        throws: ['when `name` is neither a configured preset, live `auto`, nor `custom`.'],
       },
       {
         signature: 'set(session: Session, name: string): void',
         description: 'Record a changed preset, then update each changed knob through its own setter. Selecting the effective preset again appends nothing.',
         parameters: [{ name: 'session', description: 'the session the switch belongs to.' }, { name: 'name', description: 'the preset to switch to; unknown names throw.' }],
       },
+      {
+        signature: 'refreshDefaultForReuse(session: Session): void',
+        description: 'Advance one blank session after the host has confirmed it as the exact Web New Session reuse target. Only a still-effective default-origin selection advances; a started session, an explicit pick, legacy origin-less data, or independently changed knobs remain pinned. This is the permission-side half of the Web candidate selection and the host\'s blankness, membership, cwd, and archive verification.',
+        parameters: [{ name: 'session', description: 'the live session selected for Workspace blank reuse.' }],
+      },
     ],
   },
   {
     key: 'planMode',
     summary: '`ctx.planMode`: owns logged plan state, applies and narrates selected state at step start, the `plan:policy` section, the `/plan` command, and the stable exit tool.',
-    description: '`ctx.planMode`: owns logged plan state, applies and narrates selected state at step start, the `plan:policy` section, the `/plan` command, and the stable exit tool. UIs observe committed flips through `session/event`; there is no live mirror.',
+    description: '`ctx.planMode`: owns logged plan state, applies and narrates selected state at step start, the `plan:policy` section, the `/plan` command, and the stable exit tool. Client carriers expose the projection\'s cropped `{ active, pending }` view.',
     methods: [
       {
         signature: 'get(agent: Agent): { active: boolean; pending?: boolean }',
@@ -1373,14 +1458,132 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'pluginManager',
+    summary: 'Manage profile files and apply their declared reload lifecycle.',
+    description: 'Manage profile files and apply their declared reload lifecycle.',
+    methods: [
+      {
+        signature: '@Remote async listPlugins(): Promise<PluginInfo[]>',
+        description: 'Read current plugins, including why a row cannot be changed through the profile patch.',
+        parameters: [],
+        returns: 'Current runtime entries with persistent patch targets.',
+      },
+      {
+        signature: '@Remote listBundles(): Promise<BundleInfo[]>',
+        description: 'Read the profile\'s installed bundles, the bundles this dsh installation supplies, and the selected names that are not bundles. A dependency without a bundle patch is listed, as a `not-bundle` problem, only while it is selected.',
+        parameters: [],
+        returns: 'Package versions, one-liners, rows, activation selections, whether the installation offers the bundle, and removal availability.',
+      },
+      {
+        signature: '@Remote async inspect(spec: string, signal?: AbortSignal): Promise<PluginSpecInspection>',
+        description: 'Read what a spec names before installing it.',
+        parameters: [{ name: 'spec', description: 'One package spec: a registry name, an absolute path, a git address, or a tarball.' }, { name: 'signal', description: 'Ends a registry lookup early.' }],
+        returns: 'The package the spec names, or why it is refused.',
+      },
+      {
+        signature: '@Remote setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>',
+        description: 'Persist a plugin entry\'s desired enablement and apply it on live profiles.',
+        parameters: [{ name: 'id', description: 'Loader entry identity returned by listPlugins.' }, { name: 'enabled', description: 'Whether the plugin should run.' }],
+        returns: 'Saved and runtime outcomes, including higher-priority overrides.',
+      },
+      {
+        signature: '@Remote setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult>',
+        description: 'Select or remove a bundle layer while retaining installed dependencies.',
+        parameters: [{ name: 'name', description: 'Bundle package name.' }, { name: 'enabled', description: 'Whether the bundle contributes its patch layer.' }],
+        returns: 'Persisted and runtime outcomes.',
+      },
+      {
+        signature: '@Remote installBundle(spec: string, options?: InstallBundleOptions): Promise<ChangeResult>',
+        description: 'Install a package using the same pnpm implementation as dsh plugin. A run that fails, is cancelled, or adds a package without a bundle patch restores `package.json` and `pnpm-lock.yaml` as they were; downloaded files can stay.',
+        parameters: [{ name: 'spec', description: 'One package spec, including local paths relative to the invocation directory.' }, { name: 'options', description: 'Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and the pending build scripts to allow for this profile before pnpm runs.' }],
+        returns: 'Package-manager diagnostics and observed activation outcome.',
+      },
+      {
+        signature: '@Remote async cancelInstall(requestId: PluginInstallRequestId): Promise<PluginInstallCancellation>',
+        description: 'Stop an installation this manager owns and wait until its files are back.',
+        parameters: [{ name: 'requestId', description: 'The id the installation was started with.' }],
+        returns: '`cancelled` once pnpm exited and the files are restored, `too-late` once the bundle is being applied, `not-running` for any other id.',
+      },
+      {
+        signature: '@Remote removeBundle(name: string): Promise<ChangeResult>',
+        description: 'Unload and remove a profile-owned bundle dependency through dsh plugin\'s pnpm path.',
+        parameters: [{ name: 'name', description: 'Installed dependency name.' }],
+        returns: 'Removal diagnostics and the remaining profile state.',
+      },
+    ],
+  },
+  {
+    key: 'profileContext',
+    summary: 'Current profile facts; scheduling and mutation belong to their callers.',
+    description: 'Current profile facts; scheduling and mutation belong to their callers.',
+    methods: [
+      {
+        signature: 'readonly packageManager?: ProfilePnpmInvocation',
+        description: 'Packaged applications supply their bundled runtime instead of a PATH executable.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly startedBundles: readonly string[]',
+        description: 'Bundle packages used to start this process, before any persisted edits.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly overlays: readonly PatchOptions[]',
+        description: 'Parsed command-line overlays, applied above profile and home patches.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly derivePatches?: (rows: ReadonlyMap<string, EntryOptions>) => readonly PatchOptions[]',
+        description: 'Derive launch-time patches from the composed row set, re-run on every read. Launchers inject deployment-derived config here (e.g. the shipped agent-preset root): deriving per read rather than storing a resolved patch keeps the result current when a live reload re-reads edited patch files.',
+        parameters: [{ name: 'rows', description: 'id → composed row of the current patch generation.' }],
+        returns: 'patches appended after every file and overlay layer.',
+      },
+      {
+        signature: 'readonly telemetryDisabledEnv: string | undefined',
+        description: 'Launch-time DSH_TELEMETRY_DISABLED value; any non-empty value opts out.',
+        parameters: [],
+      },
+    ],
+  },
+  {
+    key: 'ptcRuntime',
+    summary: 'Registers one `ctx.ptcRuntime` implementation.',
+    description: 'Registers one `ctx.ptcRuntime` implementation. Program, budget, abort, and substrate failures resolve in PtcRunResult; only Service Definition contract misuse rejects. Implementations bridge structured-cloneable bindings, materialize each declared namespace rejection class, treat programs as hostile peers, isolate runs from one another, and terminate and await in-flight runs during disposal.',
+    methods: [
+      {
+        signature: 'abstract readonly language: string',
+        description: 'The source language run expects `program` to be written in, as a lowercase identifier. Informational, not gating — a consumer that generates language-specific presentation (typed SDK stubs, usage instructions) switches on it and fails loud on a language it cannot present. Well-known values: `\'typescript\'` and `\'python\'`, those `dsh-tools` presents; the TypeScript backend is released, the Python backend is experimental and private (not published).',
+        parameters: [],
+      },
+      {
+        signature: 'abstract readonly isolation: string',
+        description: 'The execution substrate, as a lowercase identifier. Informational, not gating — a descriptor so deployments and diagnostics can tell backends apart, not a security claim. Well-known values: `\'worker-thread\'`, `\'process\'`, `\'container\'`.',
+        parameters: [],
+      },
+      {
+        signature: 'abstract resolve(request: PtcRunRequest): PtcRunSpec',
+        description: 'Resolve supported options and provider defaults before execution.',
+        parameters: [{ name: 'request', description: 'Program, bindings, cancellation and optional execution choices.' }],
+        returns: 'Complete directory, deadline and supported authority for run.',
+        throws: ['When an explicit choice is invalid or unsupported by this provider.'],
+      },
+      {
+        signature: 'abstract run(spec: PtcRunSpec): Promise<PtcRunResult>',
+        description: 'Execute resolved inputs; program outcomes resolve as result fields.',
+        parameters: [{ name: 'spec', description: 'directory, deadline, program, bindings, cancellation and supported policy.' }],
+        returns: 'Captured output and the execution outcome.',
+      },
+    ],
+  },
+  {
     key: 'sandbox',
     summary: 'Abstract process-sandbox service.',
     description: 'Abstract process-sandbox service. confine must return enforcing argv or fail closed at wrap or runner-execution time; silent unconfined passthrough is forbidden. Functional probes arbitrate multi-runner chains and may be skipped for a sole candidate, whose own refusal remains the fail-closed end.',
     methods: [
       {
-        signature: 'abstract confine(argv: readonly string[], policy: SandboxPolicy): ConfinedArgv',
+        signature: 'abstract confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal): Promise<ConfinedArgv>',
         description: 'Wrap `argv` so it executes confined under `policy` on this host; the caller spawns the returned argv in place of its own.',
-        parameters: [{ name: 'argv', description: 'the exact argv the caller is about to spawn (program plus arguments), NOT a shell string — a shell-shaped consumer passes `[\'bash\', \'-c\', command]`.' }, { name: 'policy', description: 'the file-effect policy this execution runs under, carried per call (see {@link SandboxPolicy}).' }],
+        parameters: [{ name: 'argv', description: 'the exact argv the caller is about to spawn (program plus arguments), NOT a shell string — a shell-shaped consumer passes `[\'bash\', \'-c\', command]`.' }, { name: 'policy', description: 'the file-effect policy this execution runs under, carried per call (see {@link SandboxPolicy}).' }, { name: 'signal', description: 'cancellation while the provider resolves the policy and runner.' }],
         returns: 'the argv to spawn instead, plus the enforcement completeness the selected backend achieves for it.',
       },
     ],
@@ -1420,36 +1623,116 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Durable append-only session storage. Implementations preserve contiguous, losslessly JSON-serializable events; append resolves only after durability, and load balances a complete interrupted tail without rewriting committed events.',
     methods: [
       {
-        signature: 'async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle>',
+        signature: 'async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandleType>',
+        description: 'Create a new stored session and take its write ownership. The create is lazy: the session is observable through `stat`/`list`/`open` in this process immediately, but no durable artifact exists until the handle\'s first `append` or `flush`.',
+        parameters: [{ name: 'header', description: 'the immutable header (id, version, cwd, lineage) to store.' }, { name: 'options', description: 'optional cancellation and the exact fork-inherited cut.' }],
+        returns: 'a `write` handle owned by the caller; close it to release ownership.',
+        throws: ['{SessionAlreadyExistsError} when the id already exists.'],
+      },
+      {
+        signature: 'async open(id: SessionId, access: SessionAccessType, options?: SessionPersistenceOpenOptions): Promise<SessionHandleType>',
+        description: 'Open an existing stored session. `read` never takes ownership and works while another handle or process holds `write`; `write` atomically claims single-writer ownership.',
+        parameters: [{ name: 'id', description: 'the stored session to open.' }, { name: 'access', description: '`read` or `write`.' }, { name: 'options', description: 'optional cancellation.' }],
+        returns: 'the open handle.',
+        throws: ['{SessionPersistenceNotFoundError} when the session does not exist.', '{SessionAlreadyOwnedError} for `write` when ownership is taken.'],
+      },
+      {
+        signature: 'async flush(): Promise<void>',
+        description: 'Flush every active write handle owned by this service instance: pending creates materialize and routed events drain durably. A handle closed concurrently counts as flushed — close itself drains durably.',
+        parameters: [],
+        returns: 'resolution once every write handle active at the call has flushed.',
+        throws: ['{AggregateError} naming each session whose flush failed.'],
+      },
+      {
+        signature: 'async stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<SessionPersistenceSnapshot | undefined>',
+        description: 'Observe one stored session without reading its event log or taking ownership; pending creates count before they materialize.',
+        parameters: [{ name: 'id', description: 'the stored session to observe.' }, { name: 'options', description: 'optional cancellation.' }],
+        returns: 'the snapshot, or `undefined` when the session does not exist.',
+      },
+      {
+        signature: 'async list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>',
+        description: 'List every stored session visible to this process, in no promised order, including pending creates that have not materialized yet.',
+        parameters: [{ name: 'options', description: 'optional cancellation.' }],
+        returns: 'one snapshot per stored session.',
+      },
+      {
+        signature: 'releaseContractHandle(id: SessionId, handle: ContractSessionHandle): void',
+        description: 'Release one contract handle\'s write ownership at close.',
+        parameters: [{ name: 'id', description: 'the session whose write handle is released.' }, { name: 'handle', description: 'the closing contract handle.' }],
+      },
+      {
+        signature: 'materializeDetached(_id: SessionId): Promise<void>',
+        description: 'Durably materialize one detached pending session created through create. Coordinator-backed backends implement; direct backends materialize through their own write handles and never reach this hook.',
+        parameters: [{ name: '_id', description: 'the pending session to materialize.' }],
+        returns: 'after the artifact is durable.',
+      },
+      {
+        signature: 'discardDetached(_id: SessionId): Promise<void>',
+        description: 'Drop one detached pending create that never materialized, returning its id to availability.',
+        parameters: [{ name: '_id', description: 'the pending session to discard.' }],
+        returns: 'after the reservation is released.',
+      },
+      {
+        signature: 'isPending(id: SessionId): boolean',
+        description: 'Whether the id names a detached pending create (created through create but not yet materialized). Backends with coordinator pending-state override; a backend without deferred materialization never holds a pending session.',
+        parameters: [{ name: 'id', description: 'the session to check.' }],
+        returns: 'true while the session exists only as an in-process reservation.',
+      },
+      {
+        signature: 'liveStorage(_id: SessionId): Promise<SessionStorageMetadata | undefined>',
+        description: 'Storage metadata for a session already bound to a live Session through the coordinator\'s `session/created` path, or `undefined`. Backends without live-session tracking never override this hook.',
+        parameters: [{ name: '_id', description: 'the session to look up.' }],
+        returns: 'the tracked storage record while a live Session owns it.',
+      },
+      {
+        signature: 'listPending(): readonly SessionStorageMetadata[]',
+        description: 'List this instance\'s detached pending creates.',
+        parameters: [],
+        returns: 'one storage metadata record per pending detached session.',
+      },
+      {
+        signature: 'listStored(signal?: AbortSignal): Promise<SessionHeader[]>',
+        description: 'List all stored (materialized) sessions\' metadata; the backend storage hook.',
+        parameters: [{ name: 'signal', description: 'optional cancellation for backend listing work.' }],
+        returns: 'one header per materialized session.',
+      },
+      {
+        signature: 'listHeaders(signal?: AbortSignal): Promise<SessionHeader[]>',
+        description: 'Header-only listing for consumers that predate the snapshot contract.',
+        parameters: [{ name: 'signal', description: 'optional cancellation for backend listing work.' }],
+        returns: 'one header per materialized session.',
+      },
+      {
+        signature: 'async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<LegacySessionHandle>',
         description: 'Create a new explicit write handle while retaining the legacy create API.',
         parameters: [{ name: 'meta', description: 'immutable Session header to register.' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length for a seeded Session.' }],
         returns: 'an owned write handle.',
       },
       {
-        signature: 'async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHandle>',
+        signature: 'async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<LegacySessionHandle>',
         description: 'Open a handle and acquire any provider-specific cross-process lock.',
         parameters: [{ name: 'id', description: 'persisted Session identity.' }, { name: 'mode', description: 'read or write access.' }],
         returns: 'a handle whose close releases local and provider ownership.',
       },
       {
-        signature: 'openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle',
+        signature: 'openHandle(id: SessionId, mode: SessionHandleMode ): LegacySessionHandle',
         description: 'Open a read or write handle for an existing Session.',
         parameters: [{ name: 'id', description: 'persisted Session identity.' }, { name: 'mode', description: 'read allows inspection; write reserves the local writer.' }],
         returns: 'an explicit SessionHandle.',
       },
       {
-        signature: 'releaseHandle(id: SessionId, handle: SessionHandle): void',
+        signature: 'releaseHandle(id: SessionId, handle: LegacySessionHandle): void',
         description: 'Release a process-local writer reservation held by one handle.',
         parameters: [{ name: 'id', description: 'session identity whose reservation is released.' }, { name: 'handle', description: 'handle that owns the reservation.' }],
       },
       {
-        signature: 'abstract locate(meta: SessionHeader): SessionLocation | undefined',
+        signature: 'locate(_meta: SessionHeader): SessionLocation | undefined',
         description: 'Resolve this backend\'s independent local artifact for a session without reading, creating, flushing, or otherwise materializing it. Backends such as SQLite that do not own one artifact per session return `undefined`.',
-        parameters: [{ name: 'meta', description: 'the immutable session header whose artifact is requested.' }],
+        parameters: [{ name: '_meta', description: 'the immutable session header whose artifact is requested.' }],
         returns: 'the backend-specific absolute location, when one exists.',
       },
       {
-        signature: 'abstract readonly supportsRawArtifacts: boolean',
+        signature: 'readonly supportsRawArtifacts: boolean = false',
         description: 'Whether this backend exposes one verbatim raw artifact per session. A backend that declares `true` must override readRaw.',
         parameters: [],
       },
@@ -1461,7 +1744,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when this backend does not expose per-session raw artifacts.'],
       },
       {
-        signature: 'abstract create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void>',
+        signature: 'async createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void>',
         description: 'Register a new session\'s metadata. A backend MAY defer the physical write until the first append (lazy materialization), in which case a created-but-never-appended session is absent from list — abandoned sessions leave nothing behind.',
         parameters: [{ name: 'meta', description: 'the immutable header (id, version, cwd, lineage) to record.' }, { name: 'inheritedEventCount', description: 'exact fork-inherited prefix length. Required for a seeded header and omitted only for an unseeded header.' }],
       },
@@ -1472,7 +1755,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'after the header-only artifact is durable.',
       },
       {
-        signature: 'abstract append(id: SessionId, events: readonly SessionEvent[]): Promise<void>',
+        signature: 'async append(id: SessionId, events: readonly SessionEvent[]): Promise<void>',
         description: 'Durably persist a batch of events. Honors the append-only and contiguous- seq contracts: the first event\'s `seq` MUST equal the stored next-seq (after `load` has durably closed any interrupted turn). Rejects non-JSON- serializable `event.data` with an error naming the offending event type. A seeded session\'s first materializing batch must reach its complete inherited prefix.',
         parameters: [{ name: 'id', description: 'the session the batch belongs to.' }, { name: 'events', description: 'the contiguous batch to persist, in seq order.' }],
       },
@@ -1489,19 +1772,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one owned unpublished Session preparation.',
       },
       {
-        signature: 'abstract load(id: SessionId): Promise<SessionInspection>',
+        signature: 'load(id: SessionId): Promise<SessionInspection>',
         description: 'Load an immutable balanced logical view and commit any required cold recovery. A complete interrupted final turn is preserved and durably closed with missing tool errors plus any open step and turn boundaries; only a torn final record is discarded. Unknown versions and corruption in the committed prefix reject. Implementations MUST NOT crash-repair an identity still bound to a live Session: a balanced live log may return as a durable snapshot, while an open live turn rejects. Returned values may be shared with immutable live or prepared state and must not be mutated. Revision-based implementations may wait for one stable read/check round trip.',
         parameters: [{ name: 'id', description: 'the persisted session to reload.' }],
         returns: 'the header and a log ending on a balanced `turn/end`.',
       },
       {
-        signature: 'abstract inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>',
+        signature: 'async inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>',
         description: 'Inspect an immutable logical session without committing recovery or publishing it. A cold complete interrupted turn receives synthetic closers in memory and a torn physical tail remains untouched. An already-live Session instead yields its current immutable snapshot, which may contain an open turn and its `session/end-seed` boundary. Coordinator-backed implementations retain the exact cold unpublished Session for bounded reuse by a later prepare. A stale ready source is reloaded; a source already committing or reserved for resume remains exclusive, and inspection may borrow its immutable view. Callers borrow only the immutable header and log. Continuous external writers may delay revision convergence.',
         parameters: [{ name: 'id', description: 'the persisted session to inspect.' }, { name: 'signal', description: 'optional cancellation for queued and backend read work.' }],
         returns: 'the validated header and current logical event log.',
       },
       {
-        signature: 'abstract readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix>',
+        signature: 'async readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix>',
         description: 'Read the stored events from `fromSeq` onward — the read-from-seq primitive for read models that resume from a watermark (e.g. a persisted projection cache folding only the tail past its checkpoint). Unlike inspect, it is a detached physical suffix read: no preparation cache, torn-tail truncation, synthetic closers, or coordinator-state publication. Only events from the valid contiguous stored prefix are returned, so a torn fragment never reaches the caller. `fromSeq` at or beyond the stored prefix returns an empty event list (never an error). Backends whose medium can seek by seq (SQLite) read only the suffix; sequential media (JSONL, both encodings) still parse the whole artifact and skip forward — the primitive bounds what is RETURNED and refolded, not every backend\'s physical read.',
         parameters: [{ name: 'id', description: 'the persisted session to read.' }, { name: 'fromSeq', description: 'first event offset to include.' }, { name: 'signal', description: 'optional cancellation for queued and backend read work.' }],
         returns: 'storage metadata, the requested offset, and stored events with `seq >= fromSeq`.',
@@ -1511,12 +1794,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Read one session header without loading its event log. First-party providers override this with an indexed lookup; the default filters the lightweight snapshot list for third-party compatibility.',
         parameters: [{ name: 'id', description: 'persisted session to observe.' }, { name: 'signal', description: 'optional cancellation for backend lookup work.' }],
         returns: 'the immutable header, or undefined when the session is absent.',
-      },
-      {
-        signature: 'abstract list(signal?: AbortSignal): Promise<SessionHeader[]>',
-        description: 'Lightweight listing from metadata, without a full-log parse.',
-        parameters: [{ name: 'signal', description: 'optional cancellation for backend listing work.' }],
-        returns: 'one header per materialized session.',
       },
       {
         signature: 'async revision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined>',
@@ -1543,7 +1820,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the index, or undefined when this backend has no bounded index.',
       },
       {
-        signature: 'abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>',
+        signature: 'async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>',
         description: 'List materialized sessions with cheap per-log change tokens.\n\nRepeated observations of an unchanged log return the same revision. A successful mutating load repair changes the next listed revision. Revisions also distinguish independently backed stores so backend-local counters cannot compare equal across different persistence sources.',
         parameters: [{ name: 'signal', description: 'optional cancellation for backend snapshot-listing work.' }],
         returns: 'one header and opaque revision per materialized session without loading full logs.',
@@ -1569,25 +1846,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'sessionProjectionCache',
     summary: 'The persisted projection cache service.',
-    description: 'The persisted projection cache service. Opens the `session_projcache` domain at init, checkpoints live sessions on a throttled write-behind (count/interval triggers from Config) plus three mandatory points — session creation, `turn/end`, and session disposal (the live-to-cold moment) — and serves the cold-read ladder: cached row, persistence `readFrom` tail, registry `restore`, durable write-back. Every durable write is fail-soft: failures log a warning and the cache self-heals on the next write or cold read.',
+    description: 'The persisted projection cache service. Opens the `session_projcache` domain at init, checkpoints live sessions on a throttled write-behind (count/interval triggers from Config) plus three mandatory points — session creation, `turn/end`, and session disposal (the live-to-cold moment) — and serves the cached rows for a session header. Every durable write is fail-soft: failures log a warning and the cache self-heals on the next write.',
     methods: [
       {
-        signature: 'cachedSnapshot(meta: SessionHeader, inheritedEventCount: SessionLogOffset): ProjectionSnapshot | undefined',
-        description: 'The zero-I/O listing read: whole values viewed straight from the stored rows (version-matching keys only), each cut carried with its watermark so a client value store can seed under its higher-seq-wins rule — as stale as the last durable checkpoint but never wrong, and never from an unrelated log (the caller\'s header is the identity witness). Fresher paths (the history tail baseline, coldSnapshot) supersede these values whenever a session is actually opened.',
-        parameters: [{ name: 'meta', description: 'the listed session\'s header (identity witness; no log read).' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length that completes the checkpoint identity.' }],
+        signature: 'cachedSnapshot( meta: SessionHeader, inheritedEventCount: SessionLogOffset, keys?: readonly Extract<keyof SessionProjectionMap, string>[], ): ProjectionSnapshot | undefined',
+        description: 'The zero-I/O listing read: whole values viewed straight from the stored rows (version-matching keys only), each cut carried with its watermark so a client value store can seed under its higher-seq-wins rule — as stale as the last durable checkpoint but never wrong, and never from an unrelated log (the caller\'s header is the identity witness). Fresher paths (the history tail baseline) supersede these values whenever a session is actually opened.',
+        parameters: [{ name: 'meta', description: 'the listed session\'s header (identity witness; no log read).' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length that completes the checkpoint identity.' }, { name: 'keys', description: 'optional projection keys required by the caller\'s audience.' }],
         returns: 'the cut (`asOfSeq` = lowest served-row watermark), or `undefined` when no usable row exists for this lifecycle.',
       },
       {
+        signature: 'cachedPredecessorTitle( meta: SessionHeader, inheritedEventCount: SessionLogOffset, ): ProjectionSnapshot | undefined',
+        description: 'Read only a predecessor checkpoint\'s title as a zero-I/O listing hint.\n\nThe authoritative Session header supplies the lifecycle identity. A cache checkpoint can lag that log but cannot lead it because writes flush the log first, so a matching predecessor title is a genuine (possibly stale) fact from this Session. The registry still requires the current title projection\'s row version and schema. No other predecessor projection is exposed: format normalization can change their current meaning, and the strict cachedSnapshot / hydration paths continue to reject them.',
+        parameters: [{ name: 'meta', description: 'authoritative listed Session header.' }, { name: 'inheritedEventCount', description: 'exact inherited cut completing the lifecycle identity.' }],
+        returns: 'a title-only checkpoint view with `asOfSeq: -1`, or `undefined` when the record is current, newer, unrelated, missing, or incompatible with the title unit. The sentinel avoids reusing a sequence that a cardinality-changing Session migration may have remapped.',
+      },
+      {
+        signature: 'hydratePrepared( session: Session, events: readonly SessionEvent[], ): ProjectionSnapshot',
+        description: 'Hydrate projection cells for an already-prepared Session without another persistence read. The cache seeds matching rows; the supplied exact log advances every unit to the observation cut. No checkpoint is written because the logical observation may contain recovery events not yet durable.',
+        parameters: [{ name: 'session', description: 'exact unpublished Session retained by persistence.' }, { name: 'events', description: 'exact logical event prefix represented by the observation.' }],
+        returns: 'all projection values at the event cut.',
+      },
+      {
         signature: 'async write(session: Session): Promise<void>',
-        description: 'Durably checkpoint one live session NOW (all mandatory points call this; tests and carriers may too). The registry cut is snapshotted at this boundary (states are live references), then the whole record is replaced. NOT fail-soft — callers on the fail-soft paths contain it.',
+        description: 'Durably checkpoint one live session NOW (all mandatory points call this; tests and carriers may too). The registry cut is snapshotted at this boundary (states are live references), then the session\'s record is replaced on the domain\'s write chain. NOT fail-soft — callers on the fail-soft paths contain it.',
         parameters: [{ name: 'session', description: 'the live session to checkpoint.' }],
         returns: 'resolution after durability and event emission.',
       },
       {
-        signature: 'async coldSnapshot(id: SessionId, signal?: AbortSignal): Promise<ProjectionSnapshot>',
-        description: 'Cold-read one persisted session\'s projections with zero full-log load: cached rows + a persistence `readFrom` tail from the registry\'s restore floor, refolded by the registry and written back (fail-soft) so the next cold read starts closer. A cache row invalidated by a shrunk log (crash-repair truncation) triggers one full re-read from seq 0 — the ladder\'s slow rung, still no crash. Rejects when the session has no persisted log (`not found` from the persistence seam).',
-        parameters: [{ name: 'id', description: 'the persisted session to read.' }, { name: 'signal', description: 'optional cancellation for the persistence reads.' }],
-        returns: 'the snapshot cut at the stored log end.',
+        signature: 'coldSnapshot( meta: SessionHeader, inheritedEventCount: SessionLogOffset, events: readonly SessionEvent[], ): ProjectionSnapshot',
+        description: 'Cold-read one session\'s projections from its complete log. Each unit is seeded from the identity-checked cached rows — the registry skips `apply` for the already-folded prefix (events at or below the row\'s `seq`) — and the refreshed checkpoint is written back (fail-soft, fire-and-forget), so the first cold read creates the cache row and later ones seed from it. The caller supplies the complete log in seq order: this service never consults the persistence layer.',
+        parameters: [{ name: 'meta', description: 'the stored session header (identity witness).' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length for projection initialization and identity.' }, { name: 'events', description: 'the session\'s complete log, in seq order.' }],
+        returns: 'the projection cut at the log end.',
       },
     ],
   },
@@ -1639,9 +1928,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the seq to hand the persistence `readFrom`, or `undefined` when no unit is registered (no read needed — {@link restore} would serve empty values regardless).',
       },
       {
-        signature: 'viewCheckpoint(checkpoint: ProjectionCheckpoint): Partial<SessionProjectionMap>',
+        signature: 'viewCheckpoint( checkpoint: ProjectionCheckpoint, keys?: readonly Extract<keyof SessionProjectionMap, string>[], ): Partial<SessionProjectionMap>',
         description: 'View a checkpoint\'s rows without any log read: for every registered client-visible unit whose row\'s `ver` matches, serve the schema-validated `view` of the schema-validated stored state; mismatched, malformed, or absent rows leave their key absent (a cold or listing consumer treats it as not-yet-available and a fuller read path refolds it). The zero-I/O rung of the read ladder — values are as stale as their rows, never wrong.',
-        parameters: [{ name: 'checkpoint', description: 'persisted rows for one session (possibly stale or empty).' }],
+        parameters: [{ name: 'checkpoint', description: 'persisted rows for one session (possibly stale or empty).' }, { name: 'keys', description: 'optional wire keys to view.' }],
         returns: 'whole values per key with a usable row; empty when none.',
       },
       {
@@ -1650,6 +1939,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'checkpoint', description: 'persisted rows for one session (possibly stale or empty).' }, { name: 'events', description: 'the stored events with `seq >= baseSeq`, in seq order.' }, { name: 'baseSeq', description: 'the seq `events` starts at (its first event\'s seq when non-empty).' }, { name: 'header', description: 'immutable metadata for the Session being restored.' }, { name: 'inheritedEventCount', description: 'exact fork-inherited prefix length supplied to unit initialization.' }],
         returns: 'the snapshot cut at the supplied log end (`asOfSeq` is the last supplied event\'s seq, `baseSeq - 1` for an empty tail) plus the refreshed checkpoint rows at that cut, ready for a durable write-back.',
       },
+      {
+        signature: 'hydrate( session: Session, checkpoint: ProjectionCheckpoint, events: readonly SessionEvent[], baseSeq: SessionLogOffset, ): ProjectionSnapshot',
+        description: 'Restore an exact cut and install its states on the supplied prepared Session. A later publication reuses these cells; ordinary live reads and event drive advance any constructor-owned suffix exactly once.',
+        parameters: [{ name: 'session', description: 'exact prepared Session that owns the restored log prefix.' }, { name: 'checkpoint', description: 'persisted rows for this Session lifecycle.' }, { name: 'events', description: 'exact events at the observation cut.' }, { name: 'baseSeq', description: 'first supplied event sequence.' }],
+        returns: 'all projection values at the supplied cut.',
+      },
     ],
   },
   {
@@ -1657,6 +1952,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'Unified live-preferred session query service.',
     description: 'Unified live-preferred session query service.\n\nExact reads, filters, and traces are backend-independent concrete behavior. A backend implements full-text observation, reconciliation, ranking, cursor generations, and query execution on the same `ctx.sessionQuery` service.',
     methods: [
+      {
+        signature: 'observeSession( sessionId: SessionId, options: SessionObservationOptions = {}, ): Promise<SessionObservation>',
+        description: 'Observe one exact live or prepared Session without a persistence listing preflight.',
+        parameters: [{ name: 'sessionId', description: 'logical Session identity.' }, { name: 'options', description: 'cancellation and projection selection for this read.' }],
+        returns: 'a caller-owned observation lease.',
+      },
       {
         signature: 'abstract searchSessions( request: SessionSearchRequest, exec?: SessionSearchExecContext, ): Promise<SessionSearchPage<SessionSearchHit>>',
         description: 'Search the live-preferred logical corpus and group by session.',
@@ -1794,7 +2095,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'prepare(id?: SessionId, options?: PrepareSessionOptions): Session',
         description: 'Build a session WITHOUT entering it into the store — validate the id/cwd and construct the Session (with its immutable SessionHeader). Pairs with enter + announce: a caller that owns a composite `ctx.effect` (the agent factory) folds the session lifecycle into that ONE effect so a fiber unload tears the session + agent down as a single ORDERED chain rather than as racing sibling effects — which would remove the publication hooks before the driver\'s closing events commit, dropping them.',
-        parameters: [{ name: 'id', description: 'the session id; omitted, the store mints `session-<n>`.' }, { name: 'options', description: 'seed events and/or creation metadata for the header. With `seedSource: \'persistence\'`, metadata and events must be fresh detached graphs whose ownership transfers to this call: they are validated and frozen in place through {@link Session.fromRestore}, so the caller must retain no mutable aliases.' }],
+        parameters: [{ name: 'id', description: 'the session id; omitted, the store mints `session-<n>`.' }, { name: 'options', description: 'seed events and/or creation metadata for the header. With `eventState`, storage values carry the aliasing state of the operation that produced them: `detached` events and metadata are fresh graphs whose ownership transfers to this call (validated and frozen in place through {@link Session.fromRestore}, so the caller must retain no mutable aliases), while `shared-frozen` values are already deeply frozen.' }],
         returns: 'the constructed session, NOT yet in the store.',
         throws: ['if a session with `id` already exists, metadata is not a plain lossless-JSON record with valid scalar fields, or `meta.cwd` is a non-absolute path.'],
       },
@@ -1845,7 +2146,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'abstract readonly sharing: SessionTelemetrySharingStatus',
-        description: 'Deployment-selected session-sharing policy, disclosed for acknowledgement surfaces that report whether recorded feedback leaves the process. Every backend must disclose its policy; a consumer renders "not configured" only when no telemetry service is mounted. The seam owns this vocabulary so the disclosure is backend-independent.',
+        description: 'Deployment-selected sharing mode, independent of SDK delivery.',
         parameters: [],
       },
       {
@@ -1915,10 +2216,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the absolute local document path, or undefined for non-file storage.',
       },
       {
-        signature: 'register<T>(ns: SettingsNamespace, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T>',
+        signature: 'register<const Namespace extends string, T>( ns: Namespace & SettingsNamespaceInput<Namespace>, schema: z<T>, options?: SettingsRegisterOptions<T>, ): SettingsScope<T>',
         description: 'Register a namespace schema and receive its owner scope. The registration is an effect on the calling plugin\'s fiber: disposing that fiber removes the namespace and its observers. An invalid stored section fails the registration itself — the earliest point where the schema can judge it.',
         parameters: [{ name: 'ns', description: 'unique namespace; duplicate registration fails loud.' }, { name: 'schema', description: 'schemastery schema resolving this namespace\'s value.' }, { name: 'options', description: 'composition `base` layer and effect timing.' }],
         returns: 'the owner scope for reads, observation, and updates.',
+        throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
+      },
+      {
+        signature: 'installSection<const Namespace extends string, T>( owner: Context, ns: Namespace & SettingsNamespaceInput<Namespace>, schema: z<T>, entry: T, hooks: SettingsSectionHooks<T>, ): void',
+        description: 'Attach one optional-settings consumer to this provider. The consumer registers its composition entry as the base layer while this provider is present, then falls back to that entry if the provider detaches.',
+        parameters: [{ name: 'owner', description: 'consumer context whose unload suppresses fallback work.' }, { name: 'ns', description: 'consumer-owned settings namespace.' }, { name: 'schema', description: 'schema resolving the namespace.' }, { name: 'entry', description: 'composition entry used as the base and fallback value.' }, { name: 'hooks', description: 'source sink, change notification, and optional validation.' }],
+        throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
       },
       {
         signature: 'describe(options?: SettingsDescribeOptions): SettingsDescriptor[]',
@@ -1927,32 +2235,36 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one descriptor per registered namespace, in registration order.',
       },
       {
-        signature: 'get(ns: SettingsNamespace): unknown',
+        signature: 'get<const Namespace extends string>(ns: Namespace & SettingsNamespaceInput<Namespace>): unknown',
         description: 'Read one registered namespace\'s resolved value.',
         parameters: [{ name: 'ns', description: 'the namespace to read.' }],
         returns: 'the resolved value, or `undefined` while unregistered.',
+        throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
       },
       {
-        signature: 'async update(ns: SettingsNamespace, patch: object, expectedRevision?: number): Promise<void>',
+        signature: 'async update<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, patch: object, expectedRevision?: number, ): Promise<void>',
         description: 'Merge a patch into one registered namespace\'s user layer, validate the resolved candidate, persist through the provider, then commit and emit. A validation failure rejects before anything is persisted. Writes to one namespace are serialized: concurrent updates apply in call order, each merging over the previous write\'s committed section.',
         parameters: [{ name: 'ns', description: 'the registered namespace to update.' }, { name: 'patch', description: 'plain-object patch over the user section.' }, { name: 'expectedRevision', description: 'the descriptor `revision` the caller read; a namespace that moved past it rejects with {@link SettingsConflictError}.' }],
+        throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
       },
       {
-        signature: 'async replace(ns: SettingsNamespace, section: object, expectedRevision?: number): Promise<void>',
+        signature: 'async replace<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, section: object, expectedRevision?: number, ): Promise<void>',
         description: 'Replace one registered namespace\'s user section wholesale, validate, persist, then commit and emit. Keys absent from `section` fall back to the composition `base` and schema defaults — this is the removal/reset path a merge-only patch cannot express (`replace({})` re-inherits everything).',
         parameters: [{ name: 'ns', description: 'the registered namespace to replace.' }, { name: 'section', description: 'the complete next user section.' }, { name: 'expectedRevision', description: 'the descriptor `revision` the caller read; a namespace that moved past it rejects with {@link SettingsConflictError}.' }],
+        throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
       },
       {
-        signature: 'async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>',
+        signature: 'async mutate<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, ops: readonly SettingsPathOp[], expectedRevision?: number, ): Promise<void>',
         description: 'Apply path-addressed edits to one registered namespace\'s user section, validate, persist, then commit and emit. The ops are applied to the section as it stands when the write reaches the front of the queue, so a caller never has to restate fields it did not touch — and, crucially, cannot delete fields it never saw. This is the write path for any caller holding a redacted view; `replace` remains the wholesale reset.',
         parameters: [{ name: 'ns', description: 'the registered namespace to edit.' }, { name: 'ops', description: 'ordered path edits; later ops observe earlier ones.' }, { name: 'expectedRevision', description: 'the descriptor `revision` the caller read; a namespace that moved past it rejects with {@link SettingsConflictError}.' }],
+        throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
       },
     ],
   },
   {
     key: 'shell',
     summary: 'Abstract bash execution service.',
-    description: 'Abstract bash execution service. Subclass, implement the abstract methods, and load the subclass as a plugin — it registers as `ctx.shell` (one implementation per context; loading a second throws, which is cordis\' standard duplicate-service behavior).\n\nImplementations must honor these semantics:\n\n- run rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a ShellRunResult.\n- start returns immediately; no timeout applies to background processes. `done` settles at process close and never rejects; spawn failures settle as `killed` with the error on stderr.\n- ShellProcess.readOutput is incremental: consecutive reads never repeat output. Lossy reads report truncation and available spill files.\n- A still-running background process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a background process survives an executor-only reload.',
+    description: 'Abstract bash execution service. Subclass, implement the abstract methods, and load the subclass as a plugin — it registers as `ctx.shell` (one implementation per context; loading a second throws, which is cordis\' standard duplicate-service behavior).\n\nImplementations must honor these semantics:\n\n- run rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a ShellRunResult.\n- start resolves after launch preparation; cancellation or setup failure rejects before publishing a handle. No timeout applies to background processes. Once published, `done` settles at process close and never rejects; subprocess provider failures settle as `killed` with the error on stderr.\n- ShellProcess.readOutput is incremental: consecutive reads never repeat output. Lossy reads report truncation and available spill files.\n- A still-running background process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a background process survives an executor-only reload.',
     methods: [
       {
         signature: 'abstract resolve(request: ShellExecRequest): ShellExecSpec',
@@ -1962,15 +2274,16 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'abstract run(spec: ShellExecSpec): Promise<ShellRunResult>',
-        description: 'Run a command in the foreground; resolves when it finishes.',
+        description: 'Run preparation and the foreground command under the resolved timeout.',
         parameters: [{ name: 'spec', description: 'a resolved spec from {@link resolve}, never a raw request.' }],
         returns: 'the outcome; nonzero exits, timeout kills, and abort kills resolve with a descriptive result rather than reject.',
+        throws: ['on preparation failure or caller cancellation before process publication.'],
       },
       {
-        signature: 'abstract start(spec: ShellExecSpec): ShellProcess',
-        description: 'Start a background process and return its handle immediately.',
+        signature: 'abstract start(spec: ShellExecSpec): Promise<ShellProcess>',
+        description: 'Prepare a background process asynchronously and publish its live handle.',
         parameters: [{ name: 'spec', description: 'a resolved spec from {@link resolve}, never a raw request.' }],
-        returns: 'the live process handle (reads, kill, quiescence promise).',
+        returns: 'the live process handle after preparation; cancellation or setup failure rejects.',
       },
     ],
   },
@@ -2080,7 +2393,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'async open<S extends DomainSpec>(spec: S): Promise<Domain<S>>',
-        description: 'Open one declared domain. Steps, each failing the whole call: reject a name that is already open (`already-open`); resolve the backend route (`backend-not-found` passes through from the hub); require its `kv` facet (`facet-unsupported`); open the unit projected from the spec (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record against the spec\'s zod schemas (`invalid-record` with the offending table and key); construct the domain.\n\nLifecycle: the CALLER owns the returned handle and closes it via `Domain.close()` (typically as its own `ctx.effect` disposer) — the facility does not tie the domain to any consumer fiber. Domains still open when the facility unmounts are closed by the plugin disposer.',
+        description: 'Open one declared domain. Steps, each failing the whole call: reject a name that is already open (`already-open`); resolve the backend route (`backend-not-found` passes through from the hub); require its `kv` facet (`facet-unsupported`); open the unit projected from the spec (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record against the spec\'s zod schemas (`invalid-record` with the offending table and key — unless the spec declares `invalidRecords: \'backup-and-skip\'` and the unit can move documents aside, in which case the failing record is backed up, logged, and skipped); construct the domain.\n\nLifecycle: the CALLER owns the returned handle and closes it via `Domain.close()` (typically as its own `ctx.effect` disposer) — the facility does not tie the domain to any consumer fiber. Domains still open when the facility unmounts are closed by the plugin disposer.',
         parameters: [{ name: 'spec', description: 'The domain declaration, typically from `defineDomain`.' }],
         returns: 'the opened domain handle, typed by the spec.',
       },
@@ -2116,6 +2429,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'Named provider registry with one-shot runs, durable discovery, and continuable-child operations.',
     description: 'Named provider registry with one-shot runs, durable discovery, and continuable-child operations.',
     methods: [
+      {
+        signature: 'resolveMaxDepth(configured?: number | \'provider-managed\'): number | undefined',
+        description: 'Resolve a delegation tool\'s depth policy against the current user setting.',
+        parameters: [{ name: 'configured', description: 'Explicit tool limit, or provider-managed for external delegation.' }],
+        returns: 'The numeric limit, or undefined when the provider owns depth enforcement.',
+      },
       {
         signature: 'async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>',
         description: 'Establish one durable continuable child and deliver its initial prompt. Resolves when the child\'s inbox accepts that prompt, without waiting for the turn to start or for the message to reach the Session log; any earlier failure rejects with no ids and rolls back the child entirely.',
@@ -2173,7 +2492,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote(\'prompt\') async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt>',
-        description: 'Deliver one browser-authored message to a continuable child through the exact live direct parent, retaining the caller-minted request identity, validated browser zone, and authenticated project participant on the accepted message. Success identifies the message the child\'s inbox accepted; later execution is independent of this call. Queue delivery targets a later turn; steer delivery targets the nearest step and retains the Agent loop\'s best-effort fallback semantics. Image parts are admitted and persisted through the attachment store before delivery, and the child\'s model must accept image input.',
+        description: 'Deliver one browser-authored message to a continuable child through the exact live direct parent, retaining the caller-minted request identity, validated browser zone, and authenticated project participant on the accepted message. Success identifies the message the child\'s inbox accepted; later execution is independent of this call. Queue delivery targets a later turn; steer delivery targets the nearest step and retains the Agent loop\'s best-effort fallback semantics. Image parts are admitted and persisted through the attachment store before delivery, and the child\'s model must accept image input. Cold resume at capacity rejects with `subagent/delivery-unavailable`.',
         parameters: [{ name: 'request', description: 'durable address, delivery, minted identity, content, and optional browser zone.' }, { name: 'signal', description: 'carrier cancellation, owning the call until inbox acceptance.' }],
         returns: 'the accepted message\'s inbox identity.',
         throws: ['{RemoteError} `gateway/bad-request`, `collaboration-forbidden`, `subagent/attachment-invalid`, `subagent/invalid-time-zone`, `subagent/parent-unavailable`, `subagent/not-resumable`, `subagent/unauthorized`, `subagent/delivery-unavailable`, `gateway/cancelled`, or `gateway/internal`.'],
@@ -2223,6 +2542,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a canonical executable path.',
       },
       {
+        signature: 'abstract terminalEnvironment(signal?: AbortSignal): Promise<SubprocessTerminalEnvironment>',
+        description: 'Inspect shell-selection facts in the provider\'s execution environment.',
+        parameters: [{ name: 'signal', description: 'cancellation of remote environment inspection.' }],
+        returns: 'platform and preferred shell; executable lookup and allocation remain separate operations.',
+      },
+      {
         signature: 'abstract spawn(spec: SubprocessSpawnSpec): SubprocessHandle',
         description: 'Start one managed child process from a fully-specified spec; this seam applies no defaults.',
         parameters: [{ name: 'spec', description: 'argv, directory, stdio dispositions, grace, cancellation, and environment.' }],
@@ -2247,6 +2572,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Register an ordered prompt section in the calling context\'s scope. A scoped section shadows a global section with the same name; duplicates within one layer and non-finite orders throw. Registration and disposal emit `system-prompt/change`.',
         parameters: [{ name: 'section', description: 'the section to register.' }],
         returns: 'the exact Cordis effect disposer.',
+      },
+      {
+        signature: 'getSectionOrder(name: PromptSectionOrderName): number',
+        description: 'Resolve the centrally owned placement of a repository prompt section.',
+        parameters: [{ name: 'name', description: 'stable section placement name.' }],
+        returns: 'the section\'s numeric sort order.',
+      },
+      {
+        signature: 'getContextOrder(name: PromptContextOrderName): number',
+        description: 'Resolve the centrally owned placement of a repository runtime context.',
+        parameters: [{ name: 'name', description: 'stable context placement name.' }],
+        returns: 'the context\'s numeric sort order.',
       },
       {
         signature: 'context(context: PromptContext): () => void',
@@ -2434,8 +2771,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Tool registry and execution pipeline. Scoped registrations shadow globals; one visibility resolver feeds presentation, lookup, and dispatch.',
     methods: [
       {
-        signature: 'presentAs(mode: ToolPresentationModeInput): () => void',
-        description: 'Present the calling scope\'s tools in `mode` instead of the deployment default. Nearest scope on the chain wins, so a preset\'s standing declaration covers every agent joined under it.\n\nScoped only, and one declaration per scope: this is how an agent preset composes PTC agents beside native ones in the same process, and a process-global override would be the `mode` config field instead.',
+        signature: 'presentAs(mode: ToolPresentationMode): () => void',
+        description: 'Present the calling scope\'s tools in `mode` instead of the deployment default. Nearest scope on the chain wins, so a preset\'s standing declaration covers every agent joined under it.\n\nScoped only, and one declaration per scope: this is how an agent preset composes PTC mode agents beside native ones in the same process, and a process-global override would be the `mode` config field instead.',
         parameters: [{ name: 'mode', description: 'the presentation the covered agents\' models see.' }],
         returns: 'the exact disposer that restores the deployment default.',
       },
@@ -2498,20 +2835,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'get(key: string): TypertSchemaRecord | undefined',
         description: 'Look up one schema by `<package>#<name>`.',
         parameters: [{ name: 'key', description: 'global schema key.' }],
-        returns: 'the live schema record, or `undefined` when absent.',
+        returns: 'a record containing the cached schema, or `undefined` when absent.',
       },
       {
         signature: 'resolve(key: string): TypertSchemaRecord',
         description: 'Resolve one required schema.',
         parameters: [{ name: 'key', description: 'global schema key.' }],
-        returns: 'the live schema record.',
+        returns: 'a record containing the cached schema.',
         throws: ['when the key is malformed, the package face is absent, or the schema is not contributed.'],
       },
       {
         signature: 'list(filter: TypertSchemaFilter = {}): TypertSchemaRecord[]',
         description: 'Enumerate live schemas in registration order.',
         parameters: [{ name: 'filter', description: 'optional package and face restriction.' }],
-        returns: 'matching schema records.',
+        returns: 'matching records containing the cached schemas.',
       },
       {
         signature: 'getPackage(packageName: string, face: TypertFace = \'host\'): TypertPackageRecord | undefined',
@@ -2715,21 +3052,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'userQuestions',
-    summary: '`ctx.userQuestions`: one active UI provider plus an `ask()` API.',
-    description: '`ctx.userQuestions`: one active UI provider plus an `ask()` API.',
+    summary: '`ctx.userQuestions`: validation plus the scoped answerer waterfall.',
+    description: '`ctx.userQuestions`: validation plus the scoped answerer waterfall.',
     methods: [
       {
-        signature: 'registerProvider(provider: UserQuestionProvider): () => void',
-        description: 'Register the UI provider. Only one provider may be active in a context.',
-        parameters: [{ name: 'provider', description: 'UI-side implementation that collects answers.' }],
-        returns: 'Disposer that unregisters this provider.',
-      },
-      {
         signature: 'async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>',
-        description: 'Ask the active UI provider and wait for the user\'s answer.\n\nWhen a caller supplies an agent, human interaction is valid only for the exact live runtime root. Runtime ownership, not durable session lineage, decides this boundary: an owned child has no human answerer and would block forever, while a lineage-bearing session resumed as a new runtime root may ask normally.',
+        description: 'Ask the scoped answerer waterfall and wait for the user\'s answer.\n\nWhen a caller supplies an agent, human interaction is valid only for the exact live runtime root. Runtime ownership, not durable session lineage, decides this boundary: an owned child has no human answerer and would block forever, while a lineage-bearing session resumed as a new runtime root may ask normally.',
         parameters: [{ name: 'request', description: 'Questions, owner agent, and abort signal.' }],
         returns: 'The answer chosen or typed by the human.',
-        throws: ['{UserQuestionError} code `CALLER_NOT_LIVE` when a supplied agent is not the registry\'s exact live instance, or `DELEGATED_CALLER` when that live agent is owned by another agent.'],
+        throws: ['{UserQuestionError} code `ASK_ABORTED` when the supplied signal is already or becomes aborted, `CALLER_NOT_LIVE` when a supplied agent is not the registry\'s exact live instance, or `DELEGATED_CALLER` when that live agent is owned by another agent.'],
       },
     ],
   },
@@ -2816,7 +3147,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
-    description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
+    description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
     methods: [
       {
         signature: 'abstract start(request: WorkflowStartRequest): WorkflowRun',
@@ -2969,12 +3300,20 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'sessionId', description: 'the session whose composition changed.' }, { name: 'agentPreset', description: 'the preset recorded by the committed selection.' }],
   },
   {
+    name: 'agent/assistant-stream',
+    mode: 'emit',
+    signature: '\'agent/assistant-stream\'(this: Scoped<Agent>, payload: { agent: Agent; frame: AssistantStreamFrame }): void',
+    summary: 'Process-local assistant-stream publication.',
+    description: 'Process-local assistant-stream publication. Chunk frames are transient; the loop appends one final v2 `assistant/message` or `assistant/attempt` with the same stream before a committed end frame.',
+    parameters: [{ name: 'payload', description: '.frame - one ordered start, chunk, or end publication. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
+  },
+  {
     name: 'agent/created',
     mode: 'serial',
     signature: '\'agent/created\'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource; signal?: AbortSignal }): undefined | Promise<undefined>',
-    summary: 'Initialize a fully configured agent and live session before queued work runs.',
-    description: 'Initialize a fully configured agent and live session before queued work runs. Listeners run serially and must return undefined so every listener runs. A throw or rejection vetoes initialization and skips later listeners. Detach requested during dispatch waits until the chain settles, including on rejection. Listeners must not await agent.whenIdle() or their own owner\'s disposal.',
-    parameters: [{ name: 'payload', description: '.signal - optional factory initialization cancellation signal; listeners must not retain it to control later turns. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
+    summary: 'An entered agent is ready for per-agent initialization after factory setup.',
+    description: 'An entered agent is ready for per-agent initialization after factory setup. Listeners run in order and are awaited before creation resolves. AgentLoop holds queued input until all listeners finish. A throw or rejection fails creation and skips later listeners. Disposal retains the scope and session until dispatch settles; listeners must not await agent.whenIdle() or their own owner\'s disposal.',
+    parameters: [{ name: 'payload', description: '.agent - the newly registered agent with its live session and completed setup; .source - fresh creation, resume, clear, or compaction source; .signal - factory initialization cancellation signal, when provided. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
     name: 'agent/disposed',
@@ -3037,7 +3376,7 @@ export const EVENT_API: readonly EventApiEntry[] = [
     mode: 'waterfall',
     signature: '\'agent/request\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>',
     summary: 'Replace the frozen call configuration.',
-    description: 'Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. Model-visible content must use logged channels; this waterfall cannot mutate messages.',
+    description: 'Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. On step admission, this runs after assembly and `step/start`, before the system prompt and accepted user batch are committed. Cancellation here or during subsequent `prepareCall()` resolution commits neither. The prepared call capability governs prompt admission. Model-visible content must use logged channels; this waterfall cannot mutate messages.',
     parameters: [{ name: 'payload', description: '.signal - the current turn\'s explicit abort signal. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
@@ -3067,10 +3406,10 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'approval/request',
     mode: 'waterfall',
-    signature: '\'approval/request\'(this: Scoped<ApprovalService>, req: ApprovalRequest, next: () => Promise<ApprovalOutcome>): Promise<ApprovalOutcome>',
+    signature: '\'approval/request\'( this: Scoped<Agent>, req: ApprovalRequestEvent, next: () => Promise<ApprovalOutcome>, ): Promise<ApprovalOutcome>',
     summary: 'Ask composed answerers for one decision.',
-    description: 'Ask composed answerers for one decision. Return an outcome to claim the request or call `next()`; failure yields the fail-closed default. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.',
-    parameters: [{ name: 'req', description: 'the pending decision (agent, tool identity, reason, signal).' }],
+    description: 'Ask composed answerers for one decision. Return an outcome to claim the request or call `next()` to delegate. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.',
+    parameters: [{ name: 'req', description: 'pending approval request.' }],
   },
   {
     name: 'authorization/settled',
@@ -3087,6 +3426,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A command was registered or unregistered.',
     description: 'A command was registered or unregistered. This is an unfiltered registry notification because a global or scoped change may affect any UI view. Observer failures are contained and cannot veto the registry mutation.',
     parameters: [],
+  },
+  {
+    name: 'compaction/summary-error',
+    mode: 'waterfall',
+    signature: '\'compaction/summary-error\'(payload: { session: Session; sourceEventSeqs: readonly SessionSeq[]; error: unknown; signal?: AbortSignal }, next: () => boolean): boolean',
+    summary: 'Recover a failed summary request by synchronously recording a durable change to its selected input.',
+    description: 'Recover a failed summary request by synchronously recording a durable change to its selected input. Return true only after making progress; the provider re-derives and re-prices the selection before retrying. Call next() when the failure cannot be recovered. Decisions survive a later summary failure or cancellation.',
+    parameters: [{ name: 'payload', description: '.signal - optional compaction cancellation signal.' }, { name: 'next', description: 'delegate to the next recovery listener.' }],
   },
   {
     name: 'cordis/dynamic-package',
@@ -3193,6 +3540,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.change - fresh current projection or clear tombstone.' }],
   },
   {
+    name: 'hmr/change',
+    mode: 'emit',
+    signature: '\'hmr/change\'(url: string): void',
+    summary: 'A watched file has no module or configuration handler.',
+    description: 'A watched file has no module or configuration handler.',
+    parameters: [{ name: 'url', description: 'Canonical file URL.' }],
+  },
+  {
+    name: 'hmr/reload',
+    mode: 'emit',
+    signature: '\'hmr/reload\'(reloads: Map<Plugin, Reload>): void',
+    summary: 'Module replacements have finished loading.',
+    description: 'Module replacements have finished loading.',
+    parameters: [{ name: 'reloads', description: 'Replaced plugins and their module locations.' }],
+  },
+  {
     name: 'llm/adapters-updated',
     mode: 'emit',
     signature: '\'llm/adapters-updated\'(): void',
@@ -3215,6 +3578,38 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Committed replacement of the organization Provider snapshot.',
     description: 'Committed replacement of the organization Provider snapshot.',
     parameters: [{ name: 'revision', description: 'revision now returned by {@link ModelProviderConfig.snapshot}.' }],
+  },
+  {
+    name: 'permission-presets/catalog-changed',
+    mode: 'emit',
+    signature: '\'permission-presets/catalog-changed\'(): void',
+    summary: 'The selectable process catalog changed.',
+    description: 'The selectable process catalog changed. Payload-free by design: consumers subscribe first, then re-read the complete catalog.',
+    parameters: [],
+  },
+  {
+    name: 'plugin-manager/changed',
+    mode: 'emit',
+    signature: '\'plugin-manager/changed\'(change: PluginChange): void',
+    summary: 'The profile\'s plugins, bundles, or composition changed: a manager operation completed.',
+    description: 'The profile\'s plugins, bundles, or composition changed: a manager operation completed. A patch generation applied outside the manager, by HMR\'s watcher after a CLI or hand edit, announces nothing here.',
+    parameters: [{ name: 'change', description: 'what changed.' }],
+  },
+  {
+    name: 'plugin-manager/install-log',
+    mode: 'emit',
+    signature: '\'plugin-manager/install-log\'(chunk: PluginInstallLogChunk): void',
+    summary: 'One chunk of a pnpm run\'s output, streamed as the run produces it.',
+    description: 'One chunk of a pnpm run\'s output, streamed as the run produces it.',
+    parameters: [{ name: 'chunk', description: 'the chunk and the run it belongs to.' }],
+  },
+  {
+    name: 'plugin-manager/install-state',
+    mode: 'emit',
+    signature: '\'plugin-manager/install-state\'(progress: PluginInstallProgress): void',
+    summary: 'An installation moved between its Host phases.',
+    description: 'An installation moved between its Host phases.',
+    parameters: [{ name: 'progress', description: 'the installation\'s request id and phase.' }],
   },
   {
     name: 'session-telemetry/record',
@@ -3364,8 +3759,8 @@ export const EVENT_API: readonly EventApiEntry[] = [
     name: 'tools/pre-execute',
     mode: 'waterfall',
     signature: '\'tools/pre-execute\'(this: Scoped<ToolRuntime>, exec: ToolExecution, next: () => Promise<PreToolDecision>): Promise<PreToolDecision>',
-    summary: 'Allow, deny, or ask before dispatch.',
-    description: 'Allow, deny, or ask before dispatch. `next()` delegates to allow; missing approval support turns `ask` into denial. Async gates must observe `exec.signal`; the registry rechecks cancellation after they settle but never abandons their promise. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent\'s calls.',
+    summary: 'Allow, deny, cancel, or ask before dispatch.',
+    description: 'Allow, deny, cancel, or ask before dispatch. `next()` delegates to allow; `cancel` selects the canonical pre-dispatch cancellation result, and missing approval support turns `ask` into denial. Async gates must observe `exec.signal`; the registry rechecks cancellation after they settle but never abandons their promise. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent\'s calls.',
     parameters: [{ name: 'exec', description: 'the pending call (name, parsed arguments, caller agent).' }],
   },
   {
@@ -3393,6 +3788,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: 'decoded endpoint, service, method, arguments, and signal.' }],
   },
   {
+    name: 'user-questions/request',
+    mode: 'waterfall',
+    signature: '\'user-questions/request\'( this: Scoped<Agent>, request: AskUserQuestionRequestEvent, next: () => Promise<AskUserQuestionAnswer>, ): Promise<AskUserQuestionAnswer>',
+    summary: 'Ask composed answerers for structured user input.',
+    description: 'Ask composed answerers for structured user input. Return an answer to claim the request or call `next()` to delegate. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.',
+    parameters: [{ name: 'request', description: 'pending user-question request.' }],
+  },
+  {
     name: 'webserver/index-inject',
     mode: 'emit',
     signature: '\'webserver/index-inject\'(table: IndexInjection[]): void',
@@ -3405,7 +3808,7 @@ export const EVENT_API: readonly EventApiEntry[] = [
     mode: 'emit',
     signature: '\'workflow/agent-end\'(info: WorkflowRunInfo, agent: WorkflowAgentEndInfo): void',
     summary: 'One `agent()` call settled (clean result, child failure, or run cancellation).',
-    description: 'One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events[\'workflow/agent-start\'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path (a worker killed past its grace) the end is engine-synthesized with outcome `\'cancelled\'`.',
+    description: 'One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events[\'workflow/agent-start\'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path the end is engine-synthesized with outcome `\'cancelled\'`.',
     parameters: [{ name: 'info', description: 'the run\'s identity snapshot.' }, { name: 'agent', description: 'the call identity plus its outcome.' }],
   },
   {
@@ -3474,11 +3877,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AdmittedPromptContentPart',
-    declaration: 'export type AdmittedPromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly attachment: ImageAttachmentRef;\n};',
+    declaration: 'export type AdmittedPromptContentPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | {\n    readonly type: \'image\';\n    readonly attachment: ImageAttachmentRef;\n} | {\n    readonly type: \'file\';\n    readonly attachment: FileAttachmentRef;\n};',
   },
   {
     name: 'Agent',
-    declaration: 'export interface Agent {\n    readonly id: SessionId;\n    readonly options: AgentOptions;\n    readonly session: Session;\n    readonly inbox: Inbox;\n    readonly status: AgentStatus;\n    readonly ctx: Context;\n    cancel(cause: AgentCancelCause, options?: CancelOptions): void;\n    whenIdle(): Promise<void>;\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n    send(message: UserMessage, target: InboxTarget, wakeup: boolean): void;\n    followup(message: UserMessage): void;\n    steer(message: UserMessage): void;\n    inject(message: UserMessage): void;\n}',
+    declaration: 'export interface Agent {\n    readonly id: SessionId;\n}',
   },
   {
     name: 'AgentCancelCause',
@@ -3550,11 +3953,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ApprovalRequest',
-    declaration: 'export interface ApprovalRequest {\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: CallId;\n    readonly reason?: string;\n    readonly signal?: AbortSignal;\n}',
+    declaration: 'export interface ApprovalRequest extends ApprovalRequestEvent {\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: ToolCallId;\n    readonly reason?: string;\n    readonly signal?: AbortSignal;\n}',
   },
   {
-    name: 'ApprovalService',
-    declaration: 'export class ApprovalService extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, public config: Config);\n    setPolicy(agent: Agent, policy: ApprovalPolicy): void;\n    async request(req: ApprovalRequest): Promise<ApprovalOutcome>;\n    overrideOf(session: Session): ApprovalPolicy | undefined;\n}',
+    name: 'ApprovalRequestEvent',
+    declaration: 'export interface ApprovalRequestEvent {\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: ToolCallId;\n    readonly reason?: string;\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'ArchivedSessionEntry',
@@ -3570,7 +3973,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AskUserQuestionIntent',
-    declaration: 'export type AskUserQuestionIntent = {\n    kind: \'plan-review\';\n    approve: string;\n};',
+    declaration: 'export type AskUserQuestionIntent = {\n    kind: \'plan-review\';\n    approve: string;\n    callId?: ToolCallId;\n};',
   },
   {
     name: 'AskUserQuestionItem',
@@ -3582,7 +3985,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AskUserQuestionRequest',
-    declaration: 'export interface AskUserQuestionRequest {\n    questions: AskUserQuestionItem[];\n    agent?: Agent;\n    signal?: AbortSignal;\n}',
+    declaration: 'export interface AskUserQuestionRequest extends AskUserQuestionRequestEvent {\n}',
+  },
+  {
+    name: 'AskUserQuestionRequestEvent',
+    declaration: 'export interface AskUserQuestionRequestEvent {\n    questions: AskUserQuestionItem[];\n    agent?: Agent;\n    signal?: AbortSignal;\n}',
   },
   {
     name: 'AssembleContext',
@@ -3594,15 +4001,19 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AssembledSection',
-    declaration: 'export interface AssembledSection {\n    name: string;\n    text: string;\n}',
+    declaration: 'export interface AssembledSection {\n    name: string;\n    text: string;\n    interpolate?: boolean;\n}',
   },
   {
     name: 'AssistantMessage',
     declaration: 'export interface AssistantMessage extends Message {\n    readonly role: \'assistant\';\n    readonly source: ModelMessageSource;\n}',
   },
   {
-    name: 'AssistantProvenance',
-    declaration: 'export interface AssistantProvenance {\n    provider: string;\n    model: string;\n    replayState?: unknown;\n}',
+    name: 'AssistantProviderMetadata',
+    declaration: 'export interface AssistantProviderMetadata {\n    provider: string;\n    model: string;\n    replayState?: unknown;\n}',
+  },
+  {
+    name: 'AssistantStreamFrame',
+    declaration: 'export type AssistantStreamFrame = {\n    readonly type: \'start\';\n    readonly attemptId: LlmAttemptId;\n    readonly revision: number;\n    readonly turn: number;\n    readonly step: number;\n} | {\n    readonly type: \'chunk\';\n    readonly attemptId: LlmAttemptId;\n    readonly revision: number;\n    readonly index: number;\n    readonly time: number;\n    readonly chunk: StreamChunk;\n} | {\n    readonly type: \'end\';\n    readonly attemptId: LlmAttemptId;\n    readonly revision: number;\n    readonly index: number;\n    readonly outcome: {\n        readonly kind: \'committed\';\n        readonly eventType: \'assistant/message\' | \'assistant/attempt\';\n        readonly seq: SessionSeq;\n    } | {\n        readonly kind: \'abandoned\';\n    };\n};',
   },
   {
     name: 'AssistantStreamRecord',
@@ -3610,7 +4021,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AttachmentAdmissionPart',
-    declaration: 'export type AttachmentAdmissionPart = {\n    readonly type: \'text\';\n    readonly text: string;\n} | ({\n    readonly type: \'image\';\n} & EncodedImageAttachment);',
+    declaration: 'export type AttachmentAdmissionPart = PromptContentPart | {\n    readonly type: \'file\';\n    readonly attachment: FileAttachmentRef;\n};',
+  },
+  {
+    name: 'AttachmentError',
+    declaration: 'export class AttachmentError extends Error {\n    readonly code: AttachmentErrorCode;\n    constructor(message: string, code: AttachmentErrorCode, options?: ErrorOptions);\n}',
+  },
+  {
+    name: 'AttachmentErrorCode',
+    declaration: 'export type AttachmentErrorCode = typeof ATTACHMENT_ERROR_CODES[number];',
   },
   {
     name: 'AttachmentId',
@@ -3693,40 +4112,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BrandedNumber<B extends string> = number & {\n    readonly [BRAND]: B;\n};',
   },
   {
-    name: 'CancelOptions',
-    declaration: 'export interface CancelOptions {\n    keepInbox?: boolean | undefined;\n}',
+    name: 'BrowserUseProviderName',
+    declaration: 'export type BrowserUseProviderName = Branded<\'BrowserUseProviderName\'>;',
+  },
+  {
+    name: 'BundleInfo',
+    declaration: 'export interface BundleInfo {\n    name: string;\n    version?: string;\n    description?: string;\n    enabled: boolean;\n    installed: boolean;\n    optional: boolean;\n    removable: boolean;\n    readOnlyReason?: ReadOnlyReason;\n    error?: ManagementError;\n    rows: BundleRowInfo[];\n    overrides: string[];\n}',
+  },
+  {
+    name: 'BundleRowInfo',
+    declaration: 'export interface BundleRowInfo {\n    rowId: string;\n    moduleName: string;\n    entryId?: PluginEntryId;\n}',
+  },
+  {
+    name: 'ChangeResult',
+    declaration: 'export interface ChangeResult {\n    changed: boolean;\n    application: \'applied\' | \'restart-required\' | \'overridden\' | \'failed\' | \'cancelled\';\n    stage: \'install\' | \'enable\' | \'remove\';\n    target: string;\n    enabled?: boolean;\n    error?: ManagementError;\n    warnings?: string[];\n    packageResult?: PackageResult;\n    bundle?: string;\n    pendingBuilds?: string[];\n    approvedBuilds?: string[];\n}',
   },
   {
     name: 'ClientResponse',
     declaration: 'export interface ClientResponse {\n    type: \'client-response\';\n    rpcId: RpcId;\n    result: RpcWireResult<unknown>;\n}',
-  },
-  {
-    name: 'CodeBindingErrorClass',
-    declaration: 'export interface CodeBindingErrorClass {\n    name: string;\n    memberNameProperty: string;\n}',
-  },
-  {
-    name: 'CodeBindingFunction',
-    declaration: 'export type CodeBindingFunction = (args: unknown) => Promise<CodeJsonValue>;',
-  },
-  {
-    name: 'CodeBindingNamespace',
-    declaration: 'export interface CodeBindingNamespace {\n    global: string;\n    functions: Record<string, CodeBindingFunction>;\n    errorClass?: CodeBindingErrorClass;\n}',
-  },
-  {
-    name: 'CodeJsonValue',
-    declaration: 'export type CodeJsonValue = null | boolean | number | string | CodeJsonValue[] | {\n    [key: string]: CodeJsonValue;\n};',
-  },
-  {
-    name: 'CodeRunFailure',
-    declaration: 'export interface CodeRunFailure {\n    kind: \'exception\' | \'timeout\' | \'abort\' | \'worker-exit\' | \'invalid-output\' | \'output-limit\';\n    message: string;\n}',
-  },
-  {
-    name: 'CodeRunRequest',
-    declaration: 'export interface CodeRunRequest {\n    program: string;\n    bindings: CodeBindingNamespace[];\n    signal?: AbortSignal;\n}',
-  },
-  {
-    name: 'CodeRunResult',
-    declaration: 'export interface CodeRunResult {\n    value?: CodeJsonValue;\n    logs: string[];\n    error?: CodeRunFailure;\n}',
   },
   {
     name: 'CollaborationAccess',
@@ -3758,7 +4161,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CommandDefinition',
-    declaration: 'export interface CommandDefinition {\n    readonly definitionId?: CommandDefinitionIdType;\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
+    declaration: 'export interface CommandDefinition {\n    readonly definitionId?: CommandDefinitionId;\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
   },
   {
     name: 'CommandDefinitionId',
@@ -3773,20 +4176,28 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CommandExecution {\n    readonly commandId: CommandId;\n    readonly result: CommandResult;\n}',
   },
   {
+    name: 'CommandFileReceiptResolver',
+    declaration: 'export type CommandFileReceiptResolver = (agent: Agent, receiptId: string) => FileAttachmentRef | undefined;',
+  },
+  {
     name: 'CommandId',
     declaration: 'export type CommandId = Branded<\'CommandId\'>;',
   },
   {
     name: 'CommandInputDescriptor',
-    declaration: 'export interface CommandInputDescriptor {\n    readonly hint: string;\n    readonly images?: boolean;\n}',
+    declaration: 'export interface CommandInputDescriptor {\n    readonly hint: string;\n    readonly attachments?: boolean;\n}',
   },
   {
     name: 'CommandInvocation',
-    declaration: 'export interface CommandInvocation {\n    readonly commandId: CommandId;\n    readonly agent: Agent;\n    readonly rawInput: string;\n    readonly attachments: readonly ImageBlock[];\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface CommandInvocation {\n    readonly commandId: CommandId;\n    readonly agent: Agent;\n    readonly rawInput: string;\n    readonly attachments: readonly (ImageBlock | FileBlock)[];\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'CommandResult',
     declaration: 'export type CommandResult = {\n    readonly kind: \'success\';\n    readonly text?: string;\n    readonly sourceEventSeq?: SessionSeq;\n} | {\n    readonly kind: \'error\';\n    readonly text: string;\n};',
+  },
+  {
+    name: 'CommandSubmitAttachment',
+    declaration: 'export type CommandSubmitAttachment = ({\n    readonly type: \'image\';\n} & EncodedImageAttachment) | {\n    readonly type: \'file\';\n    readonly receiptId: string;\n};',
   },
   {
     name: 'CompactionAgentContext',
@@ -3809,6 +4220,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CompositionRowEnablement = boolean | \'conditional\';',
   },
   {
+    name: 'ComputerUseProviderName',
+    declaration: 'export type ComputerUseProviderName = Branded<\'ComputerUseProviderName\'>;',
+  },
+  {
     name: 'ConfinedArgv',
     declaration: 'export interface ConfinedArgv {\n    argv: string[];\n    enforcement: SandboxEnforcement;\n    denialSignatures: readonly string[];\n    runnerFailureRules: readonly RunnerFailureRule[];\n}',
   },
@@ -3818,7 +4233,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContentBlockMap',
-    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n}',
+    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'file\': FileBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n}',
   },
   {
     name: 'ContentBlockType',
@@ -3853,6 +4268,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ContinuableSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'continuable\';\n    readonly label: string;\n    readonly agentProvider?: string;\n    readonly agentModel?: string;\n    readonly agentReasoningEffort?: ReasoningEffortId;\n    readonly persona?: string;\n    readonly toolFilter?: ToolRestriction;\n}',
   },
   {
+    name: 'ContractSessionHandle',
+    declaration: 'export class ContractSessionHandle implements SessionHandle {\n    constructor(private readonly owner: SessionPersistence, readonly id: SessionId, readonly header: SessionHeader, readonly inheritedEventCount: SessionLogOffset, readonly access: SessionAccess);\n    async read(offset: number = 0, length?: number, options?: SessionHandleReadOptions): Promise<SessionHandleReadResult>;\n    async append(events: readonly SessionEvent[], options?: SessionHandleAppendOptions): Promise<void>;\n    async flush(options?: SessionHandleFlushOptions): Promise<void>;\n    async close(): Promise<void>;\n    async [Symbol.asyncDispose](): Promise<void>;\n}',
+  },
+  {
     name: 'CordisDynamicPackageId',
     declaration: 'export type CordisDynamicPackageId = Branded<\'CordisDynamicPackageId\'>;',
   },
@@ -3882,7 +4301,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CreateAgentOptions',
-    declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly isSeeded?: boolean;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly inheritedEventCount?: SessionLogOffset;\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly parentAgent?: Agent;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+    declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly isSeeded?: boolean;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly inheritedEventCount?: SessionLogOffset;\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
   {
     name: 'CreateGoalRequest',
@@ -4006,7 +4425,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DomainSpec',
-    declaration: 'export interface DomainSpec {\n    readonly name: string;\n    readonly version: number;\n    readonly global?: DomainGlobalSpec<unknown>;\n    readonly tables: Record<string, DomainTableSpec>;\n}',
+    declaration: 'export interface DomainSpec {\n    readonly name: string;\n    readonly version: number;\n    readonly layout?: \'single\' | \'per-record\';\n    readonly compatibleVersions?: readonly number[];\n    readonly invalidRecords?: \'backup-and-skip\';\n    readonly global?: DomainGlobalSpec<unknown>;\n    readonly tables: Record<string, DomainTableSpec>;\n}',
   },
   {
     name: 'DomainTableSpec',
@@ -4045,6 +4464,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EditGoalRequest {\n    readonly objective?: string;\n    readonly maxGoalRounds?: number;\n}',
   },
   {
+    name: 'EncodedFileAttachment',
+    declaration: 'export interface EncodedFileAttachment {\n    data: string;\n    name?: string;\n}',
+  },
+  {
     name: 'EncodedImageAttachment',
     declaration: 'export interface EncodedImageAttachment {\n    mediaType: ImageMediaType;\n    data: string;\n    name?: string;\n}',
   },
@@ -4054,7 +4477,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'FiberState',
-    declaration: 'export type FiberState = FiberStateEnum;',
+    declaration: 'export const enum FiberState {\n    PENDING,\n    LOADING,\n    ACTIVE,\n    FAILED,\n    DISPOSED,\n    UNLOADING\n}',
+  },
+  {
+    name: 'FileAttachmentRef',
+    declaration: 'export interface FileAttachmentRef {\n    attachmentId: AttachmentId;\n    name: string;\n    bytes: number;\n}',
+  },
+  {
+    name: 'FileBlock',
+    declaration: 'export interface FileBlock {\n    type: \'file\';\n    attachment: FileAttachmentRef;\n}',
   },
   {
     name: 'FileDiff',
@@ -4206,27 +4637,19 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ImageBlock',
-    declaration: 'export interface ImageBlock {\n    type: \'image\';\n    attachment: ImageAttachmentRef;\n}',
+    declaration: 'export interface ImageBlock {\n    type: \'image\';\n    attachment: ImageAttachmentRef;\n    offloaded?: true;\n}',
   },
   {
     name: 'ImageMediaType',
     declaration: 'export type ImageMediaType = \'image/png\' | \'image/jpeg\' | \'image/webp\' | \'image/gif\';',
   },
   {
-    name: 'ImageRequestPolicy',
-    declaration: 'export interface ImageRequestPolicy {\n    maxPixels: number;\n    maxBytes: number;\n}',
+    name: 'ImageRequestTarget',
+    declaration: 'export interface ImageRequestTarget {\n    width: number;\n    height: number;\n    maxBytes: number;\n}',
   },
   {
     name: 'ImageVariantId',
     declaration: 'export type ImageVariantId = Branded<\'ImageVariantId\'>;',
-  },
-  {
-    name: 'Inbox',
-    declaration: 'export interface Inbox {\n    readonly nextTurn: readonly UserMessage[];\n    readonly nextStep: readonly UserMessage[];\n    clear(): void;\n    append(target: InboxTarget, message: UserMessage): void;\n    prepend(target: InboxTarget, message: UserMessage): void;\n    replace(messageId: MessageId, newMessage: UserMessage): boolean;\n    remove(messageId: MessageId): boolean;\n    splice(target: InboxTarget, start: number, deleteCount: number, inserted: UserMessage[]): UserMessage[];\n}',
-  },
-  {
-    name: 'InboxTarget',
-    declaration: 'export type InboxTarget = \'next-turn\' | \'next-step\';',
   },
   {
     name: 'IndexInjection',
@@ -4235,6 +4658,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'IndexInjectionPlacement',
     declaration: 'export type IndexInjectionPlacement = \'head\' | \'body\';',
+  },
+  {
+    name: 'InstallBundleOptions',
+    declaration: 'export interface InstallBundleOptions {\n    enabled?: boolean;\n    requestId?: PluginInstallRequestId;\n    approvedBuilds?: string[];\n}',
+  },
+  {
+    name: 'InstallSpecKind',
+    declaration: 'export type InstallSpecKind = \'registry\' | \'path\' | \'git\' | \'tarball\';',
   },
   {
     name: 'InvariantFailure',
@@ -4317,10 +4748,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type JsonSchemaType = \'object\' | \'array\' | \'string\' | \'number\' | \'integer\' | \'boolean\' | \'null\';',
   },
   {
-    name: 'KnobState',
-    declaration: 'export interface KnobState {\n    preset: string | null;\n    sandbox: SandboxMode | null;\n    approval: ApprovalPolicy | null;\n}',
-  },
-  {
     name: 'KvFacet',
     declaration: 'export interface KvFacet {\n    open(descriptor: KvUnitDescriptor): Promise<KvUnit>;\n}',
   },
@@ -4330,15 +4757,23 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'KvUnit',
-    declaration: 'export interface KvUnit {\n    loadAll(): Promise<{\n        tables: Record<string, Record<string, unknown>>;\n        global: unknown;\n    }>;\n    putRecord(table: string, key: string, value: unknown): Promise<void>;\n    deleteRecord(table: string, key: string): Promise<void>;\n    setGlobal(value: unknown): Promise<void>;\n    close(): Promise<void>;\n}',
+    declaration: 'export interface KvUnit {\n    loadAll(): Promise<{\n        tables: Record<string, Record<string, unknown>>;\n        global: unknown;\n    }>;\n    putRecord(table: string, key: string, value: unknown): Promise<void>;\n    deleteRecord(table: string, key: string): Promise<void>;\n    backupRecord?(table: string, key: string): Promise<string>;\n    setGlobal(value: unknown): Promise<void>;\n    close(): Promise<void>;\n}',
   },
   {
     name: 'KvUnitDescriptor',
-    declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n}',
+    declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n    readonly layout?: \'single\' | \'per-record\';\n    readonly compatibleVersions?: readonly number[];\n}',
+  },
+  {
+    name: 'LegacySessionHandle',
+    declaration: 'export interface LegacySessionHandle {\n    readonly id: SessionId;\n    readonly mode: SessionHandleMode;\n    read(offset?: number): Promise<readonly SessionEvent[]>;\n    append(events: readonly SessionEvent[]): Promise<void>;\n    flush(): Promise<void>;\n    close(): Promise<void>;\n}',
   },
   {
     name: 'LlmAdapter',
     declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    imageRequestPricing(_provider: string, _model: string): import(\'./types.ts\').LlmImageRequestPricing | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+  },
+  {
+    name: 'LlmAttemptId',
+    declaration: 'export type LlmAttemptId = Branded<\'LlmAttemptId\'>;',
   },
   {
     name: 'LlmCallConfig',
@@ -4350,7 +4785,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmConfigurableProvider',
-    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    management?: \'personal\' | \'organization\' | \'project\' | \'external\';\n    projectId?: number;\n}',
+    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    error?: string;\n    management?: \'personal\' | \'organization\' | \'project\' | \'external\';\n    projectId?: number;\n}',
   },
   {
     name: 'LlmDiscoveredModel',
@@ -4358,7 +4793,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmFailure',
-    declaration: 'export interface LlmFailure {\n    readonly message: string;\n    readonly code: string;\n    readonly status?: number;\n    readonly providerRetryAfterMs?: number;\n    readonly requestId?: ProviderRequestId;\n}',
+    declaration: 'export interface LlmFailure {\n    readonly message: string;\n    readonly code: string;\n    readonly status?: number;\n    readonly providerRetryAfterMs?: number;\n    readonly requestId?: ProviderRequestId;\n    readonly offloadImages?: number;\n}',
   },
   {
     name: 'LlmImageRequestPrice',
@@ -4366,7 +4801,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmImageRequestPricing',
-    declaration: 'export interface LlmImageRequestPricing {\n    priceImages(images: readonly ImageAttachmentRef[]): readonly LlmImageRequestPrice[];\n}',
+    declaration: 'export interface LlmImageRequestPricing {\n    priceImages(images: readonly ImageBlock[]): readonly LlmImageRequestPrice[];\n}',
   },
   {
     name: 'LlmModelContext',
@@ -4394,11 +4829,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmResolvedModelInfo',
-    declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    systemPromptUpdate?: SystemPromptUpdate;\n    reasoning?: LlmModelReasoningInfo;\n}',
+    declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    reasoning?: LlmModelReasoningInfo;\n    systemPromptUpdate?: SystemPromptUpdate;\n}',
   },
   {
     name: 'LlmRuntime',
-    declaration: 'export class LlmRuntime extends TypertRemoteService {\n    static Config: z<LlmRuntimeConfig>;\n    constructor(ctx: Context, config: LlmRuntimeConfig = {});\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): import(\'./types.ts\').LlmImageRequestPricing | undefined;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall /* …truncated — full shape in source */',
+    declaration: 'export class LlmRuntime extends TypertRemoteService {\n    static Config: z<LlmRuntimeConfig>;\n    constructor(ctx: Context, config: LlmRuntimeConfig = {});\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): import(\'./types.ts\').LlmImageRequestPricing | undefined;\n    fileRequestText(ref: FileAttachmentRef): string;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallC /* …truncated — full shape in source */',
   },
   {
     name: 'LlmRuntimeConfig',
@@ -4473,8 +4908,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ManagedModelReasoningEfforts = Partial<Record<\'off\' | \'minimal\' | \'low\' | \'medium\' | \'high\' | \'xhigh\' | \'max\', string | null>>;',
   },
   {
+    name: 'ManagementError',
+    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'operation-error\';\n    diagnostic?: string;\n}',
+  },
+  {
     name: 'ManualCompactAgentContext',
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
+  },
+  {
+    name: 'McpResourceProvider',
+    declaration: 'export interface McpResourceProvider {\n    request(request: McpResourceRequest, exec: ToolExecution): Promise<JsonValue>;\n}',
+  },
+  {
+    name: 'McpResourceRequest',
+    declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
   },
   {
     name: 'Message',
@@ -4578,7 +5025,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelMessageSource',
-    declaration: 'export interface ModelMessageSource extends AssistantProvenance {\n    kind: \'model\';\n}',
+    declaration: 'export interface ModelMessageSource extends AssistantProviderMetadata {\n    kind: \'model\';\n}',
   },
   {
     name: 'ModelProviderConfigSnapshot',
@@ -4597,8 +5044,60 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type OptionalSessionSeq = SessionSeq | null;',
   },
   {
-    name: 'PermissionSelect',
-    declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
+    name: 'PackageResult',
+    declaration: 'export interface PackageResult {\n    exitCode: number;\n    output: string;\n    truncated: boolean;\n    logPath: string;\n    kind?: PluginInstallFailureKind;\n}',
+  },
+  {
+    name: 'PermissionCatalog',
+    declaration: 'export interface PermissionCatalog {\n    options: PresetOption[];\n}',
+  },
+  {
+    name: 'PluginChange',
+    declaration: 'export interface PluginChange {\n    readonly reason: \'plugin\' | \'bundle\' | \'install\' | \'remove\';\n}',
+  },
+  {
+    name: 'PluginEntryId',
+    declaration: 'export type PluginEntryId = Branded<\'PluginEntryId\'>;',
+  },
+  {
+    name: 'PluginFiberPhase',
+    declaration: 'export type PluginFiberPhase = \'pending\' | \'loading\' | \'active\' | \'failed\' | \'unloading\' | null;',
+  },
+  {
+    name: 'PluginInfo',
+    declaration: 'export type PluginInfo = PluginInventoryEntry & ({\n    patchId: string;\n    readOnlyReason?: never;\n} | {\n    patchId?: never;\n    readOnlyReason: ReadOnlyReason;\n});',
+  },
+  {
+    name: 'PluginInspectProblem',
+    declaration: 'export type PluginInspectProblem = \'invalid-spec\' | \'already-installed\' | \'not-found\' | \'not-a-package\' | \'not-a-bundle\' | \'network\' | \'unknown\';',
+  },
+  {
+    name: 'PluginInstallCancellation',
+    declaration: 'export interface PluginInstallCancellation {\n    readonly status: \'cancelled\' | \'too-late\' | \'not-running\';\n}',
+  },
+  {
+    name: 'PluginInstallFailureKind',
+    declaration: 'export type PluginInstallFailureKind = \'pnpm-missing\' | \'timeout\' | \'not-found\' | \'no-matching-version\' | \'network\' | \'disk-full\' | \'permission\' | \'build-blocked\' | \'integrity\' | \'unknown\';',
+  },
+  {
+    name: 'PluginInstallLogChunk',
+    declaration: 'export interface PluginInstallLogChunk {\n    readonly requestId?: PluginInstallRequestId;\n    readonly jobId: string;\n    readonly argv: readonly string[];\n    readonly cwd: string;\n    readonly stream: \'stdout\' | \'stderr\';\n    readonly text: string;\n    readonly exitCode?: number | null;\n}',
+  },
+  {
+    name: 'PluginInstallProgress',
+    declaration: 'export interface PluginInstallProgress {\n    readonly requestId: PluginInstallRequestId;\n    readonly phase: \'installing\' | \'cancelling\' | \'applying\';\n}',
+  },
+  {
+    name: 'PluginInstallRequestId',
+    declaration: 'export type PluginInstallRequestId = Branded<\'PluginInstallRequestId\'>;',
+  },
+  {
+    name: 'PluginInventoryEntry',
+    declaration: 'export interface PluginInventoryEntry {\n    readonly entryId: PluginEntryId;\n    readonly moduleName: string;\n    readonly enabled: boolean;\n    readonly fiberPhase: PluginFiberPhase;\n}',
+  },
+  {
+    name: 'PluginSpecInspection',
+    declaration: 'export type PluginSpecInspection = {\n    readonly status: \'accepted\';\n    readonly kind: InstallSpecKind;\n    readonly name?: string;\n    readonly version?: string;\n    readonly description?: string;\n    readonly bundle: boolean | null;\n} | {\n    readonly status: \'refused\';\n    readonly problem: PluginInspectProblem;\n    readonly reason: string;\n};',
   },
   {
     name: 'PostToolDecision',
@@ -4626,7 +5125,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PrepareSessionOptions',
-    declaration: 'export type PrepareSessionOptions = (CreateSessionOptions & {\n    readonly seedSource?: undefined;\n}) | RestoredSessionOptions;',
+    declaration: 'export type PrepareSessionOptions = (CreateSessionOptions & {\n    readonly eventState?: undefined;\n}) | RestoredSessionOptions;',
   },
   {
     name: 'PresetOption',
@@ -4642,11 +5141,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PreStepDecision',
-    declaration: 'export type PreStepDecision = {\n    kind: \'reject\';\n} | {\n    kind: \'enter\';\n    messages: UserMessage[];\n};',
+    declaration: 'export type PreStepDecision = {\n    kind: \'reject\';\n} | {\n    kind: \'enter\';\n    messages: UserMessage[];\n    startsRequestSeries?: true;\n};',
   },
   {
     name: 'PreToolDecision',
-    declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
+    declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n    info?: ToolErrorInfo;\n} | {\n    kind: \'cancel\';\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
+  },
+  {
+    name: 'ProfilePnpmInvocation',
+    declaration: 'export interface ProfilePnpmInvocation {\n    readonly command: string;\n    readonly args: readonly string[];\n    readonly env: Readonly<Record<string, string>>;\n}',
   },
   {
     name: 'ProjectionChangeListener',
@@ -4677,8 +5180,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface PromptContext {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n}',
   },
   {
+    name: 'PromptContextOrderName',
+    declaration: 'export type PromptContextOrderName = keyof typeof CONTEXT_ORDERS;',
+  },
+  {
     name: 'PromptSection',
-    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly complete?: boolean;\n}',
+    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly interpolate?: boolean;\n    readonly complete?: boolean;\n}',
+  },
+  {
+    name: 'PromptSectionOrderName',
+    declaration: 'export type PromptSectionOrderName = keyof typeof SECTION_ORDERS;',
   },
   {
     name: 'ProviderRequestId',
@@ -4686,15 +5197,51 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PrunedEntry',
-    declaration: 'export interface PrunedEntry {\n    readonly originalSeq: SessionSeq;\n    readonly replacementSeq: SessionSeq;\n    readonly callId: CallId;\n    readonly charsBefore: number;\n    readonly charsAfter: number;\n}',
+    declaration: 'export interface PrunedEntry {\n    readonly originalSeq: SessionSeq;\n    readonly replacementSeq: SessionSeq;\n    readonly callId: ToolCallId;\n    readonly charsBefore: number;\n    readonly charsAfter: number;\n}',
   },
   {
     name: 'PruneResult',
     declaration: 'export interface PruneResult {\n    readonly pruned: readonly PrunedEntry[];\n    readonly charsRemoved: number;\n}',
   },
   {
+    name: 'PtcBindingErrorClass',
+    declaration: 'export interface PtcBindingErrorClass {\n    name: string;\n    memberNameProperty: string;\n}',
+  },
+  {
+    name: 'PtcBindingFunction',
+    declaration: 'export type PtcBindingFunction = (args: unknown) => Promise<PtcJsonValue>;',
+  },
+  {
+    name: 'PtcBindingNamespace',
+    declaration: 'export interface PtcBindingNamespace {\n    global: string;\n    functions: Record<string, PtcBindingFunction>;\n    errorClass?: PtcBindingErrorClass;\n}',
+  },
+  {
     name: 'PtcDispatchLog',
-    declaration: 'export interface PtcDispatchLog {\n    readonly exec: ToolExecution;\n    readonly agent?: Agent;\n    readonly subCallId: CallId;\n    readonly name: string;\n    readonly isError: boolean;\n    readonly content: ContentBlock[];\n}',
+    declaration: 'export interface PtcDispatchLog {\n    readonly exec: ToolExecution;\n    readonly agent?: Agent;\n    readonly subCallId: ToolCallId;\n    readonly name: string;\n    readonly isError: boolean;\n    readonly content: ContentBlock[];\n}',
+  },
+  {
+    name: 'PtcJsonValue',
+    declaration: 'export type PtcJsonValue = null | boolean | number | string | PtcJsonValue[] | {\n    [key: string]: PtcJsonValue;\n};',
+  },
+  {
+    name: 'PtcRunFailure',
+    declaration: 'export interface PtcRunFailure {\n    kind: \'exception\' | \'timeout\' | \'abort\' | \'worker-exit\' | \'invalid-output\' | \'output-limit\' | \'protocol\' | \'sandbox-unavailable\';\n    message: string;\n}',
+  },
+  {
+    name: 'PtcRunRequest',
+    declaration: 'export interface PtcRunRequest {\n    program: string;\n    bindings: PtcBindingNamespace[];\n    cwd?: string;\n    timeoutMs?: number | null;\n    sandboxPolicy?: SandboxExecutionPolicy;\n    signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'PtcRunResult',
+    declaration: 'export interface PtcRunResult {\n    sandbox?: PtcRunSandbox;\n    value?: PtcJsonValue;\n    logs: string[];\n    error?: PtcRunFailure;\n}',
+  },
+  {
+    name: 'PtcRunSandbox',
+    declaration: 'export interface PtcRunSandbox {\n    mode: SandboxMode;\n    denied: boolean;\n    enforcement?: SandboxEnforcement;\n}',
+  },
+  {
+    name: 'PtcRunSpec',
+    declaration: 'export interface PtcRunSpec extends PtcRunRequest {\n    cwd: string;\n    timeoutMs: number | null;\n}',
   },
   {
     name: 'ReadFileLine',
@@ -4703,6 +5250,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ReadOnlyCredentialLayer',
     declaration: 'export interface ReadOnlyCredentialLayer {\n    readonly id: string;\n    owns(ref: CredentialRef): boolean;\n    resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>;\n    describe(ref: CredentialRef): Promise<CredentialInfo>;\n}',
+  },
+  {
+    name: 'ReadOnlyReason',
+    declaration: 'export type ReadOnlyReason = \'management-required\' | \'unaddressable\';',
   },
   {
     name: 'ReadResultView',
@@ -4721,6 +5272,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
   },
   {
+    name: 'Reload',
+    declaration: 'export interface Reload {\n    filename: string;\n    runtime?: Plugin.Runtime | undefined;\n}',
+  },
+  {
     name: 'ReplayEnvelope',
     declaration: 'export interface ReplayEnvelope {\n    response: unknown;\n    blocks?: readonly unknown[];\n}',
   },
@@ -4734,7 +5289,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RequestHeaderReason',
-    declaration: 'export type RequestHeaderReason = \'initial\' | \'resume\' | \'change\';',
+    declaration: 'export type RequestHeaderReason = \'initial\' | \'resume\' | \'change\' | \'series\';',
   },
   {
     name: 'RequestImageAttachment',
@@ -4774,11 +5329,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RestoredSessionOptions',
-    declaration: 'export interface RestoredSessionOptions {\n    readonly seed: SessionEvent[];\n    readonly meta: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    readonly seedSource: \'persistence\';\n}',
+    declaration: 'export interface RestoredSessionOptions {\n    readonly seed: SessionEvent[];\n    readonly meta: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    readonly eventState: SessionSeedEventState;\n}',
   },
   {
     name: 'ResumeAgentOptions',
-    declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly parentAgent?: Agent;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+    declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
   {
     name: 'RpcId',
@@ -4819,6 +5374,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SandboxPolicyRequest',
     declaration: 'export interface SandboxPolicyRequest {\n    session?: Session;\n    mode?: SandboxMode;\n}',
+  },
+  {
+    name: 'SaveFileAttachment',
+    declaration: 'export interface SaveFileAttachment {\n    data: Uint8Array;\n    name?: string;\n}',
+  },
+  {
+    name: 'SaveFileStreamAttachment',
+    declaration: 'export interface SaveFileStreamAttachment {\n    data: AsyncIterable<Uint8Array>;\n    signal?: AbortSignal;\n    name?: string;\n}',
   },
   {
     name: 'SaveImageAttachment',
@@ -4877,6 +5440,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ServerResponse {\n    type: \'server-response\';\n    rpcId: RpcId;\n    result: RpcWireResult<unknown>;\n}',
   },
   {
+    name: 'SessionAccess',
+    declaration: 'export type SessionAccess = \'read\' | \'write\';',
+  },
+  {
     name: 'SessionAvailability',
     declaration: 'export type SessionAvailability = \'live\' | \'persisted\';',
   },
@@ -4898,11 +5465,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionEvent',
-    declaration: 'export type SessionEvent<T extends SessionEventType = SessionEventType> = {\n    [K in SessionEventType]: {\n        type: K;\n        seq: SessionSeq;\n        time: number;\n        data: SessionEventMap[K];\n        ignorable?: true;\n    } & (K extends SurfaceEventType ? {\n        sourceEventSeqs?: SessionSeq[];\n        surfaceOp?: SurfaceOp;\n    } : object);\n}[T];',
+    declaration: 'export type SessionEvent<T extends SessionEventType = SessionEventType> = {\n    [K in SessionEventType]: {\n        type: K;\n        seq: SessionSeq;\n        time: number;\n        data: SessionEventMap[K];\n        ignorable?: true;\n    } & (K extends SurfaceEventType ? SurfaceIntent<K> : {\n        surfaceOp?: never;\n        sourceEventSeqs?: never;\n    });\n}[T];',
   },
   {
     name: 'SessionEventMap',
-    declaration: 'export interface SessionEventMap {\n    \'turn/start\': {\n        turn: number;\n    };\n    \'turn/end\': {\n        turn: number;\n        reason: TurnEndReason;\n    };\n    \'step/start\': {\n        turn: number;\n        step: number;\n    };\n    \'step/end\': {\n        turn: number;\n        step: number;\n    };\n    \'user/message\': UserMessage;\n    \'system/message\': {\n        turn: number;\n        step: number;\n        message: SystemMessage;\n    };\n    \'assistant/chunk\': {\n        turn: number;\n        step: number;\n        chunk: StreamChunk;\n    };\n    \'assistant/message\': {\n        turn: number;\n        step: number;\n        message: AssistantMessage;\n        usage?: TokenUsage;\n        interrupted?: true;\n        stream?: AssistantStreamRecord[];\n    };\n    \'assistant/attempt\': {\n        turn: number;\n        step: number;\n        stream: AssistantStreamRecord[];\n    };\n    \'tool/call\': {\n        turn: number;\n        step: number;\n        callId: CallId;\n        name: string;\n        arguments: string;\n    };\n    \'tool/result\': {\n        turn: number;\n        step: number;\n        message: ToolResultMessage;\n        error?: {\n            name: string;\n            code: string;\n        };\n        meta?: JsonValue;\n    };\n    \'todo/write\': {\n        todos: TodoItem[];\n    };\n    \'request/header\': {\n        header: EpochHeader;\n        reason: RequestHeaderReason;\n    };\n    \'request/context\': RequestContext;\n    \'session/end-seed\': Record<string, never>;\n}',
+    declaration: 'export interface SessionEventMap {\n    \'turn/start\': {\n        turn: number;\n    };\n    \'turn/end\': {\n        turn: number;\n        reason: TurnEndReason;\n    };\n    \'step/start\': {\n        turn: number;\n        step: number;\n    };\n    \'step/end\': {\n        turn: number;\n        step: number;\n    };\n    \'user/message\': UserMessage;\n    \'system/message\': {\n        turn: number;\n        step: number;\n        message: SystemMessage;\n    };\n    \'assistant/message\': {\n        turn: number;\n        step: number;\n        message: AssistantMessage;\n        stream: AssistantStreamRecord[];\n        usage?: TokenUsage;\n        interrupted?: true;\n    };\n    \'assistant/attempt\': {\n        turn: number;\n        step: number;\n        stream: AssistantStreamRecord[];\n    };\n    \'tool/call\': {\n        turn: number;\n        step: number;\n        callId: ToolCallId;\n        name: string;\n        arguments: string;\n    };\n    \'tool/result\': {\n        turn: number;\n        step: number;\n        message: ToolResultMessage;\n        error?: {\n            name: string;\n            code: string;\n            reason?: string;\n        };\n        meta?: JsonValue;\n    };\n    \'todo/write\': {\n        todos: TodoItem[];\n    };\n    \'request/header\': {\n        header: EpochHeader;\n        reason: RequestHeaderReason;\n        startsSeries?: true;\n    };\n    \'request/context\': RequestContext;\n    \'session/end-seed\': {\n        inherited?: true;\n    };\n}',
   },
   {
     name: 'SessionEventMetadataFilter',
@@ -4970,15 +5537,31 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionHandle',
-    declaration: 'export interface SessionHandle {\n    readonly id: SessionId;\n    readonly mode: SessionHandleMode;\n    read(offset?: number): Promise<readonly SessionEvent[]>;\n    append(events: readonly SessionEvent[]): Promise<void>;\n    flush(): Promise<void>;\n    close(): Promise<void>;\n}',
+    declaration: 'export interface SessionHandle extends AsyncDisposable {\n    readonly id: SessionId;\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffset;\n    readonly access: SessionAccess;\n    read(offset?: number, length?: number, options?: SessionHandleReadOptions): Promise<SessionHandleReadResult>;\n    append(events: readonly SessionEvent[], options?: SessionHandleAppendOptions): Promise<void>;\n    flush(options?: SessionHandleFlushOptions): Promise<void>;\n    close(): Promise<void>;\n}',
+  },
+  {
+    name: 'SessionHandleAppendOptions',
+    declaration: 'export interface SessionHandleAppendOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'SessionHandleFlushOptions',
+    declaration: 'export interface SessionHandleFlushOptions {\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'SessionHandleMode',
     declaration: 'export type SessionHandleMode = \'read\' | \'write\';',
   },
   {
+    name: 'SessionHandleReadOptions',
+    declaration: 'export interface SessionHandleReadOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'SessionHandleReadResult',
+    declaration: 'export interface SessionHandleReadResult {\n    readonly eventState: SessionSeedEventState;\n    readonly events: readonly SessionEvent[];\n}',
+  },
+  {
     name: 'SessionHeader',
-    declaration: 'export interface SessionHeader {\n    readonly version: number;\n    readonly id: SessionId;\n    readonly createdAt: number;\n    readonly cwd?: string;\n    readonly parentSession?: SessionId;\n    readonly isSeeded: boolean;\n    readonly origin?: \'subagent\';\n    readonly delegationDepth?: number;\n    readonly agentPreset?: string;\n    readonly draft?: boolean;\n}',
+    declaration: 'export interface SessionHeader {\n    readonly version: typeof SESSION_FORMAT_VERSION;\n    readonly id: SessionId;\n    readonly createdAt: number;\n    readonly cwd?: string;\n    readonly parentSession?: SessionId;\n    readonly isSeeded: boolean;\n    readonly origin?: \'subagent\';\n    readonly delegationDepth?: number;\n    readonly agentPreset?: string;\n    readonly draft?: boolean;\n}',
   },
   {
     name: 'SessionId',
@@ -5017,6 +5600,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionMessageProjectionContext {\n    nodes: readonly SessionSeq[];\n    events: readonly SessionEvent[];\n    baseSeq: SessionLogOffset;\n    messages: ReadonlyMap<SessionSeq, Message>;\n}',
   },
   {
+    name: 'SessionObservation',
+    declaration: 'export interface SessionObservation extends Disposable {\n    readonly source: \'live\' | \'prepared\';\n    readonly header: SessionHeader;\n    readonly inheritedEventCount: SessionLogOffsetType;\n    readonly events: readonly SessionEvent[];\n    readonly cursor: SessionSeqCursor;\n    readonly revision?: SessionPersistenceRevision;\n    readonly projections?: ProjectionSnapshot;\n    retain(): SessionObservation;\n}',
+  },
+  {
+    name: 'SessionObservationOptions',
+    declaration: 'export interface SessionObservationOptions {\n    readonly signal?: AbortSignal;\n    readonly projectionMode?: \'all\' | \'none\';\n}',
+  },
+  {
+    name: 'SessionPersistence',
+    declaration: 'export abstract class SessionPersistence extends Service {\n    constructor(ctx: Context);\n    async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandleType>;\n    async open(id: SessionId, access: SessionAccessType, options?: SessionPersistenceOpenOptions): Promise<SessionHandleType>;\n    async flush(): Promise<void>;\n    async stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<SessionPersistenceSnapshot | undefined>;\n    async list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>;\n    releaseContractHandle(id: SessionId, handle: ContractSessionHandle): void;\n    materializeDetached(_id: SessionId): Promise<void>;\n    discardDetached(_id: SessionId): Promise<void>;\n    isPending(id: SessionId): boolean;\n    liveStorage(_id: SessionId): Promise<SessionStorageMetadata | undefined>;\n    listPending(): readonly SessionStorageMetadata[];\n    listStored(signal?: AbortSignal): Promise<SessionHeader[]>;\n    listHeaders(signal?: AbortSignal): Promise<SessionHeader[]>;\n    async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<LegacySessionHandle>;\n    async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<LegacySessionHandle>;\n    openHandle(id: SessionId, mode: SessionHandleMode): LegacySessionHandle;\n    releaseHandle(id: SessionId, handle: LegacySessionHandle): void;\n    locate(_meta: SessionHeader): SessionLocation | undefined;\n    /* …truncated — full shape in source */',
+  },
+  {
+    name: 'SessionPersistenceCreateOptions',
+    declaration: 'export interface SessionPersistenceCreateOptions {\n    readonly signal?: AbortSignal;\n    readonly inheritedEventCount?: SessionLogOffset;\n}',
+  },
+  {
+    name: 'SessionPersistenceListOptions',
+    declaration: 'export interface SessionPersistenceListOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'SessionPersistenceOpenOptions',
+    declaration: 'export interface SessionPersistenceOpenOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
     name: 'SessionPersistencePage',
     declaration: 'export interface SessionPersistencePage {\n    readonly meta: SessionHeader;\n    readonly revision: SessionPersistenceRevision;\n    readonly events: SessionEvent[];\n    readonly startSeq: number | null;\n    readonly endSeq: number | null;\n    readonly hasMore: boolean;\n    readonly nextCursor?: SessionPersistenceReadCursor;\n    readonly uncompressedBytes: number;\n}',
   },
@@ -5038,7 +5645,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionPersistenceSnapshot',
-    declaration: 'export interface SessionPersistenceSnapshot {\n    header: SessionHeader;\n    revision: SessionPersistenceRevision;\n    content?: SessionContentMetadata;\n}',
+    declaration: 'export interface SessionPersistenceSnapshot {\n    header: SessionHeader;\n    revision: SessionPersistenceRevision;\n    content?: SessionContentMetadata;\n    readonly eventCount?: number;\n    readonly sizeBytes?: number;\n}',
+  },
+  {
+    name: 'SessionPersistenceStatOptions',
+    declaration: 'export interface SessionPersistenceStatOptions {\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'SessionPreparation',
@@ -5105,6 +5716,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionSearchRequest {\n    query: string;\n    sessionFilters?: readonly SessionResultFilter[];\n    eventFilters?: readonly SessionEventMetadataFilter[];\n    limit?: number;\n    cursor?: SessionSearchCursor;\n}',
   },
   {
+    name: 'SessionSeedEventState',
+    declaration: 'export type SessionSeedEventState = \'detached\' | \'shared-frozen\';',
+  },
+  {
     name: 'SessionSeq',
     declaration: 'export type SessionSeq = BrandedNumber<\'SessionSeq\'>;',
   },
@@ -5145,8 +5760,8 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionTitleEventData {\n    readonly title: string;\n    readonly messageSeqs: SessionSeq[];\n    readonly source: SessionTitleSource;\n}',
   },
   {
-    name: 'SessionTitleModelProvenance',
-    declaration: 'export interface SessionTitleModelProvenance {\n    readonly provider: string;\n    readonly model: string;\n}',
+    name: 'SessionTitleModelIdentity',
+    declaration: 'export interface SessionTitleModelIdentity {\n    readonly provider: string;\n    readonly model: string;\n}',
   },
   {
     name: 'SessionTitleObservation',
@@ -5166,11 +5781,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionTitleProviderRequest',
-    declaration: 'export interface SessionTitleProviderRequest {\n    readonly session: Session;\n    readonly messages: readonly SessionTitleUserMessage[];\n    readonly route?: SessionTitleModelProvenance;\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface SessionTitleProviderRequest {\n    readonly session: Session;\n    readonly messages: readonly SessionTitleUserMessage[];\n    readonly route?: SessionTitleModelIdentity;\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'SessionTitleProviderResult',
-    declaration: 'export interface SessionTitleProviderResult {\n    readonly title: string;\n    readonly messageSeqs: readonly SessionSeq[];\n    readonly model?: SessionTitleModelProvenance;\n}',
+    declaration: 'export interface SessionTitleProviderResult {\n    readonly title: string;\n    readonly messageSeqs: readonly SessionSeq[];\n    readonly model?: SessionTitleModelIdentity;\n}',
   },
   {
     name: 'SessionTitleSnapshot',
@@ -5178,7 +5793,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionTitleSource',
-    declaration: 'export type SessionTitleSource = {\n    readonly kind: \'fallback\';\n} | {\n    readonly kind: \'provider\';\n    readonly provider: SessionTitleProviderId;\n    readonly model?: SessionTitleModelProvenance;\n} | {\n    readonly kind: \'user\';\n};',
+    declaration: 'export type SessionTitleSource = {\n    readonly kind: \'fallback\';\n} | {\n    readonly kind: \'provider\';\n    readonly provider: SessionTitleProviderId;\n    readonly model?: SessionTitleModelIdentity;\n} | {\n    readonly kind: \'user\';\n};',
   },
   {
     name: 'SessionTitleUserMessage',
@@ -5214,7 +5829,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SettingsRegisterOptions',
-    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n    validate?: (value: T) => void;\n}',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n}',
+  },
+  {
+    name: 'SettingsSectionHooks',
+    declaration: 'export interface SettingsSectionHooks<T> {\n    setSource(current: () => T): void;\n    onChange(): void;\n    validate?: (value: T) => void;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n}',
   },
   {
     name: 'SettingsUpdateSource',
@@ -5322,7 +5941,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpillSource',
-    declaration: 'export interface SpillSource {\n    toolName: string;\n    callId: CallId;\n    label: string;\n}',
+    declaration: 'export type SpillSource = {\n    kind: \'tool\';\n    toolName: string;\n    callId: ToolCallId;\n    label: string;\n} | {\n    kind: \'session-reference\';\n    sessionId: SessionId;\n    label: string;\n};',
   },
   {
     name: 'StorageBackend',
@@ -5418,7 +6037,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends TypertRemoteService {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async sendMessage(sender: Agent, targetId: SessionId, content: ContentBlock[], options: SubagentSendMessageOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    async drainContinuableChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    @Remote(\'list\')\n    async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog>;\n    @Remote(\'prompt\')\n    async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt>;\n    @Remote(\'interruptByParent\')\n    async interruptByParent(childSessionId: SessionId, parentSessionId: SessionId, mode: \'continuable\'): Promise<SubagentInterruptReceipt>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n}',
+    declaration: 'export class SubagentRuntime extends TypertRemoteService {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    resolveMaxDepth(configured?: number | \'provider-managed\'): number | undefined;\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async sendMessage(sender: Agent, targetId: SessionId, content: ContentBlock[], options: SubagentSendMessageOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    async drainContinuableChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    @Remote(\'list\')\n    async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog>;\n    @Remote(\'prompt\')\n    async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt>;\n    @Remote(\'interruptByParent\')\n    async interruptByParent(childSessionId: SessionId, parentSessionId: SessionId, mode: \'continuable\'): Promise<SubagentInterruptReceipt>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(n /* …truncated — full shape in source */',
   },
   {
     name: 'SubagentSendMessageOptions',
@@ -5446,7 +6065,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessHandle',
-    declaration: 'export interface SubprocessHandle {\n    readonly stdin: Writable | undefined;\n    readonly stdout: Readable | undefined;\n    readonly stderr: Readable | undefined;\n    readonly collected: SubprocessCollectedOutputs;\n    readonly done: Promise<SubprocessOutcome>;\n    terminate(): void;\n    waitForExit(signal?: AbortSignal): Promise<boolean>;\n}',
+    declaration: 'export interface SubprocessHandle {\n    readonly stdin: Writable | undefined;\n    readonly stdout: Readable | undefined;\n    readonly stderr: Readable | undefined;\n    readonly control: Duplex | undefined;\n    readonly collected: SubprocessCollectedOutputs;\n    readonly done: Promise<SubprocessOutcome>;\n    terminate(): void;\n    waitForExit(signal?: AbortSignal): Promise<boolean>;\n}',
   },
   {
     name: 'SubprocessOutcome',
@@ -5474,7 +6093,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessStdio',
-    declaration: 'export interface SubprocessStdio {\n    stdin: SubprocessStdinMode;\n    stdout: SubprocessOutputMode;\n    stderr: SubprocessOutputMode;\n}',
+    declaration: 'export interface SubprocessStdio {\n    stdin: SubprocessStdinMode;\n    stdout: SubprocessOutputMode;\n    stderr: SubprocessOutputMode;\n    control?: \'pipe\';\n}',
+  },
+  {
+    name: 'SubprocessTerminalActivity',
+    declaration: 'export interface SubprocessTerminalActivity {\n    state: \'idle\' | \'busy\' | \'unknown\';\n    revision: number;\n}',
+  },
+  {
+    name: 'SubprocessTerminalEnvironment',
+    declaration: 'export interface SubprocessTerminalEnvironment {\n    platform: \'posix\' | \'windows\';\n    defaultShell?: string;\n}',
   },
   {
     name: 'SubprocessTerminalForeground',
@@ -5482,7 +6109,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessTerminalHandle',
-    declaration: 'export interface SubprocessTerminalHandle {\n    readonly pid: number;\n    readonly output: Readable;\n    readonly done: Promise<SubprocessOutcome>;\n    write(data: string): Promise<void>;\n    inspectForeground(): Promise<SubprocessTerminalForeground | undefined>;\n    signalForeground(signal: SubprocessTerminalSignal): Promise<number>;\n    terminate(): Promise<void>;\n}',
+    declaration: 'export interface SubprocessTerminalHandle {\n    readonly pid: number;\n    readonly output: Readable;\n    readonly done: Promise<SubprocessOutcome>;\n    write(data: string): Promise<void>;\n    resize(cols: number, rows: number): Promise<void>;\n    inspectForeground(): Promise<SubprocessTerminalForeground | undefined>;\n    inspectActivity(): Promise<SubprocessTerminalActivity>;\n    signalForeground(signal: SubprocessTerminalSignal): Promise<number>;\n    terminate(): Promise<void>;\n}',
   },
   {
     name: 'SubprocessTerminalSignal',
@@ -5490,15 +6117,19 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessTerminalSpawnSpec',
-    declaration: 'export interface SubprocessTerminalSpawnSpec {\n    argv: readonly string[];\n    cwd: string;\n    env?: Record<string, string> | undefined;\n    rows: number;\n    cols: number;\n    graceMs: number;\n    signal?: AbortSignal | undefined;\n}',
+    declaration: 'export interface SubprocessTerminalSpawnSpec {\n    argv: readonly string[];\n    cwd: string;\n    env?: Record<string, string> | undefined;\n    rows: number;\n    cols: number;\n    terminalType: string;\n    shellActivity?: boolean | undefined;\n    graceMs: number;\n    signal?: AbortSignal | undefined;\n}',
   },
   {
     name: 'SurfaceEvent',
-    declaration: 'export type SurfaceEvent = SessionEvent<SurfaceEventType> & {\n    surfaceOp: SurfaceOp;\n};',
+    declaration: 'export type SurfaceEvent = SessionEvent<SurfaceEventType>;',
   },
   {
     name: 'SurfaceEventType',
     declaration: 'export type SurfaceEventType = \'system/message\' | \'user/message\' | \'assistant/message\' | \'tool/result\';',
+  },
+  {
+    name: 'SurfaceIntent',
+    declaration: 'export type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {\n    surfaceOp: SurfaceOp;\n} & (T extends \'assistant/message\' ? {\n    sourceEventSeqs?: never;\n} : {\n    sourceEventSeqs?: SessionSeq[];\n});',
   },
   {
     name: 'SurfaceOp',
@@ -5510,7 +6141,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SystemPrompt',
-    declaration: 'export class SystemPrompt extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    section(section: PromptSection): () => void;\n    context(context: PromptContext): () => void;\n    suppressRuntimeContext(): () => void;\n    tools(provider: (context: AssembleContext) => ToolProviderResult): () => void;\n    variable(name: string, provider: (context: AssembleContext) => string | undefined): () => void;\n    async assemble(context: AssembleContext = {}): Promise<PromptAssembly>;\n}',
+    declaration: 'export class SystemPrompt extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    section(section: PromptSection): () => void;\n    getSectionOrder(name: PromptSectionOrderName): number;\n    getContextOrder(name: PromptContextOrderName): number;\n    context(context: PromptContext): () => void;\n    suppressRuntimeContext(): () => void;\n    tools(provider: (context: AssembleContext) => ToolProviderResult): () => void;\n    variable(name: string, provider: (context: AssembleContext) => string | undefined): () => void;\n    async assemble(context: AssembleContext = {}): Promise<PromptAssembly>;\n}',
   },
   {
     name: 'SystemPromptUpdate',
@@ -5669,10 +6300,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface TokenUsage {\n    inputTokens: number;\n    outputTokens: number;\n    totalTokens?: number;\n    cacheReadTokens?: number;\n    cacheWriteTokens?: number;\n    reasoningTokens?: number;\n}',
   },
   {
-    name: 'ToolCallId',
-    declaration: 'export type ToolCallId = Branded<\'ToolCallId\'>;',
-  },
-  {
     name: 'ToolCallKind',
     declaration: 'export type ToolCallKind = \'read\' | \'edit\' | \'delete\' | \'move\' | \'search\' | \'execute\' | \'fetch\' | \'other\';',
   },
@@ -5690,11 +6317,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolErrorInfo',
-    declaration: 'export interface ToolErrorInfo {\n    name: string;\n    code: string;\n}',
+    declaration: 'export interface ToolErrorInfo {\n    name: string;\n    code: string;\n    reason?: string;\n}',
   },
   {
     name: 'ToolExecution',
-    declaration: 'export interface ToolExecution extends ToolExecutionInput {\n    readonly rootCallId: CallId;\n    readonly token: ToolExecutionToken;\n}',
+    declaration: 'export interface ToolExecution extends ToolExecutionInput {\n    readonly rootCallId: ToolCallId;\n    readonly token: ToolExecutionToken;\n}',
   },
   {
     name: 'ToolExecutionFailure',
@@ -5702,7 +6329,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolExecutionInput',
-    declaration: 'export interface ToolExecutionInput {\n    readonly callId: CallId;\n    readonly rootCallId?: CallId;\n    readonly name: string;\n    readonly arguments: unknown;\n    readonly agent?: Agent;\n    readonly parent?: ToolExecutionToken;\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface ToolExecutionInput {\n    readonly callId: ToolCallId;\n    readonly rootCallId?: ToolCallId;\n    readonly name: string;\n    readonly schema?: ToolSchema;\n    readonly arguments: unknown;\n    readonly agent?: Agent;\n    readonly parent?: ToolExecutionToken;\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'ToolExecutionMode',
@@ -5730,7 +6357,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolMessageSource',
-    declaration: 'export interface ToolMessageSource {\n    kind: \'tool\';\n    callId: CallId;\n}',
+    declaration: 'export interface ToolMessageSource {\n    kind: \'tool\';\n    callId: ToolCallId;\n}',
   },
   {
     name: 'ToolOutputDefinition',
@@ -5739,10 +6366,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolPresentationMode',
     declaration: 'export type ToolPresentationMode = \'native\' | \'ptc\' | \'both\';',
-  },
-  {
-    name: 'ToolPresentationModeInput',
-    declaration: 'export type ToolPresentationModeInput = ToolPresentationMode | \'code\';',
   },
   {
     name: 'ToolProviderResult',
@@ -5774,7 +6397,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolRuntime',
-    declaration: 'export class ToolRuntime extends Service {\n    static inject;\n    static Config: z<Config>;\n    readonly [TOOL_RUNTIME_SCHEDULER]: ToolRuntimeScheduler;\n    constructor(ctx: Context, config: Config = {});\n    presentAs(mode: ToolPresentationModeInput): () => void;\n    register(definition: ToolDefinition): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    guard(guard: ToolGuard): () => void;\n    get(name: string, scope?: ScopeKey): ToolDefinition | undefined;\n    schemas(scope?: ScopeKey): ToolSchema[];\n    executionMode(exec: ToolExecutionInput): ToolExecutionMode;\n    async execute(exec: ToolExecutionInput): Promise<ToolExecutionResult>;\n}',
+    declaration: 'export class ToolRuntime extends Service {\n    static inject;\n    static Config: z<Config>;\n    readonly [TOOL_RUNTIME_SCHEDULER]: ToolRuntimeScheduler;\n    constructor(ctx: Context, config: Config = {});\n    presentAs(mode: ToolPresentationMode): () => void;\n    register(definition: ToolDefinition): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    guard(guard: ToolGuard): () => void;\n    get(name: string, scope?: ScopeKey): ToolDefinition | undefined;\n    schemas(scope?: ScopeKey): ToolSchema[];\n    executionMode(exec: ToolExecutionInput): ToolExecutionMode;\n    async execute(exec: ToolExecutionInput): Promise<ToolExecutionResult>;\n}',
   },
   {
     name: 'ToolRuntimeScheduler',
@@ -5798,11 +6421,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TypertCodec',
-    declaration: 'export type TypertCodec = {\n    readonly mode: \'strict\';\n    readonly typeSymbol: string;\n    readonly schema: TypertSchema;\n} | {\n    readonly mode: \'src-json\';\n};',
+    declaration: 'export type TypertCodec = {\n    readonly mode: \'strict\';\n    readonly typeSymbol: string;\n    readonly create: () => TypertSchema;\n} | {\n    readonly mode: \'src-json\';\n};',
   },
   {
     name: 'TypertContribution',
-    declaration: 'export interface TypertContribution {\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly schemas: readonly TypertSchema[];\n    readonly model: TypertPackageModel;\n    readonly invocations: readonly InvocationDescriptor[];\n}',
+    declaration: 'export interface TypertContribution {\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly schemas: readonly TypertSchemaFactory[];\n    readonly model: TypertPackageModel;\n    readonly invocations: readonly InvocationDescriptor[];\n}',
   },
   {
     name: 'TypertDisposer',
@@ -5853,12 +6476,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export abstract class TypertRemoteService<out T = never> extends Service<T> {\n    readonly typertRemote: TypertGatewayBinding<this>;\n}',
   },
   {
+    name: 'TypertSchema',
+    declaration: 'export interface TypertSchema<Output = unknown> {\n    parse(value: unknown): Output;\n}',
+  },
+  {
+    name: 'TypertSchemaFactory',
+    declaration: 'export interface TypertSchemaFactory {\n    readonly name: string;\n    readonly create: () => z.ZodType;\n}',
+  },
+  {
     name: 'TypertSchemaFilter',
     declaration: 'export interface TypertSchemaFilter {\n    readonly package?: string;\n    readonly face?: TypertFace;\n}',
   },
   {
     name: 'TypertSchemaRecord',
-    declaration: 'export interface TypertSchemaRecord extends TypertSchema {\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly key: string;\n}',
+    declaration: 'export interface TypertSchemaRecord {\n    readonly name: string;\n    readonly schema: z.ZodType;\n    readonly package: string;\n    readonly face: TypertFace;\n    readonly key: string;\n}',
   },
   {
     name: 'TypertServiceModel',
@@ -5947,10 +6578,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'UserMessage',
     declaration: 'export interface UserMessage extends Message {\n    readonly role: \'user\';\n}',
-  },
-  {
-    name: 'UserQuestionProvider',
-    declaration: 'export interface UserQuestionProvider {\n    ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>;\n}',
   },
   {
     name: 'WebBootEntry',

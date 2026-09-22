@@ -60,7 +60,7 @@ A tag is a commit pointer, not proof of publication. Bump asks the registry whet
 
 ### Publication runs only on GitHub, and the registry decides what goes out
 
-Publication runs only from GitHub Actions; there is no local publication path. Publish reads no tag and no manifest of "what this release includes". For each packed tarball it compares the version against the registry, in three states:
+Publication verifies the tagged candidate, accepted upstream record and tested artifact evidence before contacting the registry. For each packed tarball, its existing idempotent comparison still has three outcomes:
 
 | State | Action |
 |---|---|
@@ -168,7 +168,9 @@ What this costs:
 - **The change judgement depends on visible tags.** A shallow clone, or a checkout without tags, degrades the vendored judgement to "publish everything for the first time". `fetch-depth: 0` is a precondition, not an optimization.
 - **The protocol rewrite touched 1504 dependency declarations.** It does not change local resolution — pnpm already resolves from the workspace — but it changes the ranges that go out.
 - **Private packages need credentials to install.** Every consumer — CI, sandbox e2e, outside users — needs scope credentials, including for the Landlock packages, which have never been published and so cut off no existing anonymous path.
-- **`repository` names a different organization than the one running the workflows.** Token-based publication is unaffected; npm provenance (OIDC) requires the two to agree, so adopting it means either repointing `repository` or publishing from the organization it names.
+- **`repository` names a different organization than the one running the workflows.** Token-based publication is unaffected; npm's OIDC attestation requires the two to agree, so adopting it means either repointing `repository` or publishing from the organization it names.
 - **Byte reproducibility is assumed, not measured.** The skip-on-identical-integrity state rests on packing the same commit twice producing the same bytes. Nothing measures that yet: if the build embeds absolute paths or timestamps, a re-run reports a false failure. Measure it before the first publication a re-run might follow, and fall back to comparing per-file content hashes if it does not hold.
 - **Re-running publish over an older artifact can move `latest` backwards.** Publication is decided per version, so an older set republished after a newer one takes the stable dist-tag again. The rehearsals run from a prerelease version, which never takes `latest`.
 - **The first publication is one large step.** Nine vendored packages and the whole dsh set publish at once, so any payload defect surfaces in a single release, which is why a prerelease version drives the complete path first.
+
+The [candidate-bound evidence decision](2026-09-21-candidate-bound-gate-evidence.md) extends consumer selection and publication acceptance while retaining this note’s coverage and versioning rules.

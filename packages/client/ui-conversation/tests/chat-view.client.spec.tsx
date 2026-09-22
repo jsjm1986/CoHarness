@@ -675,7 +675,7 @@ describe('ChatView', () => {
     const nextRetry = { ...retry(3), turn: 2, retry: 2 }
     const context = {
       kind: 'context', seq: 4, time: 4_000, content: [], source: null,
-      provenance: { role: 'inject', label: null },
+      producer: { role: 'inject', label: null },
       form: null,
     } as const satisfies ConversationNode
     const h = makeHarness({ nodes: [user(1, 'try'), retryNode], running: true })

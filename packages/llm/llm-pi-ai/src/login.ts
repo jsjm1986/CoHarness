@@ -7,7 +7,6 @@
  * @module dsh-llm-pi-ai/login
  */
 
-import { createModels } from '@earendil-works/pi-ai'
 import type { AuthEvent, AuthPrompt, AuthType, Provider } from '@earendil-works/pi-ai'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AuthorizationMethod, AuthorizationPrompt, AuthorizationSession } from '@deepseek-ai/dsh-authorization'
@@ -15,6 +14,7 @@ import { isCredentialKeySegment } from '@deepseek-ai/dsh-credentials'
 import { catalogProvider, catalogProviderIds } from './catalog.ts'
 import { recordKeyFor } from './auth.ts'
 import type { PiAiAuthInjection } from './adapter.ts'
+import { createModels } from './models.ts'
 
 /**
  * The login methods one catalog provider offers.
@@ -34,6 +34,7 @@ function loginMethods(provider: Provider | undefined): AuthorizationMethod[] {
   if (apiKey?.login !== undefined) methods.push({ id: 'api-key', label: apiKey.name })
   return methods
 }
+
 /**
  * Restate one pi-ai login event in the seam's vocabulary.
  *
@@ -121,10 +122,10 @@ export function registerPiAiFlows(ctx: Context, auth: PiAiAuthInjection): void {
     const provider = catalogProvider(providerId)
     const [first, ...rest] = loginMethods(provider)
     /* v8 ignore next 3 -- every id here names an installed provider and every
-       installed provider ships a login, so nothing is skipped today; the guard
+       installed provider ships a login, so no entry is skipped; the guard
        is what keeps that from becoming a crash if either stops being true. */
     if (provider === undefined || first === undefined) continue
-    /* v8 ignore next 7 -- every installed catalog id today is a lowercase
+    /* v8 ignore next 7 -- every installed catalog id is a lowercase
        hyphenated identifier; the guard keeps a future upstream id outside the
        record grammar (dotted or uppercase, as vendor ids elsewhere already
        are) from throwing in `recordKeyFor` and failing the whole mount. */

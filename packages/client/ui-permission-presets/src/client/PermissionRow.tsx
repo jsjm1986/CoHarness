@@ -60,6 +60,10 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
   const labelFor = (option: { id: string; label: string }): string =>
     localizedPermissionPreset(option.id, option.label, key => t(key))
   const busy = state.status === 'loading' || state.status === 'saving' || confirmingFullAccess
+  /* jscpd:ignore-start -- parallel settings-row surface variants share the
+   * writableReason description chain and row layout by design (ui-agent-preset's
+   * AgentPresetRow renders the same structure; plugin packages may not import
+   * each other's internals). */
   const label = (selected === undefined ? undefined : labelFor(selected))
     ?? (busy ? t('loading') : t('unavailable'))
   const description: string = state.error
@@ -112,6 +116,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
       <RiskConfirmation
         open={confirmingFullAccess}
         title={t('confirm.title')}
+        closeLabel={t('close')}
         description={t('confirm.description')}
         acknowledgeLabel={t('confirm.acknowledge')}
         cancelLabel={t('confirm.cancel')}
@@ -131,6 +136,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
       />
     </>
   )
+  /* jscpd:ignore-end */
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

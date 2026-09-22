@@ -16,13 +16,13 @@ interface CommandInputDescriptor {
   /** Placeholder shown before the user supplies free-form input. */
   readonly hint: string
   /**
-   * Whether composer image attachments may accompany an invocation. Absent or
-   * false = the executor rejects an invocation carrying images and capable
+   * Whether composer attachments may accompany an invocation. Absent or
+   * false = the executor rejects an invocation carrying attachments and capable
    * composers refuse the submission before dispatch. A declaring command's
    * handler receives the admitted durable blocks and owns every further
    * grammar decision, including rejecting sub-commands that cannot use them.
    */
-  readonly images?: boolean
+  readonly attachments?: boolean
 }
 ```
 
@@ -33,8 +33,8 @@ interface CommandInputDescriptor {
 ```ts type-equiv
 /** Plugin-owned command registration. */
 interface CommandDefinition {
-  /** Stable plugin-owned identity, independent of command name and copy. */
-  readonly definitionId?: CommandDefinitionIdType
+  /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
+  readonly definitionId?: CommandDefinitionId
   /** Lowercase command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */
@@ -66,13 +66,13 @@ interface CommandInvocation {
   /** Exact text following the registered command name, including separator whitespace. */
   readonly rawInput: string
   /**
-   * Durably admitted image blocks accompanying this invocation, in submission
-   * order; empty unless the definition declares `input.images`. The handler
+   * Durably admitted image and file blocks accompanying this invocation, in submission
+   * order; empty unless the definition declares `input.attachments`. The handler
    * owns their model-visible use — the registry never schedules them itself —
    * and a handler whose grammar cannot use them in this invocation returns an
    * error so the dispatching composer retains the originals.
    */
-  readonly attachments: readonly ImageBlock[]
+  readonly attachments: readonly (ImageBlock | FileBlock)[]
   /** Cancellation signal owned by the dispatching UI request. */
   readonly signal: AbortSignal
 }
@@ -99,7 +99,7 @@ type CommandResult =
 ```ts type-equiv
 /** Handler-free immutable command view returned to UI adapters. */
 interface CommandDescriptor {
-  /** Stable plugin-owned identity; absent for legacy or third-party definitions. */
+  /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
   readonly definitionId?: CommandDefinitionId
   /** Lowercase command name without the leading slash. */
   readonly name: string
@@ -143,6 +143,13 @@ Human-command registry. Plain-context definitions are global; definitions regist
 register(definition: CommandDefinition): () => void
 
 /**
+ * Register the sole authority that resolves staged file receipts for command submissions.
+ * @param resolver - Session-aware receipt resolver.
+ * @returns disposer that removes this exact resolver.
+ */
+registerFileReceiptResolver(resolver: CommandFileReceiptResolver): () => void
+
+/**
  * List the effective immutable command descriptors for one agent.
  * @param agent - exact receiving agent and scoped-layer key.
  * @returns name-sorted descriptors after scoped shadowing.
@@ -170,23 +177,25 @@ find(agent: Agent, name: string): CommandDefinition | undefined
  * handler-failure path is contained so the handler's own error stays the
  * reported failure.
  *
- * Image admission is enforced here, not in the composer: images sent to a
- * command that does not declare `input.images`, an absent attachment store,
- * and an exceeded attachment limit each settle as an error result before
- * the handler runs, and a rejected batch publishes no durable object.
+ * Attachment admission is enforced here, not in the composer: attachments sent to a
+ * command that does not declare `input.attachments`, an absent attachment store,
+ * and an exceeded image limit each settle as an error result before
+ * the handler runs. Validation rejection starts no attachment writes;
+ * a storage failure can leave only unreachable content-addressed objects
+ * for deferred collection.
  *
  * @param agent - exact receiving agent.
  * @param line - complete slash-command line.
- * @param images - base64-encoded composer images accompanying the line, in
- *   submission order; empty for a plain invocation.
+ * @param submittedAttachments - encoded images and staged file receipts accompanying the line,
+ *   in submission order; empty for a plain invocation.
  * @param signal - cancellation signal owned by the UI request.
  * @returns the settled execution (result + lifecycle pairing id), or
  *   `undefined` when syntax or name does not resolve.
  */
-@Remote async execute( agent: Agent, line: string, images: readonly EncodedImageAttachment[], signal: AbortSignal, ): Promise<CommandExecution | undefined>
+@Remote async execute( agent: Agent, line: string, submittedAttachments: readonly CommandSubmitAttachment[], signal: AbortSignal, ): Promise<CommandExecution | undefined>
 ```
 
-Types: [Agent](core.zh.md) · [EncodedImageAttachment](attachment.zh.md)
+Types: [Agent](core.zh.md)
 
 Source: [`packages/interaction/commands/src/index.ts`](../../packages/interaction/commands/src/index.ts)
 

@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from 'node:fs/promises'
+import type { SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -30,7 +31,6 @@ export interface MessageFixture {
   readonly userMessageId: MessageId
   readonly assistantMessageIds: readonly [MessageId, MessageId]
   readonly emptyAssistantMessageId: MessageId
-  readonly replacementAssistantMessageId: MessageId
 }
 
 /** Append one deterministic transcript used by target-validation tests. */
@@ -47,10 +47,11 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     content: [{ type: 'text', text: 'First answer' }],
     source: { provider: 'test', model: 'test' },
   })
-  const firstEvent = session.append('assistant/message', {
+  session.append('assistant/message', {
     turn: 1,
     step: 1,
     message: first,
+    stream: [],
   }, { surfaceOp: 'append' })
   const second = createAssistantMessage({
     content: [{ type: 'text', text: 'Second answer' }],
@@ -60,6 +61,7 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     turn: 1,
     step: 1,
     message: second,
+    stream: [],
   }, { surfaceOp: 'append' })
   const empty = createAssistantMessage({
     content: [],
@@ -69,28 +71,15 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     turn: 1,
     step: 1,
     message: empty,
+    stream: [],
   }, { surfaceOp: 'append' })
   session.append('step/end', { turn: 1, step: 1 })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
-
-  const replacement = createAssistantMessage({
-    content: [{ type: 'text', text: 'Model-only replacement' }],
-    source: { provider: 'test', model: 'test' },
-  })
-  session.append('assistant/message', {
-    turn: 1,
-    step: 1,
-    message: replacement,
-  }, {
-    surfaceOp: { op: 'replace', startSeq: firstEvent.seq, endSeq: firstEvent.seq },
-    sourceEventSeqs: [firstEvent.seq],
-  })
 
   return {
     userMessageId: user.id,
     assistantMessageIds: [first.id, second.id],
     emptyAssistantMessageId: empty.id,
-    replacementAssistantMessageId: replacement.id,
   }
 }
 
@@ -113,6 +102,10 @@ export function messageFixture(
 
 /** Minimal controllable persistence provider for service-level tests. */
 class TestPersistence extends SessionPersistence {
+
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
   override readonly supportsRawArtifacts = false
 
   static inject = ['sessions']
@@ -125,15 +118,15 @@ class TestPersistence extends SessionPersistence {
   onReadFrom: (() => void | Promise<void>) | undefined
   onListSnapshots: (() => void | Promise<void>) | undefined
 
-  locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
-  create(_meta: SessionHeader): Promise<void> { return Promise.resolve() }
-  append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> { return Promise.resolve() }
+  override locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
+  override createStored(_meta: SessionHeader): Promise<void> { return Promise.resolve() }
+  override append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> { return Promise.resolve() }
 
-  load(id: SessionId): Promise<SessionInspection> {
+  override load(id: SessionId): Promise<SessionInspection> {
     return this.readFrom(id, SessionLogOffset(0))
   }
 
-  inspect(id: SessionId): Promise<SessionInspection> {
+  override inspect(id: SessionId): Promise<SessionInspection> {
     this.inspectCalls += 1
     if (this.inspectFailure !== undefined) return Promise.reject(this.inspectFailure)
     const explicit = this.logical.get(id)
@@ -152,7 +145,7 @@ class TestPersistence extends SessionPersistence {
       : Promise.resolve(stored)
   }
 
-  async readFrom(
+  override async readFrom(
     id: SessionId,
     fromSeq: SessionLogOffsetType,
   ): Promise<SessionEventSuffix> {
@@ -169,11 +162,11 @@ class TestPersistence extends SessionPersistence {
       }
   }
 
-  list(): Promise<SessionHeader[]> {
+  override listStored(): Promise<SessionHeader[]> {
     return Promise.resolve([...this.durable.values()].map(value => value.meta))
   }
 
-  async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
+  override async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
     await this.onListSnapshots?.()
     return [...this.durable.values()].map((value, index) => ({
       header: value.meta,

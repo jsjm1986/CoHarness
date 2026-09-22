@@ -6,6 +6,10 @@ Per-preset agent composition. A **preset** is a directory holding one `agent.cor
 
 The mechanism is two seams. Entry contexts chain to the context a subtree was plugged into, and both [`dsh-tools`](../../core/tools/README.md) and [`dsh-system-prompt`](../../core/system-prompt/README.md) file registrations into the calling context's scope layer — so the standing mount's contributions land in the PRESET's layer. What carries them to each session is `dsh-scope`'s parent chain: an agent's views resolve `agent → preset → global` (nearest shadowing farthest), and the mount's listeners are admitted for every agent parented under it while a sibling preset's stay deaf.
 
+## Summary
+
+Use `dsh-agent-presets` to give each session the tools, prompt sections, and skills named by one preset's `agent.cordis.yml`. One process can run sessions with different presets while keeping their state separate. The preset list combines shipped definitions with configured and user roots, reports why a preset cannot start, and can create a local preset by copying an existing one. Deployments and users can choose defaults; only an empty session may switch presets. Treat every authored preset as trusted configuration because it grants the capabilities of the plugins it selects.
+
 ## Service: `AgentPresets` (ctx key: `agentPresets`)
 
 Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call, so a preset authored while the process runs is visible immediately and a deleted one disappears from the next read. Discovery also owns preset **health**: a directory whose composition is missing or unloadable (unparsable YAML — checked with the loader's own dialect, `!!js` included — or not a list of named plugin rows) is listed with a `broken` reason rather than skipped, because a skipped directory would still occupy its id on disk while every surface shows nothing to delete. A directory whose name is not a usable preset id (`[a-z0-9][a-z0-9-]*`) is skipped outright: no copy could ever claim it.
@@ -138,7 +142,7 @@ Presets are compositions, so a preset is exactly as privileged as the plugins it
 
 ## Model Experience
 
-Indirectly, through the plugins a standing composition registers, which own every tool schema and prompt section the preset makes visible to the agents joined to it.
+Indirectly, through the plugins a preset's standing composition installs, which own every tool schema, prompt section, and skill the preset makes visible to the agents joined to it.
 
 #### KV Cache effect
 

@@ -89,7 +89,7 @@ async function harness(logged?: {
 }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
-  await ctx.plugin(SystemPrompt, { persona: '' })
+  await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
@@ -168,11 +168,19 @@ describe('Web session model selection', () => {
       },
       validateImage,
       saveImage,
+      validateImageBatch(inputs: readonly unknown[]) {
+        (AttachmentStore.prototype as unknown as { validateImageBatch(this: unknown, batch: readonly unknown[]): void })
+          .validateImageBatch.call(attachments, inputs)
+      },
     }
     ctx.provide('attachments', {
       ...attachments,
       saveImages(inputs: readonly Parameters<typeof saveImage>[0][]) {
         return AttachmentStore.prototype.saveImages.call(attachments, inputs)
+      },
+      admitPromptContent(parts: readonly unknown[]) {
+        return (AttachmentStore.prototype.admitPromptContent as (this: unknown, content: readonly unknown[]) => Promise<unknown[]>)
+          .call(attachments, parts)
       },
     } as never)
     const followup = vi.fn()

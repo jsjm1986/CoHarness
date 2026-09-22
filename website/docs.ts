@@ -224,6 +224,14 @@ const develop = pairedPages([
     section: { root: '实战', en: 'Practice' },
     order: 2,
   },
+  {
+    source: 'docs/user/develop/practice/dynamic-cordis.md',
+    route: 'develop/practice/dynamic-cordis.md',
+    label: { root: '持久化 Harness 插件', en: 'Persistent Harness plugins' },
+    sidebar: { root: 'zh-develop', en: 'en-develop' },
+    section: { root: '实战', en: 'Practice' },
+    order: 3,
+  },
 ])
 
 const cordisTutorial = pairedPages(([
@@ -294,7 +302,7 @@ const subsystemGroups = [
     ['jobs.md', '后台任务', 'Background jobs'],
     ['filesystem.md', '文件系统', 'Filesystem'],
     ['lsp.md', 'LSP 导航', 'LSP navigation'],
-    ['code-runtime.md', '代码运行时', 'Code runtime'],
+    ['ptc-runtime.md', '代码运行时', 'Code runtime'],
     ['web.md', 'Web 访问', 'Web access'],
     ['skills.md', '技能', 'Skills'],
     ['workflow.md', '工作流', 'Workflows'],
@@ -336,6 +344,8 @@ const subsystemsReference = subsystemGroups.flatMap(([rootSection, enSection, fi
 ))
 
 const reference = [
+  // `docs/deepseek-llm-api-wire-extensions.md` is a repository-only provider protocol reference.
+  // Projected links intentionally resolve to its GitHub source instead of a public site route.
   ...pairedPages(([
     ['docs/architecture.md', 'reference/index.md', '架构', 'Architecture', 0],
   ] as const).map(([source, route, rootLabel, enLabel, order]): PairedPage => ({

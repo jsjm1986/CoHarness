@@ -15,7 +15,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import { CallId, createMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
@@ -46,6 +46,7 @@ function appendUserText(session: Session, text: string): SessionEvent {
 /** Append a production-shaped assistant message to the session surface. */
 function appendAssistantText(session: Session, text: string, step: number): SessionEvent {
   return session.append('assistant/message', {
+    stream: [],
     turn: 1,
     step,
     message: createMessage({
@@ -68,7 +69,7 @@ function appendExtension(session: Session, type: string, data: unknown): Session
 async function harness(): Promise<{ ctx: Context }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
-  await ctx.plugin(SystemPrompt, { persona: '' })
+  await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
@@ -114,24 +115,24 @@ describe('mux live view computation', () => {
 
     const session = ctx.sessions.create()
     session.append('turn/start', { turn: 1 })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-gen'), name: 'gen', arguments: '{}' })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-term'), name: 'term', arguments: '{"cmd":"echo hi"}' })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-diff'), name: 'diffy', arguments: '{}' })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-call-only'), name: 'call-only', arguments: '{}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-gen'), name: 'gen', arguments: '{}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-term'), name: 'term', arguments: '{"cmd":"echo hi"}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-diff'), name: 'diffy', arguments: '{}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-call-only'), name: 'call-only', arguments: '{}' })
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('c-call-only'),
+        callId: ToolCallId('c-call-only'),
         content: [{ type: 'text', text: rawResult }],
         isError: false,
       }),
     }, { surfaceOp: 'append' })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-plain'), name: 'plain', arguments: '{}' })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-boom'), name: 'boom', arguments: '{}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-plain'), name: 'plain', arguments: '{}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-boom'), name: 'boom', arguments: '{}' })
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('c-gen'),
+        callId: ToolCallId('c-gen'),
         content: [{ type: 'text', text: 'ok' }],
         isError: false,
       }),
@@ -177,12 +178,12 @@ describe('mux live view computation', () => {
     // .session is read on this path).
     await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
     session.append('turn/start', { turn: 1 })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('h-term'), name: 'term', arguments: '{"cmd":"ls"}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('h-term'), name: 'term', arguments: '{"cmd":"ls"}' })
     // meta rides through to presentResult's ToolResult (the spread arm).
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('h-term'),
+        callId: ToolCallId('h-term'),
         content: [{ type: 'text', text: 'ok' }],
         isError: false,
       }),
@@ -192,27 +193,27 @@ describe('mux live view computation', () => {
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('h-orphan'),
+        callId: ToolCallId('h-orphan'),
         content: [{ type: 'text', text: 'x' }],
         isError: false,
       }),
     }, { surfaceOp: 'append' })
     // Paired, but the call's stored arguments do not parse: backscan soft-falls.
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('h-bad'), name: 'term', arguments: '{broken' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('h-bad'), name: 'term', arguments: '{broken' })
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('h-bad'),
+        callId: ToolCallId('h-bad'),
         content: [{ type: 'text', text: 'y' }],
         isError: false,
       }),
     }, { surfaceOp: 'append' })
     // Presenterless tool: pairing succeeds but presentResult is absent.
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('h-plain'), name: 'plain', arguments: '{}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('h-plain'), name: 'plain', arguments: '{}' })
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('h-plain'),
+        callId: ToolCallId('h-plain'),
         content: [{ type: 'text', text: 'z' }],
         isError: false,
       }),
@@ -286,18 +287,20 @@ describe('mux live view computation', () => {
     expect(page.map(event => event.seq)).toEqual(page.map((_event, index) => third.seq + index))
   })
 
-  it('paginates a message with many provenance sources without variadic argument expansion', async () => {
+  it('paginates a message with many source events without variadic argument expansion', async () => {
     const { ctx } = await harness()
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
     const session = ctx.sessions.create()
     await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
     session.append('turn/start', { turn: 1 })
-    const sources = Array.from({ length: 128 }, (_unused, index) => session.append('assistant/chunk', {
+    const stepStart = session.append('step/start', { turn: 1, step: 1 })
+    const sources = Array.from({ length: 128 }, (_unused, index) => session.append('assistant/attempt', {
       turn: 1,
       step: 1,
-      chunk: { type: 'text-delta', index, text: 'x' },
+      stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', index, text: 'x' } }],
     }).seq)
     const message = session.append('assistant/message', {
+      stream: [],
       turn: 1,
       step: 1,
       message: createMessage({
@@ -305,7 +308,7 @@ describe('mux live view computation', () => {
         content: [{ type: 'text', text: 'x'.repeat(sources.length) }],
         source: { kind: 'model', provider: 'p', model: 'm' },
       }),
-    }, { surfaceOp: 'append', sourceEventSeqs: sources })
+    }, { surfaceOp: 'append' })
 
     const scalarMin = Math.min
     const min = vi.spyOn(Math, 'min').mockImplementation((...values) => {
@@ -314,11 +317,11 @@ describe('mux live view computation', () => {
     })
     try {
       const response = await api.sessions.history({
-        rpcId: RpcId('t-hist-large-provenance'),
+        rpcId: RpcId('t-hist-large-source-events'),
         payload: { sessionId: session.id, maxMessages: 1 },
       })
       if (!response.result.ok) throw new Error('unreachable')
-      expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([...sources, message.seq])
+      expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([stepStart.seq, ...sources, message.seq])
       expect(response.result.value.hasMore).toBe(true)
     } finally {
       min.mockRestore()
@@ -336,7 +339,7 @@ describe('mux live view computation', () => {
       session = inner.sessions.create('session-doomed' as SessionId)
     }, { inject: ['sessions'] }))
     session?.append('turn/start', { turn: 1 })
-    session?.append('tool/call', { turn: 1, step: 1, callId: CallId('c-doomed'), name: 'term', arguments: '{"cmd":"x"}' })
+    session?.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-doomed'), name: 'term', arguments: '{"cmd":"x"}' })
     // Disposing the owning fiber detaches the session mid-stream; the
     // session/disposed listener must clear its open-call table entry.
     await fiber.dispose()
@@ -355,14 +358,14 @@ describe('mux live view computation', () => {
 
     const session = ctx.sessions.create()
     session.append('turn/start', { turn: 1 })
-    session.append('tool/call', { turn: 1, step: 1, callId: CallId('c-late'), name: 'term', arguments: '{"cmd":"tail"}' })
+    session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('c-late'), name: 'term', arguments: '{"cmd":"tail"}' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     // The turn/end above cleared the live table; pairing must fall back to
     // scanning the session's in-memory events.
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId('c-late'),
+        callId: ToolCallId('c-late'),
         content: [{ type: 'text', text: 'ok' }],
         isError: false,
       }),

@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-新增 `scripts/incremental-coverage.ts` 及其测试，作为增量 PR 门禁的第一块基础。工具会计算变更的 package 源码文件，统一 Istanbul coverage map 的绝对/相对路径，拒绝不在 coverage map 中的变更源码，并要求每个选中文件的 lines、statements、functions、branches 均为 100%。package script 为 `test:coverage:incremental`。
+`scripts/incremental-coverage.ts` 及其测试为增量 PR 门禁提供覆盖率校验。该工具通过与全量覆盖率相同的策略选择变化的运行时源码，规范化 Istanbul 数据键，拒绝缺失的应测文件，并要求行、语句、函数和分支覆盖率均为 100%。纯类型语法从源码派生，不视为运行时数据缺失。公开命令为 `test:coverage:incremental`。
 
 本次不替换或放宽完整 coverage lane。CI 在 `ci-coverage-scoped` 聚合中接入该工具（见[增量 CI lane 分级](2026-09-10-incremental-ci-lane-gating.zh.md)）：先运行变更包的测试，再把 merge-base ref 与生成的 coverage map 传到这里，获得权威的变更文件判定。全量改动和 baseline 维护仍以完整 lane 为准。
 
@@ -24,8 +24,10 @@ Status: implemented
 
 ## Consequences
 
-小范围源码改动拥有确定性的变更文件 coverage 校验工具，同时完整 coverage 约束保持不变。未来 CI 接入必须显式传入 merge-base 路径集和最终 coverage map，任一缺失都必须失败。
+小范围源码变更获得确定的逐文件覆盖率验证工具，完整覆盖率约定保持不变。CI 显式传入合并基线路径集和最终覆盖率数据；输入缺失时失败。
 
 ## Tests
 
 `pnpm exec vitest run scripts/incremental-coverage.spec.ts` 通过，共六个测试，覆盖源码选择、路径标准化、map 缺失、coverage 不足和空输入。
+
+[候选提交绑定的证据决策](2026-09-21-candidate-bound-gate-evidence.zh.md)扩展消费方选检和发布验收，同时保留本注记的覆盖率与版本规则。

@@ -7,11 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+该能力面向运行在用户桌面上的 Web Host。CoHarness 云端组合默认不挂载这两行，因为启动器会在服务器上运行；云端应另行提供远程工作区桥接或复制路径操作。
+
 ## 概述
 
-`dsh-host-open-in-app` 是可选的桌面专用主机半边：解析本机实际持有哪些目录应用——每个都解析为已验证、可直接使用的启动器——并在 `ctx.webServer` 上注册三条仅接受 loopback 的路由：已解析的应用列表、逐应用图标、以及在其中打开 workspace 目录的启动端点。目录是一份固定白名单；解析每主机进程执行一次，产出的映射由所有路由共享，因此点击、展开菜单或刷新页面都不会重新执行检测。解析用的主机命令在配置的期限内、不经 shell 执行，PATH 名称经 subprocess 能力在进程内解析，各应用适配器以清理过凭据的环境和各自的 Windows 可见性策略 detached 派生（文件管理器例外，走 OS shell 的 open verb，即 `dsh-native-command` 的路径打开器）。随发行版一起出货的消费方是 [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.zh.md) 中的浏览器分体按钮；该功能由社区插件 `@dsh-plugins/open-anywhere` 转正而来。
-
-该能力面向运行在用户桌面上的 Web Host。CoHarness 云端组合默认不挂载这两行，因为启动器会在服务器上运行；云端应另行提供远程工作区桥接或复制路径操作。
+`dsh-host-open-in-app` 是 open-in-app 的桌面专用主机半边：把本机实际持有的目录应用解析为已验证的启动器，并在 `ctx.webServer` 上注册三条仅接受 loopback 的路由——已解析列表、逐应用图标、以及在其中打开 workspace 目录的启动端点。解析每进程执行一次；启动适配器以清理过凭据的环境 detached 派生。随发行版出货的消费方是 [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.zh.md) 中的浏览器分体按钮。
 
 ## 目录
 

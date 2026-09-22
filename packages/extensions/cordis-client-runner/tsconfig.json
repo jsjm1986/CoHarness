@@ -9,12 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
@@ -33,7 +27,13 @@
       "path": "../../client/ui-theme"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

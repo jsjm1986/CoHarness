@@ -49,10 +49,15 @@ describe('web: Cordis Workspace workbench', () => {
     })
     const runtime = scaffold
     const events = new Map<string, SessionEvent[]>()
+    const assistantFrames = new Map<string, number>()
     scaffold.ctx.on('session/event', (session: Session, event: SessionEvent) => {
       const log = events.get(session.id) ?? []
       log.push(event)
       events.set(session.id, log)
+    })
+    scaffold.ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+      if (frame.type !== 'chunk') return
+      assistantFrames.set(agent.session.id, (assistantFrames.get(agent.session.id) ?? 0) + 1)
     })
     // Seed one content-bearing Session per Workspace through the production
     // persistence and Workspace registry paths; the chooser's history list
@@ -86,7 +91,7 @@ describe('web: Cordis Workspace workbench', () => {
     // The conversation viewport boots in single-session mode; entering the
     // workbench is an explicit gesture through the toolbar's chooser, which
     // switches the viewport and mounts the default layout's (empty) panes.
-    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
     await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     await page.locator('[data-workbench-empty-content]').waitFor({ timeout: 30_000 })
     for (const workspaceId of workspaceIds) {
@@ -106,15 +111,15 @@ describe('web: Cordis Workspace workbench', () => {
     const approvalPrompt = fixtureUserPrompts(await readFile(APPROVAL, 'utf8'))[0]!
     const replyPrompt = fixtureUserPrompts(await readFile(REPLY, 'utf8'))[0]!
     await prompt(a, approvalPrompt)
-    await expect.poll(() => events.get(ids[0]!)?.some(event => event.type === 'assistant/chunk'), { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => (assistantFrames.get(ids[0]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
     await prompt(b, replyPrompt)
-    await expect.poll(() => events.get(ids[1]!)?.some(event => event.type === 'assistant/chunk'), { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => (assistantFrames.get(ids[1]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
     expect(await a.locator('[data-state="ongoing"]').count()).toBeGreaterThan(0)
     expect(await b.locator('[data-state="ongoing"]').count()).toBeGreaterThan(0)
     const approval = a.locator('[data-approval-key]')
     await approval.waitFor({ timeout: 60_000 })
     await prompt(c, replyPrompt)
-    await expect.poll(() => events.get(ids[2]!)?.some(event => event.type === 'assistant/chunk'), { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => (assistantFrames.get(ids[2]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
     await c.getByRole('button', { name: 'Close pane', exact: true }).click()
     await expect.poll(() => events.get(ids[2]!)?.some(event => event.type === 'turn/end'), { timeout: 60_000 }).toBe(true)
     expect(await panes.count()).toBe(3)
@@ -134,11 +139,11 @@ describe('web: Cordis Workspace workbench', () => {
     await page.reload({ waitUntil: 'load' })
     await page.locator('[data-session-pane]').waitFor({ timeout: 30_000 })
     await expect.poll(() => page.locator('[data-session-pane] textarea').first().inputValue()).toBe('Delta draft survives pane changes')
-    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
     await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
     expect(await page.locator('[data-session-pane]').count()).toBe(0)
     expect(await page.locator('textarea').first().inputValue()).toBe('Delta draft survives pane changes')
-    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
     await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     expect(await toolbar.getByRole('tab').count()).toBe(3)
     expect(tripwire.pageErrors).toEqual([])

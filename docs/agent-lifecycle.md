@@ -35,14 +35,15 @@ sequenceDiagram
   Driver->>Prompt: <code>system-prompt/assemble</code> waterfall
   Driver->>LLM: <code>agent/request</code> waterfall, then <code>llm/stream</code> waterfall
   LLM-->>Driver: StreamChunk*
-  Driver->>Session: <code>assistant/chunk</code>*
-  Session-->>SDK: <code>session/event</code> <code>assistant/chunk</code>*
+  Driver-->>SDK: <code>session/assistant-stream</code> chunk*
   alt final adapter or terminal in-band request failure
-    Driver->>Session: <code>step/end</code>
+    Driver->>Session: <code>assistant/attempt</code>
+    Driver-->>SDK: <code>session/assistant-stream</code> committed end
     Driver->>Hooks: <code>agent/request-error</code> waterfall
     Hooks-->>Driver: return retry action or preserve the original error
   else model request succeeded
   Driver->>Session: <code>assistant/message</code>
+  Driver-->>SDK: <code>session/assistant-stream</code> committed end
   Driver->>Tools: classify pending call by executionMode
   loop barriers and bounded rolling pool, reclassify before start
     opt call starts
@@ -71,7 +72,7 @@ sequenceDiagram
   Driver-->>SDK: <code>agent/status</code> idle
 ```
 
-The `assistant/message` event records every successful provider call, including content-less and `max-tokens` finishes. Empty content stays out of derived history, while the durable event keeps usage and `sourceEventSeqs` listing the exact `assistant/chunk` events, including an explicit empty list.
+The `assistant/message` event records every successful provider call, including content-less and `max-tokens` finishes, and embeds the exact compact stream records. Empty content stays out of derived history, while the durable event keeps usage. A failed, retried, cancelled, or stream-error attempt that reaches settlement without a surface message records its stream as `assistant/attempt`.
 
 `dsh-compaction-basic` uses `agent/pre-step` for pressure before request derivation and `agent/request-error` only for canonical context overflow. Once either trigger qualifies, optional tool-result pruning runs before summary selection. Recovery works between the closed failed step and failed turn close, and opens a fresh retry turn only when pruning or summarization advances the surface replacement generation; otherwise the original request error remains authoritative.
 

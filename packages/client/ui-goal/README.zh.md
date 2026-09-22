@@ -8,9 +8,17 @@ Goal 界面插件（浏览器端部分）：`GoalBar` 条带是 `conversation.in
 
 `/client` 的导出接口包括插件本体（`apply`/`inject`）、`GoalBar`/`GoalDock` 组件与注入动词面类型。
 
+## 概述
+
+Web GUI 的 goal 界面同时显示持久 goal 状态及当前的进程本地激活状态，供用户编辑、暂停、恢复或清除 goal；被拒绝的变更所产生的错误会内联显示。它把持久的 `/goal` 运行显示为 `Command input` 气泡，让用户或模型发出的命令在重新加载后仍然可见。goal 创建仍不归本包。除 `minimal` 外，随附的 Web preset 都会向 agent（智能体）提供 `/goal`。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。实时目标经由 `goal` session 投影到达，变更经由 `ctx.remote.goals` 进行；插件不拥有领域存储或刷新链。
+
 ## 模型体验
 
-间接影响：条带通过调用 `goals/edit`、`goals/pause`、`goals/resume` 和 `goals/clear` Remote 方法提交变更；每次被接受的变更都会在持久 `agent/inbox/spliced` 插入项中提交，goal 投影会立即折叠该插入项，同时将一条 `goal/change` 上下文消息排队。只有后续 pre-step 准入该上下文时，模型才会看到它；丢弃已排队的消息不会回滚投影状态。条带自身不添加任何提示词内容。
+间接影响：条带路由 `goals/edit`、`goals/pause`、`goals/resume` 与 `goals/clear` 变更；宿主 GoalService 拥有这些变更排队的模型可见 goal 上下文消息。
 
 #### KV Cache 影响
 

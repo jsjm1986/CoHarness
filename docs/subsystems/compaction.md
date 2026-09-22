@@ -27,6 +27,16 @@ These variants are merged inside a `declare module '@deepseek-ai/dsh-session/typ
 What a successful compaction returns to its caller: the bookkeeping-event seqs, safe summary projection, shadowed range and seqs, and estimated token count.
 
 ```ts type-equiv
+/** Exact input-image occurrences selected by one durable offload decision. */
+interface ImageOffloadTarget {
+  /** Current message-producing event containing these occurrences. */
+  seq: SessionSeq
+  /** Zero-based depth-first image indexes within the immutable message. */
+  imageIndexes: number[]
+}
+```
+
+```ts type-equiv
 /** Result of a successful compaction operation. */
 interface CompactionResult {
   /** Stable identity shared by this compaction's complete durable lifecycle. */
@@ -99,7 +109,7 @@ interface PrunedEntry {
   /** Newly appended pruned tool-result event. */
   readonly replacementSeq: SessionSeq
   /** Tool call shared by the original and replacement. */
-  readonly callId: CallId
+  readonly callId: ToolCallId
   /** Original text size in Unicode code points. */
   readonly charsBefore: number
   /** Replacement text size in Unicode code points. */
@@ -235,4 +245,35 @@ pruneSession(session: Session): PruneResult
 Types: [ContentBlock](llm-streaming.md) · [Session](session.md)
 
 Source: [`packages/compaction/compaction-tool-result-pruner/src/index.ts`](../../packages/compaction/compaction-tool-result-pruner/src/index.ts)
+
+<a id="compaction-events"></a>
+
+### `compaction/*` events
+
+<a id="compactionsummary-error--waterfall"></a>
+
+#### `compaction/summary-error` — waterfall
+
+Recover a failed summary request by synchronously recording a durable change to its selected input. Return true only after making progress; the provider re-derives and re-prices the selection before retrying. Call next() when the failure cannot be recovered. Decisions survive a later summary failure or cancellation.
+
+```ts cordis-catalog
+/**
+ * Recover a failed summary request by synchronously recording a durable
+ * change to its selected input. Return true only after making progress;
+ * the provider re-derives and re-prices the selection before retrying.
+ * Call next() when the failure cannot be recovered. Decisions survive a
+ * later summary failure or cancellation.
+ * @param payload.session - session containing the selected input.
+ * @param payload.sourceEventSeqs - selected message events in request order.
+ * @param payload.error - failure thrown by the summarizer.
+ * @param payload.signal - optional compaction cancellation signal.
+ * @param next - delegate to the next recovery listener.
+ * @mode waterfall
+ */
+'compaction/summary-error'(payload: { session: Session; sourceEventSeqs: readonly SessionSeq[]; error: unknown; signal?: AbortSignal }, next: () => boolean): boolean
+```
+
+Types: [Session](session.md) · [SessionSeq](session.md)
+
+Source: [`packages/compaction/compaction/src/index.ts`](../../packages/compaction/compaction/src/index.ts)
 <!-- END GENERATED cordis-surface -->

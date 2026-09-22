@@ -53,6 +53,7 @@ async function bench(desktop = false) {
   })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
+  runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({

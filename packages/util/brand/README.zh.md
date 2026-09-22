@@ -4,6 +4,10 @@
 
 `Branded<B>` 与 `BrandedNumber<B>` 名义类型原语：一个微小的**仅类型**包，无运行时代码，也不依赖其他 harness 包；所有拥有易混淆跨边界值的包都会共享它。
 
+## 概述
+
+`dsh-brand` 让结构相同的字符串或数字在类型层面不可互换：`SessionId` 无法传给期望 `ToolCallId` 的位置，事件序号也无法传给需要日志偏移量的位置。`brandString<T>()` 与 `brandNumber<T>()` 在不持有共享运行时状态的情况下应用名义品牌，让所属包可以定义领域类型，而无需导入不相关的能力。
+
 ## `Branded` 是什么
 
 品牌使结构相同的字符串或数字在类型层面不可互换：`SessionId` 不能传给期望 `CallId` 的位置，事件序号也不能传给要求日志偏移的位置，尽管它们在运行时都只是普通的 `string` 或 `number`。
@@ -44,3 +48,5 @@ export function SessionSeq(value: number): SessionSeq {
 包为自己拥有的值添加品牌：`CallId` 位于 `dsh-llm`，共享的 agent/会话 `SessionId` 位于 `dsh-session`，`JobId` 位于 `dsh-jobs`，`SessionSeq` 与 `SessionLogOffset` 亦位于 `dsh-session`。为可能与同一原始类型的其他值混淆的跨包值添加品牌，但无需为每个字符串或数字都添加。
 
 该包只负责这一原语。保持无依赖意味着，例如 `dsh-jobs` 可以为 `JobId` 使用品牌类型，而无需仅为使用 `Branded` 而导入不相关的功能包。
+
+**运行时不变式：** 不发布伴生入口。这个纯工具不拥有事件流或可变运行时数据；其值代数由单元测试保障。

@@ -6,6 +6,10 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 
 这是 harness 中唯一包含具体循环逻辑的包。其他所有内容要么是抽象服务，要么是针对扩展点的插件：新行为应放入插件，而不是这里。
 
+## 概述
+
+`dsh-agent-loop` 创建全新 agent 或恢复持久化会话，随后通过模型请求、流式响应、工具执行和持久会话历史驱动每个轮次。标准 agent 组合应挂载本包；声明式条目会在启动时启动 agent，公开的 `ctx.agents` API 则支持以编程方式创建和恢复 agent。`maxParallelToolCalls` 限制同时运行的并行安全调用数量，独占调用保留顺序。取消会保留已经流式交付给用户的文本。只有标准的「调用模型、运行工具、重复」生命周期无法满足需求时，才应选择自定义 `Agent` 实现。
+
 ## 服务：`AgentLoop`（ctx 键：`agentLoop`）
 
 ### 公开 API
@@ -70,9 +74,10 @@ interface Config {
 
 AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在其 inject 列表中），并在其上注册 host-only 的 `turnBoundary` projection。该投影记录打开的轮次和最近的步骤边界，供授权读取方使用，不增加第二条事件流。
 
+<a id="loop-lifecycle-agentts"></a>
 ### 循环生命周期（`agent.ts`）
 
-驱动器在其整个生命周期内拥有一个 agent，并在 `ctx.agents.withInitiator(agent, ...)` 内运行。其包内私有的 `ReactLoopInbox` 构造器在 agent 作用域上注册 host-only 的 `agentInbox` 投影，随后用该投影执行结构化命令和仅限循环的领取。注册表引用计数让共享键保持活跃，直到最后一个 agent 作用域卸载。包私有的编排入口点会恢复确切的 Agent，一次性派生 `agent.session`，并让操作局部的辅助函数捕获它，而不是通过浅层接口继续传递具体驱动器或每次操作的 `Session`。如果显式 `Session` 正是辅助函数的实际接口，该辅助函数会保留它；创建、持久化加载、未发布 setup、服务、worker、进程、持久化和 wire 协议则继续保留各自的显式身份。[agent 服务](../agent/README.zh.md#initiating-agent-scope)规定传播、teardown 和分离工作规则。
+驱动器在其整个生命周期内拥有一个 agent，并在 `ctx.agents.withInitiator(agent, ...)` 内运行。`AgentLoop` 为其服务生命周期注册 host-only 的 `inbox` 投影，使冷读取在 Agent 存在之前与全部卸载之后均可用。其包内私有的 `ReactLoopInbox` 使用该共享投影执行结构化命令和仅限循环的领取。包私有的编排入口点会恢复确切的 Agent，一次性派生 `agent.session`，并让操作局部的辅助函数捕获它，而不是通过浅层接口继续传递具体驱动器或每次操作的 `Session`。如果显式 `Session` 正是辅助函数的实际接口，该辅助函数会保留它；创建、持久化加载、未发布 setup、服务、worker、进程、持久化和 wire 协议则继续保留各自的显式身份。[agent 服务](../agent/README.zh.md#initiator-scope)规定传播、teardown 和分离工作规则。
 
 每次提供方调用成功结束时，都会恰好追加一个 `assistant/message` 完成锚点，包括无内容调用和以 `max-tokens` 结束的调用。该锚点原样记录组装后的内容，在 `sourceEventSeqs` 中列出确切的分片 seq（流没有分片时为 `[]`），并在用量可用时包含用量；空内容不会进入派生消息历史。轮次取消打断流式输出时，如果非空文本或推理内容已送达用户，循环也会追加一个带 `interrupted: true` 的锚点。该锚点引用对应的分片 seq，并把已渲染的前缀放入派生消息历史，使下一次请求包含用户看到的内容。未分派的工具调用会被省略，空流或只包含工具调用的流不会生成锚点；提供方故障也不提交 assistant 内容（[决策](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.zh.md)）。
 
@@ -97,23 +102,23 @@ AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在�
 
 ### 完整对话请求
 
-#### 模型看到的内容
+#### 模型看到什么
 
-每个步骤中，循环会发送针对该 agent 呈现的系统提示词、可见工具 schema 和会话派生消息。它提供 `provider`、`model` 与 `cwd` 变量值，但不添加固定文案。
+每个步骤中，循环会发送会话的派生消息与可见工具 schema。非空的 `system/message` 节点承载提示词，最新一条是有效版本；空渲染文本会从派生历史中清除所有提示词版本。它提供 `provider`、`model` 与 `cwd` 变量值，但不添加固定文案。
 
 #### Token 影响
 
-每个步骤都会再次计入系统文本与 schema。逐 agent 作用域决定贡献，而权威组装 waterfall 可以改变最终请求，并使其监听器负责保持协议连贯。
+系统文本与 schema 在每个步骤都会再次计入，在 `in-history` 路由上，每个保留的提示词版本都会持续计入，直到压缩将其遮蔽或提示词协调将其清空。逐 agent 作用域决定贡献，而权威组装 waterfall 可以改变最终请求，并使其监听器负责保持协议连贯。
 
 #### KV Cache 影响
 
-只有在同一提供方和模型路由下，且系统文本、schema 与此前历史都保持逐字节一致时，请求 token 序列才保持仅追加。携带 token 的组装改写或组合变更可能从第一个改变的请求 token 起使复用失效。
+只有在同一提供方与模型路由下，且系统文本、schema 与此前历史都保持逐字节一致时，请求才保持仅追加。渲染后的提示词未变时，缓存前缀得以保留，除非不具备能力的路由或新请求序列必须归并保留的历史内系统节点。原地替换某个系统节点的提示词变更会使请求从该节点的第一个 token 起就不同——该节点是第 0 号节点时则整个请求都不同——因此提供方前缀缓存从那里开始未命中；当已准备调用声明 `systemPromptUpdate: 'in-history'` 时，同一请求序列延续期间的非空提示词变更会追加到已缓存历史之后，因此直到该历史末尾的前缀仍可复用。schema 或组合变更则从第一个改变的请求 token 起使复用失效。
 
 ### 保留的消息历史
 
-#### 模型看到的内容
+#### 模型看到什么
 
-已接纳的 user 消息、assistant 消息、工具调用与结果、注入上下文和 steering（中途引导）都会记录，并在后续步骤中发送。原始流分片、生命周期边界和其他仅写入日志的事件会被排除。
+已接纳的 user 消息、assistant 消息、工具调用与结果、注入上下文与 steering（中途引导）都会记录，并在后续步骤中发送。原始流分片、生命周期边界与其他仅写入日志的事件会被排除。
 
 #### Token 影响
 
@@ -125,7 +130,7 @@ AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在�
 
 ### 取消后未分发的调用
 
-#### 模型看到的内容
+#### 模型看到什么
 
 如果后续请求回放一个中止的步骤，取消所阻止分发的每个工具调用都有错误码 `ABORTED_BEFORE_DISPATCH`，结果文本为 `Error: tool call aborted before dispatch`。
 

@@ -10,6 +10,7 @@ export type TestSqlName =
   | 'count-physical-types'
   | 'create-loose-schema'
   | 'create-unrelated-table'
+  | 'delete-event'
   | 'delete-persistence-state'
   | 'delete-session-events'
   | 'empty-store-id'
@@ -27,7 +28,7 @@ export type TestSqlName =
   | 'set-user-version-16'
   | 'set-user-version-17'
   | 'set-user-version-18'
-  | 'set-user-version-20'
+  | 'set-user-version-21'
   | 'update-invalid-session-metadata'
 
 /** Load one fixed test SQL resource. */

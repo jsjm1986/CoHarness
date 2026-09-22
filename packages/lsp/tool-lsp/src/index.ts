@@ -101,7 +101,7 @@ export function apply(ctx: Context, config: Config): void {
   assertPositiveInteger('maxResultChars', resolved.maxResultChars)
   assertTimer('timeoutMs', resolved.timeoutMs)
 
-  ctx.systemPrompt.section({ name: 'tool:lsp', order: 112, text: LSP_PROMPT_TEXT })
+  ctx.systemPrompt.section({ name: 'tool:lsp', order: ctx.systemPrompt.getSectionOrder('TOOL_LSP'), text: LSP_PROMPT_TEXT })
 
   ctx.tools.register(defineTool({
     name: 'lsp',

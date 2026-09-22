@@ -6,6 +6,10 @@ THE concrete agent plugin and loop driver. Its package-internal implementation s
 
 This is the only package in the harness that contains concrete loop logic. Everything else is an abstract service or a plugin against extension points — new behavior goes into plugins, not here.
 
+## Summary
+
+`dsh-agent-loop` creates fresh agents or resumes persisted sessions, then drives each turn through model requests, streamed responses, tool execution, and durable session history. Mount it for standard agent compositions; declarative entries start agents at boot, while the public `ctx.agents` API supports programmatic creation and resume. `maxParallelToolCalls` limits concurrent parallel-safe calls, and exclusive calls retain ordering. Cancellation preserves streamed text already delivered to the user. Choose a custom `Agent` implementation only when the standard "call model, run tools, repeat" lifecycle is insufficient.
+
 ## Service: `AgentLoop` (ctx key: `agentLoop`)
 
 ### Public API
@@ -72,7 +76,7 @@ AgentLoop requires the session-projection registry (`sessionProjections` is in i
 
 ### Loop lifecycle (`agent.ts`)
 
-The driver owns one agent for its lifetime and runs inside `ctx.agents.withInitiator(agent, ...)`. Its package-internal `ReactLoopInbox` constructor registers the host-only `agentInbox` projection on the agent scope, then uses that projection for structural commands and loop-only claims. Registry reference counting keeps the shared key active until the last agent scope unloads. Package-private orchestration entry points recover the exact Agent, derive `agent.session` once, and let operation-local helpers capture it instead of forwarding the concrete driver or per-operation `Session` through shallow interfaces. A helper keeps an explicit `Session` when that is its actual interface, while creation, persistence load, unpublished setup, services, workers, processes, persistence, and wire protocols retain their explicit identities. The [agent service](../agent/README.md#initiating-agent-scope) owns propagation, teardown, and detached-work rules.
+The driver owns one agent for its lifetime and runs inside `ctx.agents.withInitiator(agent, ...)`. `AgentLoop` registers the host-only `inbox` projection for its service lifetime, so cold reads work before any Agent exists and after all Agents unload. Its package-internal `ReactLoopInbox` uses that shared projection for structural commands and loop-only claims. Package-private orchestration entry points recover the exact Agent, derive `agent.session` once, and let operation-local helpers capture it instead of forwarding the concrete driver or per-operation `Session` through shallow interfaces. A helper keeps an explicit `Session` when that is its actual interface, while creation, persistence load, unpublished setup, services, workers, processes, persistence, and wire protocols retain their explicit identities. The [agent service](../agent/README.md#initiator-scope) owns propagation, teardown, and detached-work rules.
 
 Every provider call that reaches a successful finish appends exactly one `assistant/message` completion anchor, including content-less calls and `max-tokens` finishes. The anchor records the assembled content as-is, lists the exact chunk seqs in `sourceEventSeqs` (`[]` for a stream with no chunks), and includes usage when available; empty content stays out of derived message history. A turn cancellation that interrupts streaming also appends an `interrupted: true` anchor when non-empty text or reasoning has reached the user. The anchor cites those chunk seqs and places the rendered prefix in derived message history, so the next request contains what the user saw. Undispatched tool calls are omitted, and an empty or tool-only stream produces no anchor; provider failures still commit no assistant content ([decision](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.md)).
 
@@ -99,15 +103,15 @@ Everything that goes beyond "call the model, run the tools, repeat" belongs to p
 
 #### What the model sees
 
-For each step, the loop sends the rendered per-agent system prompt, visible tool schemas, and the session's derived messages. It supplies `provider`, `model`, and `cwd` variable values but no additional fixed prose.
+For each step, the loop sends the session's derived messages and visible tool schemas. Non-empty `system/message` nodes carry the prompt, with the latest as the effective version; an empty rendering clears all prompt versions from derived history. It supplies `provider`, `model`, and `cwd` variable values but no additional fixed prose.
 
 #### Token effect
 
-System text and schemas are paid again on every step. Per-agent scoping chooses the contributions, while the authoritative assembly waterfall can alter the final request and makes its listener responsible for protocol coherence.
+System text and schemas are paid again on every step, and on an `in-history` route every retained prompt version is paid until compaction shadows it or prompt reconciliation empties it. Per-agent scoping chooses the contributions, while the authoritative assembly waterfall can alter the final request and makes its listener responsible for protocol coherence.
 
 #### KV Cache effect
 
-Append-only only while system text, schemas, and earlier history remain byte-identical under the same provider and model route. A token-bearing assembly rewrite or composition change may invalidate reuse from the first altered request token.
+Append-only only while system text, schemas, and earlier history remain byte-identical under the same provider and model route. An unchanged rendered prompt keeps the cached prefix unless an incapable route or a new request series must consolidate retained in-history system nodes. A prompt change that replaces a system node in place makes the request differ from that node's first token — in full when the node is node 0 — so the provider prefix cache misses from there; when the prepared call declares `systemPromptUpdate: 'in-history'`, a non-empty prompt change inside a continuing request series is appended after the cached history, so the prefix through that history stays reusable. A schema or composition change invalidates reuse from the first altered request token.
 
 ### Retained message history
 
@@ -135,7 +139,7 @@ One fixed error result per skipped call remains in history until compaction shad
 
 #### KV Cache effect
 
-Append-only; each synthetic result follows the reusable request prefix and does not invalidate existing KV-cache entries.
+Append-only; each synthetic result follows the reusable request prefix and does not invalidate existing KV Cache entries.
 
 ## Known Limitations and Deferred Work
 

@@ -151,9 +151,9 @@ describe('QuestionComposer', () => {
     expect((screen.getByText('下一题').closest('button') as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByRole('radio', { name: '研究潜力型' }))
     expect(screen.getByText('2 / 3')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '跳过本题' }))
+    fireEvent.click(screen.getByRole('button', { name: '跳过' }))
     expect(screen.getByText('3 / 3')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '跳过本题' }))
+    fireEvent.click(screen.getByRole('button', { name: '跳过' }))
 
     expect(respond).toHaveBeenCalledWith(answeredEnvelope('question-1', [
       { id: 'profile', selected: ['研究潜力型'] },
@@ -214,7 +214,7 @@ describe('QuestionComposer', () => {
     // Receipt rejection surfaces through the domain face's thrown message.
     fireEvent.click(screen.getByRole('button', { name: '放弃整组问题' }))
     expect(await screen.findByText('question cancellation rejected: bad-response')).toBeTruthy()
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: '跳过本题' }).disabled).toBe(false)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: '跳过' }).disabled).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: '放弃整组问题' }))
     expect(await screen.findByText('第二次取消失败')).toBeTruthy()
@@ -257,7 +257,7 @@ describe('QuestionComposer', () => {
       'question', RpcId('solo'), SID, { questions: [{ id: 'detail', question: '补充你的要求' }] }, respond)
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} t={seatOver(en, commonEn)} />)
     expect(screen.getByLabelText('Dismiss all questions')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Skip this question' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeTruthy()
     expect(screen.getByPlaceholderText('Type your answer')).toBeTruthy()
   })
 

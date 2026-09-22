@@ -6,6 +6,10 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 
 分析器可以分别使用由 `tsconfig.host.json` 或 `tsconfig.client.json` 初始化的独立 `ts.Program`。直接项目引用确定编译器 face 的成员归属，而包子路径确定 Typert 运行时 face 的贡献：声明 `dsh.client` 的普通单项目包可以同时贡献 Host 与 Client 运行时模型；只有通过 `tsconfig.host.json` 或 `tsconfig.client.json` 显式引用的拆分项目，才会被限制在相应 face。`package.json#exports` 确定所有跨包公开边界，跨 face 的边只能来自源码导入或重新导出。NPM 依赖拥有的类型（包括 `@types` 包中的全局声明）继续以 `external` 引用表示，不会被展开。
 
+## 概述
+
+`dsh-typert-generator` 让维护者把公开的 TypeScript 类型转换为构建产物和与编译器无关的模型。包通过 `./typert` 和可选的 `./client/typert` 导出选择加入；如果声明、发布清单、Remote 导出或 Zod 投影无法被正确表示，生成过程就会失败。仓库构建会生成可执行 schema factory 与配套声明，工具也可以调用 `WorkspaceAnalyzer` 完成检查或目录生成而不发布产物。生成过程只在构建时运行，绝不会进入实时 agent（智能体）会话。
+
 ## 分析模型
 
 每个 face 包含包导出、Cordis 服务与事件、显式标记的对象与 schema，以及涵盖其可达声明的类型图。类型图保留声明标识、泛型参数及应用、显式继承、条件类型与映射类型、导入属性、abstract 修饰符和源码 JSDoc。服务和 `@typert object` 对外接口仅暴露公共实例成员；构造函数、静态成员与非公共成员均被排除。
@@ -24,13 +28,17 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 
 包根导出中包含本仓库 Cordis 目录使用的模型驱动提取逻辑、完整性检查和确定性文本渲染器。它们接受 `CordisCatalogPolicy`；由仓库持有的类型链接、基础类型／豁免类型分类和继承的 Cordis 条目仍位于 `scripts/gen-cordis-catalog.ts`，并由调用方显式传入。因此，生成器包只包含投影机制，不会隐式复制本仓库的文档分类体系。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。从源类型到 `FaceModel`/`TypeGraph` 数据的编译期变换；其输出由生成器规格断言，它不运行任何运行时状态。
+
 ## 模型体验
 
-无。该包仅在构建或测试时运行，不会向模型请求添加任何内容。
+无，因为构建时生成器在任何 agent 运行时之外运行，不触及任何模型请求。
 
 #### KV Cache 影响
 
-无。
+无直接影响；生成产物只有在消费方将其放入请求时才会触及请求。
 
 ## 已知限制与暂缓事项
 

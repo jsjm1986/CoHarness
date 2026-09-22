@@ -16,7 +16,7 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
 export const unknownFallbackDefinition: ConversationNodeDefinition<UnknownSurfaceNode> = {
   kind: 'unknown-surface',
   target: 'chat',
-  match: event => isAppendSurfaceEvent(event)
+  match: event => event.type !== 'assistant/live-chunk' && isAppendSurfaceEvent(event)
     ? { id: String(event.seq), role: 'start' }
     : null,
   start: (_context, match) => ({

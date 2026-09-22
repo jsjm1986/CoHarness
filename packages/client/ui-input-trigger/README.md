@@ -14,9 +14,17 @@ MenuView renders the menu store into the `conversation.input.overlay` slot (list
 
 The `/client` exports are the plugin body (`apply`/`inject`), `InputTriggerService`, `MenuViewInjected`, and the contract types. MenuView itself is internal — the slot registration closes over it.
 
+## Summary
+
+When users type `/` or `@` at the caret in the Web GUI, this package opens a grouped menu for slash commands, file references, and session references. It supports keyboard and pointer selection, including drill-down choices and launchers that open a single candidate group over the current selection. A pick either invokes a command flow or inserts a reference for the consuming input surface to handle. The package affects browser presentation only; it does not assemble or send model requests.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The trigger source roster is an effect-owned registration set proven by the HMR-safety spec; arbitration is per-request controller state with no durable relation.
+
 ## Model Experience
 
-None, as the trigger pipeline is browser presentation only — picks produce `CommandClaim`/`ReferenceInsert` data whose model-visible consequences (host command execution; inserted reference text riding an ordinary prompt) are owned by the consuming host and input-machine packages.
+None, as the trigger pipeline is browser presentation only — picks produce command claims and reference inserts whose model-visible consequences are owned by the consuming host and input-machine packages.
 
 #### KV Cache effect
 

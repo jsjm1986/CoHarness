@@ -9,46 +9,43 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
       "path": "../../core/agent"
-    },
-    {
-      "path": "../../shell/shell"
-    },
-    {
-      "path": "../../jobs/jobs"
     },
     {
       "path": "../../core/system-prompt"
     },
     {
-      "path": "../../shell/shell-env"
+      "path": "../../core/tools"
     },
     {
       "path": "../../interaction/user-approval"
     },
     {
+      "path": "../../jobs/jobs"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
       "path": "../../sandbox/sandbox"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../sandbox/sandbox-policy"
     },
     {
-      "path": "../../sandbox/sandbox-policy"
+      "path": "../shell"
+    },
+    {
+      "path": "../shell-env"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

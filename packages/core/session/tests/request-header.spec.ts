@@ -109,6 +109,14 @@ describe('legacy request-header format', () => {
       .toThrow('unsupported legacy request/header reason "fallback"')
     expect(session.snapshotEvents()).toHaveLength(0)
   })
+
+  it('rejects an unrecognized reason value', () => {
+    const legacy = [{
+      type: 'request/header', seq: 0, time: 1, data: { header: { config: CONFIG }, reason: 'bogus' },
+    }] as unknown as SessionEvent[]
+    expect(() => Session.create(SessionId('bad-seed-reason'), legacy))
+      .toThrow('has an invalid reason')
+  })
 })
 
 describe('Session.requestContext', () => {

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-13-upgrade-records-gate.md
-2026-09-13-upgrade-records-gate.md: 33d47c6bdda4dde67ea292ace7ec2b34d4bcf848
-2026-09-13-upgrade-records-gate.zh.md: 992f3234939fd5cc0ed961610c7799a69f91a735
+2026-09-13-upgrade-records-gate.md: bf13d61503222cc62bb878a7e0e9679b600ba940
+2026-09-13-upgrade-records-gate.zh.md: 991da81b7c5ce92a5a5462c8abac498fd7432df5

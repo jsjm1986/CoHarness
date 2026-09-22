@@ -88,6 +88,7 @@ export class ToolCallTree {
       callTime: started?.time ?? null,
       content: data.content,
       isError: data.isError,
+      ...(data.error === undefined ? {} : { error: data.error }),
       callView: null,
       resultView: null,
       subCalls: [],

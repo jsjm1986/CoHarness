@@ -12,7 +12,7 @@ Status: implemented
 
 ## 决策
 
-README 引用 `https://cdn.deepseek.com/harness/readme/` 下的固定 URL。私有仓库 [`deepseek-harness/readme-cdn-assets`](https://github.com/deepseek-harness/readme-cdn-assets) 负责管理 3 张允许发布的 PNG 文件、相应测试和发布代码。向该仓库的 `master` 分支 push 会运行 `publish.yml`，安装固定版本的华为云 OBS SDK、测试 `scripts/upload.mjs` 并发布图片。
+README 引用 `https://cdn.deepseek.com/harness/readme/` 下的固定 URL。私有仓库 `readme-cdn-assets` 负责管理 3 张允许发布的 PNG 文件、相应测试和发布代码。向该仓库的 `master` 分支 push 会运行 `publish.yml`，安装固定版本的华为云 OBS SDK、测试 `scripts/upload.mjs` 并发布图片。
 
 上传脚本只接受 3 个 README 图片文件名，验证每个源文件均为 PNG，并以 `Content-Type: image/png` 和 `Cache-Control: no-store` 上传到 `dp-cdn-deepseek/harness/readme/`。脚本检查 OBS 响应状态、报告对应公开 URL，并在成功或失败后关闭客户端。仓库级 GitHub Actions Secret 提供 `OBS_DSH_README_ACCESS_KEY_ID` 和 `OBS_DSH_README_SECRET_ACCESS_KEY`；OBS 身份只需拥有该对象前缀的写权限。
 

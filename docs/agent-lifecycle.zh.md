@@ -37,14 +37,15 @@ sequenceDiagram
   Driver->>Prompt: <code>system-prompt/assemble</code> waterfall
   Driver->>LLM: <code>agent/request</code> waterfall, then <code>llm/stream</code> waterfall
   LLM-->>Driver: StreamChunk*
-  Driver->>Session: <code>assistant/chunk</code>*
-  Session-->>SDK: <code>session/event</code> <code>assistant/chunk</code>*
+  Driver-->>SDK: <code>session/assistant-stream</code> chunk*
   alt final adapter or terminal in-band request failure
-    Driver->>Session: <code>step/end</code>
+    Driver->>Session: <code>assistant/attempt</code>
+    Driver-->>SDK: <code>session/assistant-stream</code> committed end
     Driver->>Hooks: <code>agent/request-error</code> waterfall
     Hooks-->>Driver: return retry action or preserve the original error
   else model request succeeded
   Driver->>Session: <code>assistant/message</code>
+  Driver-->>SDK: <code>session/assistant-stream</code> committed end
   Driver->>Tools: classify pending call by executionMode
   loop barriers and bounded rolling pool, reclassify before start
     opt call starts
@@ -73,7 +74,7 @@ sequenceDiagram
   Driver-->>SDK: <code>agent/status</code> idle
 ```
 
-`assistant/message` 事件会记录每次成功的提供方调用，包括返回空内容或以 `max-tokens` 结束的调用。空内容不会进入派生历史，但该持久事件仍会保留用量，并通过 `sourceEventSeqs` 精确列出对应的 `assistant/chunk` 事件，包括显式空列表。
+`assistant/message` 事件会记录每次成功的提供方调用，包括返回空内容或以 `max-tokens` 结束的调用。空内容不会进入派生历史，但该持久事件仍会保留用量，并通过 `data.stream` 嵌入已送达的提供方流。
 
 `dsh-compaction-basic` 在派生请求之前通过 `agent/pre-step` 处理压力，而 `agent/request-error` 仅用于规范的上下文溢出。任一触发条件满足后，系统都会先执行可选的工具结果剪枝，再选择摘要。恢复发生在失败步骤结束之后、失败轮次结束之前；只有当剪枝或摘要生成推进了 surface replacement generation 时，系统才会开启一个全新的重试轮次，否则仍以原始请求错误为准。
 

@@ -9,22 +9,19 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../core/session"
     },
     {
       "path": "../../llm/llm"
     },
     {
-      "path": "../../core/session"
+      "path": "../session-projection"
     },
     {
-      "path": "../session-projection"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

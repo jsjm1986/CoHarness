@@ -9,19 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
       "path": "../../boot/app-boot"
     },
     {
       "path": "../../boot/cmdline"
+    },
+    {
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../host/frontend-static"
@@ -30,19 +24,22 @@
       "path": "../../host/webserver"
     },
     {
-      "path": "../../util/launch-environment"
-    },
-    {
-      "path": "../../core/system-prompt"
-    },
-    {
       "path": "../../shell/shell-env"
     },
     {
       "path": "../../subprocess/subprocess"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/launch-environment"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

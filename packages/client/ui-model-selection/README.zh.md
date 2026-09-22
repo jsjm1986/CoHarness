@@ -16,9 +16,17 @@ Host 报告的 `ModelSelection` 是唯一的选择事实，其中包含提供方
 
 `/client` 导出面为插件本体（`apply`/`inject`）、`ModelDirectoryResolver`、`ModelDirectory` 及其状态形状、slot 注入面类型。
 
+## 概述
+
+Web GUI 允许用户通过 `/model` 弹窗或 composer 模型控件切换既有会话使用的模型与推理（reasoning）强度。两个界面呈现同一组按提供方分组的选择；所选模型决定可用的推理强度名称与默认值。完整选择从下一次请求开始生效；运行中的步骤保留其启动时的模型与推理强度。如果没有适配器可以服务会话路由，composer 会保持停用，直至路由恢复可用。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。两个界面共享每会话一个由 host 支持的 `ModelDirectory`；选择与 effort 状态仍由该解析器与会话拥有。
+
 ## 模型体验
 
-间接影响。两个入口都通过仅供普通会话使用的 `session.selectModel` RPC 提交完整的 `ModelSelection`；Host 会在下一次提示词组装边界对其进行快照，因此后续请求采用所选提供方、模型与推理强度，而运行中的步骤保留已组装选择。只有当现有请求头记录一次实际采用该选择的请求后，选择才会持久化；菜单交互不会添加提示词内容。
+两个入口提交的 `session.selectModel` 选择会间接影响模型：Host 会在下一次提示词组装边界为完整的 `ModelSelection` 创建快照，并负责使其对模型生效；运行中的步骤则保留已组装的选择。
 
 #### KV Cache 影响
 

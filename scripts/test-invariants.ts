@@ -1,6 +1,7 @@
 /**
  * Vitest-wide invariant host. Ordinary Cordis roots receive the invariant
- * service with global enablement plus the current test package's companion.
+ * service with global enablement plus the current test package's companion,
+ * when it publishes one.
  * One topology test mounts every companion; focused invariant tests own their
  * service topology explicitly.
  */
@@ -8,31 +9,7 @@
 import { expect } from 'vitest'
 import { FiberState, Inject, RegistryService, ValidationError } from '@deepseek-ai/cordis'
 import type { Context, Plugin } from '@deepseek-ai/cordis'
-import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
-import type {
-  ImageAttachmentLimits,
-  ImageAttachmentRef,
-  SaveImageAttachment,
-  StoredImageAttachment,
-} from '@deepseek-ai/dsh-attachment'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import { UserDocStore } from '@deepseek-ai/dsh-userdoc'
-import type {
-  ResolveUserDocTarget,
-  UserDocDirectoryId,
-  UserDocDirectoryListing,
-  UserDocDirectoryRef,
-  StoredUserDoc,
-  UserDocId,
-  UserDocLimits,
-  UserDocRef,
-  UserDocTrashRef,
-  UserDocTarget,
-  BeginUserDocUpload,
-  UserDocUploadChunk,
-  UserDocUploadId,
-  UserDocUploadSession,
-} from '@deepseek-ai/dsh-userdoc'
 
 declare global {
   interface ImportMeta {
@@ -53,10 +30,10 @@ export interface TestInvariantCompanion {
 export const TEST_INVARIANT_READY_SERVICE = 'testInvariantReady'
 
 /**
- * Every package companion as a lazy loader keyed by glob path. Ordinary tests
+ * Every published package companion as a lazy loader keyed by glob path. Ordinary tests
  * load only their owner's module; the exhaustive topology test loads and
  * executes all of them, so aggregated coverage still observes every
- * registration while per-file setup stops importing 168 companions and their
+ * registration while per-file setup avoids importing unrelated companions and their
  * transitive package sources.
  */
 export const testInvariantCompanions: Readonly<Record<string, () => Promise<TestInvariantCompanion>>> =
@@ -126,138 +103,11 @@ export function usesManualInvariantTree(testPath: string): boolean {
 }
 
 const ALL_COMPANION_TESTS = ['/scripts/test-invariants.spec.ts'] as const
-const ATTACHMENT_COMPANION = '../packages/attachment/attachment-local/src/invariant.ts'
-const USERDOC_COMPANION = '../packages/attachment/userdoc-local/src/invariant.ts'
-
-class TestAttachmentStore extends AttachmentStore {
-  readonly imageLimits: ImageAttachmentLimits = {
-    maxImageBytes: 1,
-    maxImagesPerMessage: 1,
-    maxMessageImageBytes: 1,
-    maxImagePixels: 1,
-    maxImageDimension: 1,
-    mediaTypes: ['image/png'],
-  }
-
-  validateImage(_input: SaveImageAttachment): Promise<void> {
-    return Promise.reject(new Error('test invariant attachment store does not validate images'))
-  }
-
-  saveImage(_input: SaveImageAttachment): Promise<ImageAttachmentRef> {
-    return Promise.reject(new Error('test invariant attachment store does not save images'))
-  }
-
-  readImage(_ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
-    return Promise.reject(new Error('test invariant attachment store does not read images'))
-  }
-}
-
-class TestUserDocStore extends UserDocStore {
-  readonly limits: UserDocLimits = {
-    maxFileBytes: 1,
-    maxFilesPerMessage: 1,
-    maxMessageBytes: 1,
-    maxInlineTextBytes: 1,
-    upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
-  }
-
-  resolveTarget(_input: ResolveUserDocTarget): Promise<UserDocTarget> {
-    return Promise.reject(new Error('test invariant user document store does not resolve targets'))
-  }
-
-  save(
-    _target: UserDocTarget,
-    _body: ReadableStream<Uint8Array>,
-    _signal?: AbortSignal,
-  ): Promise<UserDocRef> {
-    return Promise.reject(new Error('test invariant user document store does not save documents'))
-  }
-
-  beginUpload(_input: BeginUserDocUpload): Promise<UserDocUploadSession> {
-    return Promise.reject(new Error('test invariant user document store does not begin uploads'))
-  }
-
-  inspectUpload(_uploadId: UserDocUploadId): Promise<UserDocUploadSession> {
-    return Promise.reject(new Error('test invariant user document store does not inspect uploads'))
-  }
-
-  writeUploadChunk(_uploadId: UserDocUploadId, _chunk: UserDocUploadChunk): Promise<UserDocUploadSession> {
-    return Promise.reject(new Error('test invariant user document store does not write upload chunks'))
-  }
-
-  completeUpload(_uploadId: UserDocUploadId, _sha256: string): Promise<UserDocUploadSession> {
-    return Promise.reject(new Error('test invariant user document store does not complete uploads'))
-  }
-
-  cancelUpload(_uploadId: UserDocUploadId): Promise<void> {
-    return Promise.reject(new Error('test invariant user document store does not cancel uploads'))
-  }
-
-  list(_signal?: AbortSignal): Promise<UserDocRef[]> {
-    return Promise.reject(new Error('test invariant user document store does not list documents'))
-  }
-
-  listDirectory(_directoryId: UserDocDirectoryId, _signal?: AbortSignal): Promise<UserDocDirectoryListing> {
-    return Promise.reject(new Error('test invariant user document store does not list directories'))
-  }
-
-  listDirectories(_signal?: AbortSignal): Promise<UserDocDirectoryRef[]> {
-    return Promise.reject(new Error('test invariant user document store does not list directory destinations'))
-  }
-
-  createDirectory(_parentDirectoryId: UserDocDirectoryId, _name: string): Promise<UserDocDirectoryRef> {
-    return Promise.reject(new Error('test invariant user document store does not create directories'))
-  }
-
-  renameDirectory(_directoryId: UserDocDirectoryId, _name: string): Promise<UserDocDirectoryRef> {
-    return Promise.reject(new Error('test invariant user document store does not rename directories'))
-  }
-
-  removeDirectory(_directoryId: UserDocDirectoryId): Promise<void> {
-    return Promise.reject(new Error('test invariant user document store does not remove directories'))
-  }
-
-  move(_docId: UserDocId, _directoryId: UserDocDirectoryId): Promise<UserDocRef> {
-    return Promise.reject(new Error('test invariant user document store does not move documents'))
-  }
-
-  stat(_docId: UserDocId, _signal?: AbortSignal): Promise<UserDocRef> {
-    return Promise.reject(new Error('test invariant user document store does not stat documents'))
-  }
-
-  read(_docId: UserDocId, _signal?: AbortSignal): Promise<StoredUserDoc> {
-    return Promise.reject(new Error('test invariant user document store does not read documents'))
-  }
-
-  openRead(_docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableStream<Uint8Array> }> {
-    return Promise.reject(new Error('test invariant user document store does not open documents'))
-  }
-
-  remove(_docId: UserDocId, _signal?: AbortSignal): Promise<void> {
-    return Promise.reject(new Error('test invariant user document store does not remove documents'))
-  }
-
-  listTrash(_signal?: AbortSignal): Promise<UserDocTrashRef[]> {
-    return Promise.reject(new Error('test invariant user document store does not list trash'))
-  }
-
-  trash(_docId: UserDocId, _signal?: AbortSignal): Promise<UserDocTrashRef> {
-    return Promise.reject(new Error('test invariant user document store does not trash documents'))
-  }
-
-  restore(_docId: UserDocId, _directoryId?: UserDocDirectoryId, _name?: string, _signal?: AbortSignal): Promise<UserDocRef> {
-    return Promise.reject(new Error('test invariant user document store does not restore documents'))
-  }
-
-  purge(_docId: UserDocId, _signal?: AbortSignal): Promise<void> {
-    return Promise.reject(new Error('test invariant user document store does not purge documents'))
-  }
-}
 
 /**
  * Select the package companions that an ordinary test root must register.
  * Package tests receive their owner's checks; the dedicated topology test
- * receives every owner so coverage and exhaustive runtime registration remain
+ * receives every companion owner so coverage and runtime registration remain
  * independently enforced.
  * @param testPath - absolute or repo-relative normalized Vitest file path.
  * @returns sorted `import.meta.glob` keys for companions to mount.
@@ -270,10 +120,7 @@ export function testInvariantCompanionPaths(testPath: string): string[] {
   const owner = normalized.match(/\/packages\/([^/]+)\/([^/]+)\/tests\//)
   if (owner === null) return []
   const companionPath = `../packages/${owner[1]}/${owner[2]}/src/invariant.ts`
-  if (testInvariantCompanions[companionPath] === undefined) {
-    throw new Error(`test invariants: package test has no companion at ${companionPath}`)
-  }
-  return [companionPath]
+  return testInvariantCompanions[companionPath] === undefined ? [] : [companionPath]
 }
 
 function startInvariantHost(root: Context): InvariantHost {
@@ -299,14 +146,6 @@ function startInvariantHost(root: Context): InvariantHost {
   const testPath = expect.getState().testPath ?? ''
   const companionPaths = testInvariantCompanionPaths(testPath)
   const ready = requireActive(serviceFiber, 'invariant service').then(async () => {
-    const supportFibers = [
-      ...(companionPaths.includes(ATTACHMENT_COMPANION)
-        ? [{ fiber: mount(TestAttachmentStore), label: 'test attachment store' }]
-        : []),
-      ...(companionPaths.includes(USERDOC_COMPANION)
-        ? [{ fiber: mount(TestUserDocStore), label: 'test user document store' }]
-        : []),
-    ]
     const companions = await Promise.all(companionPaths.map(async (path) => {
       const load = testInvariantCompanions[path]
       if (load === undefined) {
@@ -322,10 +161,7 @@ function startInvariantHost(root: Context): InvariantHost {
       fiber: mount(companion),
       path,
     }))
-    await Promise.all([
-      ...supportFibers.map(({ fiber, label }) => requireActive(fiber, label)),
-      ...companionFibers.map(({ fiber, path }) => requireActive(fiber, path)),
-    ])
+    await Promise.all(companionFibers.map(({ fiber, path }) => requireActive(fiber, path)))
     root.provide(TEST_INVARIANT_READY_SERVICE, true)
   })
   const host = { byCallback, barrierOwners, ready }

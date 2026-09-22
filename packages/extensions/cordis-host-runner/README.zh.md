@@ -4,6 +4,10 @@
 
 由模型挂载的动态包在 host 侧的那一半：定义注册表、host 半所用的 `node:vm` 沙箱与 fiber 生命周期、invoke handler 表，以及由某个浏览器页面执行的 run 往返。以 `ctx.dynamicCordisRunner` 提供。面向模型的工具在 [`@deepseek-ai/dsh-tool-cordis`](../tool-cordis/README.zh.md) 中；浏览器半由 [`@deepseek-ai/dsh-cordis-client-runner`](../cordis-client-runner/README.zh.md) 装载。
 
+## 概述
+
+`dsh-cordis-host-runner` 提供运行时检查，并为程序调用方和浏览器控件保留进程内动态定义。Host 部分在 `node:vm` 中运行；浏览器部分使用 Client runner 和审批 UI。定义在重启后消失。Agent 通过 `tool-cordis` 发现 API，通过 Plugin Manager 安装持久化 bundle；没有模型工具创建动态定义。
+
 ## 功能
 
 分两个阶段：`define` 只做登记，一切带副作用的动作都挂在一次 run 上。
@@ -45,23 +49,29 @@ vm 沙箱隔离全局变量，但不是安全边界：Node 全局变量不存在
 
 服务包：默认导出 `DynamicCordisRunnerService`（服务键 `dynamicCordisRunner`），`./types` 则承载 `dynamicCordisRunner` remote namespace 与其消费方共享的载荷形状。`define`／`undefine` 的形状留在包内部，因为它们从不跨 wire。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。定义及其沙箱化 fiber 是私有注册表状态，其挂载/调用/撤回生命周期由 runner 的规格断言；不发布可独立观测的投影。
+
 ## 模型体验
 
-### 经 cordis 工具转达的拒绝与教学式错误
+### 转达给所属会话的运行结果、拒绝与诊断
 
 #### 模型看到的内容
 
-没有直接可见的内容：本包不注册任何工具，也不注入提示词。它的拒绝经调用它的 `cordis_*` 工具结果到达模型——无法解析的半会指出出错的那一行，缺失的定义会解释定义只活在内存里，`rejected` 或 `cancelled` 的 run 报告的是有人拒绝或该轮次已结束而非出了故障，浏览器半装载失败则带上作答页面自己的错误文本。
+本包不注册工具或提示。程序侧 `run` 调用和浏览器控件可向所属会话发送结果与诊断；停止和移除操作注入用户消息。内置模型工具无法创建或更新动态定义。
 
 #### Token 影响
 
-本包自身没有：上述每条消息都由调用它的那个工具的结果承载。
+有条件且随数据而定：消息只在事件发生时到达，每条都携带一段有界的说明；没有固定的每请求成本。
 
 #### KV Cache 影响
 
-注册工具的 host 半会改变下一次请求的工具视图，从第一个变化的 schema token 起使前缀复用失效；运行或停止一个不注册任何工具的包对前缀不产生影响。
+本包自身没有。注册工具的 host 半会改变下一次请求的工具视图，从第一个变化的 schema token 起使前缀复用失效；运行或停止一个不注册任何工具的包对前缀不产生影响。
 
 <a id="known-limitations-and-deferred-work"></a>
+
+**运行时不变式：** 不发布伴生入口。definition registry 位于进程内存中且没有可观察的事件流；它唯一负责的关系是运行中的 definition 拥有已结算的 host-half fiber 及其 handler table，该关系在单个等待完成的操作中建立和解除，因此由包测试直接断言。
 
 ## 已知限制与暂缓事项
 

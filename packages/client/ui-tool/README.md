@@ -6,6 +6,10 @@ Client Tool presentation plugin. `ui-conversation` dispatches each ordered `tool
 
 Business UI packages register only their wire Tool names and atomic views. They do not pair Session events, rebuild the transcript, or own root/subcall topology. The Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection; the conversation view remains authoritative for ChatFlow placement.
 
+## Summary
+
+`dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection.
+
 ## Rendering contract
 
 `ToolCallTree` receives one root `ToolCallBlock` that already contains recursive `subCalls`, selection state, the session `cwd`, and Host callbacks for opening files and inspecting calls. It recursively walks the standard call blocks and sends the root and children at every depth through the same atomic dispatch path, without subscribing to a separate parent-to-children map.
@@ -15,6 +19,8 @@ Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and
 The package also fills `conversation.details.tool` with `ToolDetails`. The row and details renderers share the same pure card models for `terminal`, `read`, `diff`, `search`, and `web` render intents. Completed ask-user calls use a validated, readable question/answer card; mixed or malformed result blocks fall back to the complete generic output. Unknown intent tags and malformed wire card data fall back to flattened Tool result text.
 
 Generic rows classify known Tool names into search, read, shell, write, edit, code, or generic variants. Running, successful, failed, and interrupted lifecycle states come only from the frozen call/result slice. File paths resolve against the session `cwd` only when the user invokes the Host open-file callback; presentation code does not read Session services.
+
+A native or PTC dispatch failure carrying `AUTO_REVIEW_DENIED` takes precedence over keyed specialized views: the generic row names Auto review in its collapsed summary, omits the never-executed arguments, and expands to one normalized not-executed reason — trimmed, with line separators collapsed to spaces, and a localized fallback for a missing or blank reason. The stored Session and SDK error keep the original reason.
 
 Generic rows retain the original argument payload and format it only when an expandable row is opened. This keeps large file-edit and code payloads out of the collapsed-list allocation while preserving the same formatted body on expansion.
 
@@ -36,13 +42,17 @@ This package currently owns the generic fallback and the built-in shell/pwsh, re
 
 Card-specific limits and fallback rules remain in the owning [terminal](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.md), [diff](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.md), [read](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.md), [search](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.md), and [web](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md) notes.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Call/result pairing, lifecycle, and `subCalls` projection stay authoritative in the Runtime; the package renders dispatched blocks and registers tool-view slots.
+
 ## Model Experience
 
-None, as this package renders already logged Tool calls and results without altering model requests, Tool execution, or session events.
+None, as the package is a browser-side tool presentation layer that renders logged calls without changing model context.
 
 #### KV Cache effect
 
-None. The package is client-only presentation.
+None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

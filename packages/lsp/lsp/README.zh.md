@@ -14,6 +14,10 @@
 
 该 seam 恰好公开四种语义操作：`goToDefinition`、`findReferences`、`goToImplementation`、`hover`，且没有通用 JSON-RPC 逃生口，因此任何协议载荷或未经评审的命令／修改都无法通过 `ctx.lsp` 到达提供方。
 
+## 概述
+
+使用 `dsh-lsp` 为 agent（智能体）提供语言服务器导航，包括定义、引用、实现与悬停文档。查询按文件扩展名选择已配置的提供方，并返回规范化结果与结构化错误，因此更换后端不会改变导航请求或模型可见的响应。导航只读，并刻意排除通用 JSON-RPC 访问、重命名、格式化、诊断与符号列表。本包必须与 `dsh-lsp-stdio` 等提供方及面向模型的 `dsh-tool-lsp` 组合；单独使用时不提供导航。
+
 ## 服务 API（`ctx.lsp`）
 
 | 成员 | 语义 |
@@ -29,9 +33,13 @@
 
 `LspQueryRequest`（`operation`、`filePath`、`position`、`workspaceRoot`）：每个字段都必填，因此没有字段需要实现默认值，也不存在 `resolve()` 步骤。位置与范围使用从零开始的 UTF-16，与协议一致；工具拥有从 1 开始的光标约定。`findReferences` 始终包含声明，提供方在内部强制执行，因此调用方没有 flag。`LspQueryResult` 是封闭的判别联合：导航使用 `{ kind: 'locations'; locations; resolvedWorkspaceUri }`，悬停使用 `{ kind: 'hover'; hover }`（内容或 `null`）；消费方通过 `switch` 实现穷尽检查，因此新增分支会使编译失败，直到完成处理。`resolvedWorkspaceUri` 是提供方的规范工作区 `file:` URI；调用方相对化位置 URI 时以它为基准，而不是对可能含符号链接的请求根应用宿主平台路径规则。完整约定见 `src/types.ts`；`src/index.ts` 给出 `LspError` code，包括 `LSP_DISPOSED` 和 `LSP_MALFORMED_RESPONSE`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 定义导航契约；服务器进程、文档与缓存由提供方拥有。
+
 ## 模型体验
 
-通过 `dsh-tool-lsp` 间接影响；该工具拥有面向模型的 `lsp` schema、提示词与渲染结果，本注册表自身不贡献提示词或 schema。
+通过 `dsh-tool-lsp` 间接影响；该工具拥有面向模型的 `lsp` schema、提示词指引与渲染结果，本注册表自身不贡献提示词或 schema。
 
 #### KV Cache 影响
 

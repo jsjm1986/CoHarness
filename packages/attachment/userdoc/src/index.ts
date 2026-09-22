@@ -32,6 +32,55 @@ function documentTypeForMediaType(mediaType: string): UserDocListType {
 /** Maximum offset accepted by the compatibility page implementation. */
 const MAX_PAGE_OFFSET = 1_000_000
 
+function assertListQuery(query: UserDocListQuery): void {
+  if (query.cursor !== undefined && (query.cursor.length === 0 || query.cursor.length > 4096)
+    || query.limit !== undefined && (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100)
+    || query.query !== undefined && (query.query.length > 255 || /[\u0000-\u001f\u007f]/u.test(query.query))
+    || query.type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(query.type)
+    || query.sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(query.sort)) {
+    throw new UserDocError('Document list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
+  }
+}
+
+interface UserDocListItem {
+  readonly docId: UserDocId
+  readonly name: string
+  readonly bytes: number
+  readonly mediaType: string
+}
+
+function pageDocuments<T extends UserDocListItem>(
+  items: readonly T[],
+  query: UserDocListQuery,
+  dateOf: (item: T) => number,
+): { documents: T[]; totalDocuments: number; nextCursor?: string } {
+  const limit = Math.min(Math.max(query.limit ?? 20, 1), 100)
+  const offset = query.cursor === undefined || query.cursor === '' ? 0 : Number(query.cursor)
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_PAGE_OFFSET) {
+    throw new UserDocError('Document cursor is invalid.', DOCUMENT_LIST_QUERY_CODE)
+  }
+  const needle = query.query?.trim().toLowerCase() ?? ''
+  const type = query.type ?? 'all'
+  const filtered = items.filter(document =>
+    (needle === '' || document.name.toLowerCase().includes(needle))
+    && (type === 'all' || documentTypeForMediaType(document.mediaType) === type))
+  const sort = query.sort ?? 'date-desc'
+  const ordered = [...filtered].sort((left, right) => {
+    const result = sort.startsWith('name') ? left.name.localeCompare(right.name)
+      : sort.startsWith('size') ? left.bytes - right.bytes : dateOf(left) - dateOf(right)
+    const direction = sort.endsWith('asc') ? 1 : -1
+    if (result !== 0) return direction * result
+    return left.docId.localeCompare(right.docId)
+  })
+  const documents = ordered.slice(offset, offset + limit)
+  const nextOffset = offset + documents.length
+  return {
+    documents,
+    totalDocuments: ordered.length,
+    ...(nextOffset < ordered.length ? { nextCursor: String(nextOffset) } : {}),
+  }
+}
+
 export { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
 export {
   DOCUMENT_DELETE_FAILED_CODE,
@@ -259,41 +308,9 @@ export abstract class UserDocStore extends Service {
     if (query.state !== undefined && query.state !== 'active') {
       throw new UserDocError('Directory trash pages are not available from this provider.', DOCUMENT_LIST_QUERY_CODE)
     }
-    if (query.cursor !== undefined && (query.cursor.length === 0 || query.cursor.length > 4096)
-      || query.limit !== undefined && (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100)
-      || query.query !== undefined && (query.query.length > 255 || /[\u0000-\u001f\u007f]/u.test(query.query))
-      || query.type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(query.type)
-      || query.sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(query.sort)) {
-      throw new UserDocError('Document list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
-    }
+    assertListQuery(query)
     const listing = await this.listDirectory(directoryId, signal)
-    const limit = Math.min(Math.max(query.limit ?? 20, 1), 100)
-    const offset = query.cursor === undefined || query.cursor === '' ? 0 : Number(query.cursor)
-    if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_PAGE_OFFSET) {
-      throw new UserDocError('Document cursor is invalid.', DOCUMENT_LIST_QUERY_CODE)
-    }
-    const safeOffset = offset
-    const needle = query.query?.trim().toLowerCase() ?? ''
-    const type = query.type ?? 'all'
-    const filtered = listing.documents.filter(document =>
-      (needle === '' || document.name.toLowerCase().includes(needle))
-      && (type === 'all' || documentTypeForMediaType(document.mediaType) === type))
-    const sort = query.sort ?? 'date-desc'
-    const ordered = [...filtered].sort((left, right) => {
-      const result = sort.startsWith('name') ? left.name.localeCompare(right.name)
-        : sort.startsWith('size') ? left.bytes - right.bytes : left.modifiedAt - right.modifiedAt
-      const direction = sort.endsWith('asc') ? 1 : -1
-      if (result !== 0) return direction * result
-      return left.docId.localeCompare(right.docId)
-    })
-    const documents = ordered.slice(safeOffset, safeOffset + limit)
-    const nextOffset = safeOffset + documents.length
-    return {
-      ...listing,
-      documents,
-      totalDocuments: ordered.length,
-      ...(nextOffset < ordered.length ? { nextCursor: String(nextOffset) } : {}),
-    }
+    return { ...listing, ...pageDocuments(listing.documents, query, document => document.modifiedAt) }
   }
 
   /**
@@ -317,37 +334,9 @@ export abstract class UserDocStore extends Service {
     if (query.state !== undefined && query.state !== 'trash') {
       throw new UserDocError('Trash list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
     }
-    if (query.cursor !== undefined && (query.cursor.length === 0 || query.cursor.length > 4096)
-      || query.limit !== undefined && (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100)
-      || query.query !== undefined && (query.query.length > 255 || /[\u0000-\u001f\u007f]/u.test(query.query))
-      || query.type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(query.type)
-      || query.sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(query.sort)) {
-      throw new UserDocError('Document list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
-    }
+    assertListQuery(query)
     const all = await this.listTrash(signal)
-    const limit = Math.min(Math.max(query.limit ?? 20, 1), 100)
-    const offset = query.cursor === undefined || query.cursor === '' ? 0 : Number(query.cursor)
-    if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_PAGE_OFFSET) {
-      throw new UserDocError('Document cursor is invalid.', DOCUMENT_LIST_QUERY_CODE)
-    }
-    const needle = query.query?.trim().toLowerCase() ?? ''
-    const filtered = all.filter(document => (needle === '' || document.name.toLowerCase().includes(needle))
-      && (query.type === undefined || query.type === 'all' || documentTypeForMediaType(document.mediaType) === query.type))
-    const sort = query.sort ?? 'date-desc'
-    const ordered = [...filtered].sort((left, right) => {
-      const result = sort.startsWith('name') ? left.name.localeCompare(right.name)
-        : sort.startsWith('size') ? left.bytes - right.bytes : left.trashedAt - right.trashedAt
-      const direction = sort.endsWith('asc') ? 1 : -1
-      if (result !== 0) return direction * result
-      return left.docId.localeCompare(right.docId)
-    })
-    const documents = ordered.slice(offset, offset + limit)
-    const nextOffset = offset + documents.length
-    return {
-      documents,
-      totalDocuments: ordered.length,
-      ...(nextOffset < ordered.length ? { nextCursor: String(nextOffset) } : {}),
-    }
+    return pageDocuments(all, query, document => document.trashedAt)
   }
 
   /**

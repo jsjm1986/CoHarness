@@ -4,6 +4,10 @@
 
 `SessionQueryEngine` 是组合式抽象 `ctx.sessionQuery` 约定。它对实时 `ctx.sessions` 和可选的动态挂载 `ctx.sessionPersistence` 实现精确会话历史取回、关系跟踪和与提供方无关的过滤；具体后端实现它的两个全文方法。匹配 id 只产生一条记录：实时事件优先，而 `live` 和 `persisted` 会报告两种来源的可用性。如果不可变 header 存在冲突，则以 `SESSION_QUERY_SOURCE_CONFLICT` 失败。
 
+## 概述
+
+`dsh-session-query` 让应用代码可以列出、过滤、读取和搜索会话历史，检查带边界的事件上下文，并追踪会话或事件关系。读取优先使用实时会话而非持久化副本，并返回来自同一次一致观察的脱离存储克隆。精确读取、过滤与追踪可用于任何受支持的存储设置；带排名的全文搜索需要 `dsh-session-query-sqlite` 等后端。当应用代码需要以编程方式访问呈现给模型的历史时，请使用本包。
+
 ## 读取
 
 - `listSessions(signal?)` 读取当前持久化元数据，以实时记录优先的方式合并它们，并按确定性的最新优先顺序返回克隆记录。
@@ -16,6 +20,7 @@
 - `readEvent(request, signal?)` 返回一个克隆 header、完整目标事件和有界的原始 seq 窗口。`before` 和 `after` 默认为 0，且不得超过 `readWindowMax`。
 - `traceSession(sessionId, signal?)` 只读取一次语料库，返回从直接父级向外的祖先，以及确定性的递归后代树。`complete: false` 标识第一个缺失父级；与目标相连的循环会以 `SESSION_QUERY_INVALID_LINEAGE` 失败。
 - `traceEvent(request, signal?)` 只加载一次逻辑日志，返回其克隆源 header、直接位置替换和直接引用的源事件链接。`replacementChain` 沿位置替换者跟踪到最终替换；源事件链接仍不传递。
+- `observeSession(sessionId, signal?)` 返回留存的 `SessionObservation` 租约——`source`、`header`、`inheritedEventCount`、惰性物化的 `events`、恢复用 `cursor`，以及已挂载投影的快照——无需先执行列表查询。实时观察把切点固定在当前日志长度；冷路径先 stat 已存储的 Session，并复用以持久化实例和 `stat` revision 为键的有界 prepared-Session 缓存，仅在 revision 变化时重新加载。租约会把缓存条目钉住以免被 LRU 逐出（上限 `preparedSessionCacheSize`），读取中途转为实时的会话会重走实时路径。
 
 持久化是可选的，可动态挂载或卸载。已挂载持久化无法读取时，跨语料库列表和血缘跟踪以 `SESSION_QUERY_PERSISTENCE_FAILED` 失败；已经成功读取、但无法通过 Session 校验的持久化记录则以 `SESSION_QUERY_CORRUPT_SESSION` 失败。针对已知实时会话的标题读取、事件跟踪或事件读取不会查询持久化，因此持久化后端的健康状态无法使当前内存状态变得不可读。持久化标题和事件操作在加载前先执行列表查询，并在元数据不匹配时拒绝，而不会组合不一致的观察。血缘跟踪的取消信号会传递给持久化列表查询；事件跟踪和事件读取的取消信号会传递给持久化列表查询和检查。每项操作都会等待已启动的后端调用结算，然后使用信号的精确原因拒绝，即使后端忽略了该信号。针对已知实时会话且预先中止的标题读取、事件跟踪或事件读取会在 fold 或快照之前拒绝，且不查询持久化。批量标题观察执行一次元数据列表查询，使用最多 `persistedInspectConcurrency` 个 worker 检查唯一持久化 id，并保留每个标题自己观察到的 header，供下游授权使用。取消不会启动已排队检查，且只在已启动 worker 结算后拒绝。`listSessions()` 仍保持轻量，不加载日志或索引标题。
 
@@ -41,14 +46,19 @@
 |---|---:|---|
 | `readWindowMax` | `50` | `before` 或 `after` 的最大原始事件数。 |
 | `persistedInspectConcurrency` | `4` | 一次批量读取中的最大并发持久化日志检查数；必须是正的安全整数。 |
+| `preparedSessionCacheSize` | `5` | 跨 `observeSession` 读取复用的冷 prepared-Session 观察保留数。 |
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。答案按查询从实时会话语料与任何已挂载持久化计算；引擎不持有缓存的权威副本。
 
 ## 模型体验
 
-无。该可信查询服务只向调用方返回克隆会话记录，不注册面向模型的提示词、schema、工具或消息。
+无，因为该可信查询服务只向调用方返回克隆记录，且不注册任何面向模型的内容。
 
 #### KV Cache 影响
 
-无；该包既不组装也不发送提供方请求。
+无；本包既不组装也不发送提供方请求。
 
 ## 已知限制与暂缓事项
 

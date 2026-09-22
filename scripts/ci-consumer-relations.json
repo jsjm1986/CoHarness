@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "lanes": {
+    "python": {
+      "manifest": "package.json",
+      "scripts": [
+        "check:python:static"
+      ],
+      "workflow": ".github/workflows/ci.yml",
+      "jobs": [
+        "python-sdk",
+        "python-runtime"
+      ],
+      "sources": [
+        "python/sdk/pyproject.toml",
+        ".github/workflows/build-exe-for-python-sdk.yml"
+      ]
+    },
+    "gateway": {
+      "manifest": "gateway/package.json",
+      "scripts": [
+        "typecheck",
+        "build:check",
+        "test"
+      ],
+      "workflow": ".github/workflows/ci.yml",
+      "jobs": [
+        "gateway"
+      ],
+      "sources": [
+        "gateway/tests/runtime-api.spec.ts",
+        "gateway/tests/server.spec.ts",
+        "gateway/src/runtime-api.ts"
+      ]
+    },
+    "adminUi": {
+      "manifest": "gateway/admin-ui/package.json",
+      "scripts": [
+        "test",
+        "build"
+      ],
+      "workflow": ".github/workflows/ci.yml",
+      "jobs": [
+        "gateway-admin-ui"
+      ],
+      "sources": [
+        "gateway/admin-ui/src/components/OrganizationModelsEditor.tsx"
+      ]
+    },
+    "android": {
+      "manifest": "package.json",
+      "scripts": [
+        "check:android",
+        "check:android:bridge",
+        "test:android:protocol"
+      ],
+      "workflow": ".github/workflows/ci.yml",
+      "jobs": [
+        "android-build",
+        "android-bridge"
+      ],
+      "sources": [
+        "scripts/check-android.ts",
+        "apps/web/tests/native-push.spec.ts",
+        "apps/android-shell/android/app/src/androidTest/java/com/coharness/NativePushBridgeTest.java",
+        "scripts/android-bridge-fixture.ts"
+      ]
+    }
+  },
+  "standalonePrefixes": [
+    "gateway/admin-ui/"
+  ],
+  "relations": [
+    {
+      "id": "loop-session-sdk",
+      "paths": [
+        "packages/core",
+        "packages/session",
+        "packages/sdk",
+        "packages/boot",
+        "packages/preset",
+        "packages/bundle"
+      ],
+      "lanes": [
+        "python",
+        "gateway"
+      ],
+      "basis": "Both SDKs project the loop; Gateway consumes sessionFormatCatalog and spawns composed runtimes."
+    },
+    {
+      "id": "model-governance",
+      "paths": [
+        "packages/llm",
+        "packages/credentials",
+        "packages/settings",
+        "plugins/dsh-model-governance"
+      ],
+      "lanes": [
+        "gateway",
+        "adminUi"
+      ],
+      "basis": "Gateway imports LLM discovery; organization model settings reuse the Web editor and governance provider."
+    },
+    {
+      "id": "admin-shared-ui",
+      "paths": [
+        "packages/client/ui-settings-models",
+        "packages/client/ui-settings",
+        "packages/client/ui-primitives",
+        "packages/client/runtime"
+      ],
+      "lanes": [
+        "adminUi"
+      ],
+      "basis": "OrganizationModelsEditor imports these workspace sources and the Vite runtime store alias."
+    },
+    {
+      "id": "native-notification",
+      "paths": [
+        "apps/android-shell",
+        "apps/web/src/native-push.ts",
+        "gateway/src/push-notifications.ts",
+        "gateway/tests/push-notifications.spec.ts"
+      ],
+      "lanes": [
+        "android",
+        "gateway"
+      ],
+      "basis": "Native Intent extras, push payloads, registration and session navigation share one protocol."
+    },
+    {
+      "id": "runtime-notification",
+      "paths": [
+        "gateway/src/runtime-api.ts",
+        "gateway/src/server.ts",
+        "packages/client/ui-session-list"
+      ],
+      "lanes": [
+        "android",
+        "gateway"
+      ],
+      "basis": "Runtime completion and server push-device routes supply native notification navigation."
+    },
+    {
+      "id": "fork-runtime-bridge",
+      "paths": [
+        "packages/api",
+        "packages/host/apiproxy",
+        "packages/client/connection",
+        "plugins/dsh-directory-guard",
+        "gateway"
+      ],
+      "lanes": [
+        "gateway"
+      ],
+      "basis": "BFF and Gateway protocol, authorization and runtime process consumers."
+    },
+    {
+      "id": "gateway-context-plugins",
+      "paths": [
+        "packages/context/gateway-runtime",
+        "packages/context/collaboration-gateway"
+      ],
+      "lanes": [
+        "gateway"
+      ],
+      "basis": "Gateway composes these context plugins into its runtime; a change inside them alters Gateway behavior without touching gateway/."
+    },
+    {
+      "id": "admin-app",
+      "paths": [
+        "gateway/admin-ui"
+      ],
+      "lanes": [
+        "adminUi"
+      ],
+      "basis": "Independent administration application."
+    },
+    {
+      "id": "python-runtime-build",
+      "paths": [
+        "scripts/build-exe-for-python-sdk.ts",
+        ".github/workflows/build-exe-for-python-sdk.yml",
+        "scripts/snapshots/python-sdk-single-exe"
+      ],
+      "lanes": [
+        "python"
+      ],
+      "basis": "The exe build script, its reusable workflow, and the single-exe golden fixtures produce the python-runtime proof the lane executes."
+    },
+    {
+      "id": "python-surface",
+      "paths": [
+        "python",
+        "scripts/build-python-release.py",
+        "scripts/smoke-python-runtime.py",
+        "scripts/finalize-python-runtime-artifact.py"
+      ],
+      "lanes": [
+        "python"
+      ],
+      "basis": "Python SDK and the installed bundled runtime share release tooling."
+    },
+    {
+      "id": "shared-foundation",
+      "paths": [
+        "vendor",
+        "packages/typert",
+        "packages/extensions",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "package.json",
+        "tsconfig.base.json",
+        "scripts/run-gates.ts",
+        "scripts/ci-pr-scope.ts",
+        "scripts/ci-consumer-relations.ts",
+        "scripts/ci-consumer-relations.json",
+        "scripts/ci-scope-policy.json",
+        "scripts/build.ts",
+        ".github/workflows/ci.yml"
+      ],
+      "lanes": [
+        "python",
+        "gateway",
+        "adminUi",
+        "android"
+      ],
+      "basis": "Shared resolver, dependency graph, build and lane configuration require consumers of generated or dynamically loaded output."
+    }
+  ]
+}

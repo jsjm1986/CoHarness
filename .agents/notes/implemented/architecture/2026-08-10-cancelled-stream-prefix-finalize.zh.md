@@ -12,11 +12,11 @@ Status: implemented
 
 ## Decision
 
-`ReactLoopAgent.step()` 在消费模型流期间捕捉取消，此时 `BlockAssembler`、已记录的分片 seq 和提供方路由可以确定已送达前缀。循环把该前缀追加为 step 的 `assistant/message`，并设置 `interrupted: true`、`surfaceOp: 'append'` 以及恰好包含已记录分片的 `sourceEventSeqs`。该追加先于 `step/end` 和记录 aborted 的 `turn/end`。
+`ReactLoopAgent.step()` 在消费模型流期间捕捉取消，此时 `BlockAssembler`、已累积的流记录和提供方路由可以确定已送达前缀。循环把该前缀追加为 step 的 `assistant/message`，并设置 `interrupted: true`、`surfaceOp: 'append'` 以及恰好包含已送达流的 `data.stream`。该追加先于 `step/end` 和记录 aborted 的 `turn/end`。
 
 `BlockAssembler.interruptedBlocks()` 按流顺序返回内容非空白的已闭合和未闭合 `text` 与 `reasoning` 块。打断先于分派，没有真实工具结果，因此它会省略工具调用，也会省略空块和未闭合的未知块类型。返回结果为空时不追加 assistant 消息。提供方的 `error` 和 `aborted` finish 会在 `agent/request-error` 前离开流消费范围，因此提供方故障和恢复期间的取消都不会提交失败请求的内容。
 
-Chat 和 Trajectory Conversation Definition 从持久消息读取 `interrupted`。Chat 渲染 Stopped 标记，Trajectory 则在 `step/end` 后把提供方请求保持在 error 生命周期，并保留持久结果 seq 和提供方信息。工具执行期间的取消遵循工具调度器约定，因为 assistant 消息已提交：已启动的调用生成真实结果，未分派的调用获得 `ABORTED_BEFORE_DISPATCH` 结果。
+Chat 和 Trajectory Conversation Definition 从持久消息读取 `interrupted`。Chat 渲染 Stopped 标记，Trajectory 则在 `step/end` 后把提供方请求保持在 error 生命周期，并保留持久结果 seq 和提供方元数据。工具执行期间的取消遵循工具调度器约定，因为 assistant 消息已提交：已启动的调用生成真实结果，未分派的调用获得 `ABORTED_BEFORE_DISPATCH` 结果。
 
 ## Alternatives considered
 

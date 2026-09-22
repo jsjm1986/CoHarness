@@ -23,9 +23,17 @@ store 家族（输入 `defineStore` 规范／输出 `StoreHandle<T, A>`）为 st
 
 `SessionAreaProps.sessionId` 可将 SessionProvider 显式绑定到某个 Session。省略时跟随当前选择；无法解析的 ID 渲染空分支。渲染器解析该 Session 的 provide bundle（含 projection 和 input 数据源），并通过现有 provide 通知通道观察提供方 roster 变化。
 
+## 概述
+
+`dsh-client-ui-slots` 让 Web 客户端插件定义并组合带类型检查的 UI 区域。普通 Slots 提供 parent-owned 扩展位置；Component Factory 提供带调用方所选局部 Component 的可复用装配。两套 API 都从声明合并类型推导 scoped state、injection、locale 与 child-render props，并在插件加载期间报告冲突 definition。客户端需要渲染时，将这个不依赖 React 的包与 `ui-renderer` 配合使用。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。注册表核心是纯组合机制，其 register/dispose 语义由单元规格强制；它不拥有领域状态。
+
 ## 模型体验
 
-无。slot 注册表属于浏览器侧 UI 接线；这里没有任何内容进入模型请求。
+无。该包是浏览器端 UI 接线层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

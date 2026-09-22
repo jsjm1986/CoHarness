@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Session-projection Service Definition and drive registry. It owns `ctx.sessionProjections`, the registry that drives every registered projection unit over committed session events and serves finished whole values to carriers, currently the api-proxy history tail page and `session/projection` push frame. A domain registers pure mathematics; the framework owns the drive. The [session-projection RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md) records the design rationale.
 
+## Summary
+
+Use `dsh-session-projection` when clients need current per-session state—such as todos, goals, or conversation statistics—without replaying the raw event log. Domains define synchronous projections from committed session events, and clients receive complete, schema-validated JSON values through snapshots and change notifications. Snapshots identify the last event reflected by every returned value, so carriers can pair state with the matching history cut. Projection state can be checkpointed for faster cold reads, while host-only projections remain private to the host.
+
 ## Service: `SessionProjectionRegistry` (ctx key: `sessionProjections`)
 
 ### Public API
@@ -34,9 +38,13 @@ Session-projection Service Definition and drive registry. It owns `ctx.sessionPr
 
 This package owns the Service Definition and drive roles of the capability seam: domain host plugins (e.g. `dsh-tool-todo`) contribute units, carriers (`dsh-host-apiproxy`) consume the snapshot and change feed, and neither knows the other.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Registered units are pure folds driven over committed events; drive state is itself derived from the same log.
+
 ## Model Experience
 
-None, as the registry only computes client-facing read models of already-logged session state and touches no prompt, message, schema, stream, or tool result.
+None, as the projection registry serves client-facing read models of already-logged session state and registers nothing model-facing.
 
 #### KV Cache effect
 

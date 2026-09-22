@@ -118,7 +118,7 @@ describe('web-app runtime glue', () => {
     const openBrowser = vi.fn(async (url: string) => { lifecycle.push(`open:${url}`) })
     internals.openBrowser = openBrowser
     apply(ctx, new Config({ openBrowser: true, printUrl: true, surfaceContext: true, trustedHosts: ['lab.internal'] }))
-    await ctx.plugin(SystemPrompt, { persona: '' })
+    await ctx.plugin(SystemPrompt, { personaPrefix: '' })
     // Settle the injected registrations.
     await new Promise(resolve => setTimeout(resolve, 0))
 
@@ -156,7 +156,7 @@ describe('web-app runtime glue', () => {
     const openBrowser = vi.fn(async () => {})
     internals.openBrowser = openBrowser
     apply(ctx, new Config({ openBrowser: false, printUrl: false, surfaceContext: true, trustedHosts: [] }))
-    await ctx.plugin(SystemPrompt, { persona: '' })
+    await ctx.plugin(SystemPrompt, { personaPrefix: '' })
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(log).not.toHaveBeenCalled()
     expect(openBrowser).not.toHaveBeenCalled()
@@ -178,7 +178,7 @@ describe('web-app runtime glue', () => {
       },
     } as never)
     apply(ctx, new Config({ openBrowser: false, printUrl: false, surfaceContext: false, trustedHosts: [] }))
-    await ctx.plugin(SystemPrompt, { persona: '' })
+    await ctx.plugin(SystemPrompt, { personaPrefix: '' })
     await new Promise(resolve => setTimeout(resolve, 0))
     const assembly = await ctx.systemPrompt.assemble()
     expect(assembly.sections.some(entry => entry.name === 'app:web-surface')).toBe(false)
@@ -281,7 +281,7 @@ describe('web-app runtime glue', () => {
     Object.defineProperty(server, 'port', { get: () => undefined })
     ctx.provide('webServer', server)
     apply(ctx, new Config({ openBrowser: false, printUrl: false, surfaceContext: true, trustedHosts: [] }))
-    await ctx.plugin(SystemPrompt, { persona: '' })
+    await ctx.plugin(SystemPrompt, { personaPrefix: '' })
     await new Promise(resolve => setTimeout(resolve, 0))
     await expect(ctx.systemPrompt.assemble()).rejects.toThrow('webServer service missing')
     await ctx.fiber.dispose()

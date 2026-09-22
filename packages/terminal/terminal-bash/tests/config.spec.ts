@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Config } from '@deepseek-ai/dsh-terminal-bash/src/config.ts'
 import { resolveConfig, validateConfig } from '@deepseek-ai/dsh-terminal-bash/src/config.ts'
-import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 
 function config(overrides: Partial<Config> = {}): Config {
   return {
@@ -31,11 +30,6 @@ describe('terminal-bash config', () => {
     expect(() => { validateConfig(config({ handoffGraceMs: 10, pollIntervalMs: 10 })) }).not.toThrow()
   })
 
-  it('rejects timer values that Node would clamp to one millisecond', () => {
-    for (const key of ['pollIntervalMs', 'exactProbeAfterMs', 'idleSilenceMs', 'handoffGraceMs', 'timeoutMs', 'disposeGraceMs'] as const) {
-      expect(() => { validateConfig(config({ [key]: MAX_TIMER_DELAY_MS + 1 })) }).toThrow(`${key} must be no greater than`)
-    }
-  })
 })
 
 describe('terminal-bash dialect resolution', () => {

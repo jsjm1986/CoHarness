@@ -59,7 +59,7 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
         titleClassName={css.title}
         chevronClassName={css.chevron}
         icon={<IconThinkOutline14 size={14} />}
-        title="Think"
+        title={t('message.think')}
         open={expanded}
         expandable
         expandOnRowClick

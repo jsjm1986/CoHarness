@@ -11,6 +11,7 @@ examples/*/*.jsonl
 .sessions/
 examples/*/.sessions/
 coverage/
+.coverage-times.json
 .doc-typecheck-*/
 .node-next-types-*/
 .oxlint-contract-*/
@@ -26,6 +27,8 @@ tmp/
 .idea
 mise.toml
 dist-exe/
+/dist/
+dist-python/
 python/sdk-runtime/src/deepseek_harness_runtime/runtime/dsh-jsonrpc-agent-*
 python/sdk-runtime/src/deepseek_harness_runtime/runtime/deepseek-harness-sdk-runtime-*
 python/sdk-runtime/src/deepseek_harness_runtime/runtime/node/
@@ -41,6 +44,8 @@ apps/web/dist/
 worktrees/
 .agents/worktrees/
 .typert-*/
+**/.generated-*/
+**/.rendered-*/
 !plugins/dsh-model-governance/lib/
 !plugins/dsh-model-governance/lib/index.js
 !plugins/dsh-model-governance/lib/outbox.js

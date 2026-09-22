@@ -6,6 +6,10 @@ Shared implementation policy for model-backed session-title providers. It resolv
 
 This package is a library, not a Cordis plugin. The provider plugins call `registerSessionTitleLlmProvider()` with their cadence and message selector; it validates shared config and delegates each revision to `generateSessionTitleWithLlm()`, so registration, route, prompt, cancellation, and validation behavior cannot drift between them.
 
+## Summary
+
+`dsh-session-title-llm` generates concise session titles from selected human messages with a consistent model request policy. Callers choose which messages contribute to each revision and may either supply a provider and model route together or use the route recorded for the current session. Required limits cap the framed input, generated output, and end-to-end duration, while caller cancellation remains effective throughout streaming. Invalid, empty, late, tool-call, or otherwise non-text results are rejected before they can replace a title.
+
 ## Route and failure contract
 
 `provider` and `model` overrides are optional but must be supplied together as non-empty strings. Without that pair, the helper uses the exact provider/model route captured from the current session's logged `request/header`; an explicit refresh before any route exists therefore needs overrides. The helper measures the final JSON-framed user prompt, including seq fields, wrappers, and JSON escaping, against `maxInputBytes` before logging or dispatch instead of truncating it. Timeout and caller cancellation are rechecked while consuming the stream and after it completes, so a late successful result cannot be accepted even if an interceptor or adapter ignores abort. Malformed or empty output, tool calls, and non-stop finish reasons also reject; the session-title service decides whether that rejection is an automatic warning or an explicit caller failure.
@@ -24,6 +28,10 @@ Every field is required except the paired route override; there are no library d
 | `maxOutputTokens` | Positive auxiliary generation token cap. |
 | `timeoutMs` | Positive end-to-end deadline within the runtime timer limit. |
 | `provider`, `model` | Optional explicit route; both or neither. |
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package is shared per-request policy — framing, budgets, assembly — returning normalized text; it owns no durable title state.
 
 ## Model Experience
 

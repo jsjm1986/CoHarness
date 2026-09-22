@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import { ToolCallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import { makeBridgeHarness, textResponse, type BridgeHarness } from './harness.ts'
 import { startHttpMcpFixture } from '../../../mcp/mcp-client/tests/http-fixture.ts'
@@ -249,8 +249,8 @@ describe('automation-only ACP bridge', () => {
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const sessionId = SessionId('other-frontend-live')
     harness.ctx.sessions.create(sessionId, { meta: { cwd: process.cwd() } })
-    vi.spyOn(harness.ctx.sessionPersistence, 'list').mockResolvedValue([{
-      version: 0,
+    vi.spyOn(harness.ctx.sessionPersistence, 'listHeaders').mockResolvedValue([{
+      version: SESSION_FORMAT_VERSION,
       id: sessionId,
       createdAt: 1,
       cwd: process.cwd(),
@@ -363,15 +363,15 @@ describe('automation-only ACP bridge', () => {
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const active = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
     const persistence = harness.ctx.get('sessionPersistence')!
-    vi.spyOn(persistence, 'list').mockResolvedValue([
-      { version: 0, id: SessionId(active.sessionId), createdAt: 9, cwd: process.cwd(), isSeeded: false },
-      { version: 0, id: SessionId('subagent'), createdAt: 8, cwd: '/missing/filter', isSeeded: false, origin: 'subagent' },
-      { version: 0, id: SessionId('fork'), createdAt: 7, cwd: '/missing/filter', isSeeded: true, parentSession: SessionId('parent') },
-      { version: 0, id: SessionId('no-cwd'), createdAt: 6, isSeeded: false },
-      { version: 0, id: SessionId('relative'), createdAt: 5, cwd: 'relative', isSeeded: false },
-      { version: 0, id: SessionId('other'), createdAt: 4, cwd: '/missing/other', isSeeded: false },
-      { version: 0, id: SessionId('valid-b'), createdAt: 3, cwd: '/missing/filter', isSeeded: false },
-      { version: 0, id: SessionId('valid-a'), createdAt: 3, cwd: '/missing/filter', isSeeded: false },
+    vi.spyOn(persistence, 'listHeaders').mockResolvedValue([
+      { version: SESSION_FORMAT_VERSION, id: SessionId(active.sessionId), createdAt: 9, cwd: process.cwd(), isSeeded: false },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('subagent'), createdAt: 8, cwd: '/missing/filter', isSeeded: false, origin: 'subagent' },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('fork'), createdAt: 7, cwd: '/missing/filter', isSeeded: true, parentSession: SessionId('parent') },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('no-cwd'), createdAt: 6, isSeeded: false },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('relative'), createdAt: 5, cwd: 'relative', isSeeded: false },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('other'), createdAt: 4, cwd: '/missing/other', isSeeded: false },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('valid-b'), createdAt: 3, cwd: '/missing/filter', isSeeded: false },
+      { version: SESSION_FORMAT_VERSION, id: SessionId('valid-a'), createdAt: 3, cwd: '/missing/filter', isSeeded: false },
     ])
 
     await expect(harness.client.listSessions({ cwd: 'relative' })).rejects.toThrow(/absolute path/)
@@ -423,7 +423,10 @@ describe('automation-only ACP bridge', () => {
     await expect(harness.client.newSession({ cwd: process.cwd(), mcpServers: [] }))
       .rejects.toThrow(/Internal error/)
     expect(harness.ctx.agents.list()).toHaveLength(0)
-    await expect(harness.ctx.sessionPersistence.list()).resolves.toEqual([])
+    // The loop seeds the log through its write handle before activation fails,
+    // so the rolled-back session's durable log remains; only the live agent and
+    // the bridge record are rolled back.
+    await expect(harness.ctx.sessionPersistence.listHeaders()).resolves.toHaveLength(1)
 
     const created = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
     await harness.client.prompt({ sessionId: created.sessionId, prompt: [{ type: 'text', text: 'persist' }] })

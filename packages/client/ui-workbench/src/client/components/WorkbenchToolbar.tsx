@@ -189,7 +189,7 @@ export function WorkbenchToolbar({
           { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true },
           { type: 'separator' as const, id: 'workbench-exit-separator' },
           { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
-        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label="选择工作台" aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { setWorkbenchMenuOpen(value => !value) }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
+        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { setWorkbenchMenuOpen(value => !value) }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>
       <div className={css.toolbarActions}>

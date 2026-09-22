@@ -44,11 +44,12 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 | `canonicalClientTimeZone(value)` | 对接受的时区回答规范的 `UTC` 或 IANA `Area/Location` 名称；空串、带空白、缩写、单段或平台不支持的名称回答 `undefined`。 |
 
 <a id="model-experience"></a>
-## Model Experience
+
+## 模型体验
 
 间接影响，取决于把规范时区记到持久消息上的那个消费方——`dsh-time-context` 据此渲染该轮模型可见的时区指令与时间戳。
 
-#### KV Cache effect
+#### KV Cache 影响
 
 自身没有。把时区派生文本注入请求的那个消费方，对该请求的缓存行为负责。
 

@@ -6,6 +6,10 @@
 
 `Menu` 主列表在桌面使用锚点位置；可选的 `header` 固定在可滚动条目视口上方，可选的 `footer` 固定在下方；`listClassName` 允许消费方设置产品自己的列表几何约束，例如高度上限。768px 以下会使用 `--dsw-mobile-sheet-*` 变为遵守安全区的手机 Sheet，并统一提供遮罩和拖拽提示；可滚动菜单会把 header 和 footer 留在条目滚动区外，条目仍是可选择的 menu item，并保留相同的外部按下关闭和 Escape 行为。`Modal` 使用相同的 Sheet 呈现，并在打开期间把键盘焦点保持在对话框内。portal presenter 如果信息层级需要手机专属分支，应使用 `useMediaQuery('(max-width: 767px)')`；外壳内部组件继续使用 `data-viewport` 标记。
 
+## 概述
+
+使用 `dsh-client-ui-primitives`，通过共享 React UI 构建 Web 客户端控件并渲染 agent 输出。它提供标准控件、图标、锚定浮层，以及用于带 TeX 公式的 Markdown、终端输出、文件读取、差异、搜索、网页检索和 JSON 的渲染器。这些渲染器会丢弃原始 HTML、限制链接并解析 ANSI 转义序列，以处理不受信任的模型输出。组件不 import Cordis 运行时；调用方提供本地化 label，主题相关颜色使用 `--dsw-*` 设计 token。
+
 ## 悬浮卡片
 
 `HoverCard` 通过指针离开宽限期，使采用 portal 渲染的预览在跨过与锚点之间的间隙时仍可触及。消费方还可传入 `copyText`：此时卡片为指针与键盘激活提供按钮语义，其无障碍名称会在 `copyLabel` 前缀后包含该值，通过包内剪贴板辅助函数原样写入该值，并且只有宿主接受写入后，才会临时将内容替换为 `copiedLabel`。与卡片相交的非折叠文本选区会阻止指针点击激活；成功反馈保持卡片原有高度，并随卡片关闭或在一秒后清除。`copyLabel` 和 `copiedLabel` 采用 label prop，是因为这个 zero-cordis 原子组件无法读取应用 locale；省略 `copyText` 时，卡片维持只读且可选择文本的行为。历史依据见[已归档的悬浮卡片复制 Agent Note](../../../.agents/notes/archived/feature/2026-07-31-hover-card-click-copy.md)。
@@ -42,9 +46,13 @@
 
 `useMediaQuery` 为每个查询复用一个原生监听器，并在旧版 WebView 中回退到 `addListener`／`removeListener`。`holdInert` 在可用时使用原生 `HTMLElement.inert`，同时在浮层占有页面期间保持 `aria-hidden` 与 tab 停靠点安全。主题样式会先定义 `100vh` 视口回退，待 layout 插件发布可视视口高度后再覆盖。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。纯 React 原子组件不拥有运行时状态；其渲染契约由单元规格断言。
+
 ## 模型体验
 
-无。该包在浏览器中渲染纯 React 原子组件；这里没有任何内容进入模型请求。
+无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

@@ -11,32 +11,37 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { SessionEventSuffix, SessionInspection, SessionLocation, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionEventSuffix, SessionInspection, SessionLocation, SessionPersistenceSnapshot , SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import SessionPersistence from '@deepseek-ai/dsh-session-persistence'
+import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 class HandlePersistence extends SessionPersistence {
+
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
   override readonly supportsRawArtifacts = false
   readonly created: SessionId[] = []
 
-  locate(_meta: import('@deepseek-ai/dsh-session').SessionHeader): SessionLocation | undefined { return undefined }
-  async create(meta: import('@deepseek-ai/dsh-session').SessionHeader): Promise<void> { this.created.push(meta.id) }
-  async append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {}
-  async load(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
-  async inspect(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
-  async readFrom(_id: SessionId, _fromSeq: import('@deepseek-ai/dsh-session').SessionLogOffset): Promise<SessionEventSuffix> {
+  override locate(_meta: import('@deepseek-ai/dsh-session').SessionHeader): SessionLocation | undefined { return undefined }
+  override async createStored(meta: SessionHeader): Promise<void> { this.created.push(meta.id) }
+  override async append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {}
+  override async load(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
+  override async inspect(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
+  override async readFrom(_id: SessionId, _fromSeq: import('@deepseek-ai/dsh-session').SessionLogOffset): Promise<SessionEventSuffix> {
     throw new Error('not used')
   }
-  async list(): Promise<import('@deepseek-ai/dsh-session').SessionHeader[]> { return [] }
-  async listSnapshots(): Promise<SessionPersistenceSnapshot[]> { return [] }
+  override async listStored(): Promise<SessionHeader[]> { return [] }
+  override async listSnapshots(): Promise<SessionPersistenceSnapshot[]> { return [] }
 }
 
 async function harnessWithLoop(adapter: MockAdapter = new MockAdapter([textResponse('ok')])): Promise<{ ctx: Context; loopFiber: Fiber }> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
-  await ctx.plugin(SystemPrompt, { persona: 'You are the deployment.' })
+  await ctx.plugin(SystemPrompt, { personaPrefix: 'You are the deployment.' })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
@@ -235,6 +240,37 @@ describe('agent scope lifecycle', () => {
     expect(ctx.tools.get('mine', agent)).toBeUndefined()
     const after = await ctx.systemPrompt.assemble(assembleContextFor(agent))
     expect(after.sections.find(s => s.name === 'deployment:persona-prefix')?.text).toBe('You are the deployment.')
+  })
+
+  it('owns the inbox projection until AgentLoop unloads', async () => {
+    const { ctx, loopFiber } = await harnessWithLoop()
+    const cold = ctx.sessions.create(SessionId('projection-before-any-agent'))
+    expect(ctx.sessionProjections.stateOf(cold, 'inbox')).toEqual({ 'next-turn': [], 'next-step': [] })
+    let first!: Awaited<ReturnType<typeof ctx.agents.create>>
+    let second!: Awaited<ReturnType<typeof ctx.agents.create>>
+    const firstOwner = await ctx.plugin(Object.assign(async (inner: Context) => {
+      first = await inner.agents.create({
+        sessionId: SessionId('projection-owner-first'),
+        agentOptions: { provider: 'mock', model: 'mock' },
+      })
+    }, { inject: ['agents'] }))
+    const secondOwner = await ctx.plugin(Object.assign(async (inner: Context) => {
+      second = await inner.agents.create({
+        sessionId: SessionId('projection-owner-second'),
+        agentOptions: { provider: 'mock', model: 'mock' },
+      })
+    }, { inject: ['agents'] }))
+
+    expect(ctx.sessionProjections.stateOf(first.agent.session, 'inbox')).toBeDefined()
+    await firstOwner.dispose()
+    expect(ctx.sessionProjections.stateOf(second.agent.session, 'inbox')).toBeDefined()
+    await secondOwner.dispose()
+    expect(ctx.sessionProjections.stateOf(second.agent.session, 'inbox')).toBeDefined()
+
+    await Promise.all([first.dispose(), second.dispose()])
+    await loopFiber.dispose()
+    expect(ctx.sessionProjections.stateOf(second.agent.session, 'inbox')).toBeUndefined()
+    await ctx.fiber.dispose()
   })
 
   it('agent.ctx listeners hear only their own agent (scoped dispatch end to end)', async () => {

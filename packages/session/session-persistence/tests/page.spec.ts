@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
-import type { SessionEventSuffix, SessionInspection } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionStorageMetadata,  SessionEventSuffix, SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import { describe, expect, it } from 'vitest'
 import {
   SessionPersistence,
@@ -28,32 +28,36 @@ class PagePersistence extends SessionPersistence {
   readonly entries = new Map<string, Entry>()
   afterReadFrom?: () => void
 
-  locate(_meta: SessionHeader): undefined {
+  override locate(_meta: SessionHeader): undefined {
     return undefined
   }
 
-  async create(meta: SessionHeader): Promise<void> {
+  override async createStored(meta: SessionHeader): Promise<void> {
     this.entries.set(String(meta.id), { meta: structuredClone(meta), events: [], generation: 0 })
   }
 
-  async append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
+
+  override async append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     const entry = this.entries.get(String(id))
     if (entry === undefined) throw new Error(`missing ${String(id)}`)
     entry.events.push(...structuredClone(events) as SessionEvent[])
     entry.generation += 1
   }
 
-  async load(id: SessionId): Promise<SessionInspection> {
+  override async load(id: SessionId): Promise<SessionInspection> {
     const entry = this.entries.get(String(id))
     if (entry === undefined) throw new Error(`missing ${String(id)}`)
     return { meta: structuredClone(entry.meta), inheritedEventCount: SessionLogOffset(0), events: structuredClone(entry.events) }
   }
 
-  async inspect(id: SessionId): Promise<SessionInspection> {
+  override async inspect(id: SessionId): Promise<SessionInspection> {
     return this.load(id)
   }
 
-  async readFrom(
+  override async readFrom(
     id: SessionId,
     fromSeq: SessionLogOffset,
     signal?: AbortSignal,
@@ -72,12 +76,12 @@ class PagePersistence extends SessionPersistence {
     return result
   }
 
-  async list(signal?: AbortSignal): Promise<SessionHeader[]> {
+  override async listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
     signal?.throwIfAborted()
     return [...this.entries.values()].map(entry => structuredClone(entry.meta))
   }
 
-  async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+  override async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     signal?.throwIfAborted()
     return [...this.entries.values()].map(entry => ({
       header: structuredClone(entry.meta),
@@ -105,7 +109,7 @@ async function fixture(events = Array.from({ length: 5 }, (_, seq) => event(seq)
   await ctx.plugin(SessionStore)
   const persistence = new PagePersistence(ctx)
   const id = SessionId('page-session')
-  await persistence.create({ id, version: 0, createdAt: 1, isSeeded: false })
+  await persistence.createStored({ id, version: SESSION_FORMAT_VERSION, createdAt: 1, isSeeded: false })
   await persistence.append(id, events)
   return {
     persistence,
@@ -192,7 +196,7 @@ describe('session persistence page protocol', () => {
       await expect(persistence.readPage(id, { cursor })).rejects.toMatchObject({ code: 'dependency' })
 
       const other = SessionId('other-page-session')
-      await persistence.create({ id: other, version: 0, createdAt: 1, isSeeded: false })
+      await persistence.createStored({ id: other, version: SESSION_FORMAT_VERSION, createdAt: 1, isSeeded: false })
       await persistence.append(other, [event(0)])
       await expect(persistence.readPage(other, { cursor })).rejects.toMatchObject({ code: 'protocol' })
     } finally {
@@ -218,14 +222,14 @@ describe('session persistence page protocol', () => {
   })
 
   it('honors group and byte boundaries and preserves cancellation', async () => {
-    const chunks = Array.from({ length: 4 }, (_, seq) => ({
-      type: 'assistant/chunk',
+    const attempts = Array.from({ length: 4 }, (_, seq) => ({
+      type: 'assistant/attempt',
       seq,
       time: seq,
-      data: { turn: 2, step: 1, chunk: { type: 'text-delta', index: seq, text: 'x' } },
+      data: { turn: 2, step: 1, stream: [{ type: 'chunk', time: seq, chunk: { type: 'text-delta', index: seq, text: 'x' } }] },
     })) as SessionEvent[]
     const chunkPage = selectSessionPersistencePage(
-      chunks,
+      attempts,
       'newer',
       Number.MAX_SAFE_INTEGER,
       10,

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Web Session-log download control over the host-streamed ZIP endpoint owned by `dsh-host-apiproxy`. The Host half registers `/export`; the browser half owns a 111×32 desktop `Session log` action, an icon-only action in the compact AppFrame topbar, one download controller, and one modal shared by both buttons and the slash command. ZIP generation, raw JSONL/zstd reads, descendants, attachments, backpressure, and HTTP error semantics remain owned by the [ApiProxy download implementation](../../host/apiproxy/README.md).
 
+## Summary
+
+`dsh-session-log-export` lets the Web interface download a session's full history: a `Download session log` menu item under the Session Header's more-actions button and an `/export` slash command both hand the session tree — the session, its sub-sessions, and attachments — to the browser as a ZIP download. The package owns the Host archive stream, its authenticated Fetch route, and the browser controls and feedback. The browser chooses the download destination. Setup and usage come first; implementation details follow.
+
 ## Command contract
 
 | Input | Result |
@@ -47,3 +51,5 @@ None. The log-only command lifecycle and browser download do not change the deri
 - The download endpoint requires a persistence backend with a per-Session raw artifact. The shipped JSONL backend supports plaintext and zstd artifacts; SQLite export is not included in this change.
 - This is a browser download, not a Host-path writer. The browser chooses the local destination; no Host path or native folder action is returned.
 - The preflight reports failures found before ZIP streaming starts. A descendant or attachment failure after the browser accepts the GET is reported by the browser download manager, not by the modal.
+
+No runtime invariant companion is published because the export plugin owns no independently observable registrations or state replicas.

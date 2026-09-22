@@ -74,7 +74,7 @@ export const contextBreakdownProjectionDefinition = {
     }
     let systems = state.systems
     let messageDelta = event.type === 'system/message' ? 0 : fold.deltaTokens
-    const systemWrite = event.type === 'system/message' && event.surfaceOp !== undefined
+    const systemWrite = event.type === 'system/message'
     if (isReplacementSurfaceEvent(event) || systemWrite) {
       const covered = new Set<SessionSeq>(
         isReplacementSurfaceEvent(event) ? event.sourceEventSeqs ?? [] : [],

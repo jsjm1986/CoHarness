@@ -26,8 +26,8 @@
           root: './.sessions'
           compression: !!js "process.env.DSH_SNAPSHOT === undefined ? 'zstd' : 'none'"
       - insert:
-          - id: code-runtime
-            name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+          - id: ptc-runtime
+            name: '@deepseek-ai/dsh-ptc-runtime-node'
           - id: cordis-host-runner
             name: '@deepseek-ai/dsh-cordis-host-runner'
           - id: tool-cordis

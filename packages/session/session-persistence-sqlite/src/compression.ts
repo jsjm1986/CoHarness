@@ -1,6 +1,6 @@
 /**
  * Fixed physical-record compression for SQLite. Schema-owned functions
- * encode logical events and decode tagged rows before persistence consumers
+ * encode logical events and decode physical rows before persistence consumers
  * observe them.
  * @module @deepseek-ai/dsh-session-persistence-sqlite/compression
  */
@@ -8,13 +8,7 @@
 import { readFileSync } from 'node:fs'
 import { TextDecoder } from 'node:util'
 import { constants, zstdCompressSync, zstdDecompressSync } from 'node:zlib'
-import type { SessionEvent, SurfaceEventType } from '@deepseek-ai/dsh-session'
-import {
-  decodeSerializedChunkRow,
-  type ChunkRow,
-  MAX_PACKED_DATA_BYTES,
-  type StorageRecord,
-} from './codec.ts'
+import type { SessionEvent, SessionSeq, SurfaceEventType, SurfaceOp } from '@deepseek-ai/dsh-session'
 import type { EventRow } from './schema.ts'
 
 /** One physical row ready for SQLite parameter binding. */
@@ -39,7 +33,7 @@ const ZSTD_COMPRESSION_LEVEL = 3
 const DELTA_TAG = 0
 const RUN_TAG = 1
 
-/** Stable dictionary bytes used by every compressed schema-20 data cell. */
+/** Stable dictionary bytes used by every compressed schema data cell. */
 const ZSTD_DICTIONARY = readFileSync(new URL('../resources/zstd-dictionary.bin', import.meta.url))
 
 const DATA_ZSTD_OPTIONS = {
@@ -47,58 +41,25 @@ const DATA_ZSTD_OPTIONS = {
   params: { [constants.ZSTD_c_compressionLevel]: ZSTD_COMPRESSION_LEVEL },
 } as const
 
-const CHUNK_TAGS = ['text-chunks', 'reasoning-chunks', 'tool-call-chunks'] as const
-type ChunkTag = typeof CHUNK_TAGS[number]
-
-function isChunkTag(value: string): value is ChunkTag {
-  return (CHUNK_TAGS as readonly string[]).includes(value)
-}
-
 /**
- * Decode one physical SQLite row into its complete logical event span.
+ * Decode one physical SQLite row into its logical event.
  * @param row - detached SQLite event row.
- * @returns every logical event represented by the row.
+ * @returns the logical event the row represents.
  */
 export function decodeRow(row: EventRow): SessionEvent[] {
-  // The optional fallback keeps hand-authored v18 fixtures readable while all
-  // schema-20 rows carry the explicit physical discriminator.
-  const physical = (row as unknown as { readonly is_packed?: number }).is_packed
-  const isPacked = physical === undefined ? (legacyPackedRow(row) ? 1 : 0) : physical
-  if (isPacked === 0) return [decodeScalarRow(row)]
-  if (!isChunkTag(row.type)) {
-    throw new Error(`malformed ${row.type} storage row: packed discriminator requires a chunk tag`)
+  if (row.is_packed !== 0) {
+    throw new Error(`malformed ${row.type} storage row: packed rows retired at schema 21`)
   }
-  if (row.source_event_seqs !== null || row.surface_op !== null) {
-    throw new Error(`malformed ${row.type} storage row: packed surface fields must be null`)
-  }
-  return decodeSerializedChunkRow(
-    row.type,
-    row.seq,
-    row.time,
-    decodeData(row.data, MAX_PACKED_DATA_BYTES),
-  )
+  return [decodeScalarRow(row)]
 }
 
 /**
- * Convert a storage record to SQLite column values.
- * @param record - scalar event or packed chunk record.
+ * Convert a session event to SQLite column values.
+ * @param event - the logical event to bind.
  * @returns column values for one physical insert.
  */
-export function bindRecord(record: StorageRecord): BoundRecord {
-  if (isChunkRow(record)) {
-    return {
-      seq: record.seq0,
-      type: record.type,
-      time: record.time0,
-      data: encodeData(JSON.stringify(record.data)),
-      sourceEventSeqs: null,
-      surfaceOp: null,
-      isPacked: 1,
-      ignorable: null,
-    }
-  }
-  const event = record
-  const surface = event as SessionEvent<SurfaceEventType>
+export function bindRecord(event: SessionEvent): BoundRecord {
+  const surface: { sourceEventSeqs?: SessionSeq[]; surfaceOp?: SurfaceOp } = event
   return {
     seq: event.seq,
     type: event.type,
@@ -120,11 +81,9 @@ function encodeData(serialized: string): string | Uint8Array {
   return compressed.length < bytes.length ? compressed : serialized
 }
 
-function decodeData(value: string | Uint8Array, maxOutputLength?: number): string {
+function decodeData(value: string | Uint8Array): string {
   if (typeof value === 'string') return value
-  const decoded = maxOutputLength === undefined
-    ? zstdDecompressSync(value, { dictionary: ZSTD_DICTIONARY })
-    : zstdDecompressSync(value, { dictionary: ZSTD_DICTIONARY, maxOutputLength })
+  const decoded = zstdDecompressSync(value, { dictionary: ZSTD_DICTIONARY })
   return UTF8_DECODER.decode(decoded)
 }
 
@@ -188,20 +147,6 @@ function decodeSourceEventSeqs(bytes: Uint8Array, maxEntries: number): number[] 
     // A pre-schema-20 row used an untagged delta stream. Accept it for
     // forensic fixtures; newly written rows always carry a tag.
     default: return decodeDeltaVarints(bytes, 0)
-  }
-}
-
-function legacyPackedRow(row: EventRow): boolean {
-  if (row.ignorable === 0) return true
-  if (row.ignorable !== null || !isChunkTag(row.type)) return false
-  if (row.data instanceof Uint8Array) return true
-  if (typeof row.data !== 'string') return false
-  try {
-    const value: unknown = JSON.parse(row.data)
-    return typeof value === 'object' && value !== null
-      && ('texts' in value || 'args' in value)
-  } catch {
-    return false
   }
 }
 
@@ -276,10 +221,6 @@ function readVarint(
     }
   }
   throw new Error('malformed source_event_seqs storage value: truncated varint')
-}
-
-function isChunkRow(record: StorageRecord): record is ChunkRow {
-  return isChunkTag(record.type) && 'seq0' in record && !('seq' in record)
 }
 
 function decodeScalarRow(row: EventRow): SessionEvent {

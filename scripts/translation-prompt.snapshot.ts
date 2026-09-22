@@ -1,4 +1,7 @@
 /** Runnable keyless snapshot for the assembled translation request and consumed response. */
+/* jscpd:ignore-start -- this runnable snapshot intentionally mirrors
+ * translation-prompt.expected.spec.ts: the expected-file spec and the
+ * snapshot replay drive the same assembled request/response fixture. */
 
 import { execFile } from 'node:child_process'
 import { access, mkdir, writeFile } from 'node:fs/promises'
@@ -30,3 +33,5 @@ describe('translation prompt runnable snapshot', () => {
     await expect(stdout).toMatchFileSnapshot(expected)
   })
 })
+
+/* jscpd:ignore-end */

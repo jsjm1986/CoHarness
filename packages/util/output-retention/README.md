@@ -8,6 +8,10 @@ The library owns **only** the mechanical question *"what did we keep, and what d
 
 It is a **library, not a service or plugin**: no `ctx`, registers nothing, emits no events. The only state is per-retainer (one accumulation), never cross-call. Tool packages import it directly.
 
+## Summary
+
+Use `dsh-output-retention` to cap the items or text a tool returns to a model while reporting what was omitted. `ItemRetainer` keeps an ordered head window and can report an exact omitted-item count; `TextRetainer` keeps head, tail, or head-and-tail byte windows without returning invalid UTF-8 cuts. `formatRetentionNotice` adds a consistent omission clause while each tool supplies its own recovery guidance. Grouping, line numbering, spill files, and provider errors remain tool responsibilities; consumers import this library directly rather than loading it through `cordis.yml`.
+
 ## API
 
 ```ts
@@ -83,13 +87,17 @@ const footer = formatRetentionNotice(
 )
 ```
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A stateless bounding algebra over caller-supplied items; retention math and omission metadata are covered by unit specs.
+
 ## Model Experience
 
-Indirectly, through tool consumers that render retained content and omission metadata.
+Indirectly, through the retention consumers that render retained content and omission metadata.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the retention consumers own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

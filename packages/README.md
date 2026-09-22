@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 npm scope: `@deepseek-ai/dsh-*`; Cordis `Service` subclasses and function plugins contribute through `ctx.effect()`, `ctx.on()`, or `ctx.waterfall()`. Rules: [package](AGENTS.md), [root](../AGENTS.md#conventions).
 
+## Summary
+
+The harness is assembled from `packages/` capability groups. Use this page as the top-level map to each group's package list.
+
 ## Hierarchy
 
 Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Group READMEs own package/ctx-key maps.**
@@ -18,11 +22,10 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`feedback/`](feedback/README.md) | Human feedback | Product — stable API |
 | [`identity/`](identity/README.md) | Shared anonymous identity | Product — stable API |
 | [`llm/`](llm/README.md) | LLM capability family: the abstract service + provider adapters | Product — stable API |
-| [`e2b/`](e2b/README.md) | E2B providers | POC |
 | [`subprocess/`](subprocess/README.md) | Subprocess capability family: Service Definition + local process-tree provider | Product — stable API |
 | [`shell/`](shell/README.md) | Bash capability family: executor seam, local impl, model-facing tool | Product — stable API |
 | [`terminal/`](terminal/README.md) | Persistent PTY capability family: owner-scoped sessions, local implementation, and model-facing tools | Product — stable API |
-| [`code-runtime/`](code-runtime/README.md) | Code-execution capability family: Service Definition + worker-thread provider + PTC mode Consumer | Product — stable API |
+| [`ptc-runtime/`](ptc-runtime/README.md) | Code-execution capability family: Service Definition + worker-thread provider + PTC mode Consumer | Product — stable API |
 | [`sandbox/`](sandbox/README.md) | Process-confinement seam; bwrap/Landlock/Seatbelt backends | Product — stable API |
 | [`fs/`](fs/README.md) | Filesystem capability family: seam, local impl, model-facing file tools, bash-backed discovery tools | Product — stable API |
 | [`lsp/`](lsp/README.md) | LSP capability family: seam, generic stdio provider, and the `lsp` tool | Product — stable API |

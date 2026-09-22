@@ -7,6 +7,25 @@ A service can be a core spine service, a swappable capability seam, or a bundle/
 
 ```mermaid
 flowchart LR
+  pkg_hmr["hmr"]
+  svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
+  pkg_app_boot["app-boot"]
+  pkg_plugin_manager["plugin-manager"]
+  svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
+  pkg_ui_settings_plugin_inventory["ui-settings-plugin-inventory"]
+  svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
+  pkg_mcp_resources["mcp-resources"]
+  svc_mcpResources["ctx.mcpResources<br/>Scoped MCP resource access"]
+  pkg_mcp_client["mcp-client"]
+  pkg_browser_use["browser-use"]
+  svc_browserUse["ctx.browserUse<br/>Browser-use provider registration"]
+  pkg_experimental_browser_use_playwright_mcp["experimental-browser-use-playwright-mcp"]
+  pkg_experimental_browser_use_chrome_devtools_mcp["experimental-browser-use-chrome-devtools-mcp"]
+  pkg_experimental_browser_use_stagehand_native["experimental-browser-use-stagehand-native"]
+  pkg_computer_use["computer-use"]
+  svc_computerUse["ctx.computerUse<br/>Computer-use provider registration"]
+  pkg_experimental_computer_use_cua_driver_mcp["experimental-computer-use-cua-driver-mcp"]
+  pkg_experimental_computer_use_cua_driver_native["experimental-computer-use-cua-driver-native"]
   pkg_attachment["attachment"]
   svc_attachments["ctx.attachments<br/>Durable binary attachment storage"]
   pkg_attachment_local["attachment-local"]
@@ -132,10 +151,6 @@ flowchart LR
   pkg_agent_spine_demo["agent-spine-demo"]
   pkg_goal["goal"]
   svc_goals["ctx.goals<br/>Same-session goal domain"]
-  pkg_e2b["e2b"]
-  svc_e2b["ctx.e2b<br/>E2B sandbox lifecycle owner"]
-  pkg_fs_e2b["fs-e2b"]
-  pkg_subprocess_e2b["subprocess-e2b"]
   pkg_subprocess["subprocess"]
   svc_subprocess["ctx.subprocess<br/>Subprocess seam"]
   pkg_subprocess_local["subprocess-local"]
@@ -165,10 +180,10 @@ flowchart LR
   pkg_permission_presets["permission-presets"]
   svc_permissionPresets["ctx.permissionPresets<br/>Permission presets"]
   svc_permissionPresetAuthorization["ctx.permissionPresetAuthorization<br/>Permission preset authorization policy"]
-  pkg_code_runtime["code-runtime"]
-  svc_codeRuntime["ctx.codeRuntime<br/>Code-execution seam"]
-  pkg_code_runtime_worker_thread["code-runtime-worker-thread"]
-  pkg_experimental_code_runtime_python["experimental-code-runtime-python"]
+  pkg_ptc_runtime["ptc-runtime"]
+  svc_ptcRuntime["ctx.ptcRuntime<br/>Code-execution seam"]
+  pkg_ptc_runtime_node["ptc-runtime-node"]
+  pkg_experimental_ptc_runtime_python["experimental-ptc-runtime-python"]
   pkg_fs["fs"]
   svc_fs["ctx.fs<br/>Filesystem provider seam"]
   pkg_fs_local["fs-local"]
@@ -208,11 +223,10 @@ flowchart LR
   svc_webServer["ctx.webServer<br/>HTTP route registration"]
   pkg_connection["connection"]
   pkg_modules["modules"]
-  pkg_hmr["hmr"]
   svc_clientModules["ctx.clientModules<br/>Client plugin graph host"]
   pkg_workflow["workflow"]
   svc_workflowEngine["ctx.workflowEngine<br/>Workflow script engine"]
-  pkg_workflow_worker_thread["workflow-worker-thread"]
+  pkg_workflow_ptc["workflow-ptc"]
   pkg_tool_workflow["tool-workflow"]
   pkg_lsp["lsp"]
   svc_lsp["ctx.lsp<br/>Language-server navigation seam"]
@@ -230,20 +244,21 @@ flowchart LR
   pkg_agent_team --> svc_agentTeams
   pkg_api_gateway --> svc_typertGateway
   pkg_apiproxy --> svc_apiProxy
+  pkg_app_boot --> svc_profileContext
   pkg_approval --> svc_approval
   pkg_attachment --> svc_attachments
   pkg_attachment_local --> svc_attachments
   pkg_authorization --> svc_authorization
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
-  pkg_code_runtime --> svc_codeRuntime
-  pkg_code_runtime_worker_thread --> svc_codeRuntime
+  pkg_browser_use --> svc_browserUse
   pkg_collaboration --> svc_collaboration
   pkg_collaboration_gateway --> svc_collaboration
   pkg_commands --> svc_commands
   pkg_compaction --> svc_compaction
   pkg_compaction_basic --> svc_compaction
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
+  pkg_computer_use --> svc_computerUse
   pkg_cordis_host_runner --> svc_cordisInspect
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
@@ -252,16 +267,20 @@ flowchart LR
   pkg_directory_picker --> svc_directoryPicker
   pkg_directory_picker_browse --> svc_directoryPicker
   pkg_directory_picker_native --> svc_directoryPicker
-  pkg_e2b --> svc_e2b
-  pkg_experimental_code_runtime_python --> svc_codeRuntime
+  pkg_experimental_browser_use_chrome_devtools_mcp --> svc_browserUse
+  pkg_experimental_browser_use_playwright_mcp --> svc_browserUse
+  pkg_experimental_browser_use_stagehand_native --> svc_browserUse
+  pkg_experimental_computer_use_cua_driver_mcp --> svc_computerUse
+  pkg_experimental_computer_use_cua_driver_native --> svc_computerUse
+  pkg_experimental_ptc_runtime_python --> svc_ptcRuntime
   pkg_file_reference --> svc_fileReferences
   pkg_file_reference_local --> svc_fileReferences
   pkg_fs --> svc_fs
-  pkg_fs_e2b --> svc_fs
   pkg_fs_local --> svc_fs
   pkg_fs_sandbox --> svc_fs
   pkg_gateway_runtime --> svc_gatewayRuntime
   pkg_goal --> svc_goals
+  pkg_hmr --> svc_hmr
   pkg_invariants --> svc_invariants
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
@@ -271,6 +290,8 @@ flowchart LR
   pkg_llm_replay --> svc_llm
   pkg_lsp --> svc_lsp
   pkg_lsp_local --> svc_lsp
+  pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_resources --> svc_mcpResources
   pkg_message_feedback --> svc_messageFeedback
   pkg_model_access --> svc_modelAccess
   pkg_model_provider_config --> svc_modelProviderConfig
@@ -278,6 +299,9 @@ flowchart LR
   pkg_permission_presets --> svc_permissionPresetAuthorization
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
+  pkg_plugin_manager --> svc_pluginManager
+  pkg_ptc_runtime --> svc_ptcRuntime
+  pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
   pkg_sandbox --> svc_sandbox
   pkg_sandbox_local --> svc_sandbox
@@ -318,7 +342,6 @@ flowchart LR
   pkg_subagent_fork_in_process --> svc_subagents
   pkg_subagent_spawn_in_process --> svc_subagents
   pkg_subprocess --> svc_subprocess
-  pkg_subprocess_e2b --> svc_subprocess
   pkg_subprocess_local --> svc_subprocess
   pkg_system_prompt --> svc_systemPrompt
   pkg_terminal --> svc_terminals
@@ -337,7 +360,7 @@ flowchart LR
   pkg_web_search_perplexity --> svc_web
   pkg_webserver --> svc_webServer
   pkg_workflow --> svc_workflowEngine
-  pkg_workflow_worker_thread --> svc_workflowEngine
+  pkg_workflow_ptc --> svc_workflowEngine
   pkg_workspace --> svc_workspaceRegistry
   svc_agentDefaultModel --> pkg_headless
   svc_agentDefaultModel --> pkg_host_apiproxy
@@ -352,11 +375,15 @@ flowchart LR
   svc_attachments --> pkg_host_runtime
   svc_attachments --> pkg_llm_pi_ai
   svc_authorization --> pkg_llm_pi_ai
+  svc_browserUse --> pkg_experimental_browser_use_chrome_devtools_mcp
+  svc_browserUse --> pkg_experimental_browser_use_playwright_mcp
+  svc_browserUse --> pkg_experimental_browser_use_stagehand_native
   svc_clientModules --> pkg_hmr
-  svc_codeRuntime --> pkg_tools
   svc_collaboration --> pkg_apiproxy
   svc_collaboration --> pkg_session_persistence_gateway
   svc_compaction --> pkg_compaction_basic
+  svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
+  svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
   svc_cordisInspect --> pkg_tool_cordis
   svc_credentials --> pkg_apiproxy
   svc_credentials --> pkg_llm_deepseek
@@ -366,11 +393,10 @@ flowchart LR
   svc_deepseekLlmApiExtensions --> pkg_session_log_deepseek
   svc_directoryPicker --> pkg_apiproxy
   svc_dynamicCordisRunner --> pkg_tool_cordis
-  svc_e2b --> pkg_fs_e2b
-  svc_e2b --> pkg_subprocess_e2b
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
+  svc_hmr --> pkg_app_boot
   svc_invariants --> pkg_agent
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
@@ -382,10 +408,15 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_mcpResources --> pkg_mcp_resources
   svc_modelAccess --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_llm_pi_ai
   svc_permissionPresetAuthorization --> pkg_collaboration_gateway
+  svc_pluginManager --> pkg_plugin_manager
+  svc_pluginManager --> pkg_ui_settings_plugin_inventory
+  svc_profileContext --> pkg_plugin_manager
+  svc_ptcRuntime --> pkg_tools
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -471,6 +502,12 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
+| `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |
+| `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | The dsh launcher supplies data-only profile locations and composition inputs; reload scheduling belongs to dsh-hmr. |
+| `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | Connection-owned providers serve shared resource tools in the calling agent scope. |
+| `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API. |
+| `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | One provider-owned name per service instance. Each provider also owns its model tools; the service has no common action API, runtime selection, or Session workflow lock. |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |
 | `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | [`tool-userdoc`](../packages/attachment/tool-userdoc) | - | Uploads land as real named files inside a directory the tool authorization policy already grants. The personal-document Consumer adds bounded discovery and text reads without exposing host paths; ordinary filesystem tools remain available for attached documents. |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
@@ -511,8 +548,7 @@ flowchart LR
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner. |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | The one concrete loop plugin; extension packages depend on dsh-agent events and services, not on this package. |
 | `ctx.goals` | `core` | [`goal`](../packages/goal/goal) | - | - | - | Folds revisioned objective state from the session log and keeps live continuation activation process-local. |
-| `ctx.e2b` | `core` | [`e2b`](../packages/e2b/e2b) | - | [`fs-e2b`](../packages/e2b/fs-e2b), [`subprocess-e2b`](../packages/e2b/subprocess-e2b) | - | Owns one shared E2B SDK handle, remote working directory, and final sandbox disposition so both fundamental E2B providers inhabit the same Linux runtime. |
-| `ctx.subprocess` | `seam` | [`subprocess`](../packages/subprocess/subprocess) | [`subprocess-local`](../packages/subprocess/subprocess-local), [`subprocess-e2b`](../packages/e2b/subprocess-e2b) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash), [`lsp-stdio`](../packages/lsp/lsp-stdio), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | - | The bash executors, the PTY shell backend, the LSP host, and the out-of-process ACP, Codex, and Claude Code subagent backends spawn through ctx.subprocess; the service owns process coordinates, tree/session lifetime, stdio dispositions, terminal mechanics, and kill escalation. |
+| `ctx.subprocess` | `seam` | [`subprocess`](../packages/subprocess/subprocess) | [`subprocess-local`](../packages/subprocess/subprocess-local) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash), [`lsp-stdio`](../packages/lsp/lsp-stdio), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | - | The bash executors, the PTY shell backend, the LSP host, and the out-of-process ACP, Codex, and Claude Code subagent backends spawn through ctx.subprocess; the service owns process coordinates, tree/session lifetime, stdio dispositions, terminal mechanics, and kill escalation. |
 | `ctx.shell` | `seam` | [`shell`](../packages/shell/shell) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`pwsh-local`](../packages/shell/pwsh-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) | - | The model-facing shell tools and hook bridges consume this seam; sandboxed, remote, or PowerShell executors replace bash-local without touching them. |
 | `ctx.shellEnv` | `core` | [`shell-env`](../packages/shell/shell-env) | - | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh) | - | Plugins declare effect-scoped DSH_* facts; each shell tool collects one trusted snapshot per execution and its executor rebuilds the namespace. |
 | `ctx.terminals` | `seam` | [`terminal`](../packages/terminal/terminal) | [`terminal-bash`](../packages/terminal/terminal-bash) | [`tool-terminal`](../packages/terminal/tool-terminal) | - | The registry owns exact-Agent session identity and cleanup; backends own terminal mechanics, while tool-terminal exposes the owner-scoped model tools. |
@@ -521,8 +557,8 @@ flowchart LR
 | `ctx.approval` | `seam` | `approval` | [`acp`](../packages/acp/acp) | [`tools`](../packages/core/tools), [`tool-bash`](../packages/shell/tool-bash) | - | One-shot permission decisions dispatched over the `approval/request` waterfall; answerers are listeners (the ACP bridge for its own agents), absence fails closed to `unavailable`. |
 | `ctx.permissionPresets` | `core` | [`permission-presets`](../packages/interaction/permission-presets) | - | - | - | User-facing preset table (`workspace-write`/`danger-full-access`) bundling the sandbox-mode and approval-policy knobs; a switch writes one `permission/preset` event through to both knob events. |
 | `ctx.permissionPresetAuthorization` | `core` | [`permission-presets`](../packages/interaction/permission-presets) | - | [`collaboration-gateway`](../packages/context/collaboration-gateway) | - | An optional deployment policy decides whether the current authenticated request may select each preset; the Gateway provider fails closed outside an administrator request. |
-| `ctx.codeRuntime` | `seam` | [`code-runtime`](../packages/code-runtime/code-runtime) | [`code-runtime-worker-thread`](../packages/code-runtime/code-runtime-worker-thread), [`experimental-code-runtime-python`](../packages/experimental/code-runtime-python) | [`tools`](../packages/core/tools) | - | Runs one model-written program against host-provided async bindings; backends differ by substrate and language (the tool registry consumes it for PTC). |
-| `ctx.fs` | `seam` | [`fs`](../packages/fs/fs) | [`fs-local`](../packages/fs/fs-local), [`fs-sandbox`](../packages/fs/fs-sandbox), [`fs-e2b`](../packages/e2b/fs-e2b) | [`tool-fs`](../packages/fs/tool-fs) | [`fs-observation-policy`](../packages/fs/fs-observation-policy) | tool-fs executes read/write/edit through ctx.fs; fs-sandbox fences mutations by the shared sandbox mode; fs-observation-policy contributes observed-state checks through the fs/* event gate. |
+| `ctx.ptcRuntime` | `seam` | [`ptc-runtime`](../packages/ptc-runtime/ptc-runtime) | [`ptc-runtime-node`](../packages/ptc-runtime/ptc-runtime-node), [`experimental-ptc-runtime-python`](../packages/experimental/ptc-runtime-python) | [`tools`](../packages/core/tools) | - | Runs one model-written program against host-provided async bindings; backends differ by substrate and language (the tool registry consumes it for PTC). |
+| `ctx.fs` | `seam` | [`fs`](../packages/fs/fs) | [`fs-local`](../packages/fs/fs-local), [`fs-sandbox`](../packages/fs/fs-sandbox) | [`tool-fs`](../packages/fs/tool-fs) | [`fs-observation-policy`](../packages/fs/fs-observation-policy) | tool-fs executes read/write/edit through ctx.fs; fs-sandbox fences mutations by the shared sandbox mode; fs-observation-policy contributes observed-state checks through the fs/* event gate. |
 | `ctx.compaction` | `seam` | [`compaction`](../packages/compaction/compaction) | [`compaction-basic`](../packages/compaction/compaction-basic) | [`compaction-basic`](../packages/compaction/compaction-basic) | - | The basic backend consumes post-step pressure and request-error recovery events; there is no model-facing compact tool. |
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-dsh-sdk`](../packages/subagent/subagent-dsh-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route. |
 | `ctx.subagentModelSelection` | `core` | [`tool-subagent`](../packages/subagent/tool-subagent) | - | [`tool-subagent`](../packages/subagent/tool-subagent) | - | The settings service validates and snapshots the host allowlist used by the delegation tool when model-selection support is explicitly enabled; the shipped composition keeps it disabled by default. |
@@ -531,9 +567,9 @@ flowchart LR
 | `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names. |
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | The backend saves oversized tool text and returns a model-facing locator plus retrieval hint; spill-policy is the tools/post-execute consumer that decides when to spill. |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | Discriminated interaction capability: the native backend opens one OS chooser on the host display, the browse backend serves listing/creation primitives for the in-app browser; dual-face backends fill ui-workspace directory-flow slots from their browser halves (no wire advertisement). |
-| `ctx.webServer` | `core` | `webserver` | - | `connection`, `modules`, `hmr` | - | Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes. |
-| `ctx.clientModules` | `core` | `modules` | - | `hmr` | - | Composes the __DSH_BOOT__ entry graph from an incremental dsh.client scan, serves plugin bundles, and notifies rebuilt/graph-changed subscribers. |
-| `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-worker-thread`](../packages/workflow/workflow-worker-thread) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | One engine per context, as in bash, with no named-provider registry; the general workflow and fixed Ralph consumers start runs whose agent() calls fan out through ctx.subagents. |
+| `ctx.webServer` | `core` | `webserver` | - | `connection`, `modules`, [`hmr`](../packages/boot/hmr) | - | Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes. |
+| `ctx.clientModules` | `core` | `modules` | - | [`hmr`](../packages/boot/hmr) | - | Composes the __DSH_BOOT__ entry graph from an incremental dsh.client scan, serves plugin bundles, and notifies rebuilt/graph-changed subscribers. |
+| `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-ptc`](../packages/workflow/workflow-ptc) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | One engine per context, as in bash, with no named-provider registry; the general workflow and fixed Ralph consumers start runs whose agent() calls fan out through ctx.subagents. |
 | `ctx.lsp` | `seam` | [`lsp`](../packages/lsp/lsp) | `lsp-local` | [`tool-lsp`](../packages/lsp/tool-lsp) | - | Provider registration and selection plus normalized query execution over exactly four operations; the seam offers no protocol escape hatch, so a backend translates into the normalized request and result. |
 | `ctx.apiProxy` | `core` | `apiproxy` | - | `connection` | - | The transport-agnostic host gateway face: it dispatches browser API calls, and each open host stream subscribes to the events it forwards rather than being pushed to through a broadcast verb. |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace. |

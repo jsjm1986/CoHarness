@@ -28,6 +28,16 @@ function markdownFixture(linkUrl: string): string {
   const session = Session.create(SessionId('markdown-inline-code-links-source'))
   const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
   session.append('turn/start', { turn: 1 })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('system/message', {
+    turn: 1,
+    step: 1,
+    message: createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: 'Fixture system prompt.' }],
+      source: { kind: 'plugin', plugin: 'test-fixture' },
+    }),
+  }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Show the local preview URL.' }],
     source: { kind: 'user' },
@@ -37,8 +47,8 @@ function markdownFixture(linkUrl: string): string {
     messageSeqs: [user.seq],
     source: { kind: 'fallback' },
   })
-  session.append('step/start', { turn: 1, step: 1 })
   session.append('assistant/message', {
+    stream: [],
     turn: 1,
     step: 1,
     message: createMessage({
@@ -72,6 +82,8 @@ function markdownFixture(linkUrl: string): string {
       id: '{{sessionId}}',
       createdAt: 0,
       cwd: '{{cwd}}',
+      isSeeded: false,
+      delegationDepth: 0,
     }),
     ...session.snapshotEvents().map(event => JSON.stringify({
       ...event,

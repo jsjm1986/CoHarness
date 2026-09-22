@@ -4,7 +4,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, relativeTime,
-  UNGROUPED_KEY, UNGROUPED_LABEL,
+  UNGROUPED_KEY,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
 
@@ -83,7 +83,7 @@ describe('deriveGroups', () => {
     const blankNode = groups[0]!.sessions.find(session => session.id === currentBlank.id)!
     // The stored placeholder title stays canonical; the renderer swaps in
     // the localized New Session label via the blank flag.
-    expect(blankNode.title).toBe('New Session')
+    expect(blankNode.title).toBe('')
     expect(blankNode.blank).toBe(true)
     expect(groups[0]!.sessions.find(session => session.id === real.id)!.blank).toBe(false)
     expect(groups[0]!.sessionCount).toBe(2)
@@ -256,7 +256,7 @@ describe('deriveFlat', () => {
     }
     const rows = deriveFlat(sessions, noArchive)
     expect(rows.map(row => row.id)).toEqual([currentBlank.id, sid('real')])
-    expect(rows.map(row => row.title)).toEqual(['New Session', 'real'])
+    expect(rows.map(row => row.title)).toEqual(['', 'real'])
     expect(rows.map(row => row.blank)).toEqual([true, false])
   })
 
@@ -445,8 +445,8 @@ describe('createWorkspaceViewStore', () => {
 
 describe('workspaceLabel', () => {
   it('uses the Ungrouped fallback and extracts POSIX and Windows basenames', () => {
-    expect(workspaceLabel(undefined)).toBe(UNGROUPED_LABEL)
-    expect(workspaceLabel('')).toBe(UNGROUPED_LABEL)
+    expect(workspaceLabel(undefined)).toBe('')
+    expect(workspaceLabel('')).toBe('')
     expect(workspaceLabel('/projects/demo/')).toBe('demo')
     expect(workspaceLabel('C:\\projects\\demo\\')).toBe('demo')
     expect(workspaceLabel('/')).toBe('/')

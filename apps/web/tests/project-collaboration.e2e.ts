@@ -122,7 +122,7 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
   for (let index = 0; index < count; index += 1) {
     const childId = SessionId(`${SESSION_ID}-child-${String(index + 1)}`)
     const createdAt = 1_786_767_300_000 + index * 10
-    await scaffold.ctx.sessionPersistence.create({
+    await scaffold.ctx.sessionPersistence.createStored({
       version: SESSION_FORMAT_VERSION,
       id: childId,
       createdAt,
@@ -141,6 +141,8 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
       {
         type: 'user/message', seq: 1, time: createdAt + 1,
         data: {
+          id: `header-child-${String(index + 1)}-user`,
+          role: 'user',
           content: [{ type: 'text', text: `Header layout child ${String(index + 1)}.` }],
           source: { kind: 'user' },
         },
@@ -157,7 +159,8 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
         data: { turn: 1, reason: { kind: 'completed' } },
       },
     ] as SessionEvent[])
-    await scaffold.ctx.sessionProjectionCache.coldSnapshot(childId)
+    const childLog = await scaffold.ctx.sessionPersistence.load(childId)
+    scaffold.ctx.sessionProjectionCache.coldSnapshot(childLog.meta, childLog.inheritedEventCount, childLog.events)
   }
 }
 
@@ -189,7 +192,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     scaffold = await launchWebScaffold({
       agentPresets: { roots: [{ path: SHIPPED_PRESETS, trust: 'system' }], default: 'standard' },
     })
-    const seeded = await seedSession(scaffold, await readFile(SEED, 'utf8'), SESSION_ID, 'code')
+    const seeded = await seedSession(scaffold, await readFile(SEED, 'utf8'), SESSION_ID, 'ptc')
     await seedSubagents(scaffold, seeded, 6)
     const blank = await seedBlankSession(scaffold, BLANK_SESSION_ID, scaffold.workspaceCwd)
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)

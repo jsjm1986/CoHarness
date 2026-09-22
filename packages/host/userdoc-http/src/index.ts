@@ -608,29 +608,26 @@ function safeTransferCapabilities(value: unknown): Record<string, unknown> {
   return { version: 1, current: transferSummary(candidate.current), targets }
 }
 
+function safeTransferDocumentMeta(entry: unknown, message: string): Record<string, unknown> {
+  const item = object(entry)
+  if (!safeTransferDocId(item?.docId) || typeof item.name !== 'string' || item.name === '' || item.name.length > 255
+    || /[\\/\u0000-\u001f\u007f]/u.test(item.name)
+    || typeof item.bytes !== 'number' || !Number.isSafeInteger(item.bytes) || item.bytes < 0
+    || typeof item.mediaType !== 'string' || item.mediaType === '' || item.mediaType.length > 255
+    || /[\u0000-\u001f\u007f]/u.test(item.mediaType)
+    || typeof item.modifiedAt !== 'number' || !Number.isFinite(item.modifiedAt)) {
+    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', message)
+  }
+  return { docId: item.docId, name: item.name, bytes: item.bytes, mediaType: item.mediaType, modifiedAt: item.modifiedAt }
+}
+
 function safeTransferList(value: unknown): Record<string, unknown> {
   const candidate = object(value)
   if (candidate?.version !== 1 || !Array.isArray(candidate.documents) || candidate.documents.length > 100) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document listing is invalid.')
   }
-  const documents = candidate.documents.map((entry) => {
-    const item = object(entry)
-    if (!safeTransferDocId(item?.docId) || typeof item.name !== 'string' || item.name === '' || item.name.length > 255
-      || /[\\/\u0000-\u001f\u007f]/u.test(item.name)
-      || typeof item.bytes !== 'number' || !Number.isSafeInteger(item.bytes) || item.bytes < 0
-      || typeof item.mediaType !== 'string' || item.mediaType === '' || item.mediaType.length > 255
-      || /[\u0000-\u001f\u007f]/u.test(item.mediaType)
-      || typeof item.modifiedAt !== 'number' || !Number.isFinite(item.modifiedAt)) {
-      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document listing contains invalid metadata.')
-    }
-    return {
-      docId: item.docId,
-      name: item.name,
-      bytes: item.bytes,
-      mediaType: item.mediaType,
-      modifiedAt: item.modifiedAt,
-    }
-  })
+  const documents = candidate.documents.map(entry =>
+    safeTransferDocumentMeta(entry, 'Cross-scope document listing contains invalid metadata.'))
   let limits: unknown
   if (candidate.limits !== undefined) {
     const row = object(candidate.limits)
@@ -727,18 +724,8 @@ function safeTransferPlan(value: unknown): Record<string, unknown> {
   if (directory !== undefined && (typeof directory !== 'string' || !safeRelativeDocumentId(directory, true))) {
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Transfer plan contains invalid directory metadata.')
   }
-  const safeDocuments = (entries: unknown[]): Record<string, unknown>[] => entries.map((entry) => {
-    const item = object(entry)
-    if (!safeTransferDocId(item?.docId) || typeof item.name !== 'string' || item.name === '' || item.name.length > 255
-      || /[\\/\u0000-\u001f\u007f]/u.test(item.name)
-      || typeof item.bytes !== 'number' || !Number.isSafeInteger(item.bytes) || item.bytes < 0
-      || typeof item.mediaType !== 'string' || item.mediaType === '' || item.mediaType.length > 255
-      || /[\u0000-\u001f\u007f]/u.test(item.mediaType)
-      || typeof item.modifiedAt !== 'number' || !Number.isFinite(item.modifiedAt)) {
-      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Transfer plan contains invalid metadata.')
-    }
-    return { docId: item.docId, name: item.name, bytes: item.bytes, mediaType: item.mediaType, modifiedAt: item.modifiedAt }
-  })
+  const safeDocuments = (entries: unknown[]): Record<string, unknown>[] =>
+    entries.map(entry => safeTransferDocumentMeta(entry, 'Transfer plan contains invalid metadata.'))
   const documents = safeDocuments(candidate.documents)
   let targets: unknown
   if (candidate.targets !== undefined) {
@@ -1457,15 +1444,26 @@ function parseListQuery(url: URL, state: 'active' | 'trash' = 'active'): ParsedL
   }
 }
 
-function pageListing(listing: UserDocDirectoryListing, options: ParsedListQuery) {
+interface PageableDocumentRow {
+  readonly docId: UserDocId
+  readonly name: string
+  readonly bytes: number
+  readonly mediaType: string
+}
+
+function pageRows<T extends PageableDocumentRow>(
+  rows: readonly T[],
+  options: ParsedListQuery,
+  dateOf: (row: T) => number,
+): { documents: T[]; totalDocuments: number; nextCursor?: string } {
   const needle = options.query.trim().toLowerCase()
-  const filtered = listing.documents.filter((document) => {
+  const filtered = rows.filter((document) => {
     if (needle !== '' && !document.name.toLowerCase().includes(needle)) return false
     return options.type === 'all' || documentBucket(document.mediaType) === options.type
   })
   const ordered = [...filtered].sort((left, right) => {
     let result = 0
-    if (options.sort.startsWith('date')) result = left.modifiedAt - right.modifiedAt
+    if (options.sort.startsWith('date')) result = dateOf(left) - dateOf(right)
     else if (options.sort.startsWith('name')) result = left.name.localeCompare(right.name)
     else result = left.bytes - right.bytes
     const direction = options.sort.endsWith('asc') ? 1 : -1
@@ -1475,35 +1473,18 @@ function pageListing(listing: UserDocDirectoryListing, options: ParsedListQuery)
   const documents = ordered.slice(options.offset, options.offset + options.limit)
   const nextOffset = options.offset + documents.length
   return {
-    ...listing,
     documents,
     totalDocuments: ordered.length,
     ...(nextOffset < ordered.length ? { nextCursor: cursorForOffset(nextOffset, options.fingerprint) } : {}),
   }
 }
 
+function pageListing(listing: UserDocDirectoryListing, options: ParsedListQuery) {
+  return { ...listing, ...pageRows(listing.documents, options, document => document.modifiedAt) }
+}
+
 function pageTrashListing(documents: readonly UserDocTrashRef[], options: ParsedListQuery): UserDocTrashPage {
-  const needle = options.query.trim().toLowerCase()
-  const filtered = documents.filter((document) => {
-    if (needle !== '' && !document.name.toLowerCase().includes(needle)) return false
-    return options.type === 'all' || documentBucket(document.mediaType) === options.type
-  })
-  const ordered = [...filtered].sort((left, right) => {
-    let result = 0
-    if (options.sort.startsWith('date')) result = left.trashedAt - right.trashedAt
-    else if (options.sort.startsWith('name')) result = left.name.localeCompare(right.name)
-    else result = left.bytes - right.bytes
-    const direction = options.sort.endsWith('asc') ? 1 : -1
-    if (result !== 0) return direction * result
-    return left.docId.localeCompare(right.docId)
-  })
-  const page = ordered.slice(options.offset, options.offset + options.limit)
-  const nextOffset = options.offset + page.length
-  return {
-    documents: page,
-    totalDocuments: ordered.length,
-    ...(nextOffset < ordered.length ? { nextCursor: cursorForOffset(nextOffset, options.fingerprint) } : {}),
-  }
+  return pageRows(documents, options, document => document.trashedAt)
 }
 
 function wrapProviderCursor<T extends { readonly nextCursor?: string }>(
@@ -1549,6 +1530,9 @@ function abortFor(req: IncomingMessage, res: ServerResponse): RequestAbort {
   return { signal: controller.signal, dispose }
 }
 
+/* jscpd:ignore-start -- each node:http carrier keeps its own backpressure
+ * wait; sharing one would add a package dependency edge for a small socket
+ * utility (client-connection's http-bridge carries the same loop). */
 /** Wait for a backpressured response to drain or close without retaining the losing listener. */
 async function waitForResponseWritable(res: ServerResponse): Promise<'drain' | 'close'> {
   if (res.destroyed || res.writableEnded) return 'close'
@@ -1568,6 +1552,7 @@ async function waitForResponseWritable(res: ServerResponse): Promise<'drain' | '
     if (res.destroyed || res.writableEnded) finish('close')
   })
 }
+/* jscpd:ignore-end */
 
 function publicRef(ref: UserDocRef): UserDocRef {
   // A browser only needs the opaque id and display metadata. The real path is

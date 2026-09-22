@@ -60,21 +60,22 @@ function contentHasTaggedThinking(value: unknown): boolean {
 
 /** Reject one durable assistant event that still carries tagged thinking as text. */
 export function assertSafeAssistantEvent(event: { type: string; data: unknown }): void {
-  if (event.type === 'assistant/message') {
-    const data = record(event.data)
-    const message = record(data?.message)
-    if (contentHasTaggedThinking(message?.content)) {
-      throw new Error('assistant message contains unnormalized tagged thinking text')
-    }
-    return
+  if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') return
+  const data = record(event.data)
+  if (event.type === 'assistant/message'
+    && contentHasTaggedThinking(record(data?.message)?.content)) {
+    throw new Error('assistant message contains unnormalized tagged thinking text')
   }
-  if (event.type === 'assistant/chunk') {
-    const data = record(event.data)
-    const chunk = record(data?.chunk)
+  const stream = data?.stream
+  if (!Array.isArray(stream)) return
+  for (const streamRecord of stream) {
+    const member = record(streamRecord)
+    if (member?.type !== 'chunk') continue
+    const chunk = record(member.chunk)
     const block = record(chunk?.block)
     if (chunk?.type === 'block-end' && block?.type === 'text' && typeof block.text === 'string'
       && hasTaggedThinkingPrefix(block.text)) {
-      throw new Error('assistant chunk contains unnormalized tagged thinking text')
+      throw new Error('assistant stream contains unnormalized tagged thinking text')
     }
   }
 }

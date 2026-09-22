@@ -98,6 +98,11 @@ describe('checkManifest', () => {
 })
 
 describe('checkInventoryCoverage', () => {
+  it('does not claim a similarly named package through a partial directory prefix', () => {
+    const inventory = { commits: [{ sha: SHA, bucket: 'carried', packages: ['core/session-next'] }] }
+    const claimed = matrix({ rows: [matrixRow({ upstreamCommits: [], commitScope: ['packages/core/session'] })] })
+    expect(() => { checkInventoryCoverage('i.json', inventory, claimed) }).toThrow('no matrix row claims')
+  })
   const inv = {
     commits: [
       { sha: SHA, bucket: 'carried', packages: ['session/session-format'] },

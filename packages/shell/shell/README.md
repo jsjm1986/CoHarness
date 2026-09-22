@@ -15,6 +15,10 @@ This package owns the Service Definition role of the bash capability, split so e
 
 The split is a standard capability seam ([capability-seams Agent Note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)): `dsh-bash-sandbox` is a sandboxing executor behind the same Service Definition — the Consumer detects its `sandboxMode` capability and adds escalation fields without importing the provider — and a containerized or remote executor slots in the same way.
 
+## Summary
+
+Use `ctx.shell` to run foreground shell commands with bounded output or prepare background processes asynchronously before receiving their handles. A profile can select local or sandboxed Bash or PowerShell execution without changing callers. Resolve each request before execution to make the working directory, timeout, and output limits explicit. Command completion, nonzero exits, timeouts, and caller aborts return results; only infrastructure failures reject, while the `bash` and `pwsh` tools own model-visible rendering and sandbox guidance.
+
 ## Service API (`ctx.shell`)
 
 | Member | Semantics |
@@ -38,6 +42,10 @@ The per-session sandbox-mode override vocabulary (the `'sandbox/mode'` event, th
 `stdin` and ordinary `env` are set by in-process plugins (the hooks bridges, native plugins) to feed a hook command its JSON payload and `CLAUDE_PROJECT_DIR`/`CLAUDE_PLUGIN_ROOT` values. `dshEnv` is a separate trusted overlay restricted by type to managed keys; the exported `DSH_ENV_PREFIX` is the single source for that namespace, its `DshEnvironmentKey` template type, executor scrubbing, registry validation, derived built-in names, and model guidance. Model bash uses the current snapshot collected by `ctx.shellEnv`. Implementations remove inherited managed keys, then merge `dshEnv` after ordinary `env`, so an omitted current fact cannot fall back to stale ambient state and an `env` entry cannot displace a managed value. The model-facing tool exposes none of these as parameters. All three remain optional on the resolved spec; absent means no input/overlay. See [the bash-stdin-env Agent Note](../../../.agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.md) and [the session environment Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-agent-session-identity-and-log-location.md).
 
 The exported `parseExitStatus` (with `ParsedExitStatus`) is the shared rendering contract half of the shell tools: the inverse of the `[exit code: N]` / `[killed by signal: X]` markers `dsh-tool-bash`'s `renderResult` and `dsh-tool-pwsh`'s `renderPwshResult` append. Both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill; it lives with the Service Definition so the two tools never drift on the marker contract.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam defines the executor contract; job ids, ownership, and cancellation belong to the generic `ctx.jobs` runtime.
 
 ## Model Experience
 

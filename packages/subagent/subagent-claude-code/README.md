@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 This package registers a Profile-named Claude Code subagent provider whose default name is `claude-code`. Each accepted run invokes the official Claude Agent SDK in the delegating Session's workspace, lets the pinned SDK select its installed platform CLI, submits one self-contained text task, and returns either the strict final answer or a separate safe failure diagnostic through the shared [`dsh-subagent`](../subagent/README.md) result contract.
 
+## Summary
+
+Install this Profile Bundle when a delegated task should run as a fresh, unattended Claude Code session in the parent workspace. Each run accepts one self-contained text task and returns the final answer or a safe failure diagnostic; reasoning, tool traffic, stderr, usage, and workspace diffs stay out of the parent Session. Native Claude settings and authentication remain authoritative, while Profile configuration selects the model, environment, and `permissionMode`. The platform-pinned runtime starts on demand and never falls back to the host `claude` executable. Choose it when isolation and genuine Claude Code behavior matter more than continuation or prompts.
+
 ## Start and ownership
 
 `start(request)` accepts only a non-empty sequence of text blocks and derives the child cwd from the parent Session. It creates one private `AbortController`, calls the official SDK `query()`, and publishes the run only after the SDK's `spawnClaudeCodeProcess` hook has supplied a live CLI handle owned by [`dsh-subprocess`](../../subprocess/subprocess/README.md). A failure or cancellation before publication closes the query, terminates any acquired process tree, waits for it to exit, and rejects `start()`.
@@ -106,13 +110,17 @@ Loader composition proves that the Bundle default, two additional named Claude i
 
 The project owner's identity-scoped distribution authorization covers the official SDK and the official CLI/platform payloads declared by each SDK version. [`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) discloses the current optional payload closure without classifying its declared terms as permissive; unrelated non-permissive runtime dependencies continue to fail the notices gate.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each run submits one task through the vendor SDK in the delegating workspace and returns its result; no session state is retained between runs.
+
 ## Model Experience
 
 ### Child request
 
 #### What the model sees
 
-The Claude Code child receives the standalone text task as one fresh SDK query. Its workspace is the parent Session cwd; its model, system instructions, tools, sandbox, and authentication come from native Claude settings, the selected Provider instance's Profile configuration fixes the query's environment and non-interactive permission mode, and the executable version comes from the Bundle's pinned SDK platform payload.
+The Claude Code child receives the standalone text task as one fresh SDK query. Its workspace is the parent Session cwd; the selected provider instance fixes the query's configured model, environment, and non-interactive permission mode, while an omitted model and every other product setting come from native Claude configuration. The executable version comes from the Bundle's pinned SDK platform payload.
 
 #### Token effect
 
@@ -126,7 +134,7 @@ Independent of the parent request cache. Reuse depends only on Claude Code's own
 
 #### What the model sees
 
-Through `dsh-tool-subagent`, a foreground call gives the parent the strict final Claude Code answer or an error containing the stop reason and optional safe diagnostic for a non-completed result. That diagnostic can distinguish the fixed SDK error category, lifecycle stage, and observed process outcome without copying raw product text. A background call first returns a Job id; the generic job controls later deliver a completion notice, expose the same final answer or failed status detail through `job_output`, and let `job_kill` request cancellation. Claude Code reasoning, tool activity, intermediate messages, stderr, workspace diffs, usage, product ids, tool inputs, and raw protocol payloads are not copied into the parent Session.
+Through `dsh-tool-subagent`, a foreground call gives the parent the strict final Claude Code answer or an error containing the stop reason and optional safe diagnostic for a non-completed result. That diagnostic can distinguish a coarse action category, lifecycle stage, and observed process outcome without copying raw product text or version-specific subtype names. A background call first returns a Job id; the generic job controls later deliver a completion notice, expose the same final answer or failed status detail through `job_output`, and let `job_kill` request cancellation. Claude Code reasoning, tool activity, intermediate messages, stderr, workspace diffs, usage, product ids, tool inputs, and raw protocol payloads are not copied into the parent Session.
 
 #### Token effect
 

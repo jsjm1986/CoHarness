@@ -9,9 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../locale"
     },
     {
@@ -33,7 +30,7 @@
       "path": "../../subagent/subagent"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
     }
   ]
 }

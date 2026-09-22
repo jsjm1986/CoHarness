@@ -2,6 +2,7 @@ import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, join, posix, resolve } from 'node:path'
+import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
 
 export interface GatewayConfig {
   /** Canonical immutable release directory for managed deployments. */
@@ -95,6 +96,8 @@ export interface GatewayConfig {
   jpushAppKey?: string
   /** Owner-only JPush master secret used by the Gateway REST sender. */
   jpushMasterSecret?: string
+  /** Interactive-desktop grant/queue TTLs and capacity (HGW_DESKTOP_*). */
+  desktop: DesktopCoordinatorConfig
 }
 
 const gatewayRoot = resolve(import.meta.dirname, '..')
@@ -425,6 +428,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (sessionAbsoluteTtlMs < sessionTtlMs) {
     throw new Error('HGW_SESSION_ABS_TTL_MS must be at least HGW_SESSION_TTL_MS')
   }
+  const desktop = {
+    grantTtlMs: positiveSafeInteger(
+      env.HGW_DESKTOP_GRANT_TTL_MS, DEFAULT_DESKTOP_COORDINATOR_CONFIG.grantTtlMs, 'HGW_DESKTOP_GRANT_TTL_MS'),
+    stoppingTtlMs: positiveSafeInteger(
+      env.HGW_DESKTOP_STOPPING_TTL_MS, DEFAULT_DESKTOP_COORDINATOR_CONFIG.stoppingTtlMs, 'HGW_DESKTOP_STOPPING_TTL_MS'),
+    queueTtlMs: positiveSafeInteger(
+      env.HGW_DESKTOP_QUEUE_TTL_MS, DEFAULT_DESKTOP_COORDINATOR_CONFIG.queueTtlMs, 'HGW_DESKTOP_QUEUE_TTL_MS'),
+    queueCapacity: positiveSafeInteger(
+      env.HGW_DESKTOP_QUEUE_CAPACITY, DEFAULT_DESKTOP_COORDINATOR_CONFIG.queueCapacity, 'HGW_DESKTOP_QUEUE_CAPACITY'),
+  }
   const memoryMax = systemdMemoryValue(env.HGW_MEMORY_MAX ?? '1G', 'HGW_MEMORY_MAX')
   const cpuQuota = systemdCpuValue(env.HGW_CPU_QUOTA ?? '100%', 'HGW_CPU_QUOTA')
   const systemdUnitDir = env.HGW_SYSTEMD_UNIT_DIR ?? '/etc/systemd/system'
@@ -479,5 +492,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     fcmServiceAccountFile: env.HGW_FCM_SERVICE_ACCOUNT_FILE?.trim() || undefined,
     jpushAppKey,
     jpushMasterSecret,
+    desktop,
   }
 }

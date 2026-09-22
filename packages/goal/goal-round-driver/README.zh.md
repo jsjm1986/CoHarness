@@ -4,6 +4,10 @@
 
 [`ctx.goals`](../goal/README.zh.md) 的同会话续行驱动器。它通过公开 `Agent` 与会话服务，把 phase 为 active 且已启用续行的目标转换为连续的 [Goal Round](../../../docs/glossary.zh.md#goal-round)；[同会话驱动器 Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-same-session-goal-round-driver.zh.md) 记载竞态与生命周期方面的设计理由。
 
+## 概述
+
+`dsh-goal-round-driver` 会在同一会话内自动继续 active goal，但前提是 agent（智能体）已空闲、续行已启用且配置的 Round 额度仍有剩余。每个 Round 都让模型获得另一次推进目标的机会；只有进入模型历史的 goal Round 才消耗额度，额度耗尽时会记录 blocker。驱动器本身没有配置：goal 定义 Round 上限，`dsh-tool-goal` 定义重复受阻后何时停止续行。若任务需要无人值守的多轮推进，应与 `dsh-goal` 和 `dsh-tool-goal` 一起挂载；若每一步都需要人工 steering（中途引导），则不要挂载。
+
 ## 组合
 
 ```yaml

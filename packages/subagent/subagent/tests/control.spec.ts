@@ -379,6 +379,7 @@ describe('subagent prompt Remote', () => {
       ['PARENT_UNAVAILABLE', 'subagent/delivery-unavailable'],
       ['DRAINING', 'subagent/delivery-unavailable'],
       ['ACTIVATION_CLOSING', 'subagent/delivery-unavailable'],
+      ['ACTIVATION_LIMIT_REACHED', 'subagent/delivery-unavailable'],
       ['CONTINUATION_UNAVAILABLE', 'subagent/delivery-unavailable'],
       ['PERSISTENCE_UNAVAILABLE', 'subagent/delivery-unavailable'],
       ['NO_PROVIDER', 'gateway/internal'],

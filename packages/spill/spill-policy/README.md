@@ -6,6 +6,10 @@ The **tool-result spill policy**: a `tools/post-execute` transformer that keeps 
 
 This plugin registers **no service** and owns no storage or preview mechanics: preview is [`@deepseek-ai/dsh-output-retention`](../../util/output-retention) (`TextRetainer`), storage is `ctx.spillStore`. It only decides WHEN to spill and composes the notice.
 
+## Summary
+
+Mount this package when oversized plain-text tool results should stay out of model context. Results above `maxInlineBytes` become a bounded head/tail preview with a locator and retrieval guidance, while the full text remains available through the configured spill backend. Spill failures leave the original result visible, and omitting `maxInlineBytes` disables the policy. The same limit bounds durable `run_code` sub-call log copies without changing the value returned to the program.
+
 ## Config
 
 | Key | Default | Meaning |
@@ -36,13 +40,17 @@ This plugin registers **no service** and owns no storage or preview mechanics: p
 
 The policy sees only the FINAL formatted model-facing result—not a tool's internal resource or canonical value. If a provider already truncated (e.g. `web-fetch-http.maxBodyChars`), the spill artifact holds the full formatted result the tool returned, not the full original source. Provider/resource caps stay mandatory and separate. `glob`/`grep` own item-level presentation spill because their complete acquired values still exist before rendering; bash streams own acquisition-time spill. The generic policy prepends its waterfall listener, then delegates, so ordinary tool-owned asynchronous projections complete before generic byte bounding regardless of plugin load order. See the [tool output spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each result is transformed independently by the bounded preview policy; no cross-call state is retained.
+
 ## Model Experience
 
 ### Oversized plain-text result
 
 #### What the model sees
 
-Results at or below `maxInlineBytes`, nested results, `read` results, blocked decisions, and results containing non-text blocks are unchanged. An oversized plain-text model-facing result becomes a bounded head/tail preview followed by `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`; storage or ownership failures leave the original result visible.
+Results at or below `maxInlineBytes`, nested results, `read` results, blocked decisions, and results containing non-text blocks are unchanged. An oversized plain-text model-facing result becomes a bounded head/tail preview followed by `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`; a storage or ownership failure leaves the original result visible.
 
 #### Token effect
 

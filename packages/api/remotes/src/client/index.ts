@@ -9,6 +9,7 @@ import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
+import permissionPresetsRemote from '@deepseek-ai/dsh-permission-presets/remote'
 import sessionFeedbackRemote from '@deepseek-ai/dsh-command-feedback/remote'
 import sessionReferencesRemote from '@deepseek-ai/dsh-session-reference/remote'
 import subagentsRemote from '@deepseek-ai/dsh-subagent/remote'
@@ -23,6 +24,7 @@ export type {} from '@deepseek-ai/dsh-goal/remote'
 export type {} from '@deepseek-ai/dsh-llm/remote'
 export type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 export type {} from '@deepseek-ai/dsh-message-feedback/remote'
+export type {} from '@deepseek-ai/dsh-permission-presets/remote'
 export type {} from '@deepseek-ai/dsh-command-feedback/remote'
 export type {} from '@deepseek-ai/dsh-session-reference/remote'
 export type {} from '@deepseek-ai/dsh-subagent/remote'
@@ -40,6 +42,7 @@ export type {} from '@deepseek-ai/dsh-llm/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/types'
 export type {} from '@deepseek-ai/dsh-command-feedback/types'
 export type {} from '@deepseek-ai/dsh-collaboration/types'
+export type {} from '@deepseek-ai/dsh-permission-presets/types'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
 /**
@@ -52,7 +55,8 @@ export type {
   CredentialView, DirectoryListing, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan, HostFrame, IApiClient,
   MessageId, ModelCatalogFailure, ModelProviderGroup, ModelReasoningEffort, ModelSelection,
   MuxFrame, PromptContentPart, QuestionResponsePayload, QueueAction, RpcError, RpcId, RpcReceipt,
-  RpcRequest, RpcResponse, RpcResult, SessionDraftId, SessionId, SessionModels, SessionSearchItem,
+  RpcRequest, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
+  SessionDraftId, SessionId, SessionModels, SessionSearchItem,
   SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
   SubagentAddress, SubagentCatalog, SubagentPromptContentPart, JobView, ToolCallView, ToolEventView, ToolResultView,
   WorkspaceId, WorkspaceView, WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
@@ -133,7 +137,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
-      fileReferencesRemote, pluginInventoryRemote, messageFeedbackRemote, sessionFeedbackRemote,
+      fileReferencesRemote, pluginInventoryRemote, messageFeedbackRemote, permissionPresetsRemote, sessionFeedbackRemote,
       sessionReferencesRemote, subagentsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))

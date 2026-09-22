@@ -12,19 +12,16 @@
       "path": "../../util/launch-environment"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../web"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../web"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

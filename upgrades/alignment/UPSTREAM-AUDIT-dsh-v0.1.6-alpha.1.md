@@ -7,7 +7,7 @@
 
 ## 干净基线测试（409253c092，实施前）
 
-全量单测 1065 个文件通过、2 个失败（244 项）：`packages/experimental/code-runtime-python` 的 `boot-write-failure.spec.ts` 与 `runtime.spec.ts`。失败原因全部为 `config.pythonBin "/usr/bin/python3" must be CPython 3.10 or newer, got cpython 3.9.6`——宿主系统 Python 3.9.6 低于该包的运行要求，属环境性既有失败，与本次升级改动无关；修复属于环境准备（安装 Python ≥3.10），不阻塞其他阶段。
+全量单测 1065 个文件通过、2 个失败（244 项）：`packages/experimental/ptc-runtime-python` 的 `boot-write-failure.spec.ts` 与 `runtime.spec.ts`。失败原因全部为 `config.pythonBin "/usr/bin/python3" must be CPython 3.10 or newer, got cpython 3.9.6`——宿主系统 Python 3.9.6 低于该包的运行要求，属环境性既有失败，与本次升级改动无关；修复属于环境准备（安装 Python ≥3.10），不阻塞其他阶段。
 
 Lint（oxlint）0 告警 0 错误。
 

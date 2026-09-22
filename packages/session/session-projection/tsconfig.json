@@ -9,16 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../core/session"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../core/session"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

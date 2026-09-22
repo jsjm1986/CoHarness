@@ -16,6 +16,10 @@ This package owns the Service Definition role of the web capability. Unlike shel
 
 Search and fetch share no request schema and no business logic, but they are deliberately one seam: `ctx.web` is a single web-access middle layer with one provider-selection policy owner, one abort/error vocabulary, and one product-facing "how this harness reaches the web" config surface. The `Search`/`Fetch` method pairs are deliberately parallel.
 
+## Summary
+
+Use `dsh-web` to search the web or fetch a URL without tying callers to a specific vendor. It selects a usable backend for each operation and gives callers consistent cancellation, errors, and result limits. Choose it for plugins or tools that call `ctx.web.search()` or `ctx.web.fetch()`; the shipped `dsh-tool-web` tools load it for you. A search or fetch requires a configured, usable provider because this package does not make network requests on its own.
+
 ## Service API (`ctx.web`)
 
 | Member | Semantics |
@@ -47,9 +51,13 @@ The failure branches throw `WebError`, whose structured code (plus message detai
 
 `WebSearchRequest` (`query`, `maxResults?`) → `WebSearchResult` (`content?`, `sources[]`, `truncated`); each `WebSearchSource` has a required `url` and optional `title`/`snippet`/`publishedAt` (Perplexity citations may be URL-only). `WebFetchRequest` (`url`) → `WebFetchResult` (final `url`, `statusCode`, `body`, `truncated`); cancellation is a direct optional `AbortSignal` argument to `search()`/`fetch()`. `WebFetchBody` is a CLOSED discriminated union (`html` | `text`) owned here — consumers `switch` to exhaustiveness so a new kind breaks their compilation until handled. See `src/types.ts` for the full contracts and the `WebError` code taxonomy.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The seam defines the search/fetch contract over providers; vendor state stays behind each provider.
+
 ## Model Experience
 
-Indirectly, through `dsh-tool-web`, which retains bounded normalized provider data or the exact configured-provider, unavailable-provider, no-provider, multiple-provider, and `Error: <message>` failures while this registry contributes no prompt or schema itself.
+Indirectly, through `dsh-tool-web`, which renders the seam's normalized search results and fetch bodies to the model while this service contributes no prompt or schema.
 
 #### KV Cache effect
 

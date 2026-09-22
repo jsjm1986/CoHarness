@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Process-local implementation of the [`@deepseek-ai/dsh-jobs`](../jobs/README.md) registry contract: `LocalJobRegistry` keeps every record in memory, issues per-kind `<kind>-N` ids, and hands out fresh snapshots, never live state. Load it as a plugin and it registers as `ctx.jobs`.
 
+## Summary
+
+`dsh-jobs-local` runs background jobs inside the harness process: work keeps running while the agent moves on, and the owning agent can read, wait on, list, and cancel it, with completion delivered as an in-session notice when `dsh-tool-jobs` is also mounted. It implements the `dsh-jobs` contract with in-memory records handed out as fresh snapshots, never live state. A per-owner concurrency limit (default 10) bounds how many jobs one agent can have running or stopping at once; jobs die with the harness process and are not durable across restarts.
+
 ## Admission
 
 `maxConcurrentJobsPerOwner` is a positive safe integer and defaults to `10`. Before invoking a producer, `start()` counts the exact owner's `running` and `stopping` records; all unowned jobs share one separate service bucket. Terminal history does not occupy capacity, and only producer `done` settlement releases a stopping job's place.
@@ -22,13 +26,17 @@ Settlement is first-wins: the earliest terminal outcome — producer settlement,
 
 Controllers and listeners are layered by the scope that registered them, in the tools-registry shape: a registration files into its registering context's scope, and a read unions the global layer with the owner's scope chain. One process-wide registry therefore answers per-owner questions per owner — `start()` refuses `background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)` for an owner whose own composition attaches none, however many other compositions attach theirs, and a settlement reaches only the listeners its owner's composition registered.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Records are private in-memory state handed out only as snapshots, with issue/snapshot semantics asserted by unit specs; execution ownership stays with the shell and tool seams.
+
 ## Model Experience
 
-Indirectly, through producer plugins and [`dsh-tool-jobs`](../tool-jobs/README.md), which render job ids, output, status, cancellation, and completion notices.
+Indirectly, through producer plugins and `dsh-tool-jobs`, to which the registry backend delegates all model rendering.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the named consumers own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

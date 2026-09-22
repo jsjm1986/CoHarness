@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-01-alpha23-dependency-gates.md
-2026-09-01-alpha23-dependency-gates.md: 0aba3c9aaa05c7f067150458e7189d3d836035b1
-2026-09-01-alpha23-dependency-gates.zh.md: bb3ff956d59ec91fe44e91dd1660bc516495e8ca
+2026-09-01-alpha23-dependency-gates.md: 6d58d4966f974cea0605d96472857b3521ef2c3f
+2026-09-01-alpha23-dependency-gates.zh.md: 7bcc663b5cfcf5220d1a1771e6eda4930bee7d8e

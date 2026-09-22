@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-context-breakdown-system-chain.md
-2026-09-15-context-breakdown-system-chain.md: cf761058f438988e7a601cbb47f59080ef4094e5
-2026-09-15-context-breakdown-system-chain.zh.md: 895fce17b6dd42513753ed563f771cf6ea4b675e
+2026-09-15-context-breakdown-system-chain.md: 191072da05aa2c3bce9dd3719568fbf6a11e3b3b
+2026-09-15-context-breakdown-system-chain.zh.md: 336cbf6b827bd1dd877eac2c6a203cf3ef93779a

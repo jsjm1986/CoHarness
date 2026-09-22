@@ -2,13 +2,18 @@
   "comment": "Maps each primary ` ```ts type-equiv ` or ` ```ts public-api ` block (by doc + declared symbol + projection) to the source declaration and original JSDoc it must match. Paired `.zh.md` blocks are byte-identical derivatives checked through their unsuffixed sibling and have no duplicate entry. Omit projection for the complete declaration; use public-api with a ` ```ts public-api ` block for a body-stripped public class declaration. verify-type-equiv.ts enforces a 1:1 correspondence between primary blocks and entries. Add an entry when you add a primary source-equivalence block; remove it when you remove the block.",
   "entries": [
     {
+      "doc": "docs/subsystems/compaction.md",
+      "symbol": "ImageOffloadTarget",
+      "source": "packages/compaction/compaction-image-offload/src/projection.ts"
+    },
+    {
       "doc": "docs/subsystems/core.md",
       "symbol": "Branded",
       "source": "packages/util/brand/src/index.ts"
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "AssistantProvenance",
+      "symbol": "AssistantProviderMetadata",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
@@ -35,6 +40,11 @@
       "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "ContextFormed",
       "source": "packages/llm/llm/src/message.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ImageAttachmentAccess",
+      "source": "packages/llm/llm/src/content.ts"
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
@@ -65,16 +75,6 @@
       "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "LlmDiscoveredModel",
       "source": "packages/llm/llm/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "ModelAccessTarget",
-      "source": "packages/llm/model-access/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "ModelAccessDecision",
-      "source": "packages/llm/model-access/src/index.ts"
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
@@ -133,11 +133,6 @@
     },
     {
       "doc": "docs/subsystems/core.md",
-      "symbol": "TurnBoundaryProjection",
-      "source": "packages/core/agent/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/core.md",
       "symbol": "CancelOptions",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
@@ -149,7 +144,13 @@
     {
       "doc": "docs/subsystems/core.md",
       "symbol": "Agent",
-      "source": "packages/core/agent/src/runtime-types.ts"
+      "source": "packages/core/agent/src/types.ts",
+      "augmentations": [
+        {
+          "source": "packages/core/agent/src/runtime-types.ts",
+          "module": "./types.ts"
+        }
+      ]
     },
     {
       "doc": "docs/subsystems/core.md",
@@ -187,81 +188,6 @@
       "source": "packages/core/scope/src/store.ts"
     },
     {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "GatewayRuntimeIdentity",
-      "source": "packages/context/gateway-runtime/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "GatewayPrincipalScope",
-      "source": "packages/context/gateway-runtime/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "GatewayPrincipalClaims",
-      "source": "packages/context/gateway-runtime/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "GatewayRuntimeCredential",
-      "source": "packages/context/gateway-runtime/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "GatewayRequestPrincipal",
-      "source": "packages/context/gateway-runtime/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "GatewayRuntimeRequestInit",
-      "source": "packages/context/gateway-runtime/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "ConnectionRequestBoundary",
-      "source": "packages/client/connection/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationAction",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationInteractionKind",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationVisibility",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationParticipant",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationAccess",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationSessionCreation",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationAuthority",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/collaboration.md",
-      "symbol": "CollaborationErrorCode",
-      "source": "packages/context/collaboration/src/types.ts"
-    },
-    {
       "doc": "docs/subsystems/goal.md",
       "symbol": "GoalRef",
       "source": "packages/goal/goal/src/types.ts"
@@ -284,16 +210,6 @@
     {
       "doc": "docs/subsystems/goal.md",
       "symbol": "GoalView",
-      "source": "packages/goal/goal/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/goal.md",
-      "symbol": "GoalProjection",
-      "source": "packages/goal/goal/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/goal.md",
-      "symbol": "GoalProjectionState",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
@@ -498,6 +414,16 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmImageRequestPrice",
+      "source": "packages/llm/llm/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmImageRequestPricing",
+      "source": "packages/llm/llm/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "ContentBlockMap",
       "source": "packages/llm/llm/src/types.ts"
     },
@@ -575,11 +501,6 @@
     },
     {
       "doc": "docs/subsystems/session.md",
-      "symbol": "TodoItem",
-      "source": "packages/core/session/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/session.md",
       "symbol": "SessionEvent",
       "source": "packages/core/session/src/types.ts"
     },
@@ -631,12 +552,27 @@
     },
     {
       "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionHandleReadResult",
+      "source": "packages/session/session-persistence/src/handle.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionHandle",
+      "source": "packages/session/session-persistence/src/handle.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
       "symbol": "SessionHeader",
       "source": "packages/core/session/src/types.ts"
     },
     {
       "doc": "docs/subsystems/persistence.md",
       "symbol": "CreateSessionOptions",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionSeedEventState",
       "source": "packages/core/session/src/types.ts"
     },
     {
@@ -662,28 +598,8 @@
     },
     {
       "doc": "docs/subsystems/persistence.md",
-      "symbol": "SessionStorageMetadata",
-      "source": "packages/session/session-persistence/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/persistence.md",
-      "symbol": "SessionInspection",
-      "source": "packages/session/session-persistence/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/persistence.md",
-      "symbol": "SessionEventSuffix",
-      "source": "packages/session/session-persistence/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/persistence.md",
       "symbol": "SessionLocation",
-      "source": "packages/session/session-persistence/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/persistence.md",
-      "symbol": "SessionRawArtifact",
-      "source": "packages/session/session-persistence/src/index.ts"
+      "source": "packages/session/session-persistence/src/errors.ts"
     },
     {
       "doc": "docs/subsystems/session-query.md",
@@ -767,11 +683,6 @@
     },
     {
       "doc": "docs/subsystems/session-title.md",
-      "symbol": "SessionTitleModelProvenance",
-      "source": "packages/session/session-title/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/session-title.md",
       "symbol": "SessionTitleSource",
       "source": "packages/session/session-title/src/index.ts"
     },
@@ -833,6 +744,11 @@
     {
       "doc": "docs/subsystems/session-reference.md",
       "symbol": "SessionReferenceMentionCandidate",
+      "source": "packages/context/session-reference/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-reference.md",
+      "symbol": "SessionReferenceSource",
       "source": "packages/context/session-reference/src/types.ts"
     },
     {
@@ -922,6 +838,11 @@
     },
     {
       "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolErrorInfo",
+      "source": "packages/core/tools/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
       "symbol": "ToolRestriction",
       "source": "packages/core/tools/src/index.ts"
     },
@@ -1007,11 +928,6 @@
     },
     {
       "doc": "docs/subsystems/user-questions.md",
-      "symbol": "UserQuestionProvider",
-      "source": "packages/interaction/user-questions/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/user-questions.md",
       "symbol": "UserQuestionError",
       "source": "packages/interaction/user-questions/src/index.ts"
     },
@@ -1052,6 +968,21 @@
     },
     {
       "doc": "docs/subsystems/attachment.md",
+      "symbol": "PromptContentPart",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "AttachmentAdmissionPart",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "AdmittedPromptContentPart",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
       "symbol": "EncodedImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
@@ -1063,6 +994,21 @@
     {
       "doc": "docs/subsystems/attachment.md",
       "symbol": "StoredImageAttachment",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "ImageRequestTarget",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "ProjectedDimensions",
+      "source": "packages/attachment/attachment/src/request-projection.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "RequestImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
@@ -1196,39 +1142,39 @@
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeJsonValue",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcJsonValue",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeRunRequest",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcRunRequest",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeRunResult",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcRunResult",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeBindingNamespace",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcBindingNamespace",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeBindingErrorClass",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcBindingErrorClass",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeBindingFunction",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcBindingFunction",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
-      "symbol": "CodeRunFailure",
-      "source": "packages/code-runtime/code-runtime/src/types.ts"
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcRunFailure",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
     },
     {
       "doc": "docs/subsystems/filesystem.md",
@@ -1761,11 +1707,6 @@
       "source": "packages/credentials/credentials/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/credentials.md",
-      "symbol": "ReadOnlyCredentialLayer",
-      "source": "packages/credentials/credentials/src/index.ts"
-    },
-    {
       "doc": "docs/subsystems/settings.md",
       "symbol": "SettingsDescribeOptions",
       "source": "packages/settings/settings/src/index.ts"
@@ -1774,26 +1715,6 @@
       "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "LlmConfigurableProvider",
       "source": "packages/llm/llm/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "ManagedModelProviderProtocol",
-      "source": "packages/llm/model-provider-config/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "ManagedModelProfile",
-      "source": "packages/llm/model-provider-config/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "ManagedModelProviderProfile",
-      "source": "packages/llm/model-provider-config/src/index.ts"
-    },
-    {
-      "doc": "docs/subsystems/llm-streaming.md",
-      "symbol": "ModelProviderConfigSnapshot",
-      "source": "packages/llm/model-provider-config/src/index.ts"
     },
     {
       "doc": "docs/subsystems/settings.md",
@@ -1894,6 +1815,16 @@
       "doc": "docs/subsystems/client-modules.md",
       "symbol": "WebBootGraph",
       "source": "packages/client/modules/src/client/manifest.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-telemetry.md",
+      "symbol": "SessionTelemetryCapture",
+      "source": "packages/session/session-telemetry/src/coordinator.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-telemetry.md",
+      "symbol": "SessionTelemetryCaptureOptions",
+      "source": "packages/session/session-telemetry/src/coordinator.ts"
     },
     {
       "doc": "docs/subsystems/session-telemetry.md",
@@ -2012,6 +1943,11 @@
     },
     {
       "doc": "docs/subsystems/core.md",
+      "symbol": "AssistantStreamFrame",
+      "source": "packages/core/agent/src/runtime-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
       "symbol": "AgentOptions",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
@@ -2109,6 +2045,226 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feedback.md",
+      "symbol": "FeedbackCategory",
+      "source": "packages/feedback/command-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feedback.md",
+      "symbol": "FeedbackRecord",
+      "source": "packages/feedback/command-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feedback.md",
+      "symbol": "SessionFeedbackRecordRequest",
+      "source": "packages/feedback/command-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feedback.md",
+      "symbol": "SessionFeedbackRecordValue",
+      "source": "packages/feedback/command-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feedback.md",
+      "symbol": "SessionFeedbackSessionNotFound",
+      "source": "packages/feedback/command-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feedback.md",
+      "symbol": "SessionFeedbackRecordResult",
+      "source": "packages/feedback/command-feedback/src/types.ts"
+    },
+    {
+      "doc": "packages/client/ui-conversation/README.md",
+      "symbol": "ComposerChainProps",
+      "source": "packages/client/ui-conversation/src/client/contract/slots.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "SessionMessageProjection",
+      "source": "packages/core/session/src/surface.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "SessionMessageProjectionContext",
+      "source": "packages/core/session/src/surface.ts"
+    },
+    {
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcRunSpec",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ptc-runtime.md",
+      "symbol": "PtcRunSandbox",
+      "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpResourceRequest",
+      "source": "packages/mcp/mcp-resources/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpResourceProvider",
+      "source": "packages/mcp/mcp-resources/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRuntimeIdentity",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayPrincipalScope",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayPrincipalClaims",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "ConnectionRequestBoundary",
+      "source": "packages/client/connection/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRuntimeCredential",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRequestPrincipal",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "GatewayRuntimeRequestInit",
+      "source": "packages/context/gateway-runtime/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationAction",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationInteractionKind",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationVisibility",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationParticipant",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationAccess",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationSessionCreation",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationAuthority",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "CollaborationErrorCode",
+      "source": "packages/context/collaboration/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "TurnBoundaryProjection",
+      "source": "packages/core/agent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/credentials.md",
+      "symbol": "ReadOnlyCredentialLayer",
+      "source": "packages/credentials/credentials/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/goal.md",
+      "symbol": "GoalProjection",
+      "source": "packages/goal/goal/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/goal.md",
+      "symbol": "GoalProjectionState",
+      "source": "packages/goal/goal/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProviderProtocol",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProfile",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProviderProfile",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelProviderConfigSnapshot",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelAccessTarget",
+      "source": "packages/llm/model-access/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelAccessDecision",
+      "source": "packages/llm/model-access/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionStorageMetadata",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionRawArtifact",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionInspection",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionEventSuffix",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-title.md",
+      "symbol": "SessionTitleModelIdentity",
+      "source": "packages/session/session-title/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "TodoItem",
+      "source": "packages/core/session/src/types.ts"
     }
   ]
 }

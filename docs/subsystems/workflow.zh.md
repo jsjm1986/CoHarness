@@ -4,7 +4,7 @@
 
 工作流 seam 允许 agent（智能体）运行由模型编写、会启动 subagent 的编排脚本。与 [subagent](subagent.zh.md) 一样，它是**一项可选能力**，不属于 agent loop，因此其类型和操作记录在此处，而非 [core.md](core.zh.md)。与 bash 一样，每个上下文只允许一个引擎实现提供 `ctx.workflowEngine`；没有命名提供方注册表（第二个引擎通过插件配置替换第一个，而不与它同时运行）。
 
-Service Definition：[dsh-workflow](../../packages/workflow/workflow)（`ctx.workflowEngine` + 下文词汇）。Service Provider 是 [dsh-workflow-worker-thread](../../packages/workflow/workflow-worker-thread)（一个 `node:worker_threads` 引擎——每个 run 一个 worker，脚本的 vm 上下文位于其中）；面向模型的 Consumer 是 [dsh-tool-workflow](../../packages/workflow/tool-workflow)。提案与设计理由见 [dynamic-workflows Agent Note](../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.zh.md)。
+Service Definition：[dsh-workflow](../../packages/workflow/workflow)（`ctx.workflowEngine` + 下文词汇）。Service Provider 是 [dsh-workflow-ptc](../../packages/workflow/workflow-ptc)（一个 `node:worker_threads` 引擎——每个 run 一个 worker，脚本的 vm 上下文位于其中）；面向模型的 Consumer 是 [dsh-tool-workflow](../../packages/workflow/tool-workflow)。提案与设计理由见 [dynamic-workflows Agent Note](../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.zh.md)。
 
 源码：浏览器安全词汇位于 [`packages/workflow/workflow/src/types.ts`](../../packages/workflow/workflow/src/types.ts)，Host 请求与活跃运行句柄位于 [`runtime-types.ts`](../../packages/workflow/workflow/src/runtime-types.ts)。
 
@@ -82,8 +82,8 @@ interface WorkflowResult {
   /**
    * How many `agent()` calls the run accepted over its whole lifetime. On a
    * graceful settlement this is the script-side count (calls still queued for
-   * a concurrency slot included); on a termination path (grace force-settle,
-   * worker death) it degrades to the host-observed count — calls queued
+   * a concurrency slot included); on a termination path (cancellation or
+   * process failure) it degrades to the host-observed count — calls queued
    * inside a terminated script are unknowable then.
    */
   agentsStarted: number
@@ -106,7 +106,7 @@ interface WorkflowRun {
   readonly result: Promise<WorkflowResult>
   /** Cancel the run and its children. */
   cancel(reason?: string): void
-  /** Cancel if needed and await bounded settlement and cleanup. */
+  /** Cancel if needed and await script and child cleanup. */
   dispose(): Promise<void>
 }
 ```
@@ -139,7 +139,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.workflowEngine` — `WorkflowEngine` (abstract seam)
 
-Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.
+Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.
 
 ```ts cordis-catalog
 /**
@@ -161,14 +161,14 @@ Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/work
 
 #### `workflow/agent-end` — emit
 
-One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events['workflow/agent-start'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path (a worker killed past its grace) the end is engine-synthesized with outcome `'cancelled'`.
+One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events['workflow/agent-start'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path the end is engine-synthesized with outcome `'cancelled'`.
 
 ```ts cordis-catalog
 /**
  * One `agent()` call settled (clean result, child failure, or run
  * cancellation). Paired with {@link Events['workflow/agent-start']} by
  * `agent.seq`, exactly once per started call on every stop path — on an
- * engine termination path (a worker killed past its grace) the end is
+ * engine termination path the end is
  * engine-synthesized with outcome `'cancelled'`.
  * @param info - the run's identity snapshot.
  * @param agent - the call identity plus its outcome.

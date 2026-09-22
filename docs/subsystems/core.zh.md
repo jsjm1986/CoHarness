@@ -61,90 +61,79 @@ interface AgentHandle {
 源码：[`packages/core/agent/src/types.ts`](../../packages/core/agent/src/types.ts)
 
 ```ts type-equiv
-/** Public live-agent handle. */
+/** Public live-agent handle; the runtime face augments its live capabilities. */
 interface Agent {
-  /** The single identity shared with {@link session}. */
+  /** Session-backed Agent identity. */
   readonly id: SessionId
   /** The provider route and model this agent's requests use. */
   readonly options: AgentOptions
   /** The live session this agent drives; its log is the durable source of truth. */
   readonly session: Session
-  /** The agent-owned projection of durable pending work. */
+  /** Agent-owned access to durable pending work. */
   readonly inbox: Inbox
   /** The current lifecycle state, mirrored on every `agent/status` transition. */
   readonly status: AgentStatus
   /** Agent-scoped context; its contributions are agent-local, unwind on disposal, and reject registration afterward. */
   readonly ctx: Context
-
   /**
-   * Clear queued and steering work — unless `keepInbox` — and abort the active
-   * turn or between-turn task. The first cause wins for that activity. With no
-   * active activity, cancellation is a no-op and does not arm later work.
-   * @param cause - the stable caller intent carried by the active operation signal.
-   * @param options - cancellation options; `keepInbox` preserves pending work.
-   */
+     * Clear queued and steering work — unless `keepInbox` — and abort the active
+     * turn or between-turn task. The first cause wins for that activity. With no
+     * active activity, cancellation is a no-op and does not arm later work.
+     * @param cause - the stable caller intent carried by the active operation signal.
+     * @param options - cancellation options; `keepInbox` preserves pending work.
+     */
   cancel(cause: AgentCancelCause, options?: CancelOptions): void
-
   /**
-   * Resolve after the current whole-agent activity reaches quiescence. This
-   * follows replacement work started before the observed driver retires,
-   * including a follow-up or steer tracked during a normal turn-closing
-   * microtask, but does not identify the settlement of any particular message.
-   * @returns fulfillment after no active driver or maintenance task remains.
-   */
+     * Resolve after the current whole-agent activity reaches quiescence. This
+     * follows replacement work started before the observed driver retires,
+     * but does not identify the settlement of any particular message.
+     * @returns fulfillment after no active driver or maintenance task remains.
+     */
   whenIdle(): Promise<void>
-
   /**
-   * Run one non-turn maintenance task from the true idle phase. The task starts
-   * synchronously after claiming that phase; later waking input remains in the
-   * inbox until the task settles, while public status stays `idle`.
-   * `whenIdle()` follows both the task and any waking work released behind it.
-   * @param task - operation whose fulfillment or rejection is preserved, with a signal aborted by {@link cancel}.
-   * @throws synchronously when turn-driving or another maintenance task already owns the agent.
-   * @returns the task promise.
-   */
+     * Run one non-turn maintenance task from the true idle phase. The task starts
+     * synchronously after claiming that phase; later waking input remains in the
+     * inbox until the task settles, while public status stays `idle`.
+     * `whenIdle()` follows both the task and any waking work released behind it.
+     * @param task - operation whose fulfillment or rejection is preserved, with a signal aborted by {@link cancel}.
+     * @throws synchronously when turn-driving or another maintenance task already owns the agent.
+     * @returns the task promise.
+     */
   runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
-
   /**
-   * Route identified input to an inbox boundary and optionally wake the driver.
-   * Waking input submitted after active cancellation is queued for the next
-   * turn and runs when the aborted activity converges to idle; a follow-up or
-   * steer that arrives during normal turn closure is tracked until claim and
-   * reopens a fresh driver. A failed/rejected activity parks retained input,
-   * and a `disposed` cancel leaves it parked. A wake submitted while already
-   * idle always opens its turn boundary, even when its message is cleared
-   * before the driver claims; see the
-   * [cancel-convergence wake latch](../../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md).
-   * @param message - identified content and the source that supplied it.
-   * @param target - the preferred next-turn or next-step inbox boundary.
-   * @param wakeup - whether delivery may wake the driver.
-   */
+     * Route identified input to an inbox boundary and optionally wake the driver.
+     * Waking input submitted after active cancellation is queued for the next
+     * turn and runs when the aborted activity converges to idle; a `disposed`
+     * cancel leaves it parked. A wake submitted while already idle always opens
+     * its turn boundary, even when its message is cleared before the driver
+     * claims ([cancel-convergence wake latch](../../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md)).
+     * @param message - identified content and the source that supplied it.
+     * @param target - the preferred next-turn or next-step inbox boundary.
+     * @param wakeup - whether delivery may wake the driver.
+     */
   send(message: UserMessage, target: InboxTarget, wakeup: boolean): void
-
   /**
-   * Queue an ordinary follow-up turn and wake the driver. The item becomes the
-   * sole ordinary message of its own turn.
-   * @param message - identified prompt content and the source that supplied it.
-   */
+     * Queue an ordinary follow-up turn and wake the driver. The item becomes the
+     * sole ordinary message of its own turn.
+     * @param message - identified prompt content and the source that supplied it.
+     */
   followup(message: UserMessage): void
-
   /**
-   * Submit steering for the nearest step. An idle driver starts a turn;
-   * a running driver consumes it at its next step boundary.
-   * A rejected step leaves steering parked in the inbox until the next
-   * wake; cancellation or disposal may discard pending steering.
-   * @param message - identified steering content and the source that supplied it.
-   */
+     * Submit steering for the nearest step. An idle driver starts a turn;
+     * a running driver consumes it at its next step boundary.
+     * A rejected step leaves steering parked in the inbox until the next
+     * wake; cancellation or disposal may discard pending steering.
+     * @param message - identified steering content and the source that supplied it.
+     */
   steer(message: UserMessage): void
-
   /**
-   * Queue model-facing context for the next pre-step without waking the
-   * driver. A running driver claims it at the nearest later step boundary;
-   * idle drivers leave it pending until follow-up or steering
-   * wakes them. It may miss a request whose pre-step already claimed its
-   * batch. Cancellation or disposal may discard pending context.
-   * @param message - identified injected context and the source that supplied it.
-   */
+     * Queue model-facing context for the next pre-step without waking the
+     * driver. A running driver claims it at the nearest later step boundary;
+     * idle drivers leave it pending until follow-up or steering
+     * wakes them. It may miss a request whose pre-step already claimed its
+     * batch. Cancellation or disposal may discard pending context.
+     * @param message - identified injected context and the source that supplied it.
+     */
   inject(message: UserMessage): void
 }
 ```
@@ -161,6 +150,44 @@ type AgentStatus = 'idle' | 'running'
 ```
 
 `running` 描述整个驱动器的排空区间，可能跨越连续的排队轮次；它不能证明某个轮次仍然打开。dispose 会把 agent 从注册表移除并发出 `agent/disposed`；它不是一个终态 status 值。`followup()` 不返回句柄：其 `MessageId` 标识的是持久的 inbox 插入、认领与丢弃事实，而非之后的助手输出或轮次结束。`whenIdle()` 观察的是整个 agent，因此只有当调用方明确拥有从回执到空闲的这段区间时，才能把它称为一次 run（[决策](../../.agents/notes/implemented/architecture/2026-07-30-followup-enqueue-and-owned-runs.zh.md)）。
+
+```ts type-equiv
+/** One process-local live assistant streaming publication. */
+type AssistantStreamFrame =
+  | {
+    readonly type: 'start'
+    readonly attemptId: LlmAttemptId
+    /** Monotone within one attached Agent lifecycle; replacement restarts at 1. */
+    readonly revision: number
+    readonly turn: number
+    readonly step: number
+  }
+  | {
+    readonly type: 'chunk'
+    readonly attemptId: LlmAttemptId
+    readonly revision: number
+    /** Dense zero-based position within the attempt. */
+    readonly index: number
+    /** Safe-integer timestamp reused by the durable embedded stream. */
+    readonly time: number
+    readonly chunk: StreamChunk
+  }
+  | {
+    readonly type: 'end'
+    readonly attemptId: LlmAttemptId
+    readonly revision: number
+    /** Number of chunk frames emitted by this attempt. */
+    readonly index: number
+    /** Durable settlement committed before this notification, or live abandonment without one. */
+    readonly outcome:
+      | {
+        readonly kind: 'committed'
+        readonly eventType: 'assistant/message' | 'assistant/attempt'
+        readonly seq: SessionSeq
+      }
+      | { readonly kind: 'abandoned' }
+  }
+```
 
 ```ts type-equiv
 /** Merge-extensible agent creation options. Persona belongs to system-prompt sections. */
@@ -248,23 +275,25 @@ type InboxTarget = 'next-turn' | 'next-step'
 /**
  * Turn and step boundaries folded from one agent session log.
  *
- * The key is registered by `dsh-agent-loop` and is absent when that driver
- * is not composed. Readers treat absence as no open turn and use their
- * existing indexed fallback where one is available.
+ * Reader contract: the key is registered by `dsh-agent-loop` and absent
+ * otherwise. Without agent-loop no turn events exist, so readers treat an
+ * absent key as "no open turn / no boundaries" — capability absence, not a
+ * corrupt state. A reader whose behavior has no safe fallback for that
+ * absence (the step-open decision, for example) may fail loud instead.
  */
 interface TurnBoundaryProjection {
   /** Seq of the open turn's `turn/start`, or null between turns. */
   readonly openTurnStartSeq: OptionalSessionSeq
   /** Seq of the latest `step/start` event, or null before the first step. */
   readonly lastStepStartSeq: OptionalSessionSeq
-  /** Latest step boundary and its seq, or null before the first boundary. */
+  /** The latest step boundary (`step/start` or `step/end`) and its seq, or null before the first step boundary. */
   readonly lastStepBoundary: { readonly kind: 'start' | 'end'; readonly seq: SessionSeq } | null
   /** Turn number of the latest `turn/start`; 0 before the first turn. */
   readonly lastTurn: number
 }
 ```
 
-每个待处理入队项就是其 `UserMessage`；`MessageId` 是唯一标识。`Inbox` 结构方法会记录规范化的持久 `agent/inbox/spliced` 变更，并拒绝重复的待处理 id。`replace(messageId, newMessage)` 与 `remove(messageId)` 通过 `MessageId` 跨两份列表定位待处理消息；替换可以改变标识，并先将旧消息作为 discarded 发布，再将新消息作为 inserted 发布。普通删除和 `clear()` 都表示取消。在步骤边界，dsh-agent-loop 包内私有的 `ReactLoopInbox` 通过纯删除 splice 移除拟进入步骤的批次——全部 `next-step` 输入，外加轮次边界上的一条 `next-turn` 消息——不发出 discarded 通知，随后逐条发出 claimed 通知。仅循环内部使用的待处理检测与认领不属于 `Agent.inbox`。每个 `ReactLoopInbox` 构造器在其 agent 作用域内贡献 host-only 的 `agentInbox` 投影；注册表按引用计数在多个 agent 间共享同一 fold 定义，其 cell 是唯一的存活状态，同一 fold 同时服务冷读取方。该 fold 会拒绝越界或不安全的 splice 坐标与两份列表上的重复标识，并按事件 seq 定位畸形的持久历史。跟踪单条消息的消费方使用精确的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知。
+每个待处理入队项就是其 `UserMessage`；`MessageId` 是唯一标识。`Inbox` 结构方法会记录规范化的持久 `agent/inbox/spliced` 变更，并拒绝重复的待处理 id。`replace(messageId, newMessage)` 与 `remove(messageId)` 通过 `MessageId` 跨两份列表定位待处理消息；替换可以改变标识，并先将旧消息作为 discarded 发布，再将新消息作为 inserted 发布。普通删除和 `clear()` 都表示取消。在步骤边界，dsh-agent-loop 包内私有的 `ReactLoopInbox` 通过纯删除 splice 移除拟进入步骤的批次——全部 `next-step` 输入，外加轮次边界上的一条 `next-turn` 消息——不发出 discarded 通知，随后逐条发出 claimed 通知。仅循环内部使用的待处理检测与认领不属于 `Agent.inbox`。每个 `ReactLoopInbox` 构造器在其 agent 作用域内贡献 host-only 的 `inbox` 投影；注册表按引用计数在多个 agent 间共享同一 fold 定义，其 cell 是唯一的存活状态，同一 fold 同时服务冷读取方。该 fold 会拒绝越界或不安全的 splice 坐标与两份列表上的重复标识，并按事件 seq 定位畸形的持久历史。跟踪单条消息的消费方使用精确的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知。
 
 取消：
 
@@ -315,7 +344,12 @@ pre-step 决策使用与持久 user-role 输入相同、带标识的 `UserMessag
 /** Whether and with which messages the loop enters a proposed step. */
 type PreStepDecision =
   | { kind: 'reject' }
-  | { kind: 'enter'; messages: UserMessage[] }
+  | {
+    kind: 'enter'
+    messages: UserMessage[]
+    /** Start a distinct model-message series before this step's admitted messages. */
+    startsRequestSeries?: true
+  }
 ```
 
 `agent/request-error` 在失败的模型步骤关闭之后、其轮次关闭之前运行。listener 可以在失败轮次的 signal 仍然存活时修复持久状态或 await 策略工作。处理该错误的 listener 返回 `{ kind: 'retry' }` 且不调用 `next()`；默认的 `undefined` 会让失败保持终态。
@@ -446,9 +480,7 @@ Concrete agent factory and driver service.
  * Create an agent and session under one caller-supplied identity, owned by
  * the accessing fiber. Constructor-driven config calls mint a fresh combined
  * id before entering this boundary. When a persistence backend is mounted,
- * the session's write handle is acquired before publication, so an already
- * owned or already persisted id fails inside this call rather than racing
- * the coordinator's write path later.
+ * the session's durable identity and any seed are stored before publication.
  * @param id - shared agent/session identity.
  * @param options - concrete loop options.
  * @param meta - optional fresh-session workspace metadata.
@@ -726,8 +758,8 @@ Initiator methods provide same-process causal attribution only. Ambient presence
  * Read the Agent that initiated the inherited asynchronous driver chain.
  * Use this optional form for logging, tracing, metrics, or host attribution
  * that also supports agentless calls. When a parent creates a child, setup
- * reports the causal parent while the setup callback's explicit `agent`
- * parameter identifies the child.
+ * reports the causal parent while the setup callback's Agent parameter
+ * identifies the child.
  * @returns the inherited Agent, or `undefined` outside an initiator boundary
  *   and inside an explicit clearing boundary.
  * @throws when this service instance has been disposed.
@@ -792,7 +824,7 @@ setFactory(factory: AgentFactory): () => void
  * agent): this constructs the agent and its session. Rejects if no factory is
  * registered or creation/setup fails. The resolved {@link AgentHandle} lets
  * the owner tear down exactly this agent.
- * @param options - shared identity, session seed/metadata, and agent options.
+ * @param options - shared identity, optional live parent, session seed/metadata, and agent options.
  * @returns the handle after setup, rollback-covered publication, and loop start complete.
  */
 async create(options: CreateAgentOptions): Promise<AgentHandle>
@@ -801,21 +833,22 @@ async create(options: CreateAgentOptions): Promise<AgentHandle>
  * Load a persisted session and resume an agent on it through the registered
  * factory. Rejects if no factory is registered; the factory rejects if
  * session persistence is not configured or persistence/setup fails.
- * @param options - persisted identity, configuration, and optional setup.
+ * @param options - persisted identity, optional live parent, configuration, and setup.
  * @returns the handle after setup, rollback-covered publication, and loop start complete.
  */
 async resume(options: ResumeAgentOptions): Promise<AgentHandle>
 
 /**
- * Register a live agent with source `startup`. Rejects if the id is already
- * registered or a serial `agent/created` listener fails. Emits `agent/disposed`
+ * Register a live agent with source `startup`. Rejects if the id is already registered or a
+ * serial `agent/created` listener fails. Emits `agent/disposed`
  * when the calling fiber is disposed — both with the agent's scope carrier
  * (`scopeTarget(agent, agent)`): the subject is the agent in hand, so the
  * emits are scope-filtered regardless of which context invoked `register`
  * (calling through `agent.ctx` scopes EFFECTS; dispatch scoping always
- * requires passing the carrier). Await registration before using the agent.
+ * requires passing the carrier). The entry is a runtime root; factory-backed
+ * creation uses `options.parentAgent` for child ownership. Await the registration before using the agent.
  * @param agent - the already-constructed agent to record in the store.
- * @returns the exact awaitable Cordis effect disposer (single-shot; a repeat call
+ * @returns the awaitable Cordis effect disposer (single-shot; a repeat call
  *   returns undefined without awaiting an in-flight teardown). Exact
  *   identity is load-bearing: a composite (generator) effect that owns a
  *   teardown ORDER — the agent factory's lifecycle chain — must yield THIS
@@ -833,13 +866,13 @@ register(agent: Agent): ReturnType<Context['effect']>
  * returned detach closure into its pre-installed composite teardown before
  * calling {@link announce}. Ordinary callers use {@link register}.
  * @param agent - the prepared, unpublished agent.
- * @param owner - live agent whose scoped context created this agent, or
+ * @param owner - explicitly supplied live runtime owner, or
  *   undefined for a top-level runtime root. This is runtime ownership, not
  *   the resumed session's durable parent lineage.
  * @returns an idempotent closure that removes this exact entry and emits
  *   `agent/disposed` with listener failures contained. When called from a
- *   `agent/created` listener, removal and disposal wait until
- *   the serial dispatch settles.
+ *   `agent/created` listener, removal and disposal wait until the serial
+ *   creation dispatch settles.
  */
 enter(agent: Agent, owner: Agent | undefined): () => void
 
@@ -848,8 +881,7 @@ enter(agent: Agent, owner: Agent | undefined): () => void
  * @param agent - the live inserted agent to announce.
  * @param source - fresh creation, resume, clear, or compaction source.
  * @param signal - optional factory initialization cancellation signal passed to listeners.
- * @returns completion of serial initialization; a listener failure rejects.
- *   The caller owns rollback through the detach closure from enter().
+ * @returns completion of the serial creation listeners; a listener failure rejects.
  * @throws if `agent` is not the exact live registry entry for its id, or its
  *   creation announcement already began (including a reentrant call from a
  *   creation listener).
@@ -894,22 +926,47 @@ Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index
 
 ### `agent/*` events
 
+<a id="agentassistant-stream--emit"></a>
+
+#### `agent/assistant-stream` — emit
+
+Process-local assistant-stream publication. Chunk frames are transient; the loop appends one final v2 `assistant/message` or `assistant/attempt` with the same stream before a committed end frame.
+
+```ts cordis-catalog
+/**
+ * Process-local assistant-stream publication. Chunk frames are transient;
+ * the loop appends one final v2 `assistant/message` or `assistant/attempt`
+ * with the same stream before a committed end frame.
+ * @param payload.agent - the agent whose attempt produced the frame.
+ * @param payload.frame - one ordered start, chunk, or end publication.
+ * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+ * @mode emit
+ */
+'agent/assistant-stream'(this: Scoped<Agent>, payload: { agent: Agent; frame: AssistantStreamFrame }): void
+```
+
+Types: [Scoped](scope.zh.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
 <a id="agentcreated--serial"></a>
 
 #### `agent/created` — serial
 
-Initialize a fully configured agent and live session before queued work runs. Listeners run serially and must return undefined so every listener runs. A throw or rejection vetoes initialization and skips later listeners. Detach requested during dispatch waits until the chain settles, including on rejection. Listeners must not await agent.whenIdle() or their own owner's disposal.
+An entered agent is ready for per-agent initialization after factory setup. Listeners run in order and are awaited before creation resolves. AgentLoop holds queued input until all listeners finish. A throw or rejection fails creation and skips later listeners. Disposal retains the scope and session until dispatch settles; listeners must not await agent.whenIdle() or their own owner's disposal.
 
 ```ts cordis-catalog
 /**
- * Initialize a fully configured agent and live session before queued work runs.
- * Listeners run serially and must return undefined so every listener runs.
- * A throw or rejection vetoes initialization and skips later listeners. Detach
- * requested during dispatch waits until the chain settles, including on rejection.
- * Listeners must not await agent.whenIdle() or their own owner's disposal.
- * @param payload.agent - the newly registered agent with its live session and completed setup.
- * @param payload.source - why the session started (fresh startup, resume, …).
- * @param payload.signal - optional factory initialization cancellation signal; listeners must not retain it to control later turns.
+ * An entered agent is ready for per-agent initialization after factory setup.
+ * Listeners run in order and are awaited before creation resolves. AgentLoop
+ * holds queued input until all listeners finish. A throw or rejection fails
+ * creation and skips later listeners. Disposal retains the scope and session
+ * until dispatch settles; listeners must not await agent.whenIdle() or their
+ * own owner's disposal.
+ * @param payload - .agent - the newly registered agent with its live
+ *   session and completed setup; .source - fresh creation, resume, clear,
+ *   or compaction source; .signal - factory initialization cancellation
+ *   signal, when provided.
  * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
  * @mode serial
  */
@@ -1088,14 +1145,18 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/request` — waterfall
 
-Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. Model-visible content must use logged channels; this waterfall cannot mutate messages.
+Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. On step admission, this runs after assembly and `step/start`, before the system prompt and accepted user batch are committed. Cancellation here or during subsequent `prepareCall()` resolution commits neither. The prepared call capability governs prompt admission. Model-visible content must use logged channels; this waterfall cannot mutate messages.
 
 ```ts cordis-catalog
 /**
  * Replace the frozen call configuration. `await next()` yields the config
  * the machine would use (agent options on the first request, the logged
- * header afterwards); return a replacement to switch. Model-visible
- * content must use logged channels; this waterfall cannot mutate messages.
+ * header afterwards); return a replacement to switch. On step admission,
+ * this runs after assembly and `step/start`, before the system prompt and
+ * accepted user batch are committed. Cancellation here or during subsequent
+ * `prepareCall()` resolution commits neither. The prepared call capability
+ * governs prompt admission. Model-visible content must use logged channels;
+ * this waterfall cannot mutate messages.
  * @param payload.agent - the agent making the model call.
  * @param payload.turn - the open turn number.
  * @param payload.step - the step whose request this is.

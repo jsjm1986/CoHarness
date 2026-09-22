@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-10-ci-lane-scope-classification.md
-2026-09-10-ci-lane-scope-classification.md: 777b10e92e94ab2a80b479dbd8168849fcec3615
-2026-09-10-ci-lane-scope-classification.zh.md: 895f17a82a69984b232757d6a7f99dcec58bda09
+2026-09-10-ci-lane-scope-classification.md: faddf6347ec6ea4cb359fb081f8909acbcaca8cf
+2026-09-10-ci-lane-scope-classification.zh.md: 81bb23d9378fa1d681bf20e16d5c2cd035350b23

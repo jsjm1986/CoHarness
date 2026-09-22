@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Node's built-in `fetch` ignores `HTTP_PROXY` and `HTTPS_PROXY`, so a harness behind a proxy would connect directly no matter what the user exported — the LLM request, every web search, MCP over HTTP, and the sandbox SDK alike. This package resolves one proxy policy from the launcher's environment snapshot and installs it as undici's global dispatcher, which is exactly what `fetch` resolves. Ordinary call sites therefore need no change and no import: they write `fetch()` and are proxied. Four functions cover everything the global dispatcher cannot reach on its own — install the policy, ask where one request goes, hand the policy to a spawned child, and strip it for a replay.
+Node's built-in `fetch` ignores `HTTP_PROXY`/`HTTPS_PROXY`. This package resolves one proxy policy from the launcher's environment snapshot and installs it as undici's global dispatcher — which is what `fetch` resolves — so ordinary call sites are proxied with no change. Four functions cover what the global dispatcher cannot reach: install the policy, ask where one request goes, hand the policy to a spawned child, and strip it for a replay.
 
 ## Table of Contents
 
@@ -90,6 +90,8 @@ An entry names a host and matches it together with every subdomain under it: `NO
 
 -----
 
+**Runtime invariant:** No companion is published. The one piece of mutable state here — the active policy — is asserted against the dispatcher it installs by unit tests that dispose the registration and observe a real loopback proxy.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -101,7 +103,7 @@ These limits define when the package is a poor fit. They are current package con
 - **No custom certificate authority** — a TLS-intercepting corporate proxy needs `NODE_EXTRA_CA_CERTS` set on the process before launch, which this package neither sets nor validates.
 - **A spawned child honors the policy only on a new enough runtime, and only when every value it inherits is one Node accepts** — it reads the published environment through Node's `NODE_USE_ENV_PROXY` (22.21+, 24+), and the engines range admits 22.19 and 22.20, where such a child stays direct. A user whose environment also names a SOCKS or otherwise refused proxy leaves every child Node direct: the flag is withheld so the child can start at all. A child also matches bypass entries with Node's own `NO_PROXY` rules, which differ from this package's in their separators and IPv4-range support. Nothing in this process depends on a Node version: every in-process request reaches the global dispatcher.
 - **Telemetry is direct by design** — the OTLP exporter posts through `node:http`, which no global dispatcher reaches. Routing it would need either an `http.Agent` whose `proxyEnv` option post-dates the lowest supported Node, or the SDK's `fetch` transport, which has no compression while the shipped profile enables gzip. Telemetry is the one channel whose loss costs the user nothing, so it stays where it was; `DSH_TELEMETRY_MODE=DISABLED` turns it off.
-- **A worker that executes model-authored code gets no proxy at all** — neither the `code-runtime` worker nor the `workflow` worker receives proxy configuration, so their own requests go direct. A proxy URL may carry `user:password`, and both run scripts the model wrote.
+- **A worker that executes model-authored code gets no proxy at all** — neither the `ptc-runtime` worker nor the `workflow` worker receives proxy configuration, so their own requests go direct. A proxy URL may carry `user:password`, and both run scripts the model wrote.
 - **The regression gate sees source, not dependencies** — `verify-no-bare-dispatcher` parses `packages/*/*/src` and `apps/*/src`; tests, scripts, and the internals of a third-party SDK are outside it. That is why every outbound call site also carries an `egress.spec.ts`.
 
 <a id="dev-note"></a>

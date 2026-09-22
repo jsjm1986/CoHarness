@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
-import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEventMap, SessionEventType, SurfaceIntent } from '@deepseek-ai/dsh-session'
 
@@ -33,6 +33,7 @@ const messageEventArb: fc.Arbitrary<Appendable> = fc.oneof(
   textContentArb.map((content): Appendable => ({
     type: 'assistant/message',
     data: {
+      stream: [],
       turn: 1,
       step: 1,
       message: createMessage({
@@ -46,6 +47,7 @@ const messageEventArb: fc.Arbitrary<Appendable> = fc.oneof(
   textContentArb.map((content): Appendable => ({
     type: 'assistant/message',
     data: {
+      stream: [],
       turn: 1,
       step: 1,
       message: createMessage({
@@ -61,7 +63,7 @@ const messageEventArb: fc.Arbitrary<Appendable> = fc.oneof(
     .map((r): Appendable => ({ type: 'tool/result', data: {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: CallId(r.id),
+        callId: ToolCallId(r.id),
         content: r.content,
         isError: r.isError,
       }),
@@ -74,7 +76,11 @@ const nonMessageEventArb: fc.Arbitrary<Appendable> = fc.oneof(
   fc.constant<Appendable>({ type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }),
   fc.constant<Appendable>({ type: 'step/start', data: { turn: 1, step: 1 } }),
   fc.constant<Appendable>({ type: 'step/end', data: { turn: 1, step: 1 } }),
-  fc.string().map((text): Appendable => ({ type: 'assistant/chunk', data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text } } })),
+  fc.string().map((text): Appendable => ({ type: 'assistant/attempt', data: {
+    turn: 1,
+    step: 1,
+    stream: [{ type: 'chunk', time: 0, chunk: { type: 'text-delta', index: 0, text } }],
+  } })),
 )
 
 const anyEventArb = fc.oneof(messageEventArb, nonMessageEventArb)

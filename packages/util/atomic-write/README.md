@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Zero-dependency atomic file replacement shared by file-backed stores that must never leave partial, symlink-hijacked, or wider-than-intended content on disk — the user-settings document (`dsh-settings-file`) and the credentials store (`dsh-credentials-local`).
 
+## Summary
+
+Use `dsh-atomic-write` to replace a file without exposing partial content or following a symlinked temporary path. Its writer lock serializes read-modify-write cycles across processes so concurrent writers cannot overwrite one another with stale state. Each replacement uses caller-selected permission bits on a fresh inode, which safely narrows an existing file's permissions. This zero-dependency library accepts strings; it does not provide a `cordis.yml` plugin or crash durability because it does not call `fsync`.
+
 ## Surface
 
 ```ts
@@ -31,13 +35,17 @@ await withFileLock('/home/u/.dsh/settings.yaml', async () => {
 
 `withFileLock` serializes the writers of one file across processes, for the read-render-commit cycles a bare atomic commit cannot make safe on its own. The lock is a `wx`-created `<filename>.lock` sibling, so readers never contend; waiters back off exponentially and fail with a timeout rather than block forever. `EEXIST` identifies contention directly; `EPERM` does so only when a fresh `lstat` confirms that the lock path exists, covering Windows exclusive-create behavior without hiding an unrelated permission failure. A contender never removes the existing lock: age cannot distinguish a crashed owner from a paused live writer.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A stateless write primitive asserted by filesystem-level unit specs; it owns no state between calls.
+
 ## Model Experience
 
-None, as this is a pure filesystem primitive; nothing here reaches a model request.
+None, as this is a pure filesystem write primitive that registers nothing model-facing.
 
 #### KV Cache effect
 
-None; nothing here enters a request prefix.
+Nothing here enters a request prefix, so provider cache reuse is unaffected.
 
 ## Known Limitations and Deferred Work
 

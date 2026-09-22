@@ -22,7 +22,6 @@
     "compaction",
     "context",
     "credentials",
-    "e2b",
     "feedback",
     "fs",
     "goal",
@@ -52,7 +51,8 @@
     "client"
   ],
   "modelInputPrefixes": [
-    "apps/cli/config/"
+    "apps/cli/config/",
+    "packages/skill/skill-badge/assets/"
   ],
   "modelInputSuffixes": [
     "/AGENTS.md",

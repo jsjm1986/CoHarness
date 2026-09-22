@@ -1,0 +1,69 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../app-boot"
+    },
+    {
+      "path": "../hmr"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../host/plugin-inventory"
+    },
+    {
+      "path": "../../interaction/user-approval"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../sandbox/sandbox"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/atomic-write"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/include"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../../vendor/timer"
+    }
+  ]
+}

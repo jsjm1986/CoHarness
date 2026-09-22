@@ -211,7 +211,13 @@ function runInstaller(
   })
 }
 
-describe('worktree-local Lefthook installer', { timeout: 30_000 }, () => {
+// Every case builds scratch worktrees and drives them through spawned Git and
+// Node subprocesses, so the suite is bound by process creation rather than by
+// its assertions. The value matches DSH_COVERAGE_TEST_TIMEOUT_MS, which the
+// Windows coverage lane passes as --testTimeout: a describe value overrides that
+// flag rather than yielding to it, so a smaller one here lowers what the lane
+// grants every case in this file, none of which carries an allowance of its own.
+describe('worktree-local Lefthook installer', { timeout: 90_000 }, () => {
   for (const [label, extraEnv] of [
     ['CI', { CI: 'true' }],
     ['GitHub Actions', { GITHUB_ACTIONS: 'true' }],

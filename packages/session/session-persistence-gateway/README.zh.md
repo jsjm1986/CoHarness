@@ -4,6 +4,11 @@
 
 共享项目运行时使用的 Gateway PostgreSQL `SessionPersistence` 提供方。此提供方保留标准 `PersistenceCoordinator` 生命周期，并通过认证 Gateway 内部 API 传输存储的 header/event、revision、幂等追加批次和崩溃修复提交。
 
+## 概述
+
+使用 `dsh-session-persistence-gateway` 作为共享项目运行时的 Gateway PostgreSQL `SessionPersistence` 提供方：已存头部与事件、修订、幂等追加批次与崩溃修复提交在标准 `PersistenceCoordinator` 生命周期下经已认证的 Gateway 内部 API 传输。
+
+
 ## 持久化约定
 
 - 项目运行时组合会停用 `session-persistence-jsonl` 并挂载此提供方。个人运行时保留普通持久化提供方。
@@ -39,6 +44,8 @@
 #### KV Cache 影响
 
 此提供方不重写有效历史。当重建前缀、当前 envelope 和 route 一致时，恢复可以复用提供方缓存；新提交事件追加到后缀。
+
+**运行时不变式：** 不发布伴生入口。后端正确性由共享持久化契约覆盖。
 
 ## 已知限制与延期工作
 

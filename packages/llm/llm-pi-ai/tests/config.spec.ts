@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertServiceable, Config } from '../src/config.ts'
+import { assertServiceable, Config, resolveProfiles } from '../src/config.ts'
 
 /** Validate one hand-declared route, with the caller's fields layered onto it. */
 const routeWith = (profile: Record<string, unknown>): (() => unknown) =>
@@ -62,5 +62,40 @@ describe('modality schema boundary', () => {
     const absent = configWith({})() as Materialized
     expect(absent.providers['acme-gateway']?.models?.[0]?.input).toEqual([])
     expect(absent.providers['acme-gateway']?.defaultInput).toEqual(['text'])
+  })
+})
+
+describe('assertServiceable', () => {
+  it('checks only providers the edit changed', () => {
+    // A stored entry the catalog no longer serves must not block an edit
+    // elsewhere; only the changed route is revalidated.
+    const stored = Config({ providers: { legacy: { defaultInput: [] } } })
+    const edited = Config({
+      providers: {
+        legacy: { defaultInput: [] },
+        'acme-gateway': { api: 'openai-completions', baseURL: 'https://acme.test', models: [{ id: 'm' }] },
+      },
+    })
+    expect(() => { assertServiceable(edited, stored) }).not.toThrow()
+    expect(() => { assertServiceable(edited, Config({})) }).toThrow(/defaultInput must name at least one modality/)
+    expect(() => { assertServiceable(Config({})) }).not.toThrow()
+    expect(() => { assertServiceable({}) }).not.toThrow()
+  })
+
+  it('rejects non-positive image budgets on raw stored profiles', () => {
+    // The schema boundary stops these on writes; the guards below serve the
+    // raw dicts `resolveProfiles` reads from storage.
+    for (const field of ['requestImagePixelBudget', 'requestImageMaxBytes'] as const) {
+      for (const value of [0, 1.5]) {
+        expect(() => resolveProfiles({
+          'acme-gateway': {
+            api: 'openai-completions',
+            baseURL: 'https://acme.test',
+            models: [{ id: 'm' }],
+            [field]: value,
+          },
+        })).toThrow(new RegExp(`${field} must be a positive safe integer`))
+      }
+    }
   })
 })

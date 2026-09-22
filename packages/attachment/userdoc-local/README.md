@@ -12,6 +12,11 @@ Identical in-flight listings share one filesystem scan; a caller's abort only ca
 
 `mediaType` is derived from the stored file extension. Text, Markdown, CSV, JSON, YAML, XML, common source files, images, PDF, and Office extensions receive presentation types; an unrecognized extension records `application/octet-stream`. It is presentation metadata: nothing here parses content or refuses an unknown format.
 
+## Summary
+
+Use `dsh-userdoc-local` as the local `userDocs` backend that stores documents as ordinary files below one configured root. Uploads stream to a sibling `.part` file and publish atomically through an exclusive hard link, so an occupied target is never replaced; untrusted client names are sanitized and collisions receive a ` (2)` suffix. The default deployment migrates a legacy `uploads` tree on first use. An explicit `maxFileBytes` enforces a finite deployment policy.
+
+
 ## Resumable uploads
 
 The local provider implements the `resumable-v1` upload session used by the Web client. It accepts one request-sized chunk at a time, verifies each chunk with SHA-256, persists a private manifest and partial file below `.upload-sessions/v1/`, and publishes the final file only after a complete SHA-256 verification. A session survives a runtime restart and remains resumable for the configured 24-hour default retention; expired session records and their temporary bytes are removed automatically. The default chunk size is 8 MiB, safely below the public Cloudflare request-body limit, and all upload safety values are configurable through the provider config.
@@ -20,13 +25,17 @@ The local provider implements the `resumable-v1` upload session used by the Web 
 
 The provider records the admission lock owner as a PID. During startup, a lock whose recorded process no longer exists is atomically removed before expired-session cleanup, so an interrupted runtime does not block later document requests for the full 30-second lock deadline. A live or unreadable lock remains contended and is not removed automatically.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Documents are ordinary files below one configured root; the backend holds no index beyond the filesystem tree its specs exercise.
+
 ## Model Experience
 
-Indirectly, through the host prompt-assembly consumer that turns a stored reference into inlined text or a path the agent reads with its ordinary tools.
+Indirectly, through the host prompt-assembly consumer, which owns every model-visible rendering decision for stored files.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

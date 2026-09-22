@@ -291,7 +291,7 @@ describe('incremental DeepSeek session-log upload', () => {
       },
     ] satisfies SessionEvent[]
     const { ctx, session } = await harness('wire-child', seed, {
-      inheritedEventCount: SessionLogOffset(0),
+      inheritedEventCount: SessionLogOffset(seed.length),
       meta: {
         cwd: '/wire-workspace',
         parentSession: SessionId('wire-parent'),
@@ -307,11 +307,11 @@ describe('incremental DeepSeek session-log upload', () => {
     })
     const wire = JSON.parse(JSON.stringify(prepared.fields.dsh_session_log)) as Record<string, unknown>
     expect(wire.session).toMatchObject({
-      version: 3,
+      version: 4,
       id: 'wire-child',
       parentSession: 'wire-parent',
       cwd: '/wire-workspace',
-      seedLength: 0,
+      seedLength: seed.length,
       origin: 'subagent',
       delegationDepth: 1,
       agentPreset: 'minimal',

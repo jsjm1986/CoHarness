@@ -9,19 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../core/agent"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
+      "path": "../../core/session"
     },
     {
       "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/agent"
     },
     {
       "path": "../subagent"
@@ -30,13 +24,19 @@
       "path": "../../subprocess/subprocess"
     },
     {
-      "path": "../../util/timeout"
-    },
-    {
       "path": "../../test-support/loader-smoke"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/timeout"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

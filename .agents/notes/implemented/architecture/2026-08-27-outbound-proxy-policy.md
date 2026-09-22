@@ -72,7 +72,7 @@ Weighed against that, telemetry is the one outbound channel whose loss costs the
 
 **Read the operating system's proxy settings.** Rejected for this change. Only Codex and Reasonix among six surveyed products do it, and Codex keeps it behind a default-off flag. Measured on the author's machine, it would have found nothing: the proxy application had written the setting to the Wi-Fi service while the primary interface was a USB ethernet adapter with no proxy, so `scutil --proxy` reported none while the exported variables worked. It also needs its own bypass matcher, because an operating system list carries CIDR entries that neither undici nor Node matches.
 
-**Give the `code-runtime` worker the proxy too.** Rejected. Model-authored programs run there with no ambient environment at all — a stronger containment than the scrubbed environment spawned commands get — and a proxy URL may carry credentials. Handing model code a credentialed URL to reach the network is the wrong trade; the exclusion is recorded in that package's limitations.
+**Give the `ptc-runtime` worker the proxy too.** Rejected. Model-authored programs run there with no ambient environment at all — a stronger containment than the scrubbed environment spawned commands get — and a proxy URL may carry credentials. Handing model code a credentialed URL to reach the network is the wrong trade; the exclusion is recorded in that package's limitations.
 
 ## Consequences
 

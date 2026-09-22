@@ -7,13 +7,13 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 概述
-
-这是一个可选的浏览器插件，在会话头部渲染当前 Session 的活动 Schedule 提醒。它读取完整的 `schedule` projection，不发 RPC，也不执行 mutation。浏览器派生排序、本地时间、状态与相对时间；这些呈现值不会进入持久状态。
-
 默认 Web 组合会解析本包但保持 Loader row 禁用；`examples/web-schedule/cordis.yml` 与 Host Schedule 插件一起启用该 row。只有 Session 成功打开且至少有一条活动提醒时，触发器才会出现。
 
 每行保留完整 prompt，显示「等待中」或「已逾期」，重复间隔使用最大可整除单位，并在挂到 body 的弹层中换行显示元数据。Escape 与外部指针按下会关闭目录；通过 Escape 关闭时焦点返回触发器。live 更新移除最后一条记录时，组件会先关闭弹层再卸载。
+
+## 概述
+
+这是一个可选的浏览器插件，在会话头部渲染当前 Session 的活动 Schedule 提醒。它读取完整的 `schedule` projection，不发 RPC，也不执行 mutation。浏览器派生排序、本地时间、状态与相对时间；这些呈现值不会进入持久状态。
 
 ## 实现
 
@@ -26,21 +26,17 @@ kind: "package-reference"
 
 组件通过 `useSession` 与 `useProjection('schedule')` 读取数据，不直接检查 Host 服务。定位复用共享的 `useAnchoredPosition` 与 `useDismissOnOutsidePointer` 原语，包含 portal 弹层的 ref。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。提醒状态由 Host schedule 插件及其会话帧拥有；此界面只在会话已报告活动提醒时渲染触发器。
+
 ## 模型体验
 
-### 活动 Schedule projection
+无，因为本包只为人类渲染已经完成的客户端 projection，从不改变提示词、消息、schema、流或工具结果。
 
-#### What the model sees
+#### KV Cache 影响
 
-无。本浏览器包为人类头部目录读取已完成的 `schedule` projection；它不改变 prompt、消息、schema、流或工具结果。
-
-#### Token effect
-
-无；本包从不组装或发送 provider 请求。
-
-#### KV Cache effect
-
-无；本包从不组装或发送 provider 请求。
+无；本包从不组装或发送提供方请求。
 
 ## 已知限制与延后工作
 

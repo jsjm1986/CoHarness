@@ -257,6 +257,7 @@ function sourceLive(session: Session): LogicalSessionSource {
     header: session.header,
     inheritedEventCount: session.inheritedEventCount,
     get events() {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       materialized ??= session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(end))
       return materialized
     },
@@ -275,7 +276,7 @@ async function listPersisted(
   signal?: AbortSignal,
 ): Promise<SessionHeader[]> {
   try {
-    return await persistence.list(signal)
+    return await persistence.listHeaders(signal)
   } catch (error: unknown) {
     if (signal?.aborted) signal.throwIfAborted()
     throw new SessionQueryError(
@@ -314,6 +315,7 @@ function snapshotLive(session: Session): LogicalSession {
   return {
     header: structuredClone(session.header),
     inheritedEventCount: session.inheritedEventCount,
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     events: session.snapshotEvents().map(event => structuredClone(event)),
   }
 }

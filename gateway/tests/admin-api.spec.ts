@@ -5,6 +5,7 @@ import { join, parse } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { AuditService } from '../src/audit.ts'
+import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
 import { AuthService } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { loadConfig } from '../src/config.ts'
@@ -14,6 +15,7 @@ import { ModelGovernanceService } from '../src/model-governance.ts'
 import { ProjectService } from '../src/projects.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
+import type { GatewayPrincipalClaims } from '../src/principal.ts'
 import type { ConversationArchiveDetail, ConversationArchiveRow } from '../src/postgres/conversation-archive-service.ts'
 
 let closer: (() => Promise<void>) | undefined
@@ -28,9 +30,25 @@ async function login(base: string, username: string, password: string): Promise<
   return (loginRes.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
 }
 
+function desktopClaims(over: { runtimeId?: number; userId?: number } = {}): GatewayPrincipalClaims {
+  return {
+    version: 1,
+    issuer: 'harness-gateway',
+    audience: 'dsh-runtime',
+    organization: 'org',
+    user: { id: over.userId ?? 7, username: 'u7', displayName: 'U7', role: 'user' },
+    scope: { kind: 'personal' },
+    runtime: { kind: 'user', id: over.runtimeId ?? 7, generation: 1 },
+    issuedAt: 0,
+    expiresAt: 0,
+    nonce: 'n',
+  }
+}
+
 async function setup(
   archives?: GatewayDeps['archives'],
   governance?: GatewayDeps['governance'],
+  withDesktops = false,
 ) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
@@ -49,6 +67,17 @@ async function setup(
     if (typeof target !== 'number' && target.kind === 'project') return operation()
     return withStopped(target, operation)
   }
+  let now = Date.now()
+  const desktops = withDesktops
+    ? new DesktopCoordinator(
+        new SqliteDesktopCoordinatorRepository(db),
+        instances,
+        { grantTtlMs: 1_000, stoppingTtlMs: 1_000, queueTtlMs: 5_000, queueCapacity: 8 },
+        undefined,
+        () => now,
+      )
+    : undefined
+  await desktops?.initialize()
   const deps: GatewayDeps = {
     cfg,
     auth: new AuthService(db, cfg),
@@ -58,6 +87,7 @@ async function setup(
     instances,
     governance: governance ?? new ModelGovernanceService(db),
     ...(archives === undefined ? {} : { archives }),
+    ...(desktops === undefined ? {} : { desktops }),
   }
   const admin = await deps.users.create({ username: 'boss', password: 'pw-12345678', role: 'admin' })
   await deps.users.changeOwnPassword(admin.id, 'pw-12345678')
@@ -73,7 +103,7 @@ async function setup(
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   cfg.publicOrigins.push(base)
   const cookie = await login(base, 'boss', 'pw-12345678')
-  return { deps, base, cookie, root, member, admin, stoppedTargets, invalidated }
+  return { deps, base, cookie, root, member, admin, stoppedTargets, invalidated, desktops, advance: (ms: number) => { now += ms } }
 }
 
 describe('admin JSON API', () => {
@@ -499,5 +529,78 @@ describe('admin JSON API', () => {
     expect(bad.status).toBe(400)
     expect(await bad.json()).toEqual({ error: 'invalid json' })
     expect((await fetch(`${base}/admin`, { headers: { cookie } })).status).toBe(404)
+  })
+})
+
+describe('admin desktop coordination API', () => {
+  it('lists resources and returns a resource snapshot for administrators', async () => {
+    const { base, cookie, desktops } = await setup(undefined, undefined, true)
+    const acquired = await desktops!.acquire(desktopClaims(), { node: 'node-a', desktop: 'seat-1', requestId: 'r1' })
+    expect(acquired.status).toBe('granted')
+    const list = await fetch(`${base}/admin/api/desktops`, { headers: { cookie } })
+    expect(list.status).toBe(200)
+    const { resources } = await list.json() as { resources: Array<{ node: string; desktop: string; state: string }> }
+    expect(resources).toEqual([expect.objectContaining({ node: 'node-a', desktop: 'seat-1', state: 'available' })])
+    const detail = await fetch(`${base}/admin/api/desktops/detail?node=node-a&desktop=seat-1`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    const snapshot = await detail.json() as { grants: Array<{ grantId: string; state: string }> }
+    expect(snapshot.grants).toEqual([expect.objectContaining({ grantId: (acquired as { grantId: string }).grantId, state: 'held' })])
+  })
+
+  it('revokes a held grant and writes an audit event', async () => {
+    const { base, cookie, desktops, deps } = await setup(undefined, undefined, true)
+    const acquired = await desktops!.acquire(desktopClaims(), { node: 'node-a', desktop: 'seat-1', requestId: 'r1' })
+    const grantId = (acquired as { grantId: string }).grantId
+    const response = await fetch(`${base}/admin/api/desktops/actions`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'revoke', grantId }),
+    })
+    expect(response.status).toBe(200)
+    const snapshot = await desktops!.snapshot({ node: 'node-a', desktop: 'seat-1' })
+    expect(snapshot.grants[0]?.state).toBe('stopping')
+    const audit = await deps.audit.query({ action: 'admin.desktops.revoke' })
+    expect(audit.length).toBeGreaterThan(0)
+  })
+
+  it('clears an unavailable resource and writes an audit event', async () => {
+    const { base, cookie, desktops, deps, advance } = await setup(undefined, undefined, true)
+    await desktops!.acquire(desktopClaims(), { node: 'node-a', desktop: 'seat-1', requestId: 'r1' })
+    advance(2_000)
+    await desktops!.sweep()
+    advance(2_000)
+    await desktops!.sweep()
+    const snapshot = await desktops!.snapshot({ node: 'node-a', desktop: 'seat-1' })
+    expect(snapshot.resource?.state).toBe('unavailable')
+    const response = await fetch(`${base}/admin/api/desktops/actions`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'clear', node: 'node-a', desktop: 'seat-1' }),
+    })
+    expect(response.status).toBe(200)
+    const cleared = await desktops!.snapshot({ node: 'node-a', desktop: 'seat-1' })
+    expect(cleared.resource?.state).toBe('available')
+    const audit = await deps.audit.query({ action: 'admin.desktops.clear' })
+    expect(audit.length).toBeGreaterThan(0)
+  })
+
+  it('maps coordination errors and rejects malformed requests', async () => {
+    const { base, cookie } = await setup(undefined, undefined, true)
+    const missing = await fetch(`${base}/admin/api/desktops/actions`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'revoke', grantId: 'nonexistent' }),
+    })
+    expect(missing.status).toBe(404)
+    const malformed = await fetch(`${base}/admin/api/desktops/actions`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'purge' }),
+    })
+    expect(malformed.status).toBe(400)
+    const detail = await fetch(`${base}/admin/api/desktops/detail?node=node-a`, { headers: { cookie } })
+    expect(detail.status).toBe(400)
+  })
+
+  it('reports unavailable when coordination is disabled', async () => {
+    const { base, cookie } = await setup()
+    const list = await fetch(`${base}/admin/api/desktops`, { headers: { cookie } })
+    expect(list.status).toBe(503)
   })
 })

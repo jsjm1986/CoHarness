@@ -412,7 +412,7 @@ describe('Modal', () => {
   it('is absent while closed; Escape and mask click call onClose', () => {
     const onClose = vi.fn()
     const { rerender } = render(
-      <Modal open={false} onClose={onClose} title="Create new workspace">body</Modal>)
+      <Modal open={false} onClose={onClose} title="Create new workspace" closeLabel="Close">body</Modal>)
     expect(screen.queryByRole('dialog')).toBeNull()
     rerender(
       <Modal open onClose={onClose} title="Create new workspace" closeLabel="Configure later" description="Name it." contentClassName="scrolling-content" footer={<button type="button">Create</button>}>
@@ -450,9 +450,9 @@ describe('MobileSheetBackdrop', () => {
 
 describe('ConnectionBanner', () => {
   it('renders only while reconnecting', () => {
-    const { container, rerender } = render(<ConnectionBanner reconnecting={false} />)
+    const { container, rerender } = render(<ConnectionBanner reconnecting={false} label="Reconnecting" />)
     expect(container.firstChild).toBeNull()
-    rerender(<ConnectionBanner reconnecting />)
+    rerender(<ConnectionBanner reconnecting label="正在重连" />)
     expect(container.textContent).toContain('重连')
   })
 })

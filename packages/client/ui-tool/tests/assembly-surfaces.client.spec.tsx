@@ -75,6 +75,7 @@ async function bench(nodes: ToolResultNode[]) {
   })
   // ui-theme's Appearance row binds a durable scope through these two.
   runtime.provide('remote', { $on: () => () => {} })
+  runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn() })
   const locale = new LocaleRuntime(runtime.ctx)

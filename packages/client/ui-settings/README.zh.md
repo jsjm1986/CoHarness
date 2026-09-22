@@ -5,13 +5,23 @@
 设置领域的底座，本身不含任何呈现内容。它提供 `ctx.settingsScope`——每个偏好设置行绑定自己那份持久化命名空间分区所用的宿主传输层；`ctx.settingsSchema`——设置插件使用的同步 schema 重建、校验与不可变路径编辑服务；并声明由注册方填充的设置 slot 类型：`settings.trigger`／`settings.header`／`settings.close`（界面框架内容）、`settings.action`（内容标题栏中的有序操作）、`settings.section`（每项功能一页）、`settings.plugins.tab`（“插件”分区内由各功能持有的页面）和 `settings.onboarding`（由各功能持有的有序页面）。它不依赖任何 `ui-*` 呈现包，因此任何持有偏好设置的功能都能够到它；设置**外壳**——`sidebar.settings` 占位方、它的导航与界面框架——位于 ui-settings-general，因为外壳一旦依赖 ui-sidebar，就会经 ui-layout 与 ui-theme 闭合出一条引用图环路。外壳自身的契约类型出于同一原因与外壳放在一起。
 
 该插件注入 `connection` 与 `remote`，并持有浏览器中唯一的 `settings.describe` 读取方：一面持有完整应答的共享镜像，在每次转发的 `settings/document-updated` 事件与 `connection/reset` 时刷新（首次连接也包含在内——这次读取关闭了「提交落在急切读取与 SSE 订阅之间、其失效通知丢失」的窗口）。schema 操作为同步调用，由 `settingsSchema` 服务承载。`ctx.settingsScope.bind(spec)` 在**调用方**的 context 上返回一个由镜像**派生**的按命名空间 scope——scope 的 disposer 归调用方 fiber 所有，绑定不新增任何线路读取，某一行的激活绝不会阻塞在设置传输层上，且任一时刻每个派生面看到的都是同一份文档 revision。跨命名空间的表面（schema 内省、已服务命名空间目录、`hasDocument`）通过 `ctx.settingsScope.describe()` 读同一面镜像，这是一个读取／折叠面（`getSnapshot`／`subscribe`／`ensure`，另有把写应答折入的 `acceptView`）。scope 快照携带解析后的分区、组合 `base`、原始 `user`、revision、可写性以及 host／内存模式；字段只要出现在 `user` 中即视为覆盖，即使其值与 `base` 相等，`unset` 会清除该覆盖。写入仍归各 scope：单一字段路径，以命名空间 revision 作为 `expectedRevision` 围栏；提交成功的写入将应答折回镜像、不再重读，被拒绝或失败的最新写入触发一次镜像恢复读取，被取代的写入则把恢复留给后继者。若 spec 未提供 `decode`，则分区不是普通对象、未通过其重建后的 schema 校验、或携带本客户端无法重建的 schema 信封时，一律不发布任何值，于是行渲染自己的缺失状态，而不是一份半解码的值。冷启动读取次数由 `apps/web/tests/startup-rpc-budget.e2e.ts` 钉住；客户端代码中新增直连 `settings.describe` 调用即是对它的回归。
+
+
+## 概述
+
+本包使 Web 客户端功能能够公开由宿主设置文档支持的可编辑偏好设置，而无需自行实现传输或 schema 处理。每项功能都可按命名空间读写、原子更新多个字段、校验 schema，并避免静默覆盖并发更改。它还为设置界面框架、页面、标题栏操作、插件标签页和引导流程提供标准扩展点，但自身不渲染任何界面。任何持有偏好设置的功能都可在不依赖呈现包的情况下使用它；设置外壳由单独的包提供。
+
 ## 写入权限
 
 项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。schema 服务对 Host 拥有的文档执行水合与校验，scope 传输层转发各 namespace 分节；该层不拥有偏好值。
+
 ## 模型体验
 
-无。设置领域底座为浏览器提供偏好设置存储与 slot 声明；这里没有任何内容进入模型请求。
+无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

@@ -19,6 +19,25 @@ describe('classifyCiPrScope', () => {
     )).toMatchObject({ runExpensive: false, reason: 'action-only', changedDocsOnly: false, coverageMode: 'skip', snapshotMode: 'skip' })
   })
 
+  it('does not read a run line mentioning the action ref as a pin update', () => {
+    expect(classifyCiPrScope(
+      ['.github/workflows/ci.yml'],
+      '-      - run: pnpm test # pnpm/action-setup@v6\n+      - run: echo skipped # pnpm/action-setup@v6',
+    ).reason).not.toBe('action-only')
+  })
+
+  it('reads golden and provider-owned model assets as test inputs, not docs', () => {
+    expect(classifyCiPrScope(
+      ['examples/acp-agent/tests/snapshots/text-turn/system-prompt.expected.md'],
+      '',
+    ).reason).not.toBe('docs-only')
+    expect(classifyCiPrScope(
+      ['packages/skill/skill-badge/assets/dsh-badge.md'],
+      '',
+    ).reason).not.toBe('docs-only')
+    expect(classifyCiPrScope(['README.md'], '')).toMatchObject({ reason: 'docs-only' })
+  })
+
   it('skips expensive lanes for documentation-only changes', () => {
     expect(classifyCiPrScope(['docs/testing.md', '.agents/notes/proposed.md'], '')).toMatchObject({
       runExpensive: false,
@@ -48,11 +67,11 @@ describe('classifyCiPrScope', () => {
   })
 
   it('keeps expensive lanes for source and dependency changes', () => {
-    expect(classifyCiPrScope(['packages/e2b/e2b/package.json', 'pnpm-lock.yaml'], '')).toMatchObject({
+    expect(classifyCiPrScope(['packages/subprocess/subprocess/package.json', 'pnpm-lock.yaml'], '')).toMatchObject({
       runExpensive: true,
       reason: 'full',
       changedSourceFiles: [],
-      changedPackageFiles: ['packages/e2b/e2b/package.json', 'pnpm-lock.yaml'],
+      changedPackageFiles: ['packages/subprocess/subprocess/package.json', 'pnpm-lock.yaml'],
       changedDocsOnly: false,
       coverageMode: 'full',
       snapshotMode: 'full',
@@ -118,9 +137,27 @@ describe('classifyCiPrScope', () => {
       runExpensive: false,
       coverageMode: 'skip',
       snapshotMode: 'skip',
-      compatMode: 'full',
+      compatMode: 'skip',
       pythonMode: 'full',
       windowsMode: 'skip',
+    })
+  })
+
+  it('runs only the Admin lane for a standalone admin page change', () => {
+    expect(classifyCiPrScope([
+      'gateway/admin-ui/src/pages/UsersPage.tsx',
+    ], '')).toMatchObject({
+      reason: 'consumer-only',
+      gatewayMode: 'skip',
+      adminUiMode: 'full',
+      compatMode: 'skip',
+      coverageMode: 'skip',
+      snapshotMode: 'skip',
+      windowsMode: 'skip',
+    })
+    expect(classifyCiPrScope(['gateway/src/server.ts'], '')).toMatchObject({
+      gatewayMode: 'full',
+      adminUiMode: 'skip',
     })
   })
 
@@ -131,7 +168,7 @@ describe('classifyCiPrScope', () => {
       reason: 'full',
       coverageMode: 'full',
       compatMode: 'full',
-      pythonMode: 'skip',
+      pythonMode: 'full',
       windowsMode: 'full',
     })
   })
@@ -182,7 +219,7 @@ describe('classifyCiPrScope', () => {
       expect(classifyCiPrScope([path], '')).toMatchObject({
         reason: 'full',
         coverageMode: 'full',
-        gatewayMode: 'skip',
+        gatewayMode: 'full',
       })
     }
   })
@@ -212,7 +249,7 @@ describe('classifyCiPrScope', () => {
         reason: 'full',
         coverageMode: 'full',
         gatewayMode: 'full',
-        adminUiMode: 'skip',
+        adminUiMode: plugin === 'dsh-model-governance' ? 'full' : 'skip',
       })
     }
   })
@@ -224,8 +261,8 @@ describe('classifyCiPrScope', () => {
       adminUiMode: 'skip',
     })
     expect(classifyCiPrScope(['gateway/admin-ui/src/App.tsx'], '')).toMatchObject({
-      reason: 'full',
-      gatewayMode: 'full',
+      reason: 'consumer-only',
+      gatewayMode: 'skip',
       adminUiMode: 'full',
     })
     expect(classifyCiPrScope(['packages/util/timeout/package.json'], '')).toMatchObject({

@@ -31,5 +31,6 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   '@deepseek-ai/cordis/inspect-query',
   '@deepseek-ai/cordis/inspect-query-resolved',
   'llm/adapters-updated',
+  'permission-presets/catalog-changed',
   'settings/document-updated',
 ] as const

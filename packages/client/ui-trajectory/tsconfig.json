@@ -9,28 +9,37 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../locale"
-    },
-    {
-      "path": "../ui-conversation"
     },
     {
       "path": "../runtime"
     },
     {
-      "path": "../../core/agent"
+      "path": "../ui-conversation"
     },
     {
-      "path": "../../core/tools"
+      "path": "../ui-primitives"
+    },
+    {
+      "path": "../ui-slots"
     },
     {
       "path": "../../compaction/compaction"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

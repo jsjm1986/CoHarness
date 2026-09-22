@@ -232,7 +232,8 @@ function storageFrom(value: unknown): SessionStorageMetadata {
   return {
     meta: {
       id: SessionId(header.id),
-      version: header.version,
+      // The physical generation version stays visible until adoption migrates it.
+      version: header.version as SessionHeader['version'],
       createdAt: header.createdAt,
       ...(header.cwd === undefined ? {} : { cwd: header.cwd }),
       ...(header.parentSession === undefined ? {} : { parentSession: SessionId(header.parentSession) }),
@@ -414,11 +415,31 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   }
 
   /** PostgreSQL owns no independent local artifact per session. */
-  locate(_meta: SessionHeader): SessionLocation | undefined {
+  override locate(_meta: SessionHeader): SessionLocation | undefined {
     return undefined
   }
 
-  create(meta: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
+  override materializeDetached(id: SessionId): Promise<void> {
+    return this.coordinator.materializeDetached(id)
+  }
+
+  override discardDetached(id: SessionId): Promise<void> {
+    return this.coordinator.discardDetached(id)
+  }
+
+  override listPending(): readonly SessionStorageMetadata[] {
+    return this.coordinator.listPending()
+  }
+
+  override isPending(id: SessionId): boolean {
+    return this.coordinator.isPending(id)
+  }
+
+  override liveStorage(id: SessionId): Promise<SessionStorageMetadata | undefined> {
+    return this.coordinator.liveStorage(id)
+  }
+
+  override createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
     const creation = this.rememberCreation(storageForCreate(meta, inheritedEventCount))
     return this.coordinator.create(meta, inheritedEventCount).catch((error: unknown) => {
       if (creation !== undefined) this.forgetCreation(meta.id, creation)
@@ -427,7 +448,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   }
 
   /* jscpd:ignore-start -- each persistence provider repeats the narrow Service Definition adapter. */
-  append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+  override append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }
 
@@ -498,15 +519,15 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return this.coordinator.prepare(id, signal)
   }
 
-  load(id: SessionId): Promise<SessionInspection> {
+  override load(id: SessionId): Promise<SessionInspection> {
     return this.coordinator.load(id)
   }
 
-  inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
+  override inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
     return this.coordinator.inspect(id, signal)
   }
 
-  readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
+  override readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
@@ -586,7 +607,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     }
     let events: SessionEvent[]
     try {
-      events = eventsFrom(value.events, header.version !== SESSION_FORMAT_VERSION)
+      events = eventsFrom(value.events, (header.version as number) !== SESSION_FORMAT_VERSION)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
@@ -711,6 +732,20 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     signal?: AbortSignal,
     responseLimit = GATEWAY_SESSION_RESPONSE_MAX_BYTES,
   ): Promise<unknown> {
+    return this.exchange(path, init, signal, responseLimit, false)
+  }
+
+  private async optional(path: string, signal?: AbortSignal, init: GatewayRuntimeRequestInit = {}): Promise<unknown> {
+    return this.exchange(path, init, signal, GATEWAY_SESSION_RESPONSE_MAX_BYTES, true)
+  }
+
+  private async exchange(
+    path: string,
+    init: GatewayRuntimeRequestInit,
+    signal: AbortSignal | undefined,
+    responseLimit: number,
+    notFoundAsUndefined: boolean,
+  ): Promise<unknown> {
     signal?.throwIfAborted()
     const deadline = this.signal(signal)
     try {
@@ -719,6 +754,10 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
         response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
       } catch (error: unknown) {
         throw classifyGatewayReadError(error, signal, deadline.signal)
+      }
+      if (notFoundAsUndefined && response.status === 404) {
+        await response.body?.cancel().catch(() => {})
+        return undefined
       }
       let value: unknown
       try {
@@ -738,36 +777,21 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     }
   }
 
-  private async optional(path: string, signal?: AbortSignal, init: GatewayRuntimeRequestInit = {}): Promise<unknown> {
-    signal?.throwIfAborted()
-    const deadline = this.signal(signal)
+  private storedContents(value: Record<string, unknown>, id: SessionId): { storage: SessionStorageMetadata; events: SessionEvent[] } {
+    let storage: SessionStorageMetadata
     try {
-      let response: Response
-      try {
-        response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
-      } catch (error: unknown) {
-        throw classifyGatewayReadError(error, signal, deadline.signal)
-      }
-      if (response.status === 404) {
-        await response.body?.cancel().catch(() => {})
-        return undefined
-      }
-      let value: unknown
-      try {
-        value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES, deadline.signal)
-      } catch (error: unknown) {
-        if (!response.ok) {
-          throwGatewayResponseError(response, undefined)
-        }
-        throw classifyGatewayReadError(error, signal, deadline.signal)
-      }
-      if (!response.ok) {
-        throwGatewayResponseError(response, value)
-      }
-      return value
-    } finally {
-      deadline.dispose()
+      storage = storageFrom(value.header)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session header')
     }
+    if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
+    let events: SessionEvent[]
+    try {
+      events = eventsFrom(value.events, (storage.meta.version as number) !== SESSION_FORMAT_VERSION)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session event list')
+    }
+    return { storage, events }
   }
 
   async loadStored(id: SessionId, signal?: AbortSignal): Promise<StoredPrefix<never> | undefined> {
@@ -779,19 +803,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (typeof value.revision !== 'string' || value.revision === '') {
       throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
     }
-    let storage: SessionStorageMetadata
-    try {
-      storage = storageFrom(value.header)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session header')
-    }
-    if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
-    let events: SessionEvent[]
-    try {
-      events = eventsFrom(value.events, storage.meta.version !== SESSION_FORMAT_VERSION)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session event list')
-    }
+    const { storage, events } = this.storedContents(value, id)
     return {
       ...storage,
       events,
@@ -869,20 +881,13 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       signal,
     ))
     if (value === undefined) return undefined
-    let storage: SessionStorageMetadata
-    try {
-      storage = storageFrom(value.header)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session header')
-    }
-    if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
-    let events: SessionEvent[]
-    try {
-      events = eventsFrom(value.events, storage.meta.version !== SESSION_FORMAT_VERSION)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session event list')
-    }
+    const { storage, events } = this.storedContents(value, id)
     return { ...storage, events }
+  }
+
+  /** Durably publish a header-only artifact without inventing an event row. */
+  async materializeHeader(storage: SessionStorageMetadata): Promise<void> {
+    await this.appendBatch(storage, [], false)
   }
 
   async appendBatch(storage: SessionStorageMetadata, events: readonly SessionEvent[], isMaterialized: boolean): Promise<void> {
@@ -922,7 +927,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     })
   }
 
-  async list(signal?: AbortSignal): Promise<SessionHeader[]> {
+  override async listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
     return (await this.listSnapshots(signal)).map(snapshot => snapshot.header)
   }
 
@@ -930,7 +935,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return this.readStoredRevision(id, signal)
   }
 
-  async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+  override async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     const value = record(await this.request('/internal/runtime/session/list', {}, signal))
     if (!Array.isArray(value?.items)) throw new Error('Gateway returned an invalid session list')
     return value.items.map((candidate) => {

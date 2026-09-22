@@ -4,6 +4,10 @@
 
 面向模型的 **`workflow` 工具**：运行一段扇出 subagent 的 JavaScript 编排脚本，并返回脚本的最终值。本包负责基于 [`ctx.workflowEngine`](../workflow/README.zh.md) 定义面向模型的 schema 和运行生命周期；脚本解析、执行、上限与取消位于 seam 之后，消费方仍负责面向父级的 schema 和结果包络。
 
+## 概述
+
+`dsh-tool-workflow` 让模型运行 JavaScript 编排脚本，把工作委派给多个 subagent，并返回脚本的最终 JSON 值。仅当用户明确要求工作流或大型多 agent（智能体）编排时使用；一两项委派应使用普通 subagent 调用。父级轮次会等待所有委派任务结束；取消或异常完成会返回错误，而不是部分成功。部署方可以通过 `toolName` 重命名工具，并通过 `maxResultChars` 限制渲染结果文本。
+
 ## 模型看到的内容
 
 工具有三个参数：`meta`（必需的身份数据：`name`、`description` 和可选的进度注解）、`script`（必需的纯 JavaScript 脚本体，不含 `export const meta` 语句；工具描述包含完整的编写约定）以及 `args`（可选 JSON 对象，作为全局变量 `args` 向脚本公开；裸列表应包装到字段中，使协议 schema 如实表达形态）。插件还会贡献一个 `tool:<toolName>` 系统提示词段，其中包含使用策略：只有用户明确要求工作流／大型编排时才使用该工具；一两项委派优先使用普通 subagent 调用。这遵循工具指导随工具插件交付、绝不放入部署 persona 的约定。
@@ -31,7 +35,7 @@
 
 ### 系统提示词
 
-#### 模型看到的内容
+#### 模型看到什么
 
 在该插件的注册作用域内，每个父级请求都会收到下方的工作流指导。作用域工具限制可以隐藏 schema，而不移除这段独立注册的指导。
 
@@ -47,13 +51,13 @@ Use the <toolName> tool ONLY when the user explicitly asks for a workflow or for
 
 #### KV Cache 影响
 
-只要插件作用域和指导文本不变，前缀就保持稳定。启用或 dispose 可能会使从该提示词段起的缓存复用失效。
+只要插件作用域与指导文本不变，前缀就保持稳定。启用或 dispose 可能会使从该提示词段起的缓存复用失效。
 
 ### 工具 schema
 
-#### 模型看到的内容
+#### 模型看到什么
 
-工具可见时，已生成的默认 [`workflow` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-workflow) 包含完整的 JavaScript 钩子与元数据约定；`toolName` 可以重命名该定义，模型会提交脚本、元数据和可选 args。
+工具可见时，已生成的默认 [`workflow` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-workflow) 包含完整的 JavaScript 钩子与元数据约定；`toolName` 可以重命名该定义，模型会提交脚本、元数据与可选 args。
 
 #### Token 影响
 
@@ -61,13 +65,13 @@ Use the <toolName> tool ONLY when the user explicitly asks for a workflow or for
 
 #### KV Cache 影响
 
-只要 `toolName`、定义和可见性不变，前缀就保持稳定。重命名、插件生命周期或作用域限制可能会使从该 schema 起的缓存复用失效。
+只要 `toolName`、定义与可见性不变，前缀就保持稳定。重命名、插件生命周期或作用域限制可能会使从该 schema 起的缓存复用失效。
 
 ### 工具调用历史与结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-由模型编写的完整脚本、元数据和 args 会保留在 assistant 工具调用中。成功结果精确为 `workflow "<name>" completed (<count> agent<optional-s>).`、换行、`Return value:`、换行，以及经过美化打印且依赖数据的 JSON；达到上限时，会在新行添加 `… [truncated: <omitted> more characters]`。失败结果精确为 `Error: workflow run was cancelled`（可以追加后缀 ` (<error>)`）、`Error: workflow run failed: <error-or-unknown error>` 或防御性的 `Error: workflow run ended abnormally (<reason>)`；没有所属 agent 的调用变为 `Error: workflow tool requires a calling agent (exec.agent was undefined)`。中间子 agent 消息会被省略。
+由模型编写的完整脚本、元数据与 args 会保留在 assistant 工具调用中。成功结果精确为 `workflow "<name>" completed (<count> agent<optional-s>).`、换行、`Return value:`、换行，以及美化打印且依赖数据的 JSON；达到上限时，会在新行添加 `… [truncated: <omitted> more characters]`。失败结果精确为 `Error: workflow run was cancelled`（可以追加后缀 ` (<error>)`）、`Error: workflow run failed: <error-or-unknown error>` 或防御性的 `Error: workflow run ended abnormally (<reason>)`；没有所属 agent 的调用变为 `Error: workflow tool requires a calling agent (exec.agent was undefined)`。中间子 agent 消息会被省略。
 
 #### Token 影响
 

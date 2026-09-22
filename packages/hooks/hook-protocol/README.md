@@ -6,6 +6,10 @@ The **shared core** of the Claude Code / Codex hook wire protocol. NOT a cordis 
 
 Codex deliberately reimplements a *subset* of the Claude Code hook protocol — the same `hooks.json` matcher-group shape, the same exit-code/stdout output contract, the same command-hook execution model. The genuinely-shared parts live here; each bridge owns only what differs.
 
+## Summary
+
+`dsh-hook-protocol` makes both bridges handle your hooks identically: it defines what a hook can do and what happens when it runs. You never install or configure it yourself — choose `dsh-hooks-claude-code` or `dsh-hooks-codex`, point it at your existing `hooks.json`, and these rules apply to your hooks. Through either bridge, a hook can block a prompt or tool call with a message the model sees, attach extra context to the conversation, or ask the run to stop. Only command hooks run; `http`, `mcp_tool`, `prompt`, and `agent` handlers are skipped with a warning.
+
 ## What's shared (here) vs. per-dialect (the bridges)
 
 | Concern | Here (`dsh-hook-protocol`) | The bridge (`dsh-hooks-claude-code` / `-codex`) |
@@ -33,11 +37,11 @@ Hook invocation/result records must sit inside an open turn. `UserPromptSubmit`,
 
 ## Model Experience
 
-Indirectly, through `dsh-hooks-claude-code` and `dsh-hooks-codex`, which can turn parsed hook output into prompt context, blocked outcomes, or continuation feedback.
+Indirectly, through `dsh-hooks-claude-code` and `dsh-hooks-codex`, which are the only consumers that render decoded hook output into model context.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the named consumers own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

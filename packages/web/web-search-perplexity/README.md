@@ -6,6 +6,10 @@ A [Perplexity](https://perplexity.ai)-backed `WebSearchProvider` for the harness
 
 This is an **implementation** package: it registers a provider into `ctx.web`, it does not own the key and it does not register a model-facing tool. Like `@deepseek-ai/dsh-llm-deepseek`, it is a function/namespace plugin (`inject: ['web']`). The OpenAI-compatible wire shape is a provider-private detail — it does **not** make this provider depend on `ctx.llm`.
 
+## Summary
+
+With `dsh-web-search-perplexity`, the harness searches the web through Perplexity and gets a model-generated answer plus citeable sources in one call. Choose it when a deployment has a Perplexity API key and wants a generated answer. Perplexity has no result-count control, so the returned sources are truncated to the requested bound after the fact. When Perplexity omits structured result metadata, sources fall back to URL-only citations. The model-facing `web_search` tool lives in `dsh-tool-web`.
+
 ## Config
 
 | Key | Default | Meaning |
@@ -28,6 +32,10 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
 
 `content` ← `choices[0].message.content` (the generated answer). `sources[]` prefers the structured `search_results[]` (`url`, `title`, `snippet`, `publishedAt` ← `date`), falling back to the URL-only `citations[]` array only when `search_results` is absent — those sources carry just a `url`, which is why `title`/`snippet`/`publishedAt` are optional on the seam. Provider failures surface as `WebError` `WEB_PROVIDER_ERROR`; an aborted request surfaces as `WEB_ABORTED`. HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`. Perplexity has no result-count control, so `maxResults` is enforced by the seam (truncating `sources[]` and setting `truncated`).
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each query is one stateless provider request mapped into normalized results; no search state is retained between calls.
+
 ## Model Experience
 
 ### Auxiliary Perplexity request
@@ -48,7 +56,7 @@ Independent of the conversation request cache. An identical query under the same
 
 #### What the model sees
 
-Through [`dsh-tool-web`](../tool-web/README.md), the conversation model sees the generated answer plus structured result metadata or URL-only citations. This provider's exact failures are `Perplexity search aborted`, `Perplexity search request failed: <error>`, and `Perplexity returned an unprocessable response body: <error>`; HTTP failures preserve the provider message. The consumer owns the error wrapper.
+Through `dsh-tool-web`, the conversation model sees the generated answer plus structured result metadata or URL-only citations. This provider's exact failures are `Perplexity search aborted`, `Perplexity search request failed: <error>`, and `Perplexity returned an unprocessable response body: <error>`; HTTP failures preserve the provider message. The consumer owns the error wrapper.
 
 #### Token effect
 

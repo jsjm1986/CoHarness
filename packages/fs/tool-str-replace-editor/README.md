@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed with persistent Bash, one-shot Bash, sandboxed Bash, or another terminal surface.
 
+## Summary
+
+`dsh-tool-str-replace-editor` provides a standalone model-facing `str_replace_editor` tool over `ctx.fs`: `view` shows numbered file content or a shallow directory listing, `create` makes a new file, `str_replace` applies a unique literal replacement, and `insert` adds lines at a chosen boundary. It is composable with persistent Bash, one-shot Bash, sandboxed Bash, or another terminal surface. Mutations obey the same read-before-edit policy and sandbox fence as the rest of the fs family, enforced by whichever backend and policy plugins are mounted. Choose it when a deployment wants the Claude-Code-style single editor tool with absolute paths; the `dsh-tool-fs` package provides the alternative `read`/`write`/`edit` suite.
+
 ## Config
 
 | Key | Default | Meaning |
@@ -14,6 +18,10 @@ Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed w
 ## Tool
 
 The schema provides `view`, `create`, `str_replace`, and `insert` over absolute paths. File views use one-based line numbers and preserve content tabs, so displayed text remains valid literal replacement input; directory views omit hidden, dependency, and Python-cache entries and descend two levels. A metadata miss from `view`, `str_replace`, or `insert` records confirmed absence before returning `FS_NOT_FOUND`, so a later `create` can recover an externally deleted path through the mounted policy's guarded-create flow; absence never authorizes `str_replace` or `insert`. Replacement requires one unique literal match and reports errors only in the public `old_str` vocabulary. Insert follows the selected zero-based insertion boundary without adding an implicit trailing newline. Mutations preserve tabs outside the requested edit.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The editor adapts model calls onto `ctx.fs`; all file state belongs to the mounted provider.
 
 ## Model Experience
 

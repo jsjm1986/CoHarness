@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import type { PermissionSelect as PermissionSelectValue } from '@deepseek-ai/dsh-permission-presets/client'
+import type { PermissionCatalog, PermissionSelection as PermissionSelectValue } from '@deepseek-ai/dsh-permission-presets/client'
 import { IconChevronDownOutline14, Menu, RiskConfirmation, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
@@ -60,7 +60,7 @@ function displayName(name: string): string {
 }
 
 function optionLabel(
-  option: PermissionSelectValue['options'][number],
+  option: PermissionCatalog['options'][number],
   t: ComposerBarProps['t'],
 ): string {
   if (option.value === 'read-only') return t('access.preset.readOnly')
@@ -71,6 +71,8 @@ function optionLabel(
 
 export interface PermissionSelectProps {
   value: PermissionSelectValue | undefined
+  /** Process-level option table; `undefined` while the remote catalog read is unsettled. */
+  catalog: PermissionCatalog | undefined
   locked: boolean
   command: (line: string) => Promise<boolean>
   /** The owning bar's locale seat, passed down as a plain prop. */
@@ -79,7 +81,7 @@ export interface PermissionSelectProps {
   onOpenSettings?: (section: 'model' | 'reasoning' | 'permission') => void
 }
 
-export function PermissionSelect({ value, locked, command, t, presentation = 'trigger', onOpenSettings }: PermissionSelectProps) {
+export function PermissionSelect({ value, catalog, locked, command, t, presentation = 'trigger', onOpenSettings }: PermissionSelectProps) {
   const [pick, setPick] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
@@ -93,13 +95,13 @@ export function PermissionSelect({ value, locked, command, t, presentation = 'tr
     setConfirmation(null)
   }, [locked, value])
 
-  if (value === undefined) return null
+  if (value === undefined || catalog === undefined) return null
 
   const currentValue = pick ?? value.currentValue
-  const current = value.options.find(option => option.value === currentValue)
+  const current = catalog.options.find(option => option.value === currentValue)
   const busy = pick !== null || confirmation !== null
 
-  const options = value.options
+  const options = catalog.options
     .filter(o => o.value !== 'custom')
     .map((option) => {
       const icon = permissionGlyph(option.value)
@@ -142,6 +144,7 @@ export function PermissionSelect({ value, locked, command, t, presentation = 'tr
     <RiskConfirmation
       open={confirmation !== null}
       title={t('access.confirm.title')}
+      closeLabel={t('close')}
       description={t('access.confirm.description')}
       acknowledgeLabel={t('access.confirm.acknowledge')}
       cancelLabel={t('access.confirm.cancel')}

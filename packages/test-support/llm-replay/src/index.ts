@@ -1,7 +1,8 @@
 /**
  * Keyless snapshot-test LLM replay. It derives one model-call script per
- * recorded session from `assistant/chunk` events and explicitly marked local
- * compaction calls, then binds fresh live sessions to parent/child scripts by
+ * recorded session from the embedded Assistant streams of durable
+ * `assistant/message` and `assistant/attempt` events plus explicitly marked
+ * local compaction calls, then binds fresh live sessions to parent/child scripts by
  * first-call order. Throw and hang cases require an explicit override because
  * a session log cannot reconstruct them alone.
  * @module @deepseek-ai/dsh-llm-replay
@@ -11,8 +12,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter as pathDelimiter } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
-import { decodeSeqRanges, decodeStorageRecord, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
+import {
+  SESSION_FORMAT_VERSION,
+  SessionLogOffset,
+  decodeChunkRow,
+  type SessionEvent,
+} from '@deepseek-ai/dsh-session'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
+import {
+  SessionFormatUnsupportedMigrationError,
+  sessionFormatCatalog,
+} from '@deepseek-ai/dsh-session-format-catalog'
 import type {
   ContentBlock,
   GenerateOptions,
@@ -25,9 +35,7 @@ import type {
   StreamChunk,
   TokenUsage,
 } from '@deepseek-ai/dsh-llm'
-import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
-
-const PACKED_CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
+import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantStream, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 
 /**
  * One recorded model call. `throw` may replay prefix chunks before failing;
@@ -93,8 +101,8 @@ export interface ReplayConfig {
   /**
    * Optional sidecar for the PRIMARY session: a bare `ReplayEntry[]` replaces
    * the derived script; `{ patches }` keeps it and swaps the named call
-   * indexes ({@link ReplayOverrideDoc}). Used by single-session scenarios not
-   * expressible as `assistant/chunk` (throw-before-chunk, cancel/hang,
+   * indexes ({@link ReplayOverrideDoc}). Used by single-session scenarios the
+   * durable stream cannot express (throw-before-chunk, cancel/hang,
    * injected transient failures). Absent for normal and nested scenarios.
    */
   overrideFile?: string
@@ -157,28 +165,66 @@ export interface SessionScript {
   primary: boolean
 }
 
+const PACKED_CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
+
+if (sessionFormatCatalog.currentVersion !== SESSION_FORMAT_VERSION) {
+  throw new Error(
+    `llm-replay: format catalog v${sessionFormatCatalog.currentVersion} `
+    + `does not match Session v${SESSION_FORMAT_VERSION}`,
+  )
+}
+
+interface ParsedSessionFixture {
+  readonly id: string
+  readonly createdAt: number
+  readonly inheritedEventCount: SessionLogOffsetType
+  readonly events: SessionEvent[]
+  readonly artifact: ReturnType<ReturnType<typeof sessionFormatCatalog.createRestore>['finish']>
+  readonly sourceHeader: Readonly<Record<string, unknown>>
+}
+
 /**
- * Parse a session `.jsonl` buffer into its event list. Line 0 is the session
- * header (a `{type:'session',…}` record), every subsequent non-empty line is a
- * {@link SessionEvent} or a packed chunk row (expanded back into its events, so
- * a fixture recorded with `packChunks` on derives the same script). Storage
- * range-encoded `sourceEventSeqs` values are expanded as well. The header is
- * skipped; malformed lines fail loud.
+ * Parse a session `.jsonl` buffer into current events. The first non-empty
+ * line is the physical header; every subsequent non-empty line is one stored
+ * row — a plain event or, in released (≤v3) bodies, a packed chunk row.
+ * Projected rows that omit the `seq`/`time` envelope receive deterministic
+ * dense sequences and zero timestamps. The decoded events then pass through
+ * the build-static format catalog, so replay always consumes the current
+ * generation. Malformed lines fail loud with their 1-based line number.
  * @param text - the raw `.jsonl` file contents.
- * @returns every event after the header, in log order.
+ * @returns every migrated current event, in log order.
  */
 export function parseSessionLog(text: string): SessionEvent[] {
-  const events: SessionEvent[] = []
-  let nextSeq: SessionLogOffsetType = SessionLogOffset(0)
-  let headerSkipped = false
-  // Projected fixtures omit persistence envelopes; synthesize them while
-  // decoding so replay still receives complete SessionEvent values.
+  return parseSessionFixture(text).events
+}
+
+/**
+ * Read replay identity, ordering, and fork-seed facts from a session `.jsonl`
+ * buffer. The complete artifact is decoded and migrated, so the returned
+ * inherited-event count indexes into {@link parseSessionLog}'s output.
+ * @param text - the raw `.jsonl` file contents.
+ * @returns the migrated header's `id`, `createdAt`, and inherited-event count.
+ */
+export function parseSessionHeader(text: string): {
+  id: string
+  createdAt: number
+  inheritedEventCount: SessionLogOffsetType
+} {
+  const { id, createdAt, inheritedEventCount } = parseSessionFixture(text)
+  return { id, createdAt, inheritedEventCount }
+}
+
+/** Parse, complete, decode, and migrate one projected snapshot artifact without writing its source. */
+function parseSessionFixture(text: string): ParsedSessionFixture {
+  let headerLineNumber: number | undefined
+  let sourceHeader: Record<string, unknown> | undefined
+  let restore: ReturnType<typeof sessionFormatCatalog.createRestore> | undefined
+  const rowLines: number[] = []
+  const eventLines: number[] = []
+  let bodyKind: 'complete' | 'projected' | undefined
+  let nextSeq = 0
   for (const [index, line] of text.split(/\r?\n/).entries()) {
     if (line.trim().length === 0) continue
-    if (!headerSkipped) {
-      headerSkipped = true
-      continue
-    }
     let value: unknown
     try {
       value = JSON.parse(line) as unknown
@@ -188,66 +234,226 @@ export function parseSessionLog(text: string): SessionEvent[] {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
       throw new Error(`session snapshot line ${index + 1} must be a JSON object`)
     }
-    const record = value as Record<string, unknown>
+    const lineNumber = index + 1
+    const recordValue = value as Record<string, unknown>
+    if (restore === undefined) {
+      headerLineNumber = lineNumber
+      sourceHeader = recordValue
+      try {
+        restore = sessionFormatCatalog.createRestore(normalizeProjectedHeader(recordValue), {
+          recovery: 'strict',
+          validation: 'current',
+        })
+      } catch (error: unknown) {
+        throw fixtureFormatError(error, lineNumber, [], [])
+      }
+      continue
+    }
+    const record = normalizeProjectedRow(recordValue)
     const packed = PACKED_CHUNK_ROW_TYPES.has(record.type as string)
     const seqKey = packed ? 'seq0' : 'seq'
     const timeKey = packed ? 'time0' : 'time'
-    if (!Object.hasOwn(record, seqKey)) record[seqKey] = nextSeq
-    if (!Object.hasOwn(record, timeKey)) record[timeKey] = 0
-    let decoded: SessionEvent[]
-    try {
-      if (Object.hasOwn(record, 'sourceEventSeqs')) {
-        record.sourceEventSeqs = decodeSeqRanges(record.sourceEventSeqs)
-      }
-      decoded = decodeStorageRecord(record)
-    } catch (error) {
-      /* v8 ignore next -- decodeStorageRecord throws Error instances. */
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`session snapshot line ${index + 1}: ${detail}`, { cause: error })
+    const hasSeq = Object.hasOwn(record, seqKey)
+    const hasTime = Object.hasOwn(record, timeKey)
+    if (hasSeq !== hasTime) {
+      throw new Error(
+        `session snapshot line ${lineNumber} must contain both ${seqKey} and ${timeKey}, or neither`,
+      )
     }
-    events.push(...decoded)
-    nextSeq = SessionLogOffset(nextSeq + decoded.length)
+    const currentKind = hasSeq ? 'complete' : 'projected'
+    if (bodyKind !== undefined && currentKind !== bodyKind) {
+      throw new Error(
+        `session snapshot line ${lineNumber} cannot mix projected and complete body rows`,
+      )
+    }
+    bodyKind = currentKind
+    if (currentKind === 'projected') {
+      record[seqKey] = nextSeq
+      record[timeKey] = 0
+    }
+    const cardinality = physicalRowCardinality(record)
+    rowLines.push(lineNumber)
+    eventLines.push(...Array.from({ length: cardinality }, () => lineNumber))
+    nextSeq += cardinality
+    try {
+      // Packed chunk rows are a released storage record, not one event row:
+      // expand them into their member events, then feed each member through
+      // the same row decoder as an ordinary assistant/chunk event.
+      const rows = packed ? decodeChunkRow(record) : [record]
+      for (const row of rows) restore.decodeRow(row)
+    } catch (error: unknown) {
+      throw fixtureFormatError(error, headerLineNumber as number, rowLines, eventLines, rowLines.length - 1)
+    }
   }
-  return events
+  if (restore === undefined || sourceHeader === undefined || headerLineNumber === undefined) {
+    throw new Error('session snapshot must start with a session header')
+  }
+  try {
+    return parsedSessionFixture(restore.finish(), sourceHeader)
+  } catch (error: unknown) {
+    throw fixtureFormatError(error, headerLineNumber, rowLines, eventLines)
+  }
+}
+
+/** Materialize the common replay view from a migrated artifact. */
+function parsedSessionFixture(
+  artifact: ParsedSessionFixture['artifact'],
+  sourceHeader: Readonly<Record<string, unknown>>,
+): ParsedSessionFixture {
+  return {
+    id: artifact.header.id,
+    createdAt: artifact.header.createdAt,
+    inheritedEventCount: SessionLogOffset(artifact.inheritedEventCount),
+    events: [...artifact.events] as unknown as SessionEvent[],
+    artifact,
+    sourceHeader,
+  }
 }
 
 /**
- * Read replay identity, ordering, and fork-seed facts from the JSONL header.
- *
- * @param text - the raw `.jsonl` file contents (only the header line is read).
- * @returns the header's `id`, `createdAt`, and inherited-event count, defaulted when absent.
+ * Convert one persisted or projected snapshot fixture to the current physical format in memory for expected-output comparison.
+ * Projected cwd and request-tool tokens remain tokens for comparison with a fresh run.
+ * @param text - one complete Session fixture.
+ * @returns current-format JSONL with complete event envelopes; the input string and source file remain unchanged.
  */
-export function parseSessionHeader(text: string): {
-  id: string
-  createdAt: number
-  inheritedEventCount: SessionLogOffsetType
-} {
-  const firstLine = text.split('\n').find(line => line.trim().length > 0) ?? '{}'
-  const parsed = JSON.parse(firstLine) as { id?: unknown; createdAt?: unknown; seedLength?: unknown }
+export function prepareSessionSnapshotFixtureForComparison(text: string): string {
+  const parsed = parseSessionFixture(text)
+  return encodeCurrentSessionSnapshotFixture(text, parsed)
+}
+
+/** Restore fixture tokens materialized only to satisfy released-format validation. */
+function restoreProjectedRequestHeader(
+  target: Readonly<Record<string, unknown>>,
+  source: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const targetData = target['data'] as Record<string, unknown>
+  const sourceData = source['data'] as Record<string, unknown>
+  const targetHeader = targetData['header'] as Record<string, unknown>
+  const sourceHeader = sourceData['header'] as Record<string, unknown>
+  const sourceTools = sourceHeader['tools']
+  if (sourceTools !== '{{tools}}') return target
   return {
-    id: typeof parsed.id === 'string' ? parsed.id : '',
-    createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : 0,
-    inheritedEventCount: SessionLogOffset(typeof parsed.seedLength === 'number' ? parsed.seedLength : 0),
+    ...target,
+    data: {
+      ...targetData,
+      header: { ...targetHeader, tools: sourceTools },
+    },
   }
+}
+
+/** Encode one migrated fixture while retaining projected cwd and request-tool tokens. */
+function encodeCurrentSessionSnapshotFixture(text: string, parsed: ParsedSessionFixture): string {
+  const header = {
+    ...sessionFormatCatalog.encodeCurrentHeader(
+      parsed.artifact.header,
+      parsed.artifact.inheritedEventCount,
+    ),
+  }
+  const sourceCwd = parsed.sourceHeader['cwd']
+  if (typeof sourceCwd === 'string' && /^\{\{cwd\}\}(?:\/|$)/.test(sourceCwd)) header['cwd'] = sourceCwd
+  const sourceRequests = text.split(/\r?\n/).filter(line => line.trim().length > 0).slice(1)
+    .map(line => JSON.parse(line) as Record<string, unknown>)
+    .filter(row => row['type'] === 'request/header')
+  let requestIndex = 0
+  const output = [
+    JSON.stringify(header),
+    ...parsed.artifact.events.map((event) => {
+      const encoded = sessionFormatCatalog.encodeCurrentEvent(event)
+      if (event.type !== 'request/header') return JSON.stringify(encoded)
+      const source = sourceRequests[requestIndex++] as Record<string, unknown>
+      return JSON.stringify(restoreProjectedRequestHeader(encoded, source))
+    }),
+  ].join('\n')
+  return text.endsWith('\n') ? `${output}\n` : output
+}
+
+/** Omit exact request-tool sidecar tokens and materialize projected tool names for validation. */
+function normalizeProjectedRow(source: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const record = { ...source }
+  if (record['type'] !== 'request/header') return record
+  const data = record['data']
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return record
+  const header = (data as Record<string, unknown>)['header']
+  if (header === null || typeof header !== 'object' || Array.isArray(header)) return record
+  const tools = (header as Record<string, unknown>)['tools']
+  const normalizedHeader = { ...header as Record<string, unknown> }
+  if (tools === '{{tools}}') {
+    delete normalizedHeader['tools']
+  } else if (Array.isArray(tools) && tools.length > 0
+    && tools.every((tool): tool is string => typeof tool === 'string' && tool.length > 0)) {
+    normalizedHeader['tools'] = tools.map(name => ({ name, description: '', parameters: {} }))
+  } else {
+    return record
+  }
+  record['data'] = { ...data, header: normalizedHeader }
+  return record
+}
+
+/** Materialize fixture-only header omissions and tokens before physical validation. */
+function normalizeProjectedHeader(header: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const normalized = { ...header }
+  if (normalized['version'] === 0 && !Object.hasOwn(header, 'delegationDepth')) {
+    normalized['delegationDepth'] = 0
+  }
+  if (typeof header['cwd'] === 'string' && /^\{\{cwd\}\}(?:\/|$)/.test(header['cwd'])) {
+    normalized['cwd'] = header['cwd'].replace('{{cwd}}', '/dsh-snapshot-cwd')
+  }
+  return normalized
+}
+
+/** Return how many logical events one physical row contributes for deterministic seq completion. */
+function physicalRowCardinality(row: Readonly<Record<string, unknown>>): number {
+  if (!PACKED_CHUNK_ROW_TYPES.has(row['type'] as string)) return 1
+  const data = row['data']
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return 1
+  const payload = (data as Record<string, unknown>)[row['type'] === 'tool-call-chunks' ? 'args' : 'texts']
+  return Array.isArray(payload) && payload.length > 0 ? payload.length : 1
+}
+
+/** Attach the nearest physical source line while preserving unsupported-migration classification. */
+function fixtureFormatError(
+  error: unknown,
+  headerLine: number,
+  rowLines: readonly number[],
+  eventLines: readonly number[],
+  physicalRow?: number,
+): Error {
+  const detail = error instanceof Error ? error.message : String(error)
+  const locationDetail = error instanceof Error && error.cause instanceof Error
+    ? error.cause.message
+    : detail
+  const storedRow = /^released Session row (\d+)/.exec(locationDetail)
+  const event = /Session event (\d+)/.exec(locationDetail)
+    ?? / at seq (\d+)/.exec(locationDetail)
+    ?? /inherited Session cut (\d+)/.exec(locationDetail)
+  let line: number
+  if (physicalRow !== undefined) line = rowLines[physicalRow] as number
+  else if (storedRow !== null) line = rowLines[Number(storedRow[1])] ?? headerLine
+  else if (event === null) line = headerLine
+  else line = eventLines[Number(event[1])] ?? headerLine
+  const message = `session snapshot line ${line}: ${detail}`
+  if (error instanceof SessionFormatUnsupportedMigrationError) {
+    return new SessionFormatUnsupportedMigrationError(message, { cause: error })
+  }
+  return new Error(message, { cause: error })
 }
 
 /**
  * Reconstruct the per-`stream()` replay script from a recorded session log.
  *
- * Splits `assistant/chunk` events at every `finish`, using turn and step changes
- * to detect an unterminated prior call. A `compaction/summary` explicitly marked
- * as one local LLM-stream call becomes a canonical successful stream from its
- * complete `rawOutput` at the summary's log position. A
- * missing assistant terminator means the live stream threw, so derivation
- * rejects and the scenario must provide an explicit override. Multiple calls
- * may share one turn and step when the loop retries.
+ * Each durable `assistant/message` or `assistant/attempt` event carries one
+ * complete model call in its embedded `stream` records; expansion yields the
+ * exact chunk sequence including the `finish` terminator. A `compaction/summary`
+ * explicitly marked as one local LLM-stream call becomes a canonical successful
+ * stream from its complete `rawOutput` at the summary's log position. A
+ * stream without a `finish` chunk means the live call threw or was abandoned,
+ * so derivation rejects and the scenario must provide an explicit override.
+ * Multiple calls may share one turn and step when the loop retries.
  * @param events - the recorded session's events.
  * @returns one `chunks` entry per recorded model call, in call order.
  */
 export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
   const script: ReplayEntry[] = []
-  let currentKey: string | undefined
-  let current: StreamChunk[] = []
   const close = (key: string | undefined, chunks: StreamChunk[]): void => {
     if (chunks.length === 0) return
     if (chunks[chunks.length - 1]?.type !== 'finish') {
@@ -260,9 +466,6 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
   }
   for (const event of events) {
     if (event.type === 'compaction/summary') {
-      close(currentKey, current)
-      currentKey = undefined
-      current = []
       // JSONL decoding crosses an untyped durable boundary, so retain its wider
       // shape even though current in-process producers enforce this correlation.
       const persisted: {
@@ -285,21 +488,10 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
       }
       continue
     }
-    if (event.type !== 'assistant/chunk') continue
-    const { turn, step, chunk } = event.data
-    const key = `${turn}/${step}`
-    if (current.length > 0 && key !== currentKey) {
-      close(currentKey, current)
-    }
-    if (current.length === 0) currentKey = key
-    current.push(chunk)
-    if (chunk.type === 'finish') {
-      close(currentKey, current)
-      currentKey = undefined
-      current = []
-    }
+    if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') continue
+    const chunks = expandAssistantStream(event.data.stream).map(member => member.chunk)
+    close(`${String(event.data.turn)}/${String(event.data.step)}`, chunks)
   }
-  close(currentKey, current)
   return script
 }
 
@@ -560,7 +752,7 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
   // the header off the JSONL when it exists, else use a stable default so an
   // override-only fixture (header-less) still orders first as the primary.
   const primaryHeader = existsSync(config.file)
-    ? parseSessionHeader(readFileSync(config.file, 'utf8'))
+    ? readPrimaryHeader(config.file)
     : { id: '', createdAt: 0 }
   const primary: SessionScript = {
     recordedId: primaryHeader.id, createdAt: primaryHeader.createdAt, entries: primaryEntries, primary: true,
@@ -586,6 +778,24 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
   // XXX(concurrent-subagents): concurrent children need an explicit first-call ordinal.
   children.sort((a, b) => a.createdAt - b.createdAt || a.recordedId.localeCompare(b.recordedId))
   return [primary, ...children]
+}
+
+/**
+ * Read a primary fixture's ordering facts. `file` may itself be an override
+ * doc (a JSON array, not a session log) — it carries no header, so the
+ * fixture keeps the stable defaults. A corrupt header line still fails loud
+ * inside {@link parseSessionHeader}.
+ */
+function readPrimaryHeader(file: string): { id: string; createdAt: number } {
+  const text = readFileSync(file, 'utf8')
+  const firstLine = text.split('\n').find(line => line.trim().length > 0)
+  if (firstLine === undefined) return { id: '', createdAt: 0 }
+  const value = JSON.parse(firstLine) as unknown
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { id: '', createdAt: 0 }
+  }
+  const header = parseSessionHeader(text)
+  return { id: header.id, createdAt: header.createdAt }
 }
 
 /** Replay adapter that makes a configured provider catalog discoverable without provider I/O. */

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — the only entry a deployment loads. Its `mode` decides whether the seam follows session events live, replays the canonical log only at recorded feedback, or keeps telemetry local. Uploading modes compose the OTel JS SDK as-is (`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP log exporter) and map each handed-over record onto `logger.emit()`, under two instrumentation scopes: ledger records on `@deepseek-ai/dsh-session-sessionTelemetry-otel`, operational records on `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops`. Resource identity contains `service.name`/`service.version` from `dsh-llm`'s `APP_IDENTITY` plus this package's anonymous `user.id` (`$DSH_HOME/.anonymous-user-id`, a random UUID created on first use and reset by deleting the file), carried once per export batch rather than per record.
 
+## Summary
+
+`dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. SDK batching can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
+
 ## Config
 
 ```yaml
@@ -41,13 +45,17 @@ In uploading modes, records carry the complete `event.data` as the seam's `sessi
 
 Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `severity` → `severityNumber`/`severityText` (INFO 9 / WARN 13 / ERROR 17); `body` → the structured log body; `attributes` verbatim. Receivers dedupe on `(session.id, event.seq)` and alert on severity. In `FULL`, they may also detect crashes by `shutdown`-record absence: the marker is emitted at the session's own disposal or application teardown, and a marker followed by more events is a telemetry reload. In `FEEDBACK_ONLY`, a released prefix normally has no later `shutdown` marker, so its absence is not a crash signal. Streams are not self-contained across lineage: a resumed session continues its own id's stream from where the previous process left off, and a forked session's stream starts at its inherited boundary — its prefix lives in the parent's stream, stitched via `session.parent_id` + `session.seed_length`. A resumed local log may contain synthetic closers that were never exported; the wire stream stays faithful to records actually handed to the SDK.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Records are handed to the vendor SDK's own batching and export pipeline; the backend owns no queueing or retry state to compare.
+
 ## Model Experience
 
-None, as the backend only forwards the seam's redacted records into the OTel SDK pipeline; it never contributes to a model request.
+None, as the backend forwards seam records into the OTel SDK pipeline and registers nothing model-facing.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
+None; the package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 

@@ -9,13 +9,16 @@
   ],
   "references": [
     {
-      "path": "../loader-smoke"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../session/session-format"
+    },
+    {
+      "path": "../llm-replay"
+    },
+    {
+      "path": "../loader-smoke"
     },
     {
       "path": "../../util/http-proxy"

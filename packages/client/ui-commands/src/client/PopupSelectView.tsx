@@ -164,6 +164,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
         <RiskConfirmation
           open
           title={confirmation.title}
+          closeLabel={t('close')}
           description={confirmation.description}
           acknowledgeLabel={confirmation.acknowledgeLabel}
           cancelLabel={confirmation.cancelLabel}

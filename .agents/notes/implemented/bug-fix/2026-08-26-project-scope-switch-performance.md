@@ -23,7 +23,7 @@ The frontend static server marks Vite-style hashed files under `/assets/` as imm
 
 **Replace the independent runtime and full reload with a hot scope connection.** Rejected for this change because it would alter process isolation, connection ownership, draft lifetime, and failure handling. The existing scope handoff remains the authority.
 
-**Read only a PostgreSQL history tail in this change.** Deferred because message-boundary pagination, replacement provenance, preset reconstruction, and projection cuts need a separate persistence/read-model contract. The cache removes repeated warm-runtime work without changing any of those semantics.
+**Read only a PostgreSQL history tail in this change.** Deferred because message-boundary pagination, replacement source references, preset reconstruction, and projection cuts need a separate persistence/read-model contract. The cache removes repeated warm-runtime work without changing any of those semantics.
 
 **Keep an unbounded history cache.** Rejected because project runtimes can serve many sessions and a single large tool result can make one page large. The LRU byte and entry limits bound retained memory, and cloning prevents callers from mutating the retained value.
 

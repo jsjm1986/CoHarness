@@ -73,13 +73,15 @@ function seedLog(): string {
   return [
     JSON.stringify({ type: 'session', version: 0, id: '{{sessionId}}', createdAt: time, cwd: '{{cwd}}/workspace' }),
     at(0, { type: 'turn/start', data: { turn: 1, trigger: { kind: 'message', source: { kind: 'user', rpcId: 'seed' } } } }),
-    at(1, {
+    at(1, { type: 'step/start', data: { turn: 1, step: 1 } }),
+    at(2, {
       type: 'user/message',
       data: { content: [{ type: 'text', text: 'Seeded turn.' }], source: { kind: 'user', rpcId: 'seed' } },
       surfaceOp: 'append',
     }),
-    at(2, { type: 'session/title', data: { title: 'Seeded turn', messageSeqs: [1], source: { kind: 'fallback' } } }),
-    at(3, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }),
+    at(3, { type: 'step/end', data: { turn: 1, step: 1 } }),
+    at(4, { type: 'session/title', data: { title: 'Seeded turn', messageSeqs: [2], source: { kind: 'fallback' } } }),
+    at(5, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }),
   ].join('\n')
 }
 
@@ -92,7 +94,7 @@ function seedLog(): string {
 async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise<void> {
   const childId = sessionId('agent-preset-selection-child')
   const createdAt = 1784974100100
-  await scaffold.ctx.sessionPersistence.create({
+  await scaffold.ctx.sessionPersistence.createStored({
     version: SESSION_FORMAT_VERSION,
     id: childId,
     createdAt,
@@ -137,7 +139,8 @@ async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise
       data: { turn: 1, reason: { kind: 'completed' } },
     },
   ] as SessionEvent[])
-  await scaffold.ctx.sessionProjectionCache.coldSnapshot(childId)
+  const childLog = await scaffold.ctx.sessionPersistence.load(childId)
+  scaffold.ctx.sessionProjectionCache.coldSnapshot(childLog.meta, childLog.inheritedEventCount, childLog.events)
 }
 
 /**

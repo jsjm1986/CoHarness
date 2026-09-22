@@ -10,7 +10,7 @@ import {
   renderParticipantNotice,
 } from './participant.ts'
 
-/** Cordis plugin name used in durable message provenance. */
+/** Cordis plugin name used in durable message source records. */
 export const name = 'collaboration-context'
 
 /** The agent registry owns the pre-step attribution extension point. */

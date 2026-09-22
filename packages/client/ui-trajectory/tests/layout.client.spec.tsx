@@ -12,14 +12,26 @@ import { TrajectoryGroupHeader } from '../src/client/TrajectoryGroupHeader.tsx'
 import { TrajectoryTurn } from '../src/client/TrajectoryTurn.tsx'
 import { TrajectoryTurnHeader } from '../src/client/TrajectoryTurnHeader.tsx'
 import {
-  appendTrajectoryPartialLayout, deriveTrajectoryLayout,
+  appendTrajectoryPartialLayout as appendTrajectoryPartialLayoutWithLocale,
+  deriveTrajectoryLayout as deriveTrajectoryLayoutWithLocale,
 } from '../src/client/layout.ts'
+import { t } from './locale.client.ts'
+
+const deriveTrajectoryLayout = (
+  input: Parameters<typeof deriveTrajectoryLayoutWithLocale>[0],
+) => deriveTrajectoryLayoutWithLocale(input, t)
+
+const appendTrajectoryPartialLayout = (
+  turns: Parameters<typeof appendTrajectoryPartialLayoutWithLocale>[0],
+  partial: Parameters<typeof appendTrajectoryPartialLayoutWithLocale>[1],
+  lastIndex: number,
+) => appendTrajectoryPartialLayoutWithLocale(turns, partial, lastIndex, t)
 
 afterEach(cleanup)
 
 describe('TrajectoryTurnHeader', () => {
   it('renders Turn N and the four metric column labels', () => {
-    render(<TrajectoryTurnHeader turn={1} />)
+    render(<TrajectoryTurnHeader turn={1} t={t} />)
     expect(screen.getByText('Turn 1')).toBeTruthy()
     expect(screen.getByText('Input')).toBeTruthy()
     expect(screen.getByText('Output')).toBeTruthy()
@@ -45,7 +57,7 @@ describe('TrajectoryGroupHeader', () => {
 describe('TrajectoryTurn', () => {
   it('wraps a sticky header and body children', () => {
     render(
-      <TrajectoryTurn turn={3}>
+      <TrajectoryTurn turn={3} t={t}>
         <TrajectoryGroupHeader title="Message" description="49s" />
       </TrajectoryTurn>,
     )

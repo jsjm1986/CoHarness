@@ -1,0 +1,536 @@
+{
+  "schemaVersion": 2,
+  "reviewDate": "2026-09-18",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "previousTag": "dsh-v0.1.5-rc.2",
+    "previousCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+    "targetTags": [
+      {
+        "tag": "dsh-v0.1.6-alpha.2",
+        "commit": "ddefc45fbc7f8e46dd73185e68295696d1297887"
+      }
+    ]
+  },
+  "baseline": {
+    "commit": "a901bff5f44bf9d51b99019b5c8085a0d93f248b",
+    "branch": "fix/release-session-format"
+  },
+  "targetVersion": "0.1.6-alpha.2.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "decisions-confirmed-increment-implementation-pending",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.2.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
+  "verification": [
+    {
+      "phase": "7E",
+      "command": "pnpm exec tsx scripts/verify-client-ui-i18n.ts",
+      "exitCode": 0,
+      "note": "492 client source files locale-owned; zero hard-coded copy"
+    },
+    {
+      "phase": "7E",
+      "command": "pnpm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "phase": "7E",
+      "command": "pnpm exec knip --config knip.config.ts --treat-config-hints-as-errors",
+      "exitCode": 0
+    },
+    {
+      "phase": "7E",
+      "command": "pnpm exec vitest run packages/client/ui-*/tests",
+      "exitCode": 0,
+      "passed": 1952
+    },
+    {
+      "phase": "8",
+      "command": "pnpm exec vitest run packages/boot/hmr/tests",
+      "exitCode": 0,
+      "passed": 68,
+      "environment": "macOS 26.6.2 arm64, ulimit -n soft 1048575/hard unlimited; EMFILE not reproduced on the migrated chokidar watcher"
+    },
+    {
+      "phase": "8",
+      "command": "PATH=/tmp/py312bin:$PATH pnpm exec vitest run packages/experimental/ptc-runtime-python",
+      "exitCode": 0,
+      "passed": 284,
+      "skipped": 2,
+      "environment": "macOS 26.6.2 arm64, python3 -> CPython 3.12.13; host system python3 3.9.6 is rejected at load by the version gate"
+    },
+    {
+      "phase": "8",
+      "command": "pnpm exec vitest run packages/subprocess/subprocess-local/tests packages/sandbox/sandbox-local/tests/local.spec.ts packages/sandbox/sandbox-policy/tests",
+      "exitCode": 0,
+      "passed": 415,
+      "skipped": 15,
+      "environment": "macOS 26.6.2 arm64"
+    },
+    {
+      "phase": "8",
+      "command": "pnpm exec vitest run --config vitest.e2e.config.ts packages/sandbox/sandbox-local/tests/seatbelt.e2e.ts",
+      "exitCode": 0,
+      "passed": 5,
+      "environment": "macOS 26.6.2 arm64, real sandbox-exec"
+    },
+    {
+      "phase": "8-d",
+      "command": "pnpm exec vitest run packages/session/session-format*/tests packages/session/session-persistence-jsonl/tests packages/session/session-persistence-sqlite/tests scripts/session-sqlite-migration.spec.ts",
+      "exitCode": 0,
+      "files": 50,
+      "passed": 1628,
+      "environment": "macOS 26.6.2 arm64",
+      "note": "Synthetic migration rehearsal: v0→v1→v2→v3→v4 generation chain + combined/preset migrations, immutable-generation and multi-edge publication rules, future-version refusal (migration-refusal.spec), verifier worker lifecycle (migration-verifier.spec), SQLite v18↔v20 offline migration and rollback on synthetic stores; no live WAL copy, no dual writers"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run hygiene",
+      "exitCode": 0,
+      "note": "rescope-vendor:check + knip + publint + constraints + licenses + package-invariants + built-package-invariants + cordis-config + node-next-types + optional-dependency-imports + runtime-closure + package-dependencies + client-packages + plugin-surfaces + vendored-links all green"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run build",
+      "exitCode": 0,
+      "note": "tsc host/client lib + tsdown runtime bundles + web frontend; 212 client artifacts"
+    },
+    {
+      "phase": "8-e",
+      "command": "DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts <built-bin-smoke gate file set>",
+      "exitCode": 0,
+      "files": 12,
+      "passed": 43,
+      "environment": "macOS 26.6.2 arm64",
+      "note": "Full built-smoke gate set green in lib mode; keyless-smoke also verified in src (tsx) mode. Fixed en route: configured-agent persistence mount race in agent-loop (loader group mounts entries concurrently; strict ctx.get missed a not-yet-active sessionPersistence provider) — agent now settles the loader before resolving optional persistence; restored cli deps dsh-acp-app/dsh-sdk-app/dsh-sdk-minimal; stale assertions updated to intentional local semantics (envelope gateway/input-invalid, no URL token, progress-off-by-default); loader-smoke fixtures copied + missing devDeps declared"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run release:verify --family dsh",
+      "exitCode": 0,
+      "note": "281 members at 0.1.5-alpha.1.coharness.1, publish order resolved, 2 unordered peer declarations (dsh-api-remotes peers, accepted by design)"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run verify-package-dependencies && pnpm run verify-npm-install-layout",
+      "exitCode": 0,
+      "note": "55 packages match published dependency policy; 223 DSH packages per release, 734 internal edges, one shared Cordis install, 2316 peer edges matched"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run build:official",
+      "exitCode": 0,
+      "note": "native-system + lib + web official profile; 212 client artifacts recorded with 4 public values"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm run release:pack --family dsh --out dist/npm && pnpm run release:pack --family vendor --out dist/npm-vendor && pnpm --dir native/system run build:ts && pnpm --dir native/system/packages/entry pack --pack-destination dist/npm-landlock",
+      "exitCode": 0,
+      "note": "281 dsh + 9 vendor + 1 landlock-entry tarballs; per-member payload validation passed"
+    },
+    {
+      "phase": "8-e",
+      "command": "packed-install replica of pnpm run release:verify-packed-install --family dsh --from <staged dist/npm{,-vendor,-landlock}>",
+      "exitCode": 0,
+      "environment": "macOS 26.6.2 arm64, node 25.8.1, npm 11.11.0",
+      "note": "291 tarballs installed into a throwaway consumer; verifyInstalledProductIsolation: 565 default-product packages exclude experimental packages; installed @deepseek-ai/dsh --version reports 0.1.5-alpha.1.coharness.1 under plain node. Local-host deltas vs the CI gate: tarballs staged under an ASCII-only path because npm 11.11 cannot open percent-encoded non-ASCII file: tarball URLs, and optional deps were included because koffi 3.3.1's source build cannot link napi/uv symbols on darwin (its cnoke/CMake carries no -undefined dynamic_lookup); the --omit=optional source-build leg is exercised by CI on linux where ld permits undefined symbols"
+    },
+    {
+      "phase": "8-e",
+      "command": "pnpm exec vitest run packages/boot/app-boot/tests --coverage && pnpm exec vitest run apps/cli/tests/profiles/headless/tests/source-launch.spec.ts && pnpm dsh --profile headless <mock round trip>",
+      "exitCode": 0,
+      "note": "Built-smoke 8-e.3 surfaced a product-level latent defect on the source launch: profile-resolution routed plugin entries to lib/ through the declarer's node_modules manifest (invisible to tsx paths) while each plugin's own imports fell back to src/ via tsconfig paths — two dsh-tools copies, TOOL_RUNTIME_SCHEDULER identity split, UNKNOWN prepare crash on the first tool call after pnpm build. Fix: installProfileResolution probes ambient resolution and prefers TypeScript-source results (packages/boot/app-boot/src/profile-resolution/resolver.ts); TOOL_RUNTIME_SCHEDULER restored to Symbol.for per note 2026-09-18 (alpha.2 merge had reverted it to Symbol()). New regression spec apps/cli/tests/profiles/headless/tests/source-launch.spec.ts boots real bin.ts+tsx+PluginPackages and completes a tool call — fails pre-fix. resolver.ts at 100% all metrics; agent-loop suite 379, app-boot suite 246, built-bin 31/31 green. Agent Note 2026-09-21-profile-resolution-ambient-source-plane; upstream-sync.json notes on boot/app-boot and core/tools. Upstream carries the identical latent hazard (upstream-applicable fix)."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "foundation",
+      "status": "adapt",
+      "localOwner": "vendor, Typert and workspace build owners",
+      "commitScope": [
+        "vendor",
+        "packages/typert",
+        "packages/boot/app-boot",
+        "packages/client/web",
+        "packages/todo/tool-todo",
+        "packages/extensions/cordis-client-runner",
+        "packages/host/directory-picker-auto",
+        "packages/llm/plugin-package-inventory-deepseek",
+        "packages/typert/loader",
+        "pnpm-lock.yaml"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Vendor procedure, local modifications replay, test/build and compiler consumers; js-yaml dependency review.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "foundation",
+        "reviewState": "implemented-local-tests-passing"
+      },
+      "phases": [
+        "1B"
+      ]
+    },
+    {
+      "id": "agent-session",
+      "status": "adapt",
+      "localOwner": "Agent, Session and Gateway persistence",
+      "commitScope": [
+        "packages/core",
+        "packages/session"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Async initialization, recovery, cancellation, write locks, parent ownership, quotas, immutable-generation migrations and both SDK transcripts.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "agent-session",
+        "reviewState": "local-tests-passing-production-unverified"
+      },
+      "phases": [
+        "2B"
+      ]
+    },
+    {
+      "id": "messages-images-governance",
+      "status": "adapt",
+      "localOwner": "LLM providers, compaction, attachments and model governance",
+      "commitScope": [
+        "packages/llm",
+        "packages/compaction",
+        "packages/attachment"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Both protocols through organization/BYOK routing, real credential attribution and image encoding/pricing/projection/cold recovery; no implicit stored endpoint rewrite.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "messages-images-governance",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "3A",
+        "3B"
+      ]
+    },
+    {
+      "id": "log-upload-default-off",
+      "status": "retain",
+      "localOwner": "Session log upload provider and bundles",
+      "commitScope": [
+        "packages/session/session-log-deepseek",
+        "packages/bundle"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Default off, explicit opt-in, endpoint policy and kill switch across assembled presets; independent from OTel.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "log-upload-default-off",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "2B",
+        "8"
+      ]
+    },
+    {
+      "id": "execution-migration",
+      "status": "adapt",
+      "localOwner": "PTC, workflow, shell, subprocess, sandbox, jobs and directory authorization",
+      "commitScope": [
+        "packages/ptc-runtime",
+        "packages/ptc-runtime",
+        "packages/workflow",
+        "packages/shell",
+        "packages/subprocess",
+        "packages/sandbox",
+        "packages/jobs",
+        "packages/e2b"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Migrate all consumers, cancel and await quiescence, preserve directory policy. Remove E2B only after deployment inventory and equivalent capability proof.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "execution-migration",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "4A",
+        "4B"
+      ]
+    },
+    {
+      "id": "desktop-coordination-ui",
+      "status": "required",
+      "localOwner": "Proposed Gateway desktop authority, execution adapter and shell.overlay UI",
+      "commitScope": [
+        "packages/computer-use",
+        "packages/experimental/computer-use-cua-driver-native",
+        "packages/experimental/computer-use-cua-driver-mcp"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Cross-runtime node/desktop ownership, execution fencing, revocation, FIFO, cancellation, restart and shutdown failures; private text/icon status, reduced motion, queue and unknown state. Desktop-occupancy administration and emergency stop surface under /admin.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "desktop-coordination-ui",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "5",
+        "6B"
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
+    },
+    {
+      "id": "browser-use",
+      "status": "adapt",
+      "localOwner": "Browser providers, Session initialization and capability policy",
+      "commitScope": [
+        "packages/browser-use",
+        "packages/experimental/browser-use-runtime",
+        "packages/experimental/browser-use-playwright-mcp",
+        "packages/experimental/browser-use-chrome-devtools-mcp",
+        "packages/experimental/browser-use-stagehand-native"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Isolated launch default, explicit attach authorization, resource cleanup, external listeners and screenshot visibility; history recovery does not recover browser state.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "browser-use",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "6A"
+      ]
+    },
+    {
+      "id": "auto-review",
+      "status": "adapt",
+      "localOwner": "Permission presets, pre-execute governance and Web permission UI",
+      "commitScope": [
+        "packages/experimental/auto-review",
+        "packages/interaction"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review. Eligibility is granted by an administrator from /admin.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "auto-review",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "6B"
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
+    },
+    {
+      "id": "webhook",
+      "status": "adapt",
+      "localOwner": "Webhook runtime, workspace session creation and inbound endpoint policy",
+      "commitScope": [
+        "packages/webhook/webhook",
+        "packages/webhook/webhook-github"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Inbound endpoint authentication, signature verification, replay and rate limiting, Session-creation authorization ownership and secret storage; default off until enabled by an administrator. Endpoint configuration and the enable switch live under /admin.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "webhook",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "7B"
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
+    },
+    {
+      "id": "remote-product-and-release",
+      "status": "adapt",
+      "localOwner": "Gateway, client, SSH, MCP, SDK, Android, native and release owners",
+      "commitScope": [
+        "packages/api",
+        "packages/client",
+        "packages/ssh",
+        "packages/mcp",
+        "packages/sdk",
+        "python",
+        "native",
+        "scripts",
+        "website",
+        "examples"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Preserve collaboration, User Documents, Workbench, archives, Android and LAN/public authorization; terminal lifecycle, source/built consumers, restore and deployment acceptance.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "remote-product-and-release",
+        "reviewState": "pending-cumulative-source-review"
+      },
+      "phases": [
+        "7A",
+        "7B",
+        "7C",
+        "7E",
+        "8"
+      ],
+      "adminSurface": "gateway/admin-ui (/admin)"
+    },
+    {
+      "id": "plugin-management-admin-only",
+      "status": "adapt",
+      "localOwner": "packages/boot/plugin-manager/",
+      "commitScope": [
+        "packages/boot/plugin-manager/",
+        "packages/client/ui-plugin-manager/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "7D"
+      ],
+      "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 resolved 2026-09-18: all four upstream install sources (registry, absolute path, git, tarball) are allowed for administrators; dependency build scripts follow the upstream approval model (Web allow-and-retry and tool-side approvedBuilds), persisted per package name and attributed to the approving administrator. Admin operations are exposed through the /admin surface (gateway/admin-ui), not only in-session UI.",
+      "adminSurface": "gateway/admin-ui (/admin)"
+    },
+    {
+      "id": "terminal-user-project-grants",
+      "status": "adapt",
+      "localOwner": "packages/api/terminal-controller/",
+      "commitScope": [
+        "packages/api/terminal-controller/",
+        "packages/client/ui-sidebar-terminal/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "7B"
+      ],
+      "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 resolved 2026-09-18: dual gate — an administrator must enable both the user and the project; terminals are private to their creator, invisible to other project members; administrators may list and close but never take over input; read-only members have no terminal access at all. User and project grants are administered from the /admin Users and project pages.",
+      "adminSurface": "gateway/admin-ui (/admin)"
+    },
+    {
+      "id": "office-and-sidebar-browser",
+      "status": "adapt",
+      "localOwner": "packages/document/",
+      "commitScope": [
+        "packages/document/",
+        "packages/client/ui-sidebar-browser/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "7C"
+      ],
+      "requiredVerification": "Q3 resolved 2026-09-18: ship the sidebar Browser matching upstream — iframe carrier, loopback allowed, per-tab temporary unsandbox toggle with warning, DSH origin rejected; address bar must note that loopback resolves on the visitor’s machine, never as a host-URL promise. Q4 resolved 2026-09-18: declared platforms are macOS arm64 (native engine) and Linux (WASM); Windows is not claimed; a Linux WASM acceptance environment is required or Linux stays unverified. File authorization, conversion cache isolation, resource limits and native/WASM artifact checks required. Deliverables are owned by the deliverables-workspace-changes decision."
+    },
+    {
+      "id": "deliverables-workspace-changes",
+      "status": "adapt",
+      "localOwner": "Deliverables recorder, present tool, Session event catalog and Web deliverables UI",
+      "commitScope": [
+        "packages/deliverables/",
+        "packages/client/ui-deliverables/",
+        "packages/core/session/src/known-event-types.ts"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "2B",
+        "7C"
+      ],
+      "requiredVerification": "User-confirmed 2026-09-18 (plan D7): adopt deliverables/tool-present (moved from fs/tool-present) and deliverables/workspace-changes, reversing the rc.2 upstreamOnly deferral. Verify workspace/changes required-on-read semantics before enabling the recorder, workspaceFiles authorization, project ACL and read-only member rules for change cards and per-file review; update scripts/upstream-sync.json upstreamOnly when the sync baseline advances.",
+      "alpha1History": {
+        "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+        "id": "remote-product-and-release",
+        "reviewState": "pending-cumulative-source-review",
+        "note": "fs/tool-present carried an upstreamOnly deferral in scripts/upstream-sync.json at the rc.2 baseline; no alpha.1 decision row existed."
+      }
+    },
+    {
+      "id": "apps-desktop-not-carried",
+      "status": "reject",
+      "localOwner": "CoHarness ships Web, CLI and Android shells only",
+      "commitScope": [
+        "apps/desktop/",
+        "apps/desktop-host/"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "phases": [
+        "0R"
+      ],
+      "requiredVerification": "User-confirmed 2026-09-18: the upstream desktop client application is not carried, consistent with the rejected upstream desktop ui-package tree in scripts/upstream-sync.json. Startup-chain interfaces shared with apps/cli are reviewed through the foundation decision; no implementation or acceptance is owed for these paths."
+    }
+  ],
+  "historicalVerification": {
+    "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
+    "targetCommit": "0a15e36e7f82b6ed45af6fa9759f29b40dcd965d",
+    "note": "Reference only. No alpha.1 command results count as alpha.2 validation."
+  },
+  "localPlanningCheckpoint": "6f0ec56328048a1f69f179ebbacb2acd0d40e8b9",
+  "openQuestions": [
+    {
+      "id": "Q1",
+      "state": "resolved-2026-09-18: administrators may use all four upstream install sources; build-script approval follows the upstream allow-and-retry / approvedBuilds model persisted per package name.",
+      "blocks": [
+        "7D"
+      ]
+    },
+    {
+      "id": "Q2",
+      "state": "resolved-2026-09-18: dual gate — user AND project must each be enabled by an administrator; creator-private terminals; admin lists/closes without input takeover; read-only members excluded.",
+      "blocks": [
+        "7B"
+      ]
+    },
+    {
+      "id": "Q3",
+      "state": "resolved-2026-09-18: ship the sidebar Browser matching upstream semantics; loopback label notes it resolves on the visitor’s machine.",
+      "blocks": [
+        "7C"
+      ]
+    },
+    {
+      "id": "Q4",
+      "state": "resolved-2026-09-18: declare macOS arm64 native + Linux WASM; Windows not claimed; Linux WASM acceptance environment required; desktop-driver devices decided with the Phase 5 design.",
+      "blocks": [
+        "6A",
+        "7C",
+        "8"
+      ]
+    }
+  ],
+  "processConstraints": {
+    "deploymentFreeze": {
+      "masterContainsUpgradeSince": "cfb1949958ff97e16ffee4cefefda4b7d54d262a",
+      "productionCommit": "f92068e800692adc6ab53dd1c9c2d0d66c144aec",
+      "liftsAt": "phase-8-acceptance",
+      "hotfixPolicy": "branch from the production commit; never deploy master before Phase 8 acceptance"
+    },
+    "coverageGate": {
+      "state": "never-run-for-phase-1-2-sources",
+      "requiredBefore": [
+        "1B",
+        "2B"
+      ],
+      "command": "pnpm run test:coverage"
+    },
+    "gateDiffReview": {
+      "paths": [
+        ".github/",
+        "scripts/",
+        "lefthook.yml"
+      ],
+      "requiredBefore": [
+        "1B"
+      ],
+      "phase": "0R"
+    },
+    "hostPrerequisites": [
+      "file descriptor limit sufficient for native watchers (EMFILE)",
+      "CPython >= 3.10 for ptc-runtime-python",
+      "per-platform capability checks recorded in Phase 8"
+    ],
+    "verificationLedger": {
+      "record": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md",
+      "section": "未验证与环境阻塞台账",
+      "items": 23
+    },
+    "developmentPosture": {
+      "breakingChanges": "allowed — target full upstream parity; behavior changes must be recorded per batch; no parallel compat implementations outside the local sovereignty surface",
+      "productionData": "none — synthetic-data migration rehearsal replaces sanitized-copy restore; environment rebuild is allowed",
+      "adminSurface": "global and organization-level settings land in gateway/admin-ui (/admin): plugin management, webhook, terminal grants, auto-review eligibility, desktop occupancy, model governance"
+    }
+  }
+}

@@ -41,6 +41,6 @@ Status: implemented
 
 - 来自英文浏览器的首访落在英文界面，中文浏览器落在中文界面，而两者皆未声明的浏览器落在英文而非中文界面。语言行依然呈现同样两个以自身语言自述的选项，两个方向的脱身通道都未改变。
 - 字典解析方向发生反转：当前 locale 缺失的 key 现在回落到 `en` 而非 `zh`。在字典对称的前提下，没有任何已提供的 key 行为发生变化——这正是那道对称性门禁存在的原因：它是这次反转所依赖的前提。
-- `<html lang>` 现在在两个方向上都如实报告屏幕上的语言，这也关闭了 [#2160](https://github.com/deepseek-harness/deepseek-harness/issues/2160)。若某个客户端从未激活 locale 插件，则保留所服务的默认值，因此该属性退化为旧的静态行为，而不会退化为空值。
+- `<html lang>` 现在在两个方向上都如实报告屏幕上的语言，这也关闭了 [#2160](https://github.com/deepseek-ai/deepseek-harness/issues/2160)。若某个客户端从未激活 locale 插件，则保留所服务的默认值，因此该属性退化为旧的静态行为，而不会退化为空值。
 - 客户端树的非浏览器运行（node 启动、非 jsdom 单测车道）现在以 `en` 开场。断言已提供中文文案的用例必须在其构造的 runtime 上显式调用 `setLocale('zh')`；套件级的 `usePinnedBrowserLanguages('zh-CN')` 仅在同时声明了 `@vitest-environment jsdom` 的文件中生效，因为没有 `window` 时探测路径根本不会读取 `navigator`。此前有七个 `*.client.spec.ts` 文件带着这样一条失效的固定语句，实际依赖的是旧的 `zh` 回落值。
 - 探测的代价是每次服务构造遍历一次数组，且不会隐式写入 settings；插件激活后，显式 Host 偏好可能引发一次实时收敛。

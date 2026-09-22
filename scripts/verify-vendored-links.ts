@@ -1,72 +1,78 @@
-/**
- * Verify that pnpm-lock.yaml resolves every vendored package name to its
- * workspace `link:` — never a registry copy. `linkWorkspacePackages: true`
- * (pnpm-workspace.yaml) makes matching upstream semver ranges resolve to the
- * pinned vendored sources; a registry copy of the same name coexisting with
- * the vendored one silently forks the framework layer (vendor/README.md).
- */
+/** Reject registry copies or wrong workspace targets for the vendored framework. */
 import { readdir, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 
 const root = resolve(import.meta.dirname, '..')
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
-async function vendoredNames(): Promise<Set<string>> {
-  const names = new Set<string>()
+async function vendoredNames(): Promise<Map<string, string>> {
+  const names = new Map<string, string>()
   for (const entry of await readdir(join(root, 'vendor'), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    let manifest: { name?: string }
-    try {
-      manifest = JSON.parse(await readFile(join(root, 'vendor', entry.name, 'package.json'), 'utf8')) as { name?: string }
-    } catch {
-      continue // not a package directory (e.g. vendor/README.md siblings)
+    const directory = join(root, 'vendor', entry.name)
+    let source: string
+    try { source = await readFile(join(directory, 'package.json'), 'utf8') } catch (error) {
+      // Non-package directories have no manifest; malformed or unreadable manifests are errors.
+      if (isRecord(error) && error.code === 'ENOENT') continue
+      throw error
     }
-    if (manifest.name !== undefined) names.add(manifest.name)
+    const manifest: unknown = JSON.parse(source)
+    if (!isRecord(manifest) || typeof manifest.name !== 'string' || manifest.name === '') {
+      throw new Error(`verify-vendored-links: invalid package name in ${directory}`)
+    }
+    if (names.has(manifest.name)) throw new Error(`verify-vendored-links: duplicate vendored package ${manifest.name}`)
+    names.set(manifest.name, directory)
   }
   return names
 }
 
-interface Lockfile {
-  importers?: Record<string, Record<string, unknown>>
-  packages?: Record<string, unknown>
-  snapshots?: Record<string, unknown>
-}
-
 const names = await vendoredNames()
 if (names.size === 0) throw new Error('verify-vendored-links: no vendored package manifests found under vendor/')
-const lockfile = yaml.load(await readFile(join(root, 'pnpm-lock.yaml'), 'utf8')) as Lockfile
-
+const raw: unknown = yaml.load(await readFile(join(root, 'pnpm-lock.yaml'), 'utf8'))
+if (!isRecord(raw) || !isRecord(raw.importers) || Object.keys(raw.importers).length === 0) {
+  throw new Error('verify-vendored-links: lockfile importer corpus is empty or malformed')
+}
 const violations: string[] = []
-
-// Importer resolutions: every dependency entry naming a vendored package must
-// resolve to a link:, or the build silently uses a registry copy.
-for (const [importer, sections] of Object.entries(lockfile.importers ?? {})) {
-  for (const [section, dependencies] of Object.entries(sections)) {
-    if (typeof dependencies !== 'object' || dependencies === null) continue
-    for (const [dependency, entry] of Object.entries(dependencies as Record<string, { version?: string }>)) {
-      if (!names.has(dependency)) continue
-      const version = entry.version ?? ''
-      if (!version.startsWith('link:')) {
-        violations.push(`${importer} ${section}.${dependency} resolves to ${JSON.stringify(version)} (expected link:)`)
+let references = 0
+for (const [importer, sections] of Object.entries(raw.importers)) {
+  if (!isRecord(sections)) throw new Error(`verify-vendored-links: malformed importer ${importer}`)
+  if (importer.startsWith('vendor/') && ![...names.values()].includes(resolve(root, importer))) {
+    violations.push(`${importer} has no corresponding vendored package manifest`)
+  }
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    const dependencies = sections[section]
+    if (dependencies === undefined) continue
+    if (!isRecord(dependencies)) throw new Error(`verify-vendored-links: malformed ${importer}.${section}`)
+    for (const [dependency, entry] of Object.entries(dependencies)) {
+      const expected = names.get(dependency)
+      if (expected === undefined) continue
+      references++
+      const version = isRecord(entry) && typeof entry.version === 'string' ? entry.version : ''
+      if (!version.startsWith('link:') || resolve(root, importer, version.slice(5)) !== expected) {
+        violations.push(`${importer} ${section}.${dependency} resolves to ${JSON.stringify(version)} (expected its vendor workspace link)`)
       }
     }
   }
 }
-
-// Package/snapshot keys: a registry copy materializes as a `<name>@<version>`
-// key; vendored names must never appear there at all.
-for (const section of ['packages', 'snapshots'] as const) {
-  for (const key of Object.keys(lockfile[section] ?? {})) {
-    const atIndex = key.lastIndexOf('@')
-    if (atIndex <= 0) continue
-    const packageName = key.slice(0, atIndex)
-    if (names.has(packageName)) violations.push(`${section} entry ${key} is a registry copy of a vendored package`)
+if (references === 0) throw new Error('verify-vendored-links: no vendored dependency resolutions were inspected')
+for (const section of ['packages', 'snapshots']) {
+  const entries = raw[section]
+  if (entries === undefined) continue
+  if (!isRecord(entries)) throw new Error(`verify-vendored-links: malformed ${section}`)
+  for (const key of Object.keys(entries)) {
+    // The first separator after the name precedes any parenthesized peer versions.
+    const separator = key.indexOf('@', 1)
+    if (separator > 0 && names.has(key.slice(0, separator))) {
+      violations.push(`${section} entry ${key} is a registry copy of a vendored package`)
+    }
   }
 }
-
 if (violations.length > 0) {
-  console.error(`verify-vendored-links: ${String(violations.length)} lockfile resolution(s) bypass the vendored workspaces:`)
-  for (const violation of violations) console.error(`  - ${violation}`)
-  process.exit(1)
+  console.error(`verify-vendored-links: ${violations.length} invalid resolution(s):\n${violations.join('\n')}`)
+  process.exitCode = 1
+} else {
+  console.log(`verify-vendored-links: ${names.size} manifests and ${references} workspace resolutions checked.`)
 }
-console.log(`verify-vendored-links: all ${String(names.size)} vendored package names resolve to workspace links.`)

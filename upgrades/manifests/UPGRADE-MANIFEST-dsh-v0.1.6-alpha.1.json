@@ -197,7 +197,7 @@
       "localOwner": "PTC, workflow, shell, subprocess, sandbox, jobs and directory authorization",
       "commitScope": [
         "packages/ptc-runtime",
-        "packages/code-runtime",
+        "packages/ptc-runtime",
         "packages/workflow",
         "packages/shell",
         "packages/subprocess",

@@ -6,6 +6,10 @@ locale 插件：LocaleRuntime——偏好以 `locale.preference` 存储在 `$DSH
 
 本包只内置 `zh` 与 `en`。外部 client 插件通过 `ctx.effect(() => ctx.locale.addLanguage({ id, label, fallback }))` 增加可选语言，并通过 `register(ns, locale, dict)` 增加该语言的字典；定义与字典可以按任意顺序注册。定义卸载后会从选择器移除，正在使用的选择回落到当前可用的浏览器语言或默认语言。外部 id 是 ASCII BCP 47 风格标签。其 fallback 必须已注册，形成的链必须终止于 `en`；未知目标、重复 id 和循环会在注册时失败。每个 key 先在当前语言的命名空间沿链查找，再在 `common` 中重复该链，最后显示 key。类型化 `register(ns, { zh, en })` 形式仍按 `LocaleNamespaceMap` 检查。
 
+## 概述
+
+使用 `dsh-client-locale` 可在 web GUI 中切换内置的英文和中文 locale，或 client 插件添加的语言。用户选择会立即生效；loopback 页面把选择持久化到 `$DSH_HOME/settings.yaml`，非 loopback 页面则只为当前进程保留选择。全新浏览器会使用浏览器请求的第一个受支持语言，直到允许读取的已存储偏好到达。插件作者可添加类型化命名空间字典，并通过公开 locale API 翻译；经 slot 渲染的文案无需重新加载即可随语言切换更新。
+
 ## 语言包注册
 
 语言包插件把语言定义和每个已翻译命名空间注册为自身拥有的 effect：
@@ -29,9 +33,13 @@ export function apply(ctx) {
 
 Language 行跟随绑定的账户级 settings scope；首次视图仍在 loading、scope 不可用或提供方只读时，选择器会禁用。项目运行时不会接管账户偏好，认证成员的选择通过账户 transport 保存，只有账户路由明确不支持时才回退到 Host。`LocaleRuntime.setLocale` 也执行相同的可写视图检查，因此程序化调用无法绕过禁用行发起 mutation；写入失败时会从恢复后的值重新采用状态。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。活动语言环境是绑定到 Host 拥有的 settings namespace 的一个已解析值；临时、已保存与推送的值遵循由规格断言的单一优先级。
+
 ## 模型体验
 
-无。locale 注册表为浏览器 UI 文案提供服务；这里没有任何内容进入模型请求。
+无。locale 服务属于浏览器侧 UI 插件层，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

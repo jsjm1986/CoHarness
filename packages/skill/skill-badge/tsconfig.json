@@ -4,11 +4,18 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cosmokit" },
-    { "path": "../../../vendor/cordis" },
-    { "path": "../skill" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    {
+      "path": "../skill"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    }
   ]
 }

@@ -22,7 +22,7 @@ fork 用文件级三方合并整合两个 tag（`git merge-file`，base 为上�
 - `bundle/base` 挂载 `web-fetch-http` 并开启 `web_fetch`；fork 三个预设（`code`、`cordis`、`standard`）设 `tool-web.fetch: true`，`code` 预设关闭 `workflow` 工具但保留引擎。2026-08-29 对 `web-fetch-http` 的公网地址 pinning 使该默认值在 fork 的多用户 Gateway 部署中安全。
 - `ui-theme` 新增 `corner-shape.css`、`gradient-shadow-text.css` 与 per-element elevation token。上游样式守卫套用到 fork 自有 CSS：`0.5px` hairline 描边、悬浮面不用中性边框、全圆角元素加 `corner-shape: round`。轮次导航预览层位于代码 banner 之上。
 - 长会话渲染工作中，`buildLocationData(context, scope, previous)` 复用相同的 Location 值，`flush()` 报告是否有 view 被重新发布，`ui-slots`/`ui-renderer` 新增 inject `keyedHooks` 隔间，`InputBar` 做 memo，产出文件芯片用 CSS 布局。
-- `code-runtime-python` 整包替换为 `packages/experimental/code-runtime-python` 的上游 experimental 包，适配 fork 导入（`snapshotJsonValue` 来自 `dsh-session`）、保持 `private`、补 fork 的 `./invariant` 伴生。需要 CPython 3.10 或更新。
+- `ptc-runtime-python` 整包替换为 `packages/experimental/ptc-runtime-python` 的上游 experimental 包，适配 fork 导入（`snapshotJsonValue` 来自 `dsh-session`）、保持 `private`、补 fork 的 `./invariant` 伴生。需要 CPython 3.10 或更新。
 - 修复 alpha.2/alpha.3 同步引入的两处 fork 回归：`loadLiveSnapshot` 的 `!state.materialized` 守卫，以及 `list-children` 的 seq gate 与 `origin`/`agentPreset` 生命周期见证键。
 
 代码有意保留以下 CoHarness 决定：

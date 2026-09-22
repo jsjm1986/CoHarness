@@ -142,6 +142,8 @@ function withCompaction(raw: string, meter: TokenMeter): string {
     at({
       type: 'user/message',
       data: {
+        id: 'seeded-history-compact-checkpoint',
+        role: 'user',
         content: [{
           type: 'text',
           text: '<context_checkpoint>Model-only compact checkpoint.</context_checkpoint>',
@@ -150,7 +152,7 @@ function withCompaction(raw: string, meter: TokenMeter): string {
           kind: 'plugin', plugin: 'compact', compactionId, sourceCommandId: commandId,
         },
       },
-      surfaceOp: { op: 'replace', start: first, end: last },
+      surfaceOp: { op: 'replace', startSeq: first, endSeq: last },
       sourceEventSeqs: [startSeq, summarySeq, ...surfaceSeqs],
     })
     at({

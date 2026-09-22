@@ -16,6 +16,10 @@
 
 搜索与抓取没有共享请求 schema 或业务逻辑，但有意共用一个 seam：`ctx.web` 是单一 web 访问中间层，拥有一项提供方选择策略、一套中止／错误词汇和一个面向产品的「该 harness 如何访问 web」配置接口。成对的 `Search`／`Fetch` 方法保持并行是有意为之。
 
+## 概述
+
+使用 `dsh-web` 搜索 web 或抓取 URL，而无需让调用方依赖特定厂商。它为每项操作选择可用后端，并为调用方提供一致的取消、错误和结果上限。在调用 `ctx.web.search()` 或 `ctx.web.fetch()` 的插件或工具中选择它；已交付的 `dsh-tool-web` 工具会为你加载它。搜索或抓取需要已配置且可用的提供方，因为本包自身不发起网络请求。
+
 ## 服务 API（`ctx.web`）
 
 | 成员 | 语义 |
@@ -47,9 +51,13 @@
 
 `WebSearchRequest`（`query`、`maxResults?`）→ `WebSearchResult`（`content?`、`sources[]`、`truncated`）；每个 `WebSearchSource` 都有必填 `url` 与可选 `title`／`snippet`／`publishedAt`（Perplexity 引用可能只含 URL）。`WebFetchRequest`（`url`）→ `WebFetchResult`（最终 `url`、`statusCode`、`body`、`truncated`）；取消作为可选的直接 `AbortSignal` 参数传给 `search()`／`fetch()`。`WebFetchBody` 是这里拥有的封闭判别联合（`html` | `text`）；消费方使用 `switch` 实现穷尽检查，因此新增类型会导致编译失败，直到处理完毕。完整约定见 `src/types.ts`，其中也包含 `WebError` code 分类体系。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 定义提供方之上的搜索/抓取契约；供应商状态留在各提供方之后。
+
 ## 模型体验
 
-通过 `dsh-tool-web` 间接影响；该工具会保留有界的规范化提供方数据，或者原样保留以下失败：已配置的提供方缺失、提供方不可用、无提供方、存在多个提供方以及 `Error: <message>`；本注册表自身不贡献提示词或 schema。
+间接地，通过 `dsh-tool-web`：该工具把 seam 规范化的搜索结果与抓取正文渲染给模型，而本服务不贡献任何提示词或 schema。
 
 #### KV Cache 影响
 

@@ -12,6 +12,11 @@
 
 设置所有者共用本包定义的不依赖 React 的 `SettingsScopeSpec`、`SettingsScope` 与快照类型。ui-settings 拥有 `ctx.settingsScope.bind(spec)`、对应的 Host 传输、schema 校验与生命周期；详见[该包的约定](../ui-settings/README.zh.md)。
 
+## 概述
+
+使用 `dsh-client-runtime` 作为客户端对象层：它引导 Cordis 浏览器上下文，持有 `Session`/`Workspace` 运行时对象、共享宿主事件流的分发、投影存储与会话视图订阅的历史分页。客户端会话一律由宿主创建；域包经此层读取属主事件与投影切片，自身不持有会话状态。
+
+
 ## Workspace 文件资源
 
 `WorkspaceResourceRegistry` 按明确的 runtime 目标和 Session 相对资源地址保留元数据。启动连接使用独立的 `base` 身份；各项目连接在 Host 握手声明支持文件后，以自己的 API client 注册 `workspaceResourceProvider(api)`。文件请求不从当前焦点面板推导目标。Host 的 `workspaceFileMaxResources` 配置限制每个 runtime 保留的记录数；空闲记录按使用顺序淘汰，全部记录活跃时拒绝超限接入。
@@ -74,7 +79,7 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 Definition 作者只根据当前事件完成匹配，为每条关联事件提供稳定业务 id，并保证 update 能按日志 `seq` 回放；renderer 只消费最终 Node data 与受限 Location value，不扫描 Session 或 Chat 集合。完整注册和分页路径见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 
-`ui-conversation` 注册内建 Chat Definition 与 keyed Chat snapshot builder。append 来源的 user、assistant 和 Tool result 构成人类可见记录；仅供模型使用的 replacement 副本不进入 Chat，compaction 检查点除外，它会成为独立标记，并在更早分页补齐 summary 溯源后更新。持久 inbox splice Context 能把 next-step 用户消息判定为 steering，无须让 inbox 状态成为 Session 特例。上下文消息保留生产者 provenance 与 form。StatsLine 读取 `ConversationSnapshot.chat.legacy.nodes`；Session 则把该 legacy slice 镜像到顶层 `nodes`、`partial` 和 `runningCalls` 公共兼容字段，无须运行第二套业务 fold。`ui-trajectory` 在同一个 Session 窗口上注册独立 Definition 与 target builder；它保留现有的 stage-oriented view model，既不消费 Chat 兼容字段，也不运行另一套 history fold。
+`ui-conversation` 注册内建 Chat Definition 与 keyed Chat snapshot builder。append 来源的 user、assistant 和 Tool result 构成人类可见记录；仅供模型使用的 replacement 副本不进入 Chat，compaction 检查点除外，它会成为独立标记，并在更早分页补齐 summary 溯源后更新。持久 inbox splice Context 能把 next-step 用户消息判定为 steering，无须让 inbox 状态成为 Session 特例。上下文消息保留生产者记录与 form。StatsLine 读取 `ConversationSnapshot.chat.legacy.nodes`；Session 则把该 legacy slice 镜像到顶层 `nodes`、`partial` 和 `runningCalls` 公共兼容字段，无须运行第二套业务 fold。`ui-trajectory` 在同一个 Session 窗口上注册独立 Definition 与 target builder；它保留现有的 stage-oriented view model，既不消费 Chat 兼容字段，也不运行另一套 history fold。
 
 Chat builder 为每个 Session 保留一个 mutable keyed store。内容更新只通知受影响的 node key；结构变化才重建顺序和 Location 成员关系；prepend 只增加行，不替换既有 keyed value。每个 Assistant chunk 都会更新 Definition State，但最多每个 animation frame 请求一次物化；final message 与 Turn/Step 关闭会立即发布。参见 [Client Tool 展示所有权决策](../../../.agents/notes/implemented/architecture/2026-08-08-client-tool-presentation-ownership.zh.md)。
 

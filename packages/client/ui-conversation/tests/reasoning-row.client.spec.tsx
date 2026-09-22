@@ -98,7 +98,7 @@ describe('ReasoningRow', () => {
     )
 
     expect(view.getByText('Inspect the session')).toBeTruthy()
-    fireEvent.click(view.getByText('Think'))
+    fireEvent.click(view.getByText('思考'))
     expect(view.container.querySelector('[class*="thinkBody"]')?.textContent).toBe(text)
   })
 
@@ -117,7 +117,7 @@ describe('ReasoningRow', () => {
     expect(row.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByText(/Check persistence/)).toBeTruthy()
 
-    fireEvent.click(view.getByText('Think'))
+    fireEvent.click(view.getByText('思考'))
     expect(row.getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -130,9 +130,9 @@ describe('ReasoningRow', () => {
         renderMessageImages={renderMessageImages}
       />,
     )
-    fireEvent.click(view.getByText('Think'))
+    fireEvent.click(view.getByText('思考'))
     expect(view.getAllByText(/Inspect the session/)).toHaveLength(1)
-    expect(view.queryByText('IN')).toBeNull()
+    expect(view.queryByText('输入')).toBeNull()
     expect(view.container.querySelector('[class*="ioCard"]')).toBeNull()
     expect(view.container.querySelector('[class*="thinkBody"]')).not.toBeNull()
   })

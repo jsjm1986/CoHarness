@@ -4,9 +4,13 @@ English | [中文](README.zh.md)
 
 The workflow seam (`ctx.workflowEngine`) executes a model-written orchestration script that can fan out subagents. The seam defines the script, run, result, error, and event contracts; an engine decides how to isolate and execute the script.
 
-`@deepseek-ai/dsh-workflow-worker-thread` is the current engine and `@deepseek-ai/dsh-tool-workflow` is the model-facing consumer. A future process or sandbox engine can replace the implementation without changing the tool.
+`@deepseek-ai/dsh-workflow-ptc` is the current engine and `@deepseek-ai/dsh-tool-workflow` is the model-facing consumer. A future process or sandbox engine can replace the implementation without changing the tool.
 
 The package root is the Host face. The browser-safe `@deepseek-ai/dsh-workflow/types` subpath contains run identities, metadata, results, and observe-only lifecycle payloads without importing `Agent`, Cordis services, or Host context declarations; Host-only `WorkflowStartRequest` and `WorkflowRun` live behind the package root.
+
+## Summary
+
+Run a plain-JavaScript orchestration script that fans work out to subagents and returns the script's final JSON value. Scripts can use `agent()`, `parallel()`, `pipeline()`, `phase()`, and `log()`; models normally access them through the `workflow` tool. Each run belongs to its caller, attributes every child to the invoking agent, resolves failures and cancellation without rejecting its result, and awaits script and child cleanup during disposal. The caller must supply an execution engine, allowing the isolation strategy to change without altering visible behavior.
 
 ## Service and run contract
 
@@ -44,11 +48,11 @@ A child that resolves normally with a non-completed stop reason is not an infras
 
 ## Model Experience
 
-Indirectly, through `dsh-tool-workflow` and a workflow engine, which create child-agent requests and return a retained parent tool result.
+Indirectly, through its consumer `dsh-tool-workflow` and a workflow engine, which render the parent tool result and the child-agent requests.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the named consumer and engine own any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

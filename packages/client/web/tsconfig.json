@@ -9,16 +9,7 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/loader"
-    },
-    {
       "path": "../modules"
-    },
-    {
-      "path": "../ui-slots"
     },
     {
       "path": "../ui-primitives"
@@ -27,7 +18,13 @@
       "path": "../ui-renderer"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/loader"
     }
   ],
   "exclude": [

@@ -1,0 +1,17 @@
+# Activation-capacity overlay: keep the default composition and cap live
+# continuable children per root at one, so a second continuable start is
+# rejected while the first child stays resident. The fixture fences child
+# execution behind the parent's turn so the settlement notice opens its own
+# turn deterministically.
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: subagent
+        name: '@deepseek-ai/dsh-subagent'
+        config:
+          maxActiveSubagents: 1
+      - insert:
+          - id: subagent-activation-limit
+            name: './tests/fixtures/subagent-activation-limit.ts'

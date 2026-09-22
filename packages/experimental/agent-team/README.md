@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Implicit-root Agent Teams domain. `ctx.agentTeams` owns a flat Lead/teammate roster, a durable peer mailbox, and a shared task DAG in the Lead Session log. The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) owns the coordination and isolation decisions; the [Team subsystem catalog](../../../docs/subsystems/agent-team.md) records the literal durable shapes and service API.
 
+## Summary
+
+`dsh-experimental-agent-team` turns one coding session into a small working team: the session's agent becomes the Lead, creates named teammates for delegated work, exchanges durable messages with them, and tracks shared tasks on a common board. Messages and task state survive crashes, reloads, and interruptions, so a teammate that was offline receives its queued messages when it resumes. It provides no tools of its own — mount the sibling `dsh-experimental-tool-agent-team` so the model can create teammates, message them, and use the task board. It is published under its experimental name, carries no stability promise, and needs durable session storage to activate.
+
 ## Config
 
 ```yaml
@@ -57,7 +61,7 @@ The separate `./invariant` companion replays each candidate Team event against i
 
 #### What the model sees
 
-Each delivered peer message is a user-role message. A short first text block names its stable message id and sender; the sender's original content blocks follow unchanged. Roster, task, and mailbox records themselves are log-only and never enter derived model history.
+Each delivered peer message is a user-role message. A short first text block names its stable message id and sender; the sender's original content blocks follow unchanged. Roster, task, and mailbox records are log-only and never enter derived model history.
 
 #### Token effect
 

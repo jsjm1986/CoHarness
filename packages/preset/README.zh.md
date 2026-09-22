@@ -14,3 +14,10 @@
 本组假定的组装划分是：注册表与跨会话设施是进程单例，留在宿主组装中；preset 只承载单个 agent 对它们的贡献。若 preset 中某一行发布了进程级全局服务，挂载时即被拒绝，而不是留到与下一个会话相撞。
 
 设计详见 [按会话组装 agent preset 的 Agent Note](../../.agents/notes/implemented/architecture/2026-08-03-per-session-agent-presets.zh.md)。
+
+[`AgentPresets` 参考](../../docs/subsystems/core.zh.md#ctxagentpresets--agentpresets)记录发现、挂载、继承与重组；[scope](../../docs/subsystems/scope.zh.md)负责挂载加入 agent 所用的 scope 键与父链，[system prompt](../../docs/subsystems/system-prompt.zh.md)负责预设提示词节的注册与装配。
+
+
+## 概述
+
+preset 组提供按会话的 agent（智能体）组装：agent preset 是一个目录，内含一份 `agent.cordis.yml`；从 preset 组装的会话会使用该 preset 的工具、提示词段落与 skill（技能），而其他会话仍各自使用自己的工具、提示词段落与 skill。`agent-presets` 拥有名单——对已配置根目录与 harness home 的发现、受防护的按 agent 挂载，以及仅通过复制创建 preset 的方式——`persona` 则提供可组装的行，让 preset 不止能改变 agent 的工具，也能改变它的身份。两者合起来让一个进程可以同时运行多个组装方式不同的 agent。

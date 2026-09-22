@@ -2,16 +2,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import { createApiRemoteAgentResolver } from '@deepseek-ai/dsh-api-remotes'
+import { SessionAlreadyOwnedError } from '@deepseek-ai/dsh-session-persistence'
 import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 
 const sid = (value: string): SessionId => value as SessionId
 
 function header(id: SessionId): SessionHeader {
-  return { version: 0, id, createdAt: 1, isSeeded: false, cwd: '/proj' }
+  return { version: SESSION_FORMAT_VERSION, id, createdAt: 1, isSeeded: false, cwd: '/proj' }
 }
 
 async function createContext(): Promise<Context> {
@@ -28,7 +29,7 @@ function provideSession(
   inspect: () => Promise<{ meta: SessionHeader; events: SessionEvent[] }>,
 ): void {
   ctx.provide('sessionPersistence', {
-    list: () => Promise.resolve([meta]),
+    list: () => Promise.resolve([{ header: meta, revision: `rev:${meta.id}` }]),
     inspect,
     locate: () => undefined,
   } as never)
@@ -48,7 +49,7 @@ describe('API Remote Agent resolver races', () => {
       events: [],
     }))
 
-    const result = await createApiRemoteAgentResolver(ctx, {})(sessionId)
+    const result = await createApiRemoteAgentResolver(ctx, {}).agentFor(sessionId)
 
     expect(result).toMatchObject({ error: { code: 'session-not-found', details: { sessionId } } })
     await ctx.fiber.dispose()
@@ -68,7 +69,7 @@ describe('API Remote Agent resolver races', () => {
       return { agent: stubAgent(ctx, published), dispose: () => Promise.resolve() }
     })
 
-    const result = await createApiRemoteAgentResolver(ctx, {})(sessionId)
+    const result = await createApiRemoteAgentResolver(ctx, {}).agentFor(sessionId)
 
     expect(result).toMatchObject({ agent: { id: sessionId } })
     expect(resume).toHaveBeenCalledWith({ resumeSessionId: sessionId })
@@ -85,7 +86,7 @@ describe('API Remote Agent resolver races', () => {
     })
     const resume = vi.spyOn(ctx.agents, 'resume')
 
-    const result = await createApiRemoteAgentResolver(ctx, {})(sessionId)
+    const result = await createApiRemoteAgentResolver(ctx, {}).agentFor(sessionId)
 
     expect(result).toMatchObject({ error: { code: 'agent-busy' } })
     expect(resume).not.toHaveBeenCalled()
@@ -104,11 +105,29 @@ describe('API Remote Agent resolver races', () => {
         throw new Error('session id already published')
       })
 
-      const result = await createApiRemoteAgentResolver(ctx, {})(sessionId)
+      const result = await createApiRemoteAgentResolver(ctx, {}).agentFor(sessionId)
 
       expect(result).toMatchObject({ error: { code: 'agent-busy' } })
       await ctx.fiber.dispose()
     }
+  })
+
+  it('maps a held Session writer to session-writer-held without reclassifying other resume failures', async () => {
+    const ctx = await createContext()
+    const sessionId = sid('writer-held-resume')
+    const meta = header(sessionId)
+    provideSession(ctx, meta, () => Promise.resolve({ meta, events: [] }))
+    const resume = vi.spyOn(ctx.agents, 'resume')
+      .mockRejectedValue(new SessionAlreadyOwnedError(sessionId))
+
+    const resolver = createApiRemoteAgentResolver(ctx, {}).agentFor
+    await expect(resolver(sessionId)).resolves.toMatchObject({
+      error: { code: 'session-writer-held', details: { sessionId } },
+    })
+
+    resume.mockRejectedValue(new Error('unrelated failure'))
+    await expect(resolver(sessionId)).resolves.toMatchObject({ error: { code: 'internal' } })
+    await ctx.fiber.dispose()
   })
 
   it('uses the shared cold-resume policy for the Agent Host Context', async () => {

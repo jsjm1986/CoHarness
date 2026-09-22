@@ -24,7 +24,7 @@ import {
 } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
-import { FIRST_PARTY_SECTION_ORDER } from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-system-prompt'
 import {
   assertAllowedModelSelection,
   hasConfiguredLlmSelection,
@@ -45,7 +45,7 @@ export const name = 'tool-subagent'
 export const inject = ['tools', 'subagents', 'systemPrompt', 'sessionProjections']
 
 /** Prompt order after bounded delegation policy and before child messaging. */
-const SUBAGENT_SECTION_ORDER = FIRST_PARTY_SECTION_ORDER.TOOL_SUBAGENT
+const SUBAGENT_SECTION_ORDER = 'TOOL_SUBAGENT' as const
 
 /** Config: which registered provider this tool delegates to, plus child defaults. */
 export interface Config {
@@ -94,13 +94,14 @@ export interface Config {
     deny?: string[]
   }
   /**
-   * Maximum child depth: a non-negative safe integer (default `3`; `0` forbids
-   * delegation entirely), or `'provider-managed'` to send no cap. A numeric cap
+   * Maximum child depth: a non-negative safe integer (`0` forbids delegation),
+   * or `'provider-managed'` to send no cap. A numeric cap
    * requires the provider's `depthLimit` capability (mount fails loud
    * otherwise). The provider checks the calling agent's current depth at every
    * start; the tool remains model-visible so runtime policy owns rejection.
    * `'provider-managed'` is for an out-of-process provider whose recursion
-   * budget belongs to the child runtime or its own deployment.
+   * budget belongs to the child runtime or its own deployment. Omission reads
+   * the current Host subagent depth setting (default `1`) at each delegation.
    */
   maxDepth?: number | 'provider-managed'
 }
@@ -129,7 +130,7 @@ export const Config: z<Config> = z.object({
     allow: z.array(z.string()).default(undefined as unknown as string[]),
     deny: z.array(z.string()).default(undefined as unknown as string[]),
   }).default(undefined as unknown as { allow: string[]; deny: string[] }),
-  maxDepth: z.union([z.natural().max(Number.MAX_SAFE_INTEGER), z.const('provider-managed' as const)]).default(3),
+  maxDepth: z.union([z.natural().max(Number.MAX_SAFE_INTEGER), z.const('provider-managed' as const)]),
 })
 
 /** Render text blocks from the canonical JSON block array without trusting arbitrary values. */
@@ -330,7 +331,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   ctx.sessionProjections.register(subagentModelSelectionProjectionDefinition)
 
   const assertSubagentProviderConfiguration = (subagentProvider: SubagentProvider): void => {
-    if (typeof config.maxDepth === 'number' && !subagentProvider.capabilities.depthLimit) {
+    if (ctx.subagents.resolveMaxDepth(config.maxDepth) !== undefined && !subagentProvider.capabilities.depthLimit) {
       throw new Error(
         `tool-subagent: provider "${subagentProvider.name}" cannot enforce maxDepth (no depthLimit capability) — `
         + 'set maxDepth: \'provider-managed\' to leave the recursion budget to the provider',
@@ -515,7 +516,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
             }
           }
           exec.signal.throwIfAborted()
-          const maxDepth = typeof config.maxDepth === 'number' ? config.maxDepth : undefined
+          const maxDepth = runtimeCtx.subagents.resolveMaxDepth(config.maxDepth)
           const request = {
             label: args.description,
             prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
@@ -601,7 +602,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
       // absent, and the registration itself stays owned by this plugin fiber.
       runtimeCtx.systemPrompt.section({
         name: `tool:${toolName}`,
-        order: SUBAGENT_SECTION_ORDER,
+        order: runtimeCtx.systemPrompt.getSectionOrder(SUBAGENT_SECTION_ORDER),
         text: context => mounted === undefined || runtimeCtx.tools.get(toolName, context.scope) === undefined
           ? ''
           : `Use ${toolName} in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set \`run_in_background: false\` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.`,
@@ -623,6 +624,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   }
   const selectForSession = (target: Session): ModelSelectionPolicy | undefined => {
     const freshSession = target.firstLiveSeq === 0
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       && target.eventAt(SessionSeq(0))?.type !== 'session/end-seed'
     let allowedModels = subagentModelSelectionPolicy(ctx.sessionProjections, target)
     if (allowedModels === undefined) {

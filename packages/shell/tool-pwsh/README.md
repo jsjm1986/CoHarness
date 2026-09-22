@@ -10,6 +10,10 @@ The package root exposes only the Cordis plugin contract (`name`, `inject`, `Con
 
 The plugin also contributes the `tool:pwsh` prompt section (order 105): non-zero exits are reported as `[exit code: N]` markers, and Windows interruption settles as exit 1 without a signal marker.
 
+## Summary
+
+`dsh-tool-pwsh` gives the agent a `pwsh` tool that runs PowerShell commands through the mounted shell executor — the Windows counterpart of `dsh-tool-bash`, mirroring it call-for-call. Each call runs in a fresh pwsh process, so no state survives; `run_in_background` turns long-running commands into background jobs. Commands are PowerShell-dialect: native `C:\...` paths and `$env:NAME` variables, with no dialect translation. Every call runs with the managed `DSH_*` environment, and under a sandboxing executor the tool teaches and enforces the Windows-specific language-mode and named-pipe contracts. Mount it with a PowerShell executor such as `dsh-pwsh-local` and the `dsh-shell-env` plugin.
+
 ## Tools
 
 ### `pwsh`
@@ -40,13 +44,17 @@ When `run_in_background` is true, this plugin preflights `ctx.jobs.start()` befo
 
 The tool owns its `presentCall`/`presentResult` render intent. A foreground call is a `terminal` card carrying command, description, and optional cwd; a `run_in_background` call is a `generic` card with the raw command, mirroring the bash tool's background presentation. A completed foreground result is a `terminal` card too: the exit marker becomes the card's exit-status pill (`exitCode`/`signal`), and the marker-free body is the card's output — exactly the bash tool's terminal-card story, via the shared exit-status parse from `@deepseek-ai/dsh-shell`. Background acks and execution errors stay `generic` cards with the rendered output in a `console` fence. These presenters are pure and replay-safe.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tool adapts model calls onto the `ctx.shell` executor and `ctx.jobs` runtime; process and job state are owned by those services.
+
 ## Model Experience
 
 ### System prompt
 
 #### What the model sees
 
-Every request in this plugin's registration scope contains the pwsh guidance below. Scoped tool restrictions can hide the schema without removing this independently registered section.
+Every request in this plugin's registration scope contains the pwsh guidance below at first-party order 1010. Scoped tool restrictions can hide the schema without removing this independently registered section.
 
 ##### Pwsh guidance
 
@@ -80,7 +88,7 @@ Prefix-stable while visibility and the tool definition are unchanged. A restrict
 
 #### What the model sees
 
-The renderer emits the data-dependent stdout tail, then optional `[stderr]` and the stderr tail. Conditional lines are exactly `[output truncated; full output: <path>]`, `[sandbox: file access denied under <mode> mode]` plus the escalation hint `[sandbox: escalation available — …]` (only when the composition advertises escalation), `[timed out after <timeoutMs>ms]`, `[killed by signal: <signal>]`, and `[exit code: <exitCode>]` (nonzero exits only); an empty body renders as `(no output)`.
+The renderer emits the data-dependent stdout tail, then optional `[stderr]` and the stderr tail. Conditional lines are exactly `[output truncated; full output: <path-or-(unavailable)>]`, `[sandbox: file access denied under <mode> mode]` plus the escalation hint `[sandbox: escalation available — …]` (only when the composition advertises escalation), `[timed out after <timeoutMs>ms]`, `[killed by signal: <signal>]`, and `[exit code: <exitCode>]` (nonzero exits only); an empty body renders as `(no output)`.
 
 #### Token effect
 
@@ -108,7 +116,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Validation and infrastructure failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, `invalid escalation: sandbox_permissions requires a justification`, `invalid escalation: justification is only valid together with sandbox_permissions`, `invalid justification: expected a non-empty sentence`, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the shared escalation failures (not strictly wider / no approval service / no agent to route / no approval channel / user rejected / was cancelled), `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `tool call aborted`.
+Validation and infrastructure failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, the escalation pairing failures, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the shared escalation failures (not strictly wider / no approval service / no agent to route / no approval channel / user rejected / was cancelled), `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `tool call aborted`.
 
 #### Token effect
 

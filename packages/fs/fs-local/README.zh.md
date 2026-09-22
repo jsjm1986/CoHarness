@@ -12,6 +12,10 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 // freshness policy gate and @deepseek-ai/dsh-tool-fs to expose read/write/edit.
 ```
 
+## 概述
+
+使用 `dsh-fs-local` 可在宿主文件系统上读取、列出、原子写入和编辑文件。相对路径从可配置的基准目录解析，而绝对路径和父目录遍历不受限制。到达同一文件的路径和符号链接共享一个身份。写入保留文件权限，可选版本防护会拒绝陈旧覆盖。直接访问宿主文件时选择本包；需要约束变更时使用 `fs-sandbox`。
+
 ## 行为
 
 - **`resolve(path, opts?)`**：相对 `path` 在调用方提供 `opts.cwd` 时以该值为基准解析（面向模型的工具会传入调用 agent（智能体）的会话 cwd；见[每会话 cwd Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.zh.md)），否则以 `config.cwd` 为基准（默认 `process.cwd()`）；绝对 `path` 会忽略两者。`opts.signal` 会在本地解析前后检查，远程同级后端则可以用它中止往返。`targetKey` 是文件的 `realpath`，因此经符号链接到达同一文件的两个输入路径会共享一个身份，写入/编辑落在链接目标上，同时保留链接。尚不存在的路径在父目录存在时使用 realpath 后的父目录加 basename；只有父目录无法解析时才回退到绝对路径。`displayPath` 是绝对但未经解析的路径。
@@ -25,9 +29,13 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 
 包根 SDK 接口包含默认/具名 `LocalFileSystem` 类和 `Config`。原始 I/O 位于 `src/fsio.ts`（不依赖 Cordis，单独进行单元测试）；`src/index.ts` 是轻量服务接线。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每个原语委托给作为唯一权威的宿主文件系统；提供方不保留影子状态。
+
 ## 模型体验
 
-通过 [`dsh-tool-fs`](../tool-fs/README.zh.md) 间接产生影响；该消费方把本提供方带行窗口的 UTF-8 内容、变更确认和提供方消息原文渲染为有保留上限的结果，而版本、原子写入机制和目录元数据仍属内部细节。
+通过 `dsh-tool-fs` 间接产生影响；该消费方把本提供方带行窗口的 UTF-8 内容、变更确认与提供方消息原文渲染为有保留上限的结果，而版本、原子写入机制与目录元数据仍属内部细节。
 
 #### KV Cache 影响
 

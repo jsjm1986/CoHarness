@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
-import { SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
   SessionAlreadyOwnedError,
   SessionPersistenceRevision,
@@ -14,24 +14,29 @@ class MemoryPersistence extends SessionPersistence {
   override readonly supportsRawArtifacts = false
   readonly appended: SessionEvent[][] = []
 
-  locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
-  async create(_meta: SessionHeader): Promise<void> {}
-  async append(_id: SessionId, events: readonly SessionEvent[]): Promise<void> { this.appended.push([...events]) }
-  async load(_id: SessionId): Promise<SessionInspection> { return { meta: header, inheritedEventCount: SessionLogOffset(0), events: [] } }
-  async inspect(_id: SessionId): Promise<SessionInspection> {
+  override locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
+  override async createStored(_meta: SessionHeader): Promise<void> {}
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly import('../src/index.ts').SessionStorageMetadata[] { return [] }
+  override async append(_id: SessionId, events: readonly SessionEvent[]): Promise<void> { this.appended.push([...events]) }
+  override async load(_id: SessionId): Promise<SessionInspection> {
     return { meta: header, inheritedEventCount: SessionLogOffset(0), events: [] }
   }
-  async readFrom(_id: SessionId, fromSeq: SessionLogOffset): Promise<SessionEventSuffix> {
+  override async inspect(_id: SessionId): Promise<SessionInspection> {
+    return { meta: header, inheritedEventCount: SessionLogOffset(0), events: [] }
+  }
+  override async readFrom(_id: SessionId, fromSeq: SessionLogOffset): Promise<SessionEventSuffix> {
     return { meta: header, inheritedEventCount: SessionLogOffset(0), fromSeq, events: [] }
   }
-  async list(): Promise<SessionHeader[]> { return [header] }
-  async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
+  override async listStored(): Promise<SessionHeader[]> { return [header] }
+  override async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
     return [{ header, revision: SessionPersistenceRevision('memory') }]
   }
 }
 
 const header: SessionHeader = {
-  version: 0,
+  version: SESSION_FORMAT_VERSION,
   id: SessionId('handle-test'),
   createdAt: 1,
   isSeeded: false,

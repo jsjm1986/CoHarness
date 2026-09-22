@@ -6,6 +6,10 @@ The model-facing **`lsp` tool** over `ctx.lsp`: one read-only tool with four ope
 
 Namespace plugin (`name` / `inject` / `Config` / `apply`, no default export). Injects `tools`, `lsp`, and `systemPrompt`.
 
+## Summary
+
+`dsh-tool-lsp` lets a model navigate code through one read-only `lsp` tool: open a symbol's definition, find references and implementations, or read hover documentation. Requests use one-based UTF-16 line and character positions. Navigation results are bounded, grouped by file, and labeled when locations are omitted or text is truncated; hover results are normalized and distinguish missing information from errors. The package requires a configured LSP provider and a session workspace root. Choose it when textual search is ambiguous or a change needs precise symbol relationships; ordinary navigation should continue to use `search` and `read`.
+
 ## The tool
 
 `lsp` accepts `operation` (`goToDefinition` | `findReferences` | `goToImplementation` | `hover`), `file_path`, `line`, and `character`. `line` and `character` are positive, one-based UTF-16 cursor coordinates; the tool converts them to the seam's zero-based positions and converts rendered locations back. `findReferences` includes declarations so impact analysis does not omit the defining site. Provider, language id, workspace root, limits, timeout, initialization, and executable stay outside model input.
@@ -20,13 +24,17 @@ The tool requires the workspace root from the session `header.cwd`, with no fall
 | `maxResultChars` | `16000` | Largest complete rendered result, including truncation metadata. |
 | `timeoutMs` | `60000` | Tool-call timeout budget, enforced by `dsh-tool-call-timeout-policy`; covers the complete queued open/query/close lifecycle and is not model-configurable. |
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tool validates, converts, and bounds each request against `ctx.lsp`; provider state stays behind the seam.
+
 ## Model Experience
 
 ### System prompt
 
 #### What the model sees
 
-One system-prompt section (order 112) positions LSP as a precision aid with the following text:
+One system-prompt section (first-party order 2200) positions LSP as a precision aid with the following text:
 
 ##### Verbatim guidance
 

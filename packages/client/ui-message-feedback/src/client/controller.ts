@@ -305,7 +305,7 @@ export class MessageFeedbackController implements HostObservable<MessageFeedback
       return OK
     } catch (error) {
       if (this.disposed) return OK
-      const message = error instanceof Error ? error.message : 'message feedback list failed'
+      const message = error instanceof Error ? error.message : String(error)
       this.publish({ status: 'error', items: this.view.items, error: message })
       return { ok: false, error: { code: 'transport', message } }
     }
@@ -327,7 +327,7 @@ export class MessageFeedbackController implements HostObservable<MessageFeedback
         if (!loaded.ok) return loaded
         // Disposal can land while the seeding read is in flight; without this
         // second check the fiber would still reach the wire after unloading.
-        // oxlint-disable-next-line typescript/no-unnecessary-condition -- dispose() can run during the await.
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- disposal races the awaited read; flow narrowing misses it
         if (this.disposed) return DISPOSED
       }
       try {
@@ -337,7 +337,7 @@ export class MessageFeedbackController implements HostObservable<MessageFeedback
           ok: false,
           error: {
             code: 'transport',
-            message: error instanceof Error ? error.message : 'message feedback mutation failed',
+            message: error instanceof Error ? error.message : String(error),
           },
         }
       }

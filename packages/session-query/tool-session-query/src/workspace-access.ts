@@ -62,6 +62,7 @@ function callerOf(exec: ToolRunContext): Caller {
   return {
     id: agent.session.id,
     header: agent.session.header,
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     events: agent.session.snapshotEvents(),
   }
 }

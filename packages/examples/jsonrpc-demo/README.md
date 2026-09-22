@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/server/README.md) entry serves SDK clients over newline-delimited stdio. The config composes the spine, backends, and serving plugin. The published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project. The Python SDK's `dsh-jsonrpc-agent-pkg` [single-executable runtime](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md) uses `lib/packaged-bin.js` instead: packaged bare plugins resolve from its closed runtime tree, while relative plugins remain configuration-relative.
 
+## Summary
+
+Use `dsh-sdk-jsonrpc-demo` as the bin-only app that boots an external `cordis.yml` and serves SDK clients over newline-delimited stdio through its `jsonrpc` entry. The config composes the spine, backends, and serving plugin; the published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project.
+
+
 ## Config discovery
 
 The first non-empty channel wins: `$DSH_CORDIS_CONFIG`, then positional `argv[2]`. If neither names an existing file, the bin prints one-line usage to stderr and exits 1; there is no working-directory or built-in fallback. [`dsh-app-boot`](../../boot/app-boot/README.md) makes plugin load failures fatal. This protocol does not use `DSH_SNAPSHOT`.
@@ -18,13 +23,17 @@ stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exit
 
 stdout carries only JSON-RPC frames. The bin and boot guards diagnose on stderr, and the config must omit stdout loggers.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package supplies an entry point and a `cordis.yml`; all runtime relationships belong to the composed plugins.
+
 ## Model Experience
 
-Indirectly, through the plugins loaded from the external `cordis.yml`, which own every model-bound prompt, schema, message, and result; this bin adds none of its own.
+Indirectly, through the externally configured plugin tree, which owns all model context.
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

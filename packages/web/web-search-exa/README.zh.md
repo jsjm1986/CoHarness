@@ -6,6 +6,10 @@
 
 这是一个**实现**包：它向 `ctx.web` 注册提供方，不拥有 `ctx.web` 键，也不注册面向模型的工具（后者属于 `@deepseek-ai/dsh-tool-web`）。与 `@deepseek-ai/dsh-llm-deepseek` 一样，它是函数／命名空间插件（`inject: ['web']`），负责注册后端，而非默认导出服务。
 
+## 概述
+
+有了 `dsh-web-search-exa`，harness 可以通过 Exa 搜索 web，获得带可移植 snippet 与发布日期的厂商原生结果。当部署持有 Exa API 密钥、并希望使用 Exa 的关键词或神经搜索时选择它。Exa 不返回生成答案，因此结果不携带 `content`——只产出可引用的来源。没有非空白高亮的来源会被丢弃，因此一次调用返回的来源可能少于请求数量。面向模型的 `web_search` 工具位于 `dsh-tool-web`。
+
 ## 配置
 
 | 配置键 | 默认值 | 含义 |
@@ -28,9 +32,13 @@
 
 Exa 返回扁平 `results[]`，不返回生成答案，因此省略 `content`。每项结果映射为 `WebSearchSource`：`url` ← `url`、`title` ← `title`、`snippet` ← 第一个非空的 `highlights[]` 条目（没有高亮摘要的结果缺少可移植的 snippet，会被丢弃）、`publishedAt` ← `publishedDate`。请求的 `maxResults` 优先于已配置的默认 `numResults`，并作为 Exa `numResults` 发送，以优化成本和延迟；最终上限由 seam 强制执行。提供方失败（HTTP 错误、网络失败、响应体无法解析或结构不符）以 `WebError` `WEB_PROVIDER_ERROR` 呈现；中止请求以 `WEB_ABORTED` 呈现。HTTP 重定向会在访问 `Location` 指向的目标之前被拒绝，并以 `WEB_PROVIDER_ERROR` 呈现。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次查询是一次映射为规范化结果的无状态提供方请求；调用之间不保留搜索状态。
+
 ## 模型体验
 
-通过 [`dsh-tool-web`](../tool-web/README.zh.md) 间接影响；该工具保留此提供方经 `maxResults` 限制的 URL、标题、首条 highlight 与发布日期，或将确切的错误消息 `Exa search aborted`、`Exa search request failed: <error>` 和 `Exa returned an unprocessable response body: <error>` 置于消费方的错误包装层内；生成答案与提供方私有字段不进入上下文。
+通过 `dsh-tool-web` 间接影响模型体验。该工具保留本提供方经 `maxResults` 限制的 URL、标题、首条高亮与发布日期；如果发生失败，则会在消费方的错误包装层内保留原样错误消息 `Exa search aborted`、`Exa search request failed: <error>` 和 `Exa returned an unprocessable response body: <error>`。
 
 #### KV Cache 影响
 

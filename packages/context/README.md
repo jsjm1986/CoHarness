@@ -15,3 +15,8 @@ Product plugins that add model-visible request context without defining a tool. 
 | [`userdoc-context/`](userdoc-context/README.md) | Admitted context for user-uploaded documents | `userdoc/attached` |
 
 Session references are documented in [docs/subsystems/session-reference.md](../../docs/subsystems/session-reference.md); the [`agent-instructions` decision record](../../.agents/notes/implemented/feature/2026-06-24-workspace-context.md) owns its per-agent/session isolation and lifecycle split.
+
+
+## Summary
+
+The context group provides plugins that add model-visible context to each request without defining any tool: workspace instruction files become guidance, `@file` mentions offer path completion, other sessions can be referenced as bounded snapshots, and the model can see the current time and the agent's tmux location. All of them are opt-in except `agent-instructions`, which `dsh-base` includes by default and a profile patch can disable. Context is durable: injected instructions and references enter session history as user-role messages, so they persist, replay, and compact like other conversation content. This page maps the group; each package README owns the per-package contract.

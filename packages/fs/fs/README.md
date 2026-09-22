@@ -13,7 +13,11 @@ This package owns the Service Definition and provider contract layer of the four
 | provider contract | `@deepseek-ai/dsh-fs` (this) | `ctx.fs`: execution-world paths, text IO, and atomic mutation primitives (optional version guard); owns the `fs/*` event vocabulary |
 | provider | `@deepseek-ai/dsh-fs-local` | the host-filesystem implementation |
 
-`fs-sandbox` and `fs-e2b` implement this interface without touching the policy/tool layers.
+`fs-sandbox` implements this interface without touching the policy/tool layers.
+
+## Summary
+
+Use `dsh-fs` when an application needs consistent filesystem operations across host, confined, or remote execution environments. It lets consumers resolve stable file identities, map shared host files where supported, perform bounded text and byte reads, list directories, and apply atomic text writes and literal edits. Version guards are optional, so a backend works without policy enforcement; callers can supply a guard to reject a mutation after the file changes. Choose `fs-local` or `fs-sandbox` for host execution. Model-facing filesystem tools are provided separately by `dsh-tool-fs`.
 
 ## Service API (`ctx.fs`)
 

@@ -1,6 +1,5 @@
 /**
- * dsh-commands' owned branded id: command lifecycle pairing across the
- * session log, the wire admission response, and client-side flow pairing.
+ * Command definition identities and execution ids for discovery and lifecycle pairing.
  *
  * The `Branded<B>` primitive lives in `@deepseek-ai/dsh-brand`; this module
  * is a pure type/constructor outlet (no cordis imports, no module

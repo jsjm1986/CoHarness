@@ -6,6 +6,10 @@ An [Exa](https://exa.ai)-backed `WebSearchProvider` for the harness [web capabil
 
 This is an **implementation** package: it registers a provider into `ctx.web`, it does not own the `ctx.web` key and it does not register a model-facing tool (that is `@deepseek-ai/dsh-tool-web`). Like `@deepseek-ai/dsh-llm-deepseek`, it is a function/namespace plugin (`inject: ['web']`) that registers its backend, not a default-export service.
 
+## Summary
+
+With `dsh-web-search-exa`, the harness searches the web through Exa and gets vendor-native results with portable snippets and publication dates. Choose it when a deployment has an Exa API key and wants Exa's keyword or neural search. Exa returns no generated answer, so results carry no `content` — only citeable sources. A result with no non-blank highlight is dropped, so a call can return fewer sources than requested. The model-facing `web_search` tool lives in `dsh-tool-web`.
+
 ## Config
 
 | Key | Default | Meaning |
@@ -28,9 +32,13 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
 
 Exa returns a flat `results[]` and no generated answer, so `content` is omitted. Each result maps to a `WebSearchSource`: `url` ← `url`, `title` ← `title`, `snippet` ← the first non-empty `highlights[]` entry (a result with no highlight has no portable snippet and is dropped), `publishedAt` ← `publishedDate`. A request's `maxResults` wins over the configured `numResults` default and is sent as Exa's `numResults` for a cost/latency optimization; the final bound is enforced by the seam. Provider failures (HTTP errors, network failure, unparseable or wrong-shape bodies) surface as `WebError` `WEB_PROVIDER_ERROR`; an aborted request surfaces as `WEB_ABORTED`. HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Each query is one stateless provider request mapped into normalized results; no search state is retained between calls.
+
 ## Model Experience
 
-Indirectly, through [`dsh-tool-web`](../tool-web/README.md), which retains this provider's `maxResults`-bounded URLs, titles, first highlights, and publication dates or its exact `Exa search aborted`, `Exa search request failed: <error>`, and `Exa returned an unprocessable response body: <error>` failures under the consumer's error wrapper while generated answers and provider-private fields remain outside context.
+Indirectly, through `dsh-tool-web`, which retains this provider's `maxResults`-bounded URLs, titles, first highlights, and publication dates or its exact `Exa search aborted`, `Exa search request failed: <error>`, and `Exa returned an unprocessable response body: <error>` failures under the consumer's error wrapper.
 
 #### KV Cache effect
 

@@ -426,13 +426,19 @@ export class SessionProjectionRegistry extends Service {
    * fuller read path refolds it). The zero-I/O rung of the read ladder —
    * values are as stale as their rows, never wrong.
    * @param checkpoint - persisted rows for one session (possibly stale or empty).
+   * @param keys - optional wire keys to view.
    * @returns whole values per key with a usable row; empty when none.
    */
-  viewCheckpoint(checkpoint: ProjectionCheckpoint): Partial<SessionProjectionMap> {
+  viewCheckpoint(
+    checkpoint: ProjectionCheckpoint,
+    keys?: readonly Extract<keyof SessionProjectionMap, string>[],
+  ): Partial<SessionProjectionMap> {
     const values: Record<string, unknown> = {}
+    const selected = keys === undefined ? undefined : new Set<string>(keys)
     for (const registration of this.registrations.values()) {
       const def = registration.def
       if (def.wire === undefined) continue
+      if (selected !== undefined && !selected.has(def.key)) continue
       const row = checkpoint[def.key]
       if (row === undefined || row.ver !== def.stateVersion) continue
       let state: unknown
@@ -517,6 +523,61 @@ export class SessionProjectionRegistry extends Service {
     }
   }
 
+  /**
+   * Restore an exact cut and install its states on the supplied prepared Session.
+   * A later publication reuses these cells; ordinary live reads and event drive
+   * advance any constructor-owned suffix exactly once.
+   * @param session - exact prepared Session that owns the restored log prefix.
+   * @param checkpoint - persisted rows for this Session lifecycle.
+   * @param events - exact events at the observation cut.
+   * @param baseSeq - first supplied event sequence.
+   * @returns all projection values at the supplied cut.
+   */
+  hydrate(
+    session: Session,
+    checkpoint: ProjectionCheckpoint,
+    events: readonly SessionEvent[],
+    baseSeq: SessionLogOffset,
+  ): ProjectionSnapshot {
+    const endSeq: SessionSeqCursor = events.at(-1)?.seq ?? cursorBefore(baseSeq)
+    let complete = true
+    for (const registration of this.registrations.values()) {
+      const current = registration.cells.get(session)
+      if (current?.observedSeq !== endSeq) {
+        complete = false
+        break
+      }
+    }
+    if (complete) {
+      const values: Record<string, unknown> = {}
+      for (const registration of this.registrations.values()) {
+        if (registration.def.wire === undefined) continue
+        const current = registration.cells.get(session) as UnitCell
+        values[registration.def.key] = this.viewCell(registration, current)
+      }
+      return { asOfSeq: endSeq, values }
+    }
+    const restored = this.restore(
+      checkpoint,
+      events,
+      baseSeq,
+      session.header,
+      session.inheritedEventCount,
+    )
+    for (const registration of this.registrations.values()) {
+      const row = restored.checkpoint[registration.def.key]
+      if (row === undefined) continue
+      const current = registration.cells.get(session)
+      if (current !== undefined && current.observedSeq > row.seq) continue
+      registration.cells.set(session, {
+        state: row.val,
+        observedSeq: row.seq,
+        views: [undefined, undefined],
+      })
+    }
+    return restored.snapshot
+  }
+
   /** Fold one unit from init over `events`, producing a cell watermarked at the last folded event. */
   private buildCell(
     def: ErasedDefinition,
@@ -537,6 +598,7 @@ export class SessionProjectionRegistry extends Service {
         registration.def,
         session.header,
         session.inheritedEventCount,
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
         session.snapshotEvents(),
       )
       registration.cells.set(session, cell)
@@ -555,6 +617,7 @@ export class SessionProjectionRegistry extends Service {
   ): void {
     if (cell.observedSeq >= throughSeq) return
     for (let seq = cell.observedSeq + 1; seq <= throughSeq; seq += 1) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const event = session.eventAt(SessionSeq(seq))
       if (event === undefined || event.seq !== seq) {
         throw new Error(`session projection ${JSON.stringify(def.key)} cannot advance across missing seq ${String(seq)}`)
@@ -586,6 +649,7 @@ export class SessionProjectionRegistry extends Service {
           registration.def,
           session.header,
           session.inheritedEventCount,
+          // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
           session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(event.seq)),
         )
         registration.cells.set(session, cell)

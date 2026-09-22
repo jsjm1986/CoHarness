@@ -69,7 +69,7 @@ export class LocalFileReferenceService extends FileReferenceService {
       const fiber = agent.ctx.inject(['systemPrompt', 'tools'], (scope) => {
         scope.systemPrompt.section({
           name: 'context:file-reference',
-          order: 99,
+          order: scope.systemPrompt.getSectionOrder('FILE_REFERENCE'),
           text: () => agent.ctx.tools.get('read', agent) === undefined ? '' : FILE_REFERENCE_PROMPT,
         })
       })

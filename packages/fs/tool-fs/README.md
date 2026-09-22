@@ -16,6 +16,10 @@ await ctx.plugin(ToolFs)                                  // this package — re
 
 `read_image` registers only while a durable `ctx.attachments` service is mounted. Execution additionally requires the exact routed model to declare `image` input, resolved through `ctx.llm.resolveModelInfo` from the session's latest request header and then from agent options.
 
+## Summary
+
+Use `dsh-tool-fs` to let a model read UTF-8 files with line numbers, read supported images, create or atomically replace files, and apply targeted literal edits. Results are capped, and failures provide stable error codes and recovery instructions. Add `dsh-fs-observation-policy` when writes and edits must follow a successful read; without it, mutations remain atomic but are unconditional. Image reads require durable attachment storage and an image-capable routed model. Choose the sibling discovery package for glob or grep searches.
+
 ## Config
 
 All keys are optional; the defaults are the shipped read caps.
@@ -61,13 +65,17 @@ When `ctx.fs.sandboxMode` reports confinement, write/edit advertise `sandbox_per
 
 The package root exports only the Cordis plugin contract (`name`, `inject`, `Config`, and `apply`). Read rendering (line windowing + output formatting) lives in `src/read-render.ts` (Cordis-free, independently unit-tested); `src/read.ts`/`read-image.ts`/`write.ts`/`edit.ts` are the tool executors and `src/index.ts` composes them.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tools validate, window, and format calls against the `ctx.fs` provider; all file state belongs to the mounted backend.
+
 ## Model Experience
 
 ### System prompt
 
 #### What the model sees
 
-Every request in this plugin's registration scope receives the independently registered read, write, and edit guidance below. Scoped tool restrictions can hide schemas without removing these sections.
+At assembly time, each guidance section checks `ctx.tools.get(name, scope)` and renders only while its tool is visible to that agent. The write paragraph recommends edit only while edit is visible. The text below is unchanged when all three tools are available; restrictions, their removal, and tool registration changes take effect on the next assembly. The same check works for direct agent restrictions and subagent `toolFilter`, including PTC capabilities behind `run_code`. The read-before-mutation sentences in write/edit describe the observation policy, not a requirement to invoke the tool named `read`. They remain when `read` is hidden: the policy still guards mutations, and another observing operation, such as `str_replace_editor` with `command: view`, can establish the same file observation. Tool visibility does not disable that precondition.
 
 ##### Read guidance
 
@@ -89,11 +97,11 @@ Use the edit tool for targeted changes to existing UTF-8 text files. It replaces
 
 #### Token effect
 
-Fixed guidance cost per request while the plugin is active, even when a restriction hides one or more tools.
+Guidance cost follows the visible tools and their applicable cross-tool recommendations.
 
 #### KV Cache effect
 
-Prefix-stable while the plugin scope and guidance text are unchanged. Tool restrictions do not remove this section, but plugin activation or disposal may invalidate reuse from it.
+Prefix-stable while the visible tool set, plugin scope, and guidance text are unchanged. Restrictions or plugin lifecycle changes may invalidate reuse from the first changed section.
 
 ### Tool schemas
 
@@ -155,7 +163,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Failures are normalized as `Error: <message>`. This package's stable validation and read messages are `file_path must be a non-empty string`, `limit must be less than or equal to <max>`, `old_string must be a non-empty string`, `old_string and new_string must differ`, `cannot read "<path>": not found`, `cannot read "<path>": not a regular file`, `offset <offset> is out of range for "<path>" (<total> lines)`, `cannot read "<path>": read_image only accepts PNG/JPEG/WebP/GIF paths`, `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`, and the mismatch repair `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats`. A failed 16-bit conversion reports `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`. Provider and policy templates are quoted in their package READMEs. Guarded-mutation failures additionally carry their recovery instruction in the message, appended by this package's model-facing error wrapper: `FS_STALE_VERSION` gets `— re-read the file, then retry`, and `FS_NOT_OBSERVED` gets `— read the file, then retry`; the structured code is preserved. After that reread confirms absence, edit reports `FS_NOT_FOUND` instead of repeating a stale remedy, while write uses guarded creation.
+Failures are normalized as `Error: <message>`. This package's stable validation and read messages are `file_path must be a non-empty string`, `limit must be less than or equal to <max>`, `old_string must be a non-empty string`, `old_string and new_string must differ`, `cannot read "<path>": not found`, `cannot read "<path>": not a regular file`, `offset <offset> is out of range for "<path>" (<total> lines)`, `cannot read "<path>": the <ext> extension does not declare a supported image format; read_image accepts PNG/JPEG/WebP/GIF files, including extension-less files in those formats`, `cannot read "<path>": the file content is not a supported image format; read_image accepts PNG/JPEG/WebP/GIF`, `cannot read "<path>": the bytes do not decode as a supported PNG/JPEG/WebP/GIF image; the file may be truncated or corrupt`, `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`, and the mismatch repair `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats` (an extension-less mismatch reports `cannot read "<path>": the file signature claims <type>, but the bytes decode as a different image format; the file may be corrupt`). A failed 16-bit conversion reports `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`. Provider and policy templates are quoted in their package READMEs. The model-facing error wrapper normalizes every `FS_NOT_OBSERVED` source to `cannot modify "<path>": file has not been read — read the file, then retry`; `FS_STALE_VERSION` keeps the provider's reason and adds `— re-read the file, then retry`. Both retain the structured error code and original cause. After that reread confirms absence, `edit` reports `FS_NOT_FOUND` instead of repeating a stale remedy, while `write` uses guarded creation.
 
 #### Token effect
 

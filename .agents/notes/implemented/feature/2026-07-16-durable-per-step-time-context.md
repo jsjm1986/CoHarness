@@ -14,15 +14,15 @@ A process-local refresh cache makes displayed time depend on state that cannot s
 
 `@deepseek-ai/dsh-time-context` is an opt-in function plugin in `packages/context/time-context/`. Default compositions leave its disclosure and token cost disabled; the Schedule Web overlay mounts it so the model can interpret otherwise-unqualified dates and times in the browser zone attached to the current request.
 
-The plugin prepends an `agent/pre-step` listener and delegates first. When the downstream decision enters and a reading is due, it combines that decision's final messages with durable user messages already in the open turn, derives browser-zone provenance from exact `user-rpc` sources, and appends one reading to the decision. Rejection, listener failure, or an already-aborted signal records nothing. Steering claimed after the current batch keeps ordinary next-step ownership and receives a fresh reading when that step enters.
+The plugin prepends an `agent/pre-step` listener and delegates first. When the downstream decision enters and a reading is due, it combines that decision's final messages with durable user messages already in the open turn, derives browser-zone facts from exact `user-rpc` sources, and appends one reading to the decision. Rejection, listener failure, or an already-aborted signal records nothing. Steering claimed after the current batch keeps ordinary next-step ownership and receives a fresh reading when that step enters.
 
-Each Web prompt samples the browser's IANA zone. The Host validates and canonicalizes it before binding it to the exact durable user-message source. One unique zone in the open turn resolves the request; multiple zones produce a sorted `mixed` result; no zone is `unavailable`. A resolved request tells the model to interpret unqualified dates and times in that zone. Mixed or unavailable provenance tells it to ask the user to clarify.
+Each Web prompt samples the browser's IANA zone. The Host validates and canonicalizes it before binding it to the exact durable user-message source. One unique zone in the open turn resolves the request; multiple zones produce a sorted `mixed` result; no zone is `unavailable`. A resolved request tells the model to interpret unqualified dates and times in that zone. Mixed or unavailable zone records tell it to ask the user to clarify.
 
-This message-bound provenance is not copied to `SessionHeader`, a connection default, or Schedule state. Time-context owns model guidance only. A tool accepting local calendar fields must still make its own explicit boundary; Schedule therefore requires `time_zone` rather than importing this plugin's reading ([decision](../simplification/2026-08-09-explicit-schedule-time-zone.md)).
+This message-bound zone record is not copied to `SessionHeader`, a connection default, or Schedule state. Time-context owns model guidance only. A tool accepting local calendar fields must still make its own explicit boundary; Schedule therefore requires `time_zone` rather than importing this plugin's reading ([decision](../simplification/2026-08-09-explicit-schedule-time-zone.md)).
 
 The resolved browser zone also formats the reading's timestamp. Mixed or unavailable requests use the configured `timeZone` fallback, or the Node process zone resolved once at plugin load when config is omitted, while retaining the clarify policy. Every fallback is validated through `Intl.DateTimeFormat`.
 
-Each reading uses the exact snapshot source `{ kind: 'plugin', plugin: 'time-context', form: 'snapshot', sections: [{ name: 'time-context', text: <same text> }] }`. The invariant companion checks the snapshot shape, re-derives current-turn browser provenance from the original user-rpc messages, and validates the rendered timestamp zone and elapsed baseline.
+Each reading uses the exact snapshot source `{ kind: 'plugin', plugin: 'time-context', form: 'snapshot', sections: [{ name: 'time-context', text: <same text> }] }`. The invariant companion checks the snapshot shape, re-derives current-turn browser-zone records from the original user-rpc messages, and validates the rendered timestamp zone and elapsed baseline.
 
 The optional `refreshIntervalMs` config is a non-negative safe integer. Omission or `0` injects on every eligible entered step. A positive value scans raw Session events for the latest plugin reading and injects when none exists, wall time moved backward, or the event is old enough. The event timestamp governs after compaction and resume without a process-local cache. The Schedule Web overlay omits the interval so every request step gets current browser guidance.
 
@@ -58,7 +58,7 @@ The plugin contributes nothing to system-prompt assembly or `request/header`. Re
 - **Persist a Session default zone** — rejected because the browser fact belongs to one prompt; travel and concurrent tabs must not mutate shared meaning or spread zone state through Session, fork, and persistence contracts.
 - **Copy the browser zone into a second context authority** — rejected because the original user-rpc source already owns it and the invariant can re-derive policy directly.
 - **Let Schedule consume the reading implicitly** — rejected because prose context is not a stable typed default and would couple an absolute-time parser to AgentLoop history. The model instead passes an explicit offset or zone.
-- **Use only the process zone** — rejected because deployment locality cannot infer a remote user's zone. It remains a display fallback when request provenance is absent or mixed.
+- **Use only the process zone** — rejected because deployment locality cannot infer a remote user's zone. It remains a display fallback when request zone records are absent or mixed.
 - **Expose time only through a tool** — rejected because ordinary temporal reasoning would require an avoidable round trip and would not ensure a reading before each step.
 - **Mount time-context by default** — rejected because disclosure, freshness, and history cost remain composition policy.
 
@@ -69,6 +69,6 @@ Unit and real-loop tests pin timestamp formatting, unique/mixed/missing browser 
 ## Consequences
 
 - Browser-zone meaning is request-local and durable without changing Session, fork, JSONL, or SQLite schemas.
-- The model receives the requested browser-local assumption on each Schedule Web request step; mixed or missing provenance asks instead of guessing.
+- The model receives the requested browser-local assumption on each Schedule Web request step; mixed or missing zone records ask instead of guessing.
 - Tools remain explicit: context helps the model choose fields but does not become a hidden package-seam default.
 - Timing context remains append-only until compaction; a positive interval reduces history growth but can omit fresh browser guidance on later requests.

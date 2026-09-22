@@ -1,4 +1,4 @@
-import { createUserMessage, createMessage, createToolResultMessage, CallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, createMessage, createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 // Minimal SessionEvent builders for orchestration tests (shape mirrors what the
 // host emits; only the fields the object layer reads).
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
@@ -19,13 +19,12 @@ export const ev = {
     }) }),
   stepStart: (seq: number, turn: number, step = 0): SessionEvent =>
     at(seq, { type: 'step/start', data: { turn, step } }),
-  chunkStart: (seq: number, turn: number, step = 0, index = 0): SessionEvent =>
-    at(seq, { type: 'assistant/chunk', data: { turn, step, chunk: { type: 'block-start', index, blockType: 'text' } } }),
-  chunkText: (seq: number, turn: number, piece: string, step = 0, index = 0): SessionEvent =>
-    at(seq, { type: 'assistant/chunk', data: { turn, step, chunk: { type: 'text-delta', index, text: piece } } }),
+  attempt: (seq: number, turn: number, step = 0): SessionEvent =>
+    at(seq, { type: 'assistant/attempt', data: { turn, step, stream: [] } }),
   assistant: (seq: number, turn: number, body: string, step = 0): SessionEvent =>
     at(seq, { type: 'assistant/message', surfaceOp: 'append', data: {
       turn, step,
+      stream: [],
       message: createMessage({
         role: 'assistant',
         content: text(body),
@@ -45,7 +44,7 @@ export const ev = {
         turn,
         step,
         message: createToolResultMessage({
-          callId: CallId(callId),
+          callId: ToolCallId(callId),
           content: text(body),
           isError: false,
         }),

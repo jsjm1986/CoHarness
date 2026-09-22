@@ -4,6 +4,10 @@
 
 ACP（Agent Client Protocol）提供方会在全新的子进程中运行每个 subagent，并作为 Agent Client Protocol 客户端驱动它。这是 spawn 与 fork 的进程外替代方案：子 agent（智能体）拥有自己的运行时、会话、模型配置和工具。
 
+## 概述
+
+使用本包可将任务委派给运行在全新子进程中的 ACP 兼容 agent；子 agent 拥有独立的运行时、会话、模型和工具。每次运行只共享选定的工作目录，通过 ACP 发送任务，并返回子 agent 的最终答案或安全错误；中间消息和工具流量不会进入父级对话。权限提示由配置的策略自动应答，无需人工介入。当委派需要进程隔离或需要使用非 Harness ACP agent 时选择本包；当子 agent 必须共享父级能力时，选择进程内后端。
+
 ## 启动与所有权
 
 `start(request)` 先解析子 agent 的工作目录，再依次执行 `spawn` → ACP `initialize` → `newSession`，然后才兑现。因此，兑现表示远程会话已就绪，所有权也已转移给调用方。spawn 失败、初始化失败、新建会话失败或因发布前取消而失败时，只有在子进程已回收后才会拒绝；工作目录解析失败则会在尚未 spawn 任何进程时拒绝。
@@ -61,13 +65,17 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 本包没有默认导出。否则 Cordis loader 的解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次运行通过 ACP 有线驱动一个子方；子方的运行时拥有其会话，提供方只持有进行中的客户端。
+
 ## 模型体验
 
 ### 子 agent 请求
 
-#### 模型看到的内容
+#### 模型看到什么
 
-远程子 agent 通过 ACP 接收独立任务内容，并使用其自身进程配置的系统提示词、工具和全新会话。它不接收父级对话。该提供方不声明任何可选启动时能力，因此本地服务会拒绝要求 persona、工具过滤、深度强制或结构化输出的请求，而不是静默省略这些要求。
+远程子 agent 通过 ACP 接收独立任务内容，并使用其自身进程配置的系统提示词、工具和全新会话。它不接收父级对话。本提供方不声明可选启动时能力，因此本地服务会拒绝要求 `agentOptions`、persona、工具过滤、深度强制或结构化输出的请求，而不是静默省略。
 
 #### Token 影响
 
@@ -79,13 +87,13 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 ### 父级工具结果（间接）
 
-#### 模型看到的内容
+#### 模型看到什么
 
-通过 `dsh-tool-subagent`，父级只接收子 agent 最终的流式 assistant 文本，或该消费方给出的精确结束原因错误；不接收中间消息或工具流量。发布前已经取消的请求会精确变为 `Error: subagent request was aborted before the ACP child started`；其他启动失败按原样传递为 `Error: <message>`。
+通过 `dsh-tool-subagent`，父级只接收子 agent 最终的流式 assistant 文本或该消费方给出的精确停止原因错误，不接收中间消息或工具流量。未完成的结果会先呈现安全诊断，再单独保留部分 assistant 输出。发布前已经取消的请求会精确变为 `Error: subagent request was aborted before the ACP child started`；其他启动失败只包含固定的 `Subagent failure (...)` 行。
 
 #### Token 影响
 
-父级输入只增加最终结果或错误，其内容依赖数据，并保留到压缩（compaction）为止。该提供方自身不会添加父级 schema。
+父级输入只增加最终结果或错误，其内容依赖数据，并保留到压缩（compaction）为止。本提供方自身不会添加父级 schema。
 
 #### KV Cache 影响
 

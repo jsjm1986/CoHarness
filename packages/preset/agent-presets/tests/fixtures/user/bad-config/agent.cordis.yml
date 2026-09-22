@@ -1,0 +1,6 @@
+# A row whose config fails validation: the fiber exists and its injects are
+# satisfied, so only the mount audit's settle check reports the dead row.
+- id: rejected
+  name: ../../plugins/rejects-config.js
+  config:
+    token: wrong

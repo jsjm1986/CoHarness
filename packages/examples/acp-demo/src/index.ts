@@ -55,8 +55,6 @@ export interface Config {
   sessionTitle?: NonNullable<agentCore.Config['sessionTitle']>
   /** Directory for JSONL sessions and the derived query index. Defaults to `./.sessions`. */
   persistenceRoot?: string
-  /** Write delta-chunk runs as packed storage rows (the JSONL backend's `packChunks`). Defaults to `true`. */
-  packChunks?: boolean
   /** JSONL artifact encoding; defaults to checksummed Zstandard frames. */
   persistenceCompression?: JsonlCompression
   /** Controls automatic AGENTS.md/CLAUDE.md loading; configure a byte budget or set `false`. */
@@ -89,7 +87,6 @@ export const Config: z<Config> = z.object({
   dshHome: z.string(),
   sessionTitle: agentCore.SessionTitleConfigSchema,
   persistenceRoot: z.string().default(DEFAULT_PERSISTENCE_ROOT),
-  packChunks: z.boolean().default(true),
   persistenceCompression: JsonlCompressionSchema,
   workspaceContext: z.union([z.const(false), workspaceContext.Config]).required(),
   skills: agentCore.SkillConfigSchema,
@@ -122,7 +119,6 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     /* jscpd:ignore-start */
     const persistence = ctx.plugin(JsonlSessionPersistence, {
       root: persistenceRoot,
-      ...config.packChunks !== undefined ? { packChunks: config.packChunks } : {},
       ...(config.persistenceCompression === undefined ? {} : { compression: config.persistenceCompression }),
     })
     await persistence

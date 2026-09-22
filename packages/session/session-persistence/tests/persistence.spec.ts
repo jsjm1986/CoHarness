@@ -22,7 +22,7 @@ import {
   type SessionStorageMetadata, type StoredPrefix, type StoredSuffix,
   sessionContentMetadata,
 } from '../src/index.ts'
-import { runPersistenceContract, meta, oneTurnLog } from './contract.ts'
+import { runPersistenceContract, meta, oneTurnLog } from './legacy-contract.ts'
 import { runCoordinatorContract, type CoordinatorFixture } from './coordinator-contract.ts'
 
 /** The durable store shape: materialized sessions only (no lazy entries). */
@@ -93,6 +93,10 @@ interface CoordinatorInternals {
 class MemoryPersistence extends SessionPersistence implements PersistenceBackend<never> {
   override readonly supportsRawArtifacts = false
 
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
+
   static inject = ['sessions']
 
   override readonly name = 'session-persistence-memory'
@@ -112,15 +116,15 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
 
   // --- Service API (delegated to the coordinator) ---
 
-  locate(_meta: SessionHeader): undefined {
+  override locate(_meta: SessionHeader): undefined {
     return undefined
   }
 
-  create(m: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
+  override createStored(m: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
     return this.coordinator.create(m, inheritedEventCount)
   }
 
-  append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+  override append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }
 
@@ -128,7 +132,7 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     return this.coordinator.prepare(id, signal)
   }
 
-  load(id: SessionId): Promise<SessionInspection> {
+  override load(id: SessionId): Promise<SessionInspection> {
     return this.coordinator.load(id).then(loaded => ({
       meta: loaded.meta,
       inheritedEventCount: loaded.inheritedEventCount,
@@ -136,7 +140,7 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     }))
   }
 
-  inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
+  override inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection> {
     return this.coordinator.inspect(id, signal)
       .then(loaded => ({
         meta: loaded.meta,
@@ -146,7 +150,7 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
   }
 
 
-  readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
+  override readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
@@ -213,12 +217,12 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     if (closers.length > 0) entry.events.push(...structuredClone(closers) as SessionEvent[])
   }
 
-  async list(signal?: AbortSignal): Promise<SessionHeader[]> {
+  override async listStored(signal?: AbortSignal): Promise<SessionHeader[]> {
     signal?.throwIfAborted()
     return [...this.store.values()].map(e => structuredClone(e.meta))
   }
 
-  async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
+  override async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     signal?.throwIfAborted()
     return [...this.store.values()].map(entry => ({
       header: structuredClone(entry.meta),
@@ -304,7 +308,7 @@ class ControlledBackend implements PersistenceBackend<never> {
     if (entry !== undefined) entry.events.push(...structuredClone(closers) as SessionEvent[])
   }
 
-  async list(): Promise<SessionHeader[]> {
+  async listStored(): Promise<SessionHeader[]> {
     return [...this.store.values()].map(entry => structuredClone(entry.meta))
   }
 
@@ -913,7 +917,7 @@ describe('PersistenceCoordinator session preparations', () => {
       readStoredRevision: medium.readStoredRevision.bind(medium),
       appendBatch: medium.appendBatch.bind(medium),
       commitRepair: medium.commitRepair.bind(medium),
-      list: medium.list.bind(medium),
+      listStored: medium.listStored.bind(medium),
       close: medium.close.bind(medium),
       ...withMigration ? { migrateStored } : {},
     }
@@ -923,7 +927,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(3)
+      expect(suffix.meta.version).toBe(4)
       expect(suffix.events.map(event => event.type)).toEqual([
         'step/start', 'system/message', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
@@ -946,7 +950,7 @@ describe('PersistenceCoordinator session preparations', () => {
     // without step/start migrates with an identical body, so the coordinator
     // can publish a current-version successor in place.
     const storedFor = (id: string): { meta: SessionHeader; events: SessionEvent[] } => ({
-      meta: { ...meta(id), version: 0 },
+      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
       events: [
         { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
         { type: 'user/message', seq: SessionSeq(1), time: 2, data: freezeMessage({
@@ -975,7 +979,7 @@ describe('PersistenceCoordinator session preparations', () => {
       readStoredRevision: medium.readStoredRevision.bind(medium),
       appendBatch: medium.appendBatch.bind(medium),
       commitRepair: medium.commitRepair.bind(medium),
-      list: medium.list.bind(medium),
+      listStored: medium.listStored.bind(medium),
       close: medium.close.bind(medium),
       migrateStored,
     }
@@ -986,13 +990,13 @@ describe('PersistenceCoordinator session preparations', () => {
     try {
       // The sequential readFrom path publishes the successor through its prefix read.
       const suffix = await coordinator.readFrom(readId, SessionLogOffset(0))
-      expect(suffix.meta.version).toBe(3)
+      expect(suffix.meta.version).toBe(4)
       expect(suffix.events.map(event => event.type)).toEqual(['turn/start', 'user/message', 'turn/end'])
-      expect(medium.store.get(readId)?.meta.version).toBe(3)
+      expect(medium.store.get(readId)?.meta.version).toBe(4)
       // The cold load path publishes through its preparation pass.
       const loaded = await coordinator.load(loadId)
-      expect(loaded.meta.version).toBe(3)
-      expect(medium.store.get(loadId)?.meta.version).toBe(3)
+      expect(loaded.meta.version).toBe(4)
+      expect(medium.store.get(loadId)?.meta.version).toBe(4)
       expect(migrateStored).toHaveBeenCalledTimes(2)
       // Re-running a load over the already-published log is a no-op.
       await coordinator.load(readId)
@@ -1012,7 +1016,7 @@ describe('PersistenceCoordinator session preparations', () => {
     // coordinator migrates only its in-memory view — including the ownerless
     // claim's seed-vs-stored comparison.
     backend.store.set(id, {
-      meta: { ...meta(id), version: 0 },
+      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
       events: oneTurnLog(),
     })
     let coordinator!: PersistenceCoordinator<never>
@@ -1021,7 +1025,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const loaded = await coordinator.load(id)
-      expect(loaded.meta.version).toBe(3)
+      expect(loaded.meta.version).toBe(4)
       expect(backend.store.get(id)?.meta.version).toBe(0)
 
       const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })
@@ -1107,10 +1111,169 @@ describe('PersistenceCoordinator session preparations', () => {
       if (coordinator === undefined) throw new Error('coordinator did not initialize')
       const draft = ctx.sessions.create(SessionId('header-only'), { meta: { draft: true } })
       await expect(coordinator.ensureMaterialized(draft)).rejects.toThrow(/cannot materialize an empty session/)
+      // A detached pending create has the same empty-session requirement.
+      const detached = SessionId('detached-headerless')
+      await coordinator.create(meta(detached))
+      await expect(coordinator.materializeDetached(detached)).rejects.toThrow(/cannot materialize an empty session/)
       // A session whose content already reached the backend needs no header-only artifact.
       const materialized = ctx.sessions.create(SessionId('already-materialized'), { seed: oneTurnLog() })
       await ctx.sessions.flush(materialized)
       await expect(coordinator.ensureMaterialized(materialized)).resolves.toBeUndefined()
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('materializes a live empty session through the backend header hook', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    Object.assign(backend, {
+      materializeHeader: async (storage: SessionStorageMetadata) => {
+        backend.store.set(storage.meta.id, {
+          meta: structuredClone(storage.meta),
+          inheritedEventCount: storage.inheritedEventCount,
+          events: [],
+        })
+      },
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const session = ctx.sessions.create(SessionId('empty-live'), { meta: { cwd: '/work', draft: true } })
+      await ctx.sessions.flush(session)
+      await coordinator.ensureMaterialized(session)
+      expect(backend.store.get(session.id)?.events).toEqual([])
+      // A second call observes the materialized flag and writes nothing.
+      await expect(coordinator.ensureMaterialized(session)).resolves.toBeUndefined()
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('materializes and discards detached pending creates', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    Object.assign(backend, {
+      materializeHeader: async (storage: SessionStorageMetadata) => {
+        backend.store.set(storage.meta.id, {
+          meta: structuredClone(storage.meta),
+          inheritedEventCount: storage.inheritedEventCount,
+          events: [],
+        })
+      },
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      // Untracked, live-owned, and materialized ids are not detached pendings.
+      await expect(coordinator.materializeDetached(SessionId('ghost')))
+        .rejects.toThrow(/no detached pending state/)
+
+      const pending = SessionId('detached-pending')
+      await coordinator.create(meta(pending))
+      expect(coordinator.isPending(pending)).toBe(true)
+      expect(coordinator.listPending().map(storage => storage.meta.id)).toEqual([pending])
+      await coordinator.materializeDetached(pending)
+      expect(backend.store.get(pending)?.events).toEqual([])
+      // Materialized ownerless state is no longer pending.
+      expect(coordinator.isPending(pending)).toBe(false)
+      expect(coordinator.listPending()).toEqual([])
+      await expect(coordinator.materializeDetached(pending))
+        .rejects.toThrow(/no detached pending state/)
+
+      // Discarding returns the reservation to availability.
+      const discarded = SessionId('detached-discard')
+      await coordinator.create(meta(discarded))
+      await coordinator.discardDetached(discarded)
+      expect(coordinator.isPending(discarded)).toBe(false)
+      await expect(coordinator.discardDetached(discarded)).resolves.toBeUndefined()
+      await expect(coordinator.create(meta(discarded))).resolves.toBeUndefined()
+
+      // A live-owned state is never the discard target.
+      const live = ctx.sessions.create(SessionId('live-owned'), { seed: oneTurnLog() })
+      await ctx.sessions.flush(live)
+      expect(coordinator.isPending(live.id)).toBe(false)
+      await expect(coordinator.discardDetached(live.id)).resolves.toBeUndefined()
+      expect(backend.store.has(live.id)).toBe(true)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('reports an unsupported stored event without a raw-artifact location', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const id = SessionId('unsupported-event')
+      backend.store.set(id, {
+        meta: meta(id),
+        events: [{ type: 'future/unknown', seq: SessionSeq(0), time: 1, data: {} } as unknown as SessionEvent],
+      })
+      await expect(coordinator.load(id)).rejects.toThrow(/unknown to this harness/)
+      await expect(coordinator.load(id)).rejects.not.toThrow(/raw log:/)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('points an unsupported stored event at the backend artifact location', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    Object.assign(backend, {
+      locate: (m: SessionHeader) => ({ kind: 'jsonl', path: `/artifacts/${m.id}.jsonl` }),
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const id = SessionId('located-unsupported')
+      backend.store.set(id, {
+        meta: meta(id),
+        events: [{ type: 'future/unknown', seq: SessionSeq(0), time: 1, data: {} } as unknown as SessionEvent],
+      })
+      await expect(coordinator.load(id))
+        .rejects.toThrow(/unknown to this harness.*raw log: \/artifacts\/located-unsupported\.jsonl/)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('reports live storage only for a session this coordinator owns', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const session = ctx.sessions.create(SessionId('live-storage'), { meta: { cwd: '/work' } })
+      await ctx.sessions.flush(session)
+      await expect(coordinator.liveStorage(session.id))
+        .resolves.toMatchObject({ meta: { id: session.id } })
+      await expect(coordinator.liveStorage(SessionId('untracked'))).resolves.toBeUndefined()
+      // A detached pending has no live owner, so it reports as untracked here.
+      const pending = SessionId('detached-storage')
+      await coordinator.create(meta(pending))
+      await expect(coordinator.liveStorage(pending)).resolves.toBeUndefined()
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()
@@ -2395,7 +2558,7 @@ describe('SessionPersistence service registration', () => {
     await ctx.plugin(SessionStore)
     const fiber = await ctx.plugin(MemoryPersistence)
     const m = meta('default-preparation')
-    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.createStored(m)
     await ctx.sessionPersistence.append(m.id, oneTurnLog())
     const defaultPrepare = SessionPersistence.prototype.prepare.bind(ctx.sessionPersistence)
 
@@ -2449,7 +2612,7 @@ describe('SessionPersistence service registration', () => {
     await ctx.plugin(SessionStore)
     const fiber = await ctx.plugin(MemoryPersistence)
     const m = meta('reg')
-    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.createStored(m)
     await ctx.sessionPersistence.append(m.id, oneTurnLog())
     const loaded = await ctx.sessionPersistence.load(m.id)
     expect(loaded.events).toHaveLength(6)
@@ -2462,7 +2625,7 @@ describe('SessionPersistence service registration', () => {
     const fiber = await ctx.plugin(MemoryPersistence)
     const invalid = { ...meta('invalid-meta'), createdAt: 1n as unknown as number }
 
-    await expect(ctx.sessionPersistence.create(invalid))
+    await expect(ctx.sessionPersistence.createStored(invalid))
       .rejects.toThrow('session metadata must be losslessly JSON-serializable')
     await fiber.dispose()
   })
@@ -2540,7 +2703,7 @@ describe('SessionPersistence service registration', () => {
 
   it('surfaces a migration refusal unwrapped instead of as stored corruption', async () => {
     const id = SessionId('legacy-mode-migration')
-    const m = { ...meta(id, '/legacy'), version: 0 }
+    const m = { ...meta(id, '/legacy'), version: 0 } as unknown as SessionHeader
     const store: MemoryStore = new Map([[id, { meta: m, events: [legacyModeSet()] }]])
     const ctx = new Context()
     await ctx.plugin(SessionStore)

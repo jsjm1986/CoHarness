@@ -20,7 +20,7 @@ const [{ Context }, { default: SessionStore }, { default: Sqlite }] = await Prom
 const ctx = new Context();
 await ctx.plugin(SessionStore);
 await ctx.plugin(Sqlite, { path: ':memory:' });
-console.log(JSON.stringify(await ctx.sessionPersistence.list()));
+console.log(JSON.stringify(await ctx.sessionPersistence.listHeaders()));
 await ctx.fiber.dispose();
 `
 

@@ -31,7 +31,7 @@ export function extractSessionEventText(event: SessionEvent): string {
     case 'turn/start':
     case 'step/start':
     case 'step/end':
-    case 'assistant/chunk':
+    case 'assistant/attempt':
     case 'request/header':
       return ''
     // SessionEventMap is merge-extensible. Unknown events remain

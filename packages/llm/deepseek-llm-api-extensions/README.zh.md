@@ -32,17 +32,14 @@ kind: "package-reference"
 注册表拥有字段添加与生命周期，不拥有字段语义。`@deepseek-ai/dsh-session-log-deepseek` 拥有 `dsh_session_log`；`@deepseek-ai/dsh-plugin-package-inventory-deepseek` 拥有 `dsh_plugin_packages`。提供方无关的 LLM seam 与 `llm-pi-ai` 都不消费该注册表。
 
 <a id="model-experience"></a>
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。贡献是序列化每个请求时应用的已校验声明；注册表不持有逐请求关系。
+
 ## 模型体验
 
-### 注册表字段
-
-#### 模型可见内容
-
-无。`dsh_session_log` 与 `dsh_plugin_packages` 等字段是模型消息、系统提示词和工具 schema 之外的提供方元数据。
-
-#### Token 影响
-
-不增加模型输入 token；已注册字段只增加提供方请求字节。
+通过 `@deepseek-ai/dsh-llm-deepseek` 间接生效；该包在模型的 `messages`、系统提示词与工具 schema 之外发送已注册字段。
 
 #### KV Cache 影响
 

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -74,21 +75,25 @@ async function harness(): Promise<Context> {
 }
 
 describe('catalog-route model discovery', () => {
+  it('includes the installed model input types for vision models', async () => {
+    const ctx = await harness()
+    const models = await ctx.llm.discoverModels('llm-pi-ai', { provider: 'openai' })
+    const installed = getBuiltinModels('openai').find(model => model.id === 'gpt-6-astra')
+    expect(installed?.input).toContain('image')
+    expect(models.find(model => model.id === 'gpt-6-astra')).toMatchObject({ inputModalities: installed?.input })
+  })
+
   it('answers from the installed registry, with capacities and no network call', async () => {
     const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'from-the-endpoint' }] }) })
     const ctx = await harness()
 
-    const models = await ctx.llm.discoverModels('llm-pi-ai', { provider: 'anthropic', baseURL: server.url })
+    const models = await ctx.llm.discoverModels('llm-pi-ai', { provider: 'deepseek', baseURL: server.url })
 
     // pi-ai's own registry is the authority for its own providers, and it
     // carries what a listing endpoint would not disclose.
     expect(models.map(model => model.id).sort())
-      .toEqual(getBuiltinModels('anthropic').map(model => model.id).sort())
+      .toEqual(getBuiltinModels('deepseek').map(model => model.id).sort())
     expect(models.every(model => (model.contextWindow ?? 0) > 0 && (model.maxTokens ?? 0) > 0)).toBe(true)
-    const vision = getBuiltinModels('anthropic').find(model => model.input.includes('image'))
-    if (vision === undefined) throw new Error('the installed catalog ships no anthropic vision model')
-    const discoveredVision = models.find(model => model.id === vision.id)
-    expect(discoveredVision?.inputModalities).toEqual([...vision.input])
     expect(server.paths).toEqual([])
   })
 
@@ -149,7 +154,7 @@ describe('draft-provider model discovery', () => {
 
     await expect(ctx.llm.discoverModels('llm-pi-ai', {
       provider: 'shared-gateway', baseURL: 'https://shared.example',
-    })).resolves.toEqual([{ id: 'shared-model' }])
+    })).resolves.toEqual([{ id: 'shared-model', name: 'shared-model' }])
     const result = await assemble(ctx, { provider: 'shared-gateway', model: 'shared-model', messages: [] })
 
     expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
@@ -165,6 +170,9 @@ describe('draft-provider model discovery', () => {
       body: JSON.stringify({
         data: [
           { id: 'acme-large', display_name: 'Acme Large', context_length: 65_536, max_output_tokens: 4096 },
+          { id: 'acme-camel', displayName: 'Acme Camel', contextWindow: 131_072, maxOutputTokens: 8192 },
+          { id: 'acme-mixed', name: 'Acme Mixed', context_window: 32_768, maxTokens: 2048 },
+          { id: 'acme-legacy', max_tokens: 1024 },
           { id: 'acme-small' },
         ],
       }),
@@ -175,11 +183,104 @@ describe('draft-provider model discovery', () => {
 
     expect(models).toEqual([
       { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
-      { id: 'acme-small' },
+      { id: 'acme-camel', name: 'Acme Camel', contextWindow: 131_072, maxTokens: 8192 },
+      { id: 'acme-mixed', name: 'Acme Mixed', contextWindow: 32_768, maxTokens: 2048 },
+      { id: 'acme-legacy', name: 'acme-legacy', maxTokens: 1024 },
+      { id: 'acme-small', name: 'acme-small' },
     ])
     expect(server.paths).toEqual(['/v1/models'])
     expect(server.headers[0]?.authorization).toBe('Bearer probe-key')
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
+  })
+
+  it('reads an enriched models map using route ids and nested capacities', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        models: {
+          'lobechat-deepseek-chat': {
+            id: 'deepseek/deepseek-v4-flash',
+            name: 'DeepSeek V4 Flash',
+            limit: { context: 1_048_576, output: 384_000 },
+          },
+          'bare-route': {},
+          '': { id: 'nested-id', display_name: 'Nested fallback' },
+          'malformed-route': null,
+          'primitive-route': 'not a model record',
+        },
+      }),
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url })).toEqual([
+      {
+        id: 'lobechat-deepseek-chat',
+        name: 'DeepSeek V4 Flash',
+        contextWindow: 1_048_576,
+        maxTokens: 384_000,
+      },
+      { id: 'bare-route', name: 'bare-route' },
+      { id: 'nested-id', name: 'Nested fallback' },
+    ])
+  })
+
+  it('uses Anthropic model-listing paths, headers, and capacity fields', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        data: [
+          {
+            id: 'claude-sonnet',
+            display_name: 'Claude Sonnet',
+            max_input_tokens: 200_000,
+            max_tokens: 64_000,
+          },
+        ],
+      }),
+    })
+    const ctx = await harness()
+
+    const rootModels = await ctx.llm.discoverModels('llm-pi-ai', {
+      baseURL: server.url,
+      api: 'anthropic-messages',
+      apiKey: 'anthropic-key',
+    })
+    const versionedModels = await ctx.llm.discoverModels('llm-pi-ai', {
+      baseURL: `${server.url}/v1`,
+      api: 'anthropic-messages',
+      apiKey: 'anthropic-key',
+    })
+    await ctx.llm.discoverModels('llm-pi-ai', {
+      baseURL: server.url,
+      api: 'anthropic-messages',
+    })
+
+    expect(rootModels).toEqual([
+      { id: 'claude-sonnet', name: 'Claude Sonnet', contextWindow: 200_000, maxTokens: 64_000 },
+    ])
+    expect(versionedModels).toEqual(rootModels)
+    expect(server.paths).toEqual([
+      '/v1/models?limit=1000',
+      '/v1/models?limit=1000',
+      '/v1/models?limit=1000',
+    ])
+    expect(server.headers.map(headers => headers['x-api-key']))
+      .toEqual(['anthropic-key', 'anthropic-key', undefined])
+    expect(server.headers.map(headers => headers['anthropic-version']))
+      .toEqual(['2023-06-01', '2023-06-01', '2023-06-01'])
+    expect(server.headers.map(headers => headers.authorization)).toEqual([undefined, undefined, undefined])
+    expect(server.headers.map(headers => headers['user-agent'])).toEqual([userAgent(), userAgent(), userAgent()])
+  })
+
+  it('prefers the standard data array when both supported formats are present', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        data: [{ id: 'standard' }],
+        models: { enriched: { name: 'Enriched' } },
+      }),
+    })
+    const ctx = await harness()
+
+    await expect(ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
+      .resolves.toEqual([{ id: 'standard', name: 'standard' }])
   })
 
   it('keeps a deployment path instead of resolving it away', async () => {
@@ -189,25 +290,6 @@ describe('draft-provider model discovery', () => {
     await ctx.llm.discoverModels('llm-pi-ai', { baseURL: `${server.url}/openai/v1/` })
 
     expect(server.paths).toEqual(['/openai/v1/models'])
-  })
-
-  it('reads an Anthropic listing with its version and API-key headers', async () => {
-    const server = await listingServer({
-      body: JSON.stringify({ data: [{ id: 'claude-acme', display_name: 'Claude Acme' }] }),
-    })
-    const ctx = await harness()
-
-    const models = await ctx.llm.discoverModels('llm-pi-ai', {
-      baseURL: `${server.url}/anthropic`,
-      api: 'anthropic-messages',
-      apiKey: 'anthropic-key',
-    })
-
-    expect(models).toEqual([{ id: 'claude-acme', name: 'Claude Acme' }])
-    expect(server.paths).toEqual(['/anthropic/v1/models'])
-    expect(server.headers[0]?.['x-api-key']).toBe('anthropic-key')
-    expect(server.headers[0]?.['anthropic-version']).toBe('2023-06-01')
-    expect(server.headers[0]?.authorization).toBeUndefined()
   })
 
   it('offers no credential when the draft names none', async () => {
@@ -312,7 +394,7 @@ describe('draft-provider model discovery', () => {
     const ctx = await harness()
 
     expect(await ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
-      .toEqual([{ id: 'good' }, { id: 'zero-capacity' }])
+      .toEqual([{ id: 'good', name: 'good' }, { id: 'zero-capacity', name: 'zero-capacity' }])
   })
 
   it('points at the credential for a rejected one, and only then', async () => {
@@ -336,7 +418,7 @@ describe('draft-provider model discovery', () => {
     const ctx = await harness()
 
     await expect(ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
-      .rejects.toThrow(/no "data" array; enter this provider's models by hand/)
+      .rejects.toThrow(/neither a "data" array nor a "models" object/)
 
     const broken = await listingServer({ body: 'not json at all' })
     await expect(ctx.llm.discoverModels('llm-pi-ai', { baseURL: broken.url }))
@@ -476,5 +558,63 @@ describe('probe key format', () => {
 
     const headers = new Headers(requests[0]?.headers)
     expect(headers.has('authorization')).toBe(false)
+  })
+})
+
+/**
+ * Replies recorded from live endpoints on 2026-09-02, plus the reply
+ * Anthropic's List Models reference documents. Each file keeps the reply's
+ * top-level fields and entry objects verbatim; only a recorded entry list is
+ * cut down to the named entries so the archive stays small.
+ */
+const RECORDED_LISTINGS = [
+  {
+    name: 'OpenRouter GET /api/v1/models',
+    file: 'openrouter-2026-09-02.json',
+    api: 'openai-completions',
+    models: [
+      { id: 'anthropic/claude-fable-5.1', name: 'Anthropic: Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000 },
+      // The router's own aggregate route reports no completion cap.
+      { id: 'openrouter/auto-beta', name: 'Auto Router (Beta)', contextWindow: 2_000_000 },
+      { id: 'deepseek/deepseek-v4-flash', name: 'DeepSeek: DeepSeek V4 Flash 0423', contextWindow: 1_048_576, maxTokens: 384_000 },
+    ],
+  },
+  {
+    name: 'the models.dev anthropic provider object',
+    file: 'models-dev-anthropic-2026-09-02.json',
+    api: 'openai-completions',
+    models: [
+      { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', contextWindow: 1_000_000, maxTokens: 128_000 },
+      { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000 },
+      { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (latest)', contextWindow: 200_000, maxTokens: 64_000 },
+    ],
+  },
+  {
+    name: 'DeepSeek GET /models',
+    file: 'deepseek-2026-09-02.json',
+    api: 'openai-completions',
+    models: [
+      { id: 'deepseek-v4-flash', name: 'deepseek-v4-flash' },
+      { id: 'deepseek-v4-pro', name: 'deepseek-v4-pro' },
+      { id: 'deepseek-v4-flash-vision-exp', name: 'deepseek-v4-flash-vision-exp' },
+    ],
+  },
+  {
+    name: "Anthropic's documented GET /v1/models example",
+    file: 'anthropic-reference-example.json',
+    api: 'anthropic-messages',
+    // The reference example fills both capacities with 0, which is not a
+    // usable capacity, so the row carries the name alone.
+    models: [{ id: 'claude-opus-5', name: 'Claude Opus 5' }],
+  },
+]
+
+describe('recorded provider listings', () => {
+  it.each(RECORDED_LISTINGS)('reads $name as recorded', async ({ file, api, models }) => {
+    const body = await readFile(new URL(`./fixtures/model-listings/${file}`, import.meta.url), 'utf8')
+    const server = await listingServer({ body })
+    const ctx = await harness()
+
+    await expect(ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url, api })).resolves.toEqual(models)
   })
 })

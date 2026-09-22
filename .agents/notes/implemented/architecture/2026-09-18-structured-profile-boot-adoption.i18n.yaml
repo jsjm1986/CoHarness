@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-18-structured-profile-boot-adoption.md
+2026-09-18-structured-profile-boot-adoption.md: 2f13bff554a97f8cfe341f40631ff85e9cf89f67
+2026-09-18-structured-profile-boot-adoption.zh.md: b89f81a0ad1c4e9f225e48757b783cfc165c7399

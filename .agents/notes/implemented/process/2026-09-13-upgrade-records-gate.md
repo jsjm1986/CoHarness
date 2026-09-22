@@ -29,3 +29,5 @@ Upgrade work under `upgrades/` is recorded in alignment matrices, manifests, and
 
 - `verify-upgrade-records.spec.ts` covers row field validation, all three coverage forms, released-evidence enforcement, legacy-schema passthrough, and inventory coverage including `newUpstream` commits.
 - Gate run on the checked-in records reports every row carries commit coverage or an explicit reason.
+
+The [candidate-bound evidence decision](2026-09-21-candidate-bound-gate-evidence.md) extends consumer selection and publication acceptance while retaining this note’s coverage and versioning rules.

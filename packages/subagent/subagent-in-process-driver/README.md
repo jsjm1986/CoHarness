@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 This package is the shared run driver for the two in-process providers. Spawn passes no session seed; fork passes the parent's completed-turn prefix. Everything else—depth, child creation, optional child customization, result reading, cancellation, and disposal—has one implementation here.
 
+## Summary
+
+`dsh-subagent-in-process-driver` is the shared run driver behind the two in-process subagent backends: it creates one child agent through the host's agent factory, applies per-child customization, drives one task to completion, and returns the child's own final output with a single quiescent disposal path. Spawn calls it with no session seed; fork calls it with the parent's completed-turn prefix. It is a library, not a standalone feature: provider backends call `startInProcessRun`, and nothing in a composition configures it. Read this page to understand the run lifecycle both in-process backends share.
+
 ## Start contract
 
 `startInProcessRun(request, options): Promise<SubagentRun>` fulfills only after the child is published in `ctx.agents`. A rejected start has already quiesced the agent factory's unpublished creation transaction, so the caller never receives a half-created handle.
@@ -46,17 +50,21 @@ Depth enforcement is internal to `startInProcessRun`: it reads the parent depth 
 
 A clean turn that never commits the required structured value reports `error`; the driver does not re-prompt. All registrations ride the child fiber and disappear with it.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The driver manages one child Agent per call through the host's agent factory; depth, seeding, and result reading are per-call state.
+
 ## Model Experience
 
 ### Child-agent request
 
 #### What the model sees
 
-The shared driver sends the task verbatim as the child's user message and, when requested, shadows the persona and restricts global tool schemas, lookup, execution, and PTC mode SDK bindings in the unpublished child's fresh scope; parent restrictions are not inherited, and standalone tool-guidance sections remain. Spawn supplies no history; fork supplies its balanced seed.
+The shared driver sends the task verbatim as the child's user message and, when requested, shadows the persona and restricts global tool schemas, lookup, execution, and PTC mode SDK bindings in the unpublished child's fresh scope; parent restrictions are not inherited. Tool-guidance plugins can use the assembly scope to omit unavailable guidance; arbitrary static sections are not rewritten by the driver. Spawn supplies no history; fork supplies its balanced seed.
 
 #### Token effect
 
-Child input is isolated from the parent and grows through the child's own steps. A persona changes repeated prompt text; filtering changes schema or generated SDK cost but not independently registered guidance.
+Child input is isolated from the parent and grows through the child's own steps. A persona changes repeated prompt text; filtering changes schema or generated SDK cost, and scope-aware guidance changes with the visible capabilities.
 
 #### KV Cache effect
 
@@ -66,7 +74,7 @@ Independent of the parent request cache. The child's later history is append-onl
 
 #### What the model sees
 
-A structured run adds the structured-output instruction below. It also adds a child-scoped `structured_output` definition with exact description `Report your final structured result. Call this exactly once, when your answer is complete; the arguments must match this tool's parameter schema exactly.` and the requested schema. This runtime-only definition is outside the generated shipped [tool package map](../../../docs/tool-catalog.md#tool-package-map). Its canonical acknowledgement is `{ recorded: true }`, rendered as `Structured output recorded.`; a later call becomes ``Error: structured output already recorded: the run is complete, so `<tool>` is not executed``.
+A structured run adds the structured-output instruction below. It also adds a child-scoped `structured_output` definition with the requested schema and the exact description `Report your final structured result. Call this exactly once, when your answer is complete; the arguments must match this tool's parameter schema exactly.` This runtime-only definition is outside the generated shipped [tool package map](../../../docs/tool-catalog.md#tool-package-map). Its canonical acknowledgement is `{ recorded: true }`, rendered as `Structured output recorded.`; a later call becomes ``Error: structured output already recorded: the run is complete, so `<tool>` is not executed``.
 
 ##### Structured-output instruction
 

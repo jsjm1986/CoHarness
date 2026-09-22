@@ -4,6 +4,10 @@
 
 [存储中心](../storage/README.zh.md)的 SQLite 后端：注册为后端 `sqlite`，通过一个数据库提供 `kv` facet；该数据库由 `node:sqlite` 操作，可以是单个文件，也可以是 `:memory:`。设计与取舍见[领域 KV 存储 Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)。
 
+## 概述
+
+`dsh-storage-sqlite` 是一个存储后端：把每个已路由单元托管在同一个 SQLite 数据库文件中，每条记录按行存储一份 JSON 文档，注册为后端 `sqlite`。单条记录更新恰好触碰一行，这正是它适合高频定点写入的原因。当领域数据变动频繁、或部署偏好单一可查询数据库时选择它；当数据需要以纯文本文件形式可读时选择 JSON 后端。本后端只面向宿主侧：它不贡献提示词、工具或 schema，因此模型与 agent loop（智能体循环）永远不会看到它。
+
 ## 存储模型
 
 每行一个文档：每个单元表都会成为一个物理 STRICT 表 `"u_<unit>_<table>" (key TEXT PRIMARY KEY, value TEXT)`，其中 `value` 是记录的 JSON 文本，因此一个 key 只更新一行（高频变更领域路由到这里而非 JSON 后端的原因）。单元标识位于两个元数据表中：`units` 在单元首次打开时标记其格式版本，描述符不同时以 `version-mismatch` 拒绝；`unit_globals` 保存每个单元的全局单例行。物理布局版本位于 `PRAGMA user_version`；其他任何标记值都会被拒绝（未发布格式，不迁移）。单元名和表名在进入 DDL 之前依据中心的 `UNIT_NAME_RE` 进行验证，因此不会把外部输入插值到 SQL 标识符中。
@@ -19,13 +23,17 @@ interface Config {
 }
 ```
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。所有记录位于后端打开的单一数据库文件中；没有影子状态。
+
 ## 模型体验
 
 ### 已存领域记录
 
-#### 模型看到的内容
+#### 模型看到什么
 
-无。该后端不贡献提示词、工具或 schema；它在 `ctx.storage` 后面持久化非会话领域数据（工作区记录、未来的会话伴随元数据），只供主机侧消费方使用。
+无。本后端不贡献提示词、工具或 schema；它在 `ctx.storage` 后面持久化非会话领域数据，只供宿主侧消费方使用。
 
 #### Token 影响
 
@@ -33,7 +41,7 @@ interface Config {
 
 #### KV Cache 影响
 
-无：该后端从不触碰实时请求前缀。
+无：本后端从不触碰实时请求前缀。
 
 ## 已知限制与暂缓事项
 

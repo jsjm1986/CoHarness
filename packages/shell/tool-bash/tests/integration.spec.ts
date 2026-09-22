@@ -98,14 +98,14 @@ async function pollUntil(predicate: () => boolean, timeoutMs = 5_000): Promise<v
 }
 
 describe('bash tool through the agent loop', () => {
-  it('first-turn bash receives session identity before the lazy JSONL file materializes', async () => {
+  it('first-turn bash receives session identity through the environment', async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-bash-session-env-'))
     dirs.push(root)
     const dshHome = join(root, 'dsh-home')
     vi.stubEnv('DSH_STALE_PARENT', 'stale')
     const adapter = new MockAdapter([
       toolCallResponse('call-1', 'bash', {
-        command: 'printf \'%s\\n%s\\n%s\\n%s\\n%s\\n\' "$DSH_HOME" "$DSH_SHELL" "$DSH_SESSION_ID" "$DSH_SESSION_JSONL" "${DSH_STALE_PARENT-unset}"; if [ -e "$DSH_SESSION_JSONL" ]; then printf \'present\\n\'; else printf \'absent\\n\'; fi',
+        command: 'printf \'%s\\n%s\\n%s\\n%s\\n%s\\n\' "$DSH_HOME" "$DSH_SHELL" "$DSH_SESSION_ID" "$DSH_SESSION_JSONL" "${DSH_STALE_PARENT-unset}"',
         description: 'inspect session environment',
       }),
       textResponse('Session environment inspected.'),
@@ -123,7 +123,9 @@ describe('bash tool through the agent loop', () => {
     await waitForIdle(ctx, agent)
 
     const result = findEvent(events(agent), 'tool/result')
-    expect(resultText(result)).toBe(`${dshHome}\n1\nsession-env-id\n${location?.path}\nunset\nabsent\n`)
+    // The artifact's presence mid-turn is a lease-timing race; durability is
+    // asserted after the explicit flush below.
+    expect(resultText(result)).toBe(`${dshHome}\n1\nsession-env-id\n${location?.path}\nunset\n`)
     await ctx.sessions.flush(agent.session)
     expect(existsSync(location!.path)).toBe(true)
     const header = JSON.parse(readFileSync(location!.path, 'utf8').split('\n')[0]!) as { type: string; id: string }

@@ -59,12 +59,19 @@ import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
+import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
+import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
+import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
+import McpResources from '@deepseek-ai/dsh-mcp-resources'
+import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
+import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
-import VmWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
+import WorkflowEngine from '@deepseek-ai/dsh-workflow'
+import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
 import { githubSlug } from './verify-md-links.ts'
@@ -102,6 +109,13 @@ const OUT = 'docs/tool-catalog.md'
  * mount under their shipped defaults (tool-subagent's default numeric maxDepth
  * requires `depthLimit`).
  */
+/** Workflow tools expose their schemas without executing a program. */
+class CatalogWorkflowEngine extends WorkflowEngine {
+  start(_request: WorkflowStartRequest): WorkflowRun {
+    throw new Error('gen-tool-catalog: workflow execution is unavailable during schema harvest')
+  }
+}
+
 function registerCatalogSubagentProvider(ctx: Context, name: string): void {
   const provider: SubagentProvider = {
     name,
@@ -188,6 +202,46 @@ export interface ToolPackage {
  */
 const TOOL_PACKAGES: ToolPackage[] = [
   {
+    pkg: '@deepseek-ai/dsh-plugin-manager',
+    dir: 'plugin-manager',
+    source: 'packages/boot/plugin-manager/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.pluginManager', 'ctx.sandboxPolicy'],
+    writes: ['tool/call', 'tool/result', 'user/message'],
+    async mount(ctx) {
+      // Schema harvest never executes a management method or opens a profile.
+      ctx.provide('pluginManager', {} as PluginManager)
+      await ctx.plugin(SandboxPolicy)
+      await ctx.plugin(PluginManagerTools)
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-mcp-resources',
+    dir: 'mcp-resources',
+    source: 'packages/mcp/mcp-resources/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.mcpResources'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(McpResources)
+      ctx.mcpResources.register('catalog', {
+        request: () => Promise.reject(new Error('gen-tool-catalog: MCP requests are unreachable during schema harvest')),
+      })
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+    dir: 'browser-use-stagehand-native',
+    source: 'packages/experimental/browser-use-stagehand-native/src/index.ts',
+    requires: ['ctx.browserUse', 'ctx.agents', 'ctx.tools', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(BrowserUseRegistry)
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(StagehandBrowserTools, {
+        mode: 'launch', model: { modelName: 'openai/gpt-5.4-mini', apiKey: 'catalog-placeholder' },
+      })
+    },
+  },
+  {
     pkg: '@deepseek-ai/dsh-tool-ask-user',
     dir: 'tool-ask-user',
     source: 'packages/interaction/tool-ask-user/src/index.ts',
@@ -204,7 +258,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tools',
     dir: 'tools',
     source: 'packages/core/tools/src/ptc.ts',
-    requires: ['ctx.tools', 'ctx.codeRuntime (execution time)', 'ctx.systemPrompt'],
+    requires: ['ctx.tools', 'ctx.ptcRuntime (execution time)', 'ctx.systemPrompt'],
     writes: ['tool/call', 'one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call', 'tool/result'],
     // The registry's OWN tool: run_code exists only under a non-native mode
     // (the registry registers it in its constructor; the code runtime is read
@@ -441,7 +495,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     async mount(ctx) {
       await ctx.plugin(SubagentRuntime)
       registerCatalogSubagentProvider(ctx, 'mock')
-      await ctx.plugin(VmWorkflowEngine, { provider: 'mock' })
+      await ctx.plugin(CatalogWorkflowEngine)
       await ctx.plugin(ToolRalph, { subagentProvider: 'mock' })
     },
     note:
@@ -486,7 +540,6 @@ const TOOL_PACKAGES: ToolPackage[] = [
     shippedNames: ['subagent', 'subagent_fork'],
     async mount(ctx) {
       await ctx.plugin(SubagentRuntime)
-      await ctx.plugin(SessionProjectionRegistry)
       registerCatalogSubagentProvider(ctx, 'mock')
       await ctx.plugin(ToolSubagent, { provider: 'mock' })
     },
@@ -508,7 +561,6 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(LocalJobRegistry)
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(SessionStore)
-      await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(ToolSubagentControl)
       await ctx.plugin(ToolSubagentListAgents)
     },
@@ -590,7 +642,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       // provider backs the engine.
       await ctx.plugin(SubagentRuntime)
       registerCatalogSubagentProvider(ctx, 'mock')
-      await ctx.plugin(VmWorkflowEngine, { provider: 'mock' })
+      await ctx.plugin(CatalogWorkflowEngine)
       await ctx.plugin(ToolWorkflow)
     },
   },
@@ -688,6 +740,7 @@ export async function collectToolCatalog(packages: ToolPackage[] = TOOL_PACKAGES
     // plugins mounted still tears the context down (no leaked executor/provider
     // fiber) — the repo's "dispose must reach quiescence" rule.
     try {
+      await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime, entry.toolsConfig ?? {})
       await entry.mount(ctx)

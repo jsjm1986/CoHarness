@@ -48,16 +48,17 @@ interface PromptSection {
   readonly name: string
   /**
    * Sections are concatenated in ascending order. Equal orders use code-unit
-   * name order. Repository-owned placements use
-   * {@link FIRST_PARTY_SECTION_ORDER}.
+   * name order.
    */
   readonly order: number
   /**
    * Static text or a provider evaluated at each assembly with that assembly's
    * {@link AssembleContext}. The text may reference `{{variable}}`s — they are
-   * interpolated later, by {@link renderPrompt}.
+   * interpolated later, by {@link renderPrompt}, unless `interpolate` is false.
    */
   readonly text: string | ((context: AssembleContext) => string)
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  readonly interpolate?: boolean
   /**
    * Treat this contribution as the complete system prompt. Assembly still
    * runs the cooperative waterfall so tools, contexts, and variables can be
@@ -108,6 +109,20 @@ Registry service for the prompt inputs assembled before each model step.
  * @returns the exact Cordis effect disposer.
  */
 section(section: PromptSection): () => void
+
+/**
+ * Resolve the centrally owned placement of a repository prompt section.
+ * @param name - stable section placement name.
+ * @returns the section's numeric sort order.
+ */
+getSectionOrder(name: PromptSectionOrderName): number
+
+/**
+ * Resolve the centrally owned placement of a repository runtime context.
+ * @param name - stable context placement name.
+ * @returns the context's numeric sort order.
+ */
+getContextOrder(name: PromptContextOrderName): number
 
 /**
  * Register ordered dynamic context in the calling context's scope. Scoped

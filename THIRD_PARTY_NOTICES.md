@@ -15,15 +15,15 @@ The Cordis framework and its foundation libraries are source-vendored into this 
 
 | Package | Upstream name | Upstream | License |
 | --- | --- | --- | --- |
-| `@deepseek-ai/cosmokit` | `cosmokit` | [github.com/deepseek-harness/cosmokit](https://github.com/deepseek-harness/cosmokit) | MIT |
-| `@deepseek-ai/schemastery` | `schemastery` | [github.com/deepseek-harness/schemastery](https://github.com/deepseek-harness/schemastery) | MIT |
-| `@deepseek-ai/cordis` | `cordis` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
-| `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | [github.com/deepseek-harness/cordis](https://github.com/deepseek-harness/cordis) | MIT |
+| `@deepseek-ai/cosmokit` | `cosmokit` | [vendor/cosmokit](vendor/cosmokit/) | MIT |
+| `@deepseek-ai/schemastery` | `schemastery` | [vendor/schemastery](vendor/schemastery/) | MIT |
+| `@deepseek-ai/cordis` | `cordis` | [vendor/cordis](vendor/cordis/) | MIT |
+| `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | [vendor/loader](vendor/loader/) | MIT |
+| `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | [vendor/include](vendor/include/) | MIT |
+| `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | [vendor/group](vendor/group/) | MIT |
+| `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | [vendor/timer](vendor/timer/) | MIT |
+| `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | [vendor/hmr](vendor/hmr/) | MIT |
+| `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | [vendor/logger-console](vendor/logger-console/) | MIT |
 
 ## Runtime npm dependencies
 
@@ -35,13 +35,14 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@anthropic-ai/claude-agent-sdk`](https://github.com/anthropics/claude-agent-sdk-typescript) | SEE LICENSE IN README.md |
 | [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript) | MIT |
 | [`@babel/code-frame`](https://github.com/babel/babel) | MIT |
+| [`@browserbasehq/stagehand`](https://github.com/browserbase/stagehand) | MIT |
 | [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/push-notifications`](https://github.com/ionic-team/capacitor-plugins) | MIT |
-| [`@deepseek-ai/node-addon-system`](https://github.com/deepseek-harness/deepseek-harness) | BSD-3-Clause |
 | [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi) | MIT |
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |
+| [`@modelcontextprotocol/client`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) | MIT |
 | [`@openai/codex`](https://github.com/openai/codex) | Apache-2.0 |
@@ -51,20 +52,22 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@opentelemetry/otlp-exporter-base`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
 | [`@opentelemetry/resources`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
 | [`@opentelemetry/sdk-logs`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
+| [`@playwright/mcp`](https://github.com/microsoft/playwright-mcp) | Apache-2.0 |
+| [`@puppeteer/browsers`](https://github.com/puppeteer/puppeteer/tree/main/packages/browsers) | Apache-2.0 |
 | [`@shikijs/langs`](https://github.com/shikijs/shiki) | MIT |
 | [`@standard-schema/spec`](https://github.com/standard-schema/standard-schema) | MIT |
-| [`@tanstack/react-virtual`](https://github.com/TanStack/virtual) | MIT |
-| [`@types/mdast`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
+| [`@trycua/cua-driver`](https://github.com/trycua/cua) | MIT |
 | [`@vscode/ripgrep`](https://github.com/microsoft/vscode-ripgrep) | MIT |
 | [`@xterm/headless`](https://github.com/xtermjs/xterm.js) | MIT |
 | [`anser`](https://github.com/IonicaBizau/anser) | MIT |
 | [`chokidar`](https://github.com/paulmillr/chokidar) | MIT |
+| [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) | Apache-2.0 |
 | [`clsx`](https://github.com/lukeed/clsx) | MIT |
 | [`commander`](https://github.com/tj/commander.js) | MIT |
 | [`compression`](https://github.com/expressjs/compression) | MIT |
 | [`diff`](https://github.com/kpdecker/jsdiff) | BSD-3-Clause |
-| [`e2b`](https://github.com/e2b-dev/e2b) | MIT |
 | [`eventsource-parser`](https://github.com/rexxars/eventsource-parser) | MIT |
+| [`execa`](https://github.com/sindresorhus/execa) | MIT |
 | [`fflate`](https://github.com/101arrowz/fflate) | MIT |
 | [`immer`](https://github.com/immerjs/immer) | MIT |
 | [`ipaddr.js`](https://github.com/whitequark/ipaddr.js) | MIT |
@@ -88,8 +91,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`node-pty`](https://github.com/microsoft/node-pty) | MIT |
 | [`open`](https://github.com/sindresorhus/open) | MIT |
 | [`picomatch`](https://github.com/micromatch/picomatch) | MIT |
-| [`react`](https://github.com/facebook/react) | MIT |
-| [`react-dom`](https://github.com/facebook/react) | MIT |
+| [`resolve.exports`](https://github.com/lukeed/resolve.exports) | MIT |
 | [`sharp`](https://github.com/lovell/sharp) | Apache-2.0 |
 | [`shiki`](https://github.com/shikijs/shiki) | MIT |
 | [`supports-color`](https://github.com/chalk/supports-color) | MIT |
@@ -97,7 +99,6 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`turndown`](https://github.com/mixmark-io/turndown) | MIT |
 | [`typescript`](https://github.com/microsoft/TypeScript) | Apache-2.0 |
 | [`undici`](https://github.com/nodejs/undici) | MIT |
-| [`use-sync-external-store`](https://github.com/facebook/react) | MIT |
 | [`ws`](https://github.com/websockets/ws) | MIT |
 | [`yaml`](https://github.com/eemeli/yaml) | ISC |
 | [`zod`](https://github.com/colinhacks/zod) | MIT |
@@ -133,14 +134,19 @@ External packages **directly declared** only by repository tooling, test infrast
 | --- | --- |
 | [`@braintree/sanitize-url`](https://github.com/braintree/sanitize-url) | MIT |
 | [`@capacitor/cli`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@modelcontextprotocol/node`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
+| [`@modelcontextprotocol/server`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@modelcontextprotocol/server-everything`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
 | [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
+| [`@panzoom/panzoom`](https://github.com/timmywil/panzoom) | MIT |
 | [`@stylistic/eslint-plugin`](https://github.com/eslint-stylistic/eslint-stylistic) | MIT |
+| [`@tanstack/react-virtual`](https://github.com/TanStack/virtual) | MIT |
 | [`@testing-library/dom`](https://github.com/testing-library/dom-testing-library) | MIT |
 | [`@testing-library/react`](https://github.com/testing-library/react-testing-library) | MIT |
 | [`@types/babel__code-frame`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/compression`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/jsdom`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
+| [`@types/mdast`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/negotiator`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/node`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@types/picomatch`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
@@ -155,10 +161,9 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`cytoscape`](https://github.com/cytoscape/cytoscape.js) | MIT |
 | [`cytoscape-cose-bilkent`](https://github.com/cytoscape/cytoscape.js-cose-bilkent) | MIT |
 | [`dayjs`](https://github.com/iamkun/dayjs) | MIT |
-| [`debug`](https://github.com/visionmedia/debug) | MIT |
+| [`debug`](https://github.com/debug-js/debug) | MIT |
 | [`esbuild`](https://github.com/evanw/esbuild) | MIT |
 | [`eslint-plugin-sonarjs`](https://github.com/SonarSource/SonarJS) | LGPL-3.0-only |
-| [`execa`](https://github.com/sindresorhus/execa) | MIT |
 | [`fast-check`](https://github.com/dubzzz/fast-check) | MIT |
 | [`istanbul-lib-report`](https://github.com/istanbuljs/istanbuljs) | BSD-3-Clause |
 | [`jscpd`](https://github.com/kucherenko/jscpd) | MIT |
@@ -170,16 +175,21 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`oxlint`](https://github.com/oxc-project/oxc) | MIT |
 | [`oxlint-tsgolint`](https://github.com/oxc-project/tsgolint) | MIT |
 | [`playwright`](https://github.com/microsoft/playwright) | Apache-2.0 |
+| [`pnpm`](https://github.com/pnpm/pnpm) | MIT |
 | [`publint`](https://github.com/publint/publint) | MIT |
+| [`react`](https://github.com/facebook/react) | MIT |
+| [`react-dom`](https://github.com/facebook/react) | MIT |
 | [`smol-toml`](https://github.com/squirrelchat/smol-toml) | BSD-3-Clause |
 | [`spdx-expression-parse`](https://github.com/jslicense/spdx-expression-parse.js) | MIT |
 | [`tsdown`](https://github.com/rolldown/tsdown) | MIT |
 | [`typescript-language-server`](https://github.com/typescript-language-server/typescript-language-server) | Apache-2.0 |
+| [`use-sync-external-store`](https://github.com/facebook/react) | MIT |
 | [`vite`](https://github.com/vitejs/vite) | MIT |
 | [`vite-tsconfig-paths`](https://github.com/aleclarson/vite-tsconfig-paths) | MIT |
 | [`vitepress`](https://github.com/vuejs/vitepress) | MIT |
 | [`vitepress-plugin-mermaid`](https://github.com/emersonbottero/vitepress-plugin-mermaid) | MIT |
 | [`vitest`](https://github.com/vitest-dev/vitest) | MIT |
+| [`vue`](https://github.com/vuejs/core) | MIT |
 
 `eslint-plugin-sonarjs` (LGPL-3.0-only) and `lightningcss` (MPL-2.0) run only as development tooling; their code is not linked into or distributed with any DeepSeek Harness artifact.
 
@@ -192,6 +202,7 @@ Direct dependencies of the `pyproject.toml` manifests, plus `uv` as the developm
 | [`hatchling`](https://github.com/pypa/hatch) | MIT | build backend |
 | [`pydantic`](https://github.com/pydantic/pydantic) | MIT | runtime dependency of `deepseek-harness-sdk` |
 | [`pytest`](https://github.com/pytest-dev/pytest) | MIT | test-only |
+| [`ruff`](https://github.com/astral-sh/ruff) | MIT | static-analysis tool |
 | [`uv`](https://github.com/astral-sh/uv) | MIT / Apache-2.0 | development workflow tool |
 
 ## Fetched at build time
@@ -202,4 +213,4 @@ Direct dependencies of the `pyproject.toml` manifests, plus `uv` as the developm
 
 ## First-party native packages
 
-`@deepseek-ai/node-addon-landlock-run` (and its platform packages) is built and released from this repository under BSD 3-Clause. It is listed here for completeness; it is first-party, not third-party.
+`@deepseek-ai/node-addon-system/landlock-run` (and its platform packages) is built and released from this repository under BSD 3-Clause. It is listed here for completeness; it is first-party, not third-party.

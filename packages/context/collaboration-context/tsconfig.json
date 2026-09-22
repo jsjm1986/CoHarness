@@ -4,13 +4,27 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../core/agent" },
-    { "path": "../collaboration" },
-    { "path": "../../runtime-diagnostics/invariants" },
-    { "path": "../../llm/llm" },
-    { "path": "../../core/session" }
+    {
+      "path": "../collaboration"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    }
   ]
 }

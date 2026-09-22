@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve, relative, sep } from 'node:path'
+import { selectCoverageSources } from './coverage-selection.ts'
+import { repositoryCoveragePolicy } from './coverage-policy.ts'
 
 /** Four coverage dimensions enforced for every changed measured source file. */
 export type CoverageMetric = 'lines' | 'statements' | 'functions' | 'branches'
@@ -149,7 +151,8 @@ function main(): void {
   const paths = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMRTXB', `${base}...HEAD`], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
     .trim().split(/\r?\n/u).filter(Boolean)
   const map = JSON.parse(readFileSync(resolve(root, coveragePath), 'utf8')) as Record<string, unknown>
-  const files = summarizeIncrementalCoverage(root, map, paths)
+  const measured = selectCoverageSources(changedMeasuredSources(paths), repositoryCoveragePolicy())
+  const files = summarizeIncrementalCoverage(root, map, measured)
   assertIncrementalCoverage(files)
   process.stdout.write(`incremental coverage: ${files.length} changed measured source file(s) at 100%\n`)
 }

@@ -72,7 +72,8 @@ function update(state: TurnProcessState, event: ConversationEvent): TurnProcessS
       subagentCount: current.subagentCount + (subagent ? 1 : 0),
       evidence: true,
     }
-  } else if (event.type === 'assistant/chunk' || event.type === 'llm/retry') {
+  } else if (event.type === 'assistant/live-chunk' || event.type === 'assistant/attempt'
+    || event.type === 'llm/retry') {
     current = { ...current, evidence: true }
   }
   if (event.seq < current.controlAnchorSeq && current.evidence) return { ...current, controlAnchorSeq: event.seq }
@@ -91,7 +92,8 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
     if (event.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
     const turn = eventTurn(event)
     if (turn === undefined) return null
-    if (event.type === 'assistant/chunk' || event.type === 'assistant/message'
+    if (event.type === 'assistant/live-chunk' || event.type === 'assistant/message'
+      || event.type === 'assistant/attempt'
       || event.type === 'tool/call' || event.type === 'tool/result' || event.type === 'llm/retry'
       || event.type === 'step/start' || event.type === 'step/end' || event.type === 'turn/end') {
       return { id: String(turn), role: 'update' }
@@ -104,7 +106,7 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
   },
   update: (context, match) => update(context.state, match.event),
   publication: (match) => {
-    if (match.event.type !== 'assistant/chunk') return 'immediate'
+    if (match.event.type !== 'assistant/live-chunk') return 'immediate'
     const type = match.event.data.chunk.type
     return type === 'usage' || type === 'finish' ? 'none' : 'animation-frame'
   },

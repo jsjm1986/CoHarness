@@ -4,6 +4,10 @@
 
 隐式 Root Agent Teams 领域。`ctx.agentTeams` 在 Lead Session 日志中维护扁平的 Lead／teammate roster、持久 peer mailbox 与共享任务 DAG。[Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.zh.md)负责协作和隔离决策；[Team 子系统目录](../../../docs/subsystems/agent-team.zh.md)记录持久数据的字面形态与服务 API。
 
+## 概述
+
+`dsh-experimental-agent-team` 把一个编码会话变成一个小型工作团队：会话中的 agent 成为 Lead，创建具名 teammate 处理委派的工作，与它们交换持久消息，并在公共任务板上跟踪共享任务。消息与任务状态能挺过崩溃、reload 与中断，因此离线的 teammate 会在恢复后收到排队的消息。它本身不提供任何工具——请挂载兄弟包 `dsh-experimental-tool-agent-team`，让模型能够创建 teammate、给它们发消息并使用任务板。它以实验性名称公开发布、不承诺稳定性，并且需要持久会话存储才能激活。
+
 ## 配置
 
 ```yaml
@@ -55,13 +59,13 @@ roster 同时报告持久 provisioning／failed phase 与实时 `running`／`idl
 
 ### Peer 消息
 
-#### 模型看到的内容
+#### 模型看到什么
 
-每条已投递 peer 消息都是用户角色消息。第一个短文本块包含稳定消息 id 与发送者，之后原样附加发送者的内容块。roster、task 和 mailbox 记录本身只存在于日志，不进入派生模型历史。
+每条已投递 peer 消息都是用户角色消息。第一个短文本块包含稳定消息 id 与发送者，之后原样附加发送者的内容块。roster、task 与 mailbox 记录仅存在于日志，绝不进入派生模型历史。
 
 #### Token 影响
 
-每次 peer 投递都会把发送者前缀与消息内容加入 target 历史。任务和 roster 变更不增加模型 token；其面向模型的呈现属于 `@deepseek-ai/dsh-experimental-tool-agent-team` 结果。
+每次 peer 投递都会把发送者前缀与消息内容加入 target 历史。任务与 roster 变更不增加模型 token；其面向模型的呈现属于 `@deepseek-ai/dsh-experimental-tool-agent-team` 结果。
 
 #### KV Cache 影响
 

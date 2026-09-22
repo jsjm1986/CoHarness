@@ -6,6 +6,10 @@ DeepSeek Harness 的 Workspace 实体注册表（`ctx.workspaceRegistry`）：�
 
 实体／存储理由见[领域 Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)；仅使用头部的引导初始化和 GUI 排序见 [Workspace UI 产品流 Agent Note](../../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.zh.md)。
 
+## 概述
+
+使用此包可以维护一个有序、持久的项目目录列表，以及在每个目录中运行的会话。宿主可以构建项目侧边栏、在不删除历史的情况下把会话从分组中隐藏，并在不删除文件夹、文件或会话的情况下移除项目。重新添加已移除的目录会创建一个全新项目，而目录无法校验的会话会保持 Ungrouped。需要持久项目分组的 GUI 或宿主工作流适合使用它；它对模型不可见，不增加提示词或请求上下文成本，但需要会话持久化与存储后端。
+
 ## 结构
 
 - `ctx.workspaceRegistry.create(path, title?)`：规范化 `path` 时使用 `fs.realpath`，拒绝不存在或非目录的路径，每个规范路径最多创建一条记录，并将新记录前置到持久 workspace 顺序。对同一路径重复调用会返回现有 workspace，且不改变其标题；不同路径可以共用显示标题。
@@ -26,7 +30,7 @@ DeepSeek Harness 的 Workspace 实体注册表（`ctx.workspaceRegistry`）：�
 
 ### Workspace 记录与会话记账
 
-#### 模型看到的内容
+#### 模型看到什么
 
 没有。`ctx.workspaceRegistry` 只向宿主侧消费方提供 workspace 记录：此包不注册工具、不注入提示词、不写入会话事件，因此没有请求字段会携带此包数据。
 

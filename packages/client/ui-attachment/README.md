@@ -6,6 +6,10 @@ Dynamic attachment presentation plugin for the conversation UI. It waits for the
 
 Only the active conversation pane handles document-level file-drop gestures; picker callbacks retain the Session that opened them.
 
+## Summary
+
+This package renders everything the conversation UI shows about attachments: one ordered draft rail under the composer, a full-viewport drop invitation, durable images in Chat, Trajectory, and Tool results, and a lightbox for the original image. Attachment data, upload state, image loading, and callbacks come from the declared slot owners. Choose it for the DeepSeek Chat-style attachment experience.
+
 ## Attachment rail
 
 `AttachmentRail` renders pending draft images as fixed 64px thumbnails (16px radius) in one horizontally scrolling row whose scrollbar stays hidden. Overflow is announced by circular edge arrows instead: each pages one viewport (minus one card of context, floored at 200px) with smooth scrolling (instant under `prefers-reduced-motion: reduce`), and arrow visibility is recomputed from scroll geometry on scroll, item-count changes, and rail size changes (a ResizeObserver on the rail element, so sidebar and panel resizes count, not only window resizes). The rail scrolls horizontally only: a non-passive listener consumes every wheel tick with a vertical component — nothing scrolls the conversation behind the composer — converting a pure vertical wheel to a horizontal step (LINE/PAGE deltas normalized to pixels, per-tick travel clamped to 60px) and keeping a diagonal pan's horizontal intent, while purely horizontal pans stay native. A newly added item is revealed at the rail's end; removal keeps the scroll position, and a rail that mounts over an already-populated draft keeps its start position. Each thumbnail opens its original through `onOpen` on a single click, and its remove control sits inside the card's top-right corner, hidden until the card is hovered or the control keyboard-focused; coarse-pointer (touch) surfaces show it permanently because they have no hover. The owner decides mounting and renders the rail only while items exist.
@@ -17,6 +21,10 @@ Only the active conversation pane handles document-level file-drop gestures; pic
 ## Drop overlay
 
 `DropOverlay` is the full-viewport invitation shown while a file drag is over the page: illustration, title, and a limits line while drops are accepted (`disabled` swaps the blocked illustration and hides the limits line). The layer is pointer-inert — the owner's document-level drag listeners keep the enter/leave count and decide accept/reject; the overlay only shows state. It portals to the body like the lightbox.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The package contributes presentation occupants to conversation-declared slots; attachment data, loading, and callbacks arrive through the slot owner's inject face.
 
 ## Model Experience
 

@@ -6,6 +6,10 @@
 
 其机制是两条 seam。entry 上下文沿原型链连到子树被挂载时所在的上下文，而 [`dsh-tools`](../../core/tools/README.zh.md) 与 [`dsh-system-prompt`](../../core/system-prompt/README.zh.md) 本就按调用方上下文的 scope 分层归档注册——因此常驻挂载的贡献落在 **preset 的分层**里。把它们送达每个会话的是 `dsh-scope` 的父链：agent 的视图按 `agent → preset → global` 解析（近者遮蔽远者），挂载的监听器对认父到它的每个 agent 放行，而兄弟 preset 的监听器保持失聪。
 
+## 概述
+
+使用 `dsh-agent-presets` 为每个会话提供某个 preset 的 `agent.cordis.yml` 所指定的工具、提示词段落与 skill（技能）。一个进程可以运行使用不同 preset 的会话，同时保持它们的状态相互隔离。preset 名单合并随附定义、已配置根目录与用户根目录，会报告 preset 无法启动的原因，也能通过复制现有 preset 创建本地 preset。部署与用户都可选择默认值；只有空会话可以切换 preset。请将每个自行编写的 preset 视为受信任配置，因为它会授予其所选插件的能力。
+
 ## 服务：`AgentPresets`（ctx 键：`agentPresets`）
 
 发现过程不做缓存：`list()` 与 `resolve()` 每次调用都重新读取各个根目录，因此进程运行期间新写的 preset 立即可见，被删除的 preset 也会在下一次读取时消失。发现过程同时负责 preset 的**健康**：组装文件缺失或不可加载（YAML 无法解析——用加载器自己的方言检查，含 `!!js`——或不是由具名插件行组成的列表）的目录会作为携带 `broken` 原因的行列出而不是被跳过，因为被跳过的目录仍在磁盘上占着它的 id，而各个界面却没有任何可删的东西。目录名不是可用 preset id（`[a-z0-9][a-z0-9-]*`）的目录才被直接跳过：复制永远不可能占用那种名字。
@@ -138,9 +142,9 @@ preset 就是组装，因此一个 preset 的权限恰好等于它所引用的�
 
 ## 模型体验
 
-Indirectly, through the plugins a standing composition registers, which own every tool schema and prompt section the preset makes visible to the agents joined to it.
+间接地，经由 preset 常驻组装安装的插件：这些插件拥有该 preset 向加入它的 agent 呈现的每个工具 schema、提示词段落与 skill。
 
-#### KV Cache effect
+#### KV Cache 影响
 
 在一个 agent 的整个生命周期内保持前缀稳定：组装只装入一次，发生在 agent 发布之前、因而也在它的首个请求之前，且在 agent 运行期间不再重新读取。为新会话选择不同的 preset，只会为该会话建立不同的前缀，无法让任何已在运行的会话失去缓存复用。
 

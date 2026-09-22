@@ -26,17 +26,6 @@ interface SettingsRegisterOptions<T> {
   base?: Partial<T>
   /** Owner's effect timing, surfaced to configuration UIs; defaults to `live`. */
   applies?: SettingsApplies
-  /** Logical owner shown by remote configuration surfaces. */
-  owner?: SettingsOwner
-  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
-  projectWrite?: SettingsProjectWrite
-  /**
-   * Optional allowlist for project-manager writes. Each path permits that
-   * exact value and descendants; omission keeps the whole namespace writable
-   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
-   * object-prototype keys.
-   */
-  projectWritePaths?: readonly SettingsProjectWritePath[]
   /**
    * Reject a resolved section the owner could not act on, for constraints its
    * schema cannot express — a cross-field requirement, or one field's validity
@@ -57,6 +46,17 @@ interface SettingsRegisterOptions<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /** Logical owner shown by remote configuration surfaces. */
+  owner?: SettingsOwner
+  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
+  projectWrite?: SettingsProjectWrite
+  /**
+   * Optional allowlist for project-manager writes. Each path permits that
+   * exact value and descendants; omission keeps the whole namespace writable
+   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
+   * object-prototype keys.
+   */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
 }
 ```
 
@@ -111,6 +111,8 @@ interface SettingsScope<T> {
 ```ts type-equiv
 /** One registered namespace as surfaced to configuration UIs. */
 interface SettingsDescriptor {
+  // TODO(settings-namespace-vocabulary): Rename `ns` to `namespace` across the
+  // public API, provider contract, implementations, tests, and consumers.
   /** The registered namespace. */
   ns: SettingsNamespace
   /** Serialized schemastery schema (`schema.toJSON()`). */
@@ -163,10 +165,9 @@ type SettingsPathOp =
 /** Options for {@link SettingsProvider.describe}. */
 interface SettingsDescribeOptions {
   /**
-   * Strip `role('secret')` fields from `value`/`base`/`user`, remove defaults
-   * from schema nodes that can contain them, and enumerate the positions in
-   * each descriptor's `secrets`. Every wire surface MUST pass this; the
-   * verbatim default exists for same-process configuration UIs only.
+   * Strip `role('secret')` fields from `value`/`base`/`user` and enumerate
+   * them in each descriptor's `secrets`. Every wire surface MUST pass this;
+   * the verbatim default exists for same-process configuration UIs only.
    */
   redactSecrets?: boolean
 }
@@ -213,8 +214,22 @@ prepareDocument(): Promise<string | undefined>
  * @param schema - schemastery schema resolving this namespace's value.
  * @param options - composition `base` layer and effect timing.
  * @returns the owner scope for reads, observation, and updates.
+ * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
  */
-register<T>(ns: SettingsNamespace, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T>
+register<const Namespace extends string, T>( ns: Namespace & SettingsNamespaceInput<Namespace>, schema: z<T>, options?: SettingsRegisterOptions<T>, ): SettingsScope<T>
+
+/**
+ * Attach one optional-settings consumer to this provider. The consumer
+ * registers its composition entry as the base layer while this provider is
+ * present, then falls back to that entry if the provider detaches.
+ * @param owner - consumer context whose unload suppresses fallback work.
+ * @param ns - consumer-owned settings namespace.
+ * @param schema - schema resolving the namespace.
+ * @param entry - composition entry used as the base and fallback value.
+ * @param hooks - source sink, change notification, and optional validation.
+ * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
+ */
+installSection<const Namespace extends string, T>( owner: Context, ns: Namespace & SettingsNamespaceInput<Namespace>, schema: z<T>, entry: T, hooks: SettingsSectionHooks<T>, ): void
 
 /**
  * Describe every registered namespace for configuration surfaces, including
@@ -229,8 +244,9 @@ describe(options?: SettingsDescribeOptions): SettingsDescriptor[]
  * Read one registered namespace's resolved value.
  * @param ns - the namespace to read.
  * @returns the resolved value, or `undefined` while unregistered.
+ * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
  */
-get(ns: SettingsNamespace): unknown
+get<const Namespace extends string>(ns: Namespace & SettingsNamespaceInput<Namespace>): unknown
 
 /**
  * Merge a patch into one registered namespace's user layer, validate the
@@ -242,8 +258,9 @@ get(ns: SettingsNamespace): unknown
  * @param patch - plain-object patch over the user section.
  * @param expectedRevision - the descriptor `revision` the caller read; a
  *   namespace that moved past it rejects with {@link SettingsConflictError}.
+ * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
  */
-async update(ns: SettingsNamespace, patch: object, expectedRevision?: number): Promise<void>
+async update<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, patch: object, expectedRevision?: number, ): Promise<void>
 
 /**
  * Replace one registered namespace's user section wholesale, validate,
@@ -254,8 +271,9 @@ async update(ns: SettingsNamespace, patch: object, expectedRevision?: number): P
  * @param section - the complete next user section.
  * @param expectedRevision - the descriptor `revision` the caller read; a
  *   namespace that moved past it rejects with {@link SettingsConflictError}.
+ * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
  */
-async replace(ns: SettingsNamespace, section: object, expectedRevision?: number): Promise<void>
+async replace<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, section: object, expectedRevision?: number, ): Promise<void>
 
 /**
  * Apply path-addressed edits to one registered namespace's user section,
@@ -268,8 +286,9 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
  * @param ops - ordered path edits; later ops observe earlier ones.
  * @param expectedRevision - the descriptor `revision` the caller read; a
  *   namespace that moved past it rejects with {@link SettingsConflictError}.
+ * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
  */
-async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
+async mutate<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, ops: readonly SettingsPathOp[], expectedRevision?: number, ): Promise<void>
 ```
 
 Source: [`packages/settings/settings/src/index.ts`](../../packages/settings/settings/src/index.ts)

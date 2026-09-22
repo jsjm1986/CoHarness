@@ -6,6 +6,10 @@ Event-sourced session log and in-memory store. A `Session` is the append-only so
 
 The optional `@deepseek-ai/dsh-session/invariant` companion registers this package's relational trace checks with `ctx.invariants`: monotonic sequence numbers, turn/step enclosure, and same-step tool call/result pairing. It replays existing sessions when loaded or reloaded; storage validation, snapshotting, freezing, cited source-event validation, and surface acceptance remain always-on responsibilities of the root session package.
 
+## Summary
+
+`dsh-session` records every model-visible fact in an append-only session log and derives model history from that record. Consumers can inspect, replay, fork, and flush sessions while preserving historical events; compaction hides superseded entries from the active conversation without deleting them. Sessions remain in memory unless a persistence backend is added, and durability checkpoints wait for configured backends. Choose this package wherever an agent needs a reconstructable session record; it does not call models.
+
 ## Service: `SessionStore` (ctx key: `sessions`)
 
 Creates and holds event-sourced `Session` instances. Persistence is intentionally not implemented here — plugins subscribe to `session/event`, flush on `session/flush`, and may mirror the paired `session/created`/`session/disposed` lifecycle.
@@ -32,6 +36,12 @@ Use the split lifecycle only when teardown must be ordered with another resource
 - `enter(session)` performs the collision check, publishes without announcing, and returns an entry-bound idempotent detach. Concurrent same-id preparations are allowed, but only one entry succeeds; a stale detach cannot remove its replacement.
 - `announce(session)` emits the single creation edge and rejects repeat or reentrant announcements. Detach during that dispatch is deferred and later emits the paired disposal edge; an unannounced entry emits neither lifecycle edge.
 
+Plugins declare content-changing events with `@messageProjection` and register a pure definition through `ctx.sessions.registerMessageProjection()`. Session calls the definition before accepting an event and caches its immutable message updates. Missing definitions reject append and restore; unloading a used definition also blocks cached reads. Detached constructors and `foldSurface(events, projections)` require explicit definitions. Reconstructors pass the fold's `projectedMessages` to `deriveEventMessage()`; live instance methods apply the same projections automatically. [Session message projections](../../../.agents/notes/implemented/architecture/2026-09-18-session-message-projections.md) defines ownership and offline assembly.
+
+Append, seed/restore, and event adoption/snapshot reject any `header.system` and exactly empty optional request-header fields (`tools: []`, `adapterDefaults: {}`) instead of normalizing input. Tool-result `data.error` is allowed only when `message.content[0].isError === true`; failure identity remains optional. Rejected appends do not change the log, derived state, or event feed. Adoption validates event-local metadata but not referenced history or replacement membership.
+
+`system/message` holds the rendered system prompt: the first one is surface node 0, the prepared call capability governs admission, with a non-empty rendering consolidated at the first system node on an incapable route or appended after cached history inside a continuing `in-history` series; empty system nodes project to no message, so clearing the prompt requires logged empty replacements of all active system nodes, not just the latest; the surface fold rejects a replacement covering node 0 while it is a `system/message` unless the replacing event is itself a `system/message` over exactly that node, while later system nodes carry no protection and a compaction range may shadow them (decision: system prompt as surface node).
+
 `dsh-agent-loop` uses this split so final loop flush precedes session detach; see the [ownership Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-agent-lifecycle-and-ownership-contracts.md).
 
 ### Live service events
@@ -46,8 +56,8 @@ Plain class (not a Cordis Service). Create live sessions through `ctx.sessions.c
 - `session.deriveMessages()` incrementally projects each new surface entry once and returns a fresh array over the complete identified, frozen messages stored by those entries. Assistant messages preserve the provider and model that produced them plus adapter-private replay state in their model source. A surface rewrite rebuilds the projection; there is no raw-log fallback.
 - `session.deriveEventMessage(event)` is the canonical per-event projection used by reconstruction and request checks.
 - `session.surface` exposes the readonly `SessionSurface` view owned by the session's single incremental surface manager; `replaceGeneration` changes on every committed rewrite.
-- `session.seq` reads the current log length (a `SessionLogOffset`) without materializing an array, and `session.eventAt(seq)` reads one accepted, deeply frozen event by `SessionSeq`. `session.snapshotEvents(fromSeq?, toSeqExclusive?)` materializes a frozen, stable snapshot of a half-open range; a complete current snapshot is cached until the next append. Callers that only need a length or one event use `seq` or `eventAt()`.
-- `session.inheritedEventCount` retains the exact checked fork cut; `session.ownEvents()` returns events at and after that cut, and `session.isOwnSeq(seq)` accepts only an existing child-owned position. `session.header.isSeeded` reports whether fork history exists without exposing the positional integer.
+- `session.seq` reads the current log length (a `SessionLogOffset`) without materializing an array. `session.eventAt(seq)` reads one accepted, deeply frozen event by `SessionSeq`, and `session.snapshotEvents(fromSeq?, toSeqExclusive?)` materializes a frozen, stable snapshot of a half-open range (a complete current snapshot is cached until the next append). `eventAt()`, `snapshotEvents()`, and `ownEvents()` are deprecated: existing logic may remain unmigrated for now, but new production calls are prohibited; repository test files may use these three readers under their scoped lint allowance. Callers that only need a length use `seq`.
+- `session.inheritedEventCount` retains the exact checked fork cut; deprecated `session.ownEvents()` returns events at and after that cut, and `session.isOwnSeq(seq)` accepts only an existing child-owned position. `session.header.isSeeded` reports whether fork history exists without exposing the positional integer.
 - `session.events` is a `@deprecated` compatibility getter over the cached complete snapshot, kept for out-of-tree plugins; in-tree code reads through `snapshotEvents()`, `eventAt()`, or `seq`.
 - Session log positions use two numeric brands. `SessionSeq` identifies an existing event or inclusive watermark; `SessionLogOffset` identifies a gap, prefix length, or read boundary and may equal the event count. `SessionSeqCursor` adds the `-1` “no event yet” value, while `OptionalSessionSeq` uses `null` when absence is data. The constructors validate non-negative safe integers, and the brands disappear at runtime, so durable JSON and wire values remain ordinary numbers.
 - `session.id` — readonly typed identity.
@@ -63,11 +73,15 @@ Session-event import separates ownership from message validation. `snapshotSessi
 
 The shared [storage codec](src/chunk-rows.ts) losslessly converts event sequences to compact rows and back. It preserves unrecognized events verbatim and rejects malformed encoded rows; persistence backends decide whether to enable packed writes.
 
-`encodeSeqRanges()` and `decodeSeqRanges()` provide a second lossless storage helper for surface provenance arrays. Consecutive runs can be represented as inclusive `[start, end]` pairs; the decoder accepts the historical number-only representation as well.
+`encodeSeqRanges()` and `decodeSeqRanges()` provide a second lossless storage helper for surface source-event arrays. Consecutive runs can be represented as inclusive `[start, end]` pairs; the decoder accepts the historical number-only representation as well.
 
 ### Surface types
 
 This package owns ordered surface projection, replacement validation, replay, and the type guards that distinguish append-origin from replacement events. The [surface type catalog](../../../docs/subsystems/session.md#surface-types) owns the exact shapes and field semantics. A human transcript must project append-origin events rather than `session.surface`, because landed replacements shadow history the reader already saw; model-facing consumers continue to read `session.surface`.
+
+### Design concept
+
+The package is built on event sourcing: a `Session` is an append-only log of typed `SessionEvent`s, and everything else — model history, transcripts, telemetry, titles, persistence — derives from that stream. The surface is a derived projection: an incremental manager validates append candidates, advances the ordered view from committed events, and tracks `replaceGeneration` for positional replacements and `contentGeneration` for replacements and plugin-owned message changes. Model-visible means logged: anything that reaches a model request must be reconstructable from the log. Each model attempt that reaches settlement commits one event: `assistant/message` carries the assembled model-visible message plus its compact timed stream, while `assistant/attempt` retains a failed, retried, cancelled, or stream-error attempt without adding model history. A hard process loss before settlement leaves no durable attempt stream.
 
 ### Request-header reconstruction (`request-header.ts`)
 
@@ -87,9 +101,11 @@ Also defines `TurnEndReasonMap`, the merge-extensible `kind`-tagged sum type for
 
 An interrupted live turn ends with `{ kind: 'aborted', reason: AgentCancelCause }`, preserving the typed cancellation cause in the durable transcript. Persistence imports the coarse aborted outcome from the supported older format as `{ kind: 'aborted', reason: { kind: 'legacy' } }`, because that record did not retain its caller. A turn failure carries `{ kind: 'error', error }`; crash recovery alone synthesizes `{ kind: 'interrupted' }`.
 
+`deriveMessages()` caches deep-frozen projections and returns a fresh array per call. The four surface event types (`system/message`, `user/message`, `assistant/message`, `tool/result`) supply their recorded message identities and content; an empty-content system node projects to no message. Plugin-owned projections change derived content without mutating recorded messages. Replacements and projection decisions invalidate the cache. Embedded Assistant streams and `assistant/attempt` events remain replay and diagnostic data only.
+
 Every `SessionEvent` carries three optional top-level fields (structural metadata):
 
-- `sourceEventSeqs?: number[]` — seq numbers of earlier events cited as sources (e.g., the `assistant/chunk` seqs behind an `assistant/message`, or the shadowed entries behind a compaction replacement entry). On `assistant/message`, a present `[]` records a known empty provider stream, while omission means a legacy or foreign event did not record the source stream; other surface events require a non-empty list when this field is present.
+- `sourceEventSeqs?: number[]` — seq numbers of earlier events cited as sources (e.g., a `tool/call` cited by its result, or the shadowed entries behind a compaction replacement entry). `assistant/message` embeds its exact compact provider stream in `data.stream` and forbids this field; other surface events require a non-empty list when this field is present.
 - `surfaceOp?: SurfaceOp` — how this event entered the surface. Absent for non-surface events (boundaries, chunks, usage, errors).
 - `ignorable?: true` — marks an event a reader may safely skip when it does not recognize the type; absent means required, so an unknown-type event refuses session reconstruction ([mechanism](../../../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md)).
 
@@ -100,7 +116,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 ### Extension points
 
 - Persistence plugins: subscribe to `session/event` (write-behind) and drain on `session/flush` (awaited) and fiber dispose. A durable backend reads the log and reloads it into a live session; the metadata contract (`SessionHeader`, `session.header`) is what such a backend stores beside the log.
-- Replay/fork: `create(id, { seed })` validates and freezes a contiguous current-format log and rebuilds its surface; request headers require provider/model, and assistant messages require provider/model provenance. Persistence owns read compatibility before constructing this current-format seed. `fork(source, boundary?, childSessionId?)` selects a completed-turn prefix and records lineage.
+- Replay/fork: `create(id, { seed })` validates and freezes a contiguous current-format log and rebuilds its surface; request headers require provider/model, and assistant messages require provider/model source. Persistence owns read compatibility before constructing this current-format seed. `fork(source, boundary?, childSessionId?)` selects a completed-turn prefix and records lineage.
 - Compaction: `dsh-compaction-basic` appends a `user/message` replacement for summary checkpoints, while `dsh-compaction-tool-result-pruner` appends a content-only `tool/result` replacement. Tool-pairing boundary policy and its cache belong to the [`dsh-compaction` seam](../../compaction/compaction/README.md), while this package owns ordered surface membership, replacement validation, and `replaceGeneration`.
 
 ## Model Experience
@@ -109,7 +125,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 
 #### What the model sees
 
-The model receives the complete messages from `user/message`, `assistant/message`, and `tool/result` surface entries verbatim. Their identities, roles, sources, and content blocks are the same values established at creation; projections do not mint identities. Direct prompts and injected context remain separate `user/message` events whose sources preserve their provenance. A prompt envelope changes only human presentation; its prefix context and request delimiter are already present in the event content. Tool calls live inside assistant messages. Chunks, boundaries, usage, hook records, todo records, and other log-only events add no message.
+The model receives the complete messages from `system/message`, `user/message`, `assistant/message`, and `tool/result` surface entries with logged projections applied, the system prompt first. Identities, roles, sources, and unmodified blocks retain their original values; projections never mint identities. Direct prompts and injected context remain separate `user/message` events whose sources preserve their attribution. Embedded streams, `assistant/attempt`, boundaries, and other log-only facts add no message.
 
 #### Token effect
 
@@ -137,19 +153,24 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-The session reconstructs the system prompt, tool schemas, call config, and session prefix that the loop actually sent. Header events do not add a second copy to message history; the prefix is prepended outside `deriveMessages()`.
+The session reconstructs the tool schemas and call config that the loop actually sent; the system prompt is part of `deriveMessages()` as surface node 0 and, after an in-history update, as the latest system node. Header events add no message to history and hold no copy of the prompt.
 
 #### Token effect
 
-Zero duplicate tokens from logging. The reconstructed prefix, system text, and schemas still incur their normal per-request cost.
+Zero duplicate tokens from logging. The system nodes and schemas still incur their normal per-request cost.
 
 #### KV Cache effect
 
-Logging causes no invalidation, and exact reconstruction preserves request-prefix identity. A later header with changed prefix, prompt, or schemas may invalidate reuse from its first difference.
+Logging causes no invalidation, and exact reconstruction preserves request-prefix identity. A later header with changed config or schemas may invalidate reuse from its first difference; a prompt change that replaces surface node 0 invalidates reuse from the first token, while an in-history append keeps the prefix through the cached history reusable.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
+
+These limits define when the session store needs special care. They are current package constraints, not a task backlog.
+
 - **Session branching/tree** (pi-style entry tree) — deferred unless needed beyond boundary-based `fork()`.
 - **`fork()` cuts only at stable boundaries of live sessions** — the selected prefix must end outside an open turn and the source must be in the store; forking a persisted-but-unloaded session is excluded from the [fork API](../../../.agents/notes/implemented/feature/2026-06-30-session-store-fork-api.md).
-- **`SESSION_FORMAT_VERSION` is `3`** — persistence providers migrate supported v0/v1/v2 historical generations through adjacent format packages before constructing a current `Session`; v2 request-header system text is promoted to a durable `system/message` surface node, while older generations remain immutable. Assistant settlements may carry a compact lossless stream and failed attempts are recorded separately. Newer versions refuse with a direction-aware error. Unknown event types refuse the same way unless marked `ignorable` in the envelope; the versioning mechanism is owned by the [Session format library](../../session/session-format/README.md).
+- **`SESSION_FORMAT_VERSION` is `3`** — the current reader rejects retired `header.system` and validates `system/message` payloads and protected-head rewrites. Persistence providers migrate supported v0/v1/v2 historical generations through adjacent format packages before constructing a current `Session`; v2 request-header system text is promoted to a durable `system/message` surface node, while older generations remain immutable. Assistant settlements may carry a compact lossless stream and failed attempts are recorded separately. Newer versions refuse with a direction-aware error. Unknown event types refuse the same way unless marked `ignorable` in the envelope; the versioning mechanism is owned by the [Session format library](../../session/session-format/README.md).
 - **`TurnEndReasonMap` omits the ACP-named `refusal` / `max_turn_requests` variants** — producer-gated: they land when an adapter or the loop first emits them.

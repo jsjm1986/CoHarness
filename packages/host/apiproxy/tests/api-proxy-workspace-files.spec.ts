@@ -50,7 +50,9 @@ async function harness(options: {
   ctx.provide('storageDomain', domain)
   const headers = new Map<SessionId, import('@deepseek-ai/dsh-session').SessionHeader>()
   const readHeader = vi.fn((id: SessionId) => Promise.resolve(headers.get(id)))
-  ctx.provide('sessionPersistence', { list: () => Promise.resolve([]), readHeader } as never)
+  ctx.provide('sessionPersistence', { list: () => Promise.resolve([]), readHeader,
+    listHeaders: () => Promise.resolve([]),
+  } as never)
   await ctx.plugin(WorkspaceRegistry)
   await ctx.plugin(LocalFileSystem, { cwd: root })
   if (options.authority !== undefined) ctx.provide('collaboration', { capture: () => options.authority } as never)

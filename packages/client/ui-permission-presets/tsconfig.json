@@ -9,10 +9,10 @@
   ],
   "references": [
     {
-      "path": "../locale"
+      "path": "../../api/remotes/tsconfig.client.json"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../locale"
     },
     {
       "path": "../runtime"
@@ -21,10 +21,13 @@
       "path": "../ui-commands"
     },
     {
+      "path": "../ui-input-trigger"
+    },
+    {
       "path": "../ui-primitives"
     },
     {
-      "path": "../ui-input-trigger"
+      "path": "../ui-settings"
     },
     {
       "path": "../ui-slots"
@@ -33,13 +36,7 @@
       "path": "../../interaction/permission-presets"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../api/remotes/tsconfig.client.json"
-    },
-    {
-      "path": "../ui-settings"
+      "path": "../../../vendor/cordis"
     }
   ]
 }

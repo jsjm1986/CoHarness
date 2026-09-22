@@ -12,6 +12,10 @@ This run's environment as one immutable snapshot that remembers **which layer su
 
 Values do also reach `process.env` — a user's `--config` tree and third-party libraries read it — but that flattened view is not the authority for anything the harness resolves.
 
+## Summary
+
+Use `@deepseek-ai/dsh-launch-environment` to resolve launch-time environment values without trusting the flattened `process.env`. It freezes inherited process values, the invocation directory's `.env`, and the Harness home's `.env`, then returns the winning value and its source in a fixed trust order. Callers can exclude layers for sensitive lookups; an omitted layer stays unreachable regardless of later ordering changes. The snapshot is immutable, but every layer is still copied into `process.env`, so it does not isolate subprocesses. Import it as a library; it cannot be mounted from `cordis.yml`.
+
 ## Resolving
 
 `get(name)` searches every layer, most trusted first. `getFrom(name, sources)` searches only the named layers without changing that trust order.
@@ -29,6 +33,8 @@ const endpoint = launchEnvironmentOf(ctx).get('DEEPSEEK_BASE_URL')?.value
 ```
 
 `launchEnvironmentOf(ctx)` returns the launcher's snapshot when the product CLI booted the tree, and otherwise the inherited environment as the only layer. That fallback does not weaken the rules: an SDK host or a bare `cordis.yml` discovered no files, so everything it has really is the environment it was launched with.
+
+**Runtime invariant:** No companion is published. The snapshot is frozen before any fiber starts and this package owns no event stream or mutable runtime data; its lookup and rejection rules are enforced by unit tests.
 
 ## Known Limitations and Deferred Work
 

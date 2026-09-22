@@ -40,7 +40,7 @@ function appendEvent(session: Session, event: SessionEvent) {
   const append = session.append.bind(session) as (
     type: SessionEvent['type'], data: unknown, metadata?: unknown,
   ) => SessionEvent
-  const metadata = event as SessionEvent & { surfaceOp?: unknown; sourceEventSeqs?: unknown }
+  const metadata: { surfaceOp?: unknown; sourceEventSeqs?: unknown } = event
   return append(event.type, event.data, {
     ...metadata.surfaceOp === undefined ? {} : { surfaceOp: metadata.surfaceOp },
     ...metadata.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: metadata.sourceEventSeqs },
@@ -50,7 +50,7 @@ function appendEvent(session: Session, event: SessionEvent) {
 const entryPaths: Record<string, (event: SessionEvent) => unknown> = {
   append: (event: SessionEvent) => appendEvent(Session.create(id), event),
   seed: (event: SessionEvent) => Session.create(id, [event]),
-  restore: (event: SessionEvent) => Session.fromRestore(id, [event], { ...header }, SessionLogOffset(0)),
+  restore: (event: SessionEvent) => Session.fromRestore(id, [event], { ...header }, SessionLogOffset(0), 'detached'),
   adopt: adoptSessionEvent,
   snapshot: snapshotSessionEvent,
 }
@@ -149,7 +149,7 @@ describe('canonical event payload acceptance', () => {
   it.each([null, 'invalid'])('rejects a non-object restored request config (%j)', (config) => {
     const event = requestEvent({ header: { config }, reason: 'initial' })
     expect(() => Session.create(id, [event])).toThrow('lacks provider/model')
-    expect(() => Session.fromRestore(id, [event], { ...header }, SessionLogOffset(0)))
+    expect(() => Session.fromRestore(id, [event], { ...header }, SessionLogOffset(0), 'detached'))
       .toThrow('lacks provider/model')
   })
 
@@ -177,7 +177,7 @@ describe('canonical event payload acceptance', () => {
       const created = vi.fn()
       ctx.on('session/created', created)
       const prepared = ctx.sessions.prepare(id, {
-        seed: [event], meta: { ...header }, inheritedEventCount: SessionLogOffset(0), seedSource: 'persistence',
+        seed: [event], meta: { ...header }, inheritedEventCount: SessionLogOffset(0), eventState: 'detached',
       })
       expect(prepared.eventAt(SessionSeq(0))).toBe(event)
       expect(prepared.requestHeader()).toEqual({ config })
@@ -185,7 +185,7 @@ describe('canonical event payload acceptance', () => {
       expect(created).not.toHaveBeenCalled()
       const invalid = requestEvent({ header: { config, tools: [] }, reason: 'initial' })
       expect(() => ctx.sessions.prepare(id, {
-        seed: [invalid], meta: { ...header }, inheritedEventCount: SessionLogOffset(0), seedSource: 'persistence',
+        seed: [invalid], meta: { ...header }, inheritedEventCount: SessionLogOffset(0), eventState: 'detached',
       })).toThrow(/must omit empty tools/)
       expect(ctx.sessions.get(id)).toBeUndefined()
       expect(created).not.toHaveBeenCalled()
@@ -225,7 +225,7 @@ describe('canonical event payload acceptance', () => {
   })
 
   it.each([null, [], 1, 'invalid'])('reports malformed restored event envelopes without TypeError (%j)', (value) => {
-    expect(() => Session.fromRestore(id, [value] as never, { ...header }, SessionLogOffset(0)))
+    expect(() => Session.fromRestore(id, [value] as never, { ...header }, SessionLogOffset(0), 'detached'))
       .toThrow('seed event at index 0 has an invalid event envelope')
   })
 })
@@ -252,44 +252,26 @@ describe('canonical event-local surface metadata', () => {
       expect(() => accept({ ...userEvent(), surfaceOp } as unknown as SessionEvent)).toThrow(/invalid replace surfaceOp/)
     })
 
-    it(path + ' requires markers and forbids non-surface provenance', () => {
+    it(path + ' requires markers and forbids non-surface and assistant source-event references', () => {
       const { surfaceOp: _op, ...markerless } = userEvent()
       expect(() => accept(markerless as SessionEvent)).toThrow(/requires a surfaceOp marker/)
       expect(() => accept({ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 }, surfaceOp: 'append' } as never))
         .toThrow(/not surface-eligible/)
       expect(() => accept({ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 }, sourceEventSeqs: [0] } as never))
         .toThrow(/not surface-eligible/)
-    })
-
-    it(path + ' accepts assistant chunk provenance on an earlier event', () => {
       const assistant = {
-        type: 'assistant/message', seq: SessionSeq(1), time: 1, surfaceOp: 'append', sourceEventSeqs: [SessionSeq(0)],
+        ...userEvent(), type: 'assistant/message', sourceEventSeqs: [0],
         data: { turn: 1, step: 1, stream: [], message: createMessage({
           role: 'assistant', content: [], source: { kind: 'model', provider: 'mock', model: 'mock' },
         }) },
       } as unknown as SessionEvent
-      if (path === 'append') {
-        const session = Session.create(id)
-        session.append('assistant/attempt', { turn: 1, step: 1, stream: [] })
-        expect(() => appendEvent(session, assistant)).not.toThrow()
-      } else if (path === 'seed' || path === 'restore') {
-        const attempt = {
-          type: 'assistant/attempt', seq: SessionSeq(0), time: 1,
-          data: { turn: 1, step: 1, stream: [] },
-        } as unknown as SessionEvent
-        expect(() => path === 'seed'
-          ? Session.create(id, [attempt, structuredClone(assistant)])
-          : Session.fromRestore(id, [attempt, structuredClone(assistant)], { ...header }, SessionLogOffset(0)),
-        ).not.toThrow()
-      } else {
-        expect(() => accept(structuredClone(assistant))).not.toThrow()
-      }
+      expect(() => accept(assistant)).toThrow(/cannot carry sourceEventSeqs/)
     })
   }
 
-  it('retains opaque ignorable metadata on unknown types without deriving messages', () => {
+  it.each(['extension/event', 'tool/code-dispatch', 'tool/code-dispatch-start'])('retains opaque ignorable %s metadata without deriving messages', (type) => {
     const event = {
-      type: 'extension/event', seq: SessionSeq(0), time: 1, data: { nested: { retained: true } }, ignorable: true,
+      type, seq: SessionSeq(0), time: 1, data: { nested: { retained: true } }, ignorable: true,
       surfaceOp: { opaque: ['not', 'placement'] }, sourceEventSeqs: { opaque: [null, true] },
     } as unknown as SessionEvent
     for (const [path, accept] of Object.entries(entryPaths)) {
@@ -302,7 +284,7 @@ describe('canonical event-local surface metadata', () => {
     expect(session.deriveMessages()).toEqual([])
   })
 
-  it.each(['turn/start', 'assistant/attempt', 'request/context', 'session/title', 'tool/ptc-dispatch', 'tool/code-dispatch'])('rejects known log-only %s metadata even when ignorable', (type) => {
+  it.each(['turn/start', 'assistant/attempt', 'request/context', 'session/title', 'tool/ptc-dispatch'])('rejects known log-only %s metadata even when ignorable', (type) => {
     for (const metadata of [{ surfaceOp: 'append' }, { sourceEventSeqs: [0] }]) {
       const event = {
         type, seq: SessionSeq(0), time: 1, data: { turn: 1, step: 1, stream: [] }, ignorable: true, ...metadata,
@@ -311,7 +293,7 @@ describe('canonical event-local surface metadata', () => {
     }
   })
 
-  it('requires system placement and preserves system data and provenance on head replacements', () => {
+  it('requires system placement and preserves system data and source-event references on head replacements', () => {
     const session = Session.create(id)
     const data = { turn: 1, step: 1, message: createSystemMessage('head', 'fixture'), extra: { nested: true } }
     const head = session.append('system/message', data, { surfaceOp: 'append' })
@@ -337,16 +319,18 @@ describe('canonical event-local surface metadata', () => {
     expect(snapshotSessionEvent(event)).toEqual(event)
   })
 
-  it('requires surface intent on event variants and permits assistant provenance in types', () => {
-    expectTypeOf<SurfaceEvent>().toEqualTypeOf<SessionEvent<SurfaceEventType> & { surfaceOp: SurfaceOp }>()
-    expectTypeOf<'surfaceOp' extends keyof SessionEvent<'user/message'> ? true : false>().toEqualTypeOf<true>()
+  it('requires surface intent on event variants and forbids assistant source-event references in types', () => {
+    expectTypeOf<SurfaceEvent>().toEqualTypeOf<SessionEvent<SurfaceEventType>>()
+    expectTypeOf<Omit<SessionEvent<'user/message'>, 'surfaceOp'>>().not.toExtend<SessionEvent<'user/message'>>()
+    expectTypeOf<{ surfaceOp: 'append'; sourceEventSeqs: SessionSeq[] }>().not.toExtend<SurfaceIntent<'assistant/message'>>()
     expectTypeOf<{ op: 'replace'; start: SessionSeq; end: SessionSeq }>().not.toExtend<SurfaceOp>()
-    expectTypeOf<SessionEvent<'system/message'>['surfaceOp']>().toEqualTypeOf<SurfaceOp | undefined>()
-    expectTypeOf<SessionEvent<'user/message'>['surfaceOp']>().toEqualTypeOf<SurfaceOp | undefined>()
-    expectTypeOf<SessionEvent<'assistant/message'>['sourceEventSeqs']>().toEqualTypeOf<SessionSeq[] | undefined>()
-    expectTypeOf<'surfaceOp' extends keyof SessionEvent<'turn/start'> ? true : false>().toEqualTypeOf<false>()
-    expectTypeOf<'sourceEventSeqs' extends keyof SessionEvent<'turn/start'> ? true : false>().toEqualTypeOf<false>()
-    expectTypeOf<SurfaceIntent['sourceEventSeqs']>().toEqualTypeOf<SessionSeq[] | undefined>()
+    expectTypeOf<SessionEvent<'system/message'>['surfaceOp']>().toEqualTypeOf<SurfaceOp>()
+    expectTypeOf<SurfaceIntent<'system/message'>['sourceEventSeqs']>().toEqualTypeOf<SessionSeq[] | undefined>()
+    expectTypeOf<SessionEvent<'user/message'>['surfaceOp']>().toEqualTypeOf<SurfaceOp>()
+    expectTypeOf<SessionEvent<'assistant/message'>['sourceEventSeqs']>().toEqualTypeOf<undefined>()
+    expectTypeOf<SessionEvent<'turn/start'>['surfaceOp']>().toEqualTypeOf<undefined>()
+    expectTypeOf<SessionEvent<'turn/start'>['sourceEventSeqs']>().toEqualTypeOf<undefined>()
+    expectTypeOf<SurfaceIntent<'assistant/message'>['sourceEventSeqs']>().toEqualTypeOf<undefined>()
     expectTypeOf<Extract<SurfaceOp, { op: 'replace' }>['startSeq']>().toEqualTypeOf<SessionSeq>()
     expectTypeOf<Extract<SurfaceOp, { op: 'replace' }>['endSeq']>().toEqualTypeOf<SessionSeq>()
   })

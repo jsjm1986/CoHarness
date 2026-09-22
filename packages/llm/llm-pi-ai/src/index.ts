@@ -58,15 +58,17 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
-import { assertUsableApiKey, LlmEndpointResolutionCache, LlmError } from '@deepseek-ai/dsh-llm'
+import { assertUsableApiKey, LlmEndpointResolutionCache, LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-fs'
 import type {
   ManagedModelCompat,
   ManagedModelProfile,
   ManagedModelProviderProfile,
   ModelProviderConfigSnapshot,
 } from '@deepseek-ai/dsh-model-provider-config'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { PiAiAdapter } from './adapter.ts'
 import { catalogProviderIds, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
@@ -170,7 +172,7 @@ function managedProviderMeta(snapshot: ModelProviderConfigSnapshot | undefined):
   }]))
 }
 
-function assertPersonalProfiles(config: Config): void {
+function assertReservedRoutes(config: Config): void {
   const reserved = Object.keys(config.providers ?? {}).find(provider =>
     provider.startsWith(ORGANIZATION_PROVIDER_PREFIX) || provider.startsWith(PROJECT_PROVIDER_PREFIX))
   if (reserved !== undefined) {
@@ -183,7 +185,11 @@ function assertPersonalProfiles(config: Config): void {
       `llm-pi-ai: credential reference "${reservedCredential[1].apiKeyEnv}" is reserved for organization configuration`,
     )
   }
-  assertServiceable(config)
+}
+
+function assertPersonalProfiles(config: Config, previous?: Config): void {
+  assertReservedRoutes(config)
+  assertServiceable(config, previous)
 }
 
 /**
@@ -224,7 +230,7 @@ function directoryEntries(
   const catalog = new Set(catalogProviderIds())
   const entries = new Map<string, LlmConfigurableProvider>()
   const managedMeta = managedProviderMeta(managed)
-  const declare = (provider: string, displayName: string): void => {
+  const declare = (provider: string, displayName: string, error?: string): void => {
     const metadata = managedMeta.get(provider)
     entries.set(provider, {
       provider,
@@ -239,6 +245,7 @@ function directoryEntries(
         management: metadata.management,
         ...metadata.projectId === undefined ? {} : { projectId: metadata.projectId },
       },
+      ...error === undefined ? {} : { error },
     })
   }
   // A provider whose only native method is OAuth leaves this adapter nothing
@@ -248,7 +255,9 @@ function directoryEntries(
   // answers what pi-ai ships.
   for (const provider of catalog) declare(provider, provider)
   for (const [provider, profile] of profiles) {
-    if (!provider.startsWith(ORGANIZATION_PROVIDER_PREFIX)) declare(provider, profile.displayName)
+    if (!provider.startsWith(ORGANIZATION_PROVIDER_PREFIX)) {
+      declare(provider, profile.displayName, profile.catalogError)
+    }
   }
   return [...entries.values()]
 }
@@ -275,7 +284,11 @@ export function apply(ctx: Context, config: Config): void {
     const raw = current()
     const managed = ctx.get('modelProviderConfig')?.snapshot()
     if (raw === lastRaw && managed === lastManaged && memoized !== undefined) return memoized
-    const next = resolveProfiles({ ...raw.providers, ...managedProfiles(managed) })
+    // Deferred resolution keeps catalog drift a per-route diagnostic the
+    // directory can show instead of a resolution failure that strands every
+    // route in the namespace; managed profiles never pass section validation,
+    // so this is also the only posture their errors can take.
+    const next = resolveProfiles({ ...raw.providers, ...managedProfiles(managed) }, 'deferred')
     endpointCache.clear()
     lastRaw = raw
     lastManaged = managed
@@ -318,6 +331,11 @@ export function apply(ctx: Context, config: Config): void {
     resolveApiKey,
     auth,
     resolveAttachments: () => ctx.get('attachments'),
+    resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(
+      attachments,
+      hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath),
+      ref,
+    ),
     endpointCache,
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
@@ -428,11 +446,22 @@ export function apply(ctx: Context, config: Config): void {
     applyProfileChange()
   })
 
+  let registering = true
   installSettingsSection(ctx, NS, Config, config, {
     // Refuse an unserviceable section where it is written: without this a
     // schema-valid profile the adapter cannot serve would be stored and then
     // silently disable every route in this namespace.
-    validate: assertPersonalProfiles,
+    validate: (value) => {
+      // Stored catalog drift must not prevent registration of the repair UI;
+      // the reserved-route checks still apply because managed routes share
+      // this namespace.
+      if (registering) {
+        assertReservedRoutes(value)
+        resolveProfiles(value.providers, 'deferred')
+      } else {
+        assertPersonalProfiles(value, current())
+      }
+    },
     setSource: (source) => {
       current = source
     },
@@ -443,6 +472,7 @@ export function apply(ctx: Context, config: Config): void {
       // Without its own diagnostic that refusal reaches the operator as a
       // generic "settings: watcher failed", naming neither the route nor why it
       // is not serving. The previous routes keep serving either way.
+      registering = false
       applyProfileChange()
     },
   })

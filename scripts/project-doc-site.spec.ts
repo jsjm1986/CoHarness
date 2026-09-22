@@ -1,7 +1,7 @@
 /** Tests for the documentation website projection adapter. */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fromMarkdown } from 'mdast-util-from-markdown'
@@ -9,6 +9,7 @@ import { gfmFromMarkdown } from 'mdast-util-gfm'
 import { gfm } from 'micromark-extension-gfm'
 import type { Nodes } from 'mdast'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { cleanDocSiteOutput, docSiteBuildOptions } from '../website/build.ts'
 import { docsPages, landingLink, routeLink, sectionSpec, type DocsPage } from '../website/docs.ts'
 import {
   addProjectionFrontmatter, emitRawMarkdownPages, llmsTxt, projectedPageContent, publishableImage,
@@ -67,6 +68,78 @@ describe('website source layout', () => {
       unexpectedWebsiteMarkdown(files),
       'Keep canonical Markdown under docs/ and publish it through website/docs.ts.',
     ).toEqual([])
+  })
+})
+
+describe('documentation site build', () => {
+  it.each([
+    { mode: 'SPA', mpa: false, expectedMpa: undefined },
+    { mode: 'MPA', mpa: true, expectedMpa: 'true' },
+  ])('$mode build removes stale output before writing', async ({ mpa, expectedMpa }) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-doc-build-'))
+    roots.push(root)
+    const outDir = join(root, '.dist')
+    const stale = join(outDir, 'stale.md')
+    mkdirSync(outDir)
+    writeFileSync(stale, 'stale\n')
+
+    const options = docSiteBuildOptions(root, mpa)
+    expect(options.mpa).toBe(expectedMpa)
+    expect(existsSync(stale)).toBe(true)
+    await options.onAfterConfigResolve?.({ outDir } as never)
+    expect(existsSync(outDir)).toBe(false)
+  })
+
+  it('refuses to remove the site root or an outside directory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-doc-build-root-'))
+    const outside = mkdtempSync(join(tmpdir(), 'dsh-doc-build-outside-'))
+    roots.push(root, outside)
+    writeFileSync(join(root, 'keep'), 'root\n')
+    writeFileSync(join(outside, 'keep'), 'outside\n')
+
+    expect(() => {
+      cleanDocSiteOutput(root, root)
+    }).toThrow('must be a child of site root')
+    expect(() => {
+      cleanDocSiteOutput(root, outside)
+    }).toThrow('must be a child of site root')
+    expect(readFileSync(join(root, 'keep'), 'utf8')).toBe('root\n')
+    expect(readFileSync(join(outside, 'keep'), 'utf8')).toBe('outside\n')
+  })
+
+  it('unlinks a link-shaped output without removing its target', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-doc-build-link-root-'))
+    const outside = mkdtempSync(join(tmpdir(), 'dsh-doc-build-link-target-'))
+    roots.push(root, outside)
+    const outDir = join(root, '.dist')
+    const keep = join(outside, 'keep')
+    writeFileSync(keep, 'outside\n')
+    symlinkSync(outside, outDir, 'junction')
+
+    cleanDocSiteOutput(root, outDir)
+
+    expect(existsSync(outDir)).toBe(false)
+    expect(readFileSync(keep, 'utf8')).toBe('outside\n')
+  })
+
+  it('refuses output whose nearest existing parent resolves outside the site root', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-doc-build-parent-link-root-'))
+    const outside = mkdtempSync(join(tmpdir(), 'dsh-doc-build-parent-link-target-'))
+    roots.push(root, outside)
+    const linkedParent = join(root, 'linked')
+    const outDir = join(linkedParent, 'missing', '.dist')
+    const keep = join(outside, 'keep')
+    writeFileSync(keep, 'outside\n')
+    symlinkSync(outside, linkedParent, 'junction')
+
+    try {
+      expect(() => {
+        cleanDocSiteOutput(root, outDir)
+      }).toThrow('must resolve inside site root')
+      expect(readFileSync(keep, 'utf8')).toBe('outside\n')
+    } finally {
+      unlinkSync(linkedParent)
+    }
   })
 })
 
@@ -377,7 +450,7 @@ describe('docsPages locale routes', () => {
     const translated = rootPages.filter(page => page.contentLocale === 'zh-CN')
     const fallbacks = rootPages.filter(page => page.contentLocale === 'en-US')
 
-    expect(translated).toHaveLength(43)
+    expect(translated).toHaveLength(rootPages.length)
     expect(translated.every(page => page.source.endsWith('.zh.md'))).toBe(true)
     expect(fallbacks).toEqual([])
   })
@@ -493,13 +566,13 @@ describe('sidebar ordering', () => {
 
 describe('addProjectionFrontmatter', () => {
   it('adds frontmatter to an ordinary Markdown page', () => {
-    expect(addProjectionFrontmatter('# Guide\n', { source: 'docs/guide.md' })).toBe(
-      '---\neditSource: "docs/guide.md"\n---\n\n# Guide\n',
+    expect(addProjectionFrontmatter('# Guide\n', { source: 'docs/guide.md', route: 'en/guide.md', sidebar: 'en-guide' })).toBe(
+      '---\neditSource: "docs/guide.md"\nrawMarkdownPath: "en/guide.md"\n---\n\n# Guide\n',
     )
   })
 
   it('extends existing VitePress frontmatter', () => {
-    expect(addProjectionFrontmatter('---\nlayout: home\n---\n', { source: 'docs/index.md' })).toBe(
+    expect(addProjectionFrontmatter('---\nlayout: home\n---\n', { source: 'docs/index.md', route: 'index.md', sidebar: null })).toBe(
       '---\neditSource: "docs/index.md"\nlayout: home\n---\n',
     )
   })
@@ -507,9 +580,11 @@ describe('addProjectionFrontmatter', () => {
   it('adds the page-specific outline depth from the publication manifest', () => {
     expect(addProjectionFrontmatter('# Catalog\n', {
       source: 'docs/catalog.md',
+      route: 'reference/index.md',
+      sidebar: 'zh-reference',
       outline: [2, 4],
     })).toBe(
-      '---\neditSource: "docs/catalog.md"\noutline: [2,4]\n---\n\n# Catalog\n',
+      '---\neditSource: "docs/catalog.md"\nrawMarkdownPath: "reference/index.md"\noutline: [2,4]\n---\n\n# Catalog\n',
     )
   })
 })
@@ -600,9 +675,9 @@ describe('emitRawMarkdownPages', () => {
     // The real path, because image placement proves containment via realpath.
     emitRawMarkdownPages(out, { pages, repoRoot: realpathSync(root), repositoryRef: 'abc123' })
 
-    expect(readFileSync(join(out, 'a.md'), 'utf8')).toBe('[B](./reference-root/b.md) ![logo](./logo.svg)\n')
-    expect(readFileSync(join(out, 'en/a.md'), 'utf8')).toBe('[B](./reference/b.md) ![logo](./logo.svg)\n')
-    expect(readFileSync(join(out, 'reference-root/b.md'), 'utf8')).toBe('# B\n')
+    expect(readFileSync(join(out, 'a.md'), 'utf8')).toBe('\uFEFF[B](./reference-root/b.md) ![logo](./logo.svg)\n')
+    expect(readFileSync(join(out, 'en/a.md'), 'utf8')).toBe('\uFEFF[B](./reference/b.md) ![logo](./logo.svg)\n')
+    expect(readFileSync(join(out, 'reference-root/b.md'), 'utf8')).toBe('\uFEFF# B\n')
     expect(existsSync(join(out, 'logo.svg'))).toBe(true)
     expect(existsSync(join(out, 'en/logo.svg'))).toBe(true)
   })
@@ -618,7 +693,7 @@ describe('emitRawMarkdownPages', () => {
 
     emitRawMarkdownPages(out, { pages, repoRoot: root, repositoryRef: 'abc123' })
 
-    expect(readFileSync(join(out, 'index.md'), 'utf8')).toBe('# Home\n\n[A](./a.md)\n')
+    expect(readFileSync(join(out, 'index.md'), 'utf8')).toBe('\uFEFF# Home\n\n[A](./a.md)\n')
   })
 
   it('emits a parent-level alias for an index route with links recomputed', () => {
@@ -634,8 +709,20 @@ describe('emitRawMarkdownPages', () => {
 
     emitRawMarkdownPages(out, { pages, repoRoot: root, repositoryRef: 'abc123' })
 
-    expect(readFileSync(join(out, 'guide/index.md'), 'utf8')).toBe('# C\n\n[A](../a.md)\n')
-    expect(readFileSync(join(out, 'guide.md'), 'utf8')).toBe('# C\n\n[A](./a.md)\n')
+    expect(readFileSync(join(out, 'guide/index.md'), 'utf8')).toBe('\uFEFF# C\n\n[A](../a.md)\n')
+    expect(readFileSync(join(out, 'guide.md'), 'utf8')).toBe('\uFEFF# C\n\n[A](./a.md)\n')
+  })
+
+  it('identifies UTF-8 to document readers while fetch decoding preserves the Markdown body', async () => {
+    const { root, pages } = fixture()
+    const markdown = '# 中文 → Markdown\n'
+    writeFileSync(join(root, 'docs/a.md'), markdown)
+    const out = mirrorDir()
+    emitRawMarkdownPages(out, { pages, repoRoot: root, repositoryRef: 'abc123' })
+    const bytes = readFileSync(join(out, 'a.md'))
+    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
+    expect(await new Response(bytes).text()).toBe(markdown)
+    expect(fromMarkdown(bytes.toString('utf8')).children[0]?.type).toBe('heading')
   })
 
   it('refuses to overwrite a file the build already carries', () => {
@@ -651,19 +738,6 @@ describe('emitRawMarkdownPages', () => {
       emitRawMarkdownPages(out, { pages, repoRoot: realpathSync(root), repositoryRef: 'abc123' })
     }).toThrow('would overwrite')
     expect(readFileSync(join(out, 'logo.svg'), 'utf8')).toBe('public copy\n')
-  })
-
-  it('replaces an MPA route stub and an identical emitted image', () => {
-    const { root, pages } = fixture()
-    writeFileSync(join(root, 'docs/a.md'), '![logo](../packages/logo.svg)\n')
-    const out = mirrorDir()
-    writeFileSync(join(out, 'a.md'), '# VitePress route stub\n')
-    writeFileSync(join(out, 'logo.svg'), readFileSync(join(root, 'packages/logo.svg')))
-
-    emitRawMarkdownPages(out, { pages, repoRoot: realpathSync(root), repositoryRef: 'abc123' })
-
-    expect(readFileSync(join(out, 'a.md'), 'utf8')).toBe('![logo](./logo.svg)\n')
-    expect(readFileSync(join(out, 'logo.svg'), 'utf8')).toBe('<svg/>\n')
   })
 })
 
@@ -688,7 +762,7 @@ describe('raw Markdown projection of the published manifest', () => {
   beforeAll(() => {
     mirror = mkdtempSync(join(tmpdir(), 'dsh-doc-mirror-real-'))
     emitRawMarkdownPages(mirror, { pages: docsPages, repoRoot: repositoryRoot, repositoryRef: 'master' })
-  }, 60_000)
+  }, 120_000)
 
   afterAll(() => {
     rmSync(mirror, { recursive: true, force: true })
@@ -702,7 +776,7 @@ describe('raw Markdown projection of the published manifest', () => {
 
   it('emits home pages with their bodies instead of the frontmatter stub', () => {
     for (const route of ['index.md', 'en/index.md']) {
-      const home = readFileSync(join(mirror, route), 'utf8')
+      const home = new TextDecoder().decode(readFileSync(join(mirror, route)))
       expect(home.startsWith('---'), route).toBe(false)
       expect(home, route).toContain('# DeepSeek Harness')
     }

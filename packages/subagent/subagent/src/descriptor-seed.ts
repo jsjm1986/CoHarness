@@ -27,5 +27,6 @@ export function seedDescriptorTurn(
 ): readonly SessionEvent[] {
   const staged = Session.create(childId, seed)
   staged.append('subagent/descriptor', descriptor)
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return staged.snapshotEvents()
 }

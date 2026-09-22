@@ -14,9 +14,13 @@ Node 侧会扫描已启用的 Loader 配置项以发现 web `dsh.client` 包，�
 
 `dsh.client.external` 是统一基座之外的可选精确 specifier 请求列表。统一基座包括外壳播种的 React、Cordis 和静态 UI 库，以及由 HTML parser 预载的 runtime。请求由其命名的动态 package row 或精确静态表键回答；只有末尾 `/client` 会别名到 package row，并且不存在 provider 别名声明。纯类型 import 会被擦除，不产生请求。组合阶段会拒绝畸形请求、缺失提供方、自请求和同步请求环；import 与 prefetch 会在消费者物化前递归登记动态提供方。参见[共享模块与模块图](../AGENTS.md#shared-modules-and-the-module-graph)。
 
+## 概述
+
+`dsh-client-modules` 把插件包的 `dsh.client` 声明变成可加载的浏览器 bundle：宿主半侧扫描已启用的 Loader 条目并组合启动图，可用的 Web 载体通过 `/plugins` 提供每个 bundle，由 shell 持有的载体则通过 `fetchBundle()` 分派完全相同的 bundle 响应。浏览器半侧按需惰性加载这些 bundle。插件 bundle 惰性执行——运行 bundle 只注册 factory，模块副作用在物化时运行——因此插件首次被使用之前什么都不会运行。这里的一切都是浏览器内核机制；模型永远看不到它。
+
 ## 模型体验
 
-无。模块 loader 属于浏览器侧内核机制；这里没有任何内容进入模型请求。
+无。模块 loader 属于浏览器侧内核机制，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

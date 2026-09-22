@@ -661,7 +661,7 @@ function decode(
 ): unknown {
   try {
     if (codec.mode === 'strict') {
-      value = codec.schema.parse(value)
+      value = codec.create().parse(value)
       if (value === undefined) return value
     }
     assertJsonValue(value, new Set())

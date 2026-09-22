@@ -22,3 +22,8 @@ The Codex and Claude Code packages are independent optional Profile Bundles. Ins
 See the decisions for the [capability family](../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.md), [continuable children](../../.agents/notes/implemented/feature/2026-07-21-continuable-background-subagents.md), and [control tools](../../.agents/notes/implemented/simplification/2026-07-26-merge-subagent-control-service.md).
 
 The subsystem reference — start requests, results, live runs, the provider contract, continuable background children — is [docs/subsystems/subagent.md](../../docs/subsystems/subagent.md); design rationale in the [subagent capability seam](../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.md), [continuable background subagents](../../.agents/notes/implemented/feature/2026-07-21-continuable-background-subagents.md), and [merged subagent control service](../../.agents/notes/implemented/simplification/2026-07-26-merge-subagent-control-service.md) Agent Notes.
+
+
+## Summary
+
+The subagent package family lets an agent delegate a task to a child, continue the child's work, and discover every child it created. Choose a fresh in-process child for isolated work, a history-seeded in-process child when prior conversation matters, or an out-of-process child backed by ACP, Codex, Claude Code, or another Harness runtime. Model-facing tools also let agents message adjacent agents, interrupt work, and list child status. Each child remains visible to its parent whether it is running or stored; the package READMEs document provider-specific setup and limits.

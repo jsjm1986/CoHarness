@@ -6,6 +6,10 @@
 
 该插件**不注册任何服务**，也不负责存储或预览机制：预览由 [`@deepseek-ai/dsh-output-retention`](../../util/output-retention)（`TextRetainer`）负责，存储由 `ctx.spillStore` 负责。它只决定何时 spill，并组合通知。
 
+## 概述
+
+当过大的纯文本工具结果不应进入模型上下文时，挂载本包。超过 `maxInlineBytes` 的结果会变成有界的首尾预览，并附带定位信息与取回指引；完整文本仍可通过已配置的 spill 后端访问。spill 失败时原始结果仍然可见，省略 `maxInlineBytes` 则会禁用该策略。同一上限也约束 `run_code` 子调用的持久日志副本，但不会改变程序收到的值。
+
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -36,17 +40,21 @@
 
 该策略只能看到最终格式化的呈现结果，看不到工具的内部资源或规范值。如果提供方已经截断内容（例如 `web-fetch-http.maxBodyChars`），spill 产物保存的是工具返回的完整格式化结果，而非完整原始源。提供方／资源上限仍然是必需的，并且与该策略相互独立。`glob`/`grep` 负责对项级呈现结果执行 spill，因为渲染前仍然存在完整的已获取值；bash 流负责在获取时 spill。通用策略预先注册自己的 waterfall（瀑布式事件）监听器，然后再委托，因此无论插件加载顺序如何，普通工具自身的异步投影都会在通用字节限制之前完成。详见[工具输出 spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每个结果由有界预览策略独立变换；不保留跨调用状态。
+
 ## 模型体验
 
 ### 过大的纯文本结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-大小不超过 `maxInlineBytes` 的结果、嵌套结果、`read` 结果、被阻止的决策和包含非文本块的结果都保持不变。过大的纯文本呈现结果会变为有界的首尾预览，后面附加 `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`；存储失败或没有会话所有者时，原始结果仍然可见。
+不超过 `maxInlineBytes` 的结果、嵌套结果、`read` 结果、被阻止的决策与包含非文本块的结果保持不变。过大的纯文本面向模型结果会变成有界的首尾预览，后面附加 `(Omitted <bytes> bytes. Full formatted result stored at: <locator>. <retrievalHint>)`；存储或归属失败时原始结果仍然可见。
 
 #### Token 影响
 
-成功替换后的内容最多为 `maxInlineBytes` 个 UTF-8 字节，并会保留在历史中直到压缩（compaction）；完整 spill 文本不会重新发送给模型。
+成功的替换最多为 `maxInlineBytes` 个 UTF-8 字节，并保留在历史中直到压缩（compaction）；完整 spill 文本不会重新发送给模型。
 
 #### KV Cache 影响
 

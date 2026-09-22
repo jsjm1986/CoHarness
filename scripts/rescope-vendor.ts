@@ -92,7 +92,8 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/section.client.spec.tsx', upstream: ['cordis'] },
-  { file: 'apps/cli/tests/web-agent-presets.e2e.ts', upstream: ['cordis'] },
+  // TODO(alpha.2): restore apps/cli/tests/web-agent-presets.e2e.ts with the
+  // shipped-presets port that exports SHIPPED_PRESET_ROOT.
   { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },
   { file: 'packages/preset/agent-presets/tests/session.spec.ts', upstream: ['cordis'] },
   // The inventory tab's `cordis` key is a local dictionary key, not a package
@@ -106,6 +107,8 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'docs/user/guide/index.zh.md', upstream: ['cordis'] },
   // The preset-roster loop names the `cordis` preset id, not a package.
   { file: 'apps/cli/tests/windows-shell.spec.ts', upstream: ['cordis'] },
+  // `agentPresets.mount(scope, 'cordis')` mounts the `cordis` preset id, not a package.
+  { file: 'apps/cli/tests/profiles/web/tests/fixtures/creator-plugin-manager.mjs', upstream: ['cordis'] },
   // GROUP_ORDER holds `packages/<group>/` directory names, not package names.
   { file: 'scripts/gen-module-graph.ts', upstream: ['cordis'] },
   { file: 'scripts/gen-doc-graphs.ts', upstream: ['cordis'] },
@@ -311,9 +314,9 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
   {
     id: 'client-purity-vendored-libraries-predicate',
     file: 'packages/client/tsdown.client.ts',
-    find: '        if (INLINE_SAFE.test(source) || INLINE_SAFE_TOKEN_METER.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point',
+    find: '        if (INLINE_SAFE.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point',
     replace: `        if (VENDORED_LIBRARY.test(source)) return null // vendored library: inline, no shared identity
-        if (INLINE_SAFE.test(source) || INLINE_SAFE_TOKEN_METER.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point`,
+        if (INLINE_SAFE.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point`,
     expect: 1,
   },
   {
@@ -356,13 +359,6 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
     expect: 1,
   },
   {
-    id: 'web-agent-presets-e2e-framework-import',
-    file: 'apps/cli/tests/web-agent-presets.e2e.ts',
-    find: "import { Context } from 'cordis'",
-    replace: "import { Context } from '@deepseek-ai/cordis'",
-    expect: 1,
-  },
-  {
     id: 'notices-vendored-row-type',
     file: 'scripts/gen-third-party-notices.ts',
     find: `export interface VendoredRow {
@@ -374,6 +370,8 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
   /** The name this package carries upstream; MIT attribution names the fork's origin, not our scope. */
   upstreamName: string
   upstream: string
+  /** The checked-in \`vendor/\` directory disclosed by the notices row. */
+  sourceDirectory: string
 }`,
     expect: 1,
   },
@@ -408,7 +406,7 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
 \${vendored.map(row => \`| \\\`\${row.npmName}\\\` | [\${row.upstream.replace('https://', '')}](\${row.upstream}) | MIT |\`).join('\\n')}`,
     replace: `| Package | Upstream name | Upstream | License |
 | --- | --- | --- | --- |
-\${vendored.map(row => \`| \\\`\${row.npmName}\\\` | \\\`\${row.upstreamName}\\\` | [\${row.upstream.replace('https://', '')}](\${row.upstream}) | MIT |\`).join('\\n')}`,
+\${vendored.map(row => \`| \\\`\${row.npmName}\\\` | \\\`\${row.upstreamName}\\\` | [\${row.sourceDirectory}](\${row.sourceDirectory}/) | MIT |\`).join('\\n')}`,
     expect: 1,
   },
   {
@@ -427,28 +425,6 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
     file: 'scripts/gen-third-party-notices.spec.ts',
     find: 'parseVendoredRows(\'| `cordis/` | cordis | 4.0.0 | https://example.com | `abc123` |\\n\')',
     replace: 'parseVendoredRows(\'| `cordis/` | `@deepseek-ai/cordis` | cordis | 4.0.0 | https://example.com | `abc123` |\\n\')',
-    expect: 1,
-  },
-  {
-    // The framework peer is no longer a registry name, so the rehearsal must install this
-    // repository's vendored copies; cosmokit comes along as cordis's own dependency.
-    id: 'packed-install-vendored-peer',
-    file: 'packages/sandbox/sandbox-local/tests/packed-install.e2e.ts',
-    find: `  'packages/runtime-diagnostics/invariants',
-]`,
-    replace: `  'packages/runtime-diagnostics/invariants',
-  // The framework and the vendored packages the closure declares outright:
-  // rescoped into @deepseek-ai, so the consumer installs this repository's
-  // copies. Schemastery is a hard dependency of three members above, not a
-  // peer, so npm resolves it while installing them.
-  'vendor/cordis',
-  'vendor/cosmokit',
-  'vendor/schemastery',
-  // cordis declares these rescoped framework plugins as peer dependencies;
-  // include their local tarballs so npm does not query the registry for them.
-  'vendor/include',
-  'vendor/loader',
-]`,
     expect: 1,
   },
   {
@@ -490,7 +466,7 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
 ]
 
 /** Files the rescope must never rewrite. */
-function excluded(file: string): boolean {
+export function isRescopeExcluded(file: string): boolean {
   if (file === 'scripts/rescope-vendor.ts') return true // the mapping itself
   if (file.startsWith('.agents/notes/')) return true // notes record what was true when written
   // Recorded model payloads quote documentation verbatim, so they must mirror the
@@ -500,6 +476,8 @@ function excluded(file: string): boolean {
   if (file === 'docs/rescope.md' || file === 'docs/rescope.zh.md') return true
   if (file.endsWith('.i18n.yaml')) return true // blob-hash records, re-recorded by the pairing gate
   if (file === 'pnpm-lock.yaml') return true // regenerated by pnpm install
+  // Raw npm registry resolution; only gen-dependency-catalog --refresh replaces this evidence.
+  if (file === 'scripts/dependency-catalog/package-lock.json') return true
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true // upstream files kept verbatim
   return !EXTENSIONS.some(extension => file.endsWith(extension))
 }
@@ -630,7 +608,7 @@ function main(): void {
     .split('\0')
     // ls-files reads the index: an unstaged deletion still lists the path, and
     // a vanished worktree file has no imports left to rewrite.
-    .filter(file => file !== '' && !excluded(file) && existsSync(resolve(root, file)))
+    .filter(file => file !== '' && !isRescopeExcluded(file) && existsSync(resolve(root, file)))
 
   const counts = new Map<string, { files: number; lines: number }>()
   const failures: string[] = []

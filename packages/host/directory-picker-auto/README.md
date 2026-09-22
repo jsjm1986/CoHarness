@@ -6,9 +6,17 @@ The **adaptive chooser** of the [directory-picker seam](../directory-picker/READ
 
 Resolution is one pure boot-time sample (`resolveDirectoryPickerBackend`), exported for reuse. `native` requires every signal that the operator can see the host display and the native backend can serve it: a loopback-only bind (read from the injected `webServer`; an all-interfaces bind admits remote browsers no OS chooser can reach), no SSH launch (`SSH_CONNECTION`/`SSH_TTY` unset or blank — under SSH port-forwarding the chooser would open on the unattended server), and a servable display session — assumed on darwin/win32; on linux `DISPLAY`/`WAYLAND_DISPLAY` plus a zenity or kdialog binary on `PATH` (the probe is one more boot-time fact); never on any other platform, since the native backend drives exactly darwin/win32/linux. Anything ambiguous resolves to `browse`, which works everywhere. The sample happens exactly once per boot so the mounted capability stays stable for the service lifetime, as the seam requires. Pinning an interaction is not a config field here — compose the `-native` or `-browse` row directly instead of this one, the seam's documented swap point; mounting the chooser **and** a backend row together fails loud (duplicate `directoryPicker` service, duplicate client flow in the `single` holes).
 
+## Summary
+
+`dsh-host-directory-picker-auto` picks the right directory-picking interaction for every boot: it resolves the host's situation once at boot and mounts the matching backend — [native](../directory-picker-native/README.md) or [browse](../directory-picker-browse/README.md) — together with its browser half, as real Loader entries in the in-memory root tree. The resolution is one pure boot-time sample: `native` requires a loopback-only bind, a non-SSH launch, and a servable display session; anything ambiguous resolves to `browse`, which works everywhere. Pinning an interaction means composing that backend directly. The mounted capability stays stable for the service lifetime, as the seam requires.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The chooser resolves the host situation once at boot and mounts the matching backend as an ordinary Loader entry; there is no ongoing picker state.
+
 ## Model Experience
 
-None, as the chooser only composes the GUI host's directory selection; nothing here reaches a model request.
+None, as the GUI host's directory-selection chooser only mounts a backend row and registers nothing model-facing.
 
 #### KV Cache effect
 

@@ -9,25 +9,28 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../core/tools"
-    },
-    {
       "path": "../../core/agent"
     },
     {
       "path": "../../core/session"
     },
     {
-      "path": "../../session/session-projection"
+      "path": "../../core/tools"
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

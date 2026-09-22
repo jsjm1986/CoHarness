@@ -43,12 +43,12 @@ function buildSeed(turns: number): string {
   }
   for (let turn = 1; turn <= turns; turn++) {
     at({ type: 'turn/start', data: { turn } })
+    at({ type: 'step/start', data: { turn, step: 1 } })
     at({
       type: 'user/message',
       data: { content: [{ type: 'text', text: `m${turn}` }], source: { kind: 'user' } },
       surfaceOp: 'append',
     })
-    at({ type: 'step/start', data: { turn, step: 1 } })
     at({
       type: 'assistant/message',
       data: {
@@ -61,7 +61,6 @@ function buildSeed(turns: number): string {
           source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
         },
       },
-      sourceEventSeqs: [],
       surfaceOp: 'append',
     })
     at({ type: 'step/end', data: { turn, step: 1 } })

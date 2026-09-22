@@ -4,28 +4,30 @@
  * env vars — no model, no network, no harness imports. Speaks the runtime's
  * newline-delimited JSON-RPC protocol on stdio: answers `initialize`,
  * `session/prompt` (streaming scripted `session.event` notifications, then
- * `session.finished`, then the response), and `shutdown`.
+ * `session.status` idle and the response), and `shutdown`.
  *
  * Script vocabulary (all optional):
  * - `FAKE_TEXT`: assistant text for each turn (default `hello from fake runtime`).
- * - `FAKE_STATUS`: the `session.finished` status (default `ok`).
- * - `FAKE_REASON_KIND`: the `session.finished` reason kind (default `completed`; `none` omits the reason).
+ * - `FAKE_REASON_KIND`: the `turn/end` reason kind (default `completed`; `none` omits the reason).
  * - `FAKE_SUBAGENT`: also emit a child session (subagent.started + child event + subagent.finished).
  * - `FAKE_ECHO_CWD`: prefix the assistant text with the process cwd.
  * - `FAKE_ECHO_ENV`: comma-separated env names to echo as `name=value` lines in the assistant text.
- * - `FAKE_MALFORMED`: `initialize` returns `{}` (no serverInfo); `prompt` returns `{}` (no accepted).
- * - `FAKE_MALFORMED_PROMPT`: `initialize` is normal; only `prompt` returns `{}` (no accepted).
+ * - `FAKE_MALFORMED`: `initialize` returns `{}` (no serverInfo); `prompt` returns `{}` (no messageId).
+ * - `FAKE_MALFORMED_PROMPT`: `initialize` is normal; only `prompt` returns `{}` (no messageId).
  * - `FAKE_INIT_ERROR`: `initialize` answers a JSON-RPC error response with code 7.
  * - `FAKE_INIT_ERROR_ONCE_FILE`: fail `initialize` (code 7) only when this
  *   marker file does NOT exist yet, creating it — so the first runtime
  *   process fails the handshake and a respawned one succeeds (retry probe).
  * - `FAKE_ECHO_CWD_IN_INIT`: reply `serverInfo.version` = this process's cwd
  *   (wire-visible spawn-cwd probe).
+ * - `FAKE_ABORT_REASON_KIND`: nested cause for an `aborted` turn (default `user`).
  * - `FAKE_MALFORMED_EVENT`: the turn's `session.event` carries a number as
  *   the event; `FAKE_MALFORMED_MESSAGE`: assistant/message content is not an
  *   array; `FAKE_MESSAGE_WITHOUT_DATA`: assistant/message with no data
- *   member; `FAKE_MALFORMED_REASON`: `session.finished` reason is a bare
- *   string (wire-validation probes).
+ *   member; `FAKE_MALFORMED_REASON`: the `turn/end` carries a bare reason
+ *   (`'not-a-reason-envelope'`), an aborted reason without its cause (`aborted`), an unknown abort
+ *   cause (`abort-unknown`), a hook cause without its reason (`hook`), or no
+ *   `data` member (`no-data`) — wire-validation probes.
  * - `FAKE_EMPTY_MESSAGE`: the turn streams a text chunk, then records an empty
  *   assistant/message for a usage-only max-tokens step.
  * - `FAKE_HANG_INIT`: never answer `initialize` (mid-handshake cancel probe).
@@ -34,7 +36,7 @@
  *   cancel-during-handshake window).
  * - `FAKE_HANG_PROMPT`: never answer `session/prompt` (for timeout/dispose tests).
  * - `FAKE_STREAM_THEN_MALFORMED`: stream a text chunk for the prompt, then
- *   answer `{}` (no accepted) — same-pipe ordering makes the chunk arrive
+ *   answer `{}` (no messageId) — same-pipe ordering makes the chunk arrive
  *   before the protocol failure (partial-output retention probe).
  * - `FAKE_IGNORE_EOF` + `FAKE_SIGTERM_FILE`: keep running after stdin EOF; touch the file on SIGTERM (ladder probe).
  * - `FAKE_TRAP_SIGTERM`: with `FAKE_IGNORE_EOF`, survive SIGTERM too (SIGKILL-rung probe).
@@ -49,6 +51,9 @@ import process from 'node:process'
 import { createInterface } from 'node:readline'
 
 const env = process.env
+
+/** Legacy flat `assistant/message` field carrying the model source record. */
+const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
 
 if (env.FAKE_STDERR !== undefined) process.stderr.write(`${env.FAKE_STDERR}\n`)
 if (env.FAKE_STDERR_NO_NEWLINE !== undefined) process.stderr.write(env.FAKE_STDERR_NO_NEWLINE)
@@ -95,8 +100,12 @@ function runTurn(sessionId: string): void {
     return
   }
   event(sessionId, 'turn/start', { turn: 0 })
-  event(sessionId, 'assistant/chunk', { turn: 0, step: 0, chunk: { type: 'text-delta', index: 0, text } })
   if (env.FAKE_MALFORMED_MESSAGE !== undefined) {
+    event(sessionId, 'assistant/attempt', {
+      turn: 0,
+      step: 0,
+      stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
+    })
     event(sessionId, 'assistant/message', {
       turn: 0,
       step: 0,
@@ -113,6 +122,13 @@ function runTurn(sessionId: string): void {
     notify('session.event', { sessionId, event: { type: 'assistant/message', seq: seq++, time: 0 } })
     return
   }
+  if (env.FAKE_EMPTY_MESSAGE !== undefined) {
+    event(sessionId, 'assistant/attempt', {
+      turn: 0,
+      step: 0,
+      stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
+    })
+  }
   event(sessionId, 'assistant/message', {
     turn: 0,
     step: 0,
@@ -124,9 +140,36 @@ function runTurn(sessionId: string): void {
       content: env.FAKE_EMPTY_MESSAGE !== undefined ? [] : [{ type: 'text', text }],
       source: { kind: 'model', provider: 'fake', model: 'fake' },
     },
+    stream: env.FAKE_EMPTY_MESSAGE !== undefined
+      ? []
+      : [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
   })
   const reasonKind = env.FAKE_REASON_KIND ?? 'completed'
-  event(sessionId, 'turn/end', { turn: 0, reason: { kind: reasonKind } })
+  if (reasonKind !== 'none') {
+    if (env.FAKE_MALFORMED_REASON === 'no-data') {
+      notify('session.event', { sessionId, event: { type: 'turn/end', seq: seq++, time: 0 } })
+      return
+    }
+    const reason = env.FAKE_MALFORMED_REASON === 'aborted'
+      ? { kind: 'aborted' }
+      : env.FAKE_MALFORMED_REASON === 'abort-unknown'
+        ? { kind: 'aborted', reason: { kind: 'future' } }
+        : env.FAKE_MALFORMED_REASON === 'hook'
+          ? { kind: 'aborted', reason: { kind: 'hook' } }
+          : env.FAKE_MALFORMED_REASON !== undefined
+            ? 'not-a-reason-envelope'
+            : reasonKind === 'aborted'
+              ? {
+                kind: 'aborted',
+                reason: env.FAKE_ABORT_REASON_KIND === 'hook'
+                  ? { kind: 'hook', reason: 'scripted hook abort' }
+                  : { kind: env.FAKE_ABORT_REASON_KIND ?? 'user' },
+              }
+              : reasonKind === 'error'
+                ? { kind: 'error', error: { message: 'scripted child error', code: 'UNKNOWN' } }
+                : { kind: reasonKind }
+    event(sessionId, 'turn/end', { turn: 0, reason })
+  }
   if (env.FAKE_SUBAGENT !== undefined) {
     const childId = `${sessionId}-child`
     notify('subagent.started', { parentSessionId: sessionId, childSessionId: childId })
@@ -134,7 +177,7 @@ function runTurn(sessionId: string): void {
       turn: 0,
       step: 0,
       content: [{ type: 'text', text: 'child says hi' }],
-      provenance: { provider: 'fake', model: 'fake' },
+      [LEGACY_ASSISTANT_SOURCE_KEY]: { provider: 'fake', model: 'fake' },
     })
     notify('subagent.finished', {
       provider: 'spawn',
@@ -208,7 +251,11 @@ reader.on('line', (line) => {
       })
       notify('session.status', { sessionId, status: 'running' })
       if (env.FAKE_STREAM_THEN_MALFORMED !== undefined) {
-        event(sessionId, 'assistant/chunk', { turn: 0, step: 0, chunk: { type: 'text-delta', index: 0, text: 'streamed then cut short' } })
+        event(sessionId, 'assistant/attempt', {
+          turn: 0,
+          step: 0,
+          stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: ['streamed then cut short'] }],
+        })
         respond({})
         return
       }

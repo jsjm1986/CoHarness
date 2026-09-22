@@ -6,9 +6,17 @@ SPA dist server for the Web shell: a function plugin (config `{distIndex}`) that
 
 The fallback seat is single-owner (a second claim throws) and effect-scoped: disposing the plugin's fiber releases the seat, after which the unclaimed webserver answers 404.
 
+## Summary
+
+Serve the built Web shell to browsers from its configured distribution directory. The root and configured index path render the bootstrapped index; existing assets are served directly, while missing or non-file paths return 404, traversal returns 403, and unsupported methods return 405. Index access requires a valid process token or browser cookie, but static assets remain public. Only one instance can handle unmatched routes at a time; a second activation fails, and unloading the active instance makes unmatched requests return 404.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Responses are served statelessly from the dist tree; the only registration is the claimed fallback seat, whose disposal is proven by the HMR-safety spec.
+
 ## Model Experience
 
-None, as the package serves browser assets; nothing here reaches a model request.
+None, as the SPA dist server answers browser asset requests and registers nothing model-facing.
 
 #### KV Cache effect
 

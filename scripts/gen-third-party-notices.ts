@@ -9,7 +9,7 @@
  */
 
 import { existsSync, globSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 import { parse as parseToml, type TomlTableWithoutBigInt, type TomlValueWithoutBigInt } from 'smol-toml'
 import parseSpdx from 'spdx-expression-parse'
@@ -41,9 +41,13 @@ const DEV_ONLY_AREAS = [
 
 /** First-party public native packages: reachable at runtime but not third-party. */
 const FIRST_PARTY = new Set([
-  '@deepseek-ai/node-addon-landlock-run',
-  '@deepseek-ai/node-addon-landlock-run-linux-arm64',
-  '@deepseek-ai/node-addon-landlock-run-linux-x64',
+  '@deepseek-ai/node-addon-system',
+  '@deepseek-ai/node-addon-system-linux-arm64',
+  '@deepseek-ai/node-addon-system-linux-x64',
+  '@deepseek-ai/node-addon-system-darwin-arm64',
+  '@deepseek-ai/node-addon-system-darwin-x64',
+  '@deepseek-ai/node-addon-system-linux-arm64',
+  '@deepseek-ai/node-addon-system-linux-x64',
 ])
 
 /** Official SDK identity covered by the project's narrow owner authorization. */
@@ -86,6 +90,7 @@ const PYTHON_METADATA: Record<string, { license: string; repo: string; role: str
   pydantic: { license: 'MIT', repo: 'https://github.com/pydantic/pydantic', role: 'runtime dependency of `deepseek-harness-sdk`' },
   hatchling: { license: 'MIT', repo: 'https://github.com/pypa/hatch', role: 'build backend' },
   pytest: { license: 'MIT', repo: 'https://github.com/pytest-dev/pytest', role: 'test-only' },
+  ruff: { license: 'MIT', repo: 'https://github.com/astral-sh/ruff', role: 'static-analysis tool' },
 }
 
 type PythonMetadata = typeof PYTHON_METADATA
@@ -252,47 +257,79 @@ export function claudeDistributionFromManifest(
  *
  * @param virtual - the `.pnpm` virtual store directory to scan.
  * @param name - the external package name, exactly as `node_modules` spells it.
+ * @param expectedVersion - exact version required when the store retains more than one.
  * @returns the parsed manifest, or `undefined` when neither the prefix match
- *   nor the content scan finds the package's `package.json`.
+ *   nor the content scan finds the requested package version.
  */
-export function virtualManifest(virtual: string, name: string): VirtualManifest | undefined {
+export function virtualManifest(virtual: string, name: string, expectedVersion?: string): VirtualManifest | undefined {
   const prefix = `${name.replace('/', '+')}@`
-  const entry = readdirSync(virtual).find(dir => dir.startsWith(prefix))
-  if (entry !== undefined) {
-    return JSON.parse(readFileSync(resolve(virtual, entry, 'node_modules', name, 'package.json'), 'utf8')) as VirtualManifest
+  const entries = readdirSync(virtual)
+  for (const entry of entries.filter(dir => dir.startsWith(prefix))) {
+    const manifest = JSON.parse(readFileSync(resolve(virtual, entry, 'node_modules', name, 'package.json'), 'utf8')) as VirtualManifest
+    if (expectedVersion === undefined || manifest.version === expectedVersion) return manifest
   }
-  for (const dir of readdirSync(virtual)) {
+  for (const dir of entries) {
     const candidate = resolve(virtual, dir, 'node_modules', name, 'package.json')
     if (existsSync(candidate)) {
-      return JSON.parse(readFileSync(candidate, 'utf8')) as VirtualManifest
+      const manifest = JSON.parse(readFileSync(candidate, 'utf8')) as VirtualManifest
+      if (expectedVersion === undefined || manifest.version === expectedVersion) return manifest
     }
   }
   return undefined
 }
 
+const workspaceLinkedManifestCache = new Map<string, VirtualManifest | undefined>()
+
+/**
+ * Resolve the package version selected for a declaring workspace instead of an
+ * unrelated historical version that still occupies the shared virtual store.
+ * @param name - external package identity.
+ * @param manifests - workspace manifests already loaded by the caller, so one
+ *   load serves every dependency instead of a full re-read per name.
+ * @returns the first current workspace link for that package, when installed.
+ */
+function workspaceLinkedManifest(name: string, manifests: Map<string, Manifest>): VirtualManifest | undefined {
+  if (workspaceLinkedManifestCache.has(name)) return workspaceLinkedManifestCache.get(name)
+  for (const [path, manifest] of manifests) {
+    if (!ALL_KINDS.some(kind => name in (manifest[kind] ?? {}))) continue
+    const linked = resolve(root, dirname(path), 'node_modules', name, 'package.json')
+    if (!existsSync(linked)) continue
+    const found = JSON.parse(readFileSync(linked, 'utf8')) as VirtualManifest
+    workspaceLinkedManifestCache.set(name, found)
+    return found
+  }
+  workspaceLinkedManifestCache.set(name, undefined)
+  return undefined
+}
+
 /** Resolve one installed external package manifest from either pnpm store. */
-function installedManifest(name: string): VirtualManifest | undefined {
+function installedManifest(name: string, manifests: Map<string, Manifest>, expectedVersion?: string): VirtualManifest | undefined {
+  const linked = workspaceLinkedManifest(name, manifests)
+  if (linked !== undefined && (expectedVersion === undefined || linked.version === expectedVersion)) return linked
   let manifest: (Manifest & { license?: string; repository?: string | { url?: string }; homepage?: string }) | undefined
   // Workspace-local link farms can expose a dependency that is not linked at
   // the repository root; both are backed by the root workspace's lockfile.
-  for (const store of ['node_modules', 'native/landlock-run/node_modules']) {
+  for (const store of ['node_modules', 'native/system/node_modules']) {
     const direct = resolve(root, store, name, 'package.json')
     if (existsSync(direct)) {
-      manifest = JSON.parse(readFileSync(direct, 'utf8')) as typeof manifest
-      break
+      const candidate = JSON.parse(readFileSync(direct, 'utf8')) as typeof manifest
+      if (expectedVersion === undefined || candidate?.version === expectedVersion) {
+        manifest = candidate
+        break
+      }
     }
     const virtual = resolve(root, store, '.pnpm')
     if (!existsSync(virtual)) continue
-    manifest = virtualManifest(virtual, name)
+    manifest = virtualManifest(virtual, name, expectedVersion)
     if (manifest !== undefined) break
   }
   return manifest
 }
 
 /** License and repository URL for an installed external package, from the pnpm store. */
-function installedMetadata(name: string): { license: string; repo: string } {
+function installedMetadata(name: string, manifests: Map<string, Manifest>): { license: string; repo: string } {
   const override = OVERRIDES[name]
-  const manifest = installedManifest(name)
+  const manifest = installedManifest(name, manifests)
   const license = override?.license ?? manifest?.license
   const rawRepo = typeof manifest?.repository === 'string' ? manifest.repository : manifest?.repository?.url ?? manifest?.homepage
   const repo = override?.repo ?? normalizeRepo(rawRepo)
@@ -302,8 +339,8 @@ function installedMetadata(name: string): { license: string; repo: string } {
   return { license, repo }
 }
 
-function collectClaudeDistribution(): ClaudeDistribution {
-  const manifest = installedManifest(CLAUDE_AGENT_SDK_PACKAGE)
+function collectClaudeDistribution(manifests: Map<string, Manifest>): ClaudeDistribution {
+  const manifest = installedManifest(CLAUDE_AGENT_SDK_PACKAGE, manifests)
   if (manifest === undefined) {
     throw new Error(
       `gen-third-party-notices: cannot resolve ${CLAUDE_AGENT_SDK_PACKAGE}; run \`pnpm install\`.`,
@@ -312,7 +349,7 @@ function collectClaudeDistribution(): ClaudeDistribution {
   const distribution = claudeDistributionFromManifest(manifest)
   let installedPayloads = 0
   for (const payload of distribution.payloads) {
-    const installed = installedManifest(payload.name)
+    const installed = installedManifest(payload.name, manifests, payload.version)
     if (installed === undefined) continue
     installedPayloads += 1
     if (
@@ -353,12 +390,11 @@ function normalizeRepo(raw: string | undefined): string | undefined {
  * by tooling, test infrastructure, the website, or the demo leaves — whatever
  * the declaring section is called — is development-only.
  */
-function collectNpmDeps(): ExternalDep[] {
-  const { manifests, names } = loadWorkspaceManifests()
+function collectNpmDeps(manifests: Map<string, Manifest>, names: Set<string>): ExternalDep[] {
   return [...tierExternalDeps(manifests, names)]
     .filter(([name]) => !FIRST_PARTY.has(name))
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, runtime]) => ({ name, ...installedMetadata(name), runtime }))
+    .map(([name, runtime]) => ({ name, ...installedMetadata(name, manifests), runtime }))
 }
 
 /**
@@ -390,6 +426,8 @@ export interface VendoredRow {
   /** The name this package carries upstream; MIT attribution names the fork's origin, not our scope. */
   upstreamName: string
   upstream: string
+  /** The checked-in `vendor/` directory disclosed by the notices row. */
+  sourceDirectory: string
 }
 
 /**
@@ -397,8 +435,8 @@ export interface VendoredRow {
  * @param text - the complete `vendor/README.md` contents.
  * @returns one row per manifest-table entry, in table order.
  */
-export function parseVendoredRows(text: string): VendoredRow[] {
-  const rows: VendoredRow[] = []
+export function parseVendoredRows(text: string): Array<Omit<VendoredRow, 'sourceDirectory'>> {
+  const rows: Array<Omit<VendoredRow, 'sourceDirectory'>> = []
   for (const line of text.split('\n')) {
     const match = new RegExp(String.raw`^\| \x60\S+\/\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \S+ \| `
       + String.raw`(https:\/\/\S+?)(?: \([^)]*\))? \| \x60[0-9a-f]+\x60 \|$`).exec(line)
@@ -430,15 +468,15 @@ function collectVendored(): VendoredRow[] {
   if (missing.length > 0) {
     throw new Error(`gen-third-party-notices: vendor/README.md has no manifest-table row for ${missing.join(', ')}; its table format changed or the sync is incomplete.`)
   }
-  for (const row of rows) {
+  return rows.map((row) => {
     const dir = onDisk.get(row.npmName)
     if (dir === undefined) throw new Error(`gen-third-party-notices: vendored package ${row.npmName} from vendor/README.md has no vendor/ directory.`)
     const license = readManifest(`vendor/${dir}/package.json`).license
     if (license !== 'MIT') {
       throw new Error(`gen-third-party-notices: vendored ${row.npmName} declares license ${JSON.stringify(license)}; the vendored section assumes MIT throughout.`)
     }
-  }
-  return rows
+    return { ...row, sourceDirectory: `vendor/${dir}` }
+  })
 }
 
 /** Whether a parsed TOML value is a table rather than an array or scalar. */
@@ -662,7 +700,11 @@ ${rows.join('\n')}
  */
 export function render(): string {
   verifyBuildTimePins()
-  const npm = collectNpmDeps()
+  // The linked-manifest cache is keyed by name only, so it must not outlive
+  // the manifests map it was resolved from; render() owns that single load.
+  workspaceLinkedManifestCache.clear()
+  const { manifests, names } = loadWorkspaceManifests()
+  const npm = collectNpmDeps(manifests, names)
   const runtimeDeps = npm.filter(dep => dep.runtime)
   const devDeps = npm.filter(dep => !dep.runtime)
   const vendored = collectVendored()
@@ -671,7 +713,7 @@ export function render(): string {
   const claudeDistribution = runtimeDeps.some(
     dep => dep.name === CLAUDE_AGENT_SDK_PACKAGE,
   )
-    ? collectClaudeDistribution()
+    ? collectClaudeDistribution(manifests)
     : undefined
   const nonPermissiveDev = devDeps.filter(dep => !isPermissive(dep.license))
   // A copyleft license reaching a shipped surface is a distribution decision,
@@ -702,7 +744,7 @@ The Cordis framework and its foundation libraries are source-vendored into this 
 
 | Package | Upstream name | Upstream | License |
 | --- | --- | --- | --- |
-${vendored.map(row => `| \`${row.npmName}\` | \`${row.upstreamName}\` | [${row.upstream.replace('https://', '')}](${row.upstream}) | MIT |`).join('\n')}
+${vendored.map(row => `| \`${row.npmName}\` | \`${row.upstreamName}\` | [${row.sourceDirectory}](${row.sourceDirectory}/) | MIT |`).join('\n')}
 
 ## Runtime npm dependencies
 
@@ -738,7 +780,7 @@ ${BUILD_TIME_TOOLS.map(tool => `| [\`${tool.name}\`](${tool.repo}) | ${tool.lice
 
 ## First-party native packages
 
-\`@deepseek-ai/node-addon-landlock-run\` (and its platform packages) is built and released from this repository under BSD 3-Clause. It is listed here for completeness; it is first-party, not third-party.
+\`@deepseek-ai/node-addon-system/landlock-run\` (and its platform packages) is built and released from this repository under BSD 3-Clause. It is listed here for completeness; it is first-party, not third-party.
 `
 }
 

@@ -10,7 +10,7 @@ import type { UpstreamSyncManifest } from './verify-upstream-sovereignty.ts'
 const manifest: UpstreamSyncManifest = {
   version: 2,
   syncedTag: 'dsh-v0.0.0-test',
-  syncedCommit: '82a5fd61a7cf5c293cec4bdff68f455398d685e9',
+  syncedCommit: 'f00f00f00f00f00f00f00f00f00f00f00f00f00f',
   packages: {
     'jobs/jobs': { sovereignty: 'tracked' },
     'core/session': { sovereignty: 'adapted' },

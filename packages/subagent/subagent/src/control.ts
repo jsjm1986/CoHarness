@@ -137,6 +137,7 @@ export function rejectPrompt(error: unknown, childSessionId: SessionId, signal: 
       case 'PARENT_UNAVAILABLE':
       case 'DRAINING':
       case 'ACTIVATION_CLOSING':
+      case 'ACTIVATION_LIMIT_REACHED':
       case 'CONTINUATION_UNAVAILABLE':
       case 'PERSISTENCE_UNAVAILABLE':
         throw new RemoteError(

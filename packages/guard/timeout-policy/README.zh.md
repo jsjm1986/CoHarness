@@ -4,6 +4,10 @@
 
 工具调用超时强制执行器：单个 `tools/execute` 环绕分发监听器，会在 `exec.signal` 上设置单次调用的协作式截止时间；适用于声明了 `timeoutMs` 且声明位于其 `ToolDefinition` 上的工具。该截止时间先到时，它返回结构化 `TOOL_TIMEOUT` 结果。预算从工具自身的声明中读取（`ToolDefinition.timeoutMs`，由拥有该工具的插件设置），因此此插件是**零配置**的。它是 `tools/execute` 包装层的参考实现，也是面向模型工具调用预算的强制执行归属地（[超时库 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.zh.md)）。
 
+## 概述
+
+使用本包可为工具调用执行其配置的协作式时间上限，并在取消完成后向模型返回清晰的超时错误。按时完成的调用保持不变。忽略或缓慢处理取消的工具仍可能让调用方继续等待，因为本包无法硬性停止下游工作。每个工具分别提供自己的限时；本包无需配置，并随 `dsh` 基础组合包默认启用。
+
 ## 插件（命名空间：`timeout-policy`）
 
 它是函数／命名空间插件（`name`／`inject`／`apply`），而非服务。它不注册工具，也不接受配置；它消费 `ctx.tools` 的 `tools/execute` waterfall（瀑布式事件）（由 `dsh-tools` 注册表始终提供），并读取每个已分发工具声明的 `timeoutMs`；该声明来自注册表（`ctx.tools.get(exec.name)`）。
@@ -35,13 +39,17 @@
 
 多个 `tools/execute` 监听器按 Cordis 注册顺序组合。与未来的重试／沙箱／指标包装层一起使用时，注册顺序决定语义：「超时覆盖整个重试操作」（超时注册在外层），或「超时覆盖每次尝试」（超时注册在内层）。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。每次调用按工具自身声明装配一个新的协作式截止时间；不存在跨调用状态。
+
 ## 模型体验
 
 ### 条件工具结果
 
-#### 模型看到的内容
+#### 模型看到什么
 
-此插件不添加提示词或 schema。如果已声明的截止时间先到，它会将提供方结果替换为 `Error: tool call timed out after <ms>ms` 与结构化 `TOOL_TIMEOUT`；否则原结果保持不变。
+此插件不添加提示词或 schema。如果已声明的截止时间先到且下游取消完成，它会用 `Error: tool call timed out after <ms>ms` 与结构化 `TOOL_TIMEOUT` 错误替换提供方结果；否则原结果保持不变。永不完成的下游调用无法产生超时结果。
 
 #### Token 影响
 

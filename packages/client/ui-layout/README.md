@@ -10,6 +10,14 @@ The `/client` exports are the plugin body (`apply`/`inject`), `LayoutController`
 
 The `conversation` slot is root-scoped so changing the current Session does not remount a multi-pane viewport. `layout.openDetails(sessionId?)` optionally pins the sole details panel to the triggering Session; omission retains current-session navigation behavior. Closing a matching workbench pane releases its pinned details.
 
+## Summary
+
+This package provides the Web GUI's three-column AppFrame, edge-column widths, and `ctx.layout` presentation control. The right column concedes space before the center; its occupant renders fullscreen while the frame retains the wide-screen track underneath. The theme presenter owns color scheme, alias tokens, content font size, and document metadata. Layout state resets on reload.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Panel geometry and collapse are presentation-local service state; the frame's slot registrations prove disposal through the HMR-safety spec.
+
 ## Model Experience
 
 None, as the layout shell manages browser viewing state; nothing here reaches a model request.

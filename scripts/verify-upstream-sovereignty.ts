@@ -34,7 +34,7 @@ const PACKAGE_KEY = /^[0-9A-Za-z._-]+\/[0-9A-Za-z._-]+$/
 /** A commit id: lowercase hex, covering sha1 and sha256 object formats. */
 const COMMIT_ID = /^[0-9a-f]{40,64}$/
 
-const TOP_LEVEL_KEYS = new Set(['version', 'syncedTag', 'syncedCommit', 'packages', 'upstreamOnly'])
+const TOP_LEVEL_KEYS = new Set(['version', 'syncedTag', 'syncedCommit', 'packages', 'upstreamOnly', 'gateReplayRecord'])
 const ENTRY_KEYS = new Set(['sovereignty', 'note', 'removedUpstreamPaths'])
 const UPSTREAM_ONLY_KEYS = new Set(['package', 'reason', 'replacedBy'])
 
@@ -56,6 +56,8 @@ export interface UpstreamSyncManifest {
   version: 2
   syncedTag: string
   syncedCommit: string
+  /** Active non-package gate adaptations and their executable replay checks. */
+  gateReplayRecord?: string
   /** Per-package sovereignty, keyed `<group>/<pkg>`. */
   packages: Record<string, {
     sovereignty: Sovereignty
@@ -87,7 +89,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Validate parsed manifest JSON against the version-1 contract.
- * @param raw - parsed JSON value of unknown provenance.
+ * @param raw - parsed JSON value of unknown origin.
  * @param repoRoot - repository root `note` paths resolve against.
  * @returns the manifest with exactly the schema fields, no extras.
  */
@@ -174,7 +176,11 @@ export function validateUpstreamSyncManifest(raw: unknown, repoRoot: string): Up
     if (key in packages) fail(`manifest lists "${key}" in both packages and upstreamOnly`)
     upstreamOnly.push({ package: key, reason, ...(replacedBy === undefined ? {} : { replacedBy }) })
   }
-  return { version: 2, syncedTag: raw.syncedTag, syncedCommit: raw.syncedCommit, packages, upstreamOnly }
+  if (raw.gateReplayRecord !== undefined && (typeof raw.gateReplayRecord !== 'string'
+    || !/^upgrades\/alignment\/[\w.-]+\.json$/.test(raw.gateReplayRecord))) fail('gateReplayRecord must name an alignment JSON file')
+  return { version: 2, syncedTag: raw.syncedTag, syncedCommit: raw.syncedCommit, packages, upstreamOnly,
+    ...raw.gateReplayRecord === undefined ? {} : { gateReplayRecord: raw.gateReplayRecord },
+  }
 }
 
 /**

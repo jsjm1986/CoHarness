@@ -318,9 +318,13 @@ describe('createFixtureApi', () => {
     const types = frames.filter((f): f is Extract<MuxFrame, { type: 'session/event' }> => f.type === 'session/event').map(f => f.event.type)
     expect(types).toContain('turn/start')
     expect(types).toContain('user/message')
-    expect(types).toContain('assistant/chunk')
     expect(types).toContain('assistant/message')
     expect(types.at(-1)).toBe('turn/end')
+    // Live model output crosses as assistant-stream frames, not durable events.
+    expect(frames.some(frame =>
+      frame.type === 'session/assistant-stream'
+      && frame.frame.type === 'chunk'
+      && (frame.frame.chunk as { type?: unknown }).type === 'text-delta')).toBe(true)
     // Capacity is durable log state, not a transient frame: the prompt path
     // records request/context and the projection carries it to the client.
     expect(types).toContain('request/context')
@@ -957,10 +961,10 @@ describe('createFixtureApi', () => {
     const abort = new AbortController()
     try {
       const streamed = collect(api.events.mux(req({}), abort.signal), abort, frames => frames.some(frame => (
-        frame.type === 'session/event'
-        && frame.event.type === 'assistant/chunk'
-        && frame.event.data.chunk.type === 'reasoning-delta'
-        && frame.event.data.chunk.text.includes('REASONING_STRESS_COMPLETE')
+        frame.type === 'session/assistant-stream'
+        && frame.frame.type === 'chunk'
+        && (frame.frame.chunk as { type?: unknown }).type === 'reasoning-delta'
+        && String((frame.frame.chunk as { text?: unknown }).text).includes('REASONING_STRESS_COMPLETE')
       )))
       const marker = hooks.startReasoningChunkStorm('fx-alpha', 3, 2, 16)
       expect(() => hooks.startReasoningChunkStorm('fx-alpha', 1, 1, 16)).toThrow(/already running/)
@@ -976,10 +980,10 @@ describe('createFixtureApi', () => {
 
       const frames = await streamed
       const deltas = frames.flatMap(frame => (
-        frame.type === 'session/event'
-        && frame.event.type === 'assistant/chunk'
-        && frame.event.data.chunk.type === 'reasoning-delta'
-          ? [frame.event.data.chunk.text]
+        frame.type === 'session/assistant-stream'
+        && frame.frame.type === 'chunk'
+        && (frame.frame.chunk as { type?: unknown }).type === 'reasoning-delta'
+          ? [(frame.frame.chunk as { text: string }).text]
           : []
       ))
       expect(deltas).toEqual(['推理', '推理', `\n${marker}`])

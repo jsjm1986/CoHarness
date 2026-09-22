@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Trigger-independent session feedback plus human-facing `/feedback` capture. The package exports `recordFeedback(session, record)`, which appends one log-only `feedback/record` event from a `FeedbackRecord` with optional `text` and `category` fields. Its plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers it; the shipped Web client executes it without a model turn.
 
+## Summary
+
+`dsh-command-feedback` lets a user tell the harness what they think of a session. Typing `/feedback` plus a remark records it and acknowledges the session and anonymous user ids; the Web feedback dialog records a category and an optional description through the `sessionFeedback` Host Remote. Recording is immediate and never starts model work: the model neither sees the remark nor is interrupted by it. The package also owns the fixed category taxonomy every feedback surface files under. It ships with the standard `dsh` base and needs no configuration; headless, ACP, and JSON-RPC entry points provide no slash commands.
+
 ## Command contract
 
 | Input | Result |
@@ -47,13 +51,17 @@ The producer injects only `commands`. A custom app mounts the registry plus this
 
 The shipped `dsh` base mounts this command unconditionally; it has no configuration and no dependency on the persisted-goal stack. The Web client exposes it through the command adapter. Headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so they do not expose it.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package's only effects are one append to the owning session log and a global command registration; there is no mutable relation to assert.
+
 ## Model Experience
 
 ### Human `/feedback` capture
 
 #### What the model sees
 
-Nothing. The slash input, `feedback/record`, and the acknowledgement are absent from model requests. The feedback event and registry lifecycle records are log-only and carry no `surfaceOp`, so they never reach the ordered surface, `deriveMessages()`, or a system prompt. Recording feedback during a turn does not change that turn's remaining requests.
+Nothing. The slash input, the dialog, `feedback/record`, and the acknowledgement are absent from model requests. The feedback event and registry lifecycle records are log-only and carry no `surfaceOp`, so they never reach the ordered surface, `deriveMessages()`, or a system prompt. Recording feedback during a turn does not change that turn's remaining requests.
 
 #### Token effect
 

@@ -7,7 +7,7 @@ Every `config:` block a `cordis.yml` entry can set: for each loadable harness pa
 
 This file is GENERATED from source (`scripts/gen-config-catalog.ts`) and verified fresh by `pnpm run verify-config-catalog` (part of `doc-sync`) — do not edit it by hand. Declaration blocks use a `ts config-catalog` fence (skipped by doc-typecheck, since a lone declaration referencing imports is not standalone-compilable). The generator also cross-checks the runtime schemastery schema against the pasted declaration — every schema-validated key, nested keys included, must be locatable on the declared config type — so the paste cannot hide a loader-accepted field.
 
-A `Requires:` line lists the service keys the plugin `inject`s: its `cordis.yml` tree must also load providers for those services. Scope is the harness tier (`packages/`); the vendored cordis plugins a config tree may also load (`hmr`, the console logger, …) are pinned upstream source ([vendoring policy](../vendor/README.md)) and not catalogued here.
+A `Requires:` line lists the service keys the plugin `inject`s: its `cordis.yml` tree must also load providers for those services. Scope is the harness tier (`packages/`); the vendored cordis plugins a config tree may also load (the console logger, …) are pinned upstream source ([vendoring policy](../vendor/README.md)) and not catalogued here.
 
 <a id="deepseek-aidsh-acp"></a>
 
@@ -65,8 +65,6 @@ export interface Config {
   sessionTitle?: NonNullable<agentCore.Config['sessionTitle']>
   /** Directory for JSONL sessions and the derived query index. Defaults to `./.sessions`. */
   persistenceRoot?: string
-  /** Write delta-chunk runs as packed storage rows (the JSONL backend's `packChunks`). Defaults to `true`. */
-  packChunks?: boolean
   /** JSONL artifact encoding; defaults to checksummed Zstandard frames. */
   persistenceCompression?: JsonlCompression
   /** Controls automatic AGENTS.md/CLAUDE.md loading; configure a byte budget or set `false`. */
@@ -107,6 +105,8 @@ Source: [`packages/core/agent-default-model/src/index.ts:41`](../packages/core/a
 <a id="deepseek-aidsh-agent-instructions"></a>
 
 ## `@deepseek-ai/dsh-agent-instructions`
+
+Requires: `sessionProjections`
 
 ```ts config-catalog
 /** User-facing workspace instruction loader configuration. */
@@ -177,7 +177,7 @@ export interface InboxLimits {
 
 Depends on: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
 
-Source: [`packages/core/agent-loop/src/index.ts:311`](../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts:318`](../packages/core/agent-loop/src/index.ts)
 
 <a id="deepseek-aidsh-agent-presets"></a>
 
@@ -257,7 +257,7 @@ export interface Config {
   /** Whether model history includes dynamic runtime-context snapshots (default true). */
   includeRuntimeContext?: SystemPromptConfig['includeRuntimeContext']
   /** The deployment persona (see dsh-system-prompt's `Config`). */
-  persona?: SystemPromptConfig['persona']
+  persona?: SystemPromptConfig['personaPrefix']
   /** Persona prefix forwarded to the system-prompt plugin. */
   personaPrefix?: SystemPromptConfig['personaPrefix']
   /** Persona suffix forwarded to the system-prompt plugin. */
@@ -326,17 +326,16 @@ Requires: `tools`
 export interface Config {
   /**
    * The form this agent's model sees. `native` sends every visible schema,
-   * `ptc` sends only `run_code` plus a generated SDK, `both` sends both;
-   * legacy `code` input is accepted as an alias.
+   * `ptc` sends only `run_code` plus a generated SDK, `both` sends both.
    * Required rather than defaulted: the deployment default is what a preset
    * without this row already gets, so an omitted value would mean the row was
    * composed for nothing.
    */
-  mode: ToolPresentationModeInput
+  mode: ToolPresentationMode
 }
 ```
 
-Depends on: [`ToolPresentationModeInput`](subsystems/tools.md)
+Depends on: [`ToolPresentationMode`](subsystems/tools.md)
 
 Source: [`packages/core/agent-tool-presentation/src/index.ts:38`](../packages/core/agent-tool-presentation/src/index.ts)
 
@@ -359,20 +358,17 @@ export interface Config {
   maxImagePixels?: number
   /** Maximum intrinsic width and maximum intrinsic height accepted for one submitted image. Default: 8192px. */
   maxImageDimension?: number
-  /** Long-edge pixel cap of the stored provider-independent normalized image. */
+  /** Total-pixel budget of the stored provider-independent normalized image. */
+  normalizedImageMaxPixels?: number
+  /** Long-edge pixel cap of the stored provider-independent normalized image, applied after the total-pixel budget. */
   normalizedImageMaxDimension?: number
-  /** Encoded-byte safety cap of the stored provider-independent normalized image. */
+  /**
+   * Encoded-byte target of the stored provider-independent normalized image;
+   * the smallest quality-ladder output is kept when no quality fits.
+   */
   normalizedImageMaxBytes?: number
   /** Maximum simultaneous normalization or request-image transformations in this service instance. */
   imageCompressionConcurrency?: number
-  /** Maximum aggregate bytes retained by derived request-image files. */
-  requestImageCacheMaxBytes?: number
-  /** Maximum number of derived request-image files retained. */
-  requestImageCacheMaxEntries?: number
-  /** Maximum idle age of a derived request-image file before cleanup. */
-  requestImageCacheTtlMs?: number
-  /** Interval between derived request-image cache cleanup sweeps. */
-  requestImageCacheGcIntervalMs?: number
 }
 ```
 
@@ -488,43 +484,6 @@ export interface Config {
 ```
 
 Source: [`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
-
-<a id="deepseek-aidsh-code-runtime-worker-thread"></a>
-
-## `@deepseek-ai/dsh-code-runtime-worker-thread`
-
-```ts config-catalog
-/** Plugin config: every execution cap, changeable from `cordis.yml` (no hardcoded tunables). */
-export interface Config {
-  /**
-   * Busy-time budget in milliseconds: the run fails with kind `'timeout'`
-   * once the worker's MEASURED event-loop active time
-   * (`worker.performance.eventLoopUtilization()`) exceeds this. Metering
-   * measured busy time — not wall time, not host-side pending-call
-   * bookkeeping — is what makes the budget both fair (a program awaiting a
-   * slow tool accrues nothing) and ungameable (a hot loop accrues whether
-   * or not a decoy dispatch is in flight).
-   */
-  computeMs?: number
-  /**
-   * Wall-clock ceiling in milliseconds; never pauses for anything. The
-   * backstop for what busy-time cannot see (a program awaiting a promise
-   * nobody will resolve). At most `2_147_483_647` (Node's maximum
-   * `setTimeout` delay, about 24.9 days): a longer value is rejected at load
-   * because `setTimeout` would clamp it to 1 ms.
-   */
-  maxWallMs?: number
-  /**
-   * Hard cap for serialized log-array, completion-value, and failure-message payloads;
-   * fixed result-envelope syntax is excluded.
-   */
-  maxOutputBytes?: number
-  /** The worker's max old-generation heap in MiB (`resourceLimits`); overflow kills the worker, surfacing as kind `'worker-exit'`. */
-  maxOldGenerationSizeMb?: number
-}
-```
-
-Source: [`packages/code-runtime/code-runtime-worker-thread/src/index.ts:25`](../packages/code-runtime/code-runtime-worker-thread/src/index.ts)
 
 <a id="deepseek-aidsh-compaction-basic"></a>
 
@@ -642,24 +601,6 @@ export interface Config {
 
 Source: [`packages/credentials/credentials-local/src/index.ts:64`](../packages/credentials/credentials-local/src/index.ts)
 
-<a id="deepseek-aidsh-e2b"></a>
-
-## `@deepseek-ai/dsh-e2b`
-
-```ts config-catalog
-/** Configuration for the shared E2B sandbox owner. */
-export interface Config {
-  /** API key; omission reads `E2B_API_KEY`. It is never forwarded into the sandbox. */
-  apiKey?: string
-  /** Shared remote working directory, created before adapters receive the sandbox. */
-  cwd?: string
-  /** E2B sandbox lifetime in milliseconds; expiry always deletes the sandbox. */
-  timeoutMs?: number
-}
-```
-
-Source: [`packages/e2b/e2b/src/index.ts:45`](../packages/e2b/e2b/src/index.ts)
-
 <a id="deepseek-aidsh-experimental-agent-team"></a>
 
 ## `@deepseek-ai/dsh-experimental-agent-team`
@@ -684,9 +625,105 @@ export interface Config {
 
 Source: [`packages/experimental/agent-team/src/types.ts:125`](../packages/experimental/agent-team/src/types.ts)
 
-<a id="deepseek-aidsh-experimental-code-runtime-python"></a>
+<a id="deepseek-aidsh-experimental-browser-use-chrome-devtools-mcp"></a>
 
-## `@deepseek-ai/dsh-experimental-code-runtime-python`
+## `@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp`
+
+Requires: `browserUse` · `agents` · `tools` · `systemPrompt`
+
+```ts config-catalog
+/** Fixed Chromium launch or existing-browser attachment settings. */
+export type Config = BrowserMcpConfig
+```
+
+Depends on: `BrowserMcpConfig` (`@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`)
+
+Source: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:14`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
+
+<a id="deepseek-aidsh-experimental-browser-use-playwright-mcp"></a>
+
+## `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp`
+
+Requires: `browserUse` · `agents` · `tools` · `systemPrompt`
+
+```ts config-catalog
+/** Fixed Chromium launch or existing-browser attachment settings. */
+export type Config = BrowserMcpConfig
+```
+
+Depends on: `BrowserMcpConfig` (`@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`)
+
+Source: [`packages/experimental/browser-use-playwright-mcp/src/index.ts:15`](../packages/experimental/browser-use-playwright-mcp/src/index.ts)
+
+<a id="deepseek-aidsh-experimental-browser-use-stagehand-native"></a>
+
+## `@deepseek-ai/dsh-experimental-browser-use-stagehand-native`
+
+Requires: `browserUse` · `agents` · `tools` · `systemPrompt`
+
+```ts config-catalog
+/** Profile-owned browser connection and independent Stagehand model credentials. */
+export interface Config {
+  /** Native Stagehand model and credentials; independent of the Session model. */
+  model: StagehandModelConfig
+  /** Launch a fresh browser or attach to the configured existing endpoint. */
+  mode: 'launch' | 'attach'
+  /** CDP HTTP or WebSocket endpoint, required only for attach mode. */
+  cdpEndpoint?: string
+  /** Optional Stagehand extension id for an existing browser. */
+  extensionId?: string
+  /** Installed Chrome/Chromium executable used in launch mode. */
+  executablePath?: string
+  /** Hide an owned browser's window. */
+  headless?: boolean
+  /** Deadline for Chromium startup and Stagehand navigation/action operations. */
+  operationTimeoutMs?: number
+  /** Grace for native SDK cleanup before its connection Worker is terminated. */
+  shutdownGraceMs?: number
+}
+
+/** Profile-owned model settings accepted by the pinned Stagehand SDK. */
+export interface StagehandModelConfig {
+  /** Provider-prefixed model name from Stagehand's supported model catalog. */
+  modelName: ModelConfig['modelName']
+  /** Explicit API key sent to Stagehand's browser extension. */
+  apiKey: string
+  /** Additional headers sent with the extension's model requests. */
+  headers?: Record<string, string>
+}
+```
+
+Depends on: `ModelConfig` (`@browserbasehq/stagehand`)
+
+Source: [`packages/experimental/browser-use-stagehand-native/src/index.ts:28`](../packages/experimental/browser-use-stagehand-native/src/index.ts)
+
+<a id="deepseek-aidsh-experimental-computer-use-cua-driver-mcp"></a>
+
+## `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp`
+
+Requires: `computerUse` · `tools`
+
+```ts config-catalog
+/** Installed executable and MCP connection overrides. */
+export interface Config {
+  /** Executable path or PATH command; defaults to `cua-driver`. */
+  command: string
+  /** Arguments passed without a shell; defaults to `['mcp']`. */
+  args: string[]
+  /** Per-call timeout in milliseconds; omission uses the MCP client's default. */
+  toolCallTimeoutMs?: number
+  /** Reconnection overrides; defaults to the MCP client's policy. */
+  reconnect: McpClient.ReconnectConfig
+}
+```
+
+Depends on: [`McpClient`](../packages/mcp/mcp-client/src/index.ts)
+
+Source: [`packages/experimental/computer-use-cua-driver-mcp/src/index.ts:20`](../packages/experimental/computer-use-cua-driver-mcp/src/index.ts)
+
+<a id="deepseek-aidsh-experimental-ptc-runtime-python"></a>
+
+## `@deepseek-ai/dsh-experimental-ptc-runtime-python`
 
 ```ts config-catalog
 /** Plugin config: every cap, changeable from `cordis.yml` (no hardcoded tunables). */
@@ -696,8 +733,7 @@ export interface Config {
    * rejects a float). The child sets the soft limit to `cpuSeconds` and the
    * hard limit to `cpuSeconds + 1`: the kernel delivers SIGXCPU at the soft
    * limit, which the host classifies as a `timeout`; the +1s hard limit is a
-   * SIGKILL backstop for a program that traps SIGXCPU. Granularity is seconds —
-   * a coarser counterpart to the worker backend's millisecond `computeMs`.
+   * SIGKILL backstop for a program that traps SIGXCPU. Granularity is whole seconds.
    */
   cpuSeconds?: number
   /** Wall-clock ceiling in milliseconds; backstops CPU time for programs awaiting a promise nobody resolves. */
@@ -749,7 +785,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/experimental/code-runtime-python/src/index.ts:42`](../packages/experimental/code-runtime-python/src/index.ts)
+Source: [`packages/experimental/ptc-runtime-python/src/index.ts:42`](../packages/experimental/ptc-runtime-python/src/index.ts)
 
 <a id="deepseek-aidsh-experimental-tool-agent-team"></a>
 
@@ -851,16 +887,42 @@ Source: [`packages/goal/goal/src/index.ts:174`](../packages/goal/goal/src/index.
 Requires: `agentDefaultModel` · `agents` · `sessions`
 
 ```ts config-catalog
-/** Plugin config: the task resolved from this app's injected provider service. */
+/** Plugin config: the task and run options resolved from this app's injected provider service. */
 export interface Config {
-  /** The prompt text for the single run. */
-  task: string
+  /** The prompt text for the single run; absent when the task arrives on stdin. */
+  task?: string
+  /** Exact Session identity to adopt; absent for a fresh random identity. An id with no stored Session fails. */
+  sessionId?: string
+  /** Whether stdout carries the machine-readable event stream instead of final text. */
+  json?: boolean
   /** Emit provider reasoning progress to stderr when enabled. */
-  progress: boolean
+  progress?: boolean
 }
 ```
 
-Source: [`packages/bundle/headless/src/index.ts:32`](../packages/bundle/headless/src/index.ts)
+Source: [`packages/bundle/headless/src/index.ts:41`](../packages/bundle/headless/src/index.ts)
+
+<a id="deepseek-aidsh-hmr"></a>
+
+## `@deepseek-ai/dsh-hmr`
+
+```ts config-catalog
+/** Module roots and watcher timing, with Chokidar deployment options. */
+export interface HmrConfig extends ChokidarOptions {
+  /** Directory resolved against the owning context's base URL. */
+  base?: string
+  /** Module watch roots; an empty list leaves only explicit configuration watches. */
+  root: string[]
+  /** Milliseconds for combining module changes. */
+  debounce: number
+  /** Glob patterns excluded from module watching. */
+  ignored: string[]
+}
+```
+
+Depends on: `ChokidarOptions` (`chokidar`)
+
+Source: [`packages/boot/hmr/src/index.ts:51`](../packages/boot/hmr/src/index.ts)
 
 <a id="deepseek-aidsh-hooks-claude-code"></a>
 
@@ -1119,7 +1181,7 @@ export interface LlmRuntimeConfig {
 }
 ```
 
-Source: [`packages/llm/llm/src/index.ts:276`](../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:279`](../packages/llm/llm/src/index.ts)
 
 <a id="deepseek-aidsh-llm-deepseek"></a>
 
@@ -1137,6 +1199,8 @@ Requires: `llm`
  * reasoning effort resolves to `high`.
  */
 export interface Config {
+  /** Wire protocol; defaults to messages. Configure through Cordis YAML. */
+  protocol?: DeepSeekProtocol
   /** Credential reference (environment-variable name) resolved per request; defaults to `DEEPSEEK_API_KEY`. */
   apiKeyEnv?: string
   /** Endpoint base; falls back to $DEEPSEEK_BASE_URL from a trusted environment layer, then the public API. */
@@ -1149,7 +1213,7 @@ export interface Config {
   maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value (default 1,000,000). */
   defaultContextWindow?: number
-  /** Advisory models shown by discovery consumers; defaults to V41 Flash, V4 Flash, V4 Pro, and V4 Flash Vision Exp. */
+  /** Advisory models shown by discovery consumers; defaults to V41 Flash and V4 Pro. */
   models?: DeepSeekCatalogModel[]
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs?: number
@@ -1159,8 +1223,6 @@ export interface Config {
   maxInlineRequestImageBytes?: number
   /** Maximum number of represented images per chat request (default 600). */
   maxImagesPerRequest?: number
-  /** Maximum request-image projections prepared concurrently (default 4). */
-  imagePreparationConcurrency?: number
   /** Raw-byte removal step after the request exceeds its file bound (default 64 MiB). */
   imageOffloadByteQuantum?: number
   /** Base64-byte removal step after inline fallback exceeds its bound (default 10 MiB). */
@@ -1169,16 +1231,6 @@ export interface Config {
   imageOffloadCountQuantum?: number
   /** Maximum duration of one request-image Files API resolution (default one minute). */
   filesApiTimeoutMs?: number
-  /** Maximum bytes retained from one non-2xx provider error body (default 64 KiB). */
-  maxErrorResponseBytes?: number
-  /** Maximum bytes retained from one Files API success or error body (default 16 MiB, up to 256 MiB). */
-  maxFilesResponseBytes?: number
-  /** Maximum characters buffered for one incomplete SSE event (default 4 MiB). */
-  maxSseBufferBytes?: number
-  /** Maximum accumulated visible/reasoning response bytes (default 16 MiB). */
-  maxGeneratedTextBytes?: number
-  /** Maximum accumulated arguments for one streamed tool call (default 4 MiB). */
-  maxToolArgumentBytes?: number
   /** Explicit lifetime assigned to each uploaded image (default seven days). */
   fileExpiresAfterSeconds?: number
   /** Remaining lifetime below which an indexed file is replaced (default one hour). */
@@ -1188,6 +1240,9 @@ export interface Config {
   /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
   retryPolicy?: RetryPolicyConfig
 }
+
+/** Supported wire implementations; Responses is not yet implemented. */
+export type DeepSeekProtocol = 'chat-completions' | 'messages'
 
 /** One optional model entry advertised by the direct-fetch adapter. */
 export interface DeepSeekCatalogModel {
@@ -1203,21 +1258,26 @@ export interface DeepSeekCatalogModel {
   maxTokens?: number
   /** Accepted request modalities; omission is text-only. */
   inputModalities?: ModelModality[]
-  /** Total-pixel budget for one deterministic request preview. */
+  /**
+   * Total-pixel budget replacing the published token-grid projection for one
+   * deterministic request preview, or the 512-by-512 `low` preset; omission
+   * projects onto the token grid.
+   */
   imagePixelBudget?: number | 'low'
-  /** Encoded-byte cap for one deterministic request preview. */
+  /** Encoded-byte target for one deterministic request preview; the smallest quality-ladder output is used when no quality fits. */
   imageMaxBytes?: number
-  /** Provider detail tier; `low` uses the 512-by-512 total-pixel default. */
-  /** Legacy alias for the low-detail preset; new configs use imagePixelBudget: 'low'. */
-  imageDetail?: 'auto' | 'low'
-  /** Whether the route accepts system prompt changes at any history position. */
+  /**
+   * `'in-history'` declares that the endpoint reads the latest `system`
+   * message at any position of the conversation as the complete effective
+   * system prompt; omission means only a leading system message is read.
+   */
   systemPromptUpdate?: SystemPromptUpdate
 }
 ```
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/llm/llm-deepseek/src/index.ts:144`](../packages/llm/llm-deepseek/src/index.ts)
+Source: [`packages/llm/llm-deepseek/src/config.ts:25`](../packages/llm/llm-deepseek/src/config.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
@@ -1319,6 +1379,13 @@ export interface PiAiProviderProfile {
    * requests instead of being rejected by a request-size cap.
    */
   maxRequestImageBytes?: number
+  /** Total-pixel budget for each deterministic inline request version. */
+  requestImagePixelBudget?: number
+  /**
+   * Raw encoded-byte target for each deterministic inline request version;
+   * the smallest quality-ladder output is used when no quality fits.
+   */
+  requestImageMaxBytes?: number
   /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
   retryPolicy?: RetryPolicyConfig
 }
@@ -1402,7 +1469,10 @@ export interface PiAiCompatProfile {
   supportsReasoningEffort?: boolean
   /** Whether the endpoint accepts `stream_options: {include_usage: true}`; `openai-completions`. */
   supportsUsageInStreaming?: boolean
-  /** Whether streams include a finish reason; openai-completions. */
+  /**
+   * Whether streams include `finish_reason`; `false` lets pi-ai infer the
+   * terminal reason when the stream ends; `openai-completions`.
+   */
   supportsFinishReason?: boolean
   /** Which output-cap field the endpoint reads; `openai-completions`. */
   maxTokensField?: NonNullable<OpenAICompletionsCompat['maxTokensField']>
@@ -1424,16 +1494,16 @@ export interface PiAiCompatProfile {
    * can read, so kwargs set beside another format are sent nowhere.
    */
   chatTemplateKwargs?: NonNullable<OpenAICompletionsCompat['chatTemplateKwargs']>
-  /** Arguments sent as `chat_template_args` for the baseten format. */
+  /** Arguments sent as `chat_template_args` under the `baseten` thinking format; `openai-completions`. */
   chatTemplateArgs?: NonNullable<OpenAICompletionsCompat['chatTemplateArgs']>
-  /** Top-level field used for provider-specific thinking token budgets. */
-  thinkingTokenBudgetField?: PiAiThinkingTokenBudgetField
-  /** vLLM scheduler priority; lower values run earlier. */
-  vllmPriority?: number
-  /** Whether an OpenAI Responses endpoint accepts max_output_tokens. */
-  supportsMaxOutputTokens?: boolean
-  /** Whether the endpoint accepts a vLLM thinking token budget. */
+  /** Alias for `thinkingTokenBudgetField: "thinking_token_budget"`; an explicit field wins. `openai-completions`. */
   supportsThinkingTokenBudget?: boolean
+  /** Request field carrying the reasoning budget from `thinkingBudgets`; omitted unless configured. `openai-completions`. */
+  thinkingTokenBudgetField?: PiAiThinkingTokenBudgetField
+  /** vLLM scheduler `priority`; lower runs earlier, and the server must enable priority scheduling. Omitted unless configured. */
+  vllmPriority?: number
+  /** Whether `openai-responses` accepts `max_output_tokens`; `false` omits it. Azure and Codex ignore this shared compat field. */
+  supportsMaxOutputTokens?: boolean
   /**
    * Whether the endpoint accepts `strict` in tool definitions;
    * `openai-completions`, the three Responses protocols, `bedrock-converse-stream`.
@@ -1476,13 +1546,13 @@ export type PiAiReasoningEfforts = Partial<Record<ModelThinkingLevel, string | n
 /** One reasoning-dispatch wire format a profile may name. */
 export type PiAiThinkingFormat = NonNullable<OpenAICompletionsCompat['thinkingFormat']>
 
-/** Reasoning-budget field spellings accepted by pi-ai. */
+/** The reasoning-budget field spellings pi-ai accepts. */
 export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['thinkingTokenBudgetField']>
 ```
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:202`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:221`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="deepseek-aidsh-llm-replay"></a>
 
@@ -1550,7 +1620,7 @@ export interface ReplayModelConfig {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/test-support/llm-replay/src/index.ts:817`](../packages/test-support/llm-replay/src/index.ts)
+Source: [`packages/test-support/llm-replay/src/index.ts:1027`](../packages/test-support/llm-replay/src/index.ts)
 
 <a id="deepseek-aidsh-llm-retry"></a>
 
@@ -1635,10 +1705,12 @@ export interface StdioConfig {
   env: Record<string, string>
   /** Working directory for the child process. */
   cwd: string
-  /** Per-tool-call timeout in milliseconds. */
+  /** Timeout per tool call or resource request in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
+  maxInstructionBytes?: number
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -1657,10 +1729,12 @@ export interface StreamableHttpConfig {
   url: string
   /** Additional headers attached to MCP requests. */
   headers: Record<string, string>
-  /** Per-tool-call timeout in milliseconds. */
+  /** Timeout per tool call or resource request in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
+  maxInstructionBytes?: number
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -1678,7 +1752,7 @@ export interface ReconnectConfig {
 }
 ```
 
-Source: [`packages/mcp/mcp-client/src/index.ts:99`](../packages/mcp/mcp-client/src/index.ts)
+Source: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -1700,7 +1774,7 @@ Source: [`packages/feedback/message-feedback/src/index.ts:51`](../packages/feedb
 
 ## `@deepseek-ai/dsh-permission-presets`
 
-Requires: `shell` · `approval` · `sessions`
+Requires: `shell` · `approval` · `sessions` · `sessionProjections`
 
 ```ts config-catalog
 /** The {@link PermissionPresetService} config: preset table and composition default. */
@@ -1708,13 +1782,13 @@ export interface Config {
   /**
    * The preset table: name → knob bundle. Defaults to `workspace-write`
    * (workspace-write + ask) and `danger-full-access` (danger-full-access +
-   * never). The name `custom` is reserved for the derived not-a-preset state.
+   * never). The names `custom` and `auto` are reserved for derived state and
+   * the Auto review integration respectively.
    */
   presets?: Record<string, PresetSpec>
   /**
-   * Default for fresh sessions and eligible confirmed blank reuse. When
-   * omitted, the preset matching the composed sandbox and approval defaults
-   * is used.
+   * Default for new sessions. When omitted, the preset matching the composed
+   * sandbox and approval defaults is used.
    */
   defaultPreset?: string
 }
@@ -1734,7 +1808,7 @@ export interface PresetSpec {
 
 Depends on: [`ApprovalPolicy`](subsystems/approval.md) · [`SandboxMode`](subsystems/sandbox.md)
 
-Source: [`packages/interaction/permission-presets/src/index.ts:171`](../packages/interaction/permission-presets/src/index.ts)
+Source: [`packages/interaction/permission-presets/src/index.ts:170`](../packages/interaction/permission-presets/src/index.ts)
 
 <a id="deepseek-aidsh-persona"></a>
 
@@ -1750,9 +1824,7 @@ export interface Config {
    * complete `{{…}}` groups interpolate strictly against registered prompt
    * variables. Empty text drops the section at render, matching the registry.
    */
-  prefix?: string
-  /** Legacy preset alias for prefix. */
-  text?: string
+  prefix: string
   /**
    * Persona suffix template rendered after first-party guidance. Omitted or empty
    * text shadows the deployment suffix away; interpolation is strict.
@@ -1771,7 +1843,7 @@ Source: [`packages/preset/persona/src/index.ts:30`](../packages/preset/persona/s
 
 ## `@deepseek-ai/dsh-plan-mode`
 
-Requires: `tools` · `systemPrompt`
+Requires: `tools` · `systemPrompt` · `sessionProjections`
 
 ```ts config-catalog
 /** Deployment-owned plan guidance. */
@@ -1781,7 +1853,29 @@ export interface PlanModeConfig {
 }
 ```
 
-Source: [`packages/plan/plan-mode/src/index.ts:73`](../packages/plan/plan-mode/src/index.ts)
+Source: [`packages/plan/plan-mode/src/index.ts:64`](../packages/plan/plan-mode/src/index.ts)
+
+<a id="deepseek-aidsh-plugin-manager"></a>
+
+## `@deepseek-ai/dsh-plugin-manager`
+
+Requires: `loader` · `profileContext`
+
+```ts config-catalog
+/** The pnpm executable and the limits for package diagnostics and registry lookups. */
+export interface Config {
+  /** The pnpm executable name or path; resolved through `PATH` like the `dsh plugin` command. */
+  pnpmCommand?: string
+  /** Maximum retained pnpm diagnostic bytes per operation. */
+  outputBytes?: number
+  /** Maximum time to wait for another process's profile package operation. */
+  lockWaitMs?: number
+  /** Bound on one registry lookup an inspection runs, in milliseconds. */
+  inspectTimeoutMs?: number
+}
+```
+
+Source: [`packages/boot/plugin-manager/src/index.ts:33`](../packages/boot/plugin-manager/src/index.ts)
 
 <a id="deepseek-aidsh-plugin-package-inventory-deepseek"></a>
 
@@ -1798,6 +1892,42 @@ export interface Config {
 ```
 
 Source: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:30`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
+
+<a id="deepseek-aidsh-ptc-runtime-node"></a>
+
+## `@deepseek-ai/dsh-ptc-runtime-node`
+
+Requires: `fs` · `subprocess` · `sandbox` · `sandboxPolicy`
+
+```ts config-catalog
+/** Deployment-varying runtime bounds and launch choices. */
+export interface Config extends LaunchConfig {
+  /** Default elapsed deadline, including nested tool and approval waits. */
+  timeoutMs?: number
+  /** Maximum numeric elapsed budget accepted by resolve. */
+  maxTimeoutMs?: number
+  /** Combined serialized logs, completion and diagnostic byte cap. */
+  maxOutputBytes?: number
+  /** V8 old-generation heap limit in MiB; native allocations are excluded. */
+  maxOldGenerationSizeMb?: number
+  /** Maximum control frame, outstanding argument and queued control-output bytes. */
+  maxMessageBytes?: number
+  /** Maximum simultaneous host binding calls accepted from a program. */
+  maxPendingCalls?: number
+  /** Managed process termination and output-drain grace in milliseconds. */
+  graceMs?: number
+}
+
+/** Deployment-owned Node executable and optional preinstalled built bootstrap. */
+export interface LaunchConfig {
+  /** Executable in the subprocess world; defaults to the current Node executable. */
+  nodeExecutable?: string
+  /** Absolute preinstalled built bootstrap in the execution world. */
+  bootstrapPath?: string
+}
+```
+
+Source: [`packages/ptc-runtime/ptc-runtime-node/src/index.ts:26`](../packages/ptc-runtime/ptc-runtime-node/src/index.ts)
 
 <a id="deepseek-aidsh-pwsh-local"></a>
 
@@ -1924,6 +2054,8 @@ Source: [`packages/sandbox/sandbox-local/src/index.ts:44`](../packages/sandbox/s
 
 ## `@deepseek-ai/dsh-sandbox-policy`
 
+Requires: `sessionProjections`
+
 ```ts config-catalog
 /**
  * Plugin config: the deployment's sandbox default. All optional — `Config`
@@ -1936,7 +2068,7 @@ export interface Config {
   /** File-sandbox mode a session starts from (default: `read-only`). */
   mode?: SandboxMode
   /**
-   * Fallback root for agentless calls and sessions without a cwd (default:
+   * Absolute fallback root for agentless calls and sessions without a cwd (default:
    * `process.cwd()`). Normal agent calls use their session cwd instead.
    */
   workspaceRoot?: string
@@ -1945,7 +2077,23 @@ export interface Config {
 
 Depends on: [`SandboxMode`](subsystems/sandbox.md)
 
-Source: [`packages/sandbox/sandbox-policy/src/index.ts:67`](../packages/sandbox/sandbox-policy/src/index.ts)
+Source: [`packages/sandbox/sandbox-policy/src/index.ts:71`](../packages/sandbox/sandbox-policy/src/index.ts)
+
+<a id="deepseek-aidsh-sdk-app"></a>
+
+## `@deepseek-ai/dsh-sdk-app`
+
+Requires: `cmdlineArgs`
+
+```ts config-catalog
+/** SDK stdio startup configuration. */
+export interface Config {
+  /** Profile name rendered in help and diagnostics (default `sdk`). */
+  profile?: string
+}
+```
+
+Source: [`packages/bundle/sdk-app/src/index.ts:23`](../packages/bundle/sdk-app/src/index.ts)
 
 <a id="deepseek-aidsh-sdk-jsonrpc-server"></a>
 
@@ -2035,10 +2183,8 @@ Source: [`packages/session/session-persistence-gateway/src/index.ts:90`](../pack
 
 ## `@deepseek-ai/dsh-session-persistence-jsonl`
 
-Requires: `sessions`
-
 ```ts config-catalog
-/** Plugin config: where the JSONL backend keeps its session logs, and the packed-row write switch. */
+/** Plugin config for the JSONL backend's root and physical encoding. */
 export interface Config {
   /**
    * Root directory for all session files. Required (no default): a default of
@@ -2048,43 +2194,15 @@ export interface Config {
    * readable directory; an absent root is created on first materialization.
    */
   root: string
-  /**
-   * Write runs of consecutive `assistant/chunk` delta events as packed
-   * `text-chunks`/`reasoning-chunks`/`tool-call-chunks` rows (lossless,
-   * ~60% smaller logs measured on a real session). Defaults to true; false
-   * keeps one `SessionEvent` per line for diagnostics. Reading packed rows is
-   * unconditional: a log's layout never depends on this switch.
-   */
-  packChunks?: boolean
   /** Physical encoding; defaults to checksummed Zstandard frames. */
   compression?: JsonlCompression
-  /** Maximum cold Session preparations retained for history-to-resume reuse. */
-  preparedSessionCacheSize?: number
-  /** Fixed live-event coalescing window; not a backend completion deadline. */
-  writeBatchMaxDelayMs?: number
-  /** Maximum events retained in one live session's pending write queue. */
-  maxPendingEvents?: number
-  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
-  maxPendingBytes?: number
-  /** Maximum bytes in the newline-terminated session header record. */
-  maxHeaderBytes?: number
-  /** Maximum stat/read attempts used to obtain one revision-stable artifact. */
-  readStableMaxAttempts?: number
-  /** Maximum elapsed milliseconds spent retrying one revision-stable artifact read. */
-  readStableMaxDurationMs?: number
-  /** Maximum total plaintext bytes accepted while decoding one zstd artifact. */
-  maxDecompressedBytes?: number
-  /** Maximum physical bytes read from one session artifact. */
-  maxArtifactBytes?: number
-  /** Target expanded JSON bytes per migration output batch; a single event remains indivisible. */
-  migrationBatchMaxBytes?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
 export type JsonlCompression = 'zstd' | 'none'
 ```
 
-Source: [`packages/session/session-persistence-jsonl/src/index.ts:88`](../packages/session/session-persistence-jsonl/src/index.ts)
+Source: [`packages/session/session-persistence-jsonl/src/index.ts:89`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-sqlite"></a>
 
@@ -2121,14 +2239,15 @@ Source: [`packages/session/session-persistence-sqlite/src/index.ts:42`](../packa
 
 ## `@deepseek-ai/dsh-session-projection-cache`
 
-Requires: `storageDomain` · `sessionProjections` · `sessionPersistence` · `sessions`
+Requires: `storageDomain` · `sessionProjections` · `sessions`
 
 ```ts config-catalog
 /**
  * Plugin config. Both throttle triggers are deployment choices with no
  * universally correct value, so the composition states them explicitly
  * (cordis.yml); the three mandatory write points (session creation,
- * `turn/end`, and session disposal) are policy, not tunables, and always fire.
+ * `turn/end`, and session disposal) are policy, not tunables, and always
+ * fire.
  */
 export interface Config {
   /** Committed events per session that force a durable checkpoint write between mandatory points. */
@@ -2138,7 +2257,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-projection-cache/src/index.ts:42`](../packages/session/session-projection-cache/src/index.ts)
+Source: [`packages/session/session-projection-cache/src/index.ts:62`](../packages/session/session-projection-cache/src/index.ts)
 
 <a id="deepseek-aidsh-session-query-sqlite"></a>
 
@@ -2319,7 +2438,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/settings/settings-file/src/index.ts:21`](../packages/settings/settings-file/src/index.ts)
+Source: [`packages/settings/settings-file/src/index.ts:22`](../packages/settings/settings-file/src/index.ts)
 
 <a id="deepseek-aidsh-shell-env"></a>
 
@@ -2473,12 +2592,12 @@ Requires: `storage`
  * location explicitly.
  */
 export interface Config {
-  /** Directory holding one `<unit>.json` file per unit. */
+  /** Directory holding one `<unit>.json` file (or `<unit>/` tree) per unit. */
   root: string
 }
 ```
 
-Source: [`packages/storage/storage-json/src/index.ts:27`](../packages/storage/storage-json/src/index.ts)
+Source: [`packages/storage/storage-json/src/index.ts:28`](../packages/storage/storage-json/src/index.ts)
 
 <a id="deepseek-aidsh-storage-sqlite"></a>
 
@@ -2525,8 +2644,12 @@ Source: [`packages/storage/storage-sqlite/src/index.ts:24`](../packages/storage/
 ## `@deepseek-ai/dsh-subagent`
 
 ```ts config-catalog
-/** Continuable-subagent residency limits. */
+/** Host configuration for continuable subagent capacity. */
 export interface Config {
+  /** Maximum live children sharing uninterrupted continuable parent links; defaults to 8. */
+  maxActiveSubagents?: number
+  /** Default delegation depth for tools without an explicit limit; defaults to 1. */
+  maxDepth?: number
   /** Maximum resident or materializing continuable Activations in this runtime. */
   maxContinuableActivations?: number
   /** Maximum resident or materializing continuable Activations with one direct parent. */
@@ -2534,7 +2657,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:196`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:198`](../packages/subagent/subagent/src/index.ts)
 
 <a id="deepseek-aidsh-subagent-acp"></a>
 
@@ -2712,7 +2835,7 @@ export interface Config {
 
 Depends on: [`ReasoningEffortId`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/subagent/subagent-dsh-sdk/src/index.ts:30`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
+Source: [`packages/subagent/subagent-dsh-sdk/src/index.ts:31`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
 
 <a id="deepseek-aidsh-subagent-fork-in-process"></a>
 
@@ -2746,22 +2869,6 @@ export interface Config {
 
 Source: [`packages/subagent/subagent-spawn-in-process/src/index.ts:25`](../packages/subagent/subagent-spawn-in-process/src/index.ts)
 
-<a id="deepseek-aidsh-subprocess-e2b"></a>
-
-## `@deepseek-ai/dsh-subprocess-e2b`
-
-Requires: `e2b`
-
-```ts config-catalog
-/** Configuration for the E2B subprocess adapter. */
-export interface Config {
-  /** Remote status/liveness poll cadence in milliseconds; each tick is one control-plane request. */
-  pollMs?: number
-}
-```
-
-Source: [`packages/e2b/subprocess-e2b/src/index.ts:26`](../packages/e2b/subprocess-e2b/src/index.ts)
-
 <a id="deepseek-aidsh-system-prompt"></a>
 
 ## `@deepseek-ai/dsh-system-prompt`
@@ -2778,8 +2885,6 @@ export interface Config {
    * `deployment:persona-prefix` shadows it; `{{variable}}` references are strict.
    */
   personaPrefix?: string
-  /** Legacy profile alias for personaPrefix. */
-  persona?: string
   /**
    * Persona suffix template after first-party guidance. A scoped `deployment:persona-suffix`
    * section shadows it; `{{variable}}` references are strict. Defaults to empty.
@@ -2794,13 +2899,13 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:230`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 
 ## `@deepseek-ai/dsh-terminal-bash`
 
-Requires: `terminals` · `sandboxPolicy` · `subprocess`
+Requires: `terminals` · `sandboxPolicy` · `sessionProjections` · `subprocess`
 
 ```ts config-catalog
 /** Public plugin configuration. */
@@ -2834,7 +2939,7 @@ export interface Config {
    * regain the foreground before `inferred_idle` settles; at least one `pollIntervalMs`.
    */
   handoffGraceMs?: number
-  /** Absolute send wait bound. */
+  /** Absolute bound for one send and the complete pwsh startup sequence. */
   timeoutMs?: number
   /** Grace before teardown escalates to `SIGKILL`. */
   disposeGraceMs?: number
@@ -2844,7 +2949,7 @@ export interface Config {
 export type ShellDialect = 'bash' | 'pwsh'
 ```
 
-Source: [`packages/terminal/terminal-bash/src/config.ts:11`](../packages/terminal/terminal-bash/src/config.ts)
+Source: [`packages/terminal/terminal-bash/src/config.ts:10`](../packages/terminal/terminal-bash/src/config.ts)
 
 <a id="deepseek-aidsh-time-context"></a>
 
@@ -3222,13 +3327,14 @@ export interface Config {
     deny?: string[]
   }
   /**
-   * Maximum child depth: a non-negative safe integer (default `3`; `0` forbids
-   * delegation entirely), or `'provider-managed'` to send no cap. A numeric cap
+   * Maximum child depth: a non-negative safe integer (`0` forbids delegation),
+   * or `'provider-managed'` to send no cap. A numeric cap
    * requires the provider's `depthLimit` capability (mount fails loud
    * otherwise). The provider checks the calling agent's current depth at every
    * start; the tool remains model-visible so runtime policy owns rejection.
    * `'provider-managed'` is for an out-of-process provider whose recursion
-   * budget belongs to the child runtime or its own deployment.
+   * budget belongs to the child runtime or its own deployment. Omission reads
+   * the current Host subagent depth setting (default `1`) at each delegation.
    */
   maxDepth?: number | 'provider-managed'
 }
@@ -3362,13 +3468,12 @@ export interface Config {
    * sends only `run_code` plus a generated SDK prompt and collapses the
    * executor to the same surface (a model-direct call may only name
    * `run_code`; `run_code` SDK sub-dispatches keep every visible tool); `both`
-   * sends both forms; legacy `code` input is accepted as an alias. PTC modes
-   * require a `ctx.codeRuntime` whose `language`
+   * sends both forms. PTC mode requires a `ctx.ptcRuntime` whose `language`
    * has a registered SDK renderer (TypeScript or Python) and fail prompt
-   * assembly when it is absent or has no renderer. Under `ptc` (or `code`),
-   * native names in `toolOrder` are invalid.
+   * assembly when it is absent or has no renderer. Under `ptc`, native names
+   * in `toolOrder` are invalid.
    */
-  mode?: ToolPresentationModeInput
+  mode?: ToolPresentationMode
   /**
    * Concurrency cap for a `run_code` program's overlapping sub-calls
    * (default 10, the loop scheduler's own default). Sub-calls follow the
@@ -3377,23 +3482,13 @@ export interface Config {
    * restores strictly serial dispatch. Must be a positive integer.
    */
   maxParallelSubCalls?: number
-  /**
-   * Maximum number of outstanding `run_code` sub-calls retained by one
-   * program, including queued, running, and model-order committing calls.
-   * Calls beyond this bound fail immediately so a fast producer cannot grow
-   * an unbounded in-memory queue. Must be a positive integer.
-   */
-  maxPendingSubCalls?: number
 }
-
-/** Accepted spelling for presentation declarations: `code` resolves to `ptc`. */
-export type ToolPresentationModeInput = ToolPresentationMode | 'code'
 
 /** How the registry presents its tools to the model (see {@link Config.mode}). */
 export type ToolPresentationMode = 'native' | 'ptc' | 'both'
 ```
 
-Source: [`packages/core/tools/src/index.ts:662`](../packages/core/tools/src/index.ts)
+Source: [`packages/core/tools/src/index.ts:658`](../packages/core/tools/src/index.ts)
 
 <a id="deepseek-aidsh-typert-loader"></a>
 
@@ -3409,7 +3504,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/typert/loader/src/index.ts:47`](../packages/typert/loader/src/index.ts)
+Source: [`packages/typert/loader/src/index.ts:48`](../packages/typert/loader/src/index.ts)
 
 <a id="deepseek-aidsh-user-approval"></a>
 
@@ -3440,7 +3535,7 @@ export interface Config {
 export type ApprovalPolicy = 'ask' | 'never'
 ```
 
-Source: [`packages/interaction/user-approval/src/index.ts:162`](../packages/interaction/user-approval/src/index.ts)
+Source: [`packages/interaction/user-approval/src/index.ts:128`](../packages/interaction/user-approval/src/index.ts)
 
 <a id="deepseek-aidsh-userdoc-local"></a>
 
@@ -3642,11 +3737,11 @@ export interface Config {
 
 Source: [`packages/web/web-search-perplexity/src/index.ts:40`](../packages/web/web-search-perplexity/src/index.ts)
 
-<a id="deepseek-aidsh-workflow-worker-thread"></a>
+<a id="deepseek-aidsh-workflow-ptc"></a>
 
-## `@deepseek-ai/dsh-workflow-worker-thread`
+## `@deepseek-ai/dsh-workflow-ptc`
 
-Requires: `subagents`
+Requires: `subagents` · `ptcRuntime` · `sandboxPolicy`
 
 ```ts config-catalog
 /** Plugin config (all optional — `static Config` supplies the defaults). */
@@ -3659,28 +3754,24 @@ export interface Config {
   maxTotalAgents?: number
   /** Items accepted by a single `parallel()`/`pipeline()` call (default 4096). */
   maxItemsPerCall?: number
-  /** vm timeout for the script's initial synchronous slice, inside the worker (default 5000 ms). */
+  /** VM timeout for the script's initial synchronous slice (default 5000 ms). */
   syncTimeoutMs?: number
-  /**
-   * How long after a cancellation an unsettled script may keep running before
-   * the run force-settles `cancelled` and its worker is TERMINATED (default
-   * 5000 ms); also bounds `dispose()`.
-   */
-  disposeGraceMs?: number
 }
 ```
 
-Source: [`packages/workflow/workflow-worker-thread/src/index.ts:32`](../packages/workflow/workflow-worker-thread/src/index.ts)
+Source: [`packages/workflow/workflow-ptc/src/index.ts:32`](../packages/workflow/workflow-ptc/src/index.ts)
 
 ## Loadable plugins with no config
 
 These load from a `cordis.yml` entry with no `config:` block; they declare no configuration API.
 
+- `@deepseek-ai/dsh-acp-app` — requires `cmdlineArgs` ([`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts))
 - `@deepseek-ai/dsh-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
 - `@deepseek-ai/dsh-api-gateway` — requires `typert` ([`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts))
 - `@deepseek-ai/dsh-api-remotes` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
 - `@deepseek-ai/dsh-archive-gateway` — requires `connection` · `gatewayRuntime` · `workspaceRegistry` ([`packages/context/archive-gateway/src/index.ts`](../packages/context/archive-gateway/src/index.ts))
 - `@deepseek-ai/dsh-authorization` — requires `credentials` ([`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts))
+- `@deepseek-ai/dsh-browser-use` ([`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts))
 - `@deepseek-ai/dsh-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))
 - `@deepseek-ai/dsh-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
 - `@deepseek-ai/dsh-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
@@ -3729,9 +3820,12 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
 - `@deepseek-ai/dsh-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
 - `@deepseek-ai/dsh-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
+- `@deepseek-ai/dsh-compaction-image-offload` — requires `agents` · `sessions` ([`packages/compaction/compaction-image-offload/src/index.ts`](../packages/compaction/compaction-image-offload/src/index.ts))
+- `@deepseek-ai/dsh-computer-use` ([`packages/computer-use/computer-use/src/index.ts`](../packages/computer-use/computer-use/src/index.ts))
 - `@deepseek-ai/dsh-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
 - `@deepseek-ai/dsh-deepseek-llm-api-extensions` ([`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts))
-- `@deepseek-ai/dsh-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
+- `@deepseek-ai/dsh-experimental-auto-review` — requires `llm` · `permissionPresets` · `sessions` · `tools` ([`packages/experimental/auto-review/src/index.ts`](../packages/experimental/auto-review/src/index.ts))
+- `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` — requires `computerUse` · `tools` · `systemPrompt` ([`packages/experimental/computer-use-cua-driver-native/src/index.ts`](../packages/experimental/computer-use-cua-driver-native/src/index.ts))
 - `@deepseek-ai/dsh-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@deepseek-ai/dsh-gateway-runtime` — requires `connection` ([`packages/context/gateway-runtime/src/index.ts`](../packages/context/gateway-runtime/src/index.ts))
 - `@deepseek-ai/dsh-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
@@ -3740,12 +3834,14 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-host-userdoc-http` — requires `connection` · `userDocs` ([`packages/host/userdoc-http/src/index.ts`](../packages/host/userdoc-http/src/index.ts))
 - `@deepseek-ai/dsh-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
+- `@deepseek-ai/dsh-mcp-resources` — requires `tools` ([`packages/mcp/mcp-resources/src/index.ts`](../packages/mcp/mcp-resources/src/index.ts))
 - `@deepseek-ai/dsh-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
 - `@deepseek-ai/dsh-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
 - `@deepseek-ai/dsh-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))
 - `@deepseek-ai/dsh-session-log-export` — requires `commands` ([`packages/session-query/session-log-export/src/index.ts`](../packages/session-query/session-log-export/src/index.ts))
 - `@deepseek-ai/dsh-session-projection` ([`packages/session/session-projection/src/index.ts`](../packages/session/session-projection/src/index.ts))
 - `@deepseek-ai/dsh-session-stats` — requires `sessionProjections` ([`packages/session/session-stats/src/index.ts`](../packages/session/session-stats/src/index.ts))
+- `@deepseek-ai/dsh-session-turn-outline` — requires `sessionProjections` ([`packages/session/session-turn-outline/src/index.ts`](../packages/session/session-turn-outline/src/index.ts))
 - `@deepseek-ai/dsh-skill-badge` — requires `skills` ([`packages/skill/skill-badge/src/index.ts`](../packages/skill/skill-badge/src/index.ts))
 - `@deepseek-ai/dsh-storage` ([`packages/storage/storage/src/index.ts`](../packages/storage/storage/src/index.ts))
 - `@deepseek-ai/dsh-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
@@ -3763,7 +3859,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 Abstract service classes — a deployment loads a concrete implementation package instead ([capability seams](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)).
 
 - `@deepseek-ai/dsh-attachment` — abstract `AttachmentStore` ([`packages/attachment/attachment/src/index.ts`](../packages/attachment/attachment/src/index.ts))
-- `@deepseek-ai/dsh-code-runtime` — abstract `CodeRuntime` ([`packages/code-runtime/code-runtime/src/index.ts`](../packages/code-runtime/code-runtime/src/index.ts))
 - `@deepseek-ai/dsh-collaboration` — abstract `Collaboration` ([`packages/context/collaboration/src/index.ts`](../packages/context/collaboration/src/index.ts))
 - `@deepseek-ai/dsh-compaction` — abstract `CompactionEngine` ([`packages/compaction/compaction/src/index.ts`](../packages/compaction/compaction/src/index.ts))
 - `@deepseek-ai/dsh-credentials` — abstract `CredentialProvider` ([`packages/credentials/credentials/src/index.ts`](../packages/credentials/credentials/src/index.ts))
@@ -3773,6 +3868,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@deepseek-ai/dsh-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
 - `@deepseek-ai/dsh-model-access` — abstract `ModelAccessPolicy` ([`packages/llm/model-access/src/index.ts`](../packages/llm/model-access/src/index.ts))
 - `@deepseek-ai/dsh-model-provider-config` — abstract `ModelProviderConfig` ([`packages/llm/model-provider-config/src/index.ts`](../packages/llm/model-provider-config/src/index.ts))
+- `@deepseek-ai/dsh-ptc-runtime` — abstract `PtcRuntime` ([`packages/ptc-runtime/ptc-runtime/src/index.ts`](../packages/ptc-runtime/ptc-runtime/src/index.ts))
 - `@deepseek-ai/dsh-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
 - `@deepseek-ai/dsh-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))
 - `@deepseek-ai/dsh-session-query` — abstract `SessionQueryEngine` ([`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts))
@@ -3801,10 +3897,13 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-client-userdoc-upload` ([`packages/client/userdoc-upload/src/index.ts`](../packages/client/userdoc-upload/src/index.ts))
 - `@deepseek-ai/dsh-client-web` ([`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts))
 - `@deepseek-ai/dsh-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
+- `@deepseek-ai/dsh-experimental-agent-team-profile` ([`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts))
+- `@deepseek-ai/dsh-experimental-browser-use-runtime` ([`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts))
 - `@deepseek-ai/dsh-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))
 - `@deepseek-ai/dsh-hook-protocol` ([`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts))
 - `@deepseek-ai/dsh-http-proxy` ([`packages/util/http-proxy/src/index.ts`](../packages/util/http-proxy/src/index.ts))
 - `@deepseek-ai/dsh-launch-environment` ([`packages/util/launch-environment/src/index.ts`](../packages/util/launch-environment/src/index.ts))
+- `@deepseek-ai/dsh-lazy-require` ([`packages/util/lazy-require/src/index.ts`](../packages/util/lazy-require/src/index.ts))
 - `@deepseek-ai/dsh-llm-mock-server` ([`packages/test-support/llm-mock-server/src/index.ts`](../packages/test-support/llm-mock-server/src/index.ts))
 - `@deepseek-ai/dsh-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
 - `@deepseek-ai/dsh-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
@@ -3814,8 +3913,14 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
 - `@deepseek-ai/dsh-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))
 - `@deepseek-ai/dsh-sdk-jsonrpc-demo` ([`packages/examples/jsonrpc-demo/src/index.ts`](../packages/examples/jsonrpc-demo/src/index.ts))
+- `@deepseek-ai/dsh-sdk-minimal` ([`packages/bundle/sdk-minimal/src/index.ts`](../packages/bundle/sdk-minimal/src/index.ts))
 - `@deepseek-ai/dsh-sdk-protocol` ([`packages/sdk/protocol/src/index.ts`](../packages/sdk/protocol/src/index.ts))
 - `@deepseek-ai/dsh-session-format` ([`packages/session/session-format/src/index.ts`](../packages/session/session-format/src/index.ts))
+- `@deepseek-ai/dsh-session-format-catalog` ([`packages/session/session-format-catalog/src/index.ts`](../packages/session/session-format-catalog/src/index.ts))
+- `@deepseek-ai/dsh-session-format-v0-to-v1` ([`packages/session/session-format-v0-to-v1/src/index.ts`](../packages/session/session-format-v0-to-v1/src/index.ts))
+- `@deepseek-ai/dsh-session-format-v1-to-v2` ([`packages/session/session-format-v1-to-v2/src/index.ts`](../packages/session/session-format-v1-to-v2/src/index.ts))
+- `@deepseek-ai/dsh-session-format-v2-to-v3` ([`packages/session/session-format-v2-to-v3/src/index.ts`](../packages/session/session-format-v2-to-v3/src/index.ts))
+- `@deepseek-ai/dsh-session-format-v3-to-v4` ([`packages/session/session-format-v3-to-v4/src/index.ts`](../packages/session/session-format-v3-to-v4/src/index.ts))
 - `@deepseek-ai/dsh-session-telemetry` ([`packages/session/session-telemetry/src/index.ts`](../packages/session/session-telemetry/src/index.ts))
 - `@deepseek-ai/dsh-session-title-llm` ([`packages/session/session-title-llm/src/index.ts`](../packages/session/session-title-llm/src/index.ts))
 - `@deepseek-ai/dsh-subagent-in-process-driver` ([`packages/subagent/subagent-in-process-driver/src/index.ts`](../packages/subagent/subagent-in-process-driver/src/index.ts))
@@ -3826,3 +3931,4 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-util-crypto` ([`packages/util/crypto/src/index.ts`](../packages/util/crypto/src/index.ts))
 - `@deepseek-ai/dsh-util-time` ([`packages/util/time/src/index.ts`](../packages/util/time/src/index.ts))
 - `@deepseek-ai/dsh-util-values` ([`packages/util/values/src/index.ts`](../packages/util/values/src/index.ts))
+- `@deepseek-ai/dsh-win32-process` ([`packages/subprocess/win32-process/src/index.ts`](../packages/subprocess/win32-process/src/index.ts))

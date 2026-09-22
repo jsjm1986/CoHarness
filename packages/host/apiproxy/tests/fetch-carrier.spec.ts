@@ -11,26 +11,26 @@ const SCRIPTED_HISTORY_PAGE = {
   events: [
     {
       event: {
-        type: 'assistant/chunk',
+        type: 'assistant/attempt',
         seq: SessionSeq(1),
         time: 1000,
-        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'packed ' } },
+        data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 1000, chunk: { type: 'text-delta', index: 0, text: 'packed ' } }] },
       },
     },
     {
       event: {
-        type: 'assistant/chunk',
+        type: 'assistant/attempt',
         seq: SessionSeq(2),
         time: 1010,
-        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'history ' } },
+        data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 1010, chunk: { type: 'text-delta', index: 0, text: 'history ' } }] },
       },
     },
     {
       event: {
-        type: 'assistant/chunk',
+        type: 'assistant/attempt',
         seq: SessionSeq(3),
         time: 1020,
-        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'page' } },
+        data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 1020, chunk: { type: 'text-delta', index: 0, text: 'page' } }] },
       },
     },
     {
@@ -385,12 +385,12 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
       body: JSON.stringify(request),
     }))
     const directBody = await directResponse.json() as {
-      result: { ok: boolean; value: { records?: Array<{ chunks?: unknown }>; events?: unknown } }
+      result: { ok: boolean; value: { records?: Array<{ event?: unknown }>; events?: unknown } }
     }
 
     expect(directBody.result.ok).toBe(true)
     expect(directBody.result.value).toHaveProperty('records')
-    expect(directBody.result.value.records?.some(record => record.chunks !== undefined)).toBe(true)
+    expect(directBody.result.value.records?.every(record => record.event !== undefined)).toBe(true)
     expect(directBody.result.value).not.toHaveProperty('events')
 
     const response = await new InProcessApiClient(handler).sessions.history({

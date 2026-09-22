@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Configurable registry service for package-owned runtime invariant checks. The root plugin registers `ctx.invariants`; it contains no product checks or product-package imports. Every workspace package publishes a `./invariant` companion that registers its exact npm package name.
 
+## Summary
+
+`dsh-invariants` runs package-owned runtime checks — invariants — inside a DeepSeek Harness composition: any package can ship a `./invariant` companion that verifies its own durable relationships (authoritative event streams and mutable snapshots) while the composition runs. Checks run automatically, and a failed check reports an `InvariantError` attributed to the package that owns the violated relationship. Choose it for compositions that want self-checking diagnostics with a global switch and package-name filters; the standard agent composition already mounts it with the four core companions, and loading the service alone installs no checks.
+
 ## Service: `InvariantRegistry` (`ctx.invariants`)
 
 ```ts
@@ -70,13 +74,17 @@ The standard agent composition mounts the service and its four core stateful com
 
 Every ordinary Vitest topology mounts an explicitly enabled service and the current test package's companion. Focused suites cover valid and invalid observations for executable companions, while one exhaustive topology mounts all companions to prove registration and disposal wiring.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The package is the registry that evaluates other packages' companions; it asserts no product-domain relation of its own.
+
 ## Model Experience
 
-None, as the service and companions observe runtime events and mutable snapshots without altering prompts, messages, schemas, streams, or tool results.
+None, as the observer validates requests but never rewrites their context.
 
 #### KV Cache effect
 
-None; invariant checks do not assemble or send provider requests.
+Checks observe assembled requests and durable state without mutating request content, so provider cache reuse is exactly what the underlying composition produces.
 
 ## Known Limitations and Deferred Work
 

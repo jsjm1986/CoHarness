@@ -188,7 +188,7 @@ export function apply(ctx: Context, config: Config): void {
   const resolved = resolveConfig(config)
   ctx.systemPrompt.section({
     name: 'tool:goal',
-    order: 114,
+    order: ctx.systemPrompt.getSectionOrder('TOOL_GOAL'),
     text: guidance(resolved.blockedAfterConsecutiveRounds),
   })
 

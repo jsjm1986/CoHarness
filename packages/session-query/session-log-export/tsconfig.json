@@ -15,7 +15,6 @@
     { "path": "../../client/ui-commands" },
     { "path": "../../client/ui-conversation" },
     { "path": "../../client/ui-primitives" },
-    { "path": "../../client/ui-slots" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    { "path": "../../client/ui-slots" }
   ]
 }

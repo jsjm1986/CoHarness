@@ -42,6 +42,11 @@ kind: "package-reference"
 版本 1 的 `dsh_plugin_packages` 字段只包含 `{ name, version }` 对。系统会排除禁用、pending、failed、disposed、unloading 状态，结构性 `cordis:` 配置项，普通依赖，没有所属包身份的松散文件，以编程方式挂载的子 fiber，以及内存动态插件。
 
 <a id="model-experience"></a>
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。`dsh_plugin_packages` 字段按请求从实时 Loader 清单计算；不保留清单副本。
+
 ## 模型体验
 
 ### 包清单元数据
@@ -62,7 +67,7 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **仅含 Loader 包来源**——以编程方式创建的子 fiber 与内存动态插件没有权威 NPM 名称／版本来源，因此不在该清单内。
+- **仅含 Loader 支持的包身份**——以编程方式创建的子 fiber 与内存动态插件没有权威 NPM 名称／版本身份，因此不在该清单内。
 - **省略松散模块**——没有具名且带版本所属 manifest 的相对文件是插件模块，不是插件包。
 - **原地替换包需要重启**——manifest 身份会在进程存活期内缓存。Loader 的启用、禁用、挂载、卸载与普通源码 HMR 仍会刷新存活配置项集合，但在同一进程中把已挂载包的 manifest 替换为另一版本并不是受支持的升级路径。
 

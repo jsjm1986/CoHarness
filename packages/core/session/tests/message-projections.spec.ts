@@ -1,13 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import SessionStore, { Session, SessionId, SessionSeq, SessionLogOffset, foldSurface, deriveEventMessage } from '../src/index.ts'
 import type { SessionEvent, SessionMessageProjection } from '../src/index.ts'
-vi.mock('../src/known-event-types.ts', async importOriginal => ({
-  ...await importOriginal<typeof import('../src/known-event-types.ts')>(),
-  MESSAGE_PROJECTION_EVENT_TYPES: new Set(['test/project']),
-}))
+import { MESSAGE_PROJECTION_EVENT_TYPES } from '../src/known-event-types.ts'
 import { SurfaceManager } from '../src/surface.ts'
 
 declare module '@deepseek-ai/dsh-session/types' {
@@ -37,13 +34,20 @@ function input(session: Session) {
 
 describe('plugin-owned message projections', () => {
   it('refuses required events when no interpreter is supplied', () => {
-    const type = 'test/project'
-    const event = { type, seq: SessionSeq(0), time: 0, data: {} } as SessionEvent
-    const session = Session.create(SessionId('missing'))
-    expect(() => session.append(event.type as 'test/project', event.data as never)).toThrow(/requires a message projection/)
-    expect(() => foldSurface([event])).toThrow(/requires a message projection/)
-    expect(() => Session.create(session.id, [event])).toThrow(/requires a message projection/)
-    expect(session.seq).toBe(0)
+    // No shipped event requires a projection yet; the spec registers its own
+    // type so the required-on-read path has a subject.
+    const required = MESSAGE_PROJECTION_EVENT_TYPES as Set<string>
+    required.add('test/project')
+    try {
+      const event = { type: 'test/project', seq: SessionSeq(0), time: 0, data: {} } as SessionEvent
+      const session = Session.create(SessionId('missing'))
+      expect(() => session.append(event.type, event.data as never)).toThrow(/requires a message projection/)
+      expect(() => foldSurface([event])).toThrow(/requires a message projection/)
+      expect(() => Session.create(session.id, [event])).toThrow(/requires a message projection/)
+      expect(session.seq).toBe(0)
+    } finally {
+      required.delete('test/project')
+    }
   })
 
   it('applies generic decisions atomically and replays them through detached folds', () => {
@@ -82,7 +86,7 @@ describe('plugin-owned message projections', () => {
     expect(child.deriveMessages()).toEqual(before)
     const restored = ctx.sessions.prepare(SessionId('restore'), {
       seed: [...live.snapshotEvents()], meta: { ...live.header, id: SessionId('restore') },
-      inheritedEventCount: live.inheritedEventCount, seedSource: 'persistence',
+      inheritedEventCount: live.inheritedEventCount, eventState: 'shared-frozen',
     })
     expect(restored.deriveMessages()).toEqual(before)
     await fiber.dispose()

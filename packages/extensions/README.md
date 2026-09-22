@@ -10,3 +10,10 @@ Model-facing tools over the live cordis runtime the agent itself runs inside: in
 | [`cordis-host-runner/`](cordis-host-runner/README.md) | Definition registry, the `node:vm` sandbox for host halves, and the request-run round trip | provides `ctx.dynamicCordisRunner` |
 | [`cordis-client-runner/`](cordis-client-runner/README.md) | Browser half of a dual-half package: evaluates the definition into a live browser plugin and answers the run request | client face; provides the browser `ctx.dynamicCordisRunner` |
 | [`ui-cordis/`](ui-cordis/README.md) | Browser surfaces: the frame-wide panel that operates every definition, and the read-only define card | client face; registers slots |
+
+The [extensions subsystem page](../../docs/subsystems/extensions.md) records the generated `ctx.cordisInspect` and `ctx.dynamicCordisRunner` service API.
+
+
+## Summary
+
+The extensions group provides read-only runtime API discovery for agents, process-local runners for programmatic and browser consumers, and historical generated-plugin cards. Creator mode installs persistent plugins through [Plugin Manager](../boot/plugin-manager/README.md). Choose a child package for inspection, Host execution, Client execution, or browser controls.

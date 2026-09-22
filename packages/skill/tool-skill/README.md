@@ -6,6 +6,10 @@ The model-facing skill catalog and `skill` tool.
 
 Requires `ctx.agents`, `ctx.tools`, and `ctx.skills` (`inject: ['agents', 'tools', 'skills']`).
 
+## Summary
+
+Agents can discover and load skills during a session. Before the first request, when model-invocable skills exist and the `skill` tool is visible, they receive a durable catalog of available skill names and capped descriptions, and can use the `skill` tool to load full instructions. Users can invoke a user-invocable skill with `/name`, which injects the same instructions into that step. Catalog changes append a complete replacement, including an empty catalog that retires old names; configure `catalogDescriptionMaxLength` to limit each description.
+
 ## Catalog lifecycle
 
 At every eligible `agent/pre-step`, the plugin calls `ctx.skills.snapshot()` for the calling session's cwd, forwards the pre-step abort signal to discovery, applies exact `skill` tool visibility, and renders the ordered `name` and `description` entries. When no prior catalog exists and that view is non-empty, it adds an initial durable user-role `<system-reminder>` to a downstream `enter` decision. Catalog messages contain only those summaries; skill bodies, paths, sources, providers, and `whenToUse` hints remain outside the catalog.
@@ -30,13 +34,17 @@ An unresolved name reports that the skill is unknown or no longer available. Inv
 
 Tool execution does not add a synthetic context message. Its freshly loaded result is already recorded as the tool result and becomes available to the next model step without duplicating the body. Only the catalog projection adds replacement summaries.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The tool and catalog read the `ctx.skills` registry; provider registration and content stay behind the seam.
+
 ## Model Experience
 
 ### Session catalog
 
 #### What the model sees
 
-If model-invocable skills exist and this exact `skill` tool is visible, the agent receives the catalog template below as a durable user-role message before the first request, with one data-dependent entry per sorted skill. Later membership, description, or visibility changes append a complete replacement using the same `<available_skills>` envelope; deleting every skill appends an empty envelope with an explicit instruction not to use older names. The template's closing sentence is the rule against double-loading: the user-explicit gesture boundary (the pre-step listener below) injects the same `renderSkillContent` output (shared from `@deepseek-ai/dsh-skill`) inline, and the catalog tells the model to follow that block instead of re-loading the skill through the tool; the replacement-catalog template carries the same sentence in both arms, including the emptied catalog.
+If model-invocable skills exist and this exact `skill` tool is visible, the agent receives the catalog template below as a durable user-role message before the first request, with one data-dependent entry per sorted skill. Later membership, description, or visibility changes append a complete replacement using the same `<available_skills>` envelope; deleting every skill appends an empty envelope with an explicit instruction not to use older names. The template's closing sentence is the rule against double-loading: the user-explicit gesture boundary (the pre-step listener below) injects the same `renderSkillContent` output (shared from `@deepseek-ai/dsh-skill`) inline, and the catalog tells the model to follow that block instead of re-loading the skill through the tool; the replacement-catalog template carries the same anti-double-loading rule in both arms, including the emptied catalog.
 
 ##### Skill catalog template
 

@@ -9,21 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../util/launch-environment"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../web"
-    },
-    {
       "path": "../../core/agent"
     },
     {
@@ -36,7 +21,19 @@
       "path": "../../settings/settings"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/launch-environment"
+    },
+    {
+      "path": "../web"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

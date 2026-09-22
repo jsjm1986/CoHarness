@@ -4,6 +4,7 @@ import {
   FileText,
   FolderKanban,
   LogOut,
+  Monitor,
   PanelsTopLeft,
   ScrollText,
   Sparkles,
@@ -19,6 +20,7 @@ import { ModelsPage } from './pages/ModelsPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 import { DocumentsPage } from './pages/DocumentsPage.tsx'
 import { ArchivesPage } from './pages/ArchivesPage.tsx'
+import { DesktopsPage } from './pages/DesktopsPage.tsx'
 
 export function App() {
   return (
@@ -45,6 +47,7 @@ export function App() {
             <Route path="/usage" element={<UsagePage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/archives" element={<ArchivesPage />} />
+            <Route path="/desktops" element={<DesktopsPage />} />
             <Route path="/audit" element={<AuditPage />} />
           </Routes>
         </main>
@@ -61,6 +64,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; icon: LucideIcon; end?: bool
   { to: '/usage', label: '用量', icon: ChartNoAxesCombined },
   { to: '/documents', label: '文档', icon: FileText },
   { to: '/archives', label: '归档', icon: Archive },
+  { to: '/desktops', label: '桌面', icon: Monitor },
   { to: '/audit', label: '审计', icon: ScrollText },
 ]
 

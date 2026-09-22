@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-20-win32-directory-dialog-foreground.md
+2026-09-20-win32-directory-dialog-foreground.md: 774b2b1ac7df7ab9183a8cd786c6d25220b2b509
+2026-09-20-win32-directory-dialog-foreground.zh.md: 9b7af0625e390887f39f5f137b6ab56cb829bb26

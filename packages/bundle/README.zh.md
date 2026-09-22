@@ -13,3 +13,8 @@ Bundle 身份由 manifest 声明决定，而不是由本目录决定。领域包
 | [`headless/`](headless/README.zh.md) | 直接运行在 base 之上的一次性任务模式，不含 Host 或 Web 层 | 挂载 `headless-runner` |
 
 内置组合包从 dsh 安装目录解析；树外（out-of-tree）组合包通过 `dsh plugin --profile <name> add <package>` 安装进 profile。
+
+
+## 概述
+
+本组列出 `dsh --profile` 使用的可安装 patch 层。每个包都声明 `dsh.bundle.patch`；启动器会叠放这些 patch 文档来组装具名 profile。`web`、`headless`、`acp` 与 `sdk` profile 以 `dsh-base` 为基础，`sdk-minimal` 则由一个组合包提供完整配置树。领域包也可以在本目录之外声明附加层。

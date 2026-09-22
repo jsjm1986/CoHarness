@@ -9,12 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../../attachment/attachment"
     },
     {
@@ -24,10 +18,16 @@
       "path": "../../core/scope"
     },
     {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
-      "path": "../../core/session"
+      "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../typert/protocol"
     },
     {
       "path": "../../util/brand"
@@ -36,10 +36,10 @@
       "path": "../../util/crypto"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../typert/protocol"
+      "path": "../../../vendor/cosmokit"
     }
   ]
 }

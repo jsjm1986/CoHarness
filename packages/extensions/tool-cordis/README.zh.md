@@ -4,6 +4,10 @@
 
 自引用 Cordis 工具集：五个面向模型的工具，操作当前 DSH 进程中的实时运行时。注册表、vm 沙箱与浏览器广播属于 [`@deepseek-ai/dsh-cordis-host-runner`](../cordis-host-runner/README.zh.md)（`ctx.dynamic`），本工具集注入它——只装这些工具而不装 runner 的组合永远不会激活它们。沙箱语义、动态包生命周期与组合及既定决策详见[工具集 Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.zh.md)。
 
+## 概述
+
+编写插件代码前查询 Host 和 Client 的运行时 API。创造模式同时提供这些只读工具与 Plugin Manager，后者负责持久化 profile 变更。检查注册表由 Cordis host runner 提供；浏览器查询需要已连接的页面。
+
 ## 功能
 
 两组配对动词，外加只读报告。
@@ -53,49 +57,25 @@
 
 Namespace 插件：命名导出 `name`／`inject`／`apply`，无默认导出（[docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）。它注入 `tools` 与 `dynamicCordisRunner`。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该工具集是 `ctx.dynamicCordisRunner` 之上的一组注册；定义与 fiber 状态属于 host runner。
+
 ## 模型体验
 
-### 工具 schema
+### 运行时检查
 
-#### 模型看到的内容
+#### 模型所见
 
-该插件可见时，会话模型会看到生成的 [`cordis_inspect`、`cordis_define`、`cordis_run`、`cordis_stop` 和 `cordis_undefine` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-cordis)。
-
-#### Token 影响
-
-该工具视图中的每次请求承担固定 schema 成本。
-
-#### KV Cache 影响
-
-只要该工具视图不变，前缀就保持稳定。隐藏这些定义的 scope 或插件生命周期变更，可能使从第一个变化的 schema token 起的复用失效。
-
-### 工具调用历史与结果
-
-#### 模型看到的内容
-
-检查会精确地用 `## <section>` 加换行及取决于数据的正文来拼接选中区段，各区段之间留一个空行；`what: "temporary"` 使用 `## Dynamic Packages` 标题。每一行都会报告标识、标签、用途、存在哪些半、运行状态与版本号、提供和等待的服务、已注册的 host 方法，以及最后一次浏览器半装载上报；空状态说明定义只存在于本进程内存中。宽泛的 API／事件报告省略 JSDoc；`name` 配合 `what: "api"`、`what: "events"` 或 `what: "client"` 返回一个精确目标及其完整约定。`client` 区段每个座位一行，给出其基数、作用域、摘要，以及注册进去是否会替换出厂 UI，随后是跨座位通用的 registrant 纪律；每个座位的 register 选项、owner 与框架 props、可直接运行的示例，只在精确 `name` 时才吐出。define 回答该包已定义、尚未运行，并给出用于运行的标识；run 报告版本号、host 半提供或等待什么，以及是否有页面确认了浏览器半；stop 与 undefine 各以一行确认。每一次拒绝都是携带 runner 教学文案的工具错误。提交的程序保留在 assistant 工具调用历史中。
+[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-cordis) 描述两个只读检查工具。[提示词](src/prompt.ts) 指引模型通过 Plugin Manager 进行持久化变更并说明 MCP 设置方式。创造模式的视觉请求默认通过已安装的 UI 插件显示在当前 Web 页面；开发技能说明 Client 打包和 slot 注册方法。查询结果包含所请求的 API 声明或当前工具 schema。
 
 #### Token 影响
 
-检查输出与提交的包代码取决于数据，并在压缩（compaction）前重复发送；生命周期确认文本很短。`client` 区段的体量由出厂槽数量决定（每座位两行），每座位细节按需索取，因此默认报告随槽面增长，而不是随其文档量增长。
+插件可见时，两个工具 schema 和指导段落进入模型请求。查询结果追加到转录中；精确查询避免加载无关声明。
 
 #### KV Cache 影响
 
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-### cordis_run 后的后续请求
-
-#### 模型看到的内容
-
-运行中的包可以注册工具、提示词贡献或监听器，改变其目标 scope 的后续请求；`cordis_stop` 与 `cordis_undefine` 会在完全停稳后移除这些贡献。
-
-#### Token 影响
-
-间接 token 影响等于运行中包的贡献，且只在其进程内生命周期内持续。
-
-#### KV Cache 影响
-
-运行或停止提示词／工具贡献会改变后续请求前缀，并可能使从第一个变化的贡献起的复用失效；运行集合不变时，前缀保持稳定。
+未改变的 schema 和指导保持前缀稳定。查询结果追加到历史中；启用其他插件可能改变后续工具 schema。
 
 ## 已知限制与暂缓事项
 

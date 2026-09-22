@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The shared wire protocol for the DeepSeek Harness SDK runtime: one newline-delimited JSON-RPC 2.0 transport class plus the named request, result, and notification types both wire ends speak. The package root enumerates the protocol consumer interface; source modules are not exported as deep imports. The server side is the [`dsh-sdk-jsonrpc-server`](../server/README.md) plugin; clients are [`dsh-sdk-client`](../client/README.md) (TypeScript) and the [Python SDK](../../../python/README.md) (which mirrors these shapes but does not import them). A pure library — no plugin, no Config, no registration.
 
+## Summary
+
+`dsh-sdk-protocol` lets a DeepSeek Harness runtime and its SDK clients exchange JSON-RPC 2.0 messages over newline-delimited byte streams: one transport class plus the named request, result, and notification types both wire ends speak. The serving side is the [`dsh-sdk-jsonrpc-server`](../server/README.md) plugin; the clients are the TypeScript [`dsh-sdk-client`](../client/README.md) and the [Python SDK](../../../python/README.md), which mirrors these shapes without importing them. Use this package when you implement or debug a wire end: framing rules, method names, payload types, and error semantics all live here. It is a pure library — no plugin, no configuration, no registrations.
+
 ## Transport
 
 `JsonRpcLineTransport` frames JSON-RPC 2.0 over caller-owned byte streams, one compact JSON frame per `\n`-terminated line. Frames with `id` and `method` are requests, `id` alone is a response, `method` alone is a notification; malformed JSON lines are ignored. `start()` attaches stream listeners, `close()` detaches them and rejects pending requests without destroying the streams. Missing request handlers answer `-32601`; handler rejections answer `-32603` with the error message. An error response rejects the pending `request()` with `JsonRpcResponseError`, which preserves the wire `code` and optional `data`. `JsonRpcTransportPeer` is the outbound surface (request/notify) the server class is typed against. Input lines are retained as fragments and joined only when a newline completes them, so highly fragmented stdio does not repeatedly copy the prefix. Input lines, pending requests, concurrent inbound handlers, and queued output are bounded by positive options (defaults 1 MiB, 1,000, 100, and 8 MiB); crossing a bound fails the transport and rejects pending work.
@@ -24,9 +28,13 @@ The shared wire protocol for the DeepSeek Harness SDK runtime: one newline-delim
 
 `HarnessSdkRequestMap` and `HarnessSdkNotificationMap` index these by method name. `SessionPromptResult.messageId` identifies the queued `UserMessage`; it does not identify a later assistant message, turn ending, or prompt result. Clients combine the open-ended `session.event` stream with agent-wide `session.status` according to their own activity ownership. `SubagentFinishedNotification.lastAssistantMessage` contains the child's last non-empty assistant message or, when no such message exists, its accumulated assistant text; the field is absent when the child produced neither. `InitializeParams.maxTokens` is an optional positive safe integer that caps each conversation-model output for SDK-created agents and their in-process descendants; omission allows the selected adapter's exact-model default to apply, or otherwise preserves provider behavior. The notification payload types depend on `SessionEvent` (`dsh-session`), `ContentBlock` (`dsh-llm`), and `SubagentStopReason` (`dsh-subagent`) — the protocol streams full session-log envelopes, so the session vocabulary is part of the wire contract. `serverInfo.name` stays the wire-stable `deepseek-harness-sdk-runtime`.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure wire-format library; its codec and type algebra are enforced by unit specs.
+
 ## Model Experience
 
-None, as this package defines the client-facing wire protocol; the model-visible surfaces belong to the runtime plugins composed behind the serving [`dsh-sdk-jsonrpc-server`](../server/README.md) entry.
+None, as this is a client-facing wire library; the runtime plugins behind the serving entry own all model-facing behavior.
 
 #### KV Cache effect
 

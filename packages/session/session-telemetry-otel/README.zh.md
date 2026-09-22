@@ -4,6 +4,10 @@
 
 [遥测（telemetry）seam](../session-telemetry/) 的 OpenTelemetry 后端，也是部署方唯一要加载的条目。其 `mode` 决定 seam 是实时跟随会话事件、仅在记录反馈时回放权威日志，还是将遥测留在本地。上传模式会原样组合 OTel JS SDK（`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP 日志导出器），把每条已交接记录映射到 `logger.emit()`，并使用两个插桩作用域（instrumentation scope）：ledger 记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel` 下，运维记录挂在 `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops` 下。资源身份包含 `service.name`/`service.version`（来自 `dsh-llm` 的 `APP_IDENTITY`），以及本包的匿名 `user.id`（`$DSH_HOME/.anonymous-user-id`；首次使用时创建的随机 UUID，删除该文件可重置）；这些身份随每个导出批次携带一次，而非逐条记录携带。
 
+## 概述
+
+`dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。SDK 批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
+
 ## 配置
 
 ```yaml
@@ -41,9 +45,13 @@
 
 seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；`severity` → `severityNumber`/`severityText`（INFO 9 / WARN 13 / ERROR 17）；`body` → 结构化日志 body；`attributes` 原样照搬。接收端基于 `(session.id, event.seq)` 去重，并按严重级别告警。在 `FULL` 中，接收端还可通过缺少 `shutdown` 记录检测崩溃：该标记在会话自身 dispose（资源释放）或应用关闭时发出；标记之后出现更多事件，说明遥测发生了重载。在 `FEEDBACK_ONLY` 中，已释放的前缀通常不包含随后的 `shutdown` 标记，因此缺少该标记不是崩溃信号。跨谱系（lineage）的流并不自足：恢复的会话在其自身 id 的流上从上一个进程停止之处继续；fork 出的会话的流从继承边界开始，其前缀位于父会话的流中，由接收端基于 `session.parent_id` + `session.seed_length` 拼接。恢复后的本地日志可能包含从未导出的合成关闭事件；协议流忠实于实际交给 SDK 的记录。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。记录交给供应商 SDK 自身的批处理与导出流水线；后端不拥有可供比较的排队或重试状态。
+
 ## 模型体验
 
-无。该后端只把 seam 脱敏后的记录转发进 OTel SDK 流水线；它绝不向模型请求贡献任何内容。
+无，因为该后端把 seam 记录转发进 OTel SDK 流水线，不注册任何面向模型的内容。
 
 #### KV Cache 影响
 

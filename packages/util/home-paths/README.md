@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Shared filesystem path helpers for DeepSeek Harness user data.
 
+## Summary
+
+`@deepseek-ai/dsh-home-paths` lets package authors resolve one DeepSeek Harness data root and derive child paths from it. An explicit path wins over `$DSH_HOME`, which wins over `~/.dsh`; blank environment values are ignored. Its public helpers can render the root without revealing an absolute machine path, expand only bare or current-user tilde forms, and canonicalize watch targets whose final components do not yet exist. Use it as a direct library dependency, not through `cordis.yml`.
+
 ## DSH home
 
 `resolveDshHome()` resolves the single-root DeepSeek Harness home. Precedence, highest first: an explicit configured path, `$DSH_HOME`, then `~/.dsh`. The harness keeps all user data under one root.
@@ -23,6 +27,8 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 `canonicalizeWatchPath()` gives a native filesystem watcher one stable spelling of its target. It resolves the deepest existing ancestor through `fs.realpath()` and restores any missing suffix, so a file or directory may still be watched before it is created. In particular, Windows 8.3 aliases cannot be mixed with the long paths emitted by the native watcher backend.
 
 This package is intentionally small and harness-dep-free so product packages can share user-data path conventions without depending on one another.
+
+**Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its resolution rules and value algebra are enforced by unit tests.
 
 ## Known Limitations and Deferred Work
 

@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 File-backed settings provider. One YAML or JSON document carries every namespace section; external edits hot-publish through `ctx.settings`, and `update()` re-reads the document under a writer lock before writing back atomically, preserving the user's YAML comments, any section owned by a plugin that is not currently loaded, and any on-disk change this process has not observed yet.
 
+## Summary
+
+`dsh-settings-file` keeps every namespace's user settings in one YAML or JSON document, by default `settings.yaml` under the harness home: users can edit the document directly — changes take effect live — or write through the service, which merges concurrent edits safely. YAML writes preserve comments, anchors, and formatting on every untouched node, and a section owned by a plugin that is not loaded is never dropped. Boot fails loud on an invalid document; a live reload that fails keeps the last good sections and warns rather than taking the process down.
+
 ## Config
 
 | Field | Meaning | Default |
@@ -29,9 +33,13 @@ Defaulting is one explicit `resolveSpec(config)` step; an unsupported extension 
 - **Self-write suppression by content.** The provider caches the last good text; a watcher event whose content equals the cache (its own write included) is a no-op.
 - **Host configuration adapters receive the resolved path.** `ctx.settings.documentPath` is the absolute `resolveSpec()` filename, including a custom YAML/JSON path; `prepareDocument()` preserves an existing file or exclusively creates an absent empty file with owner-only permissions before the Host opens it. The browser receives only an availability flag, never reconstructs `$DSH_HOME`, and never submits a filesystem target.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. The document on disk is the single authority: updates re-read it under a writer lock before writing back, and external edits republish, so no second durable copy exists to diverge.
+
 ## Model Experience
 
-Indirectly, through consumers of `ctx.settings`: this provider only stores and publishes namespace sections, and each consumer's own surface documents any model effect.
+Indirectly, through the consumers of `ctx.settings`, which own any model-facing behavior fed by a stored value; the file provider only stores and publishes namespace sections and registers nothing model-facing itself.
 
 #### KV Cache effect
 

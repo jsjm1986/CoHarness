@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 `SessionQueryEngine` is the combined abstract `ctx.sessionQuery` contract. It implements exact session-history retrieval, relationship tracing, and provider-independent filtering over live `ctx.sessions` plus optional dynamically mounted `ctx.sessionPersistence`; concrete backends implement its two full-text methods. Matching ids produce one record: live events win, while `live` and `persisted` report both source availabilities. Conflicting immutable headers fail with `SESSION_QUERY_SOURCE_CONFLICT`.
 
+## Summary
+
+`dsh-session-query` lets application code list, filter, read, and search session history, inspect bounded event context, and trace session or event relationships. Reads prefer live sessions over persisted copies and return detached clones from one consistent observation. Exact reads, filters, and traces work with any supported storage setup; ranked full-text search requires a backend such as `dsh-session-query-sqlite`. Use it when application code needs programmatic access to the history presented to the model.
+
 ## Reads
 
 - `listSessions(signal?)` reads current persistence metadata, merges live records with live precedence, and returns cloned records in deterministic newest-first order.
@@ -16,6 +20,7 @@ English | [中文](README.zh.md)
 - `readEvent(request, signal?)` returns a cloned header, the full target event, and a bounded raw-seq window. `before` and `after` default to zero and may not exceed `readWindowMax`.
 - `traceSession(sessionId, signal?)` reads the corpus once and returns immediate-to-outward ancestors plus deterministic recursive descendant trees. `complete: false` identifies the first missing parent; a target-connected cycle fails with `SESSION_QUERY_INVALID_LINEAGE`.
 - `traceEvent(request, signal?)` loads the logical log once and returns its cloned source header with direct positional replacements and direct cited source-event links. `replacementChain` follows positional replacers to the final replacement; source-event links remain non-transitive.
+- `observeSession(sessionId, signal?)` returns a retained `SessionObservation` lease — `source`, `header`, `inheritedEventCount`, lazily materialized `events`, a resumption `cursor`, and mounted projection snapshots — without a listing preflight. A live observation fixes its cut at the current log length; the cold path stats the stored Session first and reuses a bounded prepared-Session cache keyed by the persistence instance and `stat` revision, reloading only when the revision changes. Leases pin cache entries against LRU eviction up to `preparedSessionCacheSize`, and a session that goes live mid-read retries the live path.
 
 Persistence is optional and may mount or unmount dynamically. Cross-corpus listing and lineage tracing fail with `SESSION_QUERY_PERSISTENCE_FAILED` while mounted persistence is unreadable; a successfully read durable record that fails Session validation reports `SESSION_QUERY_CORRUPT_SESSION` instead. A title read, event trace, or event read targeting a known live session does not consult persistence, so durable backend health cannot make current in-memory state unreadable. Persisted title and event operations list before loading and reject a metadata mismatch rather than combining inconsistent observations. Lineage-trace cancellation is passed to persisted listing; event-trace and event-read cancellation is passed to persisted listing and inspection. Each waits for the started backend call to settle, then rejects with the signal's exact reason even when the backend ignored that signal. A pre-aborted known-live title read, event trace, or event read rejects before folding or snapshotting without consulting persistence. A batch title observation performs one metadata listing, inspects its unique persisted ids with at most `persistedInspectConcurrency` workers, and preserves each title's own observed header for downstream authorization. Cancellation starts no queued inspections and rejects only after already-started workers settle. `listSessions()` remains lightweight and does not load logs or index titles.
 
@@ -41,10 +46,15 @@ The package has no provider coordinator, fallback implementation, or standalone 
 |---|---:|---|
 | `readWindowMax` | `50` | Maximum `before` or `after` raw-event count. |
 | `persistedInspectConcurrency` | `4` | Maximum concurrent persisted-log inspections in one batch read; must be a positive safe integer. |
+| `preparedSessionCacheSize` | `5` | Cold prepared-Session observations retained for reuse across `observeSession` reads. |
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Answers are computed per query from the live session corpus and any mounted persistence; the engine holds no cached authoritative copy.
 
 ## Model Experience
 
-None, as this trusted query service returns cloned session records only to its callers and registers no model-facing prompt, schema, tool, or message.
+None, as the trusted query service exposes cloned records only to callers and registers nothing model-facing.
 
 #### KV Cache effect
 

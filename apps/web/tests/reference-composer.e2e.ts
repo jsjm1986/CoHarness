@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
@@ -41,6 +41,16 @@ function sourceSessionFixture(): string {
   session.append('turn/start', {
     turn: 1,
   })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('system/message', {
+    turn: 1,
+    step: 1,
+    message: createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: 'Fixture system prompt.' }],
+      source: { kind: 'plugin', plugin: 'test-fixture' },
+    }),
+  }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Research context for the reference menu.' }],
     source: { kind: 'user' },
@@ -50,6 +60,7 @@ function sourceSessionFixture(): string {
     messageSeqs: [user.seq],
     source: { kind: 'fallback' },
   })
+  session.append('step/end', { turn: 1, step: 1 })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   return [
     JSON.stringify({
@@ -58,6 +69,8 @@ function sourceSessionFixture(): string {
       id: '{{sessionId}}',
       createdAt: 0,
       cwd: '{{cwd}}',
+      isSeeded: false,
+      delegationDepth: 0,
     }),
     ...session.snapshotEvents().map(event => JSON.stringify(event)),
     '',
@@ -68,6 +81,16 @@ function sourceSessionFixture(): string {
 function targetSessionFixture(): string {
   const session = Session.create(SessionId(TARGET_SESSION_ID))
   session.append('turn/start', { turn: 1 })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('system/message', {
+    turn: 1,
+    step: 1,
+    message: createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: 'Fixture system prompt.' }],
+      source: { kind: 'plugin', plugin: 'test-fixture' },
+    }),
+  }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: '@Research notes what changed?' }],
     source: { kind: 'user' },
@@ -97,6 +120,7 @@ function targetSessionFixture(): string {
     messageSeqs: [user.seq],
     source: { kind: 'fallback' },
   })
+  session.append('step/end', { turn: 1, step: 1 })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   return [
     JSON.stringify({
@@ -105,6 +129,8 @@ function targetSessionFixture(): string {
       id: '{{sessionId}}',
       createdAt: 0,
       cwd: '{{cwd}}',
+      isSeeded: false,
+      delegationDepth: 0,
     }),
     ...session.snapshotEvents().map(event => JSON.stringify(event)),
     '',

@@ -19,9 +19,8 @@ import { zh } from '../src/client/locales.ts'
 import {
   workflowRunDefinition, type WorkflowRunChatData,
 } from '../src/client/workflow-definition.ts'
-import { apply as applyNode } from '../src/index.ts'
-import { apply as applyInvariant } from '../src/invariant.ts'
 import type {} from '../src/client/index.ts'
+import { apply as nodeApply } from '../src/index.ts'
 
 afterEach(cleanup)
 
@@ -871,15 +870,10 @@ describe('plugin lifecycle', () => {
     await replacement.dispose()
   })
 
-  it('keeps the node half inert and registers invariant ownership', async () => {
-    applyNode()
-    const registered: string[] = []
-    const ctx = new Context()
-    ctx.provide('invariants')
-    ctx.set('invariants', {
-      register: (pkg: string) => { registered.push(pkg); return () => {} },
-    } as never)
-    await applyInvariant(ctx)
-    expect(registered).toEqual(['@deepseek-ai/dsh-client-ui-workflow-run'])
+})
+
+describe('ui-workflow-run node half', () => {
+  it('the node apply is an inert loader seat', () => {
+    expect(() => { nodeApply() }).not.toThrow()
   })
 })

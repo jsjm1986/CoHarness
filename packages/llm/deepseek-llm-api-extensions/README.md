@@ -32,17 +32,14 @@ Each provider sees the exact serialized base body, the request `AbortSignal`, pl
 The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh-session-log-deepseek` owns `dsh_session_log`; `@deepseek-ai/dsh-plugin-package-inventory-deepseek` owns `dsh_plugin_packages`. The provider-neutral LLM seam and `llm-pi-ai` do not consume this registry.
 
 <a id="model-experience"></a>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Contributions are validated declarations applied while serializing each request; the registry holds no per-request relation.
+
 ## Model Experience
 
-### Registry fields
-
-#### What the model sees
-
-Nothing. Fields such as `dsh_session_log` and `dsh_plugin_packages` are provider metadata outside the model's messages, system prompt, and tool schemas.
-
-#### Token effect
-
-Zero model-input tokens; registered fields add only provider request bytes.
+Indirectly, through `@deepseek-ai/dsh-llm-deepseek`, which sends registered fields outside the model's `messages`, system prompt, and tool schemas.
 
 #### KV Cache effect
 

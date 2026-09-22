@@ -40,34 +40,41 @@ def test_session_v3_snapshot_retains_messages_and_compact_payloads() -> None:
 def test_child_prompt_precedes_runtime_context(prompt_name: str, expected: str) -> None:
     chunks = SMOKE["completion_chunks"]({
         "messages": [
-            {"role": "user", "content": SMOKE[prompt_name]},
-            {"role": "user", "content": "Current runtime context"},
+            {"role": "user", "content": [
+                {"type": "text", "text": SMOKE[prompt_name]},
+                {"type": "text", "text": "Current runtime context"},
+            ]},
         ],
     })
 
     assert any(
-        choice.get("delta", {}).get("content") == expected
+        chunk.get("delta", {}).get("text") == expected
         for chunk in chunks
-        for choice in chunk.get("choices", [])
     )
 
 
 def test_mcp_smoke_requests_the_discovered_tool() -> None:
     chunks = SMOKE["completion_chunks"]({
         "messages": [{"role": "user", "content": SMOKE["MCP_PROMPT"]}],
-        "tools": [{"type": "function", "function": {"name": "mcp__fixture__add"}}],
+        "tools": [{"name": "mcp__fixture__add", "input_schema": {"type": "object"}}],
     })
 
-    calls = [
-        call
-        for chunk in chunks
-        for choice in chunk.get("choices", [])
-        for call in choice.get("delta", {}).get("tool_calls", [])
+    uses = [
+        event["content_block"]
+        for event in chunks
+        if event.get("type") == "content_block_start"
+        and isinstance(event.get("content_block"), dict)
+        and event["content_block"].get("type") == "tool_use"
     ]
-    assert calls[0]["function"] == {
-        "name": "mcp__fixture__add",
-        "arguments": '{"a": 19, "b": 23}',
-    }
+    partials = [
+        event["delta"]["partial_json"]
+        for event in chunks
+        if event.get("type") == "content_block_delta"
+        and isinstance(event.get("delta"), dict)
+        and isinstance(event["delta"].get("partial_json"), str)
+    ]
+    assert uses[0]["name"] == "mcp__fixture__add"
+    assert partials == ['{"a": 19, "b": 23}']
 
 
 def test_mcp_smoke_accepts_the_external_server_result() -> None:
@@ -76,18 +83,23 @@ def test_mcp_smoke_accepts_the_external_server_result() -> None:
             {"role": "user", "content": SMOKE["MCP_PROMPT"]},
             {
                 "role": "assistant",
-                "tool_calls": [{
+                "content": [{
+                    "type": "tool_use",
                     "id": "mcp-add",
-                    "type": "function",
-                    "function": {"name": "mcp__fixture__add", "arguments": '{}'},
+                    "name": "mcp__fixture__add",
+                    "input": {},
                 }],
             },
-            {"role": "tool", "tool_call_id": "mcp-add", "content": "42"},
+            {"role": "user", "content": [{
+                "type": "tool_result",
+                "tool_use_id": "mcp-add",
+                "content": "42",
+            }]},
         ],
     })
 
     assert any(
-        choice.get("delta", {}).get("content") == SMOKE["MCP_TEXT"]
-        for chunk in chunks
-        for choice in chunk.get("choices", [])
+        event.get("delta", {}).get("text") == SMOKE["MCP_TEXT"]
+        for event in chunks
+        if event.get("type") == "content_block_delta"
     )

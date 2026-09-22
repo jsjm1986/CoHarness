@@ -29,6 +29,7 @@ export { ConversationNodeAssembler } from './sessions/conversation-assembler.ts'
 export { ConversationLocationIndex } from './sessions/conversation-location-index.ts'
 export { conversationContextKey } from './contract/conversation.ts'
 export type {
+  AssistantLiveChunkEvent,
   ChatConversationViewNode, ConversationContextReader, ConversationEventInput,
   ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataStore,
   ConversationStepDataMap,
@@ -36,7 +37,7 @@ export type {
   ConversationNodeContext, ConversationNodeDefinition, ConversationPreviousContext,
   ConversationPublication, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewBuilder,
   ConversationViewDefinition, ConversationViewNode, ConversationViewSnapshotMap,
-  ConversationViewSnapshotStore, StepLocation, TurnLocation,
+  ConversationViewSnapshotStore, SessionEventLike, StepLocation, TurnLocation,
 } from './contract/conversation.ts'
 export type { ConversationRuntime } from './sessions/conversation-assembler.ts'
 export type { RootOwnerProps } from './slots.ts'
@@ -117,7 +118,7 @@ export {
   readApiResponseText,
 } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type {
-  AssistantBlock, AssistantMessageNode, AssistantProvenanceView, AssistantRequestConfig,
+  AssistantBlock, AssistantMessageNode, AssistantProviderMetadataView, AssistantRequestConfig,
   AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
   CommandNode, CompactionSummaryNode, ComposerPhase,
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
@@ -131,15 +132,15 @@ export {
   EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, sanitizeAssistantText, toAssistantBlock, toAssistantBlocks,
 } from './sessions/conversation.ts'
 export { emptyAssistantBlock, IncrementalAssistantBlocks } from './sessions/partial.ts'
-export { isTokenDelta } from './sessions/assistant-timing.ts'
-export { contextForm, contextProvenance, sessionRecallLabels } from './sessions/context-provenance.ts'
+export { assistantStreamFirstTokenTime, isTokenDelta } from './sessions/assistant-timing.ts'
+export { contextForm, contextProducer, sessionRecallLabels } from './sessions/context-producer.ts'
 export { displayFailureMessage, isSessionPersistenceFailureMessage } from './sessions/failure-display.ts'
 export type {
   ConversationContext, ConversationContextOriginKind,
 } from './sessions/conversation-context.ts'
 export type {
-  ContextProvenanceView, ContextRole, KnownContextForm,
-} from './sessions/context-provenance.ts'
+  ContextProducerView, ContextRole, KnownContextForm,
+} from './sessions/context-producer.ts'
 export type {
   ConversationPromptSnapshot, RequestInspectionSnapshot, RequestPromptChange, RequestView,
 } from './sessions/request-inspection.ts'

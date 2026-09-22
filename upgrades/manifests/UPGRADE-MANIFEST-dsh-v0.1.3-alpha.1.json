@@ -131,7 +131,7 @@
     "environmentNotes": [
       {
         "command": "pnpm run test",
-        "result": "the default PATH resolves /usr/bin/python3 CPython 3.9.6, while packages/experimental/code-runtime-python requires Python >=3.10; the supported CPython 3.12.13 run above passes the full suite"
+        "result": "the default PATH resolves /usr/bin/python3 CPython 3.9.6, while packages/experimental/ptc-runtime-python requires Python >=3.10; the supported CPython 3.12.13 run above passes the full suite"
       }
     ],
     "externalEvidence": [

@@ -141,7 +141,7 @@ persisted Session
 
 The Agent inbox is the only queue. Every Agent message uses `Agent.steer()`: an idle target starts a turn, while a running target claims it at the nearest step boundary. Successful delivery returns the accepted `MessageId`; the existing `agent/inbox/inserted`, `agent/inbox/claimed`, and `agent/inbox/discarded` events remain the message-lifecycle observations, and the continuation layer defines no subagent-specific delivery route.
 
-Authority comes from the exact live sender. Parent-to-child delivery requires the target's `SessionHeader.parentSession` to name the sender; child-to-parent delivery requires the sender's resident Activation to name the target. Siblings, ancestors beyond one edge, self-targets, stale Agent objects, and one-shot children are rejected. Each accepted message is framed as `Agent <sender-id> sent a message:` and records `AgentMessageSource`; provenance records the sender but grants no authority.
+Authority comes from the exact live sender. Parent-to-child delivery requires the target's `SessionHeader.parentSession` to name the sender; child-to-parent delivery requires the sender's resident Activation to name the target. Siblings, ancestors beyond one edge, self-targets, stale Agent objects, and one-shot children are rejected. Each accepted message is framed as `Agent <sender-id> sent a message:` and records `AgentMessageSource`; the source records the sender but grants no authority.
 
 For `startContinuable()` and `sendMessage()`, the caller signal owns lookup, materialization, and admission only until inbox acceptance. Afterwards the manager owns the Activation independently: later caller cancellation neither cancels the accepted turn nor disposes the child. Human browser prompts remain a separate private Queue adapter and therefore still produce distinct FIFO turns.
 
@@ -191,7 +191,7 @@ interface ContinuableStart {
 }
 ```
 
-When a resident Activation settles, the manager delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as an Agent message. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its provenance is a distinct kind so a transcript never presents a runtime account as something the child wrote.
+When a resident Activation settles, the manager delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as an Agent message. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its source kind is distinct so a transcript never presents a runtime account as something the child wrote.
 
 ```ts type-equiv
 /**
@@ -480,6 +480,13 @@ Named provider registry with one-shot runs, durable discovery, and continuable-c
 
 ```ts cordis-catalog
 /**
+ * Resolve a delegation tool's depth policy against the current user setting.
+ * @param configured - Explicit tool limit, or provider-managed for external delegation.
+ * @returns The numeric limit, or undefined when the provider owns depth enforcement.
+ */
+resolveMaxDepth(configured?: number | 'provider-managed'): number | undefined
+
+/**
  * Establish one durable continuable child and deliver its initial prompt.
  * Resolves when the child's inbox accepts that prompt, without waiting for the
  * turn to start or for the message to reach the Session log; any earlier
@@ -621,6 +628,7 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * the Agent loop's best-effort fallback semantics. Image parts are admitted
  * and persisted through the attachment store before delivery, and the
  * child's model must accept image input.
+ * Cold resume at capacity rejects with `subagent/delivery-unavailable`.
  * @param request - durable address, delivery, minted identity, content, and optional browser zone.
  * @param signal - carrier cancellation, owning the call until inbox acceptance.
  * @returns the accepted message's inbox identity.

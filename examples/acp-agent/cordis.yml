@@ -133,10 +133,15 @@
     maxDepth: 1
 
 
+# The PTC runtime backs `ctx.ptcRuntime` for the workflow engine below; the
+# `demo:ptc` overlay mounts the same provider when it switches tools to PTC mode.
+- id: ptc-runtime
+  name: '@deepseek-ai/dsh-ptc-runtime-node'
+
 # The worker-thread workflow engine fans a model-written JavaScript script's
 # `agent()` calls out through the spawn backend; the adjacent tool exposes it to the model.
-- id: workflow-worker-thread
-  name: '@deepseek-ai/dsh-workflow-worker-thread'
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
   config:
     provider: spawn
 
@@ -145,6 +150,12 @@
 
 - id: tool-ralph
   name: '@deepseek-ai/dsh-tool-ralph'
+
+# When an image-capable route rejects a request as over its image budget,
+# replace the oldest images with placeholders on the surface and retry.
+- id: image-offload
+  name: '@deepseek-ai/dsh-compaction-image-offload'
+
 # `todo_write` replaces the logged whole list for later model requests.
 - id: tool-todo
   name: '@deepseek-ai/dsh-tool-todo'

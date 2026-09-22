@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { SessionId, type SessionEvent, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { DEFAULT_BUSY_TIMEOUT_MS } from '../packages/session/session-persistence-sqlite/src/index.ts'
 import { SqliteStore } from '../packages/session/session-persistence-sqlite/src/store.ts'
 import {
@@ -25,6 +25,16 @@ async function fixture(): Promise<{ root: string; path: string }> {
   return { root, path: join(root, 'sessions.db') }
 }
 
+/** Restamp a store written by the current build at the released v20 version the offline migrator targets. */
+function stampV20(path: string): void {
+  const db = new DatabaseSync(path)
+  try {
+    db.exec('PRAGMA user_version = 20')
+  } finally {
+    db.close()
+  }
+}
+
 function events(): SessionEvent[] {
   return [
     { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
@@ -42,12 +52,13 @@ function events(): SessionEvent[] {
 }
 
 describe('offline Session SQLite migrations', () => {
-  it('round-trips a draft, provenance, ignorable event, and store identity both ways', async () => {
+  it('round-trips a draft, source-event, ignorable event, and store identity both ways', async () => {
     const { root, path } = await fixture()
     const store = new SqliteStore({ path, journalMode: 'delete', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
-    const header = { id: SessionId('migration-session'), version: 0, createdAt: 1, cwd: '/work', isSeeded: false, draft: true }
+    const header: SessionHeader = { id: SessionId('migration-session'), version: SESSION_FORMAT_VERSION, createdAt: 1, cwd: '/work', isSeeded: false, draft: true }
     await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, events(), false)
     await store.close()
+    stampV20(path)
 
     const v18 = join(root, 'v18.db')
     await migrateV20ToV18({ input: path, output: v18 })
@@ -72,6 +83,7 @@ describe('offline Session SQLite migrations', () => {
     const empty = new SqliteStore({ path, journalMode: 'delete', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     await empty.open()
     await empty.close()
+    stampV20(path)
     const v18 = join(root, 'empty-v18.db')
     await migrateV20ToV18({ input: path, output: v18 })
     const v20 = join(root, 'empty-v20.db')
@@ -84,6 +96,7 @@ describe('offline Session SQLite migrations', () => {
     const store = new SqliteStore({ path, journalMode: 'delete', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     await store.open()
     await store.close()
+    stampV20(path)
     await expect(migrateV20ToV18({ input: path, verifyOnly: true })).resolves.toBeUndefined()
     await expect(migrateV20ToV18({ input: path, output: path })).rejects.toThrow(/must differ/)
     await expect(stat(path)).resolves.toBeTruthy()

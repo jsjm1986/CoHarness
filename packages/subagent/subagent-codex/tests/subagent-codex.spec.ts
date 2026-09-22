@@ -7,7 +7,6 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import * as yaml from 'js-yaml'
 import { describe, expect, it, vi } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -18,7 +17,6 @@ import type {
 } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as codex from '../src/index.ts'
-import * as invariant from '../src/invariant.ts'
 import {
   CODEX_PERMISSION_MODES,
   DEFAULT_CODEX_PERMISSION_MODE,
@@ -212,6 +210,7 @@ function fakeChild(options: FakeChildOptions = {}): FakeChild {
     })
   })
   const handle: SubprocessHandle = {
+    control: undefined,
     stdin: toChild,
     stdout: fromChild,
     stderr,
@@ -707,28 +706,12 @@ describe('task admission and package contracts', () => {
     await ctx.fiber.dispose()
   })
 
-  it('keeps the namespace export shape and package-owned empty invariant', async () => {
+  it('keeps the namespace export shape', async () => {
     expect('default' in codex).toBe(false)
     expect(codex.name).toBe('subagent-codex')
     expect(codex.inject).toEqual(['subagents', 'subprocess'])
     const loader = Object.create(Loader.prototype) as Loader
     expect(loader.unwrapExports(codex)).toBe(codex)
-
-    const dispose = vi.fn()
-    const register = vi.fn((
-      _packageName: string,
-      _installer: InvariantInstaller,
-    ) => dispose)
-    const ctx = { invariants: { register } } as unknown as Context
-    await expect(invariant.apply(ctx)).resolves.toBe(dispose)
-    expect(register).toHaveBeenCalledWith(
-      '@deepseek-ai/dsh-subagent-codex',
-      expect.any(Function),
-    )
-    const install = register.mock.calls[0]![1]
-    await install(new Context(), (message) => { throw new Error(message) })
-    expect(invariant.name).toBe('subagent-codex-invariant')
-    expect(invariant.inject).toEqual(['invariants'])
   })
 })
 

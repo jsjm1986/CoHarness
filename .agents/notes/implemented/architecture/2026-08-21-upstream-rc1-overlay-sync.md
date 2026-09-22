@@ -10,7 +10,7 @@ The local product is an rc.8-based fork with Gateway, organization-provider gove
 
 ## Decision
 
-The fork adopts the official rc.1 contracts at their owning package boundaries and keeps product-specific behavior in its existing overlays. The upstream reference is tag `dsh-v0.1.1-rc.1` at commit `528c682e061696f5a160f363f236ecbf53cbd006`.
+The fork adopts the official rc.1 contracts at their owning package boundaries and keeps product-specific behavior in its existing overlays. The upstream reference is tag `dsh-v0.1.1-rc.1` .
 
 - DeepSeek keeps route-level `reasoningEffort` and adds model-level `inputModalities`, including `deepseek-v4-flash-vision-exp`. pi-ai uses model-level `input` and `reasoningEfforts`; the two adapter vocabularies are validated independently.
 - Credentials use the rc.1 record model (`CredentialKey`, API-key and grant records, record mutation, enumeration, deletion, v1 YAML, locking, permissions, and migration from the pre-release flat file). The organization `DSH_*` provider remains read-only and continues to win over personal records where it owns a reference.

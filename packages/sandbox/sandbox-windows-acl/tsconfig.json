@@ -4,19 +4,27 @@
     "rootDir": "src",
     "outDir": "lib/types"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../subprocess/win32-process"
+    },
+    {
+      "path": "../../util/lazy-require"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

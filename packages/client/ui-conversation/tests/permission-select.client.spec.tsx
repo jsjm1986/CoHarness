@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { PermissionSelect as PermissionSelectValue } from '@deepseek-ai/dsh-permission-presets/client'
+import type {
+  PermissionCatalog, PermissionSelection as PermissionSelectValue,
+} from '@deepseek-ai/dsh-permission-presets/client'
 import type { ComposerBarProps } from '../src/client/contract/slots.ts'
 import { PermissionSelect } from '../src/client/skeleton/PermissionSelect.tsx'
 
@@ -26,8 +28,7 @@ const t: ComposerBarProps['t'] = (key, params) => {
   })
 }
 
-const value: PermissionSelectValue = {
-  currentValue: 'workspace-write',
+const catalog: PermissionCatalog = {
   options: [
     { value: 'read-only', name: 'read-only', description: '仅读取' },
     { value: 'workspace-write', name: 'workspace-write', description: '工作区可写' },
@@ -35,11 +36,15 @@ const value: PermissionSelectValue = {
   ],
 }
 
+const value: PermissionSelectValue = {
+  currentValue: 'workspace-write',
+}
+
 afterEach(cleanup)
 
 describe('PermissionSelect mobile presentation', () => {
   it('names the current permission on the compact icon trigger', () => {
-    render(<PermissionSelect value={value} locked={false} command={vi.fn()} t={t} />)
+    render(<PermissionSelect value={value} catalog={catalog} locked={false} command={vi.fn()} t={t} />)
     // The icon-only trigger keeps the mode on its accessible name; the label
     // span stays in the DOM for the desktop tier and is hidden by compact CSS.
     const trigger = screen.getByRole('button', { name: '访问模式，当前：Workspace Write' })
@@ -48,7 +53,7 @@ describe('PermissionSelect mobile presentation', () => {
 
   it('renders section options and submits the current-session command', async () => {
     const command = vi.fn(() => Promise.resolve(true))
-    render(<PermissionSelect value={value} locked={false} command={command} t={t} presentation="section" />)
+    render(<PermissionSelect value={value} catalog={catalog} locked={false} command={command} t={t} presentation="section" />)
     expect(screen.getByRole('menuitemradio', { name: 'Read Only' })).toBeTruthy()
     expect(screen.getByRole('menuitemradio', { name: /Workspace Write/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Read Only' }))

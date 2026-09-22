@@ -12,15 +12,23 @@
 
 实现：[`@deepseek-ai/dsh-sandbox-local`](../sandbox-local/)（Linux：`bwrap`，否则使用相应平台的 Landlock launcher；macOS：`sandbox-exec`／Seatbelt）。消费方：[`@deepseek-ai/dsh-bash-sandbox`](../../shell/bash-sandbox/)（包装 `['bash', '-c', command]`）。
 
+## 概述
+
+使用 `dsh-sandbox`，可以让子进程及其派生的所有进程在逐调用文件访问策略下运行。命令可以禁止写入（`read-only`）、只写入工作区（`workspace-write`），或不受限制地运行（`danger-full-access`）。无法强制执行所请求的模式时，调用以 `SANDBOX_UNAVAILABLE` 失败，绝不会不受限制地运行。调用被拒绝后，模型可以请求一个严格更宽的模式，交由人类批准一次。这种限制只适用于与宿主共享内核和文件系统的进程；需要隔离整个环境时，请使用容器、microVM 或远程执行器。
+
+## 不变量
+
+**运行时不变量：** 未发布配套入口。该 seam 声明约束契约与共享词汇；执行与探测状态由提供方拥有。
+
 ## 模型体验
 
 <a id="confinement-error-indirectly"></a>
 
 ### 间接的限制错误
 
-#### 模型看到的内容
+#### 模型看到什么
 
-通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md) 和 [`dsh-tool-bash`](../../shell/tool-bash/README.zh.md)，无法强制执行所请求模式时会产生错误码 `SANDBOX_UNAVAILABLE` 及以下精确错误。执行期 runner 失败会追加 ` Runner failure: <detail>`。
+通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md) 和 [`dsh-tool-bash`](../../shell/tool-bash/README.zh.md)，请求的受限模式没有可用后端时会产生错误码 `SANDBOX_UNAVAILABLE` 及下方精确错误；执行期 runner 失败会追加 ` Runner failure: <detail>`。
 
 ##### 精确错误
 
@@ -35,6 +43,20 @@ sandbox mode "<mode>" is requested but no sandbox backend is usable on this host
 #### KV Cache 影响
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
+
+### 升权请求与结果
+
+#### 模型看到什么
+
+被拒绝的调用会呈现标记 `[sandbox: file access denied under <mode> mode]`，组合声明升权能力时还会呈现提示 `[sandbox: escalation available — retry this exact <subject> once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the approval prompt asks the user]`。重试携带 `sandbox_permissions` 与 `justification`；用户的 `allowed-once`／`rejected`／`cancelled` 决定成为该调用的结果文本。
+
+#### Token 影响
+
+只有被拒绝调用的错误与任何升权结果文本可见；两者都会保留在历史中直到压缩。
+
+#### KV Cache 影响
+
+仅追加；升权文本位于保留前缀之后，不会使已缓存条目失效。
 
 ## 已知限制与暂缓事项
 

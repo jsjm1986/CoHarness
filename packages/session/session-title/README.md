@@ -6,6 +6,10 @@ Log-backed session titles with an immediate deterministic fallback and one optio
 
 Only text blocks from human `user/message` events are eligible, and a text opening with a known injection envelope — runtime-context snapshots, shared-project attribution notices, goal wrap-ups, model-change notices — is excluded even when a legacy build logged the injection under the `user` source. The first eligible prompt schedules a fallback from its first words within the configured UTF-8 byte limit. Whitespace is normalized, terminal control sequences are removed, and truncation never splits a code point. Empty and non-text prompts wait for later eligible input. A session announced with an existing log receives one up-front fallback pass, so a restored session whose durable title is absent or skipped gains the title a fresh session would mint.
 
+## Summary
+
+Use `dsh-session-title` to give each session a client-visible title from the first eligible human message, an optional asynchronous generator, or an explicit user rename. Accepted titles persist through replay, resume, and paging but never enter model input. Automatic generation never delays the main agent response, and newer title requests supersede older work. Choose the package when clients need durable titles with configurable length limits and a deliberate `refresh()` path for regenerating them.
+
 ## Service: `SessionTitleService` (ctx key: `sessionTitle`)
 
 - `get(session)` folds the latest accepted title from a live or replayed log.

@@ -18,7 +18,7 @@ Status: implemented
 
 当驻留 Activation 结算时，`notifySettlement()` 解析该 child 持久化的直接父级，并向它发送一条用户角色消息：先是父级可据以行动的一句结果说明，然后是 child 的最终 assistant 内容，或一句说明它没有产出内容。对每个调用方真正拿到过 id 的 child，投递都是无条件的。它不查询 child 是否上报过，也不保留任何可能让这项承诺变成有条件的记账——正是这种无条件性，才让 `tool-subagent` 能够承诺一条包含结局与可能存在的最终 assistant 消息的运行时通知。在第一条消息被接受之前就回滚的物化保持静默，因为调用方已被告知该 child 未建立。
 
-### 来源信息
+### 来源类型
 
 该通知携带 `{ kind: 'subagent-settled', form: 'notice', summary, senderSessionId }`，刻意不复用 `send_message` 使用的 `agent-message` kind。Agent 消息是 child 选择的内容；这条消息则是运行时在陈述这个 child 后来怎样了。把两者合并会把 child 从未写过的话算到它头上，也会让持久化日志无法区分「child 说它做完了」和「harness 观察到它停下了」。`notice` 形态还为 UI 提供了这条消息想要的折叠单行呈现，而 `relay` 会把 Agent 往来消息呈现为通信。
 

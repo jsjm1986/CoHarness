@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import SessionStore, { SessionId, type SessionEvent, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import SessionPersistenceSqlite, {
   DEFAULT_BUSY_TIMEOUT_MS,
   SCHEMA_VERSION,
@@ -23,8 +23,7 @@ import {
 import {
   meta,
   runPersistenceContract,
-} from '../../session-persistence/tests/contract.ts'
-import { MAX_PACKED_DATA_BYTES } from '../src/codec.ts'
+} from '../../session-persistence/tests/legacy-contract.ts'
 import { decodeRow } from '../src/compression.ts'
 import {
   decodeEventRow,
@@ -57,7 +56,7 @@ async function backendFailure(path: string): Promise<unknown> {
   await ctx.plugin(SessionStore)
   try {
     await ctx.plugin(SessionPersistenceSqlite, { path })
-    await ctx.sessionPersistence.list()
+    await ctx.sessionPersistence.listHeaders()
     return undefined
   } catch (error: unknown) {
     return error
@@ -90,24 +89,26 @@ function databaseWithJournalFailure(
   }
 }
 
-function chunk(seq: number, text = `token-${seq}`): SessionEvent {
+function attempt(seq: number, text = `token-${seq}`): SessionEvent {
   return {
-    type: 'assistant/chunk',
+    type: 'assistant/attempt',
     seq: SessionSeq(seq),
     time: 1_000 + seq,
     data: {
       turn: 1,
       step: 1,
-      chunk: { type: 'text-delta', index: 0, text },
+      stream: [
+        { type: 'chunk', time: 1_000 + seq, chunk: { type: 'text-delta', index: 0, text } },
+      ],
     },
   }
 }
 
-function chunkLog(count: number): SessionEvent[] {
+function attemptLog(count: number): SessionEvent[] {
   return [
     { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
     { type: 'step/start', seq: SessionSeq(1), time: 2, data: { turn: 1, step: 1 } },
-    ...Array.from({ length: count }, (_, index) => chunk(index + 2)),
+    ...Array.from({ length: count }, (_, index) => attempt(index + 2)),
     { type: 'step/end', seq: SessionSeq(count + 2), time: count + 3, data: { turn: 1, step: 1 } },
     {
       type: 'turn/end',
@@ -160,7 +161,7 @@ async function measureWriteTraffic(
   await ctx.plugin(SessionPersistenceSqlite, { path, writeBatchMaxDelayMs: 200 })
   try {
     const header = meta('traffic')
-    await ctx.sessionPersistence.create(header)
+    await ctx.sessionPersistence.createStored(header)
     let previous = new Map<number, PhysicalRow>()
     let inserted = 0
     let changed = 0
@@ -223,15 +224,15 @@ runCoordinatorContract('sqlite', async (): Promise<CoordinatorFixture> => {
       const events = rows.flatMap(row => decodeRow(decodeEventRow(row)))
       const next = (events.at(-1)?.seq ?? -1) + 1
       db.prepare(testSql('insert-corrupt-event'))
-        .run(id, next, 'assistant/chunk', 99, '{not valid json', null)
+        .run(id, next, 'assistant/attempt', 99, '{not valid json', null)
       db.close()
     },
     cleanup: async () => { await rm(directory, { recursive: true, force: true }) },
   }
 })
 
-describe('SessionPersistenceSqlite physical packing', () => {
-  it('loads from cordis.yml and packs through the assembled service', async () => {
+describe('SessionPersistenceSqlite physical rows', () => {
+  it('loads from cordis.yml and stores scalar rows through the assembled service', async () => {
     const path = await freshDbPath('dsh-sqlite-loader-')
     const configPath = join(path, '..', 'cordis.yml')
     await writeFile(configPath, [
@@ -263,26 +264,27 @@ describe('SessionPersistenceSqlite physical packing', () => {
     await ctx.loader.await()
 
     const header = meta('loader')
-    const events = chunkLog(4)
-    await ctx.sessionPersistence.create(header)
+    const events = attemptLog(4)
+    await ctx.sessionPersistence.createStored(header)
     await ctx.sessionPersistence.append(header.id, events)
     expect((await ctx.sessionPersistence.inspect(header.id)).events).toEqual(events)
     await ctx.fiber.dispose()
 
     const db = new DatabaseSync(path)
+    expect(db.prepare(testSql('count-events')).get()).toEqual({ count: 8 })
     expect(db.prepare(testSql('count-packed-events')).get())
-      .toEqual({ count: 1 })
+      .toEqual({ count: 0 })
     db.close()
   })
 
-  it('packs each append once without rewriting earlier rows and seeks inside packed rows', async () => {
+  it('stores each appended event once without rewriting earlier rows', async () => {
     const path = await freshDbPath()
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const fiber = await ctx.plugin(SessionPersistenceSqlite, { path })
     const header = meta('packed')
-    const events = chunkLog(100)
-    await ctx.sessionPersistence.create(header)
+    const events = attemptLog(100)
+    await ctx.sessionPersistence.createStored(header)
     await ctx.sessionPersistence.append(header.id, events.slice(0, 3))
     await ctx.sessionPersistence.append(header.id, events.slice(3, 4))
     const before = new DatabaseSync(path, { readOnly: true })
@@ -300,43 +302,40 @@ describe('SessionPersistenceSqlite physical packing', () => {
 
     const db = new DatabaseSync(path)
     expect(db.prepare(testSql('select-user-version')).get()).toEqual({ user_version: SCHEMA_VERSION })
-    expect(db.prepare(testSql('count-events')).get()).toEqual({ count: 7 })
+    expect(db.prepare(testSql('count-events')).get()).toEqual({ count: 104 })
     expect(db.prepare(testSql('count-packed-events')).get())
-      .toEqual({ count: 1 })
+      .toEqual({ count: 0 })
     expect(db.prepare(testSql('select-event-rowids')).all().slice(0, originalRows.length))
       .toEqual(originalRows)
     db.close()
   })
 
   it.runIf(process.platform !== 'win32')('bounds paced-stream WAL extent without rewriting committed rows', async () => {
-    const events = chunkLog(1_000)
+    const events = attemptLog(1_000)
     const measured = await measureWriteTraffic(await freshDbPath('dsh-sqlite-traffic-'), events)
 
-    expect(measured).toMatchObject({ rows: 31, inserted: 31, changed: 0, removed: 0 })
+    expect(measured).toMatchObject({ rows: 1_004, inserted: 1_004, changed: 0, removed: 0 })
     expect(measured.inserted).toBe(measured.rows)
-    expect(measured.largest).toBeLessThanOrEqual(MAX_PACKED_DATA_BYTES)
+    expect(measured.largest).toBeLessThanOrEqual(4_096)
     expect(measured.idleWalBytes).toBe(measured.walBytes)
   })
 
-  it('includes a packed predecessor when an overlapping scalar tail hides it', async () => {
+  it('reads past a corrupt scalar row when seeking inside the log', async () => {
     const path = await freshDbPath('dsh-sqlite-overlap-')
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header = meta('overlap')
-    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0), chunk(1), chunk(2)], false)
+    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0), attempt(1), attempt(2)], false)
 
+    // A hand-planted corrupt row truncates the contiguous prefix at its seq;
+    // a later seek still decodes the rows at and after its own base.
     const db = new DatabaseSync(path)
+    db.prepare(testSql('delete-event')).run(header.id, 1)
     db.prepare(testSql('insert-corrupt-event'))
-      .run(header.id, 1, 'assistant/chunk', 2, JSON.stringify(chunk(1).data), null)
+      .run(header.id, 1, 'assistant/attempt', 2, '{not json', null)
     db.close()
 
-    expect((await store.loadStoredFrom(header.id, SessionLogOffset(2)))?.events).toEqual([chunk(2)])
-
-    const malformed = new DatabaseSync(path)
-    malformed.prepare(testSql('delete-session-events')).run(header.id)
-    malformed.prepare(testSql('insert-corrupt-event'))
-      .run(header.id, 0, 'text-chunks', 1, '{not json', 0)
-    malformed.close()
-    expect((await store.loadStoredFrom(header.id, SessionLogOffset(2)))?.events).toEqual([])
+    expect((await store.loadStored(header.id))?.events).toEqual([attempt(0)])
+    expect((await store.loadStoredFrom(header.id, SessionLogOffset(2)))?.events).toEqual([attempt(2)])
     await store.close()
   })
 
@@ -344,7 +343,7 @@ describe('SessionPersistenceSqlite physical packing', () => {
     const path = await freshDbPath('dsh-sqlite-busy-')
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: 1_000 })
     const header = meta('busy')
-    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0)], false)
+    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0)], false)
 
     const holder = spawn(process.execPath, ['--input-type=module', '-e', String.raw`
       import { DatabaseSync } from 'node:sqlite';
@@ -359,10 +358,12 @@ describe('SessionPersistenceSqlite physical packing', () => {
     })
     try {
       await once(holder.stdout, 'data')
-      await expect(store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(1)], true)).resolves.toBeUndefined()
+      await expect(store.appendBatch(
+        { meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(1)], true,
+      )).resolves.toBeUndefined()
       const code = await exited
       expect(code).toBe(0)
-      expect((await store.loadStored(header.id))?.events).toEqual([chunk(0), chunk(1)])
+      expect((await store.loadStored(header.id))?.events).toEqual([attempt(0), attempt(1)])
     } finally {
       if (holder.exitCode === null) holder.kill()
       await store.close()
@@ -384,11 +385,11 @@ describe('SessionPersistenceSqlite physical packing', () => {
     const first = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const second = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header = meta(SessionId('stale'))
-    await first.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0)], false)
-    await second.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(1)], true)
-    await expect(first.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(1)], true))
+    await first.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0)], false)
+    await second.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(1)], true)
+    await expect(first.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(1)], true))
       .rejects.toThrow(/stored next seq is 2/)
-    expect((await first.loadStored(header.id))?.events).toEqual([chunk(0), chunk(1)])
+    expect((await first.loadStored(header.id))?.events).toEqual([attempt(0), attempt(1)])
     await first.close()
     await second.close()
   })
@@ -398,15 +399,15 @@ describe('SessionPersistenceSqlite physical packing', () => {
     const stale = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const winner = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header = meta(SessionId('stale-repair'))
-    await stale.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0)], false)
+    await stale.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0)], false)
     const db = new DatabaseSync(path)
-    db.prepare(testSql('insert-corrupt-event')).run(header.id, 1, 'assistant/chunk', 2, '{not json', null)
+    db.prepare(testSql('insert-corrupt-event')).run(header.id, 1, 'assistant/attempt', 2, '{not json', null)
     db.close()
     expect((await stale.loadStored(header.id))?.tornMarker).toBe(1)
     await winner.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, 1, [])
-    await winner.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(1), chunk(2)], true)
+    await winner.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(1), attempt(2)], true)
     await expect(stale.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, 1, [])).rejects.toThrow(/repair is stale/)
-    expect((await stale.loadStored(header.id))?.events).toEqual([chunk(0), chunk(1), chunk(2)])
+    expect((await stale.loadStored(header.id))?.events).toEqual([attempt(0), attempt(1), attempt(2)])
     await stale.close()
     await winner.close()
   })
@@ -539,7 +540,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 
     const foreignPath = await freshDbPath('dsh-sqlite-foreign-')
     const foreign = new DatabaseSync(foreignPath)
-    foreign.exec(testSql('set-user-version-20'))
+    foreign.exec(testSql('set-user-version-21'))
     foreign.exec(testSql('set-application-id-12345'))
     foreign.close()
     await expect(openDatabase(DatabaseSync, foreignPath, 'wal', DEFAULT_BUSY_TIMEOUT_MS)).rejects.toThrow(/has application id 12345/)
@@ -666,11 +667,11 @@ describe('SessionPersistenceSqlite schema ownership', () => {
     const path = await freshDbPath('dsh-sqlite-metadata-')
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header = meta('invalid-metadata')
-    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0)], false)
+    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0)], false)
     const db = new DatabaseSync(path)
     db.prepare(testSql('update-invalid-session-metadata')).run(header.id)
     db.close()
-    await expect(store.list()).rejects.toThrow(/seed_length|origin|delegation_depth/)
+    await expect(store.listStored()).rejects.toThrow(/seed_length|origin|delegation_depth/)
     await expect(store.loadStored(header.id)).rejects.toThrow(/seed_length|origin|delegation_depth/)
     await store.close()
   })
@@ -687,8 +688,8 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const first = new Context()
     await first.plugin(SessionStore)
     await first.plugin(SessionPersistenceSqlite, { path })
-    await first.sessionPersistence.create({ id, version: 3, createdAt: 1, cwd: '/work', isSeeded: false })
-    await first.sessionPersistence.append(id, chunkLog(1))
+    await first.sessionPersistence.createStored({ id, version: SESSION_FORMAT_VERSION, createdAt: 1, cwd: '/work', isSeeded: false })
+    await first.sessionPersistence.append(id, attemptLog(1))
     await first.fiber.dispose()
 
     const raw = new DatabaseSync(path)
@@ -699,15 +700,15 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await second.plugin(SessionStore)
     await second.plugin(SessionPersistenceSqlite, { path })
     const loaded = await second.sessionPersistence.load(id)
-    expect(loaded.meta.version).toBe(3)
+    expect(loaded.meta.version).toBe(4)
     const migrated = new DatabaseSync(path)
-    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 3 })
+    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 4 })
     migrated.close()
     // The stored body was rewritten in place: a fresh store decodes the same
     // migrated event list (v2→v3 inserts the system head into the open step).
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const reread = await store.loadStored(id)
-    expect(reread?.meta.version).toBe(3)
+    expect(reread?.meta.version).toBe(4)
     expect(reread?.events.map(event => event.type)).toEqual(loaded.events.map(event => event.type))
     expect(reread?.events.map(event => event.type)).toContain('system/message')
     await store.close()
@@ -721,7 +722,7 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await ctx.plugin(SessionPersistenceSqlite, { path })
     await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
     const emitWarning = Reflect.get(process, 'emitWarning')
-    expect(await ctx.sessionPersistence.list()).toEqual([])
+    expect(await ctx.sessionPersistence.listHeaders()).toEqual([])
     expect(Reflect.get(process, 'emitWarning')).toBe(emitWarning)
     expect(typeof (await stat(path)).size).toBe('number')
     await ctx.fiber.dispose()
@@ -733,8 +734,8 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionPersistenceSqlite, { path })
     const id = SessionId('draft-sqlite')
-    await ctx.sessionPersistence.create({
-      id, version: 0, createdAt: 1, cwd: '/work', isSeeded: false, draft: true,
+    await ctx.sessionPersistence.createStored({
+      id, version: SESSION_FORMAT_VERSION, createdAt: 1, cwd: '/work', isSeeded: false, draft: true,
     })
     await ctx.sessionPersistence.append(id, [{ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } }])
     await ctx.sessionPersistence.append(id, [{
@@ -775,9 +776,9 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     }, { inject: ['sessions'] }))
 
     const header = meta('direct-provider')
-    const events = chunkLog(3)
+    const events = attemptLog(3)
     expect(persistence.locate(header)).toBeUndefined()
-    await persistence.create(header)
+    await persistence.createStored(header)
     await persistence.append(header.id, events)
     const preparation = await persistence.prepare(header.id)
     expect(preparation.session.header).toEqual(header)
@@ -804,21 +805,21 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const path = await freshDbPath('dsh-sqlite-repair-validation-')
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header = meta('repair-validation')
-    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0)], false)
+    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0)], false)
     const db = new DatabaseSync(path)
-    db.prepare(testSql('insert-corrupt-event')).run(header.id, 1, 'assistant/chunk', 2, '{not json', null)
+    db.prepare(testSql('insert-corrupt-event')).run(header.id, 1, 'assistant/attempt', 2, '{not json', null)
     db.close()
-    await expect(store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, undefined, [chunk(1)]))
+    await expect(store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, undefined, [attempt(1)]))
       .rejects.toThrow(/omitted current torn tail/)
     await store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, 1, [])
-    await expect(store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, undefined, [chunk(2)]))
+    await expect(store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, undefined, [attempt(2)]))
       .rejects.toThrow(/closer starts at seq 2/)
 
     const cleared = new DatabaseSync(path)
     cleared.prepare(testSql('delete-session-events')).run(header.id)
     cleared.close()
-    await store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, undefined, [chunk(0)])
-    expect((await store.loadStored(header.id))?.events).toEqual([chunk(0)])
+    await store.commitRepair({ meta: header, inheritedEventCount: SessionLogOffset(0) }, undefined, [attempt(0)])
+    expect((await store.loadStored(header.id))?.events).toEqual([attempt(0)])
     await store.close()
   })
 
@@ -826,13 +827,13 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const path = await freshDbPath('dsh-sqlite-tail-')
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const header = meta('invalid-tail')
-    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(0)], false)
+    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(0)], false)
     const db = new DatabaseSync(path)
     db.prepare(testSql('insert-corrupt-event'))
-      .run(header.id, 1, 'assistant/chunk', 2, '{not json', null)
+      .run(header.id, 1, 'assistant/attempt', 2, '{not json', null)
     db.close()
 
-    await expect(store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [chunk(2)], true))
+    await expect(store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, [attempt(2)], true))
       .rejects.toThrow(/invalid physical tail/)
     await store.close()
   })

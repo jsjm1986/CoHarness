@@ -9,28 +9,19 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../util/brand"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/session"
+      "path": "../../core/agent"
     },
     {
       "path": "../../core/scope"
     },
     {
-      "path": "../../core/agent"
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
     },
     {
       "path": "../../session/session-projection"
@@ -39,7 +30,16 @@
       "path": "../../typert/protocol"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

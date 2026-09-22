@@ -1,9 +1,9 @@
-/** Error raised when a Session format value is malformed. */
+/** Error raised when a durable Session artifact cannot be restored or migrated losslessly. */
 export class SessionFormatError extends Error {
   override readonly name: string = 'SessionFormatError'
 }
 
-/** Error raised when a version has no safe migration path. */
+/** A readable artifact whose released source policy has no supported migration. */
 export class SessionFormatUnsupportedMigrationError extends SessionFormatError {
   override readonly name = 'SessionFormatUnsupportedMigrationError'
 }

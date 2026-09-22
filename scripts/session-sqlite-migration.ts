@@ -6,9 +6,17 @@ import { stat, unlink } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { zstdDecompressSync } from 'node:zlib'
-import { decodeStorageRecord, packChunkRuns, type SessionEvent } from '@deepseek-ai/dsh-session'
-import { decodeRow, bindRecord } from '../packages/session/session-persistence-sqlite/src/compression.ts'
-import type { StorageRecord as SqliteStorageRecord } from '../packages/session/session-persistence-sqlite/src/codec.ts'
+import {
+  decodeStorageRecord,
+  isChunkRow,
+  SessionSeq,
+  type ChunkRow,
+  type SessionEvent,
+  type StorageRecord,
+} from '@deepseek-ai/dsh-session'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
+import { decodeRow, bindRecord, type BoundRecord } from '../packages/session/session-persistence-sqlite/src/compression.ts'
 import { sql } from '../packages/session/session-persistence-sqlite/src/sql.ts'
 import {
   SESSION_PERSISTENCE_SQLITE_APPLICATION_ID,
@@ -16,6 +24,163 @@ import {
   decodeSessionRow,
   rowToStorage,
 } from '../packages/session/session-persistence-sqlite/src/schema.ts'
+
+/**
+ * The released-v3 `assistant/chunk` event the v18/v20 schemas stored, retired
+ * from the current event taxonomy. Schema migration copies logical events
+ * verbatim; the session-format migration (v3→v4) owns folding them later.
+ */
+interface LegacyChunkEvent {
+  readonly type: 'assistant/chunk'
+  readonly seq: number
+  readonly time: number
+  readonly data: { readonly turn: number; readonly step: number; readonly chunk: StreamChunk }
+}
+
+/** The chunk kinds the released v20 writer packed; block boundaries, usage, and finish chunks stay one row per event. */
+type DeltaKind = 'text-delta' | 'reasoning-delta' | 'tool-call-delta'
+
+/** Minimum members before the released v20 writer packed a run. */
+const MIN_RUN = 3
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function hasExactKeys(value: object, keys: readonly string[]): boolean {
+  return Object.keys(value).length === keys.length && keys.every(k => Object.hasOwn(value, k))
+}
+
+/** Classify an event for v20 packing: its delta kind when the entire released shape is whitelisted, else undefined. */
+function classifyDelta(event: SessionEvent): DeltaKind | undefined {
+  if ((event as { type: string }).type !== 'assistant/chunk') return undefined
+  if (!hasExactKeys(event, ['type', 'seq', 'time', 'data'])) return undefined
+  if (!Number.isSafeInteger(event.seq) || event.seq < 0 || Object.is(event.seq, -0)
+    || !Number.isSafeInteger(event.time)) return undefined
+  const data: unknown = event.data
+  if (!isRecord(data) || !hasExactKeys(data, ['turn', 'step', 'chunk'])) return undefined
+  if (typeof data.turn !== 'number' || typeof data.step !== 'number') return undefined
+  const chunk = data.chunk
+  if (!isRecord(chunk) || typeof chunk.index !== 'number') return undefined
+  switch (chunk.type) {
+    case 'text-delta':
+    case 'reasoning-delta':
+      return hasExactKeys(chunk, ['type', 'index', 'text']) && typeof chunk.text === 'string'
+        ? chunk.type
+        : undefined
+    case 'tool-call-delta': {
+      const shapeOk = hasExactKeys(chunk, ['type', 'index', 'id', 'argumentsDelta'])
+        || (hasExactKeys(chunk, ['type', 'index', 'id', 'name', 'argumentsDelta']) && typeof chunk.name === 'string')
+      return shapeOk && typeof chunk.id === 'string' && typeof chunk.argumentsDelta === 'string'
+        ? chunk.type
+        : undefined
+    }
+    default:
+      return undefined
+  }
+}
+
+function toolCallOf(event: LegacyChunkEvent): { id: string; name?: string } {
+  return event.data.chunk as { id: string; name?: string }
+}
+
+function indexOfDelta(event: LegacyChunkEvent): number {
+  return (event.data.chunk as { index: number }).index
+}
+
+/** Whether `next` extends a v20 run ending in `prev` (same kind already checked by the caller). */
+function continuesDelta(prev: LegacyChunkEvent, next: LegacyChunkEvent, kind: DeltaKind): boolean {
+  if (next.seq !== prev.seq + 1) return false
+  // Two safe-integer times can sit further apart than a double subtracts
+  // exactly; a rounded gap would decode to a different timestamp.
+  if (!Number.isSafeInteger(next.time - prev.time)) return false
+  if (next.data.turn !== prev.data.turn || next.data.step !== prev.data.step) return false
+  if (indexOfDelta(next) !== indexOfDelta(prev)) return false
+  if (kind !== 'tool-call-delta') return true
+  const a = toolCallOf(prev)
+  const b = toolCallOf(next)
+  return a.id === b.id && Object.hasOwn(a, 'name') === Object.hasOwn(b, 'name') && a.name === b.name
+}
+
+/** Build the released v20 packed row for one completed run (`run.length >= MIN_RUN`, uniform per {@link continuesDelta}). */
+function buildChunkRow(kind: DeltaKind, run: readonly LegacyChunkEvent[]): ChunkRow {
+  const first = run[0] as LegacyChunkEvent
+  const base = {
+    turn: first.data.turn,
+    step: first.data.step,
+    index: indexOfDelta(first),
+    dt: run.slice(1).map((event, i) => event.time - (run[i] as LegacyChunkEvent).time),
+  }
+  const envelope = { seq0: SessionSeq(first.seq), time0: first.time }
+  if (kind === 'tool-call-delta') {
+    const call = toolCallOf(first)
+    return {
+      type: 'tool-call-chunks',
+      ...envelope,
+      data: {
+        ...base,
+        id: call.id as ToolCallId,
+        ...Object.hasOwn(call, 'name') ? { name: call.name as string } : {},
+        args: run.map(event => (event.data.chunk as { argumentsDelta: string }).argumentsDelta),
+      },
+    }
+  }
+  const data = { ...base, texts: run.map(event => (event.data.chunk as { text: string }).text) }
+  return kind === 'text-delta'
+    ? { type: 'text-chunks', ...envelope, data }
+    : { type: 'reasoning-chunks', ...envelope, data }
+}
+
+/**
+ * Pack an event batch into released v20 storage records: each run of at least
+ * {@link MIN_RUN} consecutive whitelisted same-kind, same-block delta chunk
+ * events becomes one packed row; every other event passes through verbatim.
+ */
+function packV20ChunkRuns(events: readonly SessionEvent[]): StorageRecord[] {
+  const out: StorageRecord[] = []
+  let kind: DeltaKind | undefined
+  let run: LegacyChunkEvent[] = []
+  const flush = (): void => {
+    if (kind !== undefined && run.length >= MIN_RUN) out.push(buildChunkRow(kind, run))
+    else out.push(...(run as unknown as StorageRecord[]))
+    kind = undefined
+    run = []
+  }
+  for (const event of events) {
+    const k = classifyDelta(event)
+    if (k === undefined) {
+      flush()
+      out.push(event)
+      continue
+    }
+    const delta = event as unknown as LegacyChunkEvent
+    const last = run[run.length - 1]
+    if (k === kind && last !== undefined && continuesDelta(last, delta, k)) {
+      run.push(delta)
+      continue
+    }
+    flush()
+    kind = k
+    run = [delta]
+  }
+  flush()
+  return out
+}
+
+/** Bind one v20 storage record; packed chunk rows carry the `is_packed` flag the scalar codec retired at schema 21. */
+function bindV20Record(record: StorageRecord): BoundRecord {
+  if (!isChunkRow(record)) return bindRecord(record)
+  return {
+    seq: record.seq0,
+    type: record.type,
+    time: record.time0,
+    data: JSON.stringify(record.data),
+    sourceEventSeqs: null,
+    surfaceOp: null,
+    isPacked: 1,
+    ignorable: null,
+  }
+}
 
 /** One logical session extracted from either physical schema. */
 export interface LogicalSession {
@@ -354,8 +519,8 @@ function writeV20(path: string, sessions: readonly LogicalSession[], storeId: st
         header.delegationDepth ?? null, header.agentPreset ?? null,
         session.incarnation, session.revision)
       insertDraft.run(header.draft === true ? 1 : 0, header.id)
-      for (const record of packChunkRuns(session.events) as unknown as SqliteStorageRecord[]) {
-        const bound = bindRecord(record)
+      for (const record of packV20ChunkRuns(session.events)) {
+        const bound = bindV20Record(record)
         insertEvent.run(bound.seq, bound.type, bound.time, bound.data, bound.sourceEventSeqs,
           bound.surfaceOp, bound.isPacked, header.id)
         if (bound.ignorable === 1) insertIgnorable.run(bound.seq, header.id)

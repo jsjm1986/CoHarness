@@ -43,6 +43,8 @@ import type { AdmittedPromptContentPart } from '@deepseek-ai/dsh-attachment'
 import { collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority, CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   catalogView, rejectCatalogRead, rejectPrompt, validateControlRequest,
@@ -192,13 +194,20 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Continuable-subagent residency limits. */
+/** Host configuration for continuable subagent capacity. */
 export interface Config {
+  /** Maximum live children sharing uninterrupted continuable parent links; defaults to 8. */
+  maxActiveSubagents?: number
+  /** Default delegation depth for tools without an explicit limit; defaults to 1. */
+  maxDepth?: number
   /** Maximum resident or materializing continuable Activations in this runtime. */
   maxContinuableActivations?: number
   /** Maximum resident or materializing continuable Activations with one direct parent. */
   maxContinuableActivationsPerParent?: number
 }
+
+/** Settings namespace holding the editable continuable-capacity section. */
+export const SUBAGENT_SETTINGS_NAMESPACE = brandString<SettingsNamespace>('subagent')
 
 /** Default process-wide continuable Activation retention. */
 export const DEFAULT_MAX_CONTINUABLE_ACTIVATIONS = 128
@@ -214,7 +223,7 @@ function positiveLimit(value: number | undefined, fallback: number, label: strin
 }
 
 /**
- * Provenance attached to one browser prompt's durable user message. The Host
+ * Source descriptor attached to one browser prompt's durable user message. The Host
  * declares the `user-rpc` message source and depends on this package, so the
  * exact accepted record is described here and the correlation id rides the
  * durable message the Client reconciles its optimistic prompt against.
@@ -230,11 +239,15 @@ interface BrowserPromptSource {
 /** Named provider registry with one-shot runs, durable discovery, and continuable-child operations. */
 export class SubagentRuntime extends TypertRemoteService {
   static Config: z<Config> = z.object({
+    maxDepth: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(1),
+    maxActiveSubagents: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(8),
     maxContinuableActivations: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS),
     maxContinuableActivationsPerParent: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT),
   })
+
+  private settingsSource: () => Config
 
   private providers = new Map<string, SubagentProvider>()
   private continuations: SubagentContinuationManager | undefined
@@ -247,24 +260,35 @@ export class SubagentRuntime extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'subagents')
-    const limits = {
-      maxActivations: positiveLimit(
-        config.maxContinuableActivations,
-        DEFAULT_MAX_CONTINUABLE_ACTIVATIONS,
-        'maxContinuableActivations',
-      ),
-      maxActivationsPerParent: positiveLimit(
-        config.maxContinuableActivationsPerParent,
-        DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT,
-        'maxContinuableActivationsPerParent',
-      ),
-    }
+    assertSubagentMaxDepth(config.maxDepth)
+    positiveLimit(
+      config.maxContinuableActivations,
+      DEFAULT_MAX_CONTINUABLE_ACTIVATIONS,
+      'maxContinuableActivations',
+    )
+    positiveLimit(
+      config.maxContinuableActivationsPerParent,
+      DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT,
+      'maxContinuableActivationsPerParent',
+    )
+    this.settingsSource = () => config
+    ctx.inject(['settings'], (settingsCtx) => {
+      settingsCtx.settings.installSection(ctx, SUBAGENT_SETTINGS_NAMESPACE, SubagentRuntime.Config, config, {
+        validate: (value) => { assertSubagentMaxDepth(value.maxDepth) },
+        setSource: (source) => { this.settingsSource = source },
+        onChange: () => {},
+      })
+    })
     this.emitLifecycle = createLifecycleEmitter(this.ctx, parent => scopeTarget(this, parent))
     ctx.inject(['agents'], (childCtx: Context) => {
+      const resolved = (): Required<Config> => this.settingsSource() as Required<Config>
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
         observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
-      }, limits)
+      }, () => ({
+        maxActivations: resolved().maxContinuableActivations,
+        maxActivationsPerParent: resolved().maxContinuableActivationsPerParent,
+      }), () => resolved().maxActiveSubagents)
       this.continuations = manager
       childCtx.effect(() => () => {
         /* v8 ignore else -- one injected binding owns the slot until its fiber disposes. */
@@ -276,6 +300,16 @@ export class SubagentRuntime extends TypertRemoteService {
       projectionCtx.sessionProjections.register(subagentIdentityProjectionDefinition)
       projectionCtx.sessionProjections.register(subagentCatalogProjectionDefinition)
     })
+  }
+
+  /**
+   * Resolve a delegation tool's depth policy against the current user setting.
+   * @param configured - Explicit tool limit, or provider-managed for external delegation.
+   * @returns The numeric limit, or undefined when the provider owns depth enforcement.
+   */
+  resolveMaxDepth(configured?: number | 'provider-managed'): number | undefined {
+    if (configured === 'provider-managed') return undefined
+    return configured ?? (this.settingsSource() as Required<Config>).maxDepth
   }
 
   /**
@@ -316,12 +350,12 @@ export class SubagentRuntime extends TypertRemoteService {
 
   /**
    * Deliver one host-protocol message to a direct continuable child.
-   * Symbol-keyed so host adapters can preserve their own provenance without
+   * Symbol-keyed so host adapters can preserve their own source descriptors without
    * widening the public Service Definition or impersonating an Agent sender.
    * @param parent - exact live direct parent authorizing delivery.
    * @param childId - durable direct-child session id.
    * @param content - host-authored content to deliver.
-   * @param source - durable host-protocol provenance.
+   * @param source - durable host-protocol source descriptor.
    * @param signal - caller cancellation before inbox acceptance.
    * @param delivery - Queue as a distinct turn or Steer at the nearest step.
    * @returns the accepted message's inbox id.
@@ -479,6 +513,7 @@ export class SubagentRuntime extends TypertRemoteService {
    * the Agent loop's best-effort fallback semantics. Image parts are admitted
    * and persisted through the attachment store before delivery, and the
    * child's model must accept image input.
+   * Cold resume at capacity rejects with `subagent/delivery-unavailable`.
    * @param request - durable address, delivery, minted identity, content, and optional browser zone.
    * @param signal - carrier cancellation, owning the call until inbox acceptance.
    * @returns the accepted message's inbox identity.

@@ -26,6 +26,7 @@ import {
   type ConversationArchiveAdminFilter,
   type ConversationArchiveState,
 } from './postgres/conversation-archive-service.ts'
+import { DesktopCoordinationError } from './desktop-coordinator.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -89,6 +90,11 @@ function mapError(error: unknown): { status: number; error: string } {
   }
   if (error instanceof CollaborationDeniedError && error.code === 'visibility-locked') {
     return { status: 409, error: error.code }
+  }
+  if (error instanceof DesktopCoordinationError) {
+    const status = error.code === 'not-found' ? 404 : error.code === 'forbidden' ? 403
+      : error.code === 'queue-full' ? 429 : 409
+    return { status, error: `desktop-${error.code}` }
   }
   if (error instanceof Error && (error.message === 'owner-protected' || error.message === 'owner-must-be-rw')) {
     return { status: 409, error: error.message }
@@ -315,6 +321,50 @@ async function dispatch(
     await write(`admin.archives.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
     sendJson(res, 200, { action, results })
     return true
+  }
+
+  if (pathname === '/admin/api/desktops' && method === 'GET') {
+    if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
+    sendJson(res, 200, { resources: await deps.desktops.listResources() })
+    return true
+  }
+
+  if (pathname === '/admin/api/desktops/detail' && method === 'GET') {
+    if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+    const node = query.get('node')
+    const desktop = query.get('desktop')
+    if (node === null || node === '' || desktop === null || desktop === '') {
+      sendError(res, 400, 'invalid desktop detail request'); return true
+    }
+    sendJson(res, 200, await deps.desktops.snapshot({ node, desktop }))
+    return true
+  }
+
+  if (pathname === '/admin/api/desktops/actions' && method === 'POST') {
+    if (deps.desktops === undefined) { sendError(res, 503, 'desktop-coordination-unavailable'); return true }
+    const input = parseObject(body)
+    const action = input.action
+    if (action === 'revoke') {
+      const grantId = input.grantId
+      if (typeof grantId !== 'string' || grantId === '') { sendError(res, 400, 'invalid desktop revoke'); return true }
+      await deps.desktops.revoke(grantId, { userId: admin.id })
+      await write('admin.desktops.revoke', { grantId })
+      sendJson(res, 200, { action, ok: true })
+      return true
+    }
+    if (action === 'clear') {
+      const node = input.node
+      const desktop = input.desktop
+      if (typeof node !== 'string' || node === '' || typeof desktop !== 'string' || desktop === '') {
+        sendError(res, 400, 'invalid desktop clear'); return true
+      }
+      await deps.desktops.clearUnavailable({ node, desktop }, { userId: admin.id })
+      await write('admin.desktops.clear', { node, desktop })
+      sendJson(res, 200, { action, ok: true })
+      return true
+    }
+    sendError(res, 400, 'invalid desktop action'); return true
   }
 
   if (pathname === '/admin/api/documents' && method === 'GET') {

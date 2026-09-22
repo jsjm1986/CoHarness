@@ -13,14 +13,13 @@
 
 import { deriveEventMessage, validateSurfaceMetadata } from '@deepseek-ai/dsh-session'
 import type { SessionSeq, SurfaceEvent } from '@deepseek-ai/dsh-session'
-import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { ContentBlock, ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import type { TokenSurfaceNode } from './types.ts'
 import { estimateMessage, estimateStructuralBlock } from './estimate.ts'
 
 /** Internal image facts retained beside a heuristic surface node. */
 export interface SurfaceImageFacts {
-  readonly images: readonly ImageAttachmentRef[]
+  readonly images: readonly ImageBlock[]
   readonly imageFreeTokens: number
 }
 
@@ -35,11 +34,11 @@ export function surfaceImageFacts(node: TokenSurfaceNode): SurfaceImageFacts | u
   return imageFacts.get(node)
 }
 
-function collectImageFacts(blocks: readonly ContentBlock[], images: ImageAttachmentRef[]): number {
+function collectImageFacts(blocks: readonly ContentBlock[], images: ImageBlock[]): number {
   let structural = 0
   for (const block of blocks) {
     if (block.type === 'image') {
-      images.push(block.attachment)
+      images.push(block)
       structural += estimateStructuralBlock(block)
     } else if (block.type === 'tool-result') {
       structural += collectImageFacts(block.content, images)
@@ -51,7 +50,7 @@ function collectImageFacts(blocks: readonly ContentBlock[], images: ImageAttachm
 function makeNode(seq: SessionSeq, message: Message | null, tokens: number): TokenSurfaceNode {
   const node: TokenSurfaceNode = { seq, tokens, heuristicTokens: tokens }
   if (message !== null) {
-    const images: ImageAttachmentRef[] = []
+    const images: ImageBlock[] = []
     const imageStructural = collectImageFacts(message.content, images)
     if (images.length > 0) imageFacts.set(node, {
       images,

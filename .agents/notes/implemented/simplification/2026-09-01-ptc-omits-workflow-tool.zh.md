@@ -12,7 +12,7 @@ Web 端随附的 `ptc` preset 会通过生成的 SDK 提供通用 `workflow` 工
 
 Web 端随附的 `ptc` preset 禁用自身的 `tool-workflow` 配置项。因此，它生成的 PTC mode SDK 不包含 `workflow` 绑定，模型可见的协议约定仍然只有一个 `run_code` 工具。
 
-preset 在隔离的 workflow realm 中保留 `workflow-worker-thread`，因为 `tool-ralph` 使用同一个引擎。PTC mode SDK 继续提供 `ralph`。标准模式与创造模式继续提供 `workflow`，用户自定义 preset 也可以显式挂载该工具。
+preset 在隔离的 workflow realm 中保留 `workflow-ptc`，因为 `tool-ralph` 使用同一个引擎。PTC mode SDK 继续提供 `ralph`。标准模式与创造模式继续提供 `workflow`，用户自定义 preset 也可以显式挂载该工具。
 
 workflow 包及其持久 Session 事件类型仍然随产品安装。现有 workflow 记录继续正常渲染；这次默认组合变更只会阻止使用随附 `ptc` preset 的 agent 发起新的顶层 workflow 调用。
 

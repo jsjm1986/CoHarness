@@ -6,6 +6,10 @@ Local filesystem provider for the `ctx.skills` registry.
 
 This package implements one skill source. It scans local project, custom, and user skill roots, parses `SKILL.md` or flat Markdown skill files, and registers the provider on `ctx.skills`. The registry remains in `@deepseek-ai/dsh-skill`; the durable session catalogs and model-facing loader tool remain in `@deepseek-ai/dsh-tool-skill`.
 
+## Summary
+
+Agents can use local skills from the repository, a custom directory, or the user's agent configuration: author a skill as a directory bundle with a `SKILL.md` or a flat `<name>.md` file under any scanned root, and it appears in the session catalog. The provider discovers the project, custom, and user roots, parses each skill's YAML frontmatter, and watches the directories, so new, renamed, or deleted skills reach agents without a restart. Choose it when skills live on disk — the registry (`dsh-skill`) accepts any provider, and another provider can supply skills from elsewhere.
+
 ## Plugin
 
 Requires `ctx.skills` (`inject: ['skills']`).
@@ -57,6 +61,10 @@ Skills can be single-level directory bundles (`<name>/SKILL.md`) or flat Markdow
 The two invocation fields accept YAML booleans and the case-insensitive forms `true`/`false`, `yes`/`no`, `on`/`off`, and `1`/`0`. `disable-model-invocation: true` excludes the skill from model-facing catalogs and loaders; `user-invocable: false` excludes it from human-facing commands. Each omitted field defaults to permitting its surface, and the provider always emits both positive internal policy values, including when both keys are absent. A rejected camel-case spelling or a non-boolean invocation value drops the entire skill from discovery with a warning instead of discarding only that field or falling back to a permissive default. Invocation policy fails closed because ignoring invalid data could expose a skill on a disabled surface; wrong-typed optional `whenToUse` and `metadata` values are omitted because neither currently grants invocation.
 
 The catalog and body have separate lifecycles. Discovery parses frontmatter to produce the summary. Every `skill(name)` load rereads and reparses the current file, so body edits need no hash, revision, cache invalidation, or proactive model notification. A frontmatter rename between discovery and loading rejects the stale name and invalidates the provider; the next catalog observation publishes the new name.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Skills are discovered from the filesystem, which remains the only catalog authority; the provider keeps no second index to compare.
 
 ## Model Experience
 

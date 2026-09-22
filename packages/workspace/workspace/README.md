@@ -6,6 +6,10 @@ Workspace entity registry (`ctx.workspaceRegistry`) for the DeepSeek Harness: du
 
 The entity/storage rationale lives in the [domain Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); header-only bootstrap and GUI ordering live in the [Workspace UI product-flow Agent Note](../../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md).
 
+## Summary
+
+Use this package to keep an ordered, persistent list of project directories and the sessions run in each directory. Hosts can build project sidebars, hide sessions from grouping without deleting their histories, and remove projects without deleting folders, files, or sessions. Re-adding a removed directory creates a fresh project, while sessions whose directories cannot be validated remain ungrouped. Choose it for GUI or host workflows that need durable project grouping; it is invisible to models and adds no prompt or request-context cost, but requires session persistence and storage backends.
+
 ## Shape
 
 - `ctx.workspaceRegistry.create(path, title?)` — canonicalizes `path` via `fs.realpath`, rejects a nonexistent or non-directory path, creates at most one record per canonical path, and prepends a new record to durable workspace order. Repeated calls for that path return the existing workspace without changing its title; different paths may share a display title.

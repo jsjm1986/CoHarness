@@ -1,25 +1,13 @@
 /**
- * The `Branded<B>` / `BrandedNumber<B>` nominal-typing primitives — a type-only
- * utility (no runtime code, no harness-package dependency) shared by every
- * package that owns a cross-boundary id or ordinal.
+ * Duplicate-install-safe nominal primitive helpers.
  *
  * A brand makes structurally identical strings or numbers non-interchangeable
- * at the type level: a `SessionId` cannot be passed where a `CallId` is
- * expected, and an event sequence (`SessionSeq`) cannot be passed as a log
- * offset (`SessionLogOffset`), even though both are plain primitives at
- * runtime. Construction goes through a per-brand factory in the OWNING package
- * (a plain cast inside — zero runtime cost); comparison, logging, and
- * serialization retain the underlying primitive behavior.
+ * at the type level: a `SessionId` cannot be passed where a `ToolCallId` is
+ * expected, and an event sequence cannot be passed as a log offset. Comparison,
+ * logging, and serialization retain the underlying primitive behavior.
  *
- * Policy: a package brands the values it owns — `CallId` in dsh-llm (tool-call
- * correlation), the shared agent/session `SessionId` plus the `SessionSeq` /
- * `SessionLogOffset` ordinals in dsh-session, and `JobId` in dsh-jobs. Branding
- * is for values that cross package boundaries and could plausibly be confused;
- * not every string or number needs a brand.
- * This package owns ONLY the primitives — no concrete id, no runtime code beyond
- * the (erased) types — so the brand vocabulary stays dependency-free and a
- * package can brand its values without depending on an unrelated capability
- * package.
+ * This package owns no concrete domain value and keeps no runtime identity or mutable
+ * state, so independently installed copies produce interchangeable values.
  *
  * @module @deepseek-ai/dsh-brand
  */
@@ -31,3 +19,21 @@ export type Branded<B extends string> = string & { readonly [BRAND]: B }
 
 /** A number carrying a compile-time-only brand `B`. */
 export type BrandedNumber<B extends string> = number & { readonly [BRAND]: B }
+
+/**
+ * Apply a compile-time string brand without changing the value.
+ * @param value - string admitted by the domain that owns the target brand.
+ * @returns the same string with the requested compile-time brand.
+ */
+export function brandString<T extends Branded<string>>(value: string | T): T {
+  return value as T
+}
+
+/**
+ * Apply a compile-time number brand without changing the value.
+ * @param value - number admitted by the domain that owns the target brand.
+ * @returns the same number with the requested compile-time brand.
+ */
+export function brandNumber<T extends BrandedNumber<string>>(value: number | T): T {
+  return value as T
+}

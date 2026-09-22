@@ -186,7 +186,7 @@ PascalCase 标识符中的首字母缩略词使用首字母大写格式：`Ui`�
 | `@deepseek-ai/dsh-tool-schedule`、`schedule/tool-schedule/`、插件 `tool-schedule` | `@deepseek-ai/dsh-schedule`、`schedule/schedule/`、插件 `schedule` | 该包拥有持久 Schedule 领域、持久化屏障、管理工具、定时器、后续轮次和运行时生命周期。`tool-` 只描述其中一部分。 |
 | `ScheduleOwner` | `ScheduleRuntime` | 该逐 agent 对象运行实时定时器、持久化投影、分派、空闲等待和资源释放。`Owner` 没有说明这一执行职责。耦合的私有 `owner*` 名称也改用 `runtime*`。 |
 | `WorkflowService`, `ctx.workflows` | `WorkflowEngine`, `ctx.workflowEngine` | 一个引擎负责解析并执行工作流程序。复数键错误地暗示这是注册表。保留 `@deepseek-ai/dsh-workflow` 以及工作流事件和工具。 |
-| `@deepseek-ai/dsh-workflow-workerthread`, `WorkerWorkflowEngine` | `@deepseek-ai/dsh-workflow-worker-thread`, `WorkerThreadWorkflowEngine` | `worker thread` 是准确的 Node 机制，仓库拼写要求使用完整单词。 |
+| `@deepseek-ai/dsh-workflow-workerthread`, `WorkerWorkflowEngine` | `@deepseek-ai/dsh-workflow-ptc`, `WorkerThreadWorkflowEngine` | `worker thread` 是准确的 Node 机制，仓库拼写要求使用完整单词。 |
 | `@deepseek-ai/dsh-goal-session`, `goal/goal-session/` | `@deepseek-ai/dsh-goal-round-driver`, `goal/goal-round-driver/` | 该插件驱动同一会话内的 Goal Rounds。它既不存储目标，也不定义会话。保留 `GoalService`、目标来源、事件和约定。 |
 | `packages/compact/` | `packages/compaction/` | 该组是以名词命名的领域系列。`compact` 仍作为面向用户的命令动词。 |
 | `@deepseek-ai/dsh-compact`, `ctx.compact`, `CompactService` | `@deepseek-ai/dsh-compaction`, `ctx.compaction`, `CompactionEngine` | 该对象运行压缩（compaction）算法和生命周期。它是引擎，而不是通用服务。 |
@@ -224,7 +224,7 @@ PascalCase 标识符中的首字母缩略词使用首字母大写格式：`Ui`�
 | `SessionPersistenceSqlite` | `SqliteSessionPersistence` | 采用与 JSONL 相同的提供方命名顺序。 |
 | `@deepseek-ai/dsh-session-title-first-message-llm`，触发周期 `first-message` | `@deepseek-ai/dsh-session-title-first-prompt-llm`，触发周期 `first-prompt` | 触发条件是第一条用户提示词，而不是会话日志中的任意消息。 |
 | `@deepseek-ai/dsh-session-title-all-messages-llm`，触发周期 `all-user-messages` | `@deepseek-ai/dsh-session-title-all-prompts-llm`，触发周期 `all-prompts` | 后端根据用户提示词刷新。`all messages` 会错误地包含助手消息和工具事件。 |
-| `@deepseek-ai/dsh-code-runtime-worker`, `WorkerCodeRuntime` | `@deepseek-ai/dsh-code-runtime-worker-thread`, `WorkerThreadCodeRuntime` | 该实现使用 Node 工作线程。单独的 `worker` 作用域过宽。 |
+| `@deepseek-ai/dsh-ptc-runtime-worker`, `WorkerCodeRuntime` | `@deepseek-ai/dsh-ptc-runtime-node`, `WorkerThreadCodeRuntime` | 该实现使用 Node 工作线程。单独的 `worker` 作用域过宽。 |
 | `SubprocessService` | `SubprocessRuntime` | 该服务拥有实时子进程的执行和生命周期。保留其包和键。 |
 | `LocalSubprocessService` | `LocalSubprocessRuntime` | 该提供方运行同主机进程和进程树。 |
 | `E2BSubprocessService` | `E2BSubprocessRuntime` | 该提供方在 E2B 运行时中运行子进程。 |

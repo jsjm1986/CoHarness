@@ -4,6 +4,13 @@
 
 `dsh-schedule` 为未来创建的 live 根 agent（智能体）提供 3 个会话范围内的工具，用于管理持久提醒。版本 1 接受正的安全整数 `after_seconds` 延时、显式绝对时间 `at` 目标，以及至少 5 分钟的固定速率 `every_seconds` 间隔。会话事件日志拥有提醒状态；timer、工具值和模型 follow-up 都是该日志的可丢弃投影。
 
+<a id="composition"></a>
+
+
+## 概述
+
+Schedule 让你向模型请求持久提醒；提醒会作为普通 follow-up 消息返回同一会话。你可以创建延时或绝对时间的一次性提醒、按固定间隔重复提醒、列出待处理提醒，也可以取消提醒。提醒在重启后仍然存在，但交付需要 live 根 agent（智能体）：已关闭的会话会让提醒保持逾期，直到恢复。交付绝不会使用电子邮件、短信、推送或浏览器通知。启用 Schedule overlay 即可提供提醒工具和活动提醒目录；侧边栏闹钟只是已知活动提醒的尽力而为指示，不证明提醒交付当前正在运行。
+
 ## 组合
 
 请在 `ctx.sessions`、`ctx.agents`、`ctx.tools`、`ctx.sessionPersistence`，以及实现 Session flush 的持久化监听器之后加载此函数插件。静态注入会使缺少持久化服务的组合直接失败。此插件只监听后续的 `agent/created` 事件，在运行时根 agent 上安装，并通过完全相同的 `agent.ctx` 注册所有工具。插件加载时已经存在的 agent 与运行时子 agent 不会获得 Schedule。
@@ -50,23 +57,23 @@ framing 构造或同步 follow-up 失败不会写入 dispatch。追加失败会�
 
 ### 范围限定的管理工具
 
-#### 模型看到的内容
+#### 模型看到什么
 
-只有在此插件加载后创建的 live 根 agent 中，模型才会看到 3 个生成的工具 schema。工具结果包含上文所述的规范 JSON 值。
+只有在此插件加载后创建的 live 根 agent 中，模型才会看到三个生成的工具 schema；[生成的工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-schedule)拥有精确的参数与结果 schema。工具结果包含上文所述的规范 JSON 值。
 
 #### Token 影响
 
-安装 Schedule 后，范围限定的 schema 会增加固定的请求前缀。每次执行工具都会经由普通工具结果流水线添加与数据相关的 JSON 结果；此包不增加私有截断或 token 预算。
+安装 Schedule 后，范围限定的 schema 会增加固定的请求前缀。每次执行工具都会经由普通工具结果流水线添加与数据相关的 JSON 结果；本包不增加私有截断或 token 预算。
 
 #### KV Cache 影响
 
-3 个 schema 的定义与范围不变时，前缀保持稳定。工具调用和结果会追加到后续历史中，并保留已经可以复用的前缀。
+三个 schema 的定义与范围不变时，前缀保持稳定。工具调用和结果会追加到后续历史中，并保留已经可以复用的前缀。
 
 ### 到期提醒 follow-up
 
-#### 模型看到的内容
+#### 模型看到什么
 
-对于每条获得准入且已到期的一次性提醒，此包会将以下稳定的用户角色 framing 入队，并对动态值进行 JSON 转义：
+对于每条获得准入且已到期的一次性提醒，本包会将以下稳定的用户角色 framing 入队，并对动态值进行 JSON 转义：
 
 ##### 提醒 framing
 
@@ -88,9 +95,9 @@ reminder_prompt_json: <JSON.stringify(prompt)>
 
 ### 到期固定速率批次
 
-#### 模型看到的内容
+#### 模型看到什么
 
-当一条或多条 Every 记录逾期时，此包会排入一条稳定的用户角色 framing。`reminders_json` 是一个按目标时间和创建顺序排列的 JSON 数组；每个对象都包含 `schedule_id`、选中的最新 `occurrence_at`，以及创建时提供的 `reminder_prompt`：
+当一条或多条 Every 记录逾期时，本包会排入一条稳定的用户角色 framing。`reminders_json` 是一个按目标时间和创建顺序排列的 JSON 数组；每个对象都包含 `schedule_id`、选中的最新 `occurrence_at`，以及创建时提供的 `reminder_prompt`：
 
 ##### 固定速率批次 framing
 
@@ -102,7 +109,7 @@ reminders_json: <JSON.stringify(reminders)>
 
 #### Token 影响
 
-无论有多少条不同的 Every 记录到期，每个获得准入的固定速率批次只会增加一条与数据相关的用户角色消息。该消息保留在会话历史中，并持续贡献 token，直到普通压缩移除或替换这段历史。
+无论有多少条不同的 Every 记录到期，每个获得准入的固定速率批次只会增加一条与数据相关的用户角色消息。该消息保留在会话历史中，并持续贡献 token，直到普通压缩（compaction）移除或替换这段历史。
 
 #### KV Cache 影响
 

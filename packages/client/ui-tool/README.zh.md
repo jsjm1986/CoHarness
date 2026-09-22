@@ -6,6 +6,10 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 业务 UI 包只注册 wire 工具名称和原子视图，不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑。运行时仍对 call/result 配对、生命周期和递归 `subCalls` 投影拥有最终决定权；conversation view 仍对 ChatFlow 位置拥有最终决定权。
 
+## 概述
+
+`dsh-client-ui-tool` 是 dsh Web 客户端的 Client 工具展示插件：它渲染对话中的每一次工具调用。`ui-conversation` 通过 `conversation.chat.node` 的匹配 key 分发每个已排序的 `tool-call` Conversation Node；本包渲染其中的 root 及其 PTC dispatch 子调用，并把每个原子调用通过 keyed slot `tool.call.toolview` 分发。没有注册的工具名称使用通用卡片。业务 UI 包只注册 wire 工具名称和原子视图——它们不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑，因为运行时仍对 call/result 配对、生命周期与递归 `subCalls` 投影拥有最终决定权。
+
 ## 渲染约定
 
 `ToolCallTree` 接收一个已经包含递归 `subCalls` 的 root `ToolCallBlock`、selection 状态、会话 `cwd`，以及用于打开文件和检查调用的 Host 回调。它递归遍历标准调用块，让 root 与任意深度的 child 经过同一条原子分发路径，不订阅独立的 parent-to-children map。
@@ -15,6 +19,8 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 本包还通过 `ToolDetails` 填充 `conversation.details.tool`。行 renderer 与详情 renderer 共用同一组面向 `terminal`、`read`、`diff`、`search` 和 `web` render intent 的纯 card model。已完成的 ask-user 调用使用经过校验、可读的问题／回答卡片；混合或格式错误的结果块会回退为完整的通用输出。未知的 intent 标签和格式错误的 wire card 数据都会回退为压平的工具结果文本。
 
 通用行把已知工具名称归类为 search、read、shell、write、edit、code 或 generic 变体。运行中、成功、失败和中断状态只来自冻结的 call/result slice。只有用户调用 Host 打开文件回调时，文件路径才相对会话 `cwd` 解析；展示代码不读取会话服务。
+
+携带 `AUTO_REVIEW_DENIED` 的原生或 PTC 分发失败优先于 keyed 专用视图：通用行在折叠摘要中标识 Auto review，省略从未执行的参数，展开后显示一条归一化的未执行原因——去除首尾空白并把行分隔符折叠为空格，缺失或全空白时使用本地化回退文案。Session 与 SDK 中的结构化错误仍保留原始 reason。
 
 通用行保留原始参数载荷，只在用户展开可展开行时格式化。这样大体积的文件修改或代码参数不会在折叠列表构造期间产生额外格式化副本，展开后的正文仍保持原有格式。
 
@@ -36,13 +42,17 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、冻结的 `block`
 
 各类卡片的上限与 fallback 规则仍由对应的 [terminal](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.zh.md)、[diff](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.zh.md)、[read](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.zh.md)、[search](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.zh.md) 和 [web](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.zh.md) Agent Note 负责。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。调用/结果配对、生命周期与 `subCalls` 投影在 Runtime 中保持权威；本包渲染分发的块并注册工具视图 slot。
+
 ## 模型体验
 
-无，因为本包只渲染已经记录的工具调用和结果，不改变模型请求、工具执行或会话事件。
+无。该包是浏览器端工具展示层，只渲染已记录的工具调用，不改变模型上下文。
 
 #### KV Cache 影响
 
-无。本包只负责 Client 展示。
+无；该包既不组装也不发送提供方请求。
 
 ## 已知限制与后续工作
 

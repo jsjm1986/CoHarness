@@ -32,7 +32,9 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [subprocess.md](subprocess.md) | the subprocess seam: fully-explicit `SubprocessSpawnSpec`, offset-based output readers, unclassified `SubprocessOutcome`, and the managed `DSH_*` environment vocabulary |
 | [terminal.md](terminal.md) | persistent terminal ids, backend/session contracts, send readiness, bounded reads, and owner-visible snapshots |
 | [sandbox.md](sandbox.md) | per-session policy resolution and the process-confinement seam: file-effect modes, execution/provider policies, `ConfinedArgv`, enforcement and fail-closed errors |
-| [code-runtime.md](code-runtime.md) | the code-execution seam: `CodeRunRequest`/`Result`, binding namespaces, captured logs, the `CodeRunFailure` taxonomy |
+| [ptc-runtime.md](ptc-runtime.md) | the code-execution seam: `PtcRunRequest`/`Result`, binding namespaces, captured logs, the `PtcRunFailure` taxonomy |
+| [computer-use.md](computer-use.md) | exclusive named computer-use provider registration and Cua Driver integration choices |
+| [browser-use.md](browser-use.md) | exclusive named browser-use registration, provider choices, and per-Session browser ownership |
 | [extensions.md](extensions.md) | versioned dynamic Cordis Plugins and Packages, Host/Client activation, approval, runtime inspection, and lifecycle teardown |
 | [filesystem.md](filesystem.md) | the filesystem seam: `FsTarget`, read/write/edit outcomes, observed-file state, `FsErrorCode` |
 | [lsp.md](lsp.md) | the LSP navigation seam: `LspQueryRequest`/`Result`, `LspProvider`/`Service`, four operations, `LspError` |
@@ -51,7 +53,12 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |
 | [workspace.md](workspace.md) | the workspace registry: `Workspace`/`WorkspaceId`, registration and resolution, the session `cwd` relationship |
 | [client-modules.md](client-modules.md) | the web plugin table: `dsh.client` declarations, `WebBootGraph` wire composition, the bundle route and index tap |
+| [web-client.md](web-client.md) | the browser Cordis application: its four foundations (Client Modules, API Gateway, Slots, Conversation) and where Client models and feature packages belong |
+| [slots.md](slots.md) | the Web Client's typed React composition system: `ctx.slots.register()`, the React-free registry and type algebra, and the renderer's observable-source bindings |
+| [conversation.md](conversation.md) | the target-neutral assembly layer between a Client Session event window and browser views: per-binding registries, Turn/Step locations, and incremental Context assembly |
 | [session-projection.md](session-projection.md) | the projection seam: `SessionProjectionMap`, the pure `ProjectionDefinition` unit, `ProjectionSnapshot`'s consistent cut, the change feed |
 | [session-telemetry.md](session-telemetry.md) | the outbound session-reporting capability seam: `SessionTelemetryRecord`/`SessionTelemetrySeverity`, the `SessionTelemetrySink` contract, and the `session-telemetry/record` redact waterfall |
+| [boot.md](boot.md) | current-profile plugin management and launcher reload coordination |
+| [mcp.md](mcp.md) | external MCP connections, scoped tools and resources, server instructions, protocol results, and configuration ownership |
 
 > Type declarations and their JSDoc on these pages are source-equivalent and drift-checked by `pnpm run verify-type-equiv` (see [development.md](../development.md#documenting-types-verbatim-ts-type-equiv)). Ordinary blocks preserve complete declarations; `public-api` blocks preserve body-stripped public class declarations. Cordis services and events use each page's generated **Cordis API** section.

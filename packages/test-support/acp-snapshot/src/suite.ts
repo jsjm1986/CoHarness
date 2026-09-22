@@ -59,8 +59,6 @@ const WINDOWS_STDOUT_SNAPSHOT = 'stdout.expected.windows.jsonl'
 /** Stable session-log token standing in for the sidecar's initial schemas. */
 const TOOLS_TOKEN = '{{tools}}'
 
-const PACKED_CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
-
 /** Canonical UUID spelling minted for ordinary message identities. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -94,8 +92,8 @@ export interface Scenario {
    * guard requires the sidecar exactly when this is set: the harness forwards
    * the file purely on existence, so an unregistered stray sidecar would
    * silently alter the derived script. The guard fails loud on either
-   * mismatch. Defaults to false (replay derives from the fixture's
-   * `assistant/chunk` events).
+   * mismatch. Defaults to false (replay derives from the fixture's durable
+   * assistant events).
    */
   overridden?: boolean
   /**
@@ -388,15 +386,25 @@ export function fixtureContext(fixture: string): NormalizeContext {
  * @returns The normalized `data.header` payloads, in log order.
  */
 export function normalizedHeaders(rawLog: string, ctx: NormalizeContext): unknown[] {
+  return normalizedHeaderEvents(rawLog, ctx).map(event => event.header)
+}
+
+interface NormalizedHeaderEvent {
+  readonly header: unknown
+  readonly reason: unknown
+}
+
+/** Normalize request-header payloads while retaining the reason that selects a pin revision. */
+function normalizedHeaderEvents(rawLog: string, ctx: NormalizeContext): NormalizedHeaderEvent[] {
   const records = normalizeSessionLog(rawLog, ctx)
     .split('\n')
     .filter(line => line.trim().length > 0)
     .map(line => JSON.parse(line) as {
       type?: unknown
-      data?: { header?: unknown; message?: { content?: unknown[] } }
+      data?: { header?: unknown; reason?: unknown; message?: { content?: unknown[] } }
     })
   let lastSystem: string | undefined
-  const headers: unknown[] = []
+  const events: NormalizedHeaderEvent[] = []
   for (const record of records) {
     if (record.type === 'system/message') {
       const content = record.data?.message?.content
@@ -412,15 +420,36 @@ export function normalizedHeaders(rawLog: string, ctx: NormalizeContext): unknow
     }
     if (record.type !== 'request/header') continue
     const header = record.data?.header
-    if (lastSystem !== undefined && header !== null && typeof header === 'object') {
-      const withSystem = { ...(header as Record<string, unknown>) }
-      if (!Object.hasOwn(withSystem, 'system')) withSystem.system = lastSystem
-      headers.push(withSystem)
-    } else {
-      headers.push(header)
-    }
+    events.push({
+      header: lastSystem !== undefined && header !== null && typeof header === 'object'
+        && !Object.hasOwn(header, 'system')
+        ? { ...(header as Record<string, unknown>), system: lastSystem }
+        : header,
+      reason: record.data?.reason,
+    })
   }
-  return headers
+  return events
+}
+
+/**
+ * Header revisions that own sidecar content. `series` reuses the current
+ * revision, while `resume` owns sidecars because its full snapshot may drift
+ * across the process boundary. Pinning fixtures therefore cover one loop
+ * instance; a mid-log `resume` fails their pin-count invariant.
+ */
+function pinningHeaderPayloads(rawLog: string, ctx: NormalizeContext): unknown[] {
+  return normalizedHeaderEvents(rawLog, ctx)
+    .filter(event => event.reason !== 'series')
+    .map(event => event.header)
+}
+
+/** Extract every array-valued tool catalog from a normalized header sequence. */
+function toolSchemasFrom(headers: readonly unknown[]): unknown[][] {
+  return headers.flatMap((header) => {
+    if (header === null || typeof header !== 'object') return []
+    const tools = (header as { tools?: unknown }).tools
+    return Array.isArray(tools) ? [tools] : []
+  })
 }
 
 /**
@@ -450,11 +479,7 @@ export function normalizedSystemPrompts(rawLog: string, ctx: NormalizeContext): 
  * @returns The normalized initial tool-schema arrays, in header order.
  */
 export function normalizedToolSchemas(rawLog: string, ctx: NormalizeContext): unknown[][] {
-  return normalizedHeaders(rawLog, ctx).flatMap((header) => {
-    if (header === null || typeof header !== 'object') return []
-    const tools = (header as { tools?: unknown }).tools
-    return Array.isArray(tools) ? [tools] : []
-  })
+  return toolSchemasFrom(normalizedHeaders(rawLog, ctx))
 }
 
 /** The structured contents of a tool-schema sidecar. */
@@ -720,22 +745,6 @@ export function stabilizeFixtureMessageIds(logs: readonly string[], fixtures: re
   return logs.map(log => applyFixtureMessageIds(log, replacements))
 }
 
-/** One packed row's member times, or `undefined` for an ordinary record. */
-function packedTimes(record: Record<string, unknown>): number[] | undefined {
-  if (!PACKED_CHUNK_ROW_TYPES.has(record.type as string)) return undefined
-  const row = record as unknown as { time0?: number; data: { dt: number[] } }
-  const times = [row.time0 ?? 0]
-  for (const gap of row.data.dt) times.push((times[times.length - 1] as number) + gap)
-  return times
-}
-
-/** Expand packed timing envelopes so refresh alignment follows logical events, not physical lines. */
-function logicalRecords(records: Record<string, unknown>[]): Record<string, unknown>[] {
-  return records.flatMap((record) => {
-    const times = packedTimes(record)
-    return times === undefined ? [record] : times.map(time => ({ type: 'assistant/chunk', time }))
-  })
-}
 
 /**
  * Find tool calls whose structured result reports `UNKNOWN_TOOL`.
@@ -817,25 +826,6 @@ function preserveFixtureVolatiles(record: Record<string, unknown>, existing: Rec
   ) {
     (data as Record<string, unknown>).durationMs = (existingData as Record<string, unknown>).durationMs
   }
-}
-
-/** Carry logical member times into a fresh packed row while leaving its fragment arrays untouched. */
-function preservePackedMemberTimes(
-  record: Record<string, unknown>,
-  existingMembers: Record<string, unknown>[],
-): void {
-  if (!PACKED_CHUNK_ROW_TYPES.has(record.type as string)) return
-  const row = record as unknown as { time0: number; data: { dt: number[] } }
-  const firstTime = existingMembers[0]?.time
-  if (!Number.isSafeInteger(firstTime)) return
-  row.time0 = firstTime as number
-  if (existingMembers.length !== row.data.dt.length + 1) return
-  const times = existingMembers.map(member => Number.isSafeInteger(member.time) ? member.time as number : undefined)
-  if (times.some(time => time === undefined)) return
-  const memberTimes = times as number[]
-  const gaps = memberTimes.slice(1).map((time, index) => time - (memberTimes[index] as number))
-  if (gaps.some(gap => !Number.isSafeInteger(gap))) return
-  row.data.dt = gaps
 }
 
 /** Whether a parsed JSON value is a non-array object. */
@@ -1012,27 +1002,18 @@ function normalizedStringMappings(
   for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
     const record = records[recordIndex] as Record<string, unknown>
     const existingRecord = existingRecords[existingIndex]
-    const memberCount = packedTimes(record)?.length ?? 1
     if (record.type === 'session/title' && existingRecord?.type !== 'session/title') continue
-    if (memberCount > 1) {
-      const existingMembers = existingRecords.slice(existingIndex, existingIndex + memberCount)
-      if (
-        existingMembers.length !== memberCount
-        || existingMembers.some(member => member.type !== 'assistant/chunk')
-      ) return undefined
-    } else {
-      if (existingRecord === undefined || existingRecord.type !== record.type) return undefined
-      if (!collectNormalizedStringMappings(
-        record,
-        existingRecord,
-        normalizedRefreshRecord(freshRecords[recordIndex] as Record<string, unknown>, freshContext),
-        normalizedRefreshRecord(existingRecord, existingContext),
-        excludedStrings,
-        forward,
-        reverse,
-      )) return undefined
-    }
-    existingIndex += memberCount
+    if (existingRecord === undefined || existingRecord.type !== record.type) return undefined
+    if (!collectNormalizedStringMappings(
+      record,
+      existingRecord,
+      normalizedRefreshRecord(freshRecords[recordIndex] as Record<string, unknown>, freshContext),
+      normalizedRefreshRecord(existingRecord, existingContext),
+      excludedStrings,
+      forward,
+      reverse,
+    )) return undefined
+    existingIndex += 1
   }
   return existingIndex === existingRecords.length ? forward : undefined
 }
@@ -1045,9 +1026,8 @@ function normalizedStringMappings(
  * complete record layout aligns and volatile strings form a consistent
  * bijection. Complete durable-message ids are excluded because the later
  * fixture-ready structural pass owns them. Ambiguous layouts or mappings
- * keep fresh strings. Packed timing envelopes expand for alignment, so
- * packing does not shift later records;
- * fresh semantic values and fragment arrays remain authoritative.
+ * keep fresh strings; fresh semantic values and fragment arrays remain
+ * authoritative.
  *
  * @param fresh The newly harvested session JSONL.
  * @param existing The committed fixture JSONL being refreshed.
@@ -1063,7 +1043,7 @@ export function stabilizeRefreshLog(
 ): string {
   const freshRecords = parseJsonlRecords(fresh)
   const stable = applyFixtureReplacements(fresh, replacements)
-  const existingRecords = logicalRecords(parseJsonlRecords(existing))
+  const existingRecords = parseJsonlRecords(existing)
   const records = parseJsonlRecords(stable)
   const existingContext = fixtureContext(existing)
   const stringMappings = normalizedStringMappings(
@@ -1078,7 +1058,6 @@ export function stabilizeRefreshLog(
   for (let i = 0; i < records.length; i++) {
     let record = records[i] as Record<string, unknown>
     const existingRecord = existingRecords[existingIndex]
-    const memberCount = packedTimes(record)?.length ?? 1
     const insertedTitle = record.type === 'session/title' && existingRecord?.type !== 'session/title'
     if (insertedTitle) {
       /* v8 ignore next -- a title is turn-enclosed, so a preceding event time exists in every valid fixture. */
@@ -1087,7 +1066,6 @@ export function stabilizeRefreshLog(
     } else {
       if (
         stringMappings !== undefined
-        && memberCount === 1
         && existingRecord !== undefined
         && existingRecord.type === record.type
       ) {
@@ -1100,9 +1078,8 @@ export function stabilizeRefreshLog(
         ) as Record<string, unknown>
         records[i] = record
       }
-      preservePackedMemberTimes(record, existingRecords.slice(existingIndex, existingIndex + memberCount))
       preserveFixtureVolatiles(record, existingRecord)
-      existingIndex += memberCount
+      existingIndex += 1
     }
     if (typeof record.time === 'number') previousEventTime = record.time
   }
@@ -1303,7 +1280,11 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
           }
           if (scenario.pinsHeader === true) {
             const primary = result.sessionLogs[0] as HarvestedLog
-            const prompts = normalizedSystemPrompts(primary.content, ctx)
+            const pinningHeaders = pinningHeaderPayloads(primary.content, ctx)
+            const prompts = pinningHeaders.flatMap((header) => {
+              const system = (header as { system?: unknown } | null)?.system
+              return typeof system === 'string' ? [system] : []
+            })
             expect(prompts.length, `${mode} produced no system prompt to snapshot`).toBeGreaterThan(0)
             const promptSnapshot = formatSystemPromptSnapshot(prompts[0] as string, prompts.slice(1))
             /* v8 ignore next -- registration guarantees every scenario class has resolved sources. */
@@ -1312,7 +1293,7 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
             claimSharedSnapshot(promptClaims, promptPath, scenario.name, promptSnapshot)
             await writeFile(promptPath, promptSnapshot)
 
-            const schemaSets = normalizedToolSchemas(primary.content, ctx)
+            const schemaSets = toolSchemasFrom(pinningHeaders)
             expect(schemaSets.length, `${mode} produced no tool schemas to snapshot`).toBeGreaterThan(0)
             expect(schemaSets.length, `${mode} produced a tool-schema sequence that differs from its prompt sequence`)
               .toBe(prompts.length)
@@ -1383,7 +1364,7 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         const schemaSource = schemaSourceByClass.get(classOf(scenario)) ?? pinningScenario
         const pinningDir = join(snapshotsDir, pinningScenario.name)
         const pinnedFixture = await readFile(join(pinningDir, 'session.jsonl'), 'utf8')
-        const pinned = normalizedHeaders(scrubSystemPrompts(pinnedFixture), fixtureContext(pinnedFixture))
+        const pinned = pinningHeaderPayloads(scrubSystemPrompts(pinnedFixture), fixtureContext(pinnedFixture))
         const promptSnapshot = await readFile(
           join(snapshotsDir, promptSource.name, SYSTEM_PROMPT_SNAPSHOT),
           'utf8',
@@ -1423,22 +1404,31 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
             : 0
           expect(headerChangeCount(log.content), `session ${log.id}: changed request/header count`)
             .toBe(expectedChanges)
-          const headers = normalizedHeaders(scrubSystemPrompts(log.content), ctx)
+          const headerEvents = normalizedHeaderEvents(scrubSystemPrompts(log.content), ctx)
+          const headers = headerEvents.map(event => event.header)
           const prompts = normalizedSystemPrompts(log.content, ctx)
           const schemaSets = normalizedToolSchemas(log.content, ctx)
           expect(prompts.length, `session ${log.id}: every request/header must carry a string system prompt`)
             .toBe(headers.length)
           expect(schemaSets.length, `session ${log.id}: every request/header must carry an array-valued tools field`)
             .toBe(headers.length)
+          // Pinning payloads stay unscrubbed: the sidecars own real prompt
+          // text and tool schemas, while `headerEvents`/`headers` carry the
+          // `{{system}}` token for the class-pin comparison.
+          const pinningHeaders = pinningHeaderPayloads(log.content, ctx)
           if (childSchemas !== undefined) {
             expect(childSchemas.length, `session ${log.id}: ${childToolSchemasSnapshot(logIndex)} has an unexpected tool-schema count`)
-              .toBe(schemaSets.length)
+              .toBe(pinningHeaders.length)
           }
+          let revision = 0
           for (const [k, header] of headers.entries()) {
-            const classPin = expectedChanges > 0 ? pinnedHeaders[k] : pinnedHeaders[0]
+            // A `series` boundary reuses the current revision; only `change`
+            // advances the pin index (matching the sidecar layout).
+            if (headerEvents[k]?.reason === 'change') revision++
+            const classPin = expectedChanges > 0 ? pinnedHeaders[revision] : pinnedHeaders[0]
             const expected = childSchemas === undefined
               ? classPin
-              : { ...classPin as Record<string, unknown>, tools: childSchemas[k] }
+              : { ...classPin as Record<string, unknown>, tools: childSchemas[revision] }
             expect(header, `session ${log.id}: request/header #${k + 1} diverged from the pinned (${pinningScenario.name}) header`)
               .toEqual(expected)
             if (expectedChanges === 0) {
@@ -1453,14 +1443,19 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
             }
           }
           if (scenario.pinsHeader === true && logIndex === 0) {
+            const pinningPrompts = pinningHeaders.flatMap((header) => {
+              const system = (header as { system?: unknown } | null)?.system
+              return typeof system === 'string' ? [system] : []
+            })
+            const pinningSchemas = toolSchemasFrom(pinningHeaders)
             expect(formatSystemPromptSnapshot(
-              prompts[0] as string,
-              prompts.slice(1),
+              pinningPrompts[0] as string,
+              pinningPrompts.slice(1),
             ), `session ${log.id}: changed system prompts diverged from ${promptSource.name}/${SYSTEM_PROMPT_SNAPSHOT}`)
               .toEqual(promptSnapshot)
             expect(formatToolSchemasSnapshot(
-              schemaSets[0] as unknown[],
-              schemaSets.slice(1),
+              pinningSchemas[0] as unknown[],
+              pinningSchemas.slice(1),
             ), `session ${log.id}: changed tool schemas diverged from ${schemaSource.name}/${TOOL_SCHEMAS_SNAPSHOT}`)
               .toEqual(toolSchemasSnapshot)
           }
@@ -1536,7 +1531,7 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         /* v8 ignore next -- registration guarantees every pin has resolved sources. */
         const schemaSource = schemaSourceByClass.get(classOf(scenario)) ?? scenario
         const fixture = await readFile(join(snapshotsDir, scenario.name, 'session.jsonl'), 'utf8')
-        const headers = normalizedHeaders(scrubSystemPrompts(fixture), fixtureContext(fixture))
+        const headers = pinningHeaderPayloads(scrubSystemPrompts(fixture), fixtureContext(fixture))
         const promptSnapshot = await readFile(
           join(snapshotsDir, promptSource.name, SYSTEM_PROMPT_SNAPSHOT),
           'utf8',

@@ -4,9 +4,13 @@
 
 工作流 seam（扩展点，`ctx.workflowEngine`）执行由模型编写、可扇出 subagent 的编排脚本。该 seam 定义脚本、运行、结果、错误和事件契约；引擎负责决定如何隔离并执行脚本。
 
-`@deepseek-ai/dsh-workflow-worker-thread` 是当前引擎，`@deepseek-ai/dsh-tool-workflow` 是面向模型的消费方。未来的进程或沙箱引擎可以替换实现，而无需更改工具。
+`@deepseek-ai/dsh-workflow-ptc` 是当前引擎，`@deepseek-ai/dsh-tool-workflow` 是面向模型的消费方。未来的进程或沙箱引擎可以替换实现，而无需更改工具。
 
 包根是 Host face。浏览器安全的 `@deepseek-ai/dsh-workflow/types` 子路径包含运行身份、元数据、结果和仅供观察的生命周期 payload，不导入 `Agent`、Cordis service 或 Host Context 声明；Host 专用的 `WorkflowStartRequest` 与 `WorkflowRun` 只从包根提供。
+
+## 概述
+
+运行一段纯 JavaScript 编排脚本，将工作扇出给 subagent，并返回脚本的最终 JSON 值。脚本可以使用 `agent()`、`parallel()`、`pipeline()`、`phase()` 和 `log()`；模型通常通过 `workflow` 工具访问它们。每次运行都归调用方所有，将每个子 agent（智能体）归属于调用它的 agent，在失败或取消时以结果兑现而不拒绝，并在 dispose（资源释放）期间等待脚本与子 agent 清理完成。调用方必须提供执行引擎，因此可以更换隔离策略而不改变可见行为。
 
 ## 服务与运行契约
 
@@ -44,11 +48,11 @@
 
 ## 模型体验
 
-通过 `dsh-tool-workflow` 和工作流引擎间接产生影响；两者创建子 agent 请求，并返回保留在父级的工具结果。
+间接地，通过其消费方 `dsh-tool-workflow` 与一个工作流引擎，由它们渲染父级工具结果与子 agent 请求。
 
 #### KV Cache 影响
 
-不会直接导致 KV Cache 失效；请求前缀的任何变化均由上述消费方负责。
+不会直接导致失效；请求前缀的任何变化均由上述消费方与引擎负责。
 
 ## 已知限制与暂缓事项
 

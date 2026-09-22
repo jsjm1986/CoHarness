@@ -23,6 +23,7 @@ const apiKey = process.env.DEEPSEEK_API_KEY
 const maybe = apiKey !== undefined && apiKey.length > 0 ? describe : describe.skip
 
 maybe('DeepSeekSearchProvider real API', () => {
+  // test-skip: the live endpoint can omit structured sources; see docs/testing.md (real-provider evidence).
   it.skip('returns citeable sources for a live query via native web_search', async () => {
     const provider = searchProvider({
       apiKey: apiKey!,

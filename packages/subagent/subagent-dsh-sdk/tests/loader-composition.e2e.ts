@@ -1,12 +1,13 @@
 /**
- * Keyless REAL-composition coverage for parent-session cwd inheritance across
- * the SDK wire: a test-only cordis.yml boots the headless app through the
- * Loader with the SDK backend's `cwd` omitted, a scripted model delegates
- * once, and the child — a COMPLETE second harness runtime booted from its own
- * cordis.yml and driven over stdio JSON-RPC — echoes where it actually ran.
- * Both the parent's tool result and the child's own persisted session log
- * must carry the parent session's cwd. Mock-only composition, so only this
- * keyless tier applies (the with-key tier lives in subagent-sdk.e2e.ts).
+ * Keyless REAL-composition coverage for dynamic child routing and parent cwd
+ * inheritance across the SDK wire: a test-only cordis.yml boots the headless
+ * app through the Loader, a scripted model selects provider/model/reasoning,
+ * tool config adds maxTokens, and the child — a COMPLETE second harness
+ * runtime booted from its own cordis.yml and driven over stdio JSON-RPC —
+ * echoes the effective route and where it actually ran. The same path also
+ * verifies model-visible child-failure diagnostics remain separate from
+ * partial output. Mock-only composition, so only this keyless tier applies
+ * (the with-key tier lives in subagent-sdk.e2e.ts).
  */
 
 import { realpathSync } from 'node:fs'
@@ -39,19 +40,39 @@ async function sessionEvents(log: string): Promise<SessionEvent[]> {
   return lines.slice(1).map(line => JSON.parse(line) as SessionEvent)
 }
 
-describe('SDK subagent cwd inheritance through a real cordis.yml', () => {
-  it('runs the child runtime in the parent session workspace', async () => {
-    // The child launch honors the same src/lib mode as the driving harness,
-    // per the shared example-launch resolver (testing policy forbids
-    // hand-written `--import tsx` argv for example subprocesses).
-    const childLaunch = resolveExampleLaunch({
-      srcBin: runtimeBin,
-      configArgs: [childConfigPath],
-      tsconfigPath: repoTsconfig,
-    })
+function toolResultText(events: SessionEvent[]): string {
+  const results = events.filter(event => event.type === 'tool/result')
+  expect(results).toHaveLength(1)
+  return results[0]!.data.message.content[0].content
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+}
 
+function childEnv(extra: Record<string, string> = {}): Record<string, string> {
+  // The child launch honors the same src/lib mode as the driving harness,
+  // per the shared example-launch resolver (testing policy forbids
+  // hand-written `--import tsx` argv for example subprocesses).
+  const childLaunch = resolveExampleLaunch({
+    srcBin: runtimeBin,
+    configArgs: [childConfigPath],
+    tsconfigPath: repoTsconfig,
+  })
+  return {
+    DSH_TEST_CHILD_COMMAND: childLaunch.command,
+    DSH_TEST_CHILD_ARGS: JSON.stringify(childLaunch.args),
+    DSH_TEST_CHILD_ENV: JSON.stringify({
+      ...Object.fromEntries(Object.entries(childLaunch.env).filter(([, value]) => value !== undefined)),
+      ...extra,
+    }),
+  }
+}
+
+describe('SDK subagent routing and diagnostics through a real cordis.yml', () => {
+  it('runs the selected child route in the parent session workspace', async () => {
     let events: SessionEvent[] = []
     let childEvents: SessionEvent[] = []
+    let parentResolvedRoutes: string[] = []
     let workspace = ''
     const { stderr } = await runLoaderSmoke({
       label: 'dsh-sdk-subagent cwd composition smoke',
@@ -65,11 +86,9 @@ describe('SDK subagent cwd inheritance through a real cordis.yml', () => {
       // 30s window.
       processTimeoutMs: 120_000,
       env: {
-        DSH_TEST_CHILD_COMMAND: childLaunch.command,
-        DSH_TEST_CHILD_ARGS: JSON.stringify(childLaunch.args),
-        DSH_TEST_CHILD_ENV: JSON.stringify({
-          ...Object.fromEntries(Object.entries(childLaunch.env).filter(([, value]) => value !== undefined)),
-        }),
+        ...childEnv(),
+        DSH_TEST_CHILD_DEFAULT_ROUTE: '1',
+        DSH_TEST_PARENT_MODEL_RECORD: '.parent-model-routes',
       },
       inspect: async (cwd) => {
         // The child reports realpaths; canonicalize the temp workspace to match.
@@ -82,26 +101,56 @@ describe('SDK subagent cwd inheritance through a real cordis.yml', () => {
         const childLogs = await jsonlFiles(join(cwd, '.child-sessions'))
         expect(childLogs).toHaveLength(1)
         childEvents = await sessionEvents(childLogs[0] as string)
+        parentResolvedRoutes = (await readFile(join(cwd, '.parent-model-routes'), 'utf8')).trim().split('\n')
       },
     })
     expect(stderr).not.toContain('UNHANDLED')
 
-    // The parent's tool result carries the child model's echo of its real
-    // process.cwd() — the parent session's workspace, never the harness
-    // process's launch directory.
-    const results = events.filter(event => event.type === 'tool/result')
-    expect(results).toHaveLength(1)
-    const resultText = results[0]!.data.message.content[0].content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('')
-    expect(resultText).toBe(`child cwd: ${workspace}`)
+    // The parent's tool result carries the child model's echo of the routed
+    // options and its real process.cwd() — the parent session's workspace,
+    // never the harness process's launch directory.
+    expect(toolResultText(events)).toBe(`child route: mock/mock-routed/max/777; cwd: ${workspace}`)
+    expect(parentResolvedRoutes).toContain('mock/mock-routed')
 
-    // The child ran a real turn of its own: user message in, assistant out.
+    // The child ran a real turn with the model-selected route and tool-configured cap.
     expect(childEvents.some(event => event.type === 'user/message')).toBe(true)
+    const childHeader = childEvents.find(
+      (event): event is Extract<SessionEvent, { type: 'request/header' }> => event.type === 'request/header',
+    )
+    expect(childHeader?.data.header.config).toEqual({
+      provider: 'mock',
+      model: 'mock-routed',
+      reasoningEffort: 'max',
+      maxTokens: 777,
+    })
     const childAnswers = childEvents.filter(event => event.type === 'assistant/message')
     expect(childAnswers.length).toBeGreaterThan(0)
     // 15s of vitest headroom past the subprocess deadline, mirroring
     // LOADER_SMOKE_TEST_TIMEOUT_MS's margin over the default window.
+  }, 135_000)
+
+  it('presents the child error diagnostic separately from partial output', async () => {
+    let events: SessionEvent[] = []
+    const { stderr } = await runLoaderSmoke({
+      label: 'dsh-sdk-subagent diagnostic composition smoke',
+      tempDirPrefix: 'dsh-sdk-subagent-diagnostic-e2e-',
+      binScript: driver,
+      libBinScript: driver,
+      configPath,
+      tsconfigPath: repoTsconfig,
+      processTimeoutMs: 120_000,
+      env: childEnv({ DSH_TEST_CHILD_FAILURE: '1' }),
+      inspect: async (cwd) => {
+        const parentLogs = await jsonlFiles(join(cwd, '.sessions'))
+        expect(parentLogs).toHaveLength(1)
+        events = await sessionEvents(parentLogs[0] as string)
+      },
+    })
+    expect(stderr).not.toContain('UNHANDLED')
+    expect(toolResultText(events)).toBe(
+      'Error: subagent run failed\n'
+      + 'Diagnostic: Subagent failure (provider: DSH SDK; stage: session-run; category: child-error)\n'
+      + 'Partial output before the run ended:\npartial child loader answer',
+    )
   }, 135_000)
 })

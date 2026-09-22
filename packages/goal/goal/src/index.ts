@@ -388,7 +388,7 @@ export class GoalService extends TypertRemoteService {
 
   /**
    * Resume and arm a stopped goal, or rearm an active goal after a
-   * agent initialization, while its round budget still has capacity.
+   * session-start edge, while its round budget still has capacity.
    * @param agent - owning live agent.
    * @param ref - expected current revision.
    * @returns the active view.
@@ -510,6 +510,7 @@ export class GoalService extends TypertRemoteService {
     const projected = this.projected(session)
     const state = projected === undefined ? emptyGoalFoldState() : goalFoldState(projected)
     if (projected === undefined) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       for (const event of session.snapshotEvents()) applyGoalEvent(state, event)
     }
     cache = {
@@ -544,6 +545,7 @@ export class GoalService extends TypertRemoteService {
   /** Incrementally observe durable events and reconcile local activation intent. */
   private sync(session: Session, cache: GoalCache): void {
     while (cache.observedSeq < session.seq) {
+      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const event = session.eventAt(SessionSeq(cache.observedSeq))
       /* v8 ignore next -- Session exposes a contiguous immutable event log. */
       if (event === undefined) throw new Error(`goal cache cannot advance across missing seq ${String(cache.observedSeq)}`)

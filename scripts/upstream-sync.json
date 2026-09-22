@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.1.5-rc.2",
-  "syncedCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+  "syncedTag": "dsh-v0.1.6-alpha.2",
+  "syncedCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -23,10 +23,10 @@
       "sovereignty": "adapted"
     },
     "attachment/attachment": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "attachment/attachment-local": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "attachment/tool-userdoc": {
       "sovereignty": "owned"
@@ -38,16 +38,35 @@
       "sovereignty": "owned"
     },
     "boot/app-boot": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-21-profile-resolution-ambient-source-plane.md"
     },
     "boot/cmdline": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
+    },
+    "boot/hmr": {
+      "sovereignty": "tracked"
+    },
+    "boot/plugin-manager": {
+      "sovereignty": "tracked"
+    },
+    "bundle/acp-app": {
+      "sovereignty": "tracked"
     },
     "bundle/base": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "bundle/headless": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "removedUpstreamPaths": [
+        "packages/bundle/headless/tests/fixtures/provider-cwd.ts"
+      ]
+    },
+    "bundle/sdk-app": {
+      "sovereignty": "tracked"
+    },
+    "bundle/sdk-minimal": {
+      "sovereignty": "tracked"
     },
     "bundle/web-app": {
       "sovereignty": "adapted"
@@ -67,7 +86,12 @@
       "sovereignty": "adapted"
     },
     "client/modules": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/modules/src/client/entries.ts",
+        "packages/client/modules/src/client/entry-lifecycle.ts"
+      ]
     },
     "client/runtime": {
       "sovereignty": "owned"
@@ -76,7 +100,11 @@
       "sovereignty": "adapted"
     },
     "client/ui-attachment": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-attachment/src/client/drop-events.ts"
+      ]
     },
     "client/ui-brand-official": {
       "sovereignty": "adapted"
@@ -88,10 +116,46 @@
       "sovereignty": "adapted"
     },
     "client/ui-conversation": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-conversation/src/client/contract/context-producer.ts",
+        "packages/client/ui-conversation/src/client/contract/draft-editor.ts",
+        "packages/client/ui-conversation/src/client/input/editor/DraftEditor.tsx",
+        "packages/client/ui-conversation/src/client/input/editor/reference-activation.ts",
+        "packages/client/ui-conversation/src/client/input/editor/runtime.ts",
+        "packages/client/ui-conversation/src/client/input/editor/view-binding.ts",
+        "packages/client/ui-conversation/src/client/skeleton/ConversationContent.tsx",
+        "packages/client/ui-conversation/src/client/skeleton/ConversationMainPanel.tsx",
+        "packages/client/ui-conversation/src/client/skeleton/ConversationPanel.tsx",
+        "packages/client/ui-conversation/src/client/skeleton/ConversationWidthControls.tsx",
+        "packages/client/ui-conversation/src/client/skeleton/DefaultConversationViews.tsx"
+      ]
     },
     "client/ui-deliverables": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-deliverables/src/changes.ts",
+        "packages/client/ui-deliverables/src/client/ChangedFiles.module.css",
+        "packages/client/ui-deliverables/src/client/ChangedFiles.tsx",
+        "packages/client/ui-deliverables/src/client/changes-diff.ts",
+        "packages/client/ui-deliverables/src/client/changes-summary.ts",
+        "packages/client/ui-deliverables/src/client/Deliverables.module.css",
+        "packages/client/ui-deliverables/src/client/Deliverables.tsx",
+        "packages/client/ui-deliverables/src/client/host-read-store.ts",
+        "packages/client/ui-deliverables/src/client/icons.tsx",
+        "packages/client/ui-deliverables/src/client/present-open.ts",
+        "packages/client/ui-deliverables/src/client/PresentedFileCard.tsx",
+        "packages/client/ui-deliverables/src/client/PresentRow.module.css",
+        "packages/client/ui-deliverables/src/client/PresentRow.tsx",
+        "packages/client/ui-deliverables/src/client/review-definition.ts",
+        "packages/client/ui-deliverables/src/client/review-store.ts",
+        "packages/client/ui-deliverables/src/client/ReviewTab.module.css",
+        "packages/client/ui-deliverables/src/client/ReviewTab.tsx",
+        "packages/client/ui-deliverables/src/present-open.ts",
+        "packages/client/ui-deliverables/src/presented.ts"
+      ]
     },
     "client/ui-directory-picker-browse": {
       "sovereignty": "adapted"
@@ -115,7 +179,14 @@
       "sovereignty": "adapted"
     },
     "client/ui-message-feedback": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-message-feedback/src/client/dialog.ts",
+        "packages/client/ui-message-feedback/src/client/FeedbackDialog.module.css",
+        "packages/client/ui-message-feedback/src/client/FeedbackDialog.tsx",
+        "packages/client/ui-message-feedback/src/client/surface.ts"
+      ]
     },
     "client/ui-model-selection": {
       "sovereignty": "adapted"
@@ -124,19 +195,50 @@
       "sovereignty": "adapted"
     },
     "client/ui-permission-presets": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-permission-presets/src/client/catalog.ts",
+        "packages/client/ui-permission-presets/src/client/PermissionSelect.module.css",
+        "packages/client/ui-permission-presets/src/client/PermissionSelect.tsx"
+      ]
     },
     "client/ui-plan": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-plan/src/client/failure-line.ts",
+        "packages/client/ui-plan/src/client/plan-definition.ts",
+        "packages/client/ui-plan/src/client/plan-resource.ts",
+        "packages/client/ui-plan/src/client/plan.ts",
+        "packages/client/ui-plan/src/client/PlanCard.tsx",
+        "packages/client/ui-plan/src/client/PlanPreview.module.css",
+        "packages/client/ui-plan/src/client/PlanPreview.tsx",
+        "packages/client/ui-plan/src/client/review-preview.ts",
+        "packages/client/ui-plan/src/client/review-store.ts"
+      ]
     },
     "client/ui-primitives": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-primitives/src/Checkbox.module.css",
+        "packages/client/ui-primitives/src/Checkbox.tsx",
+        "packages/client/ui-primitives/src/darwin-desktop.ts",
+        "packages/client/ui-primitives/src/markdown/file-link.ts",
+        "packages/client/ui-primitives/src/markdown/MarkdownDelegate.tsx",
+        "packages/client/ui-primitives/src/SiteGlyph.tsx"
+      ]
     },
     "client/ui-reference": {
       "sovereignty": "adapted"
     },
     "client/ui-renderer": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-renderer/src/client/errors.ts"
+      ]
     },
     "client/ui-schedule": {
       "sovereignty": "adapted"
@@ -145,19 +247,49 @@
       "sovereignty": "adapted"
     },
     "client/ui-settings-general": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-settings-general/src/client/desktop-update-bridge.ts",
+        "packages/client/ui-settings-general/src/client/desktop-update-source.ts",
+        "packages/client/ui-settings-general/src/client/DesktopUpdateIndicator.module.css",
+        "packages/client/ui-settings-general/src/client/DesktopUpdateIndicator.tsx"
+      ]
     },
     "client/ui-settings-models": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-settings-models/src/client/ModelInputTypes.tsx",
+        "packages/client/ui-settings-models/src/client/ModelRow.tsx"
+      ]
     },
     "client/ui-settings-plugin-inventory": {
       "sovereignty": "adapted"
     },
     "client/ui-settings-plugins": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-settings-plugins/src/client/PluginConfigForm.module.css",
+        "packages/client/ui-settings-plugins/src/client/PluginConfigForm.tsx",
+        "packages/client/ui-settings-plugins/src/client/subagent-card-controller.ts",
+        "packages/client/ui-settings-plugins/src/client/subagent-limits-card-controller.ts",
+        "packages/client/ui-settings-plugins/src/client/SubagentCard.module.css",
+        "packages/client/ui-settings-plugins/src/client/SubagentCard.tsx",
+        "packages/client/ui-settings-plugins/src/client/SubagentLimitsFields.module.css",
+        "packages/client/ui-settings-plugins/src/client/SubagentLimitsFields.tsx",
+        "packages/client/ui-settings-plugins/src/client/SubagentModelSelectionFields.module.css",
+        "packages/client/ui-settings-plugins/src/client/SubagentModelSelectionFields.tsx"
+      ]
     },
     "client/ui-sidebar": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-sidebar/src/client/HeaderLeadingControls.module.css",
+        "packages/client/ui-sidebar/src/client/HeaderLeadingControls.tsx"
+      ]
     },
     "client/ui-skill": {
       "sovereignty": "adapted"
@@ -166,7 +298,12 @@
       "sovereignty": "adapted"
     },
     "client/ui-subagent": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-subagent/src/client/sidebar-chat/index.tsx",
+        "packages/client/ui-subagent/src/client/sidebar-chat/SidebarChat.module.css"
+      ]
     },
     "client/ui-theme": {
       "sovereignty": "adapted"
@@ -175,7 +312,12 @@
       "sovereignty": "adapted"
     },
     "client/ui-trajectory": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-trajectory/src/client/code-program.ts",
+        "packages/client/ui-trajectory/src/client/string-wrapping-store.ts"
+      ]
     },
     "client/ui-usage-alert": {
       "sovereignty": "owned"
@@ -196,28 +338,26 @@
       "sovereignty": "owned"
     },
     "client/web": {
-      "sovereignty": "adapted"
-    },
-    "code-runtime/code-runtime": {
-      "sovereignty": "adapted"
-    },
-    "code-runtime/code-runtime-worker-thread": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/client/web/src/apply-injections.ts"
+      ]
     },
     "compaction/command-compact": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "compaction/compaction": {
       "sovereignty": "tracked"
     },
     "compaction/compaction-basic": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "compaction/compaction-tool-result-pruner": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "context/agent-instructions": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "context/archive-gateway": {
       "sovereignty": "owned"
@@ -259,10 +399,11 @@
       "sovereignty": "adapted"
     },
     "core/agent-loop": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-21-configured-agent-persistence-mount-race.md"
     },
     "core/agent-tool-presentation": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "core/scope": {
       "sovereignty": "adapted"
@@ -271,10 +412,11 @@
       "sovereignty": "adapted"
     },
     "core/system-prompt": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "core/tools": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-18-tool-scheduler-process-stable-symbol.md"
     },
     "credentials/authorization": {
       "sovereignty": "adapted"
@@ -283,15 +425,6 @@
       "sovereignty": "adapted"
     },
     "credentials/credentials-local": {
-      "sovereignty": "adapted"
-    },
-    "e2b/e2b": {
-      "sovereignty": "adapted"
-    },
-    "e2b/fs-e2b": {
-      "sovereignty": "adapted"
-    },
-    "e2b/subprocess-e2b": {
       "sovereignty": "adapted"
     },
     "examples/acp-demo": {
@@ -310,8 +443,11 @@
         "packages/experimental/agent-team/src/projection.ts"
       ]
     },
-    "experimental/code-runtime-python": {
-      "sovereignty": "adapted"
+    "experimental/agent-team-profile": {
+      "sovereignty": "tracked"
+    },
+    "experimental/ptc-runtime-python": {
+      "sovereignty": "tracked"
     },
     "experimental/tool-agent-team": {
       "sovereignty": "adapted"
@@ -368,7 +504,7 @@
       "sovereignty": "adapted"
     },
     "guard/repeat-tool-reminder": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "guard/timeout-policy": {
       "sovereignty": "adapted"
@@ -404,7 +540,7 @@
       "sovereignty": "adapted"
     },
     "host/plugin-inventory": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "host/userdoc-http": {
       "sovereignty": "owned"
@@ -413,22 +549,22 @@
       "sovereignty": "adapted"
     },
     "identity/anonymous-user-id": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "interaction/commands": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "interaction/permission-presets": {
       "sovereignty": "adapted"
     },
     "interaction/tool-ask-user": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "interaction/user-approval": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "interaction/user-questions": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "jobs/jobs": {
       "sovereignty": "tracked"
@@ -467,7 +603,7 @@
       "sovereignty": "adapted"
     },
     "lsp/lsp": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "lsp/lsp-stdio": {
       "sovereignty": "adapted"
@@ -476,31 +612,41 @@
       "sovereignty": "adapted"
     },
     "mcp/mcp-client": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
+    },
+    "mcp/mcp-resources": {
+      "sovereignty": "tracked"
     },
     "plan/plan-mode": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "preset/agent-presets": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-21-preset-remote-contract-boundaries.md"
     },
     "preset/persona": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
+    },
+    "ptc-runtime/ptc-runtime": {
+      "sovereignty": "tracked"
+    },
+    "ptc-runtime/ptc-runtime-node": {
+      "sovereignty": "tracked"
     },
     "runtime-diagnostics/invariants": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "sandbox/sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "sandbox/sandbox-local": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "sandbox/sandbox-policy": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "sandbox/sandbox-windows-acl": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "schedule/schedule": {
       "sovereignty": "adapted"
@@ -527,7 +673,7 @@
       "sovereignty": "adapted"
     },
     "session/session-checkpoint-policy": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "session/session-format": {
       "sovereignty": "adapted"
@@ -537,12 +683,7 @@
     },
     "session/session-persistence": {
       "sovereignty": "replaced",
-      "note": ".agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md",
-      "removedUpstreamPaths": [
-        "packages/session/session-persistence/src/errors.ts",
-        "packages/session/session-persistence/src/handle.ts",
-        "packages/session/session-persistence/src/storage-contract.ts"
-      ]
+      "note": ".agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md"
     },
     "session/session-persistence-gateway": {
       "sovereignty": "owned"
@@ -560,10 +701,10 @@
       "sovereignty": "adapted"
     },
     "session/session-stats": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "session/session-telemetry": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "session/session-telemetry-otel": {
       "sovereignty": "adapted"
@@ -572,10 +713,10 @@
       "sovereignty": "adapted"
     },
     "session/session-title-all-prompts-llm": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "session/session-title-first-prompt-llm": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "session/session-title-llm": {
       "sovereignty": "adapted"
@@ -584,19 +725,19 @@
       "sovereignty": "adapted"
     },
     "settings/settings-file": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/bash-local": {
       "sovereignty": "adapted"
     },
     "shell/bash-sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/pwsh-local": {
       "sovereignty": "adapted"
     },
     "shell/pwsh-sandbox": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/shell": {
       "sovereignty": "adapted"
@@ -608,19 +749,19 @@
       "sovereignty": "adapted"
     },
     "shell/tool-bash-persistent": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "shell/tool-pwsh": {
       "sovereignty": "adapted"
     },
     "shell/tool-pwsh-persistent": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "skill/skill": {
       "sovereignty": "adapted"
     },
     "skill/skill-badge": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "skill/skill-filesystem": {
       "sovereignty": "adapted"
@@ -629,7 +770,7 @@
       "sovereignty": "adapted"
     },
     "spill/spill": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "spill/spill-local": {
       "sovereignty": "adapted"
@@ -638,10 +779,10 @@
       "sovereignty": "adapted"
     },
     "storage/storage": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "storage/storage-domain": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "storage/storage-json": {
       "sovereignty": "adapted"
@@ -653,7 +794,8 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent-acp": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md"
     },
     "subagent/subagent-claude-code": {
       "sovereignty": "adapted"
@@ -662,7 +804,8 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent-dsh-sdk": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md"
     },
     "subagent/subagent-fork-in-process": {
       "sovereignty": "adapted"
@@ -680,31 +823,45 @@
       "sovereignty": "adapted"
     },
     "subprocess/subprocess": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "subprocess/subprocess-local": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
+    },
+    "subprocess/win32-process": {
+      "sovereignty": "tracked"
     },
     "terminal/terminal": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "terminal/terminal-bash": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "terminal/tool-terminal": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "test-support/acp-snapshot": {
       "sovereignty": "owned"
     },
     "test-support/agent-loop-testkit": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "test-support/client-runtime": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
+      "removedUpstreamPaths": [
+        "packages/test-support/client-runtime/src/assembly/bundle-roster.ts",
+        "packages/test-support/client-runtime/src/assembly/index.ts",
+        "packages/test-support/client-runtime/src/assembly/modules.ts",
+        "packages/test-support/client-runtime/src/assembly/remote-default-responses.ts",
+        "packages/test-support/client-runtime/src/assembly/remote-proxies.ts",
+        "packages/test-support/client-runtime/src/assembly/roster.ts",
+        "packages/test-support/client-runtime/src/assembly/test-client.ts",
+        "packages/test-support/client-runtime/src/assembly/vitest.ts"
+      ]
     },
     "test-support/llm-mock-server": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "test-support/llm-replay": {
       "sovereignty": "adapted"
@@ -716,7 +873,7 @@
       "sovereignty": "adapted"
     },
     "typert/generator": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "typert/loader": {
       "sovereignty": "adapted"
@@ -728,25 +885,28 @@
       "sovereignty": "adapted"
     },
     "util/atomic-write": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/brand": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/chunked-list": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/crypto": {
       "sovereignty": "adapted"
     },
     "util/home-paths": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/http-proxy": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/launch-environment": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
+    },
+    "util/lazy-require": {
+      "sovereignty": "tracked"
     },
     "util/native-command": {
       "sovereignty": "adapted"
@@ -759,16 +919,16 @@
       "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
     },
     "util/time": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/timeout": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "util/values": {
       "sovereignty": "adapted"
     },
     "web/tool-web": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "web/web": {
       "sovereignty": "adapted"
@@ -794,11 +954,61 @@
     "workflow/workflow": {
       "sovereignty": "tracked"
     },
-    "workflow/workflow-worker-thread": {
+    "workflow/workflow-ptc": {
       "sovereignty": "adapted"
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "browser-use/browser-use": {
+      "sovereignty": "tracked"
+    },
+    "compaction/compaction-image-offload": {
+      "sovereignty": "tracked"
+    },
+    "computer-use/computer-use": {
+      "sovereignty": "tracked"
+    },
+    "experimental/auto-review": {
+      "sovereignty": "adapted"
+    },
+    "experimental/browser-use-chrome-devtools-mcp": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-playwright-mcp": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-runtime": {
+      "sovereignty": "tracked"
+    },
+    "experimental/browser-use-stagehand-native": {
+      "sovereignty": "tracked"
+    },
+    "experimental/computer-use-cua-driver-mcp": {
+      "sovereignty": "tracked"
+    },
+    "experimental/computer-use-cua-driver-native": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-v0-to-v1": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md"
+    },
+    "session/session-format-v1-to-v2": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-v2-to-v3": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md"
+    },
+    "session/session-turn-outline": {
+      "sovereignty": "tracked"
+    },
+    "session/session-format-catalog": {
+      "sovereignty": "adapted"
+    },
+    "session/session-format-v3-to-v4": {
+      "sovereignty": "owned"
     }
   },
   "upstreamOnly": [
@@ -813,6 +1023,11 @@
       "replacedBy": "host/apiproxy"
     },
     {
+      "package": "api/terminal-controller",
+      "reason": "terminal sessions are served by host/apiproxy terminal remotes",
+      "replacedBy": "host/apiproxy"
+    },
+    {
       "package": "api/workspace-controller",
       "reason": "workspace operations are served by host/apiproxy and the Workbench runtime targets",
       "replacedBy": "host/apiproxy"
@@ -821,18 +1036,6 @@
       "package": "api/workspace-files",
       "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
       "replacedBy": "host/apiproxy"
-    },
-    {
-      "package": "bundle/acp-app",
-      "reason": "CoHarness ships its own installable bundle profiles; the upstream ACP bundle is not carried"
-    },
-    {
-      "package": "bundle/sdk-app",
-      "reason": "CoHarness ships its own installable bundle profiles; the upstream SDK bundle is not carried"
-    },
-    {
-      "package": "bundle/sdk-minimal",
-      "reason": "CoHarness ships its own installable bundle profiles; the upstream minimal SDK bundle is not carried"
     },
     {
       "package": "client/file-upload",
@@ -862,9 +1065,22 @@
       "reason": "the desktop docking layout belongs to the rejected upstream ui-package tree; the Workbench owns the cloud layout"
     },
     {
+      "package": "client/ui-plugin-manager",
+      "reason": "plugin management surfaces live in client/ui-settings-plugins",
+      "replacedBy": "client/ui-settings-plugins"
+    },
+    {
       "package": "client/ui-session",
       "reason": "client/ui-conversation and ui-workbench own the session surface",
       "replacedBy": "client/ui-conversation"
+    },
+    {
+      "package": "client/ui-settings-unarchive-sessions",
+      "reason": "session archival actions live inside the CoHarness Workbench session settings surface"
+    },
+    {
+      "package": "client/ui-sidebar-browser",
+      "reason": "the sidebar browser dock is part of the rejected upstream ui-panel dock family"
     },
     {
       "package": "client/ui-sidebar-documentpreview",
@@ -879,8 +1095,20 @@
       "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
     },
     {
-      "package": "experimental/agent-team-profile",
-      "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
+      "package": "client/ui-sidebar-terminal",
+      "reason": "the sidebar terminal dock is part of the rejected upstream ui-panel dock family"
+    },
+    {
+      "package": "deliverables/tool-present",
+      "reason": "the present-file tool adds a model-visible deliverable declaration; adoption pending with the deliverables surface"
+    },
+    {
+      "package": "deliverables/workspace-changes",
+      "reason": "workspace-change review is part of the pending Phase 7 deliverables surface"
+    },
+    {
+      "package": "document/office-to-pdf",
+      "reason": "Office document conversion is a pending Phase 7 adoption; no cloud consumer yet"
     },
     {
       "package": "experimental/agent-team-web-profile",
@@ -903,36 +1131,28 @@
       "reason": "experimental prototype with no cloud consumer"
     },
     {
-      "package": "fs/tool-present",
-      "reason": "the present-file tool adds a model-visible deliverable declaration surface; adoption is deferred pending a product decision on the cloud produced-files flow"
+      "package": "skill/skill-office",
+      "reason": "Office skills are a pending Phase 7 adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-catalog",
-      "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
-      "replacedBy": "session/session-format"
+      "package": "ssh/fs-ssh",
+      "reason": "SSH-backed filesystem is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-v0-to-v1",
-      "reason": "real v0 normalization inlines into session/session-format; empty bump() shells are replaced under the rc.2 Session-correctness work",
-      "replacedBy": "session/session-format"
+      "package": "ssh/sandbox-ssh",
+      "reason": "SSH-backed sandbox is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-v1-to-v2",
-      "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
-      "replacedBy": "session/session-format"
+      "package": "ssh/ssh",
+      "reason": "SSH capability is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-format-v2-to-v3",
-      "reason": "v2\u2192v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
-      "replacedBy": "session/session-format"
+      "package": "ssh/subprocess-ssh",
+      "reason": "SSH-backed subprocess is a pending Phase 7B adoption; no cloud consumer yet"
     },
     {
-      "package": "session/session-turn-outline",
-      "reason": "readHistoryIndex covers the lookup surface but only the gateway provider produces indexes; the exclusion is under review"
-    },
-    {
-      "package": "subprocess/win32-process",
-      "reason": "shared Windows process helper library; adopted or rejected with the PR-11 subprocess runner rebuild"
+      "package": "test-support/remote-mock",
+      "reason": "remote mock server is used by upstream remote tests the fork does not carry"
     },
     {
       "package": "test-support/session-snapshot",
@@ -954,5 +1174,6 @@
       "package": "webhook/webhook-github",
       "reason": "a cloud HTTP entry that creates Sessions needs a separate security review; deferred"
     }
-  ]
+  ],
+  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json"
 }

@@ -4,6 +4,10 @@
 
 这个浏览器插件把持久化的顶层工作流运行重建为独立 Chat 节点。它消费由 [`dsh-tool-workflow`](../../workflow/tool-workflow/README.zh.md) 拥有的四类 `tool-workflow/*` Session 事件，注册一个 `ConversationNodeDefinition`，并通过 keyed `conversation.chat.node` slot 渲染，不改变现有工作流工具卡。
 
+## 概述
+
+使用 `dsh-client-ui-workflow-run` 可以把每个持久化的顶层工作流运行作为独立 Chat 节点查看。展开运行可查看阶段，展开阶段可查看成员；运行中、失败、已取消与已中断的层级默认展开，已完成层级保持折叠。只有当运行中的成员属于当前会话且可在本地访问时，才能打开其子会话。节点只显示身份与状态；脚本、输出、错误、日志、用量、拓扑与控制操作不属于本界面。
+
 ## 持久状态与回放
 
 `tool-workflow/run-start` 以 `runId` 创建唯一 Context；成员开始、成员结束和运行结束事件按日志顺序更新该 Context。只有 update 的历史尾页会保持 pending，直到更早页面补入唯一 start；此后 prepend、完整回放和实时 append 得到相同状态。若所属 Turn 或 Step 已关闭但终点事件缺失，界面把相应运行或成员显示为已中断，而不改写工具结果。
@@ -20,13 +24,17 @@
 
 本包把 Definition、locale 字典和 `workflow-run` renderer 都注册为 Cordis effect；移除客户端 entry 会撤销三者。shipped Web bundle 在 `ui-conversation` 与 `ui-tool` 之后装配该插件。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。节点定义是对持久 `tool-workflow/*` session 事件的纯重建；除渲染出的节点外不增加状态。
+
 ## 模型体验
 
-无，因为本包只为人类展示持久 Session 事实，不增加 prompt、工具 schema、请求内容或模型可见结果。
+无。该包是浏览器端 UI 插件层，只渲染持久化工作流记录，不改变模型上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-无。
+无；该包既不组装也不发送提供方请求。
 
 ## 已知限制与暂缓事项
 

@@ -17,7 +17,7 @@ Status: implemented
 
 ## 决策
 
-五项重组决策仍然有效；其余每个组都保持先前的边界与内容不变（依赖分析确认各能力家族——`shell/`、`terminal/`、`code-runtime/`、`sandbox/`、`subprocess/`、`fs/`、`lsp/`、`web/`、`skill/` 及其余——本来就划得正确）。原本的第六项决策把 SDK 项目初始化器、启动器工具与运行时 JSON-RPC 包汇集到 `scaffold/`；[移除这套未发布工具链](../simplification/2026-08-11-remove-sdk-project-toolchain.zh.md)的决策删除了项目工具，并将存留的运行时三包移到 `sdk/`。后续的[仓库命名约定](2026-08-11-repository-naming-contract-and-rename-ledger.zh.md)负责 `shell/`、`terminal/` 与 `extensions/` 组名，以及本决策曾推迟的两个包名。
+五项重组决策仍然有效；其余每个组都保持先前的边界与内容不变（依赖分析确认各能力家族——`shell/`、`terminal/`、`ptc-runtime/`、`sandbox/`、`subprocess/`、`fs/`、`lsp/`、`web/`、`skill/` 及其余——本来就划得正确）。原本的第六项决策把 SDK 项目初始化器、启动器工具与运行时 JSON-RPC 包汇集到 `scaffold/`；[移除这套未发布工具链](../simplification/2026-08-11-remove-sdk-project-toolchain.zh.md)的决策删除了项目工具，并将存留的运行时三包移到 `sdk/`。后续的[仓库命名约定](2026-08-11-repository-naming-contract-and-rename-ledger.zh.md)负责 `shell/`、`terminal/` 与 `extensions/` 组名，以及本决策曾推迟的两个包名。
 
 | 组 | 成员（目录名） | 来源 |
 |---|---|---|
@@ -49,7 +49,7 @@ Status: implemented
 
 ## 曾考虑的替代方案
 
-**粗粒度领域桶**（`exec/` = subprocess+sandbox+bash+pty+code-runtime，`workspace/` = fs+lsp+workspace，`orchestration/` = subagent+workflow+tasks，`knowledge/` = web+skill，`collab/` = plan+todo+goal；约 16 个组）。不予采纳：实测依赖图与这些合并相矛盾。`sandbox` 和 `subprocess` 是被各家族跨界消费的共享基础设施（与 bash ×5、fs ×5、pty、lsp、mcp 及 subagent 均有依赖边），`web` ↔ `skill` 之间零依赖边，而大桶只会在更大尺度上复现 `ui/` 式大杂烩。
+**粗粒度领域桶**（`exec/` = subprocess+sandbox+bash+pty+ptc-runtime，`workspace/` = fs+lsp+workspace，`orchestration/` = subagent+workflow+tasks，`knowledge/` = web+skill，`collab/` = plan+todo+goal；约 16 个组）。不予采纳：实测依赖图与这些合并相矛盾。`sandbox` 和 `subprocess` 是被各家族跨界消费的共享基础设施（与 bash ×5、fs ×5、pty、lsp、mcp 及 subagent 均有依赖边），`web` ↔ `skill` 之间零依赖边，而大桶只会在更大尺度上复现 `ui/` 式大杂烩。
 
 **抽象分层名**（`capability/`、`policy/`、`extension/`、`provider/`）。不予采纳：这些名字对每个插件都同样地不达意，而且一个 `capability/` 桶会装下约 50 个包。
 

@@ -141,7 +141,7 @@ persisted Session
 
 Agent 收件箱是唯一队列。每条 Agent 消息都使用 `Agent.steer()`：空闲目标会启动一个轮次，运行中目标则在最近的 step 边界领取消息。投递成功会返回被接受的 `MessageId`；既有的 `agent/inbox/inserted`、`agent/inbox/claimed` 与 `agent/inbox/discarded` 事件仍是消息生命周期的观测点，继续执行层不定义任何 subagent 专属的投递路由。
 
-权限来自确切在线 sender。parent 到 child 的投递要求目标的 `SessionHeader.parentSession` 指向 sender；child 到 parent 的投递要求 sender 的驻留 Activation 指向目标。sibling、相隔多于一条边的 ancestor、self-target、陈旧 Agent 对象与一次性 child 都会被拒绝。每条已接受消息都以 `Agent <sender-id> sent a message:` 作为前缀，并记录 `AgentMessageSource`；来源信息记录 sender，但不授予权限。
+权限来自确切在线 sender。parent 到 child 的投递要求目标的 `SessionHeader.parentSession` 指向 sender；child 到 parent 的投递要求 sender 的驻留 Activation 指向目标。sibling、相隔多于一条边的 ancestor、self-target、陈旧 Agent 对象与一次性 child 都会被拒绝。每条已接受消息都以 `Agent <sender-id> sent a message:` 作为前缀，并记录 `AgentMessageSource`；来源记录 sender，但不授予权限。
 
 对于 `startContinuable()` 与 `sendMessage()`，调用方 signal 仅在收件箱接受之前掌管查找、物化与准入。此后管理器独立掌管该 Activation：之后的调用方取消既不会取消已接受的轮次，也不会 dispose 子 agent。浏览器中的人类提示仍由私有 Queue 适配器处理，因此继续产生独立 FIFO 轮次。
 
@@ -191,7 +191,7 @@ interface ContinuableStart {
 }
 ```
 
-当驻留 Activation 结算时，管理器会向该 child 持久化的直接 parent 投递一条通知，说明该 epoch 如何结束，并携带其最终 assistant 内容。对每个调用方拿到过 id 的 child，这条投递都是无条件的；它发生在会让 parent 被判定为已结算的所有权释放之前，并通过与 Agent 消息相同的唤醒准入记账到达驻留 parent。若 parent 自身所在的谱系已在拆卸中，这条通知会以不唤醒的方式送达，因为唤醒一个静息 Agent 是开启一个轮次，而不是排队等待工作。其来源信息使用一个独立的 kind，因此 transcript（文本记录）绝不会把运行时的记账呈现为 child 自己写下的内容。
+当驻留 Activation 结算时，管理器会向该 child 持久化的直接 parent 投递一条通知，说明该 epoch 如何结束，并携带其最终 assistant 内容。对每个调用方拿到过 id 的 child，这条投递都是无条件的；它发生在会让 parent 被判定为已结算的所有权释放之前，并通过与 Agent 消息相同的唤醒准入记账到达驻留 parent。若 parent 自身所在的谱系已在拆卸中，这条通知会以不唤醒的方式送达，因为唤醒一个静息 Agent 是开启一个轮次，而不是排队等待工作。其来源 kind 是独立的，因此 transcript（文本记录）绝不会把运行时的记账呈现为 child 自己写下的内容。
 
 ```ts type-equiv
 /**
@@ -484,6 +484,13 @@ Named provider registry with one-shot runs, durable discovery, and continuable-c
 
 ```ts cordis-catalog
 /**
+ * Resolve a delegation tool's depth policy against the current user setting.
+ * @param configured - Explicit tool limit, or provider-managed for external delegation.
+ * @returns The numeric limit, or undefined when the provider owns depth enforcement.
+ */
+resolveMaxDepth(configured?: number | 'provider-managed'): number | undefined
+
+/**
  * Establish one durable continuable child and deliver its initial prompt.
  * Resolves when the child's inbox accepts that prompt, without waiting for the
  * turn to start or for the message to reach the Session log; any earlier
@@ -625,6 +632,7 @@ listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<Subagen
  * the Agent loop's best-effort fallback semantics. Image parts are admitted
  * and persisted through the attachment store before delivery, and the
  * child's model must accept image input.
+ * Cold resume at capacity rejects with `subagent/delivery-unavailable`.
  * @param request - durable address, delivery, minted identity, content, and optional browser zone.
  * @param signal - carrier cancellation, owning the call until inbox acceptance.
  * @returns the accepted message's inbox identity.

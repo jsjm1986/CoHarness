@@ -10,7 +10,8 @@ name: E2E (real DeepSeek API)
 # PRs and Dependabot PRs (the latter are same-repo, fork==false, but still
 # keyless). The job-level `if:` below also restricts credentialed execution to
 # the canonical repository and requires the DSH_REAL_API_E2E_ENABLED repository
-# variable to be exactly `true`; an absent variable keeps the job disabled. The
+# variable to be exactly `true` for automatic events; workflow_dispatch is an
+# explicit request to run the suite. The
 # Dependabot test keys on the PR AUTHOR (pull_request.user.login), not
 # github.actor (the run trigger) — a maintainer reopening a Dependabot PR would
 # make github.actor human while the PR is still keyless. When the job runs, the
@@ -61,7 +62,7 @@ jobs:
     # opt-in. Fork and Dependabot PRs remain skipped because secrets are withheld.
     if: >-
       github.repository == 'jsjm1986/CoHarness'
-      && vars.DSH_REAL_API_E2E_ENABLED == 'true'
+      && (github.event_name == 'workflow_dispatch' || vars.DSH_REAL_API_E2E_ENABLED == 'true')
       && (github.event_name != 'pull_request'
       || !(github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]'))
     # Bounded file parallelism (DSH_E2E_MAX_WORKERS), 120s/test, retry 2. 45m
@@ -120,4 +121,17 @@ jobs:
           DEEPSEEK_BASE_URL: https://api.deepseek.com
           DSH_E2E_MAX_WORKERS: 14
           DSH_EXAMPLE_MODE: lib
-        run: pnpm run test:e2e
+        run: pnpm run test:e2e --reporter=default --reporter=json --outputFile=.artifacts/provider-results.json
+
+      - name: Preserve real-provider evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        env:
+          DSH_GATE_REPORT_DIR: .artifacts/gates
+          DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-real-provider-${{ github.run_attempt }}
+          DSH_EVIDENCE_JOB_NAME: e2e
+          DSH_PROVIDER_TEST_RESULTS: .artifacts/provider-results.json
+        with:
+          external: real-provider
+          status: ${{ job.status }}
+          command: pnpm run test:e2e (external DeepSeek API)

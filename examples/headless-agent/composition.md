@@ -18,10 +18,10 @@ flowchart LR
   cfg --> plugin_headless_subprocess
   plugin_headless_bash["bash<br/>@deepseek-ai/dsh-bash-local"]
   cfg --> plugin_headless_bash
-  plugin_headless_agent_spine["agent-spine<br/>@deepseek-ai/dsh-agent-spine-demo"]
-  cfg --> plugin_headless_agent_spine
   plugin_headless_persistence["persistence<br/>@deepseek-ai/dsh-session-persistence-jsonl"]
   cfg --> plugin_headless_persistence
+  plugin_headless_agent_spine["agent-spine<br/>@deepseek-ai/dsh-agent-spine-demo"]
+  cfg --> plugin_headless_agent_spine
   plugin_headless_checkpoint_policy["checkpoint-policy<br/>@deepseek-ai/dsh-session-checkpoint-policy"]
   cfg --> plugin_headless_checkpoint_policy
   plugin_headless_token_meter["token-meter<br/>@deepseek-ai/dsh-token-meter"]
@@ -42,8 +42,14 @@ flowchart LR
   cfg --> plugin_headless_tool_subagent
   plugin_headless_tool_subagent_fork["tool-subagent-fork<br/>@deepseek-ai/dsh-tool-subagent"]
   cfg --> plugin_headless_tool_subagent_fork
-  plugin_headless_workflow_worker_thread["workflow-worker-thread<br/>@deepseek-ai/dsh-workflow-worker-thread"]
-  cfg --> plugin_headless_workflow_worker_thread
+  plugin_headless_sandbox["sandbox<br/>@deepseek-ai/dsh-sandbox-local"]
+  cfg --> plugin_headless_sandbox
+  plugin_headless_sandbox_policy["sandbox-policy<br/>@deepseek-ai/dsh-sandbox-policy"]
+  cfg --> plugin_headless_sandbox_policy
+  plugin_headless_ptc_runtime["ptc-runtime<br/>@deepseek-ai/dsh-ptc-runtime-node"]
+  cfg --> plugin_headless_ptc_runtime
+  plugin_headless_workflow_ptc["workflow-ptc<br/>@deepseek-ai/dsh-workflow-ptc"]
+  cfg --> plugin_headless_workflow_ptc
   plugin_headless_tool_workflow["tool-workflow<br/>@deepseek-ai/dsh-tool-workflow"]
   cfg --> plugin_headless_tool_workflow
   plugin_headless_tool_ralph["tool-ralph<br/>@deepseek-ai/dsh-tool-ralph"]
@@ -65,8 +71,8 @@ flowchart LR
 | `llm-deepseek` | `@deepseek-ai/dsh-llm-deepseek` |
 | `subprocess` | `@deepseek-ai/dsh-subprocess-local` |
 | `bash` | `@deepseek-ai/dsh-bash-local` |
-| `agent-spine` | `@deepseek-ai/dsh-agent-spine-demo` |
 | `persistence` | `@deepseek-ai/dsh-session-persistence-jsonl` |
+| `agent-spine` | `@deepseek-ai/dsh-agent-spine-demo` |
 | `checkpoint-policy` | `@deepseek-ai/dsh-session-checkpoint-policy` |
 | `token-meter` | `@deepseek-ai/dsh-token-meter` |
 | `compaction-basic` | `@deepseek-ai/dsh-compaction-basic` |
@@ -77,7 +83,10 @@ flowchart LR
 | `tool-subagent-control` | `@deepseek-ai/dsh-tool-subagent-control` |
 | `tool-subagent` | `@deepseek-ai/dsh-tool-subagent` |
 | `tool-subagent-fork` | `@deepseek-ai/dsh-tool-subagent` |
-| `workflow-worker-thread` | `@deepseek-ai/dsh-workflow-worker-thread` |
+| `sandbox` | `@deepseek-ai/dsh-sandbox-local` |
+| `sandbox-policy` | `@deepseek-ai/dsh-sandbox-policy` |
+| `ptc-runtime` | `@deepseek-ai/dsh-ptc-runtime-node` |
+| `workflow-ptc` | `@deepseek-ai/dsh-workflow-ptc` |
 | `tool-workflow` | `@deepseek-ai/dsh-tool-workflow` |
 | `tool-ralph` | `@deepseek-ai/dsh-tool-ralph` |
 | `tool-todo` | `@deepseek-ai/dsh-tool-todo` |

@@ -18,9 +18,17 @@ The foot is the `sidebar.settings` seat: the sidebar renders the bottom-pinned l
 
 The `/client` exports are the plugin body (`apply`/`inject`) plus the contract types only; SidebarRoot, the row components, and the tree derivation remain package-internal behind the slot registration.
 
+## Summary
+
+The dsh web client sidebar lets users recognize the active build, start a new session, collapse navigation to a 56px rail, browse Workspaces and Sessions, and open Settings. It preserves a bottom-pinned Settings entry and hides idle scrollbars without moving browser rows. New Session uses an explicitly selected Workspace, then the current Session's Workspace, then the most recently active Workspace; if none exists, it opens a blank New Session page. Deployments can replace the brand mark or name while retaining the navigation controls and rail geometry.
+
+## Invariants
+
+**Runtime invariant:** No companion is published. The sidebar contributes shell seats and collapse chrome; Workspace and Session rows are owned by `ui-workspace` and their data by runtime mirrors.
+
 ## Model Experience
 
-None, as the sidebar renders the browser session list; nothing here reaches a model request.
+None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
 
 #### KV Cache effect
 

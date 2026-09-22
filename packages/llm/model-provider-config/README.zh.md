@@ -6,6 +6,11 @@
 
 组织路由 id 使用部署保留的 `org-*` 命名空间；项目路由使用带项目编号的 `project-<id>-<slug>` id，并携带项目编号。每个配置包含适配器驱动、线协议、端点、可选的只读凭据引用及开放模型。存储、授权、凭据解析和刷新顺序由 Provider 实现负责。
 
+## 概述
+
+使用 `dsh-model-provider-config` 作为组织与项目托管模型提供方的服务定义。提供方在 `ctx.modelProviderConfig` 发布不可变路由快照，并在每次已提交修订后发出 `model-provider-config/updated`；适配器消费方注册这些路由而不复制到用户设置。
+
+
 ## 模型体验
 
 间接影响，由 LLM 适配器 Consumer 将启用的组织模型提供给选择与执行流程。

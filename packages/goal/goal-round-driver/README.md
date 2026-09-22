@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Same-session continuation driver for [`ctx.goals`](../goal/README.md). It turns an active, armed goal into sequential [goal rounds](../../../docs/glossary.md#goal-round) through the public `Agent` and session services; the [same-session driver Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-same-session-goal-round-driver.md) owns the race and lifecycle rationale.
 
+## Summary
+
+`dsh-goal-round-driver` automatically continues an active goal in the same session while the agent is idle, continuation is armed, and the configured round allowance remains. Each round gives the model another turn toward the objective; only goal rounds that reach model history consume the allowance, and exhaustion records a blocker. The driver has no configuration: the goal defines the round limit, and `dsh-tool-goal` defines when repeated blocking stops continuation. Mount it with `dsh-goal` and `dsh-tool-goal` for unattended multi-round progress; omit it when each step requires human steering.
+
 ## Composition
 
 ```yaml

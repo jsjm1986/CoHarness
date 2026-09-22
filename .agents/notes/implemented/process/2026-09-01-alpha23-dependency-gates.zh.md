@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`scripts/verify-package-dependencies.ts` 扫描 workspace 清单和 Host 源码 import。它要求使用 workspace 协议范围、DSH 包的 peer/development 对应声明、生产依赖区段不重复、peer 元数据不悬空，并要求每条检测到的 Host 运行时边都存在于 production dependency 区段。Client、bundle、app、vendor 和 native 的策略继续由已有专门检查负责。
+`scripts/verify-package-dependencies.ts` 扫描 workspace 清单与两侧源码面。Client 面与 `verify-client-packages` 共用 module-graph 规则：Cordis 家族与 `dsh-*` 关系保留对应的 peer/development 声明，静态链接输入与 vendored 库留在 development 或普通 dependency 区段，已声明的 workspace peer 按其记录的共享身份保留。Host 运行时 import 要求 production dependency 区段，除非所导入的导出经评审为 peer-required。门禁还要求 workspace 协议范围、生产区段不重复、peer 元数据不悬空。Bundle、app、vendor 与 native 的策略继续由已有专门检查负责。
 
 `scripts/benchmark-npm-resolution.ts` 提供只读元数据本地 registry resolver。`scripts/verify-npm-install-layout.ts` 构造两个不兼容的合成 DSH 发行版，让 npm 计算 hoisted lock 布局，检查每条已解析 production/optional 边的嵌套与根路径，并要求 Cordis 只存在一份共享路径。本 fork 的完整 DSH peer 图循环过多，npm 严格 solver 会耗尽 Node 堆；因此布局探针先检查源码发行版的 1,244 条 peer 范围，再只在 npm 调用的合成元数据中移除 DSH peer 信息，并直接将全部 2,488 条合成 DSH peer 范围与各自发行版本比对。源码清单和独立的归属门禁仍保留 peer 声明。
 

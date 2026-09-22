@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 The **Plugins** settings section and its **Plugin configuration** tab. The section owns the heading and compact tab chrome; feature plugins contribute pages through `settings.plugins.tab`. This package's own tab shows one expandable card per Host plugin whose configuration a user owns. A card shows the plugin's name and what it governs; expanding it in place reveals hand-written controls bound to that plugin's settings namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed.
 
+## Summary
+
+Use the **Built-in plugins** settings section to inspect the plugins this deployment ships, and the **Official** group of the sidebar's Plugins page to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
+
 ## What appears here
 
 The configurable tab reads which settings namespaces the Host serves and dispatches one slot key per namespace, so what renders is the intersection of two ledgers: the namespaces a live Host plugin registered, and the cards registered under those keys. A served namespace no card claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and a card whose namespace this deployment does not serve is never dispatched, so an uncomposed plugin leaves no trace and does not hold the tab back from its empty line. The empty line waits for the Host's first answer, so an unanswered read never reads as "this deployment configures no plugin". Cards appear in the order they registered, which is stable for the cards one package installs together and not stable across plugins: apply order between packages is unconstrained.
@@ -26,9 +30,13 @@ A key can also be written from another surface — the Models page addresses the
 
 A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Plugin configuration values live in the Host plugin settings namespaces; the section contributes tab chrome and per-field bindings over that remote document.
+
 ## Model Experience
 
-None, as the section renders a browser configuration UI; the values it writes reach a model only through the plugins that own them, each documenting that effect itself.
+None, as the package is a browser-side settings surface that registers no model surface.
 
 #### KV Cache effect
 

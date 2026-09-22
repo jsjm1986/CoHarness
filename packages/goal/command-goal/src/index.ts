@@ -192,7 +192,7 @@ export function apply(ctx: Context): void {
     definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-goal'),
     name: 'goal',
     description: 'set or view the goal for a long-running task',
-    input: { hint: '[<objective>|clear|edit <objective>|pause|resume]', images: true },
+    input: { hint: '[<objective>|clear|edit <objective>|pause|resume]', attachments: true },
     handler: invocation => executeGoalCommand(ctx, invocation),
   })
 }

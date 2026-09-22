@@ -19,6 +19,7 @@ import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
   DEFAULT_DISPOSE_GRACE_MS,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
+  sdkConfigurationFailure,
   startSdkRun,
   type SdkRunSpec,
 } from './run.ts'
@@ -105,6 +106,17 @@ class SdkSubagentProvider implements SubagentProvider {
   }
 
   start(request: SubagentStartRequest) {
+    if (request.signal.aborted) {
+      throw new Error('subagent request was aborted before the SDK child started')
+    }
+    let cwd: string
+    try {
+      cwd = resolveChildCwd('subagent-dsh-sdk', this.config.cwd, request.parent.session.header.cwd)
+    } catch (error: unknown) {
+      const failure = sdkConfigurationFailure(error)
+      this.ctx.logger.warn(`subagent-dsh-sdk "${this.name}": child start failed: %o`, error)
+      throw failure
+    }
     const requested = request.agentOptions
     const maxTokens = requested?.maxTokens ?? this.config.maxTokens
     const route = {
@@ -116,7 +128,7 @@ class SdkSubagentProvider implements SubagentProvider {
     const spec: SdkRunSpec = {
       command: this.config.command,
       args: this.config.args,
-      cwd: resolveChildCwd('subagent-dsh-sdk', this.config.cwd, request.parent.session.header.cwd),
+      cwd,
       ...route,
       env: this.config.env,
       shutdownTimeoutMs: this.config.shutdownTimeoutMs,

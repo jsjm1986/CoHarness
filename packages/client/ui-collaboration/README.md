@@ -4,6 +4,11 @@ English | [中文](README.zh.md)
 
 Gateway collaboration UI for the Web client. One plugin owns the account-context HTTP state, personal/project scope selector, staged root-conversation visibility, conversation sharing menu, and read-only project composer policy through existing Client slots and session-create waterfall events.
 
+## Summary
+
+Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client: an account scope selector, staged root-conversation visibility, a conversation sharing menu, and a read-only project composer policy. One plugin contributes these through existing Client slots and session-create waterfall events, so shared project conversations work without a separate account surface.
+
+
 ## User interface contract
 
 - `sidebar.footer.action` shows the active personal or project runtime, accessible memberships, `ro`/`rw` mode, and the next root conversation's `project` or `private` visibility. Changing runtime scope persists through `/account/api/scope` and reloads the page so every Host connection targets the selected runtime.
@@ -15,13 +20,17 @@ Gateway collaboration UI for the Web client. One plugin owns the account-context
 - New `rw` project-session flows pass the staged visibility through `sessions/prepare-create`. Before reusing a blank candidate, `sessions/confirm-blank-reuse` revalidates its root visibility through the Gateway and accepts only an exact match; a mismatch creates a new root with the prepared visibility. HTTP responses are decoded at the browser trust boundary through a streaming 16 MiB byte budget before any state is published.
 - All registrations are effects and unload cleanly. Personal scope keeps the ordinary Web UI and clears project conversation detail state.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. Collaboration truth lives on the Gateway behind authenticated endpoints; the plugin stages only request-scoped selections and composer policy in the page.
+
 ## Model Experience
 
-Indirectly, through scope, visibility, and submission choices that Host collaboration Consumers enforce while `dsh-collaboration-context` records model-visible participant attribution.
+Indirectly, through host collaboration consumers, which own authorization and participant attribution for the state the browser UI selects.
 
 #### KV Cache effect
 
-The UI does not assemble model requests; the owning Host Consumers determine whether new participant context appends to a request suffix.
+No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

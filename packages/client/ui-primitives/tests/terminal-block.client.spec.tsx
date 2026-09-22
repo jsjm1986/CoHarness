@@ -9,8 +9,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { DEFAULT_TERMINAL_MAX_LINES, TerminalBlock } from '../src/index.ts'
+import type { ComponentProps } from 'react'
+import { DEFAULT_TERMINAL_MAX_LINES, TerminalBlock as LocalizedTerminalBlock } from '../src/index.ts'
+import { terminalBlockLabels } from './labels.client.ts'
 import { writeClipboard } from '../src/clipboard.ts'
+
+function TerminalBlock(props: Omit<ComponentProps<typeof LocalizedTerminalBlock>, 'labels'>) {
+  return <LocalizedTerminalBlock {...props} labels={terminalBlockLabels} />
+}
 
 const ESC = '\u001b'
 

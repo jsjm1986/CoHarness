@@ -32,7 +32,9 @@
 | [subprocess.md](subprocess.zh.md) | 子进程 seam：完全显式的 `SubprocessSpawnSpec`、基于偏移的输出读取器、不含分类的 `SubprocessOutcome`，以及受管 `DSH_*` 环境词汇 |
 | [terminal.md](terminal.zh.md) | 持久化终端 ID、后端/会话约定、发送就绪状态、有界读取与 owner 可见快照 |
 | [sandbox.md](sandbox.zh.md) | 每会话策略解析与进程约束 seam：文件效果模式、执行/提供方策略、`ConfinedArgv`、强制执行与故障关闭错误 |
-| [code-runtime.md](code-runtime.zh.md) | 代码执行 seam：`CodeRunRequest`/`Result`、绑定命名空间、捕获日志、`CodeRunFailure` 分类体系 |
+| [ptc-runtime.md](ptc-runtime.zh.md) | 代码执行 seam：`PtcRunRequest`/`Result`、绑定命名空间、捕获日志、`PtcRunFailure` 分类体系 |
+| [computer-use.md](computer-use.zh.md) | 按名称独占注册计算机操作提供方，以及 Cua Driver 集成选项 |
+| [browser-use.md](browser-use.zh.md) | 按名称独占注册浏览器操作提供方、提供方选项与按 Session 管理的浏览器所有权 |
 | [extensions.md](extensions.zh.md) | 带版本的动态 Cordis Plugin 与 Package、Host/Client 激活、审批、运行时检查和生命周期撤销 |
 | [filesystem.md](filesystem.zh.md) | 文件系统 seam：`FsTarget`、读/写/编辑结果、观测到的文件状态、`FsErrorCode` |
 | [lsp.md](lsp.zh.md) | LSP 导航 seam：`LspQueryRequest`/`Result`、`LspProvider`/`Service`、四种操作、`LspError` |
@@ -51,7 +53,12 @@
 | [storage.md](storage.zh.md) | 存储子系统：后端约定（`StorageBackend`）、`StorageForms`、`DomainSpec`/`Domain`、`domain/changed` |
 | [workspace.md](workspace.zh.md) | 工作区注册表：`Workspace`/`WorkspaceId`、注册与解析、与会话 `cwd` 的关系 |
 | [client-modules.md](client-modules.zh.md) | Web 插件表：`dsh.client` 声明、`WebBootGraph` 线上组合、bundle 路由与 index 转换 |
+| [web-client.md](web-client.zh.md) | 浏览器端 Cordis 应用：四大基础（Client Modules、API Gateway、Slots、Conversation）以及 Client 模型与功能包的归属 |
+| [slots.md](slots.zh.md) | Web Client 的类型化 React 组合系统：`ctx.slots.register()`、无 React 依赖的注册表与类型代数、渲染器的可观测源绑定 |
+| [conversation.md](conversation.zh.md) | Client Session 事件窗口与浏览器视图之间的目标中立装配层：按 binding 的注册表、Turn/Step 位置与增量 Context 组装 |
 | [session-projection.md](session-projection.zh.md) | 投影 seam：`SessionProjectionMap`、纯函数 `ProjectionDefinition` 单元、`ProjectionSnapshot` 的一致切面、变更馈送 |
 | [session-telemetry.md](session-telemetry.zh.md) | 对外会话上报能力 seam：`SessionTelemetryRecord`/`SessionTelemetrySeverity`、`SessionTelemetrySink` 约定和 `session-telemetry/record` 脱敏 waterfall |
+| [boot.md](boot.zh.md) | 当前 profile 插件管理与 launcher 重载协调 |
+| [mcp.md](mcp.zh.md) | 外部 MCP 连接、作用域工具与资源、服务器指令、协议结果与配置归属 |
 
 > 这些页面上的类型声明及其 JSDoc 与源码等价，并由 `pnpm run verify-type-equiv` 检查漂移（见 [development.md](../development.zh.md#documenting-types-verbatim-ts-type-equiv)）。普通块保留完整声明；`public-api` 块保留去除实现体的公开 class 声明。Cordis 服务与事件使用每页生成的 **Cordis API** 小节。

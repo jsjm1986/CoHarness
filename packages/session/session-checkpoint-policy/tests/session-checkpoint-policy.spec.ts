@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import type { SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
-import LlmRuntime, { CallId, type GenerateOptions, LlmAdapter, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { ToolCallId, type GenerateOptions, LlmAdapter, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import SessionPersistence, { type SessionEventSuffix, type SessionInspection } from '@deepseek-ai/dsh-session-persistence'
@@ -13,22 +14,26 @@ import * as checkpointPolicy from '../src/index.ts'
 const contexts: Context[] = []
 
 class TestPersistence extends SessionPersistence {
+
+  override async materializeDetached(_id: SessionId): Promise<void> {}
+  override async discardDetached(_id: SessionId): Promise<void> {}
+  override listPending(): readonly SessionStorageMetadata[] { return [] }
   override readonly supportsRawArtifacts = false
 
-  locate(_meta: SessionHeader): undefined { return undefined }
-  create(_meta: SessionHeader): Promise<void> { return Promise.resolve() }
-  append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> { return Promise.resolve() }
-  load(_id: SessionId): Promise<SessionInspection> {
+  override locate(_meta: SessionHeader): undefined { return undefined }
+  override createStored(_meta: SessionHeader): Promise<void> { return Promise.resolve() }
+  override append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> { return Promise.resolve() }
+  override load(_id: SessionId): Promise<SessionInspection> {
     return Promise.reject(new Error('not used'))
   }
-  inspect(_id: SessionId): Promise<SessionInspection> {
+  override inspect(_id: SessionId): Promise<SessionInspection> {
     return Promise.reject(new Error('not used'))
   }
-  readFrom(_id: SessionId, _fromSeq: SessionLogOffset): Promise<SessionEventSuffix> {
+  override readFrom(_id: SessionId, _fromSeq: SessionLogOffset): Promise<SessionEventSuffix> {
     return Promise.reject(new Error('not used'))
   }
-  list(): Promise<SessionHeader[]> { return Promise.resolve([]) }
-  listSnapshots(): Promise<never[]> { return Promise.resolve([]) }
+  override listStored(): Promise<SessionHeader[]> { return Promise.resolve([]) }
+  override listSnapshots(): Promise<never[]> { return Promise.resolve([]) }
 }
 
 class RecordingAdapter extends LlmAdapter {
@@ -135,7 +140,7 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
     })
 
     const pending = ctx.tools.execute({
-      callId: CallId('write-1'), name: 'write', arguments: {}, agent,
+      callId: ToolCallId('write-1'), name: 'write', arguments: {}, agent,
       signal: new AbortController().signal,
     })
     await Promise.resolve()
@@ -164,7 +169,7 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
     })
 
     const pending = ctx.tools.execute({
-      callId: CallId('write-cancelled'), name: 'write', arguments: {}, agent,
+      callId: ToolCallId('write-cancelled'), name: 'write', arguments: {}, agent,
       signal: controller.signal,
     })
     await Promise.resolve()
@@ -195,7 +200,7 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
       execute: async () => { ran = true; return null },
     })
     const result = await ctx.tools.execute({
-      callId: CallId('write-2'), name: 'write', arguments: {}, agent,
+      callId: ToolCallId('write-2'), name: 'write', arguments: {}, agent,
       signal: new AbortController().signal,
     })
     expect(result.isError).toBe(true)
@@ -215,7 +220,7 @@ describe('session-checkpoint-policy tool and step boundaries', () => {
       execute: async () => null,
     })
     await ctx.tools.execute({
-      callId: CallId('nested-1'), name: 'nested', arguments: {}, agent,
+      callId: ToolCallId('nested-1'), name: 'nested', arguments: {}, agent,
       parent: Symbol('outer') as never,
       signal: new AbortController().signal,
     })

@@ -18,22 +18,22 @@
       "path": "../ui-primitives"
     },
     {
+      "path": "../ui-settings"
+    },
+    {
       "path": "../ui-slots"
     },
     {
       "path": "../../host/webserver"
     },
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
       "path": "../../settings/settings"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../ui-settings"
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

@@ -75,6 +75,11 @@ The package root only re-exports declarations from [`src/types.ts`](src/types.ts
 - [Public package metadata](../../../.agents/notes/implemented/architecture/2026-09-10-public-package-manifest.md) — field placement and reader ownership.
 
 <a id="model-experience"></a>
+
+## Invariants
+
+**Runtime invariant:** No companion is published. Pure type declarations with no runtime behavior; readers own parsing, validation, and defaults.
+
 ## Model Experience
 
 None, as this package only exports types.

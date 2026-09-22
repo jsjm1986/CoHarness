@@ -96,6 +96,9 @@ function nextHandlerId(point: string): string {
 /** The `{kind:'plugin'}` source stamped on every context this bridge injects. */
 const PLUGIN_SOURCE: MessageSource = { kind: 'plugin', plugin: 'hooks-claude-code' }
 
+/* jscpd:ignore-start -- the Claude Code and Codex bridges are parallel
+ * wire-protocol plugins; their load-time cap validation and apply() prologue
+ * mirror each other by design rather than sharing a module. */
 /** The summary cap bounds a persisted event field — a positive integer or the slice misbehaves silently. */
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 1) {
@@ -112,6 +115,7 @@ export function apply(ctx: Context, config: Config): void {
   const cap = (text: string): string => capModelFeedback(text, modelFeedbackMaxChars)
   const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
   assertPositiveInteger('defaultTimeoutMs', defaultTimeoutMs)
+  /* jscpd:ignore-end */
   // Parse once at load. A read or parse failure logs and registers nothing.
   let parsed: ClaudeCodeHookConfig = {}
   try {
@@ -324,6 +328,7 @@ const SUBAGENT_TYPE = 'general-purpose'
 /** The last open turn number in the agent's log, or 0 without an agent. */
 function lastTurn(agent: Agent | undefined): number {
   if (!agent) return 0
+  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const last = [...agent.session.snapshotEvents()].findLast(e => e.type === 'turn/start')
   /* v8 ignore next -- agent-present callers are tool/stop extension points inside an open turn. */
   return last?.type === 'turn/start' ? last.data.turn : 0

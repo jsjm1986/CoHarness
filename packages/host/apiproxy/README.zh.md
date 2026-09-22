@@ -8,6 +8,11 @@
 
 现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。
 
+## 概述
+
+使用 `dsh-host-apiproxy` 作为共享 API 网关：零依赖、浏览器可导入的 TypeScript API 契约、一对 fetch 载体，以及每个 HTTP 载体包装的宿主侧 `ApiProxyService`（`ctx.apiProxy`）。其 `workspaceFiles.*` 方法在授权、包含性与版本防护下按公开界限提供会话相对文件读取。
+
+
 ## 共享 Agent 默认值（`agent-default-model` Settings 分节）
 
 `ApiProxyService` 消费 `ctx.agentDefaultModel`；它不持有提供方／模型配置或 Settings 分节。共享服务在 `agent-default-model` 下注册 `{provider, model, reasoningEffort?}`：base 组合包的组合条目是底层，`settings.yaml` 把用户选择叠加其上。
@@ -48,7 +53,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 会话模型选择属于会话领域约定。`session.models` 将当前 `ModelSelection` 与按提供方分组的建议性模型、精确模型的推理元数据和逐提供方查询失败记录分开返回。该选择可能不在这些分组中，也绝不会作为合成行注入；客户端可以提示用户作出另一项选择，而无需把目录变成路由白名单。`session.selectModel` 校验由适配器持有的可选推理强度，并指定下次组装提示词时使用的完整选择。目录成员关系不构成校验：适配器可以解析未列出的模型，而不可用的提供方或不受支持的推理强度会返回 `model-unavailable`。`session.models` 还会报告 `routable`，即当前是否有适配器为所选提供方提供服务。该值刻意不从分组推导，因为适配器可以服务未公布的模型。`session.prompt` 会依据同一事实，在开启轮次之前以 `model-unavailable` 拒绝；客户端禁用 composer 只是提示性设计，这个方法始终可被调用。
 
-`session.prompt` 和 `subagent.prompt` 接受可选的请求本地 `clientTimeZone` 来源信息。若提供该值，Host 会在进入 Agent 前校验 `UTC` 或 IANA Area/Location 并将其规范化；无效输入以 `invalid-time-zone` 拒绝，规范值则与 `rpcId` 一起记录在这条确切的 `user-rpc` 消息上。该值不属于 Session、连接、create、resume 或 fork 状态；非浏览器调用方可以省略它。可继续 subagent prompt 使用与普通 prompt 相同的上传形态图片部分；gateway 会通过 `ctx.attachments` 在 continuation inbox 接受前完成整批准入，continuation manager 再检查子级已解析模型的输入模态。
+`session.prompt` 和 `subagent.prompt` 接受可选的请求本地 `clientTimeZone` 元数据。若提供该值，Host 会在进入 Agent 前校验 `UTC` 或 IANA Area/Location 并将其规范化；无效输入以 `invalid-time-zone` 拒绝，规范值则与 `rpcId` 一起记录在这条确切的 `user-rpc` 消息上。该值不属于 Session、连接、create、resume 或 fork 状态；非浏览器调用方可以省略它。可继续 subagent prompt 使用与普通 prompt 相同的上传形态图片部分；gateway 会通过 `ctx.attachments` 在 continuation inbox 接受前完成整批准入，continuation manager 再检查子级已解析模型的输入模态。
 
 提示准入仅在内容包含图片时读取 `ctx.attachments`，仅在内容包含文档时读取 `ctx.userDocs`。因此，纯文本提示在未挂载这两种存储的组合中仍然有效，纯文档提示也不依赖图片存储。
 
@@ -84,13 +89,17 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 
 `inbox` 投影从 Session 自有的持久化 splice 重建待处理输入，不恢复 Agent。历史读取仍由 Gateway 授权控制；冷队列修改继续要求 live Agent。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。请求分发委托给所属会话服务与已注册处理器；网关组合传输与策略而不拥有领域状态。
+
 ## 模型体验
 
-无。该包定义客户端与宿主间的 wire 约定和载体，其中没有任何内容会进入模型请求。
+没有直接影响；线上契约与 fetch 载体只搬运已组装的消息，不注册任何模型可见内容。
 
 #### KV Cache 影响
 
-无；该包既不组装也不发送提供方请求。
+无；本包从不组装或发送提供方请求。
 
 ## 已知限制与暂缓事项
 

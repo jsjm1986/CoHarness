@@ -17,7 +17,7 @@ Two lightweight aggregates were added to the gate runner:
 - `ci-coverage-scoped` runs Vitest coverage for the changed packages' test directories only, then enforces the authoritative per-file 100% gate with `scripts/incremental-coverage.ts` over the produced map. The global per-file threshold is disabled during the intermediate Vitest run (`DSH_COVERAGE_SCOPED_MODE=1`) because the selected tests import unchanged packages they never fully exercise; the incremental gate owns the verdict for exactly the changed files.
 - `ci-consumers-scoped` is the complete consumer inventory minus the Playwright web-snapshot gate. Keyless ACP/CLI snapshots, lint, publint, built invariants, doc-typecheck, node-next-types, and built-bin smoke all still run; only the browser-grade snapshot is dropped.
 
-The workflow uses the existing `run_expensive` selector for the coverage and consumer jobs (both lanes run them) and gates `python-runtime`, `windows`, and `windows-native` on `coverage_mode == 'full'` so the scoped lane skips them. `all-checks-passed` requires coverage and consumers on every expensive PR and the runtime/Windows jobs only on full PRs. Playwright provisioning is skipped in the scoped lane.
+The workflow uses independent compatibility, Python, Windows, Gateway, Admin UI and Android selections. The required verdict rejects any selected job that does not succeed. Scoped runtime validation retains ACP/CLI consumers; the dedicated browser lane follows its own tier.
 
 ## Alternatives considered
 
@@ -34,3 +34,5 @@ Routine package-only changes now finish coverage and consumers in the time their
 ## Tests
 
 `pnpm exec vitest run scripts/ci-pr-scope.spec.ts scripts/run-gates.spec.ts scripts/ci-workflow.spec.ts` passes. The scope spec covers the scoped classification, metadata/infra fallback to full, and the package-count bound; the run-gates spec covers the scoped coverage/consumer aggregates and their required inputs (`DSH_SCOPED_PACKAGES`, `DSH_INCREMENTAL_BASE`); the workflow spec pins the lane conditions and push-reachability.
+
+The [candidate-bound evidence decision](2026-09-21-candidate-bound-gate-evidence.md) extends consumer selection and publication acceptance while retaining this note’s coverage and versioning rules.

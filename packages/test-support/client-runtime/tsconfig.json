@@ -9,22 +9,22 @@
   ],
   "references": [
     {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../client/ui-slots"
-    },
-    {
-      "path": "../../client/ui-renderer"
+      "path": "../../attachment/attachment"
     },
     {
       "path": "../../client/runtime"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../client/ui-renderer"
+    },
+    {
+      "path": "../../client/ui-slots"
     },
     {
       "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../../vendor/cordis"
     }
   ]
 }

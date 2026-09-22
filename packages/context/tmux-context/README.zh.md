@@ -4,6 +4,10 @@
 
 可选启用的持久上下文，记录本 agent（智能体）进程所在的 tmux session、window、pane，以及该 window 的 pane 树布局。在准备模型请求时每轮采样一次；随附 Web／无头组合不包含它。决策记录见：[tmux-context Agent Note](../../../.agents/notes/implemented/feature/2026-07-27-tmux-location-context.zh.md)。
 
+## 概述
+
+`dsh-tmux-context` 让模型识别其 agent 进程所在的 tmux 会话、window、pane 和 pane 树布局。它仅在位置发生变化时，于每轮的第一个步骤追加一条持久、带来源的读数。若终端只继承了 tmux 环境变量，却并未在所指名的 pane 中运行，则不添加任何内容；查询失败同样不添加内容，也不会使该轮失败。本包需主动启用，且不包含在随附的 Web 或无头 profile 中。
+
 ## 配置
 
 ```yaml
@@ -35,6 +39,10 @@ exec tmux display-message -t "$TMUX_PANE" -p '<format>'
 
 该插件会前置一个 `agent/pre-step` 监听器。需要注入且下游决策进入拟议步骤时，它会向返回的批次前置添加一条带来源的 `UserMessage`。AgentLoop 会在 `step/start` 之后记录该上下文，其来源为 `{ kind: 'plugin', plugin: 'tmux-context' }`。变化抑制与间隔调度会扫描原始持久会话事件中该来源的最近一次注入，因此调度可跨压缩（compaction）与恢复的进程存续，无需进程内缓存状态；各会话独立调度。下游在步骤前运行的监听器拒绝或失败时，该读数不会被记录。
 
+## 不变量
+
+**运行时不变量：** 未发布配套入口。窗格事实在每轮次从 tmux 重新采样；采样之间不保留任何内容。
+
 ## 模型体验
 
 ### 准备期 tmux 位置
@@ -53,7 +61,7 @@ window active=<0|1>, pane active=<0|1>, layout <window-layout>
 
 #### Token 影响
 
-每条两行读数会累积，直到压缩将其遮蔽。位置未变化以及间隔抑制不会新增内容。
+每条三行读数会累积，直到压缩将其遮蔽。位置未变化以及间隔抑制不会新增内容。
 
 #### KV Cache 影响
 

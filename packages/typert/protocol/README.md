@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Compiler-independent declarations shared by business packages, generated Typert artifacts, the Host Gateway, and Client API. This package owns the Remote Service base, decorators, explicit binding fallback, merge-extensible protocol maps, invocation descriptors, codecs, and provider contracts; it does not run TypeScript analysis or register a concrete Cordis service.
 
+## Summary
+
+With `dsh-typert-protocol`, business packages can expose Host methods to Remote clients: mark a method with `@Remote` (or `@RemoteScope` for scoped receivers), bind the service to a wire namespace, and associate Host objects and scoped Contexts with wire identities through the merge-extensible protocol maps. Generated artifacts, the Host Gateway, and the Client API consume the same invocation descriptors, codecs, and provider contracts. Invocation-owned values transfer cleanup to Gateway without adding a reference count. The package registers no Cordis service and runs no TypeScript analysis.
+
 ## Remote declarations
 
 - `@Remote` marks a public instance method for direct invocation on its registered Cordis Service.
@@ -24,13 +28,17 @@ The Host assembly extends `TypertRemoteEventSelection` with the Host events it f
 
 Lookup and Context packages own both sides of their contract: declaration merging supplies the static association, while runtime providers register identity resolution with `ctx.typert`. A lookup or Host Context provider supplies the stable declaration and default resolver, while Host composition may separately configure a synchronous or asynchronous resolver; policy rejections may use `TypertLookupFailure` to carry a failure value owned by the boundary adapter. Strict codecs carry generated schemas; `src-json` codecs identify the weaker source-launch path.
 
+## Invariants
+
+**Runtime invariant:** No companion is published. A pure declaration-and-codec library with no service registration; its contracts are enforced by type-level use and codec specs.
+
 ## Model Experience
 
-None, as this protocol package declares application reflection and registers nothing model-facing.
+None, as compiler-independent Remote protocol declarations register nothing model-facing.
 
 #### KV Cache effect
 
-No direct effect.
+No direct effect; the declared contracts reach a request only when an assembly places them in one.
 
 ## Known Limitations and Deferred Work
 

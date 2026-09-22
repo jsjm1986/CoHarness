@@ -28,13 +28,17 @@ The separately published `./invariant` companion checks that every scheduled ret
 
 The executor has no policy config. Multi-provider adapters such as `dsh-llm-pi-ai` place `retryPolicy` inside each provider profile, avoiding a second provider-name list.
 
+## Summary
+
+Mount `@deepseek-ai/dsh-llm-retry` to retry failed model requests at durable agent-step boundaries. Provider `retryPolicy` settings choose bounded normal-mode retries or unlimited always-mode retries; scheduled attempts reach the session log before backoff, and cancellation leaves consistent history. Retries re-run the failed step in the same open turn, while direct `ctx.llm.stream()` calls remain single-attempt. Each retry is another billed provider request, and always mode continues until success, cancellation, or disposal.
+
 ## Model Experience
 
 ### Model-request recovery
 
 #### What the model sees
 
-No retry event, delay, provider error, or failed partial output is model-visible. The retry turn reconstructs the same explicit provider/model request from durable surface history unless a downstream recovery policy deliberately changes that surface; failed chunks never enter derived messages.
+No retry event, delay, provider error, or failed partial output is model-visible. The retried step reconstructs the same explicit provider/model request from durable surface history unless a downstream recovery policy deliberately changes that surface; failed chunks never enter derived messages.
 
 #### Token effect
 

@@ -80,8 +80,8 @@
         "client/ui-workflow-run",
         "client/ui-workspace",
         "client/web",
-        "code-runtime/code-runtime",
-        "code-runtime/code-runtime-worker-thread",
+        "ptc-runtime/ptc-runtime",
+        "ptc-runtime/ptc-runtime-node",
         "compaction/command-compact",
         "compaction/compaction",
         "compaction/compaction-basic",
@@ -110,7 +110,7 @@
         "experimental/agent-team-profile",
         "experimental/agent-team-web-profile",
         "experimental/client-ui-agent-team",
-        "experimental/code-runtime-python",
+        "experimental/ptc-runtime-python",
         "experimental/inspector",
         "experimental/tool-agent-team",
         "experimental/webworker-packer",
@@ -277,7 +277,7 @@
         "workflow/tool-ralph",
         "workflow/tool-workflow",
         "workflow/workflow",
-        "workflow/workflow-worker-thread",
+        "workflow/workflow-ptc",
         "workspace/workspace"
       ],
       "bucket": "carried"
@@ -367,8 +367,8 @@
         "client/ui-workflow-run",
         "client/ui-workspace",
         "client/web",
-        "code-runtime/code-runtime",
-        "code-runtime/code-runtime-worker-thread",
+        "ptc-runtime/ptc-runtime",
+        "ptc-runtime/ptc-runtime-node",
         "compaction/command-compact",
         "compaction/compaction",
         "compaction/compaction-basic",
@@ -397,7 +397,7 @@
         "experimental/agent-team-profile",
         "experimental/agent-team-web-profile",
         "experimental/client-ui-agent-team",
-        "experimental/code-runtime-python",
+        "experimental/ptc-runtime-python",
         "experimental/inspector",
         "experimental/tool-agent-team",
         "experimental/webworker-packer",
@@ -564,7 +564,7 @@
         "workflow/tool-ralph",
         "workflow/tool-workflow",
         "workflow/workflow",
-        "workflow/workflow-worker-thread",
+        "workflow/workflow-ptc",
         "workspace/workspace"
       ],
       "bucket": "carried"
@@ -741,8 +741,8 @@
         "client/ui-workflow-run",
         "client/ui-workspace",
         "client/web",
-        "code-runtime/code-runtime",
-        "code-runtime/code-runtime-worker-thread",
+        "ptc-runtime/ptc-runtime",
+        "ptc-runtime/ptc-runtime-node",
         "compaction/command-compact",
         "compaction/compaction",
         "compaction/compaction-basic",
@@ -771,7 +771,7 @@
         "experimental/agent-team-profile",
         "experimental/agent-team-web-profile",
         "experimental/client-ui-agent-team",
-        "experimental/code-runtime-python",
+        "experimental/ptc-runtime-python",
         "experimental/inspector",
         "experimental/tool-agent-team",
         "experimental/webworker-packer",
@@ -938,7 +938,7 @@
         "workflow/tool-ralph",
         "workflow/tool-workflow",
         "workflow/workflow",
-        "workflow/workflow-worker-thread",
+        "workflow/workflow-ptc",
         "workspace/workspace"
       ],
       "bucket": "carried"
@@ -1470,7 +1470,7 @@
       "sha": "1b56cf601307ae9fe318d4dbf93d4232cc90d2b2",
       "subject": "test(ci): retain useful regression controls after master rebase",
       "packages": [
-        "code-runtime/code-runtime-worker-thread",
+        "ptc-runtime/ptc-runtime-node",
         "host/open-in-app",
         "lsp/lsp-stdio",
         "shell/pwsh-local",
@@ -1482,7 +1482,7 @@
       "sha": "da1df501b8190d098b7caf5b7cf47f31511570ff",
       "subject": "test(runtime): isolate busy-meter decisions from worker startup",
       "packages": [
-        "code-runtime/code-runtime-worker-thread"
+        "ptc-runtime/ptc-runtime-node"
       ],
       "bucket": "carried"
     },
@@ -1723,9 +1723,9 @@
     },
     {
       "sha": "843029448a080519e1ab1280be0e9119428e8290",
-      "subject": "test(code-runtime): allow measured worker initialization time",
+      "subject": "test(ptc-runtime): allow measured worker initialization time",
       "packages": [
-        "code-runtime/code-runtime-worker-thread"
+        "ptc-runtime/ptc-runtime-node"
       ],
       "bucket": "carried"
     },
@@ -2445,8 +2445,8 @@
         "client/ui-workflow-run",
         "client/ui-workspace",
         "client/web",
-        "code-runtime/code-runtime",
-        "code-runtime/code-runtime-worker-thread",
+        "ptc-runtime/ptc-runtime",
+        "ptc-runtime/ptc-runtime-node",
         "compaction/command-compact",
         "compaction/compaction",
         "compaction/compaction-basic",
@@ -2475,7 +2475,7 @@
         "experimental/agent-team-profile",
         "experimental/agent-team-web-profile",
         "experimental/client-ui-agent-team",
-        "experimental/code-runtime-python",
+        "experimental/ptc-runtime-python",
         "experimental/inspector",
         "experimental/tool-agent-team",
         "experimental/webworker-packer",
@@ -2640,7 +2640,7 @@
         "workflow/tool-ralph",
         "workflow/tool-workflow",
         "workflow/workflow",
-        "workflow/workflow-worker-thread",
+        "workflow/workflow-ptc",
         "workspace/workspace"
       ],
       "bucket": "carried"
@@ -3333,8 +3333,8 @@
         "client/ui-user-questions",
         "client/ui-workflow-run",
         "client/ui-workspace",
-        "code-runtime/code-runtime",
-        "code-runtime/code-runtime-worker-thread",
+        "ptc-runtime/ptc-runtime",
+        "ptc-runtime/ptc-runtime-node",
         "compaction/compaction-basic",
         "compaction/compaction-tool-result-pruner",
         "context/agent-instructions",
@@ -3353,7 +3353,7 @@
         "credentials/credentials-local",
         "e2b/e2b",
         "e2b/subprocess-e2b",
-        "experimental/code-runtime-python",
+        "experimental/ptc-runtime-python",
         "experimental/tool-agent-team",
         "extensions/tool-cordis",
         "extensions/ui-cordis",
@@ -3449,7 +3449,7 @@
         "workflow/tool-ralph",
         "workflow/tool-workflow",
         "workflow/workflow",
-        "workflow/workflow-worker-thread",
+        "workflow/workflow-ptc",
         "workspace/workspace"
       ],
       "bucket": "carried"
@@ -5873,7 +5873,7 @@
         "test-support/agent-loop-testkit",
         "todo/tool-todo",
         "workflow/tool-ralph",
-        "workflow/workflow-worker-thread"
+        "workflow/workflow-ptc"
       ],
       "bucket": "carried"
     },
@@ -6055,7 +6055,7 @@
         "terminal/tool-terminal",
         "test-support/agent-loop-testkit",
         "todo/tool-todo",
-        "workflow/workflow-worker-thread"
+        "workflow/workflow-ptc"
       ],
       "bucket": "carried"
     },

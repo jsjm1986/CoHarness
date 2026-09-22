@@ -142,12 +142,24 @@ export interface ISessions {
    * @returns binding, or undefined for a session neither listed nor already scoped.
    */
   binding(id: SessionId): SessionBinding | undefined
-  /** Ensure an account-visible session is loaded into its target runtime. */
+  /** Ensure an account-visible session is loaded into its target runtime.
+   * @param target - account runtime that owns the session's workbench binding.
+   * @param id - listed session identity to materialize.
+   * @returns whether the runtime accepted the load; false means the session stays list-only.
+   */
   ensureSession?(target: SessionRuntimeTarget, id: SessionId): Promise<boolean>
-  /** Create a new conversation in an explicitly selected account runtime. */
+  /** Create a new conversation in an explicitly selected account runtime.
+   * @param target - account runtime that hosts the new session.
+   * @returns the created session identity.
+   */
   createSession?(target: SessionRuntimeTarget): Promise<SessionId>
-  /** Reconcile the bootstrap connection with the account's current scope. */
+  /** Reconcile the bootstrap connection with the account's current scope.
+   * @param target - runtime the account scope now resolves to.
+   */
   setBaseRuntimeTarget?(target: SessionRuntimeTarget): void
-  /** Resolve the target runtime currently owning one session. */
+  /** Resolve the target runtime currently owning one session.
+   * @param id - session identity to locate.
+   * @returns the owning runtime target, or undefined when no runtime owns it.
+   */
   runtimeTargetFor?(id: SessionId): SessionRuntimeTarget | undefined
 }

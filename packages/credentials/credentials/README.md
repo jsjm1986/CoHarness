@@ -10,6 +10,10 @@ Credential Service Definition (`ctx.credentials`). One doctrine, three consequen
 
 **An empty stored value is absent.** Everywhere: `resolve` skips it, `describe` reports it unconfigured. A blank can never masquerade as a configured secret.
 
+## Summary
+
+`dsh-credentials` keeps secret values out of configuration by letting settings and `cordis.yml` refer to key names such as `DEEPSEEK_API_KEY`. It also stores durable per-plugin credential records, including authorization grants and provider environment values. A rotated stored key applies to the next request without a restart or configuration edit. Configuration UIs can report whether a key or record is set, its source, and whether it is writable without exposing values. Empty key values count as absent, while an empty record remains a deliberate stored credential.
+
 ## Two key spaces, two questions
 
 A `CredentialRef` answers *what is behind this environment-variable name*, layered over the process environment, the managed store, and `.env` files. Everything above describes that half.
@@ -56,11 +60,11 @@ The shadowing rule on `set`/`unset` is deliberate fail-loud: when a read-only so
 
 ## Model Experience
 
-Indirectly, through the consuming LLM adapters: a resolved value authorizes their provider requests, and the adapter owns every model-visible surface.
+Indirectly, through the consuming adapter, which resolves each credential reference and owns every model-facing use a value authorizes.
 
 #### KV Cache effect
 
-No direct invalidation; credentials never enter a request prefix.
+No direct invalidation; resolved values never enter a request prefix.
 
 ## Known Limitations and Deferred Work
 

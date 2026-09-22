@@ -38,40 +38,113 @@ const SECOND_PROMPT = 'Now give the final answer.'
  */
 function completedTailFixture(raw: string): string {
   return rewriteSeedEvents(raw, (events) => {
-    const isTurnOneAssistant = (event: SessionEvent): event is Extract<SessionEvent, { type: 'assistant/message' }> =>
-      event.type === 'assistant/message' && event.data.turn === 1
-    const assistantMessages = events.filter(isTurnOneAssistant)
-    const stepOne = assistantMessages.find(event => event.data.step === 1)
-    const stepTwo = assistantMessages.find(event => event.data.step === 2)
-    if (stepOne === undefined || stepTwo === undefined) {
-      throw new Error('borrowed recording must carry two assistant messages in turn 1')
+    const stepTwoStart = events.findIndex(event =>
+      event.type === 'step/start' && event.data.turn === 1 && event.data.step === 2)
+    if (stepTwoStart < 0) throw new Error('borrowed fixture has no step-two start')
+    const kept = events.slice(0, stepTwoStart + 2).map((event): SessionEvent => {
+      if (event.type === 'assistant/message' && event.data.turn === 1 && event.data.step === 2) {
+        // The turn is interrupted after step two's partial output: the durable
+        // interrupted message keeps the recorded content while its stream is
+        // cut before the finish record, matching an abort mid-settle.
+        const finish = event.data.stream.findIndex(record =>
+          record.type === 'chunk' && record.chunk.type === 'finish')
+        return {
+          ...event,
+          data: {
+            ...event.data,
+            interrupted: true as const,
+            ...finish < 0 ? {} : { stream: event.data.stream.slice(0, finish) },
+          },
+        }
+      }
+      if (event.type !== 'assistant/message' || event.data.turn !== 1 || event.data.step !== 1) return event
+      const finish = event.data.stream.findIndex(record =>
+        record.type === 'chunk' && record.chunk.type === 'finish')
+      if (finish < 0) throw new Error('borrowed step-one Assistant message has no finish record')
+      const finishRecord = event.data.stream[finish]!
+      if (finishRecord.type !== 'chunk') throw new Error('borrowed step-one finish is not a chunk record')
+      const streamTime = finishRecord.time
+      const index = event.data.message.content.length
+      return {
+        ...event,
+        data: {
+          ...event.data,
+          message: {
+            ...event.data.message,
+            content: [...event.data.message.content, { type: 'text' as const, text: MID_TURN_TEXT }],
+          },
+          stream: [
+            ...event.data.stream.slice(0, finish),
+            { type: 'chunk' as const, time: streamTime, chunk: { type: 'block-start' as const, index, blockType: 'text' as const } },
+            { type: 'text-chunks' as const, time0: streamTime, index, dt: [], texts: [MID_TURN_TEXT] },
+            {
+              type: 'chunk' as const,
+              time: streamTime,
+              chunk: { type: 'block-end' as const, index, block: { type: 'text' as const, text: MID_TURN_TEXT } },
+            },
+            ...event.data.stream.slice(finish),
+          ],
+        },
+      }
+    })
+    const inheritedHeader = kept.findLast(event => event.type === 'request/header')
+    if (inheritedHeader?.type !== 'request/header') {
+      throw new Error('borrowed recording has no request header')
     }
-    // Projected fixture rows carry the assistant content directly on `data`
-    // (the in-memory event nests it under `message`); edit the row as stored.
-    const projected = stepOne.data as unknown as { content: Array<{ type: string; text: string }> }
-    if (projected.content.length === 0) throw new Error('borrowed step-one assistant message has no content')
-    projected.content.splice(1, 0, { type: 'text', text: MID_TURN_TEXT })
-    // Keep the step-two Think chunks but cut before its answer text starts,
-    // dropping the message and the recorded closure: the turn is interrupted
-    // instead, then a second turn completes.
-    const textStart = events.findIndex(event => event.type === 'assistant/chunk'
-      && event.data.turn === 1 && event.data.step === 2
-      && event.data.chunk.type === 'block-start' && event.data.chunk.blockType === 'text')
-    if (textStart === -1 || textStart > events.indexOf(stepTwo)) {
-      throw new Error('borrowed step-two stream must open a text block before its message')
-    }
-    const kept = events.slice(0, textStart)
-    const tail: Record<string, unknown>[] = [
-      { type: 'step/end', data: { turn: 1, step: 2 } },
-      { type: 'turn/end', data: { turn: 1, reason: { kind: 'aborted' } } },
-      { type: 'turn/start', data: { turn: 2, trigger: { kind: 'message', source: { kind: 'user', rpcId: '{{rpcId}}' } } } },
-      { type: 'user/message', data: { content: [{ type: 'text', text: SECOND_PROMPT }], source: { kind: 'user', rpcId: '{{rpcId}}' } }, surfaceOp: 'append' },
-      { type: 'step/start', data: { turn: 2, step: 1 } },
-      { type: 'assistant/message', data: { turn: 2, step: 1, content: [{ type: 'text', text: 'DONE' }], provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }, sourceEventSeqs: [], surfaceOp: 'append' },
-      { type: 'step/end', data: { turn: 2, step: 1 } },
-      { type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
+    let seq = (kept.at(-1)?.seq ?? -1) + 1
+    const at = (event: Record<string, unknown>): SessionEvent => ({
+      ...event, seq: seq++, time: 0,
+    } as unknown as SessionEvent)
+    const tail = [
+      // The recorded step-two message is kept above as an interrupted message;
+      // the turn then ends in error, leaving the turn tail behind the
+      // transcript's latest event so its branch action stays unavailable,
+      // and a second turn completes.
+      at({ type: 'step/end', data: { turn: 1, step: 2 } }),
+      at({
+        type: 'turn/end',
+        data: {
+          turn: 1,
+          reason: { kind: 'error', error: { message: 'provider stream reset', code: 'SERVER_ERROR' } },
+        },
+      }),
+      at({ type: 'turn/start', data: { turn: 2 } }),
+      at({
+        type: 'user/message',
+        surfaceOp: 'append',
+        data: {
+          content: [{ type: 'text', text: SECOND_PROMPT }],
+          source: { kind: 'user', rpcId: '{{rpcId}}' },
+          role: 'user',
+          id: 'legacy-message:{{sessionId}}:second-prompt',
+        },
+      }),
+      at({ type: 'step/start', data: { turn: 2, step: 1 } }),
+      at({ type: 'request/header', data: { header: inheritedHeader.data.header, reason: 'resume' } }),
+      at({
+        type: 'assistant/message',
+        surfaceOp: 'append',
+        data: {
+          turn: 2,
+          step: 1,
+          message: {
+            role: 'assistant',
+            id: 'legacy-message:{{sessionId}}:done-reply',
+            source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+            content: [{ type: 'text', text: 'DONE' }],
+          },
+          stream: [
+            { type: 'chunk', time: 0, chunk: { type: 'block-start', index: 0, blockType: 'text' } },
+            { type: 'text-chunks', time0: 0, index: 0, dt: [], texts: ['DONE'] },
+            { type: 'chunk', time: 0, chunk: { type: 'block-end', index: 0, block: { type: 'text', text: 'DONE' } } },
+            { type: 'chunk', time: 0, chunk: { type: 'finish', reason: { kind: 'stop' } } },
+          ],
+        },
+      }),
+      at({ type: 'step/end', data: { turn: 2, step: 1 } }),
+      at({ type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } }),
     ]
-    return [...kept, ...tail.map((event, index) => ({ ...event, seq: kept.length + index, time: 0 } as unknown as SessionEvent))]
+    return [...kept, ...tail]
   })
 }
 
@@ -110,8 +183,11 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     const sessionRow = page.locator('[role="treeitem"]').nth(1)
     await sessionRow.waitFor({ timeout: 10_000 })
     await sessionRow.click()
+    // The intermediate step folds into the turn-process group; expand it so
+    // the step-one message text mounts in the transcript DOM.
+    await page.locator('[data-turn-process]').first().click()
     await expect.poll(() => page.getByText(MID_TURN_TEXT, { exact: true }).count(), { timeout: 15_000 }).toBe(1)
-    await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
+    await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBe(2)
 
     // Focus-reveal the footers (hover:hover keeps them opacity-hidden until
     // hover/focus-within). Branch renders only under assistant answers — user
@@ -136,6 +212,11 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     await page.getByRole('button', { name: /^Select model/ })
       .waitFor({ timeout: 10_000 })
     await page.getByRole('button', { name: /Cache hit \d+%/u }).waitFor({ timeout: 10_000 })
+    // The intermediate-steps group mounts its messages only when expanded; the
+    // golden covers the full transcript, so normalize the disclosure state
+    // before capture regardless of earlier tests' clicks.
+    const processGroup = page.locator('[data-turn-process]').first()
+    if (await processGroup.getAttribute('aria-expanded') !== 'true') await processGroup.click()
     // Keep a footer focused so opacity-hidden actions stay in the a11y tree
     // as an active/focused control during the capture.
     await page.getByRole('button', { name: 'Copy' }).first().focus()
