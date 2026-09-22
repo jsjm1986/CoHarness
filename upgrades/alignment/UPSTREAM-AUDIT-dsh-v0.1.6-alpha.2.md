@@ -4,7 +4,7 @@
 
 - 本轮目标由 `dsh-v0.1.6-alpha.1`（`0a15e36e7f82b6ed45af6fa9759f29b40dcd965d`）调整为 `dsh-v0.1.6-alpha.2`（`ddefc45fbc7f8e46dd73185e68295696d1297887`），发布页 https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.6-alpha.2（2026-09-17 发布，prerelease）。
 - 证据来源：GitHub compare API（`0a15e36e...ddefc45f`：`total_commits` 887、300 个返回文件页）与 recursive git/trees 全树 blob 比较。2026-09-18 以本地拉取的上游 tag 复核：`git diff --name-status --no-renames dsh-v0.1.6-alpha.1 dsh-v0.1.6-alpha.2` 为 2,641 个变化文件（901 新增、57 删除、1,683 修改），累计 rc.2→alpha.2 为 5,507；新增包 9、删除包 1（`fs/tool-present` 实为迁移到 `deliverables/tool-present`）；`packages/session/session-format/src` 无变化。首版库存多计 2 个路径，原因是本地 `git ls-tree` 默认对非 ASCII 路径加引号转义而 GitHub trees 返回原始 UTF-8，`snapshots/web/present/workspace.expected/说明.txt`（三个 tag 内容相同）被同时计为删除和新增并生成一行伪行；矩阵已删除伪行并以 `core.quotePath=false` 对账。alpha.1 是 alpha.2 的直接祖先（merge-base 即 alpha.1），增量可与累计线性叠加。这些是范围证据，不是逐文件语义审查。
-- alpha.1 的实施与验收历史保留在 [alpha.1 计划](../../plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md)、[alpha.1 审计](UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)及对应清单/矩阵中，不并入本文件。
+- alpha.1 的实施与验收历史保留在 [alpha.1 计划](../plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md)、[alpha.1 审计](UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)及对应清单/矩阵中，不并入本文件。
 
 ## alpha.1 → alpha.2 影响核验
 
@@ -33,7 +33,7 @@
 
 ## 主权对账（2026-09-18）
 
-- 矩阵 333 行全部标注 `localSovereignty`（`scripts/upstream-sync.json` 与 upstreamOnly 清单）：adapted 227、replaced 2、tracked 3、upstreamOnly 35、unmanifested 32（上游新包，在各自阶段决定携带并登记）。
+- 2026-09-22 批次 0 归并后的当前矩阵为 329 个唯一 area，其中 295 个包级行登记 `localSovereignty`：adapted 221、replaced 2、tracked 6、upstreamOnly 38、unmanifested 28；另有 34 个 non-package 行。归并的 4 个已携带包统一为 `adapt`，源码审查仍 pending；其 ownership 取自当前 [同步记录](../../scripts/upstream-sync.json)，其余路由仍须逐阶段核实，不能由分类数字推导实现完成度。
 - 不携带包的行为归属已逐行写清：35 个 upstreamOnly 行中 13 行标 `adapt`（增量须审查并把行为移植到替代面，如 `api/session-controller` 的 38 文件多实例增量归 7A 经 `host/apiproxy`、`ui-sidebar-documentpreview` 的 58 文件预览增量归 7C）、4 行 `defer`（agent-team×3、`client/file-upload`）、13 行 `reject`（含 `apps/desktop`、`apps/desktop-host` 与无消费者的实验/工具包）。
 - `.github`、`scripts`、`lefthook.yml` 三行门禁面归 0R，在实施批次开工前完成差异比对与新增必需检查登记。
 - 开发阶段姿态：允许破坏性更新，目标为上游全量对齐；全局管理设置经 `/admin`（`gateway/admin-ui`）落地；无生产数据，Phase 8 以合成数据迁移演练替代脱敏副本恢复。
@@ -72,15 +72,15 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 
 ## 本审计的边界
 
-- 尚未完成 2,641 个变化文件的逐文件语义审查，未完成逐提交归属；矩阵行与清单决定只声明范围与待验证要求，不声明实现完成。矩阵 333 行中只有 `apps/desktop`、`apps/desktop-host` 两行为用户确认路由，其余仍为初始路由。
+- 尚未完成全部累计与增量文件的逐文件语义审查，未完成所有消费者验收。当前 schema v3 矩阵为 329 行：320 行 `pending-cumulative-source-review`，9 行保留 `implemented-local-tests-passing`；后者仅保留已记录范围的本地验证，不覆盖新候选或未运行环境。批次 0 已使累计 5,507 路径、增量 2,641 路径与固定 Git 原始差异逐一一致，这只证明范围完整，不证明语义等价。
 - 本地规划检查点 `6f0ec56328` 与上游 tag 无祖先关系；树差异不证明等价。
-- alpha.1 遗留的未验证项、环境阻塞、不稳定用例与观察项集中在下表，共 23 项；alpha.1 记录中没有独立枚举清单，本表由 alpha.1 审计各批次的"未验证／待完成"陈述与 alpha.1 Phase 1/2 代码审查逐条整理。换目标不清空欠账；销账须记录验证提交、命令与环境。
+- alpha.1 遗留的未验证项、环境阻塞、不稳定用例与观察项集中在下表，初始为 23 项，后续追加 L24、L25，当前共 25 项。alpha.1 记录中没有独立枚举清单，本表由旧审计及后续验证逐条整理。换目标不清空欠账；销账须记录验证提交、命令与环境。
 
 ## 未验证与环境阻塞台账
 
 | 编号 | 项 | 类型 | 来源 | 承接阶段 |
 | --- | --- | --- | --- | --- |
-| L1 | `pnpm run test:coverage` per-file 100% 从未对 Phase 1/2 源码执行；coverage 分片 3/3 曾被主动终止 | 已验证 | alpha.1 审计"Phase 1：Node 内部加载器依赖"、两处收口 | 8-e.1 销账：`check:ci:coverage` 分区模式三腿全绿（4 分区 1201 插桩文件 + exempt-heavy 21138 测试，合并阈值零违规），缺口清单逐项收口详见 8-e.1 节 |
+| L1 | 早期 Phase 1/2 覆盖率缺口及本轮候选重验 | 历史已验证；新候选待验 | alpha.1 审计"Phase 1：Node 内部加载器依赖"、两处收口 | 保留 8-e.1 本地记录：4 分区 1201 插桩文件 + exempt-heavy 21138 测试，合并阈值零违规；另核实 `2ba86fcbb908dd90226dbf5a62148099d24d6607` 的 [CI 全量覆盖率步骤](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271/job/106620429647)成功。本轮候选不得复用该提交的结果 |
 | L2 | 真实 provider e2e：DeepSeek 双协议、BYOK 与组织代理路由、凭据归因 | 未验证 | alpha.1 审计各批 | 3A |
 | L3 | 组装快照未覆盖 Messages、图片、PTC 新面 | 未验证 | alpha.1 审计"Phase 2 收口" | 3A、3B、4A |
 | L4 | Python SDK 打包产物仅 macOS arm64 carrier 冒烟通过，Linux/Windows 产物未验 | 部分验证 | alpha.1 审计"Phase 2 收口" | 8 |
@@ -97,7 +97,7 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 | L15 | 快照请求数 2 而非 1 偶发，原因未定 | 不稳定 | alpha.1 审计"串行创建与启动 hooks" | 2B |
 | L16 | Claude/Codex hooks、Landlock 后台分类 5 秒超时偶发 | 不稳定 | alpha.1 审计"非事务 Loader 适配收口" | 2B、4B |
 | L17 | `watch-config.spec.ts` 首次配置添加未生效偶发，隔离通过 | 不稳定 | alpha.1 审计"Node 内部加载器依赖" | 1B 迁移后复测 |
-| L18 | CI 必需任务（平台矩阵、windows-wine、coverage lane）未在本地或分支执行 | 未验证 | 计划证据要求 | 8 |
+| L18 | 当前候选的 CI 必需任务及尚未运行的原生平台验收 | 历史 CI 已验证；新候选与缺失平台待验 | 计划证据要求 | `2ba86fcbb908dd90226dbf5a62148099d24d6607` 的 [CI 35688456271](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271)为 success：15 个 job 成功、11 个 skipped；覆盖率、Wine、Web、SDK/Gateway 等已执行任务的证据只属于该提交。该次原生 Windows complete、macOS serial、manual full audit 等未运行，不能据汇总绿灯销账；新候选重新验收 |
 | L19 | `Fiber.update()` 返回 void 后，运行期配置更新失败只留在 fiber `_error` 与日志，无等价于启动路径的审计 | 观察项 | alpha.1 Phase 1 代码审查 | 1B |
 | L20 | 串行 `agent/created` 监听器顺序为隐式注册顺序，无显式编排 | 观察项 | alpha.1 Phase 2 代码审查 | 2B |
 | L21 | `tool-cordis` api-catalog 的 `agent/created` 参数描述缺 `agent`／`source`，goal `resume` 描述有语法错误 | 已验证 | alpha.1 Phase 2 代码审查 | 7D 销账：`@param payload.*` 点名在 `parseTags` 正则处坍缩为 `payload`，末位标签覆盖前者——改为单 `@param payload` 续行枚举三字段；`resume` 措辞对齐上游 `session-start edge`；`gen-cordis-api` 重生 + `verify-cordis-api` 105 产物同步；上游同缺陷，修复可上游化 |
@@ -267,3 +267,24 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - **文档漂移**：`subagent-dsh-sdk` README 停止原因映射更新（`blocked`→`refusal`、disposed-abort→`child-disposed`、diagnostic 字段，双语）；`session-persistence-jsonl` README 删 11 个已失效配置项（coordinator 时代残留：packChunks/writeBatchMaxDelayMs/maxPending* 等，schema 仅 `{root, compression}`）、packed-row 段重述为 v0/v1 历史 codec 事实、"迁移到当前 v3"改 v4、写路径"配置的固定批处理窗口"改 seam 内部调度（双语）；`acp-demo` 删死配置 `packChunks`（字段+schema+转发+README 行），config-catalog 重生；`core/session/chunk-rows.ts` 头注 "Released-v3" 改 "Released-v0/v1"（v2/v3/v4 写入端从不打包）。
 - **如实登记未修（LOW/观察项）**：`discovery.ts` group 行自身 `name` 不查 + `disabled` 语义与 loader 分歧（group 行的 disabled 在挂载期被忽略）；`internals.createHarness` 测试缝本仓暂无消费方（结构随上游保留）；`fakeLaunch` 透传 `process.env` 使环境 FAKE_* 可泄入 fake 脚本；`index.ts` `%o` 对 plain Error 渲染 `{}`（SDK 同款惯例，保留一致性）；`settledOutcome` 一宏任务窗的 transport/process-exit 分类竞态（代码注释已声明）；`gateway/server.ts` `/account/api/projects` 的 `canManage` 未计 `authority.administrator`（未发现消费方）；`api-catalog` spec 的 `referencedTypes` 仅查数组形态。
 - **验证**：全量 typecheck/lint 绿；受影响 spec 全绿（client-runtime 453、cordis-client-runner 120、agent-presets 172、subagent-dsh-sdk 37+34、subagent-acp 54、hmr 7）；`doc-sync` 维持 40/40。
+
+## 本轮补全批次 0（2026-09-22）
+
+本轮实施基线为 `aa98a628f4e0e41316af25279c5d922f4bd7b5cd`，分支为 `codex/alpha2-complete-alignment`，上游目标仍固定 `ddefc45fbc7f8e46dd73185e68295696d1297887`。顶层状态为 `implementation-in-progress`，继承全部已批准阶段及产品决定；记录修复没有把新候选、后续 UI/能力补全或发布验收标为完成。此前各节保留对应时点的历史记录。
+
+当前矩阵和清单升级为 schema v3；冻结的 alpha.1 记录保持原样。矩阵消除 4 组同 area 的 `required`／`adapt` 冲突，按现有代码归入 `adapt`，累计与增量原始路径仍归其实际消费者 owner，审查状态全部保留 pending。
+
+| area | 累计原始路径 | 增量原始路径 | 单独保留的历史归一化别名 |
+| --- | --- | --- | --- |
+| `packages/ptc-runtime/ptc-runtime` | 18 | 1 | 0 |
+| `packages/ptc-runtime/ptc-runtime-node` | 52 | 6 | 5 |
+| `packages/experimental/ptc-runtime-python` | 31 | 1 | 0 |
+| `packages/workflow/workflow-ptc` | 50 | 1 | 6 |
+
+按 `git diff --no-renames --name-only -z` 对账，补回 76 个被旧 code-runtime／workflow-worker-thread 路径归一化掩盖的真实变化路径，消除 9 个同一行内的重复路径引用，并把不属于真实 diff 的 11 个历史归一化路径移入各 owner 的 `historicalPathAliases`，保留原始 `sourcePath` 和 alpha.1 来源记录。最终 329 行逐一认领累计 5,507 路径、增量 2,641 路径，无缺失、多余或重复；其中 320 行待累计源码审查、9 行保留既有本地验证状态。路径与旧名归属一致，无需为了计数新增 area。
+
+[记录检查器](../../scripts/verify-upgrade-records.ts)对 schema v3 拒绝重复 area、重复 decision id、缺少对应身份字段、原始路径漏项／多项／重复认领和错误摘要计数。重命名的删除与新增路径分别对账，历史别名不能代替实际变化路径。当前同步目标要求 schema v3 或更新版本，不能通过降级字段绕过校验；较早目标的 schema v2 及更早记录继续使用其历史解释，没有重写历史来满足新格式。[回归测试](../../scripts/verify-upgrade-records.spec.ts)通过临时 Git 仓库运行真实 CLI，覆盖含中文文件名的重命名、累计和增量缺口、无效重复身份及历史兼容。新增身份与库存拒绝用例在修复前均观察到未被阻断；修复后 35 项测试通过，真实仓库入口校验 16 份记录通过。
+
+[CI 输入准备入口](../../scripts/fetch-upstream-baseline.ts)读取当前矩阵的累计与增量基线提交，校验完整 SHA 和一致的目标固定值，仅从固定公开上游以 `--depth=1 --no-tags` 补取缺失快照。已有但身份不符的 tag 会失败而不被覆盖，输入不可取得时不能跳过对账。[直接测试](../../scripts/fetch-upstream-baseline.spec.ts)使用真实浅 Git 仓库和本地传输，证明两个缺失比较提交被取得、较早的未请求祖先仍不存在、再次执行不 fetch、非法／缺失 SHA 和错误 tag 被拒绝。6 项测试通过；连同记录检查器共 41 项。实际执行现有 CI 顺序 `node scripts/fetch-upstream-baseline.ts` → `node --import tsx/esm scripts/verify-upgrade-records.ts`，3 个固定比较树就绪，16 份记录通过。这里没有新增工作流或全量历史拉取。
+
+GitHub API 核实 [CI 35688456271](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271)的 `head_sha` 为 `2ba86fcbb908dd90226dbf5a62148099d24d6607`，完成于 `2026-09-22T05:12:36Z`，结论 success；`node 24 / coverage` 的 `Run exhaustive coverage` 步骤成功，执行 `pnpm run check:ci:coverage`。该次共有 15 个 job 成功、11 个 skipped，原生 Windows complete、macOS serial、manual full audit、可选 Android 等未运行。清单因此修正“从未运行”的陈述，同时保留当前候选 `pending`：旧 CI、不带提交身份的旧命令记录及仅有汇总状态都不能作为本轮发布通过证据。

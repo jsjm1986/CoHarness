@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "reviewDate": "2026-09-18",
+  "schemaVersion": 3,
+  "reviewDate": "2026-09-22",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness",
     "previousTag": "dsh-v0.1.5-rc.2",
@@ -18,7 +18,7 @@
   },
   "targetVersion": "0.1.6-alpha.2.coharness.1",
   "versionStatus": "proposed-release-families-unverified",
-  "status": "decisions-confirmed-increment-implementation-pending",
+  "status": "implementation-in-progress",
   "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.2.md",
   "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
   "verification": [
@@ -140,6 +140,27 @@
       "command": "pnpm exec vitest run packages/boot/app-boot/tests --coverage && pnpm exec vitest run apps/cli/tests/profiles/headless/tests/source-launch.spec.ts && pnpm dsh --profile headless <mock round trip>",
       "exitCode": 0,
       "note": "Built-smoke 8-e.3 surfaced a product-level latent defect on the source launch: profile-resolution routed plugin entries to lib/ through the declarer's node_modules manifest (invisible to tsx paths) while each plugin's own imports fell back to src/ via tsconfig paths — two dsh-tools copies, TOOL_RUNTIME_SCHEDULER identity split, UNKNOWN prepare crash on the first tool call after pnpm build. Fix: installProfileResolution probes ambient resolution and prefers TypeScript-source results (packages/boot/app-boot/src/profile-resolution/resolver.ts); TOOL_RUNTIME_SCHEDULER restored to Symbol.for per note 2026-09-18 (alpha.2 merge had reverted it to Symbol()). New regression spec apps/cli/tests/profiles/headless/tests/source-launch.spec.ts boots real bin.ts+tsx+PluginPackages and completes a tool call — fails pre-fix. resolver.ts at 100% all metrics; agent-loop suite 379, app-boot suite 246, built-bin 31/31 green. Agent Note 2026-09-21-profile-resolution-ambient-source-plane; upstream-sync.json notes on boot/app-boot and core/tools. Upstream carries the identical latent hazard (upstream-applicable fix)."
+    },
+    {
+      "phase": "historical-ci",
+      "commit": "2ba86fcbb908dd90226dbf5a62148099d24d6607",
+      "command": "GitHub Actions .github/workflows/ci.yml",
+      "conclusion": "success",
+      "runId": 35688456271,
+      "runAttempt": 1,
+      "evidence": "https://github.com/jsjm1986/CoHarness/actions/runs/35688456271",
+      "completedAt": "2026-09-22T05:12:36Z",
+      "successfulJobs": 15,
+      "skippedJobs": 11,
+      "coverage": {
+        "command": "pnpm run check:ci:coverage",
+        "step": "Run exhaustive coverage",
+        "conclusion": "success",
+        "jobId": 106620429647,
+        "evidence": "https://github.com/jsjm1986/CoHarness/actions/runs/35688456271/job/106620429647",
+        "environment": "GitHub-hosted ubuntu-latest, Node 24"
+      },
+      "limitations": "Recorded commit only. Native Windows complete, macOS serial, manual full audit and optional Android jobs were skipped; Wine success is not native Windows evidence. No result is transferred to the current candidate."
     }
   ],
   "decisions": [
@@ -499,12 +520,15 @@
       "hotfixPolicy": "branch from the production commit; never deploy master before Phase 8 acceptance"
     },
     "coverageGate": {
-      "state": "never-run-for-phase-1-2-sources",
+      "state": "historical-ci-passed-current-candidate-pending",
       "requiredBefore": [
         "1B",
         "2B"
       ],
-      "command": "pnpm run test:coverage"
+      "command": "pnpm run check:ci:coverage",
+      "verifiedCommit": "2ba86fcbb908dd90226dbf5a62148099d24d6607",
+      "evidence": "https://github.com/jsjm1986/CoHarness/actions/runs/35688456271/job/106620429647",
+      "currentCandidate": "unverified; relevant exhaustive coverage must pass for the new committed candidate"
     },
     "gateDiffReview": {
       "paths": [
@@ -525,12 +549,19 @@
     "verificationLedger": {
       "record": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md",
       "section": "未验证与环境阻塞台账",
-      "items": 23
+      "items": 25
     },
     "developmentPosture": {
       "breakingChanges": "allowed — target full upstream parity; behavior changes must be recorded per batch; no parallel compat implementations outside the local sovereignty surface",
       "productionData": "none — synthetic-data migration rehearsal replaces sanitized-copy restore; environment rebuild is allowed",
       "adminSurface": "global and organization-level settings land in gateway/admin-ui (/admin): plugin management, webhook, terminal grants, auto-review eligibility, desktop occupancy, model governance"
     }
+  },
+  "currentImplementation": {
+    "baseCommit": "aa98a628f4e0e41316af25279c5d922f4bd7b5cd",
+    "branch": "codex/alpha2-complete-alignment",
+    "upstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+    "candidateVerification": "pending",
+    "scope": "Complete the approved alpha.2 plan across all batches; historical verification does not accept the current working-tree candidate."
   }
 }

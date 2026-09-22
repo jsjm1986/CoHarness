@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "reviewDate": "2026-09-18",
+  "schemaVersion": 3,
+  "reviewDate": "2026-09-22",
   "baseline": {
     "tag": "dsh-v0.1.5-rc.2",
     "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
@@ -14,13 +14,13 @@
     "tag": "dsh-v0.1.6-alpha.1",
     "commit": "0a15e36e7f82b6ed45af6fa9759f29b40dcd965d"
   },
-  "inventoryMethod": "Local git ls-tree -r with core.quotePath=false for baseline and alpha.1, GitHub recursive git/trees (truncated=false) for pinned alpha.2; compare object ids with no rename inference. Path spellings are normalized to raw UTF-8 before comparison so a non-ASCII path is never counted once quoted and once unquoted. All cumulative and incremental paths enumerated once; totals reconcile with git diff --name-status --no-renames. Historical alpha.1 rows retained even when no net delta remains. Routing is provisional except rows marked owner-confirmed; it is not semantic review or implementation acceptance.",
+  "inventoryMethod": "Raw cumulative and incremental path inventories reproduce git diff --no-renames --name-only -z between the recorded Git commits, using original UTF-8 spellings and listing both deleted and added paths across renames. Every changed path has exactly one row owner. Historical alpha.1 normalized aliases are preserved in historicalPathAliases with their original source path and record, outside the current changed-file arrays. Empty historical areas may retain routing rows. Routing and pending review states do not assert semantic review or implementation acceptance.",
   "summary": {
     "cumulativeChangedFiles": 5507,
     "incrementChangedFiles": 2641,
     "incrementAddedFiles": 901,
     "incrementRemovedFiles": 57,
-    "rows": 333,
+    "rows": 329,
     "incrementAddedPackages": [
       "packages/boot/hmr",
       "packages/boot/plugin-manager",
@@ -126,9 +126,9 @@
         ".agents/notes/implemented/architecture/2026-07-31-claimed-pre-step-inbox-lifecycle.i18n.yaml",
         ".agents/notes/implemented/architecture/2026-07-31-claimed-pre-step-inbox-lifecycle.md",
         ".agents/notes/implemented/architecture/2026-07-31-claimed-pre-step-inbox-lifecycle.zh.md",
-        ".agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.i18n.yaml",
-        ".agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md",
-        ".agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md",
+        ".agents/notes/implemented/architecture/2026-07-31-code-runtime-python-fd3-protocol.i18n.yaml",
+        ".agents/notes/implemented/architecture/2026-07-31-code-runtime-python-fd3-protocol.md",
+        ".agents/notes/implemented/architecture/2026-07-31-code-runtime-python-fd3-protocol.zh.md",
         ".agents/notes/implemented/architecture/2026-07-31-goal-owned-durable-events.i18n.yaml",
         ".agents/notes/implemented/architecture/2026-07-31-goal-owned-durable-events.md",
         ".agents/notes/implemented/architecture/2026-07-31-goal-owned-durable-events.zh.md",
@@ -2910,9 +2910,9 @@
         "docs/subsystems/client-resources.i18n.yaml",
         "docs/subsystems/client-resources.md",
         "docs/subsystems/client-resources.zh.md",
-        "docs/subsystems/ptc-runtime.i18n.yaml",
-        "docs/subsystems/ptc-runtime.md",
-        "docs/subsystems/ptc-runtime.zh.md",
+        "docs/subsystems/code-runtime.i18n.yaml",
+        "docs/subsystems/code-runtime.md",
+        "docs/subsystems/code-runtime.zh.md",
         "docs/subsystems/commands.i18n.yaml",
         "docs/subsystems/commands.md",
         "docs/subsystems/commands.zh.md",
@@ -3310,9 +3310,9 @@
         "packages/client/README.md",
         "packages/client/README.zh.md",
         "packages/client/tsdown.client.ts",
-        "packages/ptc-runtime/README.i18n.yaml",
-        "packages/ptc-runtime/README.md",
-        "packages/ptc-runtime/README.zh.md",
+        "packages/code-runtime/README.i18n.yaml",
+        "packages/code-runtime/README.md",
+        "packages/code-runtime/README.zh.md",
         "packages/compaction/README.i18n.yaml",
         "packages/compaction/README.md",
         "packages/compaction/README.zh.md",
@@ -8504,12 +8504,22 @@
       "status": "adapt",
       "localOwner": "packages/ptc-runtime/ptc-runtime",
       "commitScope": [
+        "packages/code-runtime/code-runtime/",
         "packages/ptc-runtime/ptc-runtime/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "phase": "4A",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
+        "packages/code-runtime/code-runtime/README.i18n.yaml",
+        "packages/code-runtime/code-runtime/README.md",
+        "packages/code-runtime/code-runtime/README.zh.md",
+        "packages/code-runtime/code-runtime/package.json",
+        "packages/code-runtime/code-runtime/src/index.ts",
+        "packages/code-runtime/code-runtime/src/types.ts",
+        "packages/code-runtime/code-runtime/tests/reserved.spec.ts",
+        "packages/code-runtime/code-runtime/tests/service.spec.ts",
+        "packages/code-runtime/code-runtime/tsconfig.json",
         "packages/ptc-runtime/ptc-runtime/README.i18n.yaml",
         "packages/ptc-runtime/ptc-runtime/README.md",
         "packages/ptc-runtime/ptc-runtime/README.zh.md",
@@ -8520,54 +8530,131 @@
         "packages/ptc-runtime/ptc-runtime/tests/service.spec.ts",
         "packages/ptc-runtime/ptc-runtime/tsconfig.json"
       ],
-      "incrementFiles": [],
+      "incrementFiles": [
+        "packages/ptc-runtime/ptc-runtime/package.json"
+      ],
       "alpha1History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
         "area": "packages/ptc-runtime/ptc-runtime",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked",
+      "localDisposition": "Merge the inherited and incremental routing claims for this existing local package. All cumulative and incremental paths remain claimed; source review and consumer acceptance remain pending."
     },
     {
       "area": "packages/ptc-runtime/ptc-runtime-node",
       "status": "adapt",
       "localOwner": "packages/ptc-runtime/ptc-runtime-node",
       "commitScope": [
+        "packages/code-runtime/code-runtime-worker-thread/",
         "packages/ptc-runtime/ptc-runtime-node/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "phase": "4A",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
+        "packages/code-runtime/code-runtime-worker-thread/README.i18n.yaml",
+        "packages/code-runtime/code-runtime-worker-thread/README.md",
+        "packages/code-runtime/code-runtime-worker-thread/README.zh.md",
+        "packages/code-runtime/code-runtime-worker-thread/package.json",
+        "packages/code-runtime/code-runtime-worker-thread/src/bootstrap.ts",
+        "packages/code-runtime/code-runtime-worker-thread/src/index.ts",
+        "packages/code-runtime/code-runtime-worker-thread/src/output-json.ts",
+        "packages/code-runtime/code-runtime-worker-thread/src/protocol.ts",
+        "packages/code-runtime/code-runtime-worker-thread/src/worker-json.ts",
+        "packages/code-runtime/code-runtime-worker-thread/src/worker.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/bootstrap.spec.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/budget.spec.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/built-lib.e2e.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/output-json.spec.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/runtime.spec.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/source-worker.compat.spec.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tests/worker-json.spec.ts",
+        "packages/code-runtime/code-runtime-worker-thread/tsconfig.json",
+        "packages/code-runtime/code-runtime-worker-thread/tsdown.config.ts",
         "packages/ptc-runtime/ptc-runtime-node/README.i18n.yaml",
         "packages/ptc-runtime/ptc-runtime-node/README.md",
         "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
         "packages/ptc-runtime/ptc-runtime-node/package.json",
+        "packages/ptc-runtime/ptc-runtime-node/src/bindings.ts",
         "packages/ptc-runtime/ptc-runtime-node/src/bootstrap.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/channel.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/environment.ts",
         "packages/ptc-runtime/ptc-runtime-node/src/index.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/json-wire.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/launch.ts",
         "packages/ptc-runtime/ptc-runtime-node/src/output-json.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/output-ledger.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/output-stream.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/process-entry.ts",
+        "packages/ptc-runtime/ptc-runtime-node/src/process.ts",
         "packages/ptc-runtime/ptc-runtime-node/src/protocol.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/worker-json.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/worker.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/bindings.spec.ts",
         "packages/ptc-runtime/ptc-runtime-node/tests/bootstrap.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/budget.spec.ts",
         "packages/ptc-runtime/ptc-runtime-node/tests/built-lib.e2e.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/channel.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/host-failures.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/json-wire.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/launch.spec.ts",
         "packages/ptc-runtime/ptc-runtime-node/tests/output-json.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/output-ledger.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/output-stream.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/process-main.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/process.spec.ts",
         "packages/ptc-runtime/ptc-runtime-node/tests/runtime.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/source-worker.compat.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/worker-json.spec.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/setup.ts",
         "packages/ptc-runtime/ptc-runtime-node/tsconfig.json",
         "packages/ptc-runtime/ptc-runtime-node/tsdown.config.ts"
       ],
-      "incrementFiles": [],
+      "incrementFiles": [
+        "packages/ptc-runtime/ptc-runtime-node/README.i18n.yaml",
+        "packages/ptc-runtime/ptc-runtime-node/README.md",
+        "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
+        "packages/ptc-runtime/ptc-runtime-node/package.json",
+        "packages/ptc-runtime/ptc-runtime-node/src/index.ts",
+        "packages/ptc-runtime/ptc-runtime-node/tests/host-failures.spec.ts"
+      ],
       "alpha1History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
         "area": "packages/ptc-runtime/ptc-runtime-node",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked",
+      "localDisposition": "Merge the inherited and incremental routing claims for this existing local package. All cumulative and incremental paths remain claimed; source review and consumer acceptance remain pending.",
+      "historicalPathAliases": [
+        {
+          "normalizedPath": "packages/ptc-runtime/ptc-runtime-node/src/worker-json.ts",
+          "sourcePath": "packages/code-runtime/code-runtime-worker-thread/src/worker-json.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/ptc-runtime/ptc-runtime-node/src/worker.ts",
+          "sourcePath": "packages/code-runtime/code-runtime-worker-thread/src/worker.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/ptc-runtime/ptc-runtime-node/tests/budget.spec.ts",
+          "sourcePath": "packages/code-runtime/code-runtime-worker-thread/tests/budget.spec.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/ptc-runtime/ptc-runtime-node/tests/source-worker.compat.spec.ts",
+          "sourcePath": "packages/code-runtime/code-runtime-worker-thread/tests/source-worker.compat.spec.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/ptc-runtime/ptc-runtime-node/tests/worker-json.spec.ts",
+          "sourcePath": "packages/code-runtime/code-runtime-worker-thread/tests/worker-json.spec.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        }
+      ]
     },
     {
       "area": "packages/compaction/command-compact",
@@ -9848,12 +9935,28 @@
       "status": "adapt",
       "localOwner": "packages/experimental/ptc-runtime-python",
       "commitScope": [
+        "packages/experimental/code-runtime-python/",
         "packages/experimental/ptc-runtime-python/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "phase": "4A",
       "phaseAssignment": "initial-routing-requires-owner-confirmation",
       "cumulativeFiles": [
+        "packages/experimental/code-runtime-python/README.i18n.yaml",
+        "packages/experimental/code-runtime-python/README.md",
+        "packages/experimental/code-runtime-python/README.zh.md",
+        "packages/experimental/code-runtime-python/package.json",
+        "packages/experimental/code-runtime-python/py/bootstrap.py",
+        "packages/experimental/code-runtime-python/py/protocol.py",
+        "packages/experimental/code-runtime-python/src/index.ts",
+        "packages/experimental/code-runtime-python/src/protocol.ts",
+        "packages/experimental/code-runtime-python/tests/boot-write-failure.spec.ts",
+        "packages/experimental/code-runtime-python/tests/protocol-mirror.e2e.ts",
+        "packages/experimental/code-runtime-python/tests/protocol.spec.ts",
+        "packages/experimental/code-runtime-python/tests/residual-detach.spec.ts",
+        "packages/experimental/code-runtime-python/tests/runtime.spec.ts",
+        "packages/experimental/code-runtime-python/tsconfig.json",
+        "packages/experimental/code-runtime-python/tsdown.config.ts",
         "packages/experimental/ptc-runtime-python/README.i18n.yaml",
         "packages/experimental/ptc-runtime-python/README.md",
         "packages/experimental/ptc-runtime-python/README.zh.md",
@@ -9867,17 +9970,21 @@
         "packages/experimental/ptc-runtime-python/tests/protocol.spec.ts",
         "packages/experimental/ptc-runtime-python/tests/residual-detach.spec.ts",
         "packages/experimental/ptc-runtime-python/tests/runtime.spec.ts",
+        "packages/experimental/ptc-runtime-python/tests/stray-fragments.spec.ts",
         "packages/experimental/ptc-runtime-python/tsconfig.json",
         "packages/experimental/ptc-runtime-python/tsdown.config.ts"
       ],
-      "incrementFiles": [],
+      "incrementFiles": [
+        "packages/experimental/ptc-runtime-python/package.json"
+      ],
       "alpha1History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
         "area": "packages/experimental/ptc-runtime-python",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked",
+      "localDisposition": "Merge the inherited and incremental routing claims for this existing local package. All cumulative and incremental paths remain claimed; source review and consumer acceptance remain pending."
     },
     {
       "area": "packages/experimental/computer-use-cua-driver-mcp",
@@ -9979,45 +10086,6 @@
         "reason": "experimental prototype with no cloud consumer"
       },
       "localDisposition": "Experimental prototype with no cloud consumer."
-    },
-    {
-      "area": "packages/experimental/ptc-runtime-python",
-      "status": "required",
-      "localOwner": "packages/experimental/ptc-runtime-python",
-      "commitScope": [
-        "packages/experimental/ptc-runtime-python/"
-      ],
-      "reviewState": "pending-cumulative-source-review",
-      "phase": "4A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
-      "cumulativeFiles": [
-        "packages/experimental/ptc-runtime-python/README.i18n.yaml",
-        "packages/experimental/ptc-runtime-python/README.md",
-        "packages/experimental/ptc-runtime-python/README.zh.md",
-        "packages/experimental/ptc-runtime-python/package.json",
-        "packages/experimental/ptc-runtime-python/py/bootstrap.py",
-        "packages/experimental/ptc-runtime-python/py/protocol.py",
-        "packages/experimental/ptc-runtime-python/src/index.ts",
-        "packages/experimental/ptc-runtime-python/src/protocol.ts",
-        "packages/experimental/ptc-runtime-python/tests/boot-write-failure.spec.ts",
-        "packages/experimental/ptc-runtime-python/tests/protocol-mirror.e2e.ts",
-        "packages/experimental/ptc-runtime-python/tests/protocol.spec.ts",
-        "packages/experimental/ptc-runtime-python/tests/residual-detach.spec.ts",
-        "packages/experimental/ptc-runtime-python/tests/runtime.spec.ts",
-        "packages/experimental/ptc-runtime-python/tests/stray-fragments.spec.ts",
-        "packages/experimental/ptc-runtime-python/tsconfig.json",
-        "packages/experimental/ptc-runtime-python/tsdown.config.ts"
-      ],
-      "incrementFiles": [
-        "packages/experimental/ptc-runtime-python/package.json"
-      ],
-      "alpha1History": {
-        "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
-        "area": "packages/experimental/ptc-runtime-python",
-        "reviewState": "pending-cumulative-source-review"
-      },
-      "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/experimental/tool-agent-team",
@@ -11957,99 +12025,6 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "adapted"
-    },
-    {
-      "area": "packages/ptc-runtime/ptc-runtime",
-      "status": "required",
-      "localOwner": "packages/ptc-runtime/ptc-runtime",
-      "commitScope": [
-        "packages/ptc-runtime/ptc-runtime/"
-      ],
-      "reviewState": "pending-cumulative-source-review",
-      "phase": "4A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
-      "cumulativeFiles": [
-        "packages/ptc-runtime/ptc-runtime/README.i18n.yaml",
-        "packages/ptc-runtime/ptc-runtime/README.md",
-        "packages/ptc-runtime/ptc-runtime/README.zh.md",
-        "packages/ptc-runtime/ptc-runtime/package.json",
-        "packages/ptc-runtime/ptc-runtime/src/index.ts",
-        "packages/ptc-runtime/ptc-runtime/src/types.ts",
-        "packages/ptc-runtime/ptc-runtime/tests/reserved.spec.ts",
-        "packages/ptc-runtime/ptc-runtime/tests/service.spec.ts",
-        "packages/ptc-runtime/ptc-runtime/tsconfig.json"
-      ],
-      "incrementFiles": [
-        "packages/ptc-runtime/ptc-runtime/package.json"
-      ],
-      "alpha1History": {
-        "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
-        "area": "packages/ptc-runtime/ptc-runtime",
-        "reviewState": "pending-cumulative-source-review"
-      },
-      "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested"
-    },
-    {
-      "area": "packages/ptc-runtime/ptc-runtime-node",
-      "status": "required",
-      "localOwner": "packages/ptc-runtime/ptc-runtime-node",
-      "commitScope": [
-        "packages/ptc-runtime/ptc-runtime-node/"
-      ],
-      "reviewState": "pending-cumulative-source-review",
-      "phase": "4A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
-      "cumulativeFiles": [
-        "packages/ptc-runtime/ptc-runtime-node/README.i18n.yaml",
-        "packages/ptc-runtime/ptc-runtime-node/README.md",
-        "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
-        "packages/ptc-runtime/ptc-runtime-node/package.json",
-        "packages/ptc-runtime/ptc-runtime-node/src/bindings.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/bootstrap.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/channel.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/environment.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/index.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/json-wire.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/launch.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/output-json.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/output-ledger.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/output-stream.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/process-entry.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/process.ts",
-        "packages/ptc-runtime/ptc-runtime-node/src/protocol.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/bindings.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/bootstrap.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/built-lib.e2e.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/channel.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/host-failures.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/json-wire.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/launch.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/output-json.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/output-ledger.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/output-stream.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/process-main.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/process.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/runtime.spec.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/setup.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tsconfig.json",
-        "packages/ptc-runtime/ptc-runtime-node/tsdown.config.ts"
-      ],
-      "incrementFiles": [
-        "packages/ptc-runtime/ptc-runtime-node/README.i18n.yaml",
-        "packages/ptc-runtime/ptc-runtime-node/README.md",
-        "packages/ptc-runtime/ptc-runtime-node/README.zh.md",
-        "packages/ptc-runtime/ptc-runtime-node/package.json",
-        "packages/ptc-runtime/ptc-runtime-node/src/index.ts",
-        "packages/ptc-runtime/ptc-runtime-node/tests/host-failures.spec.ts"
-      ],
-      "alpha1History": {
-        "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
-        "area": "packages/ptc-runtime/ptc-runtime-node",
-        "reviewState": "pending-cumulative-source-review"
-      },
-      "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested"
     },
     {
       "area": "packages/runtime-diagnostics/invariants",
@@ -15682,10 +15657,11 @@
     },
     {
       "area": "packages/workflow/workflow-ptc",
-      "status": "required",
+      "status": "adapt",
       "localOwner": "packages/workflow/workflow-ptc",
       "commitScope": [
-        "packages/workflow/workflow-ptc/"
+        "packages/workflow/workflow-ptc/",
+        "packages/workflow/workflow-worker-thread/"
       ],
       "reviewState": "pending-cumulative-source-review",
       "phase": "4A",
@@ -15716,7 +15692,31 @@
         "packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts",
         "packages/workflow/workflow-ptc/tests/workflow-ptc.spec.ts",
         "packages/workflow/workflow-ptc/tsconfig.json",
-        "packages/workflow/workflow-ptc/tsdown.config.ts"
+        "packages/workflow/workflow-ptc/tsdown.config.ts",
+        "packages/workflow/workflow-worker-thread/README.i18n.yaml",
+        "packages/workflow/workflow-worker-thread/README.md",
+        "packages/workflow/workflow-worker-thread/README.zh.md",
+        "packages/workflow/workflow-worker-thread/package.json",
+        "packages/workflow/workflow-worker-thread/src/host.ts",
+        "packages/workflow/workflow-worker-thread/src/index.ts",
+        "packages/workflow/workflow-worker-thread/src/meta.ts",
+        "packages/workflow/workflow-worker-thread/src/protocol.ts",
+        "packages/workflow/workflow-worker-thread/src/realm.ts",
+        "packages/workflow/workflow-worker-thread/src/runtime.ts",
+        "packages/workflow/workflow-worker-thread/src/session.ts",
+        "packages/workflow/workflow-worker-thread/src/types.ts",
+        "packages/workflow/workflow-worker-thread/src/worker.ts",
+        "packages/workflow/workflow-worker-thread/tests/built-worker.e2e.ts",
+        "packages/workflow/workflow-worker-thread/tests/egress.spec.ts",
+        "packages/workflow/workflow-worker-thread/tests/integration.spec.ts",
+        "packages/workflow/workflow-worker-thread/tests/meta.spec.ts",
+        "packages/workflow/workflow-worker-thread/tests/realm.spec.ts",
+        "packages/workflow/workflow-worker-thread/tests/session.spec.ts",
+        "packages/workflow/workflow-worker-thread/tests/source-worker.compat.spec.ts",
+        "packages/workflow/workflow-worker-thread/tests/workflow-worker-thread.e2e.ts",
+        "packages/workflow/workflow-worker-thread/tests/workflow-worker-thread.spec.ts",
+        "packages/workflow/workflow-worker-thread/tsconfig.json",
+        "packages/workflow/workflow-worker-thread/tsdown.config.ts"
       ],
       "incrementFiles": [
         "packages/workflow/workflow-ptc/package.json"
@@ -15727,52 +15727,46 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested"
-    },
-    {
-      "area": "packages/workflow/workflow-ptc",
-      "status": "adapt",
-      "localOwner": "packages/workflow/workflow-ptc",
-      "commitScope": [
-        "packages/workflow/workflow-ptc/"
-      ],
-      "reviewState": "pending-cumulative-source-review",
-      "phase": "4A",
-      "phaseAssignment": "initial-routing-requires-owner-confirmation",
-      "cumulativeFiles": [
-        "packages/workflow/workflow-ptc/README.i18n.yaml",
-        "packages/workflow/workflow-ptc/README.md",
-        "packages/workflow/workflow-ptc/README.zh.md",
-        "packages/workflow/workflow-ptc/package.json",
-        "packages/workflow/workflow-ptc/src/host.ts",
-        "packages/workflow/workflow-ptc/src/index.ts",
-        "packages/workflow/workflow-ptc/src/meta.ts",
-        "packages/workflow/workflow-ptc/src/protocol.ts",
-        "packages/workflow/workflow-ptc/src/realm.ts",
-        "packages/workflow/workflow-ptc/src/runtime.ts",
-        "packages/workflow/workflow-ptc/src/session.ts",
-        "packages/workflow/workflow-ptc/src/types.ts",
-        "packages/workflow/workflow-ptc/src/worker.ts",
-        "packages/workflow/workflow-ptc/tests/built-worker.e2e.ts",
-        "packages/workflow/workflow-ptc/tests/egress.spec.ts",
-        "packages/workflow/workflow-ptc/tests/integration.spec.ts",
-        "packages/workflow/workflow-ptc/tests/meta.spec.ts",
-        "packages/workflow/workflow-ptc/tests/realm.spec.ts",
-        "packages/workflow/workflow-ptc/tests/session.spec.ts",
-        "packages/workflow/workflow-ptc/tests/source-worker.compat.spec.ts",
-        "packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts",
-        "packages/workflow/workflow-ptc/tests/workflow-ptc.spec.ts",
-        "packages/workflow/workflow-ptc/tsconfig.json",
-        "packages/workflow/workflow-ptc/tsdown.config.ts"
-      ],
-      "incrementFiles": [],
-      "alpha1History": {
-        "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
-        "area": "packages/workflow/workflow-ptc",
-        "reviewState": "pending-cumulative-source-review"
-      },
-      "targetAssessment": "inherited-scope-review-required",
-      "localSovereignty": "adapted"
+      "localSovereignty": "adapted",
+      "localDisposition": "Merge the inherited and incremental routing claims for this existing local package. All cumulative and incremental paths remain claimed; source review and consumer acceptance remain pending.",
+      "historicalPathAliases": [
+        {
+          "normalizedPath": "packages/workflow/workflow-ptc/src/protocol.ts",
+          "sourcePath": "packages/workflow/workflow-worker-thread/src/protocol.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/workflow/workflow-ptc/src/session.ts",
+          "sourcePath": "packages/workflow/workflow-worker-thread/src/session.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/workflow/workflow-ptc/src/worker.ts",
+          "sourcePath": "packages/workflow/workflow-worker-thread/src/worker.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/workflow/workflow-ptc/tests/built-worker.e2e.ts",
+          "sourcePath": "packages/workflow/workflow-worker-thread/tests/built-worker.e2e.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/workflow/workflow-ptc/tests/session.spec.ts",
+          "sourcePath": "packages/workflow/workflow-worker-thread/tests/session.spec.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        },
+        {
+          "normalizedPath": "packages/workflow/workflow-ptc/tests/source-worker.compat.spec.ts",
+          "sourcePath": "packages/workflow/workflow-worker-thread/tests/source-worker.compat.spec.ts",
+          "sourceRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.1.json",
+          "reason": "Historical normalized reference retained for provenance; only sourcePath belongs to the raw cumulative Git diff."
+        }
+      ]
     },
     {
       "area": "packages/workspace/workspace",
