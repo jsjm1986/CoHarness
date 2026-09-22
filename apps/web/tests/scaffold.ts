@@ -42,9 +42,9 @@ import {
   type Profile,
 } from '@deepseek-ai/dsh-app-boot'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
-import { LlmAdapter } from '@deepseek-ai/dsh-llm'
+import { AssistantStreamAccumulator, expandAssistantStream, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type {
-  LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
+  AssistantStreamRecord, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ReplayHandle } from '@deepseek-ai/dsh-llm-replay'
 import { installLlmReplay, parseSessionLog, prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
@@ -726,7 +726,7 @@ function rawSessionLog(session: Session): string {
       createdAt: header.createdAt,
       ...header.cwd === undefined ? {} : { cwd: header.cwd },
       ...header.parentSession === undefined ? {} : { parentSession: header.parentSession },
-      ...header.isSeeded ? { seedLength: Number(session.inheritedEventCount) } : {},
+      isSeeded: header.isSeeded,
       ...header.origin === undefined ? {} : { origin: header.origin },
       ...header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth },
       ...header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset },
@@ -859,7 +859,23 @@ export async function seedSession(
   const header = JSON.parse(realized.split('\n', 1)[0]!) as { createdAt?: unknown }
   if (typeof header.createdAt !== 'number') throw new Error('seed fixture requires a numeric createdAt header')
   const timeAnchor = header.createdAt === 0 ? meta.createdAt : header.createdAt
-  const materializedEvents = events.map((event, index) => ({ ...event, time: timeAnchor + index }))
+  // Envelope times compress to one millisecond per event for deterministic
+  // goldens; embedded attempt streams must compress onto the same axis or
+  // timing derivations (decode duration) read a foreign clock. Stream members
+  // sit immediately before their settlement so firstToken stays inside the
+  // compressed window.
+  const materializedEvents = events.map((event, index) => {
+    const time = timeAnchor + index
+    const data = event.data as { stream?: readonly AssistantStreamRecord[] } | undefined
+    const stream = data?.stream
+    if (!Array.isArray(stream) || stream.length === 0) return { ...event, time }
+    const accumulator = new AssistantStreamAccumulator()
+    for (const member of expandAssistantStream(stream)) {
+      accumulator.push({ time: time - 1, chunk: member.chunk })
+    }
+    const repacked = { ...(event.data as Record<string, unknown>), stream: accumulator.snapshot() }
+    return { ...event, time, data: repacked } as SessionEvent
+  })
   await persistSeedSession(scaffold, meta, materializedEvents)
   return meta.id
 }

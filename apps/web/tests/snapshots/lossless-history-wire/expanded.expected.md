@@ -206,15 +206,12 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Usage 900 tok · Cache hit 75%":
-  - img
-  - text: Usage 900 tok · Cache hit 75%
 - button "Ran for {{duration}}":
   - img
   - text: Ran for {{duration}}
 - text: {{date}} {{clock}}
-- button "Process details" [expanded]:
-  - text: Process details
+- button "1 intermediate message" [expanded]:
+  - text: 1 intermediate message
   - img
 - text: WIRE_USER_INTERRUPTED {{date}} {{clock}}
 - button "Copy":
@@ -226,6 +223,10 @@
 - paragraph: WIRE_INTERRUPTED_TEXT
 - text: <!--未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未--> Stopped
 - button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
   - img
 - button "Branch into a new conversation":
   - img
@@ -250,7 +251,7 @@
 - button "8 turns · 9 steps · {{throughput}} tok/s":
   - img
   - text: 8 turns · 9 steps{{throughput}} tok/s
-- button "3.6K tok · Cache hit 75%":
+- button "4.1K tok · Cache hit 75%":
   - img
-  - text: 3.6K tokCache hit 75%
+  - text: 4.1K tokCache hit 75%
 - separator "Adjust transcript content width"

@@ -315,8 +315,10 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     // The real host streamed the ZIP; its root entry is the persisted log
     // text verbatim (the assembled seam: real route, real persistence read).
     const files = unzipSync(await readFile(await download.path()))
-    expect(Object.keys(files)).toEqual(['session.jsonl'])
-    const content = strFromU8(files['session.jsonl'] as Uint8Array)
+    // The root entry keeps the persisted artifact's base filename — the
+    // current-generation session log is `session.v4`.
+    expect(Object.keys(files)).toEqual(['session.v4'])
+    const content = strFromU8(files['session.v4'] as Uint8Array)
     expect(content.split('\n')[0]).toContain(SEED_ID)
     expect(content).toContain('FIRST_DONE')
     await dialog.getByText('Close', { exact: true }).click()
@@ -354,7 +356,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
       const slashDownload = await slashDownloadPromise
       expect(slashDownload.suggestedFilename()).toBe(download.suggestedFilename())
       const slashFiles = unzipSync(await readFile(await slashDownload.path()))
-      const slashContent = strFromU8(slashFiles['session.jsonl'] as Uint8Array)
+      const slashContent = strFromU8(slashFiles['session.v4'] as Uint8Array)
       const slashEvents = parseSessionLog(slashContent)
       const exportRun = slashEvents.findLast(event => event.type === 'command/run' && event.data.name === 'export')
       if (exportRun?.type !== 'command/run') throw new Error('slash ZIP has no export command/run')

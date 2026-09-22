@@ -41,7 +41,22 @@ function completedTailFixture(raw: string): string {
     const stepTwoStart = events.findIndex(event =>
       event.type === 'step/start' && event.data.turn === 1 && event.data.step === 2)
     if (stepTwoStart < 0) throw new Error('borrowed fixture has no step-two start')
-    const kept = events.slice(0, stepTwoStart + 1).map((event) => {
+    const kept = events.slice(0, stepTwoStart + 2).map((event): SessionEvent => {
+      if (event.type === 'assistant/message' && event.data.turn === 1 && event.data.step === 2) {
+        // The turn is interrupted after step two's partial output: the durable
+        // interrupted message keeps the recorded content while its stream is
+        // cut before the finish record, matching an abort mid-settle.
+        const finish = event.data.stream.findIndex(record =>
+          record.type === 'chunk' && record.chunk.type === 'finish')
+        return {
+          ...event,
+          data: {
+            ...event.data,
+            interrupted: true as const,
+            ...finish < 0 ? {} : { stream: event.data.stream.slice(0, finish) },
+          },
+        }
+      }
       if (event.type !== 'assistant/message' || event.data.turn !== 1 || event.data.step !== 1) return event
       const finish = event.data.stream.findIndex(record =>
         record.type === 'chunk' && record.chunk.type === 'finish')
@@ -81,27 +96,18 @@ function completedTailFixture(raw: string): string {
       ...event, seq: seq++, time: 0,
     } as unknown as SessionEvent)
     const tail = [
-      // Keep the step-two Think output but drop its message and the recorded
-      // closure: the turn is interrupted instead, then a second turn completes.
+      // The recorded step-two message is kept above as an interrupted message;
+      // the turn then ends in error, leaving the turn tail behind the
+      // transcript's latest event so its branch action stays unavailable,
+      // and a second turn completes.
+      at({ type: 'step/end', data: { turn: 1, step: 2 } }),
       at({
-        type: 'assistant/attempt',
+        type: 'turn/end',
         data: {
           turn: 1,
-          step: 2,
-          stream: [
-            { type: 'chunk', time: 0, chunk: { type: 'block-start', index: 0, blockType: 'reasoning' } },
-            { type: 'reasoning-chunks', time0: 0, index: 0, dt: [], texts: ['This path was interrupted.'] },
-            {
-              type: 'chunk',
-              time: 0,
-              chunk: { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'This path was interrupted.' } },
-            },
-            { type: 'chunk', time: 0, chunk: { type: 'finish', reason: { kind: 'stop' } } },
-          ],
+          reason: { kind: 'error', error: { message: 'provider stream reset', code: 'SERVER_ERROR' } },
         },
       }),
-      at({ type: 'step/end', data: { turn: 1, step: 2 } }),
-      at({ type: 'turn/end', data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } } }),
       at({ type: 'turn/start', data: { turn: 2 } }),
       at({
         type: 'user/message',
@@ -177,8 +183,11 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     const sessionRow = page.locator('[role="treeitem"]').nth(1)
     await sessionRow.waitFor({ timeout: 10_000 })
     await sessionRow.click()
+    // The intermediate step folds into the turn-process group; expand it so
+    // the step-one message text mounts in the transcript DOM.
+    await page.locator('[data-turn-process]').first().click()
     await expect.poll(() => page.getByText(MID_TURN_TEXT, { exact: true }).count(), { timeout: 15_000 }).toBe(1)
-    await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
+    await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBe(2)
 
     // Focus-reveal the footers (hover:hover keeps them opacity-hidden until
     // hover/focus-within). Branch renders only under assistant answers — user
@@ -203,6 +212,11 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     await page.getByRole('button', { name: /^Select model/ })
       .waitFor({ timeout: 10_000 })
     await page.getByRole('button', { name: /Cache hit \d+%/u }).waitFor({ timeout: 10_000 })
+    // The intermediate-steps group mounts its messages only when expanded; the
+    // golden covers the full transcript, so normalize the disclosure state
+    // before capture regardless of earlier tests' clicks.
+    const processGroup = page.locator('[data-turn-process]').first()
+    if (await processGroup.getAttribute('aria-expanded') !== 'true') await processGroup.click()
     // Keep a footer focused so opacity-hidden actions stay in the a11y tree
     // as an active/focused control during the capture.
     await page.getByRole('button', { name: 'Copy' }).first().focus()

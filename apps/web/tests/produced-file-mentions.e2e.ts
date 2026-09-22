@@ -9,7 +9,7 @@
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createAssistantMessage, createMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-title'
 import {
@@ -34,6 +34,16 @@ function mentionFixture(): string {
   const session = Session.create(SessionId('produced-file-mentions-source'))
   const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
   session.append('turn/start', { turn: 1 })
+  session.append('step/start', { turn: 1, step: 1 })
+  session.append('system/message', {
+    turn: 1,
+    step: 1,
+    message: createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: 'Fixture system prompt.' }],
+      source: { kind: 'plugin', plugin: 'test-fixture' },
+    }),
+  }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Write the report page and both stylesheets.' }],
     source: { kind: 'user' },
@@ -43,7 +53,6 @@ function mentionFixture(): string {
     messageSeqs: [user.seq],
     source: { kind: 'fallback' },
   })
-  session.append('step/start', { turn: 1, step: 1 })
   const calls = WRITES.map((path, index) => ({
     path,
     callId: ToolCallId(`file-mention-${String(index)}`),
@@ -81,6 +90,7 @@ function mentionFixture(): string {
       }),
     }, { surfaceOp: 'append', sourceEventSeqs: [source.seq] })
   }
+  session.append('step/end', { turn: 1, step: 1 })
   session.append('step/start', { turn: 1, step: 2 })
   session.append('assistant/message', {
     stream: [],
@@ -108,6 +118,8 @@ function mentionFixture(): string {
       id: '{{sessionId}}',
       createdAt: 0,
       cwd: '{{cwd}}',
+      isSeeded: false,
+      delegationDepth: 0,
     }),
     ...session.snapshotEvents().map(event => JSON.stringify({
       ...event,

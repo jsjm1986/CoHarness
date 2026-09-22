@@ -9,7 +9,6 @@ import type { Browser, Page, Response as PlaywrightResponse } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { DEFAULT_HISTORY_PAGE_TARGET_BYTES, RpcId } from '@deepseek-ai/dsh-host-apiproxy'
-import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
@@ -54,6 +53,7 @@ const MESSAGE_MARKERS = [
   TOOL_CALL_MARKER,
   TOOL_DONE_MARKER,
   INTERRUPTED_USER_MARKER,
+  INTERRUPTED_TEXT,
 ]
 
 interface SeedEvidence {
@@ -137,13 +137,12 @@ function buildSeed(): SeedEvidence {
     repetitions: number,
     tool?: { id: string; name: string; arguments: string },
   ): void => {
-    const stream = new AssistantStreamAccumulator()
+    const chunkSeqs: number[] = []
     const chunk = (value: Record<string, unknown>): void => {
-      stream.push({ time, chunk: value as never })
-      at({
+      chunkSeqs.push(at({
         type: 'assistant/chunk',
         data: { turn, step, chunk: value },
-      })
+      }))
     }
 
     chunk({ type: 'block-start', index: 0, blockType: 'reasoning' })
@@ -221,16 +220,16 @@ function buildSeed(): SeedEvidence {
           source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
         },
         usage,
-        stream: stream.snapshot(),
       },
+      sourceEventSeqs: chunkSeqs,
       surfaceOp: 'append',
     })
   }
 
   for (let turn = 1; turn <= LARGE_TURNS; turn++) {
     at({ type: 'turn/start', data: { turn } })
-    appendUser(USER_MARKERS[turn - 1] as string)
     at({ type: 'step/start', data: { turn, step: 1 } })
+    appendUser(USER_MARKERS[turn - 1] as string)
     appendAssistant(
       turn,
       1,
@@ -248,8 +247,8 @@ function buildSeed(): SeedEvidence {
     description: TOOL_DESCRIPTION,
   })
   at({ type: 'turn/start', data: { turn: toolTurn } })
-  appendUser(TOOL_USER_MARKER)
   at({ type: 'step/start', data: { turn: toolTurn, step: 1 } })
+  appendUser(TOOL_USER_MARKER)
   appendAssistant(
     toolTurn,
     1,
@@ -314,73 +313,107 @@ function buildSeed(): SeedEvidence {
 
   const interruptedTurn = LARGE_TURNS + 2
   at({ type: 'turn/start', data: { turn: interruptedTurn } })
-  appendUser(INTERRUPTED_USER_MARKER)
   at({ type: 'step/start', data: { turn: interruptedTurn, step: 1 } })
-  at({
+  appendUser(INTERRUPTED_USER_MARKER)
+  const interruptedChunkSeqs: number[] = []
+  interruptedChunkSeqs.push(at({
     type: 'assistant/chunk',
     data: {
       turn: interruptedTurn,
       step: 1,
       chunk: { type: 'block-start', index: 0, blockType: 'reasoning' },
     },
-  })
-  at({
+  }))
+  interruptedChunkSeqs.push(at({
     type: 'assistant/chunk',
     data: {
       turn: interruptedTurn,
       step: 1,
       chunk: { type: 'reasoning-delta', index: 0, text: `${INTERRUPTED_REASONING}\n` },
     },
-  })
+  }))
   reasoningDeltaEvents += 1
   for (let index = 0; index < 64; index++) {
-    at({
+    interruptedChunkSeqs.push(at({
       type: 'assistant/chunk',
       data: {
         turn: interruptedTurn,
         step: 1,
         chunk: { type: 'reasoning-delta', index: 0, text: '断' },
       },
-    })
+    }))
     reasoningDeltaEvents += 1
   }
-  at({
+  interruptedChunkSeqs.push(at({
     type: 'assistant/chunk',
     data: {
       turn: interruptedTurn,
       step: 1,
       chunk: { type: 'block-start', index: 1, blockType: 'text' },
     },
-  })
-  at({
+  }))
+  interruptedChunkSeqs.push(at({
     type: 'assistant/chunk',
     data: {
       turn: interruptedTurn,
       step: 1,
       chunk: { type: 'text-delta', index: 1, text: `${INTERRUPTED_TEXT}\n<!--` },
     },
-  })
+  }))
   textDeltaEvents += 1
   for (let index = 0; index < 64; index++) {
-    at({
+    interruptedChunkSeqs.push(at({
       type: 'assistant/chunk',
       data: {
         turn: interruptedTurn,
         step: 1,
         chunk: { type: 'text-delta', index: 1, text: '未' },
       },
-    })
+    }))
     textDeltaEvents += 1
   }
-  at({
+  interruptedChunkSeqs.push(at({
     type: 'assistant/chunk',
     data: {
       turn: interruptedTurn,
       step: 1,
       chunk: { type: 'text-delta', index: 1, text: '-->' },
     },
-  })
+  }))
   textDeltaEvents += 1
+  appendMessageCount += 1
+  at({
+    type: 'assistant/message',
+    data: {
+      turn: interruptedTurn,
+      step: 1,
+      message: {
+        id: messageId(),
+        role: 'assistant',
+        content: [
+          { type: 'reasoning', text: `${INTERRUPTED_REASONING}\n${'断'.repeat(64)}` },
+          { type: 'text', text: `${INTERRUPTED_TEXT}\n<!--${'未'.repeat(64)}-->` },
+        ],
+        source: { kind: 'model', provider: 'snapshot', model: 'snapshot-replier' },
+      },
+      interrupted: true,
+      usage,
+    },
+    sourceEventSeqs: interruptedChunkSeqs,
+    surfaceOp: 'append',
+  })
+  // A crashed retry leaves one dangling chunk run that the migration folds
+  // into an assistant/attempt, keeping attempt records on the log tail.
+  for (const value of [
+    { type: 'block-start', index: 0, blockType: 'text' },
+    { type: 'text-delta', index: 0, text: 'WIRE_CRASHED_RETRY' },
+  ]) {
+    at({
+      type: 'assistant/chunk',
+      data: { turn: interruptedTurn, step: 1, chunk: value },
+    })
+    textDeltaEvents += 1
+  }
   at({ type: 'step/end', data: { turn: interruptedTurn, step: 1 } })
   at({ type: 'turn/end', data: { turn: interruptedTurn, reason: { kind: 'aborted' } } })
 
@@ -661,7 +694,7 @@ describe('web e2e: lossless history wire pagination', () => {
       detail: 'conversation',
     })
     expect(firstBrowserPage?.omittedSpanCount).toBeGreaterThan(0)
-    expect(firstBrowserPage?.attemptRecordCount).toBeGreaterThan(0)
+    expect(firstBrowserPage?.attemptRecordCount).toBe(0)
     expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
     expect(firstBrowserPage?.hasMore).toBe(true)
 
@@ -689,16 +722,17 @@ describe('web e2e: lossless history wire pagination', () => {
     expect((await usageDetails.textContent()) ?? '').toMatch(/input/i)
     expect((await usageDetails.textContent()) ?? '').toContain('Output')
     await usageButton.press('Escape')
-    // Per-turn TTFT and throughput live in the turn-time dialog; with the
-    // chunk runs still omitted the settled tail's dialog carries neither row.
+    // Per-turn TTFT and throughput live in the turn-time dialog; settled
+    // messages embed their stream so the dialog derives both rows without
+    // waiting for a detail fill.
     const initialTails = page.locator('[data-chat-flow-kind="turn-tail"]')
     const initialTimeButton = initialTails.nth((await initialTails.count()) - 2)
       .getByRole('button', { name: /Ran for/u })
     await initialTimeButton.click()
     const initialTimeDetails = page.locator('[data-turn-time-details]')
     await initialTimeDetails.waitFor({ timeout: 10_000 })
-    expect((await initialTimeDetails.textContent()) ?? '').not.toContain('TTFT')
-    expect((await initialTimeDetails.textContent()) ?? '').not.toContain('tok/s')
+    expect((await initialTimeDetails.textContent()) ?? '').toContain('TTFT')
+    expect((await initialTimeDetails.textContent()) ?? '').toContain('tok/s')
     await initialTimeButton.press('Escape')
     expect(initialUi.interruptedTextCount).toBe(1)
     expect(initialUi.interruptedReasoningCount).toBe(1)
@@ -737,6 +771,8 @@ describe('web e2e: lossless history wire pagination', () => {
     await expect.poll(() => page.getByRole('button', { name: 'Load earlier' }).count(), {
       timeout: 10_000,
     }).toBe(0)
+    // Every loaded turn is settled and folds its intermediate rows.
+    await expandTurnProcesses(page)
     for (const marker of MESSAGE_MARKERS) {
       expect(await transcript(page).getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
@@ -769,7 +805,6 @@ describe('web e2e: lossless history wire pagination', () => {
     }
 
     const expandedUi = await stableUiEvidence(page, scaffold)
-    expect(expandedUi.stats).toContain('tok/s')
     const timeButton = page.getByRole('button', { name: /TTFT|turns.*steps/u }).first()
     await timeButton.click()
     const timeDetails = page.locator('[data-session-stats-details]')

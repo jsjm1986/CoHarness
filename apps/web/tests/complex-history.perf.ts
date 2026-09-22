@@ -324,6 +324,8 @@ function fixtureLog(session: Session): string {
     id: '{{sessionId}}',
     createdAt: Date.now() - 60_000,
     cwd: '{{cwd}}',
+    isSeeded: false,
+    delegationDepth: 0,
   }
   return [
     JSON.stringify(header),
@@ -337,13 +339,13 @@ function smallSidebarFixture(): string {
   session.append('turn/start', {
     turn: 1,
   })
+  session.append('step/start', { turn: 1, step: 1 })
+  appendRequestHeader(session, 1, 1)
   const user = session.append('user/message', createUserMessage({
     content: text('Inspect this compact synthetic session.'),
     source: { kind: 'user' },
   }), { surfaceOp: 'append' })
   appendTitle(session, 'Synthetic sidebar session', user.seq)
-  session.append('step/start', { turn: 1, step: 1 })
-  appendRequestHeader(session, 1, 1)
   appendToolStep(session, 1, 1, 2)
   session.append('step/end', { turn: 1, step: 1 })
   session.append('step/start', { turn: 1, step: 2 })
@@ -360,6 +362,8 @@ function longHistoryFixture(): string {
     session.append('turn/start', {
       turn,
     })
+    session.append('step/start', { turn, step: 1 })
+    appendRequestHeader(session, turn, 1)
     const user = session.append('user/message', createUserMessage({
       content: text(
         `LONG_PERF_SENTINEL turn ${String(turn)}: analyze payload ${'u'.repeat(200)}`,
@@ -367,9 +371,6 @@ function longHistoryFixture(): string {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     if (turn === 1) appendTitle(session, LONG_SESSION_TITLE, user.seq)
-
-    session.append('step/start', { turn, step: 1 })
-    appendRequestHeader(session, turn, 1)
     if (turn % TOOL_TURN_INTERVAL === 0) {
       appendToolStep(session, turn, 1, TOOLS_PER_TOOL_TURN)
       session.append('step/end', { turn, step: 1 })

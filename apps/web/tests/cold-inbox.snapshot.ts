@@ -6,7 +6,7 @@ it.each([0, 200])('serves a cold pending queue after %s turns without activating
   const scaffold = await launchWebScaffold()
   try {
     const id = await seedSession(scaffold, [
-      JSON.stringify({ type: 'session', version: 2, id: '{{sessionId}}', createdAt: 1786406400000, cwd: '{{cwd}}' }),
+      JSON.stringify({ type: 'session', version: 2, id: '{{sessionId}}', createdAt: 1786406400000, cwd: '{{cwd}}', isSeeded: false, delegationDepth: 0 }),
       ...Array.from({ length: turns }, (_, index) => [
         JSON.stringify({ type: 'turn/start', data: { turn: index + 1 } }),
         JSON.stringify({ type: 'step/start', data: { turn: index + 1, step: 1 } }),

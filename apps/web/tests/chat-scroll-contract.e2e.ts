@@ -96,6 +96,7 @@ interface ScrollWorld {
 interface ScrollWorldOptions {
   readonly failureShot: string
   readonly replay?: ReplayOverrideDoc
+  readonly paceMs?: number
   readonly seeds: readonly { fixture: ChatScrollFixture; id: string }[]
 }
 
@@ -161,7 +162,7 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
       scaffold = await launchWebScaffold({
         replayFixture: join(replayDir, 'override-only.jsonl'),
         replayOverride,
-        paceMs: STREAM_PACE_MS,
+        paceMs: options.paceMs ?? STREAM_PACE_MS,
         replayContextWindow: REPLAY_CONTEXT_WINDOW,
       })
     } else {
@@ -471,10 +472,6 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-function eventCarries(event: SessionEvent, marker: string): boolean {
-  return JSON.stringify(event).includes(marker)
-}
-
 function assertClean(world: ScrollWorld): void {
   expect(world.tripwire.pageErrors).toEqual([])
   expect(world.tripwire.warnings).toEqual([])
@@ -585,6 +582,10 @@ describe('web e2e: long Chat scroll contract', () => {
         replayEntry(toolStream()),
         replayEntry(textStream(LIVE_TOOL_FIRST, LIVE_TOOL_DONE, 84)),
       ],
+      // The scroll-away cycle spans several 15s assertions; a burst-paced
+      // 84-chunk stream can drain before repin under host contention, so this
+      // world slows the recorded deltas to keep streaming through repin.
+      paceMs: 300,
       seeds: [{ fixture: TOOL_FIXTURE, id: TOOL_SESSION_ID }],
     }, async (world) => {
       const readyPath = join(world.scaffold.workspaceCwd, TOOL_READY_FILE)
@@ -613,7 +614,7 @@ describe('web e2e: long Chat scroll contract', () => {
           { timeout: 15_000 },
         ).toBe(true)
         await expect.poll(
-          () => world.events.some(event => eventCarries(event, LIVE_TOOL_FIRST)),
+          () => world.assistantFrames.some(frame => JSON.stringify(frame).includes(LIVE_TOOL_FIRST)),
           { timeout: 15_000 },
         ).toBe(true)
         await expect.poll(

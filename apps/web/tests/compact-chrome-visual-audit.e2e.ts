@@ -304,7 +304,7 @@ describe('visual audit: compact product chrome', () => {
           if (phone.width <= 359) {
             // Short phones must retain the first summary value; a flex-shrunk
             // nested overview used to leave only section headings visible.
-            expect(await details.getByText('Completed', { exact: true }).count()).toBe(1)
+            expect(await details.getByText('已完成', { exact: true }).count()).toBe(1)
           }
           const closeDetails = details.getByRole('button', { name: /Close details|关闭详情/ })
           if (await closeDetails.count() > 0) await closeDetails.click()
@@ -341,7 +341,7 @@ describe('visual audit: compact product chrome', () => {
           if (kindBox === null) throw new Error(`${prefix}: assistant details kind has no geometry`)
           expect(kindBox.x, `${prefix}: assistant details kind starts inside the viewport`).toBeGreaterThanOrEqual(0)
           expect(kindBox.x + kindBox.width, `${prefix}: assistant details kind stays inside the viewport`).toBeLessThanOrEqual(phone.width + 1)
-          expect(await kind.textContent()).toBe('ASSISTANT')
+          expect(await kind.textContent()).toBe('助手')
           const layer = await page.evaluate(() => {
             const card = document.querySelector<HTMLElement>('[data-composer-card]')
             const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
