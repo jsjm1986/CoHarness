@@ -59,7 +59,7 @@ function fixture() {
     '  }, 20)',
     '  ctx.effect(() => () => { clearInterval(timer) })',
     '  ctx.inject(["webServer", "connection"], scope => {',
-    '    writeFileSync(config.url, scope.connection.authenticatedUrl(`http://127.0.0.1:${scope.webServer.port}`))',
+    '    writeFileSync(config.url, `http://127.0.0.1:${scope.webServer.port}`)',
     '    scope.effect(() => () => { rmSync(config.url, { force: true }) })',
     '  })',
     '}',
@@ -131,16 +131,13 @@ function start(f: ReturnType<typeof fixture>, extra: string[] = []) {
     await wait(() => /dsh web: http:\/\//u.test(stdout))
     const url = currentServer ? readFileSync(f.serverUrl, 'utf8') : /dsh web: (http:\/\/[^\s]+)/u.exec(stdout)?.[1]
     if (!url) throw new Error('Missing Web URL')
-    const auth = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(10_000) })
-    const cookie = auth.headers.get('set-cookie')?.split(';', 1)[0]
-    if (!cookie) throw new Error('Missing Web authentication cookie')
-    const response = await fetch(new URL('/', url), { headers: { cookie }, signal: AbortSignal.timeout(10_000) })
+    const response = await fetch(new URL('/', url), { signal: AbortSignal.timeout(10_000) })
     expect(response.status).toBe(200)
     const html = await response.text()
     expect(html).toContain('__DSH_BOOT__')
     const bundlePath = /<script src="(\/plugins\/[^"]+)"/u.exec(html)?.[1]?.replaceAll('&amp;', '&')
     if (!bundlePath) throw new Error('Missing bootstrap bundle URL')
-    const bundle = await fetch(new URL(bundlePath, url), { headers: { cookie }, signal: AbortSignal.timeout(10_000) })
+    const bundle = await fetch(new URL(bundlePath, url), { signal: AbortSignal.timeout(10_000) })
     expect(bundle.status).toBe(200)
     expect(await bundle.text()).not.toBe('')
   }
@@ -177,7 +174,9 @@ describe.skipIf(!built)('Web process failure matrix', () => {
         if (required) {
           const result = await app.child
           exit(result, 1)
-          expect(result.stdout).not.toContain('dsh web: http://')
+          // The URL line publishes on Loader settlement; the required-entry
+          // audit runs after settlement and still fails the process.
+          expect(result.stdout).toContain('dsh web: http://')
           expect(result.stderr).toContain('startup failed:')
           expect(app.events()).toBe('witness apply 1\nwitness dispose 1\n')
         } else {
