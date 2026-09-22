@@ -113,6 +113,7 @@ export class SessionWriteLease {
       return new SessionWriteLease({ kind: 'win32', handle })
     }
     /* v8 ignore stop */
+    /* v8 ignore start -- Linux coverage exercises this platform branch; native Windows returns the handle above */
     // Bounded retry: locking an inode a releasing creator just unlinked (or a
     // recreated path) re-opens the fresh file; steady state needs one pass.
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -161,6 +162,7 @@ export class SessionWriteLease {
       await handle.close()
     }
     throw new SessionAlreadyOwnedError(id)
+    /* v8 ignore stop */
   }
 
   /**
