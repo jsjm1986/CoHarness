@@ -558,7 +558,9 @@ describe('DirectoryBrowser', () => {
     // re-parks on the crumb edit zone.
     await screen.findByRole('alert')
     expect(screen.queryByText('.config')).toBeNull()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'browser.editPath' }))
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'browser.editPath' }))
+    })
   })
 
   it('leaves focus on a surviving row when its pick fails', async () => {
