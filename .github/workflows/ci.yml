@@ -362,8 +362,11 @@ jobs:
           && '32'
           || '1' }}
     steps:
+      # The golden summary diffs the pull-request base against HEAD; a
+      # depth-1 checkout lacks the merge-base object.
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: pnpm/action-setup@v6.0.10
@@ -478,9 +481,12 @@ jobs:
           echo "Web browser verification: snapshot_mode=${{ needs.pr-scope.outputs.snapshot_mode }}; groups=${{ needs.pr-scope.outputs.web_groups || '(complete inventory)' }}" >> "$GITHUB_STEP_SUMMARY"
 
       # Every step below only runs when the selector chose a browser tier.
+      # The golden summary diffs the pull-request base against HEAD; a
+      # depth-1 checkout lacks the merge-base object.
       - uses: actions/checkout@v7
         if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: pnpm/action-setup@v6.0.10

@@ -766,9 +766,22 @@ def smoke_sdk_custom(base_url: str, executable: Path) -> None:
             text_result = harness.run("reply with the smoke text", session_id="custom-smoke")
             code_result = harness.run(CODE_PROMPT, session_id="custom-smoke")
             workflow_result = harness.run(WORKFLOW_PROMPT, session_id="custom-smoke")
-        assert text_result.final_response == EXPECTED_TEXT, text_result.final_response
-        assert code_result.final_response == CODE_WORKER_TEXT, code_result.final_response
-        assert workflow_result.final_response == WORKFLOW_WORKER_TEXT, workflow_result.final_response
+        assert text_result.final_response == EXPECTED_TEXT, (
+            f"final_response={text_result.final_response!r}; "
+            f"events={json.dumps(text_result.events[-8:])}; "
+            f"notifications={json.dumps([n.payload for n in text_result.notifications[-8:]], default=str)}; "
+            f"requests={json.dumps(MockModelHandler.requests[-2:], default=str)[:4000]}"
+        )
+        assert code_result.final_response == CODE_WORKER_TEXT, (
+            f"final_response={code_result.final_response!r}; "
+            f"events={json.dumps(code_result.events[-8:])}; "
+            f"notifications={json.dumps([n.payload for n in code_result.notifications[-8:]], default=str)}"
+        )
+        assert workflow_result.final_response == WORKFLOW_WORKER_TEXT, (
+            f"final_response={workflow_result.final_response!r}; "
+            f"events={json.dumps(workflow_result.events[-8:])}; "
+            f"notifications={json.dumps([n.payload for n in workflow_result.notifications[-8:]], default=str)}"
+        )
         assert_session_log(sessions, root, EXPECTED_TEXT, CODE_WORKER_TEXT, WORKFLOW_WORKER_TEXT)
 
 

@@ -991,7 +991,8 @@
       "sovereignty": "tracked"
     },
     "session/session-format-v0-to-v1": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md"
     },
     "session/session-format-v1-to-v2": {
       "sovereignty": "tracked"
