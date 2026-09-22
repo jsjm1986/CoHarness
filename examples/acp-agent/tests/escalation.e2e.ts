@@ -15,6 +15,20 @@ import {
 } from '@deepseek-ai/dsh-acp-snapshot'
 import { cleanupAcpExampleTest } from './cleanup.ts'
 
+const STANDARD_EXECUTION_UPDATES = new Set([
+  'agent_message_chunk',
+  'agent_thought_chunk',
+  'tool_call',
+  'tool_call_update',
+  'usage_update',
+])
+
+/** Require a model answer while allowing every standard semantic execution update. */
+function expectStandardExecutionUpdates(updates: LaunchedAcpTestAgent['updates']): void {
+  expect(updates.some(update => update.sessionUpdate === 'agent_message_chunk')).toBe(true)
+  expect(updates.every(update => STANDARD_EXECUTION_UPDATES.has(update.sessionUpdate))).toBe(true)
+}
+
 /**
  * The default ACP composition (`cordis.yml`) end to end.
  *
@@ -137,7 +151,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || !hasRunner)('default sandbox co
       }],
     })
     expect(['end_turn', 'max_tokens']).toContain(res.stopReason)
-    expect(updates.every(update => update.sessionUpdate === 'agent_message_chunk')).toBe(true)
+    expectStandardExecutionUpdates(updates)
 
     // The WORLD: the approved escalated retry landed the write.
     const proof = await readFile(join(workdir, 'escalated.txt'), 'utf8')
@@ -169,7 +183,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || !hasRunner)('default sandbox co
       }],
     })
     expect(['end_turn', 'max_tokens']).toContain(res.stopReason)
-    expect(updates.every(update => update.sessionUpdate === 'agent_message_chunk')).toBe(true)
+    expectStandardExecutionUpdates(updates)
 
     // The WORLD: rejected means the file never appeared.
     await expect(readFile(join(workdir, 'refused.txt'), 'utf8')).rejects.toThrow()

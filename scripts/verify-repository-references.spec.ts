@@ -44,6 +44,23 @@ function repository(test: TestContext) {
 }
 
 describe('maintained repository reference policy', () => {
+  it('permits only the frozen selector metadata field, not prose or neighboring files', (test) => {
+    const fixture = repository(test)
+    const pin = 'scripts/fixtures/pr-scope-baseline/inputs.json'
+    fixture.write(pin, `{"version":1,\n  "sourceCommit": "${fixture.commit}"\n}\n`)
+    expect(scanRepositoryReferences(fixture.root)).toEqual([])
+    fixture.write(pin, `{"version":1,\n  "sourceCommit": "${fixture.commit}",\n  "comment": "${fixture.commit}",\n  "url": "${organizationUrl}"\n}\n`)
+    fixture.write('scripts/fixtures/pr-scope-baseline/classifier.ts', `// ${fixture.commit}\n`)
+    fixture.write('other.json', `  "sourceCommit": "${fixture.commit}"\n`)
+    expect(scanRepositoryReferences(fixture.root)).toEqual(expect.arrayContaining([
+      { file: pin, line: 3, kind: 'commit-hash' },
+      { file: pin, line: 4, kind: 'organization-url' },
+      { file: 'scripts/fixtures/pr-scope-baseline/classifier.ts', line: 1, kind: 'commit-hash' },
+      { file: 'other.json', line: 1, kind: 'commit-hash' },
+    ]))
+    expect(scanRepositoryReferences(fixture.root)).toHaveLength(4)
+  })
+
   it('permits only the independent kit repository and its source URLs', () => {
     for (const suffix of ['', '.git', '/tree/main/packages/entry']) {
       expect(findRepositoryReferences('package.json', `${organizationUrl}/libreoffice-kit${suffix}`, new Set())).toEqual([])

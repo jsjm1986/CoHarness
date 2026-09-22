@@ -13,8 +13,9 @@
 //
 // Composition divergences from `dsh web`, all deliberate, all via include
 // patches after the shipped bundle layers, over the SAME tree (never a
-// second yml): temp persistenceRoot; host-level skill roots confined to the
-// temp workspace while project skill discovery remains real; agent-instructions
+// second yml): private Session/document storage outside the workspace;
+// host-level skill roots confined to the temp workspace while project skill
+// discovery remains real; agent-instructions
 // disabled (recorded fixtures must not embed this repo's AGENTS.md);
 // session-title-llm disabled (its fire-and-forget title call would race the
 // loop for the session's replay cursor); webserver pinned to port 0 with the
@@ -293,12 +294,12 @@ export interface LaunchOptions {
   harnessHome?: string
 }
 
-/** Dispose the booted tree and remove both owned temp roots, reporting every independent cleanup failure. */
-async function cleanupScaffoldWorld(ctx: Context, workspaceCwd: string, persistenceRoot: string): Promise<unknown[]> {
+/** Dispose the booted tree and remove its workspace and private storage, reporting every cleanup failure. */
+async function cleanupScaffoldWorld(ctx: Context, workspaceCwd: string, storageRoot: string): Promise<unknown[]> {
   const failures: unknown[] = []
   await Promise.resolve(ctx.fiber.dispose()).catch((error: unknown) => failures.push(error))
   await rm(workspaceCwd, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
-  await rm(persistenceRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+  await rm(storageRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
   return failures
 }
 
@@ -366,9 +367,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     }
   }
   Object.assign(process.env, skillRootEnvironment)
-  let persistenceRoot: string
+  let storageRoot: string
   try {
-    persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-sessions-'))
+    storageRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-storage-'))
   } catch (error) {
     const failures: unknown[] = [error]
     await rm(workspaceCwd, { recursive: true, force: true }).catch((cleanupError: unknown) => failures.push(cleanupError))
@@ -376,6 +377,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     if (failures.length > 1) throw new AggregateError(failures, 'web scaffold temp-root setup failed')
     throw error
   }
+  const persistenceRoot = join(storageRoot, 'sessions')
+  const documentRoot = join(storageRoot, 'documents')
   if (maskDeepSeekCredential) Reflect.deleteProperty(process.env, 'DEEPSEEK_API_KEY')
 
   // The include patch set — the same layer stack the profile boot composes
@@ -417,6 +420,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     },
     { id: 'session-persistence-jsonl', config: { root: persistenceRoot } },
+    // An explicit document root also disables implicit ~/uploads migration.
+    // The real store still warms, locks, sweeps and drains inside this world.
+    { id: 'userdoc-local', config: { uploadRoot: documentRoot } },
     // Content search is enabled here although the shipped bundles default it
     // off (`openAt: never`, pinned by apps/cli/tests/lazy-search-startup):
     // the seeded-session scenarios navigate by content search, and these e2e
@@ -652,7 +658,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     }
   } catch (error) {
     if (process.cwd() !== originalCwd) process.chdir(originalCwd)
-    const cleanupFailures = await cleanupScaffoldWorld(ctx, workspaceCwd, persistenceRoot)
+    const cleanupFailures = await cleanupScaffoldWorld(ctx, workspaceCwd, storageRoot)
     restoreCredentialEnvironment()
     restoreSkillRootEnvironment()
     if (cleanupFailures.length > 0) {
@@ -702,7 +708,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         }
       }
       try {
-        failures.push(...await cleanupScaffoldWorld(ctx, workspaceCwd, persistenceRoot))
+        failures.push(...await cleanupScaffoldWorld(ctx, workspaceCwd, storageRoot))
       } finally {
         restoreCredentialEnvironment()
         restoreSkillRootEnvironment()

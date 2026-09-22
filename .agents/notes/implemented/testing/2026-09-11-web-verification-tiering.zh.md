@@ -33,3 +33,5 @@ Status: implemented
 ## 后果
 
 本文档部分取代[必需的浏览器 CI 门禁笔记](2026-07-30-web-browser-snapshot-ci-gate.zh.md)：其中仅重放规则、worker 隔离与串行属主理由仍然是权威；其在 consumer job 内运行完整浏览器套件的位置安排被分层 lane 取代。共享表面（`ui-primitives`、`ui-renderer`、`ui-layout`、`ui-slots`、`ui-theme`、`locale`）映射到 `all`，会选择整个库存——focused 是路由决策，不是规模折扣。slot 被多个组的场景触及的共享包（`ui-commands`、`ui-collaboration`、`ui-deliverables`、`ui-sidebar`、`ui-open-in-app`、`ui-trajectory`、`ui-workspace`）映射到每一个这样的组，而非 `all`。新增场景必须登记策略条目，否则双射测试失败；未映射的新浏览器渲染包升级为 `full`，而不是跳过验证。
+
+[验证提速决策](../process/2026-09-22-pr-verification-throughput.zh.md)增加候选策略中的精确场景及 golden 属主选择，并包含全部冒烟场景。生产组件保留本文的分组规则，默认影子并集在经过审查的切换前保留原有覆盖。本文继续负责分组归属与公共冒烟库存。

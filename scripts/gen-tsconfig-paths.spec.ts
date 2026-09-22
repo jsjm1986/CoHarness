@@ -25,7 +25,8 @@ describe('generated tsconfig package aliases', () => {
     const source = resolve(root, `packages/${packagePath}/src/${entry}.ts`)
     const host = { ...ts.sys, fileExists: (file: string) => !file.replaceAll('\\', '/').includes('/lib/') && ts.sys.fileExists(file) }
     expect(ts.resolveModuleName(`@deepseek-ai/dsh-${specifier}`,
-      resolve(root, 'packages/subprocess/subprocess-local/src/control-spawn.ts'), options, host).resolvedModule?.resolvedFileName).toBe(source)
+      resolve(root, 'packages/subprocess/subprocess-local/src/control-spawn.ts'), options, host).resolvedModule?.resolvedFileName?.replaceAll('\\', '/'))
+      .toBe(source.replaceAll('\\', '/'))
   })
 
   it('maps each package to its own source directory', () => {

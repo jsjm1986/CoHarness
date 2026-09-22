@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { clientSurfacePackages } from './ci-pr-scope.ts'
 import {
   expandPackageGroups,
+  exactScenarioFiles,
   focusedScenarioFiles,
   listWebScenarioFiles,
   loadWebTestPolicy,
@@ -117,6 +118,19 @@ describe('focusedScenarioFiles', () => {
   })
 })
 
+describe('exactScenarioFiles', () => {
+  it('keeps only exact owners and every smoke scenario', () => {
+    const selected = exactScenarioFiles(policy, ['goal-bar.e2e.ts', 'goal-bar.e2e.ts', 'workbench.e2e.ts'])
+    expect(selected).toEqual([...new Set([...policy.smokeScenarios, 'goal-bar.e2e.ts', 'workbench.e2e.ts'])].sort())
+    expect(selected).not.toContain('queue-actions.e2e.ts')
+  })
+
+  it('rejects empty and unknown selections instead of silently running only smokes', () => {
+    expect(() => exactScenarioFiles(policy, [])).toThrow(/must not be empty/)
+    expect(() => exactScenarioFiles(policy, ['missing.e2e.ts'])).toThrow(/unknown scenario/)
+  })
+})
+
 describe('expandPackageGroups', () => {
   it('expands the reserved all-group token to every business group', () => {
     expect(expandPackageGroups('all', policy)).toEqual(policy.groups)
@@ -153,6 +167,13 @@ describe('validateWebTestPolicy', () => {
 
   it('rejects smoke scenarios outside the scenario table', () => {
     rejected('smokeScenarios', ['missing.e2e.ts'], /not in scenarios/)
+  })
+
+  it('rejects an empty inventory, unsafe scenario paths and a missing smoke corpus', () => {
+    rejected('scenarios', {}, /scenarios must not be empty/)
+    rejected('scenarios', { '../outside.e2e.ts': 'conversation' }, /relative browser scenario path/)
+    rejected('smokeScenarios', [], /non-empty/)
+    rejected('smokeScenarios', [policy.smokeScenarios[0], policy.smokeScenarios[0]], /duplicates/)
   })
 
   it('rejects packages naming unknown groups', () => {

@@ -602,17 +602,24 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await expect.poll(() => sessionRows.count(), { timeout: 10_000 }).toBe(1)
     const sessionRow = sessionRows.first()
     const rowTitle = await sessionRow.locator('[class*="title"]').innerText()
+    const sessionTitles = () => ungroupedSection.locator('[role="treeitem"][aria-selected] [class*="title"]').allTextContents()
+    const titlesBefore = await sessionTitles()
+    expect(titlesBefore).toContain(rowTitle)
+    const retainedTitles = titlesBefore.filter(title => title !== rowTitle)
     // Row menu: hover reveals the actions button; Archive session commits
     // without a confirmation dialog (non-destructive: log + accounting stay).
     await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
     await page.getByRole('menuitem', { name: 'Archive session' }).click()
-    // The row disappears on the archive-set echo; the bucket itself may
-    // keep the provisional New Session a prior adoption left selected, so
-    // what must vanish is the archived row, not the group.
+    // The row disappears on the archive-set echo while unrelated rows stay:
+    // the bucket may keep a provisional New Session a prior adoption left
+    // selected, so what must vanish is the archived row, not the group.
     await expect.poll(async () => {
       const bucket = page.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
       return await bucket.locator('[role="treeitem"]').filter({ hasText: rowTitle }).count()
     }, { timeout: 10_000 }).toBe(0)
+    await expect.poll(sessionTitles, { timeout: 10_000 }).toEqual(retainedTitles)
+    await expect.poll(() => page.getByText('Independent sessions', { exact: true }).count(), { timeout: 10_000 })
+      .toBe(retainedTitles.length === 0 ? 0 : 1)
     // Durable on the host: the registry-global set carries the id while the
     // session log itself stays in persistence untouched.
     await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds], { timeout: 10_000 })
@@ -624,10 +631,9 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await expect.poll(() => page.getByText('Workspaces', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
-    // The archived row must not resurface (the Ungrouped bucket itself may
-    // reappear if selection restore lands on another stray — not this test's
-    // concern).
+    // The archive set and unrelated selection both survive the fresh baseline.
     expect(await page.getByText(rowTitle, { exact: true }).count()).toBe(0)
+    await expect.poll(sessionTitles, { timeout: 10_000 }).toEqual(retainedTitles)
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 

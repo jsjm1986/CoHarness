@@ -5,14 +5,12 @@
 name: Landlock Run
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/landlock-run.yml'
-      - '.github/workflows/landlock-run-release.yml'
-      - 'native/system/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
+  workflow_call:
+    inputs:
+      required_proof:
+        description: Run the existing native build, test and packed-install matrix.
+        type: boolean
+        default: false
   push:
     branches: [master]
     paths:
@@ -25,7 +23,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: native-system-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:

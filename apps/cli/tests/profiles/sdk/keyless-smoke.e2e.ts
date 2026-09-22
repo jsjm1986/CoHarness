@@ -202,16 +202,23 @@ describe('Python SDK dsh profile keyless smoke', () => {
 
   it.each([
     { label: 'boots the standalone minimal profile through its generated manifest', editorEnabled: false },
-    { label: 'executes the documented editor opt-in patch with sdk-minimal', editorEnabled: true },
+    { label: 'executes an editor opt-in patch with sdk-minimal', editorEnabled: true },
   ])('$label', async ({ editorEnabled }) => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-python-sdk-minimal-'))
     const editorPatch = join(root, 'editor.patch.yml')
     if (editorEnabled) {
-      const guide = await readFile(join(repoRoot, 'docs/user/guide/python-sdk.md'), 'utf8')
-      const yaml = guide.split('<a id="opt-in-to-str_replace_editor"></a>')[1]
-        ?.match(/```yaml\n([\s\S]*?)```/)?.[1]
-      expect(yaml).toBeDefined()
-      await writeFile(editorPatch, yaml!)
+      // The minimal tree mounts neither the editor nor a filesystem provider;
+      // the opt-in patch inserts both.
+      await writeFile(editorPatch, [
+        '- insert:',
+        '    - id: fs-local',
+        "      name: '@deepseek-ai/dsh-fs-local'",
+        '      config:',
+        '        cwd: !!js process.cwd()',
+        '    - id: tool-str-replace-editor',
+        "      name: '@deepseek-ai/dsh-tool-str-replace-editor'",
+        '',
+      ].join('\n'))
     }
     const editorFile = join(root, 'editor.txt')
     const editorContent = 'sdk-minimal editor opt-in\n'

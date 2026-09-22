@@ -26,9 +26,21 @@
 - id: session-telemetry-otel
   name: '@deepseek-ai/dsh-session-telemetry-otel'
   config:
-    mode: !!js process.env.DSH_TELEMETRY_E2E_MODE || 'FULL'
+    mode: !!js process.env.DSH_TELEMETRY_E2E_MODE || 'FEEDBACK_ONLY'
     exporter:
       url: !!js process.env.DSH_TELEMETRY_E2E_URL
+
+# The session-persistence backend must mount before agent-spine: configured
+# agents create their sessions while later entries are still mounting, and a
+# create that sees no backend never gains durable routing for the session.
+- id: persistence
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: 'none'
+
+- id: checkpoint-policy
+  name: '@deepseek-ai/dsh-session-checkpoint-policy'
 
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
@@ -40,12 +52,3 @@
         cwd: !!js process.cwd()
     persona: 'Test the session-telemetry-otel plugin.'
     workspaceContext: false
-
-- id: persistence
-  name: '@deepseek-ai/dsh-session-persistence-jsonl'
-  config:
-    root: './.sessions'
-    compression: 'none'
-
-- id: checkpoint-policy
-  name: '@deepseek-ai/dsh-session-checkpoint-policy'

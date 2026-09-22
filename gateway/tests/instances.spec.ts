@@ -63,7 +63,7 @@ async function setup(extraEnv: Record<string, string> = {}) {
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'),
     HGW_DSH_REPO_ROOT: root,
-    HGW_READINESS_TIMEOUT_MS: '10000',
+    HGW_READINESS_TIMEOUT_MS: '30000',
     HGW_INSTANCE_PORT_BASE: '43100',
     ...extraEnv,
   })

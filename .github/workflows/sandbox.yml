@@ -1,5 +1,5 @@
-# Sandbox CI: the keyless real-kernel confinement proofs. This master-only
-# reference stays outside the pull-request verdict; rationale lives in
+# Sandbox CI: keyless real-kernel confinement proofs, called by affected PRs.
+# Mainline and nightly sweeps retain the same matrix; rationale lives in
 # .agents/notes/implemented/process/2026-07-21-serial-cross-platform-ci-reference.md.
 # A separate workflow from ci.yml because the axis is different — these jobs
 # fan out over OS×runner (kernel capabilities), not node versions. The Landlock
@@ -8,6 +8,12 @@
 name: Sandbox
 
 on:
+  workflow_call:
+    inputs:
+      required_proof:
+        description: Selected pre-merge proof; every existing kernel matrix leg must pass.
+        type: boolean
+        default: false
   push:
     branches: [master]
     paths:
@@ -25,7 +31,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: sandbox-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -70,6 +76,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6.0.10
 

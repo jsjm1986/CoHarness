@@ -247,7 +247,7 @@ export function gatesForMode(selected: Mode): Gate[] {
     case 'ci-linux-primary':
       // The HMR web test rewrites the shared `lib/` and `apps/web/dist/`
       // trees; let every built-artifact reader in this mode settle first.
-      return [...ciPrimaryGates(), webSnapshotGate(['built-package-invariants'], [
+      return [webFixturesGate(), ...ciPrimaryGates(), webSnapshotGate(['built-package-invariants', 'web-fixtures'], [
         'publint',
         'snapshot',
         'doc-typecheck',
@@ -291,7 +291,7 @@ export function gatesForMode(selected: Mode): Gate[] {
       // and the CI platform matrix, which the hosted lanes own. `test` runs
       // the suite; per-file coverage thresholds stay a `test:coverage` gate.
       return [
-        lintGate(),
+        lintGate({ needs: ['build'] }),
         ...staticPolicyGates(),
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
@@ -519,6 +519,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     'built-bin-smoke',
   ]
   return [
+    ...options.includeWebSnapshot === false ? [] : [webFixturesGate()],
     ...pluginTestGates(),
     ciBuildGate(),
     pnpmScript('node-compat', 'check:node-compat', {
@@ -543,7 +544,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     snapshotGate(validatedBuild),
     ...options.includeWebSnapshot === false
       ? []
-      : [webSnapshotGate(validatedBuild, buildArtifactReaders)],
+      : [webSnapshotGate([...validatedBuild, 'web-fixtures'], buildArtifactReaders)],
     pnpmScript('doc-typecheck', 'doc-typecheck:contracts-ready', {
       needs: validatedBuild,
       env: { DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
@@ -580,17 +581,17 @@ function webSnapshotGate(needs: string[], after?: string[]): Gate {
   })
 }
 
-/**
- * The dedicated web verification aggregates behind the `web-verification` CI
- * lane: the complete build, which includes the web bundle and the client
- * build record, then either the complete browser inventory or the focused
- * selection read from `DSH_WEB_GROUPS` by the runner.
- * @param focused - Whether the aggregate narrows to the policy-selected groups.
- * @returns The aggregate's gate graph.
- */
+function webFixturesGate(focused = false): Gate {
+  return pnpmExec('web-fixtures', [
+    'tsx', 'scripts/verify-web-fixtures.ts', ...focused ? ['--focused'] : [],
+  ], { label: 'browser fixture admission' })
+}
+
+/** Browser-only builds require admitted fixtures; shared consumer builds remain independent. */
 function ciWebGates(focused: boolean): Gate[] {
   return [
-    ciBuildGate(),
+    webFixturesGate(focused),
+    ciBuildGate('build', { needs: ['web-fixtures'] }),
     focused
       ? pnpmScript('web-snapshot-focused', 'test:web:focused', {
         label: 'web browser snapshot (focused)',

@@ -12,6 +12,18 @@
 - id: time-context
   name: '@deepseek-ai/dsh-time-context'
 
+# The session-persistence backend must mount before agent-spine: configured
+# agents resolve `ctx.sessionPersistence` synchronously while the spine mounts
+# the loop, so a later backend would leave them ephemeral.
+- id: persistence
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: 'none'
+
+- id: checkpoint-policy
+  name: '@deepseek-ai/dsh-session-checkpoint-policy'
+
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
   config:
@@ -22,12 +34,3 @@
         cwd: !!js process.cwd()
     persona: 'Test the time-context plugin.'
     workspaceContext: false
-
-- id: persistence
-  name: '@deepseek-ai/dsh-session-persistence-jsonl'
-  config:
-    root: './.sessions'
-    compression: 'none'
-
-- id: checkpoint-policy
-  name: '@deepseek-ai/dsh-session-checkpoint-policy'
