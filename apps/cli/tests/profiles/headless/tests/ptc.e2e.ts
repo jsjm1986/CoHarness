@@ -243,7 +243,12 @@ describe('PTC mode typed values: keyless real-process contracts', () => {
       console.log(started.jobId);
       await new Promise(() => {});
     `, afterPublication.signal)
-    for (let attempt = 0; attempt < 100 && ctx.jobs.list().length === 0; attempt++) {
+    // Worker boot plus binding dispatch is environment-paced; stop polling
+    // once the outer run settles — an early settle means the bash call
+    // failed instead of queueing a job.
+    let runSettled = false
+    void running.then(() => { runSettled = true }, () => { runSettled = true })
+    for (let attempt = 0; attempt < 1000 && ctx.jobs.list().length === 0 && !runSettled; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 10))
     }
     const job = ctx.jobs.list()[0]
