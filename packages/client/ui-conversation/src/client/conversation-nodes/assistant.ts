@@ -4,8 +4,8 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  IncrementalAssistantBlocks, isAppendSurfaceEvent, isTokenDelta, sanitizeAssistantText,
-  toAssistantBlocks,
+  IncrementalAssistantBlocks, assistantStreamFirstTokenTime, isAppendSurfaceEvent, isTokenDelta,
+  sanitizeAssistantText, toAssistantBlocks,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
@@ -207,6 +207,7 @@ function settleMessage(
     hidden: false,
     final: match,
     usage: event.data.usage,
+    firstTokenTime: state.firstTokenTime ?? assistantStreamFirstTokenTime(event.data.stream),
   }
 }
 
