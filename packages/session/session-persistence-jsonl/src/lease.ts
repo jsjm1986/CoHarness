@@ -48,6 +48,7 @@ type HeldLock =
   | { readonly kind: 'posix'; readonly handle: FileHandle }
   | { readonly kind: 'win32'; readonly handle: number }
 
+/* v8 ignore start -- Linux coverage exercises these POSIX-legacy helpers; native Windows takes the handle branch */
 /** Whether a flock failure means another descriptor holds the lock. */
 function isLockContention(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException | null)?.code
@@ -75,6 +76,7 @@ function legacyPidAlive(pid: number): boolean {
     return (error as NodeJS.ErrnoException | null)?.code === 'EPERM'
   }
 }
+/* v8 ignore stop */
 
 /**
  * One held write lock. Constructed only by {@link SessionWriteLease.acquire};
@@ -172,6 +174,7 @@ export class SessionWriteLease {
    * the stable inode later lockers verify against. Idempotent.
    */
   async release(): Promise<void> {
+    /* v8 ignore next -- the double-release return is exercised on POSIX; the win32 spec releases once */
     if (this.released) return
     this.released = true
     /* v8 ignore start -- native Windows coverage exercises this platform branch; Linux covers the POSIX peer */
@@ -180,6 +183,7 @@ export class SessionWriteLease {
       return
     }
     /* v8 ignore stop */
+    /* v8 ignore start -- Linux coverage exercises this platform branch; native Windows returns the handle above */
     try {
       // The owner record describes a live holder only while the lock is held;
       // a released file that still carries a live pid would keep refusing
@@ -188,5 +192,6 @@ export class SessionWriteLease {
     } finally {
       await this.held.handle.close()
     }
+    /* v8 ignore stop */
   }
 }

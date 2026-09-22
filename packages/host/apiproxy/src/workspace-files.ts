@@ -317,6 +317,7 @@ export function subscribeWorkspaceFileChanges(ctx: Context, options: ChangeOptio
         const root = await fs.resolve('.', { cwd, signal })
         if (!fs.contains(root, target)) continue
         const base = fs.processPath(root)
+        /* v8 ignore next -- coverage runs on one host spelling; the cross-platform path form is exercised by the specs */
         const path = (/^[A-Za-z]:|^\\\\/u.test(base) ? win32 : posix).relative(base, fs.processPath(target)).replaceAll('\\', '/')
         if (path === '' || path.startsWith('../')) continue
         await ctx.serial('workspace-files/authorize', session.id, fs.processPath(target))
