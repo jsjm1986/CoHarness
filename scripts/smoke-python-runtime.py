@@ -300,7 +300,8 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
     messages = body.get("messages")
     if not isinstance(messages, list) or not messages:
         raise AssertionError(f"model request has no messages: {body}")
-    latest = messages[-1]
+    # A system prompt update may follow the tool result without replacing it.
+    latest = next(message for message in reversed(messages) if message.get("role") != "system")
     if not isinstance(latest, dict):
         raise AssertionError(f"model request has an invalid latest message: {body}")
 
@@ -328,10 +329,14 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
             return text_chunks(WORKFLOW_WORKER_TEXT)
         raise AssertionError(f"unexpected tool follow-up: {tool_name}")
 
+    # One user message can carry several text blocks (prompt + runtime-context
+    # snapshot); match scenario prompts per block, not per joined message.
     user_prompts = [
-        message_text(message.get("content"))
+        block["text"]
         for message in reversed(messages)
         if isinstance(message, dict) and message.get("role") == "user"
+        for block in message.get("content", [])
+        if isinstance(block, dict) and block.get("type") == "text"
     ]
     minimal_prompt = next(
         (
@@ -546,6 +551,7 @@ def advanced_tool_followup(
             {
                 "description": "Check direct child",
                 "prompt": SNAPSHOT_DIRECT_CHILD_PROMPT,
+                "run_in_background": False,
             },
         )
     if call_id == "advanced-direct-child" and tool_name == "subagent":
@@ -616,9 +622,9 @@ def latest_tool_result(message: dict[str, object]) -> dict[str, object] | None:
     ]
     if not results:
         return None
-    if len(results) != 1 or len(content) != 1:
-        raise AssertionError(f"unexpected multi-block tool reply: {content}")
-    return results[0]
+    # Parallel tool calls deliver several tool_result blocks in one message;
+    # the mock chain only ever awaits the last issued call.
+    return results[-1]
 
 
 def latest_tool_call(messages: list[object], result: dict[str, object]) -> tuple[str, str]:
@@ -922,7 +928,11 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
         ) as harness:
             result = harness.run(SNAPSHOT_PROMPT, session_id=SNAPSHOT_SESSION_ID)
 
-        assert result.final_response == SNAPSHOT_FINAL_TEXT, result.final_response
+        assert result.final_response == SNAPSHOT_FINAL_TEXT, (
+            f"final_response={result.final_response!r}; "
+            f"events={json.dumps(result.events[-8:])}; "
+            f"requests={json.dumps(MockModelHandler.requests[-3:], default=str)[:4000]}"
+        )
         methods = [notification.method for notification in result.notifications]
         if methods.count("subagent.started") != 2 or methods.count("subagent.finished") != 2:
             raise AssertionError(f"advanced snapshot emitted unexpected subagent lifecycle: {methods}")
