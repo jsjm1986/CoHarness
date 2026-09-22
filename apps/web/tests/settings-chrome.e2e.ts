@@ -90,6 +90,9 @@ describe('web e2e: settings modal and General preferences', () => {
     await expect.poll(() => openDocument.isEnabled(), { timeout: 5_000 }).toBe(true)
     await page.unroute('**/api/settings.openDocument')
     // Golden of the freshly opened dialog (default zh, General active).
+    // The preset row stays disabled until its settings.describe load resolves;
+    // capture only once the row has settled enabled.
+    await expect.poll(() => dialog.getByRole('button', { name: '标准模式' }).isEnabled(), { timeout: 10_000 }).toBe(true)
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DIALOG_EXPECTED, snapshot, MODE)
     // Section switch: aria-current moves (the Models page itself has its own scenario file).
@@ -515,7 +518,10 @@ describe('web e2e: settings modal and General preferences', () => {
       expect(await frPage.evaluate(() => document.documentElement.lang)).toBe('en')
       // Golden of the English fallback dialog — the visible output this change
       // produces. The zh golden above covers the detected-locale surface, so
-      // the pair pins both directions of the resolution.
+      // the pair pins both directions of the resolution. The preset row stays
+      // disabled until its settings.describe load resolves; capture only once
+      // the row has settled enabled.
+      await expect.poll(() => dialog.getByRole('button', { name: 'Standard mode' }).isEnabled(), { timeout: 10_000 }).toBe(true)
       const snapshot = await captureStableAria(frPage, '[role="dialog"]', fresh.workspaceCwd)
       await compareOrRefreshGolden(DIALOG_EN_EXPECTED, snapshot, MODE)
       expect(frTripwire.pageErrors).toEqual([])

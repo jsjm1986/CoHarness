@@ -99,6 +99,21 @@ CUSTOM_CORDIS = """\
   config:
     root: !!js process.env.DSH_SESSION_ROOT
     compression: 'none'
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+- id: session-projection
+  name: '@deepseek-ai/dsh-session-projection'
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+  config:
+    mode: danger-full-access
+    workspaceRoot: !!js process.cwd()
 - id: code-runtime
   name: '@deepseek-ai/dsh-ptc-runtime-node'
 - id: subagents

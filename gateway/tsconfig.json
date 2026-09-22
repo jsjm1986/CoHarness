@@ -17,7 +17,8 @@
       // session-format's durable JSON index signatures only compile under
       // exactOptionalPropertyTypes, which the gateway's own source does not
       // satisfy; consume its emitted declarations instead of source so the
-      // declaration-internal check does not run under this flag set.
+      // declaration-internal check does not run under this flag set. Vitest
+      // maps the same specifiers to the emitted .js in vitest.config.ts.
       "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/catalog-default.d.ts"],
       "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/lib/types/surface.d.ts"],
       "@deepseek-ai/dsh-util-crypto": ["../packages/util/crypto/src/index.ts"],
