@@ -11276,8 +11276,8 @@ importers:
         specifier: 4.1.0
         version: 4.1.0(cytoscape@3.34.1)
       dayjs:
-        specifier: 1.11.21
-        version: 1.11.21
+        specifier: 1.11.23
+        version: 1.11.23
       debug:
         specifier: 4.4.3
         version: 4.4.3
@@ -15083,6 +15083,9 @@ packages:
 
   dayjs@1.11.21:
     resolution: {integrity: sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==}
+
+  dayjs@1.11.23:
+    resolution: {integrity: sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ==}
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
@@ -21191,6 +21194,8 @@ snapshots:
       - '@noble/hashes'
 
   dayjs@1.11.21: {}
+
+  dayjs@1.11.23: {}
 
   debug@2.6.9:
     dependencies:
