@@ -102,3 +102,20 @@ print(result.final_response)
 该组合使用 `danger-full-access`。只能在可丢弃的 checkout 或容器内运行：Bash 与编辑器可以修改运行时进程有权访问的任何路径。持久 PTY 后端需要 POSIX 终端环境，因此该组合不支持 Windows agent。
 
 准确的组合内容归 [`jsonrpc-agent` 示例参考](../../../examples/jsonrpc-agent/README.zh.md)所有。[Python SDK 参考](../../../python/sdk/README.zh.md)介绍生命周期、结果、通知、运行时选择和配置；[Cordis primer](../../cordis-primer.zh.md)介绍组合语法。
+
+<a id="opt-in-to-str_replace_editor"></a>
+## 选择启用 `str_replace_editor`
+
+捆绑运行时包含 `str_replace_editor`，但 `sdk-minimal` profile 的默认 Cordis 树省略了它及其文件系统 provider。要在此使用它，请将以下配置保存为 `editor.patch.yml`；`insert` 会同时加入编辑器和 minimal profile 缺少的文件系统 provider：
+
+```yaml
+- insert:
+    - id: fs-local
+      name: '@deepseek-ai/dsh-fs-local'
+      config:
+        cwd: !!js process.cwd()
+    - id: tool-str-replace-editor
+      name: '@deepseek-ai/dsh-tool-str-replace-editor'
+```
+
+通过 `dsh --profile sdk-minimal --patch /absolute/path/to/editor.patch.yml` 应用，或将该 patch 放到 `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` 作为持久配置。下次启动运行时后，模型请求会在持久 shell 之外附带 `str_replace_editor`。本地文件系统 provider 以运行时工作目录解析相对路径，与 minimal shell 一样不会把访问限制在该目录内。标准 `sdk` profile 只需插入编辑器一行，即可复用已有的文件系统 provider 与策略。

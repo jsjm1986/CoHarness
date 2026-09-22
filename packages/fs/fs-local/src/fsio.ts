@@ -6,18 +6,24 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { createReadStream, constants as fsConstants } from 'node:fs'
+import { createReadStream, constants as fsConstants, realpath as realpathCallback } from 'node:fs'
 import { constants as bufferConstants } from 'node:buffer'
-import { chmod, link, lstat, mkdir, open, opendir, readFile, realpath, readdir, rename, rm, stat } from 'node:fs/promises'
+import { chmod, link, lstat, mkdir, open, opendir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import type { BigIntStats, Dirent, Stats } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
-import { TextDecoder } from 'node:util'
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
+import { TextDecoder, promisify } from 'node:util'
 import { FsError, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 import { copyFileDaclWin32, replaceFileWin32 } from './win32.ts'
 
 const BINARY_SAMPLE_BYTES = 8192
 // Bound one non-abortable FileHandle.read so cancellation is observed between chunks.
 const DIFF_BASIS_READ_CHUNK_BYTES = 64 * 1024
+// Native realpath follows the filesystem's component-by-component lookup: a
+// symlinked component resolves before `..` climbs, matching chdir/spawn and
+// the sandbox enforcement layers. The JavaScript implementation collapses
+// `..` lexically first and would read `link/../x` beside the link, not the
+// link target's parent.
+const realpath = promisify(realpathCallback.native)
 
 function isENOENT(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
@@ -137,6 +143,20 @@ export interface LocalDirEntry {
 }
 
 /**
+ * Anchor a path using native drive semantics and POSIX physical parent traversal.
+ * @param cwd - provider base directory for relative paths.
+ * @param path - non-empty requested path.
+ * @returns absolute display spelling shared by target resolution and no-follow metadata.
+ */
+export function localDisplayPath(cwd: string, path: string): string {
+  const absoluteCwd = isAbsolute(cwd) ? cwd : `${process.cwd()}${sep}${cwd}`
+  const raw = isAbsolute(path) ? path : `${absoluteCwd}${sep}${path}`
+  const physicalSpelling = /(?:^|[\\/])\.\.(?:[\\/]|$)/u.test(raw) ? raw : resolve(cwd, path)
+  /* v8 ignore next -- Native Windows tests cover DOS drive-relative resolution; POSIX preserves physical traversal. */
+  return process.platform === 'win32' ? resolve(cwd, path) : physicalSpelling
+}
+
+/**
  * Resolve a path to its absolute display path and realpath identity. For a missing target,
  * realpath the nearest existing ancestor and append the missing suffix, preserving identity
  * across symlinked ancestors before and after creation.
@@ -146,7 +166,7 @@ export interface LocalDirEntry {
  */
 export async function resolveLocalTarget(cwd: string, path: string): Promise<LocalTarget> {
   if (path.trim().length === 0) throw new FsError('file_path must be a non-empty string', 'FS_NOT_FOUND')
-  const displayPath = resolve(cwd, path)
+  const displayPath = localDisplayPath(cwd, path)
   try {
     // Prefer the file's own realpath (resolves a symlinked file to its target).
     return { displayPath, targetKey: FsTargetKey(await realpath(displayPath)) }
@@ -167,6 +187,8 @@ export async function resolveLocalTarget(cwd: string, path: string): Promise<Loc
   while (true) {
     try {
       const realAncestor = await realpath(ancestor)
+      /* v8 ignore next -- POSIX rejects this traversal; Windows normalizes parent segments before filesystem lookup. */
+      if (missing.includes('..')) throw new FsError(`cannot resolve "${displayPath}": parent traversal crosses a missing directory`, 'FS_NOT_FOUND')
       // On Windows, realpath of a regular file succeeds where POSIX returns
       // ENOTDIR (the OS reports ENOENT for `regular-file/child`, not ENOTDIR).
       // Stat the ancestor to restore the semantic distinction: a non-directory
@@ -269,7 +291,7 @@ function listingIoError(displayPath: string, error: unknown): FsError {
 
 async function resolveListedChildTarget(parent: LocalTarget, name: string): Promise<LocalTarget> {
   const identity = await resolveLocalTarget(parent.targetKey, name)
-  return { displayPath: join(parent.displayPath, name), targetKey: identity.targetKey }
+  return { displayPath: localDisplayPath(parent.displayPath, name), targetKey: identity.targetKey }
 }
 
 /**

@@ -102,3 +102,20 @@ The composition omits harness identity, workspace prompt text, skills, one-shot 
 The composition uses `danger-full-access`. Run it only inside a disposable checkout or container: Bash and the editor can modify any path allowed to the runtime process. The persistent PTY backend requires a POSIX terminal substrate, so this composition does not support Windows agents.
 
 The [`jsonrpc-agent` example reference](../../../examples/jsonrpc-agent/README.md) owns the exact composition. The [Python SDK reference](../../../python/sdk/README.md) covers lifecycle, results, notifications, runtime selection, and configuration; the [Cordis primer](../../cordis-primer.md) covers composition syntax.
+
+<a id="opt-in-to-str_replace_editor"></a>
+## Opt in to `str_replace_editor`
+
+The bundled runtime includes `str_replace_editor`, but the `sdk-minimal` profile omits it — and its filesystem provider — from the default Cordis tree. To use it there, save this configuration as `editor.patch.yml`; `insert` adds both the editor and the filesystem provider the minimal profile lacks:
+
+```yaml
+- insert:
+    - id: fs-local
+      name: '@deepseek-ai/dsh-fs-local'
+      config:
+        cwd: !!js process.cwd()
+    - id: tool-str-replace-editor
+      name: '@deepseek-ai/dsh-tool-str-replace-editor'
+```
+
+Apply it with `dsh --profile sdk-minimal --patch /absolute/path/to/editor.patch.yml`, or put the patch at `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` for persistent configuration. On the next runtime launch, model requests include `str_replace_editor` beside the persistent shell. The local filesystem provider resolves relative paths against the runtime working directory and, like the minimal shell, does not confine access to that directory. For the standard `sdk` profile, insert only the editor row so it uses the existing filesystem provider and policies.
