@@ -9,6 +9,8 @@ import { CLIENT_BUILD_RECORD_PATH, officialClientBuildEnvironment, readClientBui
 import { pnpmInvocation } from './pnpm-invocation.ts'
 import { repositoryConfigHost } from './ts-project.ts'
 
+const COMPILER_OUTPUT_ROOT = /^(?:vendor\/[^/]+|packages\/[^/]+\/[^/]+|apps\/[^/]+|native\/system\/packages\/entry)\/lib(?=\/|$)/
+
 /** Same-commit build identity and the exact generated inventory a consumer must receive. */
 export interface BuildArtifactManifest {
   readonly version: 1
@@ -55,7 +57,9 @@ function json(path: string): Record<string, unknown> {
 function ownedPath(root: string, path: string): string {
   const child = relative(root, resolve(root, path)).split(sep).join('/')
   if (child === '' || child.startsWith('../') || isAbsolute(child)
-    || child.split('/').some(part => part === 'src' || part === 'node_modules' || part === '.git')) {
+    || child.split('/').some(part => part === 'node_modules' || part === '.git')
+    // Projects rooted above src preserve that directory inside their emitted lib.
+    || child.split('/').includes('src') && !COMPILER_OUTPUT_ROOT.test(child)) {
     throw new Error(`build artifacts: not a generated repository path: ${path}`)
   }
   let parent = root
@@ -93,8 +97,13 @@ function compilerOutputs(root: string): {
     if (parsed.options.outDir !== undefined && parsed.options.noEmit !== true) {
       const output = basename(parsed.options.outDir) === 'types' ? dirname(parsed.options.outDir) : parsed.options.outDir
       const child = ownedPath(root, output)
-      if (!/^(?:vendor\/[^/]+|packages\/[^/]+\/[^/]+|apps\/cli|native\/system\/packages\/entry)\/lib$/.test(child)) {
+      if (COMPILER_OUTPUT_ROOT.exec(child)?.[0] !== child) {
         throw new Error(`build artifacts: unsupported compiler output root: ${child}`)
+      }
+      const owner = join(root, dirname(child))
+      const configPath = relative(owner, path)
+      if (configPath.startsWith('..' + sep) || isAbsolute(configPath)) {
+        throw new Error(`build artifacts: compiler output belongs to another package: ${child}`)
       }
       outputs.add(child)
       const directory = ownedPath(root, parsed.options.outDir)
@@ -127,7 +136,7 @@ function assertDeclaredEntries(root: string, output: string): void {
     const pattern = ownedPath(root, join(packageDirectory, path))
     if (!pattern.startsWith(output + '/')) throw new Error(`build artifacts: entry escapes its output root: ${pattern}`)
     const matches = [...globSync(pattern, { cwd: root })]
-    if (matches.length === 0 || matches.some(match => !lstatSync(join(root, match)).isFile())) {
+    if (!matches.some(match => lstatSync(join(root, match)).isFile())) {
       throw new Error(`build artifacts: declared entry is missing: ${pattern}`)
     }
   }

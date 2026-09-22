@@ -14,7 +14,7 @@ const tsx = createRequire(import.meta.url).resolve('tsx/esm')
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 5 }) })
 
-function fixture() {
+function fixture(options: { appDirectory?: string; appOutput?: string; appExport?: string } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'dsh-build-artifacts-'))
   roots.push(root)
   const write = (path: string, contents: string | object): void => {
@@ -28,7 +28,8 @@ function fixture() {
   write('.gitignore', 'lib/\ndist/\n.typecheck/\n.dsh-build/\n.artifacts/\n.tools/\nnative/system/packages/*/bin/\n')
   write('package.json', { name: 'build-fixture', version: '1.0.0', type: 'module', packageManager: 'pnpm@11.7.0' })
   write('pnpm-lock.yaml', 'lockfileVersion: 9\n')
-  const packages = ['vendor/cordis', 'packages/core/probe', 'packages/client/probe', 'apps/cli', 'native/system/packages/entry']
+  const appDirectory = options.appDirectory ?? 'apps/web'
+  const packages = ['vendor/cordis', 'packages/core/probe', 'packages/client/probe', 'apps/cli', appDirectory, 'native/system/packages/entry']
   write('tsconfig.json', { files: [], references: [{ path: './tsconfig.host.json' }] })
   write('host.ts', 'export const host = true\n')
   write('tsconfig.host.json', {
@@ -36,16 +37,24 @@ function fixture() {
     references: packages.map(path => ({ path })),
   })
   for (const directory of packages) {
+    const webApp = directory === appDirectory
     write(directory + '/package.json', {
       name: 'fixture-' + directory.replaceAll('/', '-'), type: 'module',
-      main: './lib/index.js', types: './lib/types/index.d.ts',
-      exports: { '.': { types: './lib/types/index.d.ts', default: './lib/index.js' },
-        ...directory === 'packages/core/probe' ? { './typert': './lib/typert.host.js' } : {} },
+      ...webApp ? { exports: { './output/*': options.appExport ?? './dist/*' } } : {
+        main: './lib/index.js', types: './lib/types/index.d.ts',
+        exports: { '.': { types: './lib/types/index.d.ts', default: './lib/index.js' },
+          ...directory === 'apps/cli' ? { './lib/*': './lib/*' } : {},
+          ...directory === 'packages/core/probe' ? { './typert': './lib/typert.host.js' } : {} },
+      },
       ...directory === 'apps/cli' ? { bin: { fixture: './lib/bin.js' } } : {},
     })
     write(directory + '/src/index.ts', 'export const value = 1\n')
     write(directory + '/tsconfig.json', {
-      compilerOptions: { composite: true, declaration: true, rootDir: './src', outDir: './lib/types', tsBuildInfoFile: './lib/build.tsbuildinfo' },
+      compilerOptions: {
+        composite: true, declaration: true, rootDir: webApp ? '.' : './src',
+        outDir: webApp ? options.appOutput ?? './lib/types' : './lib/types',
+        tsBuildInfoFile: webApp ? './lib/types/tsconfig.tsbuildinfo' : './lib/build.tsbuildinfo',
+      },
       include: ['src/**/*.ts'],
     })
   }
@@ -64,6 +73,12 @@ function fixture() {
     '-c', `core.hooksPath=${join(root, '.tools/hooks')}`, 'commit', '-qm', 'source fixture')
   const commit = git('rev-parse', 'HEAD')
   for (const directory of packages) {
+    if (directory === appDirectory) {
+      write(directory + '/lib/types/src/index.d.ts', 'export declare const value = 1\n')
+      write(directory + '/lib/types/src/index.js', 'export const value = 1\n')
+      write(directory + '/lib/types/tsconfig.tsbuildinfo', '{}')
+      continue
+    }
     write(directory + '/lib/index.js', 'export const value = 1\n')
     write(directory + '/lib/types/index.d.ts', 'export declare const value = 1\n')
     write(directory + '/lib/types/index.js', 'export const value = 1\n')
@@ -107,12 +122,50 @@ describe('workspace build artifact CLI', () => {
     expect(manifest.files.map(file => file.path)).toEqual(expect.arrayContaining([
       'vendor/cordis/lib/types/index.d.ts', 'packages/core/probe/lib/typert.host.js',
       'packages/client/probe/lib/client.js', 'apps/web/dist/index.html', 'apps/cli/lib/bin.js',
+      'apps/web/lib/types/src/index.js', 'apps/web/lib/types/src/index.d.ts',
+      'apps/web/lib/types/tsconfig.tsbuildinfo',
       '.dsh-build/client-build-environment.json',
       '.typecheck/host.tsbuildinfo', 'packages/core/probe/lib/build.tsbuildinfo',
     ]))
     if (f.native !== undefined) expect(manifest.files.some(file => file.path === f.native)).toBe(true)
     const verified = f.cli('verify')
     expect(verified.status, verified.output).toBe(0)
+  })
+
+  it('accepts another app declared by the compiler graph without a name-specific output list', () => {
+    const f = fixture({ appDirectory: 'apps/dashboard' })
+    const created = f.cli('create')
+    expect(created.status, created.output).toBe(0)
+    expect(f.read().files.some(file => file.path === 'apps/dashboard/lib/types/src/index.d.ts')).toBe(true)
+    const verified = f.cli('verify')
+    expect(verified.status, verified.output).toBe(0)
+  })
+
+  it.each(['./src/generated', './generated', '../cli/lib/types', '../../unknown/lib/types'])(
+    'rejects the app compiler output outside its owned lib root: %s', (appOutput) => {
+      const f = fixture({ appOutput })
+      const result = f.cli('create')
+      expect(result.status, result.output).toBe(1)
+      expect(result.output).toMatch(/not a generated repository path|unsupported compiler output root|belongs to another package/)
+    },
+  )
+
+  it.each(['missing', 'stale', 'source'] as const)('rejects %s files inside the emitted app src directory', (kind) => {
+    const f = fixture()
+    if (kind === 'missing') rmSync(join(f.root, 'apps/web/lib/types/src/index.d.ts'))
+    if (kind === 'stale') f.write('apps/web/lib/types/src/deleted.js', 'export const stale = true')
+    if (kind === 'source') f.write('apps/web/lib/types/src/leak.ts', 'export const secret = true')
+    const result = f.cli('create')
+    expect(result.status, result.output).toBe(1)
+    expect(result.output).toMatch(/missing or stale compiler outputs|non-generated file/)
+  })
+
+  it('requires wildcard exports to match an emitted file, not only a directory', () => {
+    const f = fixture({ appExport: './lib/missing/*' })
+    mkdirSync(join(f.root, 'apps/web/lib/missing/empty'), { recursive: true })
+    const result = f.cli('create')
+    expect(result.status, result.output).toBe(1)
+    expect(result.output).toContain('declared entry is missing')
   })
 
   it.each(['commit', 'tree', 'node', 'architecture', 'pnpm', 'lockSha256', 'profile', 'publicClientEnvironment'] as const)(
