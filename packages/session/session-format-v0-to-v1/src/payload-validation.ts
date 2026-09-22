@@ -547,9 +547,10 @@ function messageSourceValue(
   if (expected === 'tool' && source['kind'] !== 'tool') throw new SessionFormatError(`${label} must be tool source`)
   switch (source['kind']) {
     case 'user':
-      assertReleasedV0Keys(source, ['kind'], ['rpcId', 'clientTimeZone'], label)
+      assertReleasedV0Keys(source, ['kind'], ['rpcId', 'clientTimeZone', 'participant'], label)
       if (source['rpcId'] !== undefined) nonEmptyString(source['rpcId'], `${label} rpcId`)
       if (source['clientTimeZone'] !== undefined) nonEmptyString(source['clientTimeZone'], `${label} clientTimeZone`)
+      if (source['participant'] !== undefined) participantValue(source['participant'], `${label} participant`)
       return
     case 'plugin':
       pluginSourceValue(source, label)
@@ -632,6 +633,7 @@ function messageSourceValue(
 function pluginSourceValue(source: JsonRecord, label: string): void {
   const optional = ['form', 'sections', 'summary']
   if (source['plugin'] === 'compact') optional.push('compactionId', 'sourceCommandId')
+  if (source['plugin'] === 'collaboration-context') optional.push('participantMessageId', 'participant')
   assertReleasedV0Keys(source, ['kind', 'plugin'], optional, label)
   nonEmptyString(source['plugin'], `${label} plugin`)
   if (source['plugin'] === 'compact') {
@@ -652,6 +654,25 @@ function pluginSourceValue(source: JsonRecord, label: string): void {
   }
   if (form === 'notice') stringValue(source['summary'], `${label} summary`)
   else if (source['summary'] !== undefined) throw new SessionFormatError(`${label} summary requires notice form`)
+  if (source['participantMessageId'] !== undefined) nonEmptyString(source['participantMessageId'], `${label} participantMessageId`)
+  if (source['participant'] !== undefined) participantValue(source['participant'], `${label} participant`)
+}
+
+/** The collaboration participant record a `collaboration-context` source carries. */
+function participantValue(value: SessionFormatJsonValue | undefined, label: string): void {
+  const participant = releasedV0Record(value, label)
+  assertReleasedV0Keys(participant, ['userId', 'username', 'displayName', 'role', 'scope'], [], label)
+  positiveIntegerValue(participant['userId'], `${label} userId`)
+  nonEmptyString(participant['username'], `${label} username`)
+  stringValue(participant['displayName'], `${label} displayName`)
+  literalValue(participant['role'], ['admin', 'user'], `${label} role`)
+  const scope = releasedV0Record(participant['scope'], `${label} scope`)
+  literalValue(scope['kind'], ['personal', 'project'], `${label} scope kind`)
+  if (scope['kind'] === 'project') {
+    positiveIntegerValue(scope['projectId'], `${label} scope projectId`)
+    nonEmptyString(scope['projectName'], `${label} scope projectName`)
+    literalValue(scope['mode'], ['rw', 'ro'], `${label} scope mode`)
+  }
 }
 
 function sessionReferenceSourceValue(source: JsonRecord, label: string, version: number): void {

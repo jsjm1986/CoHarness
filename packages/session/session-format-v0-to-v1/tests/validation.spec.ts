@@ -448,6 +448,20 @@ describe('released event and payload inventory', () => {
         kind: 'webhook', provider: 'github', source: 'repo', deliveryId: 'delivery', ruleId: 'rule',
         form: 'notice', summary: 'push',
       },
+      {
+        kind: 'plugin', plugin: 'collaboration-context', form: 'notice', summary: 'Message from Lin',
+        participantMessageId: 'participant-message',
+        participant: {
+          userId: 7, username: 'lin', displayName: 'Lin', role: 'user',
+          scope: { kind: 'project', projectId: 9, projectName: 'Payments', mode: 'rw' },
+        },
+      },
+      {
+        kind: 'user', participant: {
+          userId: 8, username: 'zhou', displayName: 'Zhou', role: 'admin',
+          scope: { kind: 'personal' },
+        },
+      },
     ]
     for (const [index, source] of sources.entries()) {
       const message = { id: `source-${index}`, role: 'user', content: [textBlock], source }
