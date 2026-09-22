@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -65,6 +66,33 @@ describe('runLoaderSmoke', () => {
     expect(canonicalTempPath(inspected)).toBe(canonicalTempPath(output.cwd))
     expect(marker).toBe('prepared')
     expect(existsSync(inspected)).toBe(false)
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('reuses a caller-provided cwd and leaves its world state in place', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'loader-smoke-provided-'))
+    try {
+      let inspected = ''
+      const result = await runLoaderSmoke({
+        label: 'provided cwd fixture',
+        cwd: dir,
+        binScript: fixture('success'),
+        libBinScript: fixture('success'),
+        configPath,
+        tsconfigPath,
+        prepare: cwd => writeFile(join(cwd, 'prepared.txt'), 'kept'),
+        inspect: async (cwd) => {
+          inspected = cwd
+          expect(await readFile(join(cwd, 'prepared.txt'), 'utf8')).toBe('kept')
+        },
+      })
+      const output = JSON.parse(result.stdout) as { cwd: string }
+      expect(canonicalTempPath(output.cwd)).toBe(canonicalTempPath(dir))
+      expect(canonicalTempPath(inspected)).toBe(canonicalTempPath(dir))
+      // The caller owns the directory, so the harness removes nothing.
+      expect(existsSync(join(dir, 'prepared.txt'))).toBe(true)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('rejects a non-zero exit with captured diagnostics', async () => {

@@ -55,6 +55,8 @@ describe('durable V3 admission failures', () => {
   it('carries the v3-era draft flag through header decode/encode while v2 stays strict', () => {
     const physical = { type: 'session', ...header, version: 3, draft: true }
     expect(releasedV3SessionFormatCodec.decodeHeader(physical)).toEqual({ ...header, version: 3, draft: true })
+    const decoder = releasedV3SessionFormatCodec.createDecoder(physical, 'strict')
+    expect(decoder.header).toEqual({ ...header, version: 3, draft: true })
     const encoded = releasedV3SessionFormatCodec.encodeHeader({ ...header, version: 3, draft: false }, 0)
     expect(encoded).toMatchObject({ version: 3, draft: false })
     expect(releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...encoded })).toEqual({ ...header, version: 3, draft: false })

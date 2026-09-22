@@ -40,7 +40,10 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-app-boot": "workspace:^"
+    "@deepseek-ai/dsh-app-boot": "workspace:^",
+    "@deepseek-ai/dsh-ptc-runtime-node": "workspace:^",
+    "@deepseek-ai/dsh-sandbox-windows-acl": "workspace:^",
+    "@deepseek-ai/dsh-subprocess-local": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"

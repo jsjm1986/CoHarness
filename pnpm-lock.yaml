@@ -5007,6 +5007,15 @@ importers:
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:^
         version: link:../../boot/app-boot
+      '@deepseek-ai/dsh-ptc-runtime-node':
+        specifier: workspace:^
+        version: link:../../ptc-runtime/ptc-runtime-node
+      '@deepseek-ai/dsh-sandbox-windows-acl':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox-windows-acl
+      '@deepseek-ai/dsh-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^

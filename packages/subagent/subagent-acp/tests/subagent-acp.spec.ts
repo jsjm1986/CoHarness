@@ -544,6 +544,33 @@ describe('dsh-subagent-acp', () => {
     }
   })
 
+  it('rejects a pre-aborted start at the provider boundary, before spawning', async () => {
+    // The service delegates the request untouched, so the provider's own
+    // aborted-signal check is what must stop the spawn.
+    const tmp = mkdtempSync(join(tmpdir(), 'acp-provider-preabort-'))
+    const sentinel = join(tmp, 'spawned')
+    try {
+      const ctx = new Context()
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(acp, {
+        providerName: 'acp',
+        command: 'touch',
+        args: [sentinel],
+        permission: 'reject',
+        env: {},
+      })
+      contexts.push(ctx)
+      const controller = new AbortController()
+      controller.abort()
+      await expect(ctx.subagents.start('acp', request('p', controller.signal)))
+        .rejects.toThrow('subagent request was aborted before the ACP child started')
+      expect(existsSync(sentinel)).toBe(false)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
   it('reaps a child whose session/new response omits the session id', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'acp-malformed-session-'))
     const flushed = join(tmp, 'flushed')

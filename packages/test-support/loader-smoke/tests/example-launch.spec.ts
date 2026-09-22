@@ -53,6 +53,19 @@ describe('resolveExampleLaunch', () => {
     expect(env.TSX_TSCONFIG_PATH).toBe(TSCONFIG)
   })
 
+  it('src mode: selects the ESM-only tsx hook over the generic loader when asked', () => {
+    const { args } = resolveExampleLaunch({
+      srcBin: SRC_BIN,
+      mode: 'src',
+      tsconfigPath: TSCONFIG,
+      sourceImport: 'tsx/esm',
+    })
+    const tsxEsm = import.meta.resolve('tsx/esm')
+    expect(args).toContain('--import')
+    expect(args).toContain(tsxEsm)
+    expect(import.meta.resolve('tsx')).not.toBe(tsxEsm)
+  })
+
   it('src mode: throws without a tsconfig path', () => {
     expect(() => resolveExampleLaunch({ srcBin: SRC_BIN, mode: 'src' })).toThrow(/needs tsconfigPath/)
   })
