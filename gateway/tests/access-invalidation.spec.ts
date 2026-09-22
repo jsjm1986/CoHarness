@@ -510,6 +510,74 @@ describePg('cross-Gateway access invalidation', () => {
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
   })
 
+  it('cancels every subject in a project transaction before waiting for one user runtime to stop', async () => {
+    const upstreams = new Map<string, { response: ServerResponse; closed: ReturnType<typeof barrier> }>()
+    const f = await fixture({ runtime(req, res) {
+      if (!req.url?.startsWith('/api/documents/content')) return false
+      const name = new URL(req.url, 'http://runtime').searchParams.get('docId')!
+      const closed = barrier()
+      upstreams.set(name, { response: res, closed })
+      res.once('close', closed.resolve)
+      res.write(`prefix:${name}`)
+      return true
+    } })
+    const gateway = f.gateways[1]!
+    const admin = await gateway.deps.users.create({ username: 'carol', password: 'password-123', role: 'admin' })
+    await gateway.deps.users.changeOwnPassword(admin.id, 'password-123')
+    const login = await gateway.deps.auth.login('carol', 'password-123', '127.0.0.1', 'test')
+    if (typeof login === 'string') throw new Error(login)
+    const readers: ReadableStreamDefaultReader<Uint8Array>[] = []
+    const tails: Promise<unknown>[] = []
+    const stopped = barrier(), release = barrier()
+    let pausedUser: number | undefined
+    try {
+      for (const [name, cookie] of [['alice', f.aliceCookie], ['bob', f.bobCookie], ['carol', `hgw_session=${login.token}`]]) {
+        const response = await fetch(`${gateway.base}/api/documents/scope/content?scope=project:${f.project.id}&docId=${name}`, {
+          headers: { cookie: cookie! },
+        })
+        const reader = response.body!.getReader()
+        readers.push(reader)
+        expect(new TextDecoder().decode((await reader.read()).value)).toBe(`prefix:${name}`)
+        tails.push(reader.read().then(
+          result => { expect(result.done).toBe(true) },
+          (error: unknown) => { expect(error).toBeInstanceOf(Error) },
+        ))
+      }
+      await gateway.monitor.synchronize()
+      const before = await f.revision()
+      gateway.stop.mockImplementation(async (target) => {
+        if (typeof target === 'object' && target.kind === 'user' && pausedUser === undefined) {
+          pausedUser = target.id
+          stopped.resolve()
+          await release.promise
+        }
+      })
+      await pool.query("UPDATE harness.project_mounts SET status='missing' WHERE organization_id=$1", [f.organizationId])
+      await stopped.promise
+      expect([f.alice.id, f.bob.id]).toContain(pausedUser)
+      const otherUser = pausedUser === f.alice.id ? 'bob' : 'alice'
+      // Both the other member and the non-member administrator depend on
+      // subjects after the paused owner in the same committed transaction.
+      for (const name of [otherUser, 'carol']) {
+        const upstream = upstreams.get(name)!
+        if (!upstream.response.destroyed) {
+          await once(upstream.response, 'close', { signal: AbortSignal.timeout(5_000) })
+        }
+        expect(upstream.response.write('forbidden-suffix')).toBe(false)
+      }
+      expect((await pool.query<{ revision: string }>(
+        'SELECT access_applied_revision::text AS revision FROM harness.compute_nodes WHERE id=$1', [gateway.owner.nodeId],
+      )).rows[0]!.revision).toBe(before)
+      release.resolve()
+      await gateway.monitor.synchronize()
+      await Promise.all(tails)
+      expect(vi.mocked(gateway.deps.instances.operationRef!).mock.calls.reduce((sum, call) => sum + call[1], 0)).toBe(0)
+    } finally {
+      release.resolve()
+      await Promise.all(readers.map(async (reader) => { await reader.cancel().catch(() => {}); reader.releaseLock() }))
+    }
+  })
+
   it.each(['authorization', 'lease'] as const)('cancels content waiting for %s and releases any late lease', async (waiting) => {
     const calls: string[] = []
     const f = await fixture({ runtime(req, res) {

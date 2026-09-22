@@ -296,7 +296,7 @@ GitHub API 核实 [CI 35688456271](https://github.com/jsjm1986/CoHarness/actions
 | 改动 | 本地承接与保留差异 | 已执行的局部证据 |
 | --- | --- | --- |
 | Profile 管理授权 | `boot/plugin-manager` 所有公开操作与工具共用部署授权，排队后重验；Gateway 实时读取有效管理员资格。独立本机仍按本机权限执行。该包登记为 adapted，不再 unmanifested。 | 89 项 owning package 回归；3 个指定源文件四维覆盖率 100%；真实 PostgreSQL＋HTTP 证明过期前的旧管理员断言在降权、禁用后被拒绝。 |
-| 跨 Gateway 撤权 | 同事务 outbox、按节点确认游标、代理和文档下载取消；事件发布重验 ACL。下载的 EOF／取消共用释放结果，失败不确认撤权；不宣称收回已发送字节。 | 真实 `test:postgres` 两套件 42/42（25 项基线、17 项撤权）；既有文档传输／server／proxy 55/55，API 515/515，纯 Node 构建产物 mux／Host smoke 2/2。上游运行时仍是受控传输夹具，不替代完整多用户产品验收。 |
+| 跨 Gateway 撤权 | 同事务 outbox、按节点确认游标、代理和文档下载取消；事件发布重验 ACL。批量主体先全部收到取消，再等待停止完成。下载的 EOF／取消共用释放结果，失败不确认撤权；不宣称收回已发送字节。 | 真实 `test:postgres` 两套件 43/43（25 项基线、18 项撤权）；既有文档传输／server／proxy 55/55，API 515/515，纯 Node 构建产物 mux／Host smoke 2/2。上游运行时仍是受控传输夹具，不替代完整多用户产品验收。 |
 | ACP 清理 | `subagent-acp` 的退出观测失败不能跳过终止与最后退出等待，错误保留。 | 60 项包测试；真实子进程负例先失败后通过；构建后的 Loader 场景通过。 |
 | 文件计价 | `token-meter` 接入普通文件事实与实际文本请求长度，保留本地不可变折叠和缓存。 | 79 项包测试、135 项 compaction 回归；3 个源文件四维覆盖率 100%，退役 `route-pricing.ts` 的覆盖率排除。 |
 | 草稿恢复 | 当前格式读取器保留 writer 已有的 boolean `draft` 字段，不新增格式代次，也不重写已提交文件。 | 507 项持久化测试；真实 Steer 场景和构建后迁移 smoke 通过。 |
