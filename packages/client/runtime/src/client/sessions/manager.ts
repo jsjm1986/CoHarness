@@ -709,7 +709,11 @@ export class SessionManager {
     this.summaries = applyMutation(this.summaries, mutation)
     // Eager edge reconciliation — a snapshot-build-time pass would miss consecutive status frames.
     this.syncCompletedNotifications()
-    this.notifier.markDirty()
+    // Frame-batched: mutations arrive once per streamed event during bursts
+    // (engaged/status/upsert), and per-envelope microtask flushes leave React
+    // commits permanently behind — the designed stream cadence is one
+    // publication per frame (see Notifier.markFrameDirty).
+    this.notifier.markFrameDirty()
   }
 
   /** Keep a locally created blank Session through list refreshes that omit it from the Host baseline. */
@@ -794,11 +798,12 @@ export class SessionManager {
     }
     if (frame.type === 'session/projection') {
       // Finished host-computed value: land it in the resident store whether or
-      // not the Session is instantiated (list rows read the 'title' key). The
-      // synchronous markDirty keeps the list snapshot same-tick fresh (the
-      // store's own any-key channel is microtask-batched).
+      // not the Session is instantiated (list rows read the 'title' key).
+      // Frame-batched like the store's own per-key channel: projections arrive
+      // once per streamed unit, so the list publication follows stream
+      // cadence rather than microtask-per-frame.
       this.projectionStore(frame.sessionId).apply(frame.key, frame.value, frame.seq)
-      this.notifier.markDirty()
+      this.notifier.markFrameDirty()
       return
     }
     if (frame.type === 'session/jobs') {
@@ -807,7 +812,7 @@ export class SessionManager {
       // reports as `[]` — both land as an absent key.
       if (frame.jobs.length === 0) this.jobsBySession.delete(frame.sessionId)
       else this.jobsBySession.set(frame.sessionId, frame.jobs)
-      this.notifier.markDirty()
+      this.notifier.markFrameDirty()
       return
     }
     if (frame.type === 'session/subscribed') {

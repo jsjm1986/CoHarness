@@ -115,6 +115,12 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null)
   const [fixedPos, setFixedPos] = useState<CSSProperties | null>(null)
   const { arm: armClose, cancel: cancelClose } = usePointerGrace(onClose)
+  // Owners pass onClose inline, so its identity changes every render. Reading
+  // it through a ref keeps the dismiss effect on the `open` edge alone —
+  // re-running it per render would dispatch setOpenSubmenuId inside every
+  // commit (a per-commit update loop under React 19's nested-update count).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   // Portal mode: fixed-position the list from the anchor rect before paint;
   // track the anchor while open (capture-phase scroll catches nested panes).
@@ -179,10 +185,10 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       // The portaled list is outside the anchor subtree; check both.
       if (rootRef.current?.contains(e.target) === true) return
       if (listRef.current?.contains(e.target) === true) return
-      onClose()
+      onCloseRef.current()
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -190,7 +196,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, onClose])
+  }, [open])
 
   // A close from selection/Escape/outside click outruns a pending grace close;
   // left armed it would shut a list reopened inside the grace window. Its own

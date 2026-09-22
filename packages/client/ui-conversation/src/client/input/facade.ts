@@ -679,11 +679,37 @@ export class SessionInputShell implements SessionInput {
 
   private publish(): void {
     const next = this.compose()
-    this.state.set(next)
+    // Snapshot identity contract: subscribers re-render only when a member
+    // actually moved. Session/queue notifies that leave input state
+    // untouched must not republish a fresh object — every gratuitous set
+    // schedules a synchronous render on every InputZone subscriber.
+    if (!sameInputState(this.state.getSnapshot(), next)) this.state.set(next)
     const mirroredDraft = projectClipboard(next)
     if (mirroredDraft !== this.lastMirroredDraft) {
       this.lastMirroredDraft = mirroredDraft
       this.mirrorFn?.(mirroredDraft)
     }
   }
+}
+
+/**
+ * Field-wise equality between two composed states. Every member is already
+ * reference-stable between mutations (machine arrays, queue mirror, shell
+ * id lists); `claim` is rebuilt per read, so it compares by members.
+ */
+function sameInputState(a: InputState, b: InputState): boolean {
+  if (!(
+    a.draft === b.draft
+    && a.draftRev === b.draftRev
+    && a.phase === b.phase
+    && a.occurrences === b.occurrences
+    && a.paste === b.paste
+    && a.imageIds === b.imageIds
+    && a.documentIds === b.documentIds
+    && a.queue === b.queue
+  )) return false
+  const claim = a.claim
+  const other = b.claim
+  if (claim === undefined || other === undefined) return claim === other
+  return claim.token === other.token && claim.hint === other.hint && claim.images === other.images
 }
