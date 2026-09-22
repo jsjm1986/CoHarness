@@ -124,12 +124,17 @@ export async function inspectApiRemoteSession(
  * subagent-owned identities retain the legacy `agent-busy` fence.
  * @param ctx - owning Host Context.
  * @param options - defaults and Agent-scope setup used only for cold resume.
- * @returns resolver shared by legacy API Proxy methods and Typert lookups.
+ * @returns the resolver shared by legacy API Proxy methods and Typert lookups,
+ *   plus a read on the in-flight cold resume for one identity: readers racing
+ *   resume's lifecycle appends await it before retrying a revision-bound read.
  */
 export function createApiRemoteAgentResolver(
   ctx: Context,
   options: ApiRemoteAgentOptions,
-): (sessionId: SessionId) => Promise<ApiRemoteAgentResult> {
+): {
+  agentFor: (sessionId: SessionId) => Promise<ApiRemoteAgentResult>
+  pendingResume: (sessionId: SessionId) => Promise<Agent> | undefined
+} {
   const resumes = new Map<SessionId, Promise<Agent>>()
 
   const fencedLiveAgent = (sessionId: SessionId): ApiRemoteAgentResult | undefined => {
@@ -224,5 +229,8 @@ export function createApiRemoteAgentResolver(
     typeCtx.typert.contexts.configureHost('agent', async sessionId => (await resolveAgent(sessionId)).ctx)
   })
 
-  return agentFor
+  return {
+    agentFor,
+    pendingResume: sessionId => resumes.get(sessionId),
+  }
 }

@@ -2218,7 +2218,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   // composition, and the header is written once at creation. Reading the
   // header here would silently undo the switch on the next restart and
   // restore that history under the old tool set.
-  const agentFor = createApiRemoteAgentResolver(ctx, {
+  const { agentFor, pendingResume } = createApiRemoteAgentResolver(ctx, {
     agentOptions,
     setup: async ({ meta, events }) =>
       (await composeAgent(resolveSessionPreset({ header: meta, events }))).setup,
@@ -2616,10 +2616,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // browser attaches it concurrently with the first history read, and
         // the resume appends lifecycle events across its whole settle window —
         // an in-flight creation can still outlast one immediate retry — so an
-        // announced creation is awaited to completion before the resident-log
-        // check; any other writer gets one restart on the new revision before
-        // the failure reaches the client.
-        const pending = sessionCreations.get(sessionId)
+        // announced creation or resolver resume is awaited to completion
+        // before the resident-log check; any other writer gets one restart on
+        // the new revision before the failure reaches the client.
+        const pending = sessionCreations.get(sessionId) ?? pendingResume(sessionId)
         if (pending !== undefined) {
           // A rejected or disposed creation simply leaves the detached retry.
           await pending.then(() => undefined, () => undefined)
@@ -3922,6 +3922,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               detachedBaseline = await coldHistoryBaseline(source, signal)
             } catch (error: unknown) {
               if (!(error instanceof SessionPersistenceReadError) || error.code !== 'dependency') throw error
+              // The baseline fold can still race a resume that the page walk
+              // escaped: lifecycle appends land between the detached cut and
+              // the observation read, so the announced creation or resolver
+              // resume is awaited to completion before the resident-log check,
+              // mirroring historySourceFor's detached retry.
+              const pending = sessionCreations.get(sessionId) ?? pendingResume(sessionId)
+              if (pending !== undefined) await pending.then(() => undefined, () => undefined)
               const nowAttached = ctx.sessions.get(sessionId)
               if (nowAttached === undefined) throw error
               // The walk finished on the pre-attach revision and the resume's
