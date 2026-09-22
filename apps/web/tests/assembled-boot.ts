@@ -137,8 +137,15 @@ class EventSourceStub {
   close(): void {}
 }
 
+/** Deterministic blob URL for jsdom lanes; createObjectURL needs a realm Blob. */
+let objectUrlSerial = 0
+const objectUrlStub = (): string => `blob:assembled-${++objectUrlSerial}`
+const revokeObjectUrlStub = (): void => {}
+
 const win = window as FixtureWindow
 let unmount: (() => Promise<void>) | undefined
+let realCreateObjectURL: PropertyDescriptor | undefined
+let realRevokeObjectURL: PropertyDescriptor | undefined
 
 /**
  * Register the per-test jsdom setup and teardown the assembled boot needs:
@@ -162,6 +169,10 @@ export function installAssembledBootEnv(): void {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
       setTimeout(() => { callback(0) }, 0) as unknown as number)
     vi.stubGlobal('cancelAnimationFrame', (id: number) => { clearTimeout(id) })
+    realCreateObjectURL = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+    realRevokeObjectURL = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+    URL.createObjectURL = objectUrlStub
+    URL.revokeObjectURL = revokeObjectUrlStub
   })
 
   afterEach(async () => {
@@ -179,6 +190,8 @@ export function installAssembledBootEnv(): void {
     const ownNavigator = navigator as unknown as Record<string, unknown>
     delete ownNavigator.languages
     delete ownNavigator.language
+    if (realCreateObjectURL !== undefined) Object.defineProperty(URL, 'createObjectURL', realCreateObjectURL)
+    if (realRevokeObjectURL !== undefined) Object.defineProperty(URL, 'revokeObjectURL', realRevokeObjectURL)
     vi.unstubAllGlobals()
   })
 }
