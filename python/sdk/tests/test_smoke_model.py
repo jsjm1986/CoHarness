@@ -40,15 +40,16 @@ def test_session_v3_snapshot_retains_messages_and_compact_payloads() -> None:
 def test_child_prompt_precedes_runtime_context(prompt_name: str, expected: str) -> None:
     chunks = SMOKE["completion_chunks"]({
         "messages": [
-            {"role": "user", "content": SMOKE[prompt_name]},
-            {"role": "user", "content": "Current runtime context"},
+            {"role": "user", "content": [
+                {"type": "text", "text": SMOKE[prompt_name]},
+                {"type": "text", "text": "Current runtime context"},
+            ]},
         ],
     })
 
     assert any(
-        event.get("delta", {}).get("text") == expected
-        for event in chunks
-        if event.get("type") == "content_block_delta"
+        chunk.get("delta", {}).get("text") == expected
+        for chunk in chunks
     )
 
 
