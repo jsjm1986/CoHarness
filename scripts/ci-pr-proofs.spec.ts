@@ -22,6 +22,7 @@ function proofs(paths: string[]) { return classifyCiPrProofs(paths, classifyCiPr
 describe('additional PR proof selection', () => {
   it('keeps ordinary prose and permitted action pin changes outside expensive proof lanes', () => {
     for (const paths of [['docs/testing.md'], ['packages/llm/llm/README.md'], ['gateway/README.md'],
+      ['packages/core/agent-loop/tests/README.md'], ['apps/web/tests/README.md'],
       ['AGENTS.md', 'SKILL.md', 'docs/testing.md', 'packages/llm/llm/README.md']]) {
       const result = proofs(paths)
       expect(Object.values(result.reasons).flat()).toEqual([])

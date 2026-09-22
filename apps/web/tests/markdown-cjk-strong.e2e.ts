@@ -134,8 +134,9 @@ describe('web e2e: CJK-adjacent Markdown strong emphasis', () => {
       expect(await page.getByText(paragraph, { exact: true }).count()).toBe(1)
     }
 
-    const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
-      .split(SEED_ID).join('{{seededId}}')
+    const markdownRegion = '[class*="markdown"]:has(h2)'
+    expect(await page.locator(markdownRegion).count()).toBe(1)
+    const snapshot = await captureStableAria(page, markdownRegion, scaffold.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])

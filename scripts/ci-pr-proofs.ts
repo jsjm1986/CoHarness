@@ -83,7 +83,7 @@ function modelInput(path: string): boolean {
 
 function runtimeInput(path: string): boolean {
   if (modelInput(path) || path === 'vendor/README.md') return true
-  if (/^(?:snapshots\/)|(?:^|\/)(?:tests?|fixtures|expected)\//.test(path)) return true
+  if (/(?:^|\/)snapshots\//.test(path) || /\.expected\.(?:md|json|txt|html)$/.test(path)) return true
   if (/\.(?:md|mdx)$|\.i18n\.yaml$/.test(path)) return false
   return !scopePolicy.inertPrefixes.some(prefix => path.startsWith(prefix))
 }

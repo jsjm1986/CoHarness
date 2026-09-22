@@ -1350,9 +1350,12 @@
           "path": ".github/workflows/ci.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "2139231c060c0d53b1e2c12cfc424415642d8f5e",
-          "replay": "Preserve conditional PR jobs and HMR/artifact order. Add explicit required consumers, pinned Ruff and job-scoped evidence names with matrix/attempt identity. Android APK/emulator jobs are manual-only and absent from required PR and default release checks. Provision the sandbox before source compatibility tests. Keep selected required failures and skipped-required jobs blocking.",
+          "replay": "Use the same candidate-bound plan for producer conditions and verify-pr-results. Retain conditional native/kernel/provider/pack proof calls, manual-only Android, read-only CI, HMR ordering and bounded workers. Keep dependency cache producer/reader keys aligned; scheduling weights never replace tests.",
           "regressions": [
-            "scripts/gate-workflow-wiring.spec.ts"
+            "scripts/ci-workflow.spec.ts",
+            "scripts/gate-workflow-wiring.spec.ts",
+            "scripts/ci-pr-proofs.spec.ts",
+            "scripts/verify-pr-results.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
         },
@@ -1360,10 +1363,11 @@
           "path": ".github/workflows/e2e.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "f4335f78bb5445b6e49b8c1ef0021b7fdff9470b",
-          "replay": "Keep canonical-repository and secret preflight protections. Explicit dispatch may run without enabling automatic schedules. Emit JSON results, require successful real-provider assertions, and upload immutable evidence.",
+          "replay": "Keep canonical-repository and secret preflight protections. Explicit dispatch may run without enabling automatic schedules. Emit JSON results, require successful real-provider assertions, and upload immutable evidence. Keep reusable required-proof calls in unique concurrency groups; a required credentialed proof cannot pass by skipping. PR calls never publish. Retain manual and mainline roles.",
           "regressions": [
             "scripts/ci-workflow.spec.ts",
-            "scripts/gate-evidence.spec.ts"
+            "scripts/gate-evidence.spec.ts",
+            "scripts/ci-pr-proofs.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
         },
@@ -1381,9 +1385,10 @@
           "path": ".github/workflows/release-vendor.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "75fb865767cef11a48b6c50a107a1f1aa4213efa",
-          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs.",
+          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs. Keep reusable required-proof calls in unique concurrency groups; a required credentialed proof cannot pass by skipping. PR calls never publish. Retain manual and mainline roles.",
           "regressions": [
-            "scripts/gate-workflow-wiring.spec.ts"
+            "scripts/gate-workflow-wiring.spec.ts",
+            "scripts/ci-pr-proofs.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
         },
@@ -1391,9 +1396,10 @@
           "path": ".github/workflows/release.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "633186c8f1a8a46af8f7d008811c45a32b04b52e",
-          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs.",
+          "replay": "Keep independent family build/pack jobs. Require explicit evidence_runs on publication, capture pack hashes, prepare authenticated evidence at preflight and publication, and do not rebuild in publisher jobs. Keep reusable required-proof calls in unique concurrency groups; a required credentialed proof cannot pass by skipping. PR calls never publish. Retain manual and mainline roles.",
           "regressions": [
-            "scripts/gate-workflow-wiring.spec.ts"
+            "scripts/gate-workflow-wiring.spec.ts",
+            "scripts/ci-pr-proofs.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
         },
@@ -1401,11 +1407,22 @@
           "path": ".github/workflows/sandbox.yml",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "713616f3b634a7ad85752e609e71169d2bf91675",
-          "replay": "Resolve native build commands against native/system. Preserve real-kernel assertions and the anti-self-skip guard; propagate the test process exit status before checking its summary. Record the actual job outcome.",
+          "replay": "Resolve native build commands against native/system. Preserve real-kernel assertions and the anti-self-skip guard; propagate the test process exit status before checking its summary. Record the actual job outcome. Keep reusable required-proof calls in unique concurrency groups; a required credentialed proof cannot pass by skipping. PR calls never publish. Retain manual and mainline roles.",
           "regressions": [
-            "scripts/gate-workflow-wiring.spec.ts"
+            "scripts/gate-workflow-wiring.spec.ts",
+            "scripts/ci-pr-proofs.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
+        },
+        {
+          "path": ".github/workflows/pi-ai-provider-e2e.yml",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "255c7654e7a37dea2e69b7ccf57cf5941194a155",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Preserve manual/reusable provider entry, key preflight, protocol assertions and anti-skip proof summary. ci-scope-policy declares acceptance scope explicitly; unsupported providers remain unverified in reports.",
+          "regressions": [
+            "scripts/ci-pr-proofs.spec.ts"
+          ]
         }
       ]
     },
@@ -1991,7 +2008,52 @@
         "area": "non-package:apps",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "increment-review-required"
+      "targetAssessment": "increment-review-required",
+      "gateReplays": [
+        {
+          "path": "apps/web/tests/scaffold.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "f807eb83c6d6464a321361ba5d2784e46f3ee2ad",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Keep real Loader and storage lifecycle. Assign userdoc-local an explicit private uploadRoot outside the model workspace, beside Session storage; dispose before removing the owned root. Do not access ambient documents, legacy uploads or admission locks.",
+          "regressions": [
+            "apps/web/tests/scaffold-hermetic.e2e.ts",
+            "apps/web/tests/queue-actions.e2e.ts"
+          ]
+        },
+        {
+          "path": "apps/web/tests/scaffold-hermetic.e2e.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "585d10ab989db6f9d99afcdf0ccc2f0f3c2c2078",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Exercise real document write/list/read and cleanup. A controlled OS-home substitute protects ambient document/lock/upload canaries; storage remains real and independent processes stay isolated.",
+          "regressions": [
+            "apps/web/tests/scaffold-hermetic.e2e.ts"
+          ]
+        },
+        {
+          "path": "apps/web/tests/queue-actions.e2e.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "44199c5b407a9585aa19f2a08b7326fe2feb998b",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Capture dock/composer regions while retaining exact text, control states, order, durable events and geometry. Shared chrome remains covered by assembly scenarios; refresh is followed by read-only replay.",
+          "regressions": [
+            "apps/web/tests/queue-actions.e2e.ts",
+            "apps/web/tests/lifecycle-chrome.e2e.ts"
+          ]
+        },
+        {
+          "path": "apps/web/tests/markdown-cjk-strong.e2e.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "237bbd9d3d95109dbecd0f0ca516d9c22f8d1961",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Capture the unique Markdown owner while retaining exact strong spans, paragraph text, console checks and real assembled session entry. Preserve complete assembly chrome scenarios.",
+          "regressions": [
+            "apps/web/tests/markdown-cjk-strong.e2e.ts",
+            "apps/web/tests/lifecycle-chrome.e2e.ts"
+          ]
+        }
+      ]
     },
     {
       "area": "non-package:apps/desktop",
@@ -3840,9 +3902,11 @@
           "path": "scripts/run-gates.ts",
           "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
           "upstreamBlob": "48ec3f0cdeb872da500583cc70d94480fb0fe60c",
-          "replay": "Keep passed/failed/skipped and needs/after unchanged. Reapply shared static leaves, optional evidence writing, hygiene union and full-build Web deduplication; verify run-gates and workflow wiring specs.",
+          "replay": "Preserve three states and needs/after semantics, existing source leaves, evidence, hygiene union and build deduplication. Typed lint waits for build in check-all. Admit fixtures before browser-only builds; in shared aggregates only browser execution depends on fixture admission.",
           "regressions": [
-            "scripts/run-gates.spec.ts"
+            "scripts/run-gates.spec.ts",
+            "scripts/verify-web-fixtures.spec.ts",
+            "scripts/gate-workflow-wiring.spec.ts"
           ],
           "retireWhen": "Upstream supplies the same behavior and the listed consumer regressions pass after removing this adaptation."
         },
@@ -3894,6 +3958,27 @@
           "replay": "Preserve SHA-256 verification and the functional confinement probe. Download the pinned package from a dated Ubuntu snapshot; refresh version, snapshot and checksum together.",
           "regressions": [
             "scripts/gate-workflow-wiring.spec.ts"
+          ]
+        },
+        {
+          "path": "scripts/coverage-partitions.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "1dbc89390a2d64c468a8ebb59cb57025433eca0b",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Preserve authoritative inventory, exactly-once membership and coverage thresholds. Scheduling weights bind version, toolchain, configuration, platform, resource profile and age; corrupt or incompatible inputs use cold weights. Save only after complete successful execution and merge.",
+          "regressions": [
+            "scripts/coverage-partitions.spec.ts"
+          ]
+        },
+        {
+          "path": "scripts/run-web-snapshots.ts",
+          "reviewedUpstreamCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+          "upstreamBlob": "da3ed586fd52741dc1eb5d2c7cd4a8d4bc6ad958",
+          "retireWhen": "Upstream supplies equivalent behavior and named consumer regressions pass after removing this adaptation.",
+          "replay": "Retain serial owners and bounded pool. Exact scenario selection includes every smoke, is mutually exclusive with groups, and shares validation with print-plan. Reject missing entries and full-mode narrowing.",
+          "regressions": [
+            "scripts/run-web-snapshots.spec.ts",
+            "scripts/web-test-policy.spec.ts"
           ]
         }
       ]

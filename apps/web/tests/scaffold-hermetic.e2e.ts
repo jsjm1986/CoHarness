@@ -1,11 +1,69 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
+import os, { tmpdir } from 'node:os'
+import { dirname, join, relative, sep } from 'node:path'
+import { afterEach, expect, it, vi } from 'vitest'
 import type {} from '@deepseek-ai/dsh-skill'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent-presets'
+import type { LocalUserDocStore } from '@deepseek-ai/dsh-userdoc-local'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
+
+let restoreAmbientHome: (() => void) | undefined
+afterEach(() => { restoreAmbientHome?.() })
+
+it('stores documents outside the workspace and leaves ambient documents, locks and legacy uploads untouched', async () => {
+  const ambient = await mkdtemp(join(tmpdir(), 'dsh-web-ambient-documents-'))
+  const ambientDocument = join(ambient, 'documents', 'keep.txt')
+  const legacyUpload = join(ambient, 'uploads', 'legacy.txt')
+  const ambientLock = join(ambient, 'documents', '.upload-sessions', 'v1', '.admission.lock')
+  let scaffold: WebScaffold | undefined
+  let storageRoot: string | undefined
+  try {
+    await mkdir(dirname(ambientLock), { recursive: true })
+    await mkdir(dirname(legacyUpload), { recursive: true })
+    await writeFile(ambientDocument, 'ambient document')
+    await writeFile(legacyUpload, 'legacy upload')
+    await writeFile(ambientLock, `${process.pid}\n`)
+    // Loader imports plugins through native ESM. Substitute only the OS home,
+    // including native named imports; storage and its lifecycle remain real.
+    const homeSpy = vi.spyOn(os, 'homedir').mockReturnValue(ambient)
+    restoreAmbientHome = () => {
+      homeSpy.mockRestore()
+      syncBuiltinESMExports()
+      restoreAmbientHome = undefined
+    }
+    syncBuiltinESMExports()
+    scaffold = await launchWebScaffold()
+    storageRoot = dirname(scaffold.persistenceRoot)
+    const documents = join(storageRoot, 'documents')
+    const store = scaffold.ctx.userDocs
+    expect((store as LocalUserDocStore).root).toBe(documents)
+    expect(relative(scaffold.workspaceCwd, documents).startsWith(`..${sep}`)).toBe(true)
+    const target = await store.resolveTarget({ name: 'owned.txt' })
+    const ref = await store.save(target, new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('scaffold document'))
+        controller.close()
+      },
+    }))
+    expect(dirname(await realpath(ref.path))).toBe(await realpath(documents))
+    expect(await readFile(ref.path, 'utf8')).toBe('scaffold document')
+    expect((await store.list()).map(item => item.name)).toEqual(['owned.txt'])
+    expect(await readFile(ambientDocument, 'utf8')).toBe('ambient document')
+    expect(await readFile(legacyUpload, 'utf8')).toBe('legacy upload')
+    expect(await readFile(ambientLock, 'utf8')).toBe(`${process.pid}\n`)
+  } finally {
+    try {
+      await scaffold?.close()
+    } finally {
+      restoreAmbientHome?.()
+      await rm(ambient, { recursive: true, force: true })
+    }
+  }
+  if (storageRoot === undefined) throw new Error('scaffold did not allocate private storage')
+  await expect(lstat(storageRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+})
 
 async function writeSkill(root: string, name: string): Promise<void> {
   const bundle = join(root, name)

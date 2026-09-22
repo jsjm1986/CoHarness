@@ -26,7 +26,9 @@ The mainline release pack owns the pnpm cache namespace consumed by PR jobs, and
 
 [Artifact manifests](../../../../scripts/build-artifacts.ts) bind a clean candidate, environment, profile, input digest, and complete output inventory. Consumers reject missing, extra, stale, or corrupt outputs. Shared-build topology remains disabled without qualifying measurements. The [cost comparator](../../../../scripts/compare-ci-cost.ts) accepts at most three comparable pairs and retains a trial only when total installation, build, and transfer runner time falls at least 10%, median wall time does not rise, and the worst sample rises no more than 5%. Failed or incomparable samples cannot establish a gain. Independent consumer builds retain the [queue-delay rationale](2026-07-30-independent-ci-consumer-build.md).
 
-Queue goldens cover their queue dock; the responsive layout golden covers the composer. Queue text, button names, disabled states, ordering, durable events, and responsive geometry remain exact. Complete assembly and lifecycle scenarios retain public chrome coverage. Refresh is explicit and followed by read-only replay; normalization does not broaden.
+Queue goldens cover their queue dock, the responsive layout golden covers the composer, and the CJK emphasis golden covers its Markdown content. Queue text, button names, disabled states, ordering, durable events, and responsive geometry remain exact. Complete assembly and lifecycle scenarios retain public chrome coverage. Refresh is explicit and followed by read-only replay; normalization does not broaden.
+
+Web scaffolds allocate Session and document storage in a private root outside the model workspace. The explicit document root prevents ambient document access, shared admission-lock waits, and implicit legacy-upload migration. Storage initialization, filesystem locking, maintenance, and asynchronous disposal remain real; the scaffold removes its owned root only after disposal. The hermetic regression writes and reads real documents, protects a controlled ambient-home fixture, and runs in independent concurrent processes.
 
 ## Alternatives considered
 
