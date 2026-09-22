@@ -1912,6 +1912,8 @@ Requires: `loader` · `profileContext`
 ```ts config-catalog
 /** The pnpm executable and the limits for package diagnostics and registry lookups. */
 export interface Config {
+  /** Local operators manage their profile; managed deployments require an authorization provider. */
+  authorization?: 'local' | 'required'
   /** The pnpm executable name or path; resolved through `PATH` like the `dsh plugin` command. */
   pnpmCommand?: string
   /** Maximum retained pnpm diagnostic bytes per operation. */
@@ -1923,7 +1925,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/boot/plugin-manager/src/index.ts:33`](../packages/boot/plugin-manager/src/index.ts)
+Source: [`packages/boot/plugin-manager/src/index.ts:34`](../packages/boot/plugin-manager/src/index.ts)
 
 <a id="deepseek-aidsh-plugin-package-inventory-deepseek"></a>
 

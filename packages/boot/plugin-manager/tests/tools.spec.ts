@@ -20,6 +20,7 @@ function resultText(result: Awaited<ReturnType<ToolRuntime['execute']>>): string
 async function fixture(mode: 'read-only' | 'workspace-write' | 'danger-full-access' = 'danger-full-access', approval?: 'ask' | 'never') {
   const ctx = new Context()
   onTestFinished(() => ctx.fiber.dispose())
+  const authorize = vi.fn(async () => {})
   const manager = {
     listPlugins: vi.fn(async () => Array.from({ length: 30 }, (_, i) => ({ entryId: `include:${i}`, enabled: true }))),
     listBundles: vi.fn(async () => [{ name: 'bundle', enabled: true }]),
@@ -28,7 +29,7 @@ async function fixture(mode: 'read-only' | 'workspace-write' | 'danger-full-acce
     installBundle: vi.fn(async () => ({ changed: true, application: 'restart-required' })),
     removeBundle: vi.fn(async () => ({ changed: false, application: 'failed' })),
   }
-  ctx.provide('pluginManager', manager as unknown as PluginManager)
+  ctx.provide('pluginManager', { ...manager, authorize } as unknown as PluginManager)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(SessionProjections)
@@ -38,10 +39,10 @@ async function fixture(mode: 'read-only' | 'workspace-write' | 'danger-full-acce
   const call = (args: unknown, agent?: Agent, signal = new AbortController().signal) => ctx.tools.execute({ name: 'plugin_manager', arguments: args,
     ...agent === undefined ? {} : { agent },
     callId: ToolCallId('manager-call'), signal })
-  return { ctx, manager, call, fiber }
+  return { ctx, manager, authorize, call, fiber }
 }
 
-it.each(['read-only', 'workspace-write'] as const)('denies every management action in %s before accessing the manager', async (mode) => {
+it.each(['read-only', 'workspace-write'] as const)('denies every management action in %s before accessing the profile', async (mode) => {
   const { call, manager } = await fixture(mode)
   for (const action of ['list_plugins', 'list_bundles', 'set_plugin', 'set_bundle', 'install_bundle', 'remove_bundle']) {
     const result = await call({ action, target: 'bundle', enabled: true })
@@ -49,6 +50,26 @@ it.each(['read-only', 'workspace-write'] as const)('denies every management acti
     expect(JSON.stringify(result.content)).toContain('requires approval, but no approval service is composed')
   }
   for (const method of Object.values(manager)) expect(method).not.toHaveBeenCalled()
+})
+
+it('rejects deployment-denied management even with danger-full-access', async () => {
+  const { call, manager, authorize } = await fixture('danger-full-access')
+  authorize.mockRejectedValue(new Error('administrator required'))
+  const result = await call({ action: 'install_bundle', target: 'bundle' })
+  expect(result.isError).toBe(true)
+  expect(JSON.stringify(result.content)).toContain('administrator required')
+  for (const operation of Object.values(manager)) expect(operation).not.toHaveBeenCalled()
+})
+
+it('does not request an approval that cannot grant deployment authority', async () => {
+  const { ctx, call, manager, authorize } = await fixture('workspace-write', 'ask')
+  authorize.mockRejectedValue(new Error('administrator required'))
+  const prompted = vi.fn(async () => 'allowed-once' as const)
+  ctx.on('approval/request', prompted)
+  const result = await call({ action: 'install_bundle', target: 'bundle' }, activeAgent())
+  expect(result.isError).toBe(true)
+  expect(prompted).not.toHaveBeenCalled()
+  for (const operation of Object.values(manager)) expect(operation).not.toHaveBeenCalled()
 })
 
 it('checks the calling session on each execution, including after permission is revoked', async () => {

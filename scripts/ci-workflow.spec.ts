@@ -392,7 +392,20 @@ describe('CI workflow', () => {
       'npm run typecheck --prefix gateway',
       'npm run build:check --prefix gateway',
       'npm test --prefix gateway',
+      'npm run test:postgres --prefix gateway',
     ]))
+    const gatewaySteps = (gateway.steps as unknown[]).filter(isRecord)
+    const unitIndex = gatewaySteps.findIndex(step => step.run === 'npm test --prefix gateway')
+    const postgresIndex = gatewaySteps.findIndex(step => step.run === 'npm run test:postgres --prefix gateway')
+    const evidenceIndex = gatewaySteps.findIndex(step => step.name === 'Preserve gate evidence')
+    expect(postgresIndex).toBeGreaterThan(unitIndex)
+    expect(evidenceIndex).toBeGreaterThan(postgresIndex)
+    expect(gatewaySteps[postgresIndex]?.if).toBeUndefined()
+    expect(gatewaySteps[postgresIndex]?.['continue-on-error']).toBeUndefined()
+    expect(gatewaySteps[evidenceIndex]?.with).toMatchObject({
+      external: 'gateway',
+      command: 'npm test --prefix gateway && npm run test:postgres --prefix gateway',
+    })
   })
 
   it('limits release and sandbox workflows to relevant changes while retaining manual or scheduled runs', () => {

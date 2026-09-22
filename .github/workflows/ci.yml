@@ -676,13 +676,15 @@ jobs:
           mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
       - name: Test Gateway
         run: npm test --prefix gateway
+      - name: Test Gateway PostgreSQL authorization and invalidation
+        run: npm run test:postgres --prefix gateway
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
         with:
           status: ${{ job.status }}
           external: gateway
-          command: npm test --prefix gateway
+          command: npm test --prefix gateway && npm run test:postgres --prefix gateway
 
   gateway-admin-ui:
     needs: pr-scope

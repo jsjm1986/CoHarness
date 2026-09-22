@@ -11,6 +11,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { ConnectionHttpHandler, ConnectionRequestBoundary } from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import { gatewayPluginManagementAuthorization } from './plugin-management.ts'
 
 /** HTTP header carrying one Gateway-signed browser principal. */
 export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
@@ -418,6 +419,10 @@ export class GatewayRuntime extends Service {
     this.organization = this.credential.organization
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
     this.publicKey = createPublicKey(this.credential.principalPublicKey)
+    const managementLifetime = new AbortController()
+    ctx.effect(() => () => { managementLifetime.abort(new Error('Gateway management authorization is unavailable')) },
+      'gateway-runtime: stop management authorization')
+    ctx.provide('pluginManagementAuthorization', gatewayPluginManagementAuthorization(this, managementLifetime.signal))
     ctx.on('connection/request', (request: ConnectionRequestBoundary, next) => {
       const requestMeta = request as ConnectionRequestBoundary & { method?: string; pathname?: string }
       const header = request.headers[GATEWAY_PRINCIPAL_HEADER]

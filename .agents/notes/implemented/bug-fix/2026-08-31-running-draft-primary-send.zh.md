@@ -10,13 +10,13 @@ Status: implemented
 
 ## 决策
 
-`InputBar` 根据运行状态、草稿内容和 owner block 选择普通会话的主操作。运行中的 composer 为空时显示 Stop，并通过既有会话取消回调执行。存在非空白文字或至少一张图片或一份文档时，同一控件切换为 Send，点击后使用既有 Queue 提交路径。owner block 会禁用编辑与提交，因此即使保留了草稿，运行中的 composer 也保持 Stop。清空草稿或成功提交后，只要 Turn 仍在运行，就会恢复 Stop。空闲会话仍显示 Send；草稿为空或无法提交时，该按钮保持禁用。
+`InputBar` 根据运行状态、草稿内容和 owner block 选择普通会话的主操作。运行中的 composer 为空时显示 Stop，并通过既有会话取消回调执行。存在非空白文字或至少一张图片或一份文档时，同一控件切换为 Send，投递方式遵循[运行中 Send 决策](2026-09-22-busy-send-follows-enter-setting.zh.md)。owner block 会禁用编辑与提交，因此即使保留了草稿，运行中的 composer 也保持 Stop。清空草稿或成功提交后，只要 Turn 仍在运行，就会恢复 Stop。空闲会话仍显示 Send；草稿为空或无法提交时，该按钮保持禁用。
 
-指针操作不继承 `ui-conversation.busyEnter` 偏好。该偏好仍然只为两个键盘手势选择 Queue 或 Steer。可继续 subagent 保留相互独立的 Send 与 Stop 控件，one-shot subagent 保持只读行为。
+[运行中 Send 决策](2026-09-22-busy-send-follows-enter-setting.zh.md)取代本笔记最初的指针仅使用 Queue 策略，并保留主操作位置和 owner block 规则。可继续 subagent 保留相互独立的 Send 与 Stop 控件，one-shot subagent 保持只读行为。
 
 ## 验证
 
-`InputBar` 组件测试覆盖运行中草稿的空白、文字、清空、提交成功、仅图片、仅文档和 owner-blocked 状态，并证明键盘偏好选择 Steer 时，按钮提交仍使用 Queue。无密钥的组装 Web 场景通过 replay 适配器停住真实组合出的 Turn，捕获显示 Send 的运行中草稿，经 Host Queue 路径点击提交，在草稿清空后观察 Stop 恢复，移除 Queue 行，再取消该 Turn。
+`InputBar` 组件测试覆盖运行中草稿的空白、文字、清空、提交成功、仅图片、仅文档和 owner-blocked 状态，并覆盖 busy-Enter 偏好变化时所选的投递方式。无密钥的组装 Web 场景通过 replay 适配器停住真实组合出的 Turn，捕获显示 Send 的运行中草稿，经 Host Queue 路径点击提交，在草稿清空后观察 Stop 恢复，移除 Queue 行，再取消该 Turn。
 
 ## 相关决策
 
@@ -28,7 +28,7 @@ Status: implemented
 
 **为每个运行中会话同时渲染 Send 与 Stop。** 可继续 subagent 需要两个独立操作，因为其取消路由与继续投递不同。普通会话已有单一主操作位置；永久增加第二个控件会占用更多空间，并在草稿本身已经指明当前操作时引入另一套层级。
 
-**让指针 Send 采用 busy-Enter 偏好。** 标记为 Send 的按钮会随键盘偏好在 Queue 与 Steer 之间静默变化。保持指针提交始终使用 Queue，可以保留既有显式区分，避免按钮携带不可见模式。
+**让指针 Send 采用 busy-Enter 偏好。** 标记为 Send 的按钮会随键盘偏好在 Queue 与 Steer 之间静默变化。[运行中 Send 决策](2026-09-22-busy-send-follows-enter-setting.zh.md)通过显式 Queue 或 Steer 标签，以及标签和投递方式共用的同一偏好解决这一顾虑。
 
 ## 影响
 

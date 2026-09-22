@@ -34,6 +34,7 @@ import { PostgresUserService } from './postgres/user-service.ts'
 import { loadPrincipalKeys, PRINCIPAL_HEADER } from './principal.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 import { createProxyHandlers } from './proxy.ts'
+import { PostgresAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
 import { createGatewayWorkbenchCatalogHandler } from './workbench.ts'
@@ -237,6 +238,7 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
     if (operationLease) await Promise.resolve(instances.operationRef?.(target, -1)).catch(() => {})
   }
 })
+const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
 const deps: GatewayDeps = {
   cfg,
   auth,
@@ -251,7 +253,12 @@ const deps: GatewayDeps = {
   push,
   instances,
   desktops,
-  readiness: signal => checkPostgresReadiness(context, signal),
+  accessMonitor,
+  readiness: async (signal) => {
+    await checkPostgresReadiness(context, signal)
+    await accessMonitor.synchronize()
+    signal?.throwIfAborted()
+  },
 }
 
 if (await deps.users.count() === 0) {
@@ -276,6 +283,7 @@ if (await deps.users.count() === 0) {
 await refreshModelGovernance(deps)
 
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
+await accessMonitor.synchronize()
 const documentAdmin = createGatewayDocumentAdminHandler({
   instances: deps.instances,
   users,
@@ -515,6 +523,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       desktopSweepTask.wait(),
     ])
     proxyHandlers.close()
+    await accessMonitor.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])
     await deps.instances.stopAll()
     await pool.end()

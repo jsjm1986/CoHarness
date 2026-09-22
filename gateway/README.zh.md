@@ -7,7 +7,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 ## 工具链
 
 - **Node 25**（`.nvmrc`；dsh 仓库 engines `^22.19 || >=24` 亦兼容）。`better-sqlite3` 与 `argon2` 是原生模块，ABI 绑定安装时的 Node 大版本——切换 Node 后运行 `npm rebuild better-sqlite3 argon2`，否则报 `NODE_MODULE_VERSION` 不匹配。
-- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（vitest）、`npm run typecheck`。
+- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（单元测试）、`npm run typecheck`。`HGW_TEST_DATABASE_URL` 为 `npm run test:postgres` 指定可丢弃数据库；两个套件串行执行并替换 `harness` schema。CI 执行这两个测试命令。
 
 `npm run build` 会把 Gateway 源码图生成到 `lib/`，并将相对导入改写为 `.js`；生产 supervisor 必须在同一个 release 目录中执行 `node lib/index.js`。源码 `tsx` 入口只用于开发和测试。
 
@@ -31,6 +31,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PROJECT_RUNTIME_USER` | `harness-project` | 项目 scope systemd 单元使用的专用 Linux 账户 |
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | 用于签发浏览器请求 principal 的仅所有者可读 Ed25519 密钥对 |
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
+| `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 秒 | 持久授权变更的兜底读取及重连间隔；通知与请求准入也会触发读取 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
@@ -120,6 +121,14 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 每次调用都会先以 UUID 写入运行时本地的崩溃安全 outbox。仅回环的 intake 在 PostgreSQL 中按 UUID 去重，按调用时间选择生效价格版本，并根据非秘密凭据来源标签归属公司成本（`file`/`project-env`/`request` 为个人，启动环境来源为公司，未知来源按公司成本保守计入）。账本不写 API Key、提示词或回复内容。自然月使用 `HGW_USAGE_TIME_ZONE`；Token 与公司成本额度支持角色默认、按用户继承/不限/自定义，以及项目继承或显式额度。额度只在 80% 和 100% 提醒，不阻断调用。账务归属始终只属于一个用户或项目；共享项目记录在可确认时额外保存已验证的参与者 ID，用于非计费活动分析；无法还原的历史项目记录保持未归属。用户在 Web shell 看到持久阈值提醒；管理员看到分开的个人、项目和贡献者汇总、缺失计量次数以及明确的价格覆盖状态。
 Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview`、`/admin/api/usage/contributors` 与 `/admin/api/usage/health`；贡献者行只是活动投影，绝不会加到项目账务总量中。归档身份仍会保留在 overview 中，使历史个人用量与已确认的项目活动能够继续和主体总量对账。
 个人 settings 变化会使用同一套已鉴权 outbox，并以 `model-registration` 类型记录。Gateway 将 Provider/model 的新增、修改和删除与用量分开保存，并在管理员 Models 页面提供查询；记录只包含路由身份和时间戳。
+
+## 跨 Gateway 撤权
+
+现有账号、项目、对话、归档或文档的访问权限变更提交后，组织内每个 Gateway 都会终止对应主体正在代理的 HTTP 响应和 WebSocket。新请求先补读持久授权记录，再在运行时准入后复核登录和项目权限。目录授权变更还会停止受影响的本地运行时，使其下次启动时读取当前授权。新建 Session／文档登记、消息追加、统计和登录过期时间的滑动续期不会终止流量。
+
+PostgreSQL 监听连接丢失时会关闭已准入的代理流量。重连等待取消完成并补读遗漏记录，再允许新流量；签名 principal 过期仍是额外的限制。冷启动 Gateway 从计算节点已成功应用的运行时版本继续处理；已有进程重连时保留自己的游标。保留 `harness.outbox` 中的 `access.invalidate` 记录，包括已设置 `completed_at` 的记录：它们是重放历史，不是可删除的任务队列。版本缺口会阻断就绪检查和代理准入。[决策记录](../.agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.zh.md)说明事务顺序、留存和成本。
+
+运行时事件流在每批发布前复核 Session 可见性。清除浏览器已经持有的内容仍由 Client 单独负责。关闭某位参与者的传输连接不能证明共享项目运行时中该参与者已启动的模型／工具任务已经停止；参与者拥有的任务取消需要独立验证。
 
 ## 目录强制的分层
 

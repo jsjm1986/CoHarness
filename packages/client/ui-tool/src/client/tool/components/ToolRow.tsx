@@ -20,7 +20,7 @@
 import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
+  CodeBlock, DiffBlock, diffTotals, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { AskQuestionCard } from './AskQuestionCard.tsx'
@@ -48,8 +48,8 @@ export interface ToolRowProps {
    * Trailing summary fragment rendered outside the ellipsized summary text, so
    * a narrow row clips the summary before this. For a fragment whose whole
    * value is surviving that clip — the todo row's parallel-active count.
-   * null/absent = the summary is the whole collapsed content. Dropped on an
-   * error row, whose collapsed summary is the failure line instead.
+   * Absent/null uses the shared +/- counts for a diff card and no suffix for
+   * other cards. Dropped when a failure line replaces the summary.
    */
   summarySuffix?: string | null | undefined
   /** Original argument payload; formatting is deferred until expansion. */
@@ -179,7 +179,12 @@ export function ToolRow({
   const summaryText = failureLine ?? summary
   // The failure line replaces the summary wholesale, so a suffix derived from
   // the call args has nothing left to sit beside.
-  const suffix = failureLine === null ? summarySuffix ?? null : null
+  const diffStat = useMemo(() => {
+    if (diffBody === null) return null
+    const { added, removed } = diffTotals(diffBody.card.diffs)
+    return `+${added} -${removed}`
+  }, [diffBody])
+  const suffix = failureLine === null ? summarySuffix ?? diffStat : null
   // The failure line is error prose, not the path: no open-file affordance.
   const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
   const toggleExpand = () => {
@@ -238,7 +243,7 @@ export function ToolRow({
                 {summaryText}
               </span>
             )}
-            {suffix !== null && <span className={css.summarySuffix}>{suffix}</span>}
+            {suffix !== null && <span className={clsx(css.summarySuffix, suffix === diffStat && css.diffStat)}>{suffix}</span>}
           </>
         )}
       >

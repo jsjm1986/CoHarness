@@ -53,6 +53,8 @@ export interface GatewayDeps {
   projects: GatewayProjectService
   audit: GatewayAuditService
   instances: GatewayInstanceService
+  /** Durable revocations shared by Gateways using the same organization. */
+  accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
   /** PostgreSQL-backed account preferences; absent in legacy test compositions. */

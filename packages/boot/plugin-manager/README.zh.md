@@ -45,10 +45,13 @@ kind: "package-reference"
 
 pnpm 11 拦下依赖脚本时，失败的安装在 `pendingBuilds` 里报告 profile 中所有待决定的包名，包括先前尝试留下的；失败的运行会恢复 `package.json` 与 `pnpm-lock.yaml`，但有意不恢复 pnpm 记录这些名字的 `pnpm-workspace.yaml`。Web 插件页提供**允许这些脚本并重试**；工具可以在用户于对话中批准这些脚本后，通过 `install_bundle` 的 `approvedBuilds` 代为授权。服务只校验待决定的名字，不核实对话中的批准。授权按包名保存在当前 profile，允许以宿主用户的权限执行命令，并在再次安装失败后保留。只能批准当前未决定的名字；已有的拒绝与通配规则不能通过此操作覆盖。`allowBuilds` 里出现 YAML 锚点或别名时拒绝授权。重试保留原来的启用选择。
 
+Gateway 管理的运行时在每次服务操作前重新核验管理员身份，工具审批或 Full access 不能代替此授权。`authorization: required` 在授权提供者不可用时拒绝操作；独立本机 profile 默认使用 `local`。Gateway 在持久写锁和配置队列内再次检查授权，拒绝已撤销的权限。受保护的部署插件及其父条目不能被组合包 patch 替换或关闭。
+
 ### 配置
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
+| `authorization` | `local` | `required` 要求部署授权提供者；Gateway 固定此模式并提供实时管理员检查。 |
 | `pnpmCommand` | `pnpm` | pnpm 可执行文件名或路径，与 `dsh plugin` 命令一样通过 `PATH` 解析。 |
 | `inspectTimeoutMs` | `20000` | 单次检查所做注册表查询的上限，单位毫秒。 |
 | `outputBytes` | `16384` | 每次操作返回的 pnpm 诊断字节上限；完整输出保留在返回的日志路径中。 |

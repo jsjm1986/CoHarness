@@ -32,4 +32,6 @@ Build approvals update pnpm 11's unresolved `allowBuilds` entries under the same
 
 ## Consequences
 
+Gateway-managed profiles additionally require [deployment administrator authority](2026-09-22-gateway-profile-management-authority.md); tool approval alone cannot grant it.
+
 The same profile can be managed through CLI, Web and tools, with file-level coordination and preserved patch precedence. Operators must repair failed package operations using the reported files and diagnostics. A startup process must stop before its loaded packages can be removed through CLI. Management components remain protected against service-initiated removal.

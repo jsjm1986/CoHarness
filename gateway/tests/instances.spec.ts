@@ -288,7 +288,8 @@ describe('InstanceManager', () => {
     // by dsh over every profile without touching the launch argv.
     expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toBe(
       '- insert:\n    - id: gateway-runtime\n      name: \'@deepseek-ai/dsh-gateway-runtime\'\n'
-      + '    - id: governance\n- insert: []\n',
+      + '    - id: governance\n- insert: []\n'
+      + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n',
     )
     for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
       const installed = join(modules, plugin)
@@ -319,6 +320,7 @@ describe('InstanceManager', () => {
     const patch = readFileSync(join(root, 'users', 'admin', 'dsh', 'cordis.patch.yml'), 'utf8')
     expect(patch).toContain('- insert: []\n- id: permission\n')
     expect(patch).toContain('danger-full-access:\n        sandbox: danger-full-access\n        approval: never\n')
+    expect(patch).toContain('- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n')
   })
 
   it('refuses an administrator start when the configured guard has no admin overlay', async () => {

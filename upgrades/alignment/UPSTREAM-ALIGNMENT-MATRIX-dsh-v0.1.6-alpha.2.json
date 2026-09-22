@@ -5438,7 +5438,7 @@
         "packages/boot/plugin-manager/tsconfig.json"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested"
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/browser-use/browser-use",

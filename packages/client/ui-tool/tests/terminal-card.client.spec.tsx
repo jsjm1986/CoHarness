@@ -17,7 +17,7 @@ import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-api-remotes/
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { terminalCardModel, terminalFailed } from '../src/client/tool/models/terminal-card-model.ts'
+import { terminalBlockLabels, terminalCardModel, terminalFailed } from '../src/client/tool/models/terminal-card-model.ts'
 import { createChatStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
@@ -109,6 +109,14 @@ describe('terminalCardModel', () => {
     }))!)).toBe(true)
     expect(terminalFailed(terminalCardModel(settled())!)).toBe(false)
     expect(terminalFailed(terminalCardModel(running())!)).toBe(false)
+  })
+
+  it('preserves an explicitly unknown exit and supplies its localized status label', () => {
+    const model = terminalCardModel(settled({ resultView: resultTerminal({ exitCode: null }) }))
+    if (model === null) throw new Error('terminal result lost its card')
+    expect(model.card.exitCode).toBeNull()
+    expect(terminalFailed(model)).toBe(true)
+    expect(terminalBlockLabels(t).noExitCode).toBe('无退出码')
   })
 
   it('takes the result view\'s replacement title over the pending one', () => {
@@ -391,6 +399,23 @@ describe('BashRow terminal card', () => {
       resultView: resultTerminal({ exitCode: 2 }),
     }))} />)
     expect(view.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('error')
+  })
+
+  it.each([
+    { exitCode: null, signal: undefined, status: '无退出码' },
+    { exitCode: 2, signal: undefined, status: '退出码 2' },
+    { exitCode: null, signal: 'SIGTERM', status: '信号 SIGTERM' },
+  ])('keeps the collapsed failure and expanded $status consistent', ({ exitCode, signal, status }) => {
+    const resultView: ToolResultView = {
+      card: 'terminal', output: 'partial output',
+      ...(signal === undefined ? { exitCode } : { signal }),
+    }
+    const view = render(<BashRow {...rowProps(settled({ resultView }))} />)
+    expect(view.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('error')
+    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    expect(view.getByText(status)).toBeTruthy()
+    expect(view.getByText('partial output')).toBeTruthy()
+    expect(runStateOf(view.container)).toBe('error')
   })
 
   it('shows the terminal presenter\'s description instead of the args summary', () => {

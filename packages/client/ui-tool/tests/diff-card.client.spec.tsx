@@ -185,6 +185,22 @@ describe('FileMutationRow diff card', () => {
     expect(view.getByText('复制')).toBeTruthy()
   })
 
+  it.each([
+    { changed: 1, totals: '+1 -1' },
+    { changed: 129, totals: '+130 -130' },
+  ])('keeps $totals consistent in the collapsed row and expanded card', ({ changed, totals }) => {
+    const fragment = (prefix: string) => ['shared heading', ...Array.from({ length: changed }, (_, i) => `${prefix} setting ${i}`)].join('\n')
+    const view = render(<FileMutationRow {...rowProps(settled({
+      resultView: resultDiff({ diffs: [{ path: 'notes/demo.txt', oldText: fragment('old'), newText: fragment('new') }] }),
+    }))} />)
+    expect(view.getByText(totals, { exact: true })).toBeTruthy()
+    expect(view.container.querySelector('[data-diff]')).toBeNull()
+    toggleRow(view)
+    expect(view.getByText(`└ ${totals} · 1 个文件`, { exact: true })).toBeTruthy()
+    toggleRow(view)
+    expect(view.getByText(totals, { exact: true })).toBeTruthy()
+  })
+
   it('the summary is a path link that opens the tool path through the host', () => {
     const openFile = vi.fn()
     const view = render(<FileMutationRow {...{ ...rowProps(settled()), openFile }} />)

@@ -31,9 +31,11 @@ export interface TerminalBlockLabels {
   signal: (signal: string) => string
   /** Status pill text for a non-zero exit code. */
   exitCode: (exitCode: number) => string
+  /** Status pill text when the command settled without a known exit code or signal. */
+  noExitCode: string
   /** Run-state text while the command is still running. */
   running: string
-  /** Run-state text for a signal or non-zero-exit settle. */
+  /** Run-state text for a signal or a non-zero or unknown exit code. */
   failed: string
   /** Run-state text for a clean settle. */
   done: string
@@ -62,11 +64,11 @@ export interface TerminalBlockProps {
   home?: string | undefined
   /** The command's output text; may contain ANSI escape sequences. */
   output?: string | undefined
-  /** Settled exit code; a non-zero value renders the status pill. */
-  exitCode?: number | undefined
+  /** Settled exit code; non-zero renders a failure pill, null an explicit no-exit-code pill. */
+  exitCode?: number | null | undefined
   /** Settled terminating signal name; any value renders the status pill, taking precedence over the exit code. */
   signal?: string | undefined
-  /** The command is still running: the block shows the prompt line alone. */
+  /** The command is still running: show any received output, with no copy control until settlement. */
   running?: boolean | undefined
   /** Height cap in output lines before the middle collapses (default {@link DEFAULT_TERMINAL_MAX_LINES}); Infinity disables the cap. */
   maxLines?: number | undefined
@@ -96,17 +98,18 @@ function promptLabel(cwd: string, home: string | undefined): string {
  * Status pill text for a settled command, or undefined when the command
  * settled cleanly (exit 0, no signal) and needs no pill — the same
  * distinction the bash tool's own exit-status markers draw.
- * @param exitCode - settled exit code, when known.
+ * @param exitCode - settled code, `null` for an explicitly unknown code, or absent.
  * @param signal - settled terminating signal name, when known.
  * @param labels - display copy for the pill text.
  * @returns the pill text, or undefined for a clean exit.
  */
 function statusText(
-  exitCode: number | undefined,
+  exitCode: number | null | undefined,
   signal: string | undefined,
   labels: TerminalBlockLabels,
 ): string | undefined {
   if (signal !== undefined) return labels.signal(signal)
+  if (exitCode === null) return labels.noExitCode
   if (exitCode !== undefined && exitCode !== 0) return labels.exitCode(exitCode)
   return undefined
 }
@@ -118,18 +121,18 @@ function statusText(
  * four states are reachable: the running chase (the same
  * indicator a running tool row's leading icon uses, so the row and its card
  * never disagree), green for a clean settle, red for a signal or a non-zero
- * exit — the same status distinction {@link statusText} draws for the pill. A
- * settled command whose exit status never reached the view counts as a clean
- * settle: the view says it finished and says nothing went wrong.
+ * exit — the same status distinction {@link statusText} draws for the pill. An
+ * omitted legacy exit status keeps the clean-settle presentation. An explicit
+ * null status reports that no exit code was received and never shows success.
  * @param running - the command has not settled.
- * @param exitCode - settled exit code, when known.
+ * @param exitCode - settled code, `null` for an explicitly unknown code, or absent.
  * @param signal - settled terminating signal name, when known.
  * @param labels - display copy for the text label.
  * @returns the dot's state and its text label, since the dot is aria-hidden.
  */
 function runState(
   running: boolean,
-  exitCode: number | undefined,
+  exitCode: number | null | undefined,
   signal: string | undefined,
   labels: TerminalBlockLabels,
 ): { state: StateDotState; label: string } {
@@ -205,9 +208,10 @@ export function TerminalBlock({
   // for invisible bytes, and hide the placeholder that belongs there.
   const empty = lines.every(line => line.every(span => span.text.trim() === ''))
   const { hidden, capped, headLines, tailLines } = headTailCap(lines.length, maxLines, expanded)
+  const hasBody = !running || !empty
 
   return (
-    <div className={clsx(css.block, className)} data-terminal="" data-running={running ? '' : undefined}>
+    <div className={clsx(css.block, className)} data-terminal="" data-running={running ? '' : undefined} data-body={hasBody ? '' : undefined}>
       <div className={css.header}>
         <div className={css.prompt}>
           <span className={css.runStateLabel}>{state.label}</span>
@@ -238,7 +242,7 @@ export function TerminalBlock({
           </button>
         )}
       </div>
-      {!running && (empty
+      {hasBody && (empty
         ? <div className={css.empty}>{copy.noOutput}</div>
         : (
           <div className={css.output}>

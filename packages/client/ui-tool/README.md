@@ -18,6 +18,8 @@ Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and
 
 The package also fills `conversation.details.tool` with `ToolDetails`. The row and details renderers share the same pure card models for `terminal`, `read`, `diff`, `search`, and `web` render intents. Completed ask-user calls use a validated, readable question/answer card; mixed or malformed result blocks fall back to the complete generic output. Unknown intent tags and malformed wire card data fall back to flattened Tool result text.
 
+File-mutation rows retain `+A -R` counts while collapsed. Their summary and expanded card use `ui-primitives.diffTotals`’s bounded comparison, and an explicit summary suffix or failure line keeps precedence.
+
 Generic rows classify known Tool names into search, read, shell, write, edit, code, or generic variants. Running, successful, failed, and interrupted lifecycle states come only from the frozen call/result slice. File paths resolve against the session `cwd` only when the user invokes the Host open-file callback; presentation code does not read Session services.
 
 A native or PTC dispatch failure carrying `AUTO_REVIEW_DENIED` takes precedence over keyed specialized views: the generic row names Auto review in its collapsed summary, omits the never-executed arguments, and expands to one normalized not-executed reason — trimmed, with line separators collapsed to spaces, and a localized fallback for a missing or blank reason. The stored Session and SDK error keep the original reason.

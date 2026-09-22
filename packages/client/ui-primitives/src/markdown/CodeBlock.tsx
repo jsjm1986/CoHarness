@@ -161,7 +161,7 @@ export function CodeBlock({ code, lang, streaming = false, className, copyLabel,
       data-empty={trimmed === '' ? '' : undefined}
     >
       <div className={css.bannerWrap}>
-        <div className={css.banner}>
+        <div className={css.banner} data-code-block-banner>
           <div className={css.infostring}>{lang ?? ''}</div>
           <div className={css.action}>
             <button type="button" className={css.copyButton} onClick={onCopy}>

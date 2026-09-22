@@ -1,5 +1,6 @@
-import { readdirSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { clientSurfacePackages } from './ci-pr-scope.ts'
@@ -149,6 +150,7 @@ describe('validateWebTestPolicy', () => {
 
   it('rejects scenarios naming unknown groups', () => {
     rejected('scenarios', { 'workbench.e2e.ts': 'nonexistent' }, /unknown group/)
+    rejected('scenarios', { 'helper.ts': 'conversation' }, /not a browser scenario file/)
   })
 
   it('rejects smoke scenarios outside the scenario table', () => {
@@ -159,7 +161,43 @@ describe('validateWebTestPolicy', () => {
     rejected('packages', { 'client/ui-workbench': 'nonexistent' }, /unknown group/)
   })
 
+  it('rejects empty, duplicate, unknown, or non-list shared-input owners', () => {
+    rejected('sharedInputs', { 'fixture.jsonl': [] }, /non-empty/)
+    rejected('sharedInputs', { 'fixture.jsonl': ['diff-context.e2e.ts', 'diff-context.e2e.ts'] }, /duplicate-free/)
+    rejected('sharedInputs', { 'fixture.jsonl': ['removed.e2e.ts'] }, /unknown scenario/)
+    rejected('sharedInputs', { 'fixture.jsonl': 'diff-context.e2e.ts' }, /string array/)
+  })
+
+  it.each(['../fixture.jsonl', '/fixture.jsonl', 'a//fixture.jsonl', 'a/./fixture.jsonl', 'C:/fixture.jsonl', 'a\\fixture.jsonl'])(
+    'rejects non-relative shared input %s', (input) => {
+      rejected('sharedInputs', { [input]: ['diff-context.e2e.ts'] }, /normalized repository-relative/)
+    },
+  )
+
   it('rejects the all-group token inside a package group list', () => {
     rejected('packages', { 'client/ui-workbench': ['all'] }, /bare string "all"/)
+  })
+})
+
+describe('shared-input references at policy load', () => {
+  it('requires both a real input file and a real registered scenario file', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'dsh-web-policy-'))
+    try {
+      mkdirSync(join(fixtureRoot, 'scripts'))
+      writeFileSync(join(fixtureRoot, 'scripts/web-test-policy.json'), JSON.stringify({
+        ...policy, sharedInputs: { 'fixture.jsonl': ['diff-context.e2e.ts'] },
+      }))
+      expect(() => loadWebTestPolicy(fixtureRoot)).toThrow(/shared input .*existing regular file/)
+      mkdirSync(join(fixtureRoot, 'fixture.jsonl'))
+      expect(() => loadWebTestPolicy(fixtureRoot)).toThrow(/existing regular file/)
+      rmSync(join(fixtureRoot, 'fixture.jsonl'), { recursive: true })
+      writeFileSync(join(fixtureRoot, 'fixture.jsonl'), '{}\n')
+      expect(() => loadWebTestPolicy(fixtureRoot)).toThrow(/missing scenario/)
+      mkdirSync(join(fixtureRoot, WEB_TESTS_ROOT), { recursive: true })
+      writeFileSync(join(fixtureRoot, WEB_TESTS_ROOT, 'diff-context.e2e.ts'), 'export {}\n')
+      expect(loadWebTestPolicy(fixtureRoot).sharedInputs).toEqual({ 'fixture.jsonl': ['diff-context.e2e.ts'] })
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true })
+    }
   })
 })

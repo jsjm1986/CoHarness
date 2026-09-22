@@ -28,6 +28,6 @@ These checks establish record identity and comparison scope. They do not complet
 
 ## Consequences
 
-An in-progress record can pass structural validation while its pending review states still prevent release. Merging duplicate routing rows preserves all raw path claims and historical provenance without marking either implementation or acceptance complete.
+An in-progress record can pass structural validation while its pending review states still prevent release. Merging duplicate routing rows preserves all raw path claims and historical source records without marking either implementation or acceptance complete.
 
 Real CLI tests cover unique and conflicting identities, both sides of a Unicode rename, missing and extra inventories, repeated paths, incorrect counts, active-schema downgrades and frozen-schema compatibility. Separate real Git tests verify missing snapshot acquisition, fixed-URL depth-limited fetches, no refetch, rejected pins and unchanged mismatched tags; the older unrequested ancestor remains absent.

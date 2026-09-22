@@ -168,6 +168,7 @@ function fixture() {
   })
   return {
     append,
+    query,
     deps,
     handler: createRuntimeApiHandler(deps),
     issuePrincipal,
@@ -179,6 +180,27 @@ function fixture() {
     archiveAck,
   }
 }
+
+describe('profile management authorization', () => {
+  it('admits an active administrator and rechecks a later revocation', async () => {
+    const runtime = fixture()
+    const principal = runtime.issuePrincipal(ADMIN_ID)
+    const path = '/internal/runtime/plugin-management/authorize'
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 204 })
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining("m.role='admin'"), [ORGANIZATION_ID, ADMIN_ID])
+    runtime.query.mockResolvedValueOnce({ rows: [] })
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 403 })
+  })
+
+  it('rejects a member or a missing principal before looking up deployment authority', async () => {
+    const runtime = fixture()
+    const path = '/internal/runtime/plugin-management/authorize'
+    expect(await request(runtime.handler, path, { body: {}, principal: runtime.issuePrincipal(CREATOR_ID) }))
+      .toMatchObject({ status: 403 })
+    expect(await request(runtime.handler, path, { body: {} })).toMatchObject({ status: 403 })
+    expect(runtime.query).not.toHaveBeenCalled()
+  })
+})
 
 async function prepare(
   runtime: ReturnType<typeof fixture>,

@@ -167,10 +167,10 @@ export interface TerminalResultView {
   /** Captured command output (stdout+stderr as the tool chooses to combine them). */
   output?: string
   /**
-   * Process exit code, when the run ended by exiting (not a signal). Lets a
-   * capable UI show an exit-status pill. Omit when killed by a signal or unknown.
+   * Process exit code, or null when the run settled without a known code.
+   * Omit when a signal supplies the status or no exit-status fact is available.
    */
-  exitCode?: number
+  exitCode?: number | null
   /** Signal name that killed the process (e.g. `SIGTERM`). Mutually exclusive with `exitCode`. */
   signal?: string
 }

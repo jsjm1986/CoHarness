@@ -18,6 +18,10 @@ Use `dsh-gateway-runtime` for the authenticated request context and private loop
 - Credentials and principal assertions fail closed at their parsing and request boundaries. The runtime bearer token is never exposed through the public service fields.
 - Consumers that read a private JSON response use `readGatewayResponseJson()` (or its byte-level companion) with a domain limit and optional `AbortSignal`; chunked bodies are cancelled when the limit or signal is reached, so `Content-Length` is not the only protection.
 
+### Profile management authorization
+
+`pluginManagementAuthorization` rejects a missing, restricted or expired request principal before contacting the Gateway. Each permitted request then checks the caller’s current active administrator membership through the private runtime API. Gateway launch patches require this provider; unloading it cannot restore local-operator access. The policy also identifies mandatory authentication, collaboration, governance and isolation plugins that profile operations must preserve.
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. The launch credential binds one fixed identity for the process lifetime; request context is derived per call, so nothing mutable exists to compare.

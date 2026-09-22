@@ -288,3 +288,24 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 [CI 输入准备入口](../../scripts/fetch-upstream-baseline.ts)读取当前矩阵的累计与增量基线提交，校验完整 SHA 和一致的目标固定值，仅从固定公开上游以 `--depth=1 --no-tags` 补取缺失快照。已有但身份不符的 tag 会失败而不被覆盖，输入不可取得时不能跳过对账。[直接测试](../../scripts/fetch-upstream-baseline.spec.ts)使用真实浅 Git 仓库和本地传输，证明两个缺失比较提交被取得、较早的未请求祖先仍不存在、再次执行不 fetch、非法／缺失 SHA 和错误 tag 被拒绝。6 项测试通过；连同记录检查器共 41 项。实际执行现有 CI 顺序 `node scripts/fetch-upstream-baseline.ts` → `node --import tsx/esm scripts/verify-upgrade-records.ts`，3 个固定比较树就绪，16 份记录通过。这里没有新增工作流或全量历史拉取。
 
 GitHub API 核实 [CI 35688456271](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271)的 `head_sha` 为 `2ba86fcbb908dd90226dbf5a62148099d24d6607`，完成于 `2026-09-22T05:12:36Z`，结论 success；`node 24 / coverage` 的 `Run exhaustive coverage` 步骤成功，执行 `pnpm run check:ci:coverage`。该次共有 15 个 job 成功、11 个 skipped，原生 Windows complete、macOS serial、manual full audit、可选 Android 等未运行。清单因此修正“从未运行”的陈述，同时保留当前候选 `pending`：旧 CI、不带提交身份的旧命令记录及仅有汇总状态都不能作为本轮发布通过证据。
+
+## 本轮补全的局部实现与验证（2026-09-22）
+
+以下记录对应 `codex/alpha2-complete-alignment` 的局部实现，不关闭整项产品决定或累计源码审查。最终候选、GitHub CI、真实 Provider 和平台验收仍待完成。独立提交 `f599b9fca0` 固定批次 0 校验；`c7a95773d7` 修复 ACP 清理；`974ad9a198` 修复草稿 Session 读取。
+
+| 改动 | 本地承接与保留差异 | 已执行的局部证据 |
+| --- | --- | --- |
+| Profile 管理授权 | `boot/plugin-manager` 所有公开操作与工具共用部署授权，排队后重验；Gateway 实时读取有效管理员资格。独立本机仍按本机权限执行。该包登记为 adapted，不再 unmanifested。 | 89 项 owning package 回归；3 个指定源文件四维覆盖率 100%；真实 PostgreSQL＋HTTP 证明过期前的旧管理员断言在降权、禁用后被拒绝。 |
+| ACP 清理 | `subagent-acp` 的退出观测失败不能跳过终止与最后退出等待，错误保留。 | 60 项包测试；真实子进程负例先失败后通过；构建后的 Loader 场景通过。 |
+| 文件计价 | `token-meter` 接入普通文件事实与实际文本请求长度，保留本地不可变折叠和缓存。 | 79 项包测试、135 项 compaction 回归；3 个源文件四维覆盖率 100%，退役 `route-pricing.ts` 的覆盖率排除。 |
+| 草稿恢复 | 当前格式读取器保留 writer 已有的 boolean `draft` 字段，不新增格式代次，也不重写已提交文件。 | 507 项持久化测试；真实 Steer 场景和构建后迁移 smoke 通过。 |
+| 运行中发送 | 鼠标与 Enter 使用同一 Queue／Steer 偏好；保留本地输入、上传、命令及 Stop 行为。 | 153 项源测试；真实 Queue／Steer、设置与持久化验证。 |
+| 模型菜单 | 上游键盘和 portal 行为接入治理数据源；保留手机 Settings Sheet 及原触控尺寸。 | 40 项源测试；真实 Web 4/4，390／375／320 手机几何 golden 未变。 |
+| 工具 diff／终端 | 上游有界 diff、准确增删数及未知退出状态接入现有工具卡片；保留本地 8 行预览。 | 真实 `read/edit`、文件字节及持久结果验证；精确 diff 与 130 删除／130 新增／0 上下文场景均通过。bounded golden 仅适配 8 行上限引起的两行变化。 |
+| 思考正文 | 上游紧凑 Markdown 进入现有 Think 行；保留摘要节流，不截断展开正文，折叠按钮保持可达。 | 115 项相关组件与 Markdown 回归；长流式内容保留首段、全部 900 段及后续追加；实际 Web 生命周期 7/7、会话往返 7/7。 |
+
+真实 Web 验证使用现有 keyless replay 及实际产品、工具和文件操作；它不等同于真实 DeepSeek Provider、GUI 发布演示或 Gateway 多用户验收。只调整对应 owner 的期望和断言，没有全量重录 a11y 快照。共享录制输入通过现有 `web-test-policy.sharedInputs` 登记全部 owner，引用不存在时失败；未来整合 #219 时必须保留这些 owner 与共同 smoke。
+
+插件管理的请求级授权只是完整发起人传播的基础。共享会话中的混合人工输入、排队及恢复工作的真实身份、Auto 资格和子 Agent／PTC 传播仍未验收；不能用仍然有效的某个管理员请求上下文代表另一个参与者的权限。跨 Gateway 断流、下一次请求拒绝和目录授权进程重建也不能代表共享 runtime 中所有既有模型／工具任务都已停止。这些差异继续阻止相应产品决定被标为完成。
+
+SessionReference、batches／ClientEntries、统一右侧标签、D7、SSH、用户终端、Browser、Office、Webhook、完整 Admin、桌面执行授权、外部 Team、部署迁移及最终平台／产物验收仍按已批准计划实施。上述局部证据不将它们转为通过，也不将旧提交的 CI 结果转移到新候选。

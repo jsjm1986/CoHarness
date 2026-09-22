@@ -36,6 +36,8 @@ export interface GatewayConfig {
   principalAssertionTtlMs: number
   /** Maximum time an HTTP/WebSocket proxy waits on one runtime upstream operation. */
   upstreamTimeoutMs: number
+  /** Maximum interval between durable access-revocation reads and listener reconnects. */
+  accessInvalidationPollMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
   upstreamResponseLimitBytes: number
   /** Maximum buffered body bytes accepted by one authenticated runtime API call. */
@@ -467,6 +469,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     archiveRetentionDays,
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
+    accessInvalidationPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_POLL_MS, 1_000, 'HGW_ACCESS_INVALIDATION_POLL_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,
     bootstrapAdminPasswordFile,

@@ -73,7 +73,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/llm/llm/src/attribution.ts',
   'packages/llm/llm/src/content.ts',
   'packages/llm/llm/src/text-thinking-guard.ts',
-  'packages/llm/token-meter/src/route-pricing.ts',
   'packages/llm/token-meter/src/turn-usage.ts',
   // Sub-agent delegation and its model-selection settings.
   'packages/subagent/subagent-dsh-sdk/src/index.ts',

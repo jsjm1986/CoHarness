@@ -4,6 +4,23 @@ import type { PluginInventoryEntry } from '@deepseek-ai/dsh-host-plugin-inventor
 export type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 import type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 
+/** Deployment-owned authority for current-profile management. */
+export interface PluginManagementAuthorization {
+  /** Modules a managed profile cannot disable or replace through a bundle. */
+  readonly protectedModules: ReadonlySet<string>
+  /** Recheck the current caller before profile reads or writes.
+   * @returns After the deployment permits the operation; rejects without permission.
+   */
+  authorize(): Promise<void>
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    /** Profile management requires current deployment authorization. */
+    'plugin-management/forbidden': Record<string, never>
+  }
+}
+
 /** Reasons a profile control cannot modify its target. */
 export type ReadOnlyReason = 'management-required' | 'unaddressable'
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { classifyCiPrScope, classifyWebVerification, clientSurfacePackages } from './ci-pr-scope.ts'
 import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
-import { loadWebTestPolicy } from './web-test-policy.ts'
+import { focusedScenarioFiles, loadWebTestPolicy } from './web-test-policy.ts'
 
 describe('classifyCiPrScope', () => {
   it('uses a versioned declarative policy for shared and model-input paths', () => {
@@ -350,6 +350,61 @@ describe('web verification tier selection', () => {
       snapshotMode: 'focused',
       webGroups: ['workbench'],
     })
+  })
+
+  it('routes the shared ACP edit fixture to its real browser consumer', () => {
+    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'])).toMatchObject({
+      runExpensive: true,
+      snapshotMode: 'focused',
+      webGroups: ['conversation'],
+    })
+  })
+
+  it('selects every shared-input owner and the common smoke scenarios', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'
+    const combined = {
+      ...policy,
+      sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts', 'workbench.e2e.ts'] },
+    }
+    const plan = classifyWebVerification([input], packages, combined, new Map())
+    expect(plan).toEqual({ mode: 'focused', groups: ['conversation', 'workbench'] })
+    const selected = focusedScenarioFiles(combined, plan.groups)
+    expect(selected).toEqual(expect.arrayContaining(['diff-context.e2e.ts', 'workbench.e2e.ts', ...policy.smokeScenarios]))
+    expect(selected).not.toContain('subagent-conversation.e2e.ts')
+  })
+
+  it('treats a declared Markdown input as runtime evidence while leaving unrelated examples scoped', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    const input = 'examples/shared-prose.md'
+    const supplied = { ...policy, sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts'] } }
+    expect(classifyCiPrScope([input], '', packages, supplied)).toMatchObject({
+      runExpensive: true, changedDocsOnly: false, snapshotMode: 'focused', webGroups: ['conversation'],
+    })
+    expect(web(['examples/acp-agent/tests/snapshots/unrelated/session.jsonl'])).toMatchObject({
+      snapshotMode: 'scoped', webGroups: [],
+    })
+    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.jsonl.backup'])).toMatchObject({
+      snapshotMode: 'scoped', webGroups: [],
+    })
+    expect(web(['new-runtime-input.dat'])).toMatchObject({ snapshotMode: 'full' })
+  })
+
+  it('fails on a shared relation with no registered consumer instead of falling back', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'
+    expect(() => classifyWebVerification([input], packages, {
+      ...policy, sharedInputs: { [input]: ['removed.e2e.ts'] },
+    }, new Map())).toThrow(/unknown scenario/)
+  })
+
+  it('does not let a shared-input declaration narrow runtime or dependency validation', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    for (const input of ['pnpm-lock.yaml', 'packages/client/runtime/src/index.ts', 'scripts/web-test-policy.json']) {
+      expect(classifyWebVerification([input], packages, {
+        ...policy, sharedInputs: { [input]: ['diff-context.e2e.ts'] },
+      }, new Map())).toEqual({ mode: 'full', groups: [] })
+    }
   })
 
   it('routes a committed golden to the groups of the scenarios that reference it', () => {

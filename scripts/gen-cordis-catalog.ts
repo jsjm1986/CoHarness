@@ -92,6 +92,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   permissionPresetAuthorization: 'permission-presets.md',
   planMode: 'plan.md',
   pluginManager: 'boot.md',
+  pluginManagementAuthorization: 'boot.md',
   profileContext: 'boot.md',
   hmr: 'boot.md',
   mcpResources: 'mcp.md',

@@ -1,6 +1,6 @@
 /**
  * Composer submission policy. It owns the live busy-Enter
- * preference and resolves keyboard gestures into queue/steer delivery modes;
+ * preference and resolves composer gestures into queue/steer delivery modes;
  * Host and Agent keep the actual delivery-window authority.
  */
 import {
@@ -15,12 +15,30 @@ import type { ConversationSettings } from '../../submission-settings.ts'
 export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 
 /**
+ * Resolve delivery for one composer gesture from the displayed preference.
+ * @param busyEnter - current account preference for Enter and the Send button.
+ * @param running - whether the addressed agent currently reports busy.
+ * @param gesture - plain Enter or the Cmd/Ctrl-accelerated chord.
+ * @param steeringAvailable - whether this session transport supports steering.
+ * @returns Queue outside steer-capable busy state; otherwise the preferred mode or its opposite.
+ */
+export function resolveSubmitMode(
+  busyEnter: BusyEnterBehavior,
+  running: boolean,
+  gesture: ComposerSubmitGesture,
+  steeringAvailable: boolean,
+): InputSubmitMode {
+  if (!running || !steeringAvailable) return 'queue'
+  return gesture === 'enter' ? busyEnter : busyEnter === 'queue' ? 'steer' : 'queue'
+}
+
+/**
  * Busy-Enter policy used by both the composer inject face and its Settings row.
  * Direct `steer` is intentionally best-effort: AgentLoop turns a closed-window
  * submission into the next waking Queue item.
  */
 export class ComposerSubmissionPolicy {
-  /** Reactive preference source for the Settings row. */
+  /** Reactive preference source shared by the composer and Settings row. */
   readonly busyEnter: SnapshotStore<BusyEnterBehavior> = createSnapshotStore(DEFAULT_BUSY_ENTER_BEHAVIOR)
   /** Host writability and write status source for the Settings row. */
   readonly settings: SnapshotStore<SettingsControlState>
@@ -45,24 +63,6 @@ export class ComposerSubmissionPolicy {
       })
       this.adopt(host)
     }
-  }
-
-  /**
-   * Resolve one keyboard gesture without changing state.
-   * @param running - whether the addressed agent currently reports busy.
-   * @param gesture - plain Enter or the Cmd/Ctrl-accelerated chord.
-   * @param steeringAvailable - whether this session transport supports steering.
-   * @returns Queue outside steer-capable busy state; otherwise the preferred mode or its opposite.
-   */
-  resolve(
-    running: boolean,
-    gesture: ComposerSubmitGesture,
-    steeringAvailable: boolean,
-  ): InputSubmitMode {
-    if (!running || !steeringAvailable) return 'queue'
-    const preferred = this.busyEnter.getSnapshot()
-    if (gesture === 'enter') return preferred
-    return preferred === 'queue' ? 'steer' : 'queue'
   }
 
   /**

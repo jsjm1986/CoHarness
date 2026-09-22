@@ -7,7 +7,7 @@ The public-facing portal gateway for DeepSeek Harness: PostgreSQL-backed login/s
 ## Toolchain
 
 - **Node 25** (`.nvmrc`; the dsh repository's engines `^22.19 || >=24` accept it). `better-sqlite3` and `argon2` are native modules whose ABI binds to the Node major that installed them — after switching Node, run `npm rebuild better-sqlite3 argon2`, otherwise they fail with a `NODE_MODULE_VERSION` mismatch.
-- Commands: `npm run dev` (tsx source entry), `npm run build` (compiled `lib/index.js` production entry), `npm test` (vitest), `npm run typecheck`.
+- Commands: `npm run dev` (tsx source entry), `npm run build` (compiled `lib/index.js` production entry), `npm test` (unit tests), `npm run typecheck`. `HGW_TEST_DATABASE_URL` selects a disposable database for `npm run test:postgres`; its two suites run serially and replace the `harness` schema. CI runs both test commands.
 
 `npm run build` emits the Gateway source graph under `lib/` with relative imports rewritten to `.js`; production supervisors must execute `node lib/index.js` from the same release directory. The source `tsx` entry is for development and tests only.
 
@@ -31,6 +31,7 @@ The public-facing portal gateway for DeepSeek Harness: PostgreSQL-backed login/s
 | `HGW_PROJECT_RUNTIME_USER` | `harness-project` | Dedicated Linux account used by project-scoped systemd units |
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | Owner-private Ed25519 keypair used to sign browser request principals |
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 s | Lifetime of one signed principal; WebSocket clients reconnect before expiry |
+| `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 s | Fallback read/reconnect interval for durable access changes; notifications and request admission also trigger reads |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | Host-private credential files loaded into systemd user/project runtimes |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | Owner-only AES-GCM key used for organization and project Provider API keys |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | Maximum body size accepted by one authenticated private runtime API request |
@@ -120,6 +121,14 @@ A pinned PostgreSQL 17 deployment lives in [`deploy/postgres/`](deploy/postgres/
 Every call produces one UUID-keyed usage record in a crash-safe per-runtime outbox. The loopback intake deduplicates UUIDs in PostgreSQL, applies the price version effective at the call timestamp, and attributes company cost from a non-secret credential source label (`file`/`project-env`/`request` are personal; launch environment sources are company; unknown remains company-conservative). No API key, prompt, or response content enters the ledger. Natural months use `HGW_USAGE_TIME_ZONE`; token and company-cost quotas support role defaults, per-user inherit/unlimited/custom overrides, and project inherit-or-explicit limits. Quotas warn at 80% and 100% but do not block calls. Billing ownership remains exactly one user or project; shared-project records additionally retain a verified participant id when available for non-billing activity reports. Historical project records without that fact remain unattributed. Users see durable crossings in the Web shell; admins see separate personal, project, and contributor summaries, missing-usage counts, and explicit price-coverage status.
 The Admin usage API keeps the legacy subject summary and adds `/admin/api/usage/overview`, `/admin/api/usage/contributors`, and `/admin/api/usage/health`; contributor rows are activity projections and are never added to project billing totals. Archived identities remain in the overview so historical personal usage and confirmed project activity continue to reconcile with their subject totals.
 Personal settings changes use the same authenticated outbox with a `model-registration` record type. The Gateway stores Provider/model creation, modification, and deletion separately from usage and exposes them through the administrator Models page; records contain route identities and timestamps only.
+
+## Access revocation across Gateways
+
+Committed changes to existing account, project, conversation, archive, and document access invalidate affected proxied HTTP responses and WebSockets on every Gateway in the organization. New requests catch up with the durable access records and recheck login and project authority after runtime admission. Directory-grant changes also stop affected local runtimes so their next start receives current grants. New Session/document registration, message appends, statistics, and sliding login expiry do not invalidate traffic.
+
+A lost PostgreSQL listener closes admitted proxy traffic. Reconnection waits for cancellation and reads missed records before admitting more traffic; signed-principal expiry is an additional limit. A cold Gateway resumes its compute node's successfully applied runtime revision; an existing process keeps its own cursor across reconnects. Keep the `access.invalidate` records in `harness.outbox`, including records with `completed_at` set: they are a replay history, not a deletable work queue. Missing revisions fail readiness and proxy admission. The [decision record](../.agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.md) explains transaction ordering, retention, and cost.
+
+Runtime event streams recheck Session visibility for each publication batch. Clearing content already held by the browser remains a separate Client responsibility. Closing a participant's transport does not establish that participant's existing model/tool tasks have stopped inside a shared project runtime; participant-owned task cancellation needs independent verification.
 
 ## Layered directory enforcement
 

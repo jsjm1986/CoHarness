@@ -48,7 +48,8 @@
       "sovereignty": "tracked"
     },
     "boot/plugin-manager": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md"
     },
     "bundle/acp-app": {
       "sovereignty": "tracked"
@@ -600,7 +601,8 @@
       "sovereignty": "adapted"
     },
     "llm/token-meter": {
-      "sovereignty": "adapted"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-22-token-meter-file-request-pricing.md"
     },
     "lsp/lsp": {
       "sovereignty": "tracked"

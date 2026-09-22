@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-22-upgrade-record-identities-and-raw-paths.md
-2026-09-22-upgrade-record-identities-and-raw-paths.md: 35ccc5062d44f992194be90e4668b6c08d0a131e
+2026-09-22-upgrade-record-identities-and-raw-paths.md: 07afec7a463c72a6b79e239ea49fd410eb9d7eef
 2026-09-22-upgrade-record-identities-and-raw-paths.zh.md: 146e4b22e7341474dd43d4e1c53b7360000603a8

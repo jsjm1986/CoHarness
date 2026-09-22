@@ -31,6 +31,7 @@ export function apply(ctx: Context): void {
       render: (_args, value) => [{ type: 'text', text: value }],
     },
     async execute(args, exec) {
+      await ctx.pluginManager.authorize()
       const policy = ctx.sandboxPolicy.resolve(exec.agent === undefined ? {} : { session: exec.agent.session })
       await approveEscalation({
         requestedMode: 'danger-full-access', effectiveMode: policy.mode, subject: 'plugin management operation',

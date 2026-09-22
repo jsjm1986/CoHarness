@@ -18,6 +18,10 @@
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
 - 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。
 
+### Profile 管理授权
+
+`pluginManagementAuthorization` 在联系 Gateway 前拒绝缺失、用途受限或已过期的请求主体。其余请求每次通过私有运行时 API 检查调用者当前有效的管理员成员资格。Gateway 启动 patch 要求此提供者；卸载它不能恢复本机操作者权限。该策略还标识 profile 操作必须保留的认证、协作、治理与隔离插件。
+
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。启动凭据在进程生命周期内绑定一个固定身份；请求上下文逐次调用派生，因此不存在可供比较的可变内容。

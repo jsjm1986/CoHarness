@@ -367,6 +367,75 @@ describe('project collaboration Typert Remote ACL', () => {
 })
 
 describe('project collaboration streams', () => {
+  it.each(['mux', 'host'] as const)('rechecks an already visible Session for each %s publication', async (kind) => {
+    const secretId = SessionId('later-revoked')
+    const witnessId = SessionId('still-readable')
+    const allowed = new Set([secretId, witnessId])
+    const authority = controlledAuthority().authority
+    authority.readableSessionIds = ids => Promise.resolve(new Set(ids.filter(id => allowed.has(id))))
+    const { ctx, api } = await harness(authority)
+    const secret = ctx.sessions.create(secretId)
+    const witness = ctx.sessions.create(witnessId)
+    const abort = new AbortController()
+    const firstSecret = Promise.withResolvers<true>()
+    const nextWitness = Promise.withResolvers<true>()
+    const afterRevocation: Array<MuxFrame | HostFrame> = []
+    let revoked = false
+    const stream = kind === 'mux' ? api.events.mux(request({}), abort.signal) : api.events.host(request({}), abort.signal)
+    const consuming = (async () => {
+      for await (const envelope of stream) {
+        const value = envelope.payload
+        if (!('sessionId' in value)) continue
+        if (revoked) afterRevocation.push(value)
+        if (!revoked && value.sessionId === secretId) firstSecret.resolve(true)
+        if (revoked && value.sessionId === witnessId) nextWitness.resolve(true)
+      }
+    })()
+    const publish = (session: Session, turn: number): void => {
+      if (kind === 'mux') session.append('turn/start', { turn })
+      else ctx.emit('agent/status', { agent: stubAgent(ctx, session), status: 'running' })
+    }
+    try {
+      publish(secret, 1)
+      await firstSecret.promise
+      allowed.delete(secretId)
+      revoked = true
+      publish(secret, 2)
+      publish(witness, 1)
+      await nextWitness.promise
+      expect(afterRevocation.some(value => 'sessionId' in value && value.sessionId === secretId)).toBe(false)
+      expect(afterRevocation.some(value => 'sessionId' in value && value.sessionId === witnessId)).toBe(true)
+    } finally {
+      abort.abort()
+      await consuming
+    }
+  })
+
+  it('rechecks the queued mux baseline after its initial authorization read', async () => {
+    const controlled = controlledAuthority()
+    const secretId = SessionId('revoked-before-baseline-publish')
+    const witnessId = SessionId('baseline-witness')
+    let reads = 0
+    controlled.authority.readableSessionIds = (ids) => {
+      reads++
+      if (reads === 1) return controlled.firstRead.promise
+      return Promise.resolve(new Set(ids.filter(id => id === witnessId)))
+    }
+    const { ctx, api } = await harness(controlled.authority)
+    ctx.sessions.create(secretId)
+    ctx.sessions.create(witnessId)
+    const abort = new AbortController()
+    const stream = api.events.mux(request({}), abort.signal)[Symbol.asyncIterator]()
+    try {
+      controlled.firstRead.resolve(new Set([secretId, witnessId]))
+      const first = await stream.next()
+      expect(first).toMatchObject({ done: false, value: { payload: { type: 'session/subscribed', sessionId: witnessId } } })
+    } finally {
+      abort.abort()
+      await stream.return?.()
+    }
+  })
+
   it('captures a Host increment after open even when the first pull is delayed', async () => {
     const authority = controlledAuthority().authority
     authority.readableSessionIds = sessionIds => Promise.resolve(new Set(sessionIds))

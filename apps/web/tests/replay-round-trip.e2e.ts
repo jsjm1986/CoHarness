@@ -171,6 +171,15 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     expect(await think.getAttribute('aria-expanded')).toBe('false')
     await think.click()
     await expect.poll(() => think.getAttribute('aria-expanded'), { timeout: 5_000 }).toBe('true')
+    // Earlier step reasoning belongs to the collapsed intermediate-message group.
+    const closingReply = sessionEvents.findLast(event => event.type === 'assistant/message')
+    const reasoning = closingReply?.type === 'assistant/message'
+      ? closingReply.data.message.content.find(block => block.type === 'reasoning') : undefined
+    if (reasoning === undefined) throw new Error('the replayed turn did not publish reasoning')
+    const body = page.locator('[data-variant="think"][data-expanded] [class*="thinkBody"]')
+    expect(await body.textContent()).toBe(reasoning.text)
+    expect(await body.locator('[class*="compact"]').count()).toBe(1)
+    expect(await think.evaluate(element => getComputedStyle(element).position)).toBe('sticky')
     await think.click()
     await expect.poll(() => think.getAttribute('aria-expanded'), { timeout: 5_000 }).toBe('false')
   })

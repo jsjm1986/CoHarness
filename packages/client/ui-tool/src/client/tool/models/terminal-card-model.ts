@@ -25,6 +25,7 @@ export function terminalBlockLabels(t: TranslateNS<'conversation'>): TerminalBlo
   return {
     signal: signal => t('terminal.signal', { signal }),
     exitCode: code => t('terminal.exitCode', { code }),
+    noExitCode: t('terminal.noExitCode'),
     running: t('terminal.running'),
     failed: t('terminal.failed'),
     done: t('terminal.done'),
@@ -61,7 +62,7 @@ export interface TerminalCardModel {
 }
 
 /**
- * True when a settled terminal card reports a failing exit — a non-zero code
+ * True when a settled terminal card reports a non-zero or unknown exit code
  * or a terminating signal. The bash tool settles a failing command as a
  * completed call (`isError` stays false: the exit status is result data), so
  * this is the collapsed row's only failure signal; without it the red exit

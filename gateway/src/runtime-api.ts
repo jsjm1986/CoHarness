@@ -663,6 +663,20 @@ export function createRuntimeApiHandler(
     }
     try {
       const url = new URL(req.url ?? '/', 'http://runtime')
+      if (pathname === '/internal/runtime/plugin-management/authorize' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (claims.user.role !== 'admin' || claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
+        const current = await deps.context.pool.query(`SELECT u.id FROM harness.users u
+          JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
+          JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
+          WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
+            AND u.status='active' AND m.status='active' AND m.role='admin'`,
+        [subject.organizationId, claims.user.id])
+        if (current.rows.length !== 1) throw new CollaborationDeniedError('forbidden')
+        res.writeHead(204, { 'cache-control': 'no-store' })
+        res.end()
+        return true
+      }
       if (pathname === '/internal/runtime/model-credential' && req.method === 'POST') {
         const payload = record(JSON.parse(body))
         const ref = payload?.ref

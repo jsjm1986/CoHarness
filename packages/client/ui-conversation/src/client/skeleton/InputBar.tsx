@@ -24,6 +24,7 @@ import type {} from '@deepseek-ai/dsh-goal/client'
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps, ComposerDocument } from '../contract/slots.ts'
 import type { DraftDocumentId, EditRange } from '../input/contract.ts'
+import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { deriveDecorations } from '../contract/decorations.ts'
 import type { DraftDecorations } from '../contract/decorations.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
@@ -148,13 +149,14 @@ export type InputBarProps = ComposerBarProps
 
 export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addImages, addDocuments, removeImage, removeDocument, retryDocument, draftImages,
-  resolveSubmitMode, toggleCommandMenu, stop, command, t,
-  renderSlot, useNotices, useLexicon, useMenuLauncher, useDocuments, usePermissionCatalog,
+  toggleCommandMenu, stop, command, t,
+  renderSlot, useBusyEnter, useNotices, useLexicon, useMenuLauncher, useDocuments, usePermissionCatalog,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
   placeholder, accessory, overlay, leftItems, rightItems, footer, active = true, compact = false,
 }: InputBarProps) {
   const input = useInput(s => s)
+  const busyEnter = useBusyEnter(value => value)
   const viewportPhone = useMediaQuery('(max-width: 767px)')
   const phone = compact || viewportPhone
   const notice = useNotices(s => s)
@@ -532,6 +534,7 @@ export const InputBar = memo(function InputBar({
       return
     }
     keyboard.submit(resolveSubmitMode(
+      busyEnter,
       running,
       accelerated ? 'accelerated' : 'enter',
       steeringAvailable,
@@ -680,20 +683,25 @@ export const InputBar = memo(function InputBar({
     if (el !== null) toggleCommandMenu?.(selectionOf(el))
   }
 
-  // An ordinary running session keeps Stop while the composer is empty or
-  // owner-blocked; an actionable draft gets the existing Queue action. A
-  // continuable child keeps Send primary and exposes Stop independently.
+  // An empty or owner-blocked ordinary composer keeps Stop. A sendable draft
+  // uses the same delivery as Enter; continuable children keep independent Stop.
   const primaryStops = running && subagent === null && (empty || blocked !== undefined)
+  const primaryDisabled = primaryStops ? stop === undefined : empty || disabled || machineBusy || documentsPending
   const interruptible = running && continuable
-  const primaryLabel = primaryStops ? t('input.stop') : t('input.send')
+  const primarySubmitMode = resolveSubmitMode(busyEnter, running, 'enter', steeringAvailable)
+  const plainMessageDraft = !empty && input?.phase === 'plain' && !draft.trimStart().startsWith('/')
+  const primaryLabel = primaryStops ? t('input.stop')
+    : running && steeringAvailable && !primaryDisabled && plainMessageDraft
+      ? t(primarySubmitMode === 'steer' ? 'input.send.steer' : 'input.send.queue')
+      : t('input.send')
   const onPrimary = (): void => {
     if (primaryStops) {
       stop?.()
       return
     }
-    if (inputActions === undefined) return // absent machine: the button is disabled
-    /* v8 ignore next -- defensive: the primary button is disabled while empty||disabled, so a click cannot reach the false arm. */
-    if (!empty && !disabled && !machineBusy && !documentsPending) inputActions.submit()
+    if (keyboard === undefined) return // absent machine: the button is disabled
+    /* v8 ignore next -- the primary button is disabled for empty, unavailable, and pending-upload states. */
+    if (!primaryDisabled) keyboard.submit(primarySubmitMode)
   }
 
   // The Access seat: the projection-fed permission chip (renders nothing
@@ -1018,7 +1026,7 @@ export const InputBar = memo(function InputBar({
             })}
             <ContextMeter useProjection={useProjection} t={t} />
             {interruptible && (
-              <Tooltip label={t('input.stop')} side="top" delayMs={500}>
+              <Tooltip label={t('input.stop')} side="top" delayMs={500} disabled={stop === undefined}>
                 <button
                   type="button"
                   className={css.primary}
@@ -1033,12 +1041,12 @@ export const InputBar = memo(function InputBar({
                 </button>
               </Tooltip>
             )}
-            <Tooltip label={primaryLabel} side="top" delayMs={500}>
+            <Tooltip label={primaryLabel} side="top" delayMs={500} disabled={primaryDisabled}>
               <button
                 type="button"
                 className={css.primary}
                 aria-label={primaryLabel}
-                disabled={primaryStops ? stop === undefined : empty || disabled || machineBusy || documentsPending}
+                disabled={primaryDisabled}
                 onMouseDown={keepFocus}
                 onClick={onPrimary}
               >

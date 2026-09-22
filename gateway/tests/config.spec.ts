@@ -221,6 +221,7 @@ describe('loadConfig', () => {
       'HGW_DATABASE_STARTUP_RETRY_INITIAL_MS',
       'HGW_DATABASE_STARTUP_RETRY_MAX_MS',
       'HGW_UPSTREAM_TIMEOUT_MS',
+      'HGW_ACCESS_INVALIDATION_POLL_MS',
       'HGW_READINESS_TIMEOUT_MS',
     ]) {
       expect(() => loadConfig({ [variable]: String(MAX_TIMER_DELAY_MS + 1) }))

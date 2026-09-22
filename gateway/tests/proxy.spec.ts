@@ -17,6 +17,7 @@ import { createProxyHandlers } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
+import { barrier } from './barrier.ts'
 
 // Resolve from a real cwd path (not import.meta.url, which is a virtual URL
 // under vitest) so the absolute ws path stays requireable by the plain-node child.
@@ -201,6 +202,31 @@ describe('proxy handlers', () => {
     expect(response.status).toBe(302)
     await closed
     expect((await fetch(`${base}/api/echo`, { headers: { cookie } })).status).toBe(401)
+  })
+
+  it('rechecks a login revoked while runtime admission is waiting', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const admitted = barrier()
+    const release = barrier()
+    const original = deps.instances.operationRef!.bind(deps.instances)
+    deps.instances.operationRef = async (target, delta, generation) => {
+      await original(target, delta, generation)
+      if (delta === 1) {
+        admitted.resolve()
+        await release.promise
+      }
+    }
+    const response = fetch(`${base}/api/echo`, { headers: { cookie } })
+    try {
+      await admitted.promise
+      await deps.auth.revoke(cookie.slice('hgw_session='.length))
+      release.resolve()
+      expect((await response).status).toBe(403)
+    } finally {
+      release.resolve()
+      await response
+    }
   })
 
   it('invalidates only matching targets and terminates in-flight HTTP bodies', async () => {

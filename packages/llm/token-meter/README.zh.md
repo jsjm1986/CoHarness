@@ -6,7 +6,7 @@
 
 ## 概述
 
-使用 `ctx.tokenMeter` 估算会话当前的请求与上下文压力，或为单条消息计价。测量会回放持久会话日志，结果确定且不进行模型调用，因此压缩、占用显示与遥测可以共享同一结果。会话投影可用时，消费方可以读取 `tokenUsage`、`contextPressure` 与 `contextBreakdown`；文本和没有图片定价的路由采用近似的固定启发式规则，存在声明时应用视觉 token 定价，文件则按模型可见的句柄文本计价。只有请求 envelope 完全相同时才复用提供方报告的用量；本包不添加模型可见内容，也不在 loop 中做决策。
+使用 `ctx.tokenMeter` 估算会话当前的请求与上下文压力，或为单条消息计价。测量会在当前模型路由与执行环境下回放持久会话日志，不进行模型调用。会话投影可用时，消费方可以读取 `tokenUsage`、`contextPressure` 与 `contextBreakdown`；文本和没有图片定价的路由采用近似的固定启发式规则，存在声明时应用视觉 token 定价，挂载 LLM（大语言模型）服务时文件按当前模型可见的句柄文本计价。只有请求 envelope 完全相同时才复用提供方报告的用量；本包不添加模型可见内容，也不在 loop 中做决策。
 
 ## 配置
 
@@ -19,7 +19,9 @@
 - `measure(session, requestHeader?)` 在同一个已消费日志 revision 上返回请求压力与当前已计价表层。
 - `estimateMessage(message)` 使用固定启发式规则为一条消息计价。
 
-`measure()` 会同步一次，并返回一个独立且深度不可变的快照。`totalTokens` 是请求与响应压力，`surfaceTokens` 是仅表层启发式总量，等于 `nodes[].tokens` 之和。`requestHeader` 覆盖只影响压力字段；表层字段仍描述当前会话。每次调用都会克隆带位置的节点，因此测量是 O(surface)。
+`measure()` 会同步一次，并返回一个独立且深度不可变的快照。`totalTokens` 是请求与响应压力，`surfaceTokens` 是按请求时附件表示计价的当前表层总量，等于 `nodes[].tokens` 之和。`requestHeader` 覆盖会改变压力与路由拥有的图片计价；节点集合仍描述当前会话。每次调用都会克隆带位置的节点，因此测量是 O(surface)。
+
+每次测量都通过 `ctx.llm.fileRequestText()` 为每个文件出现位置计价，包括工具结果中的嵌套文件。当前表层与其用量锚点使用相同的执行环境路径映射；路径不可用时采用 LLM 服务的说明性句柄。未挂载该服务时，文件引用保留结构启发式价格。`nodes[].heuristicTokens` 始终保留固定的引用价格，供持久投影和压缩遮蔽计数消费方使用。[文件计价决定](../../../.agents/notes/implemented/bug-fix/2026-09-22-token-meter-file-request-pricing.zh.md) 解释了为何不在日志中缓存路径及其价格。
 
 fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成功 assistant 消息、提供方用量，以及每条 assistant 消息引用的分片 seq。只有当最新成功调用的规范请求 envelope 与已测量 envelope 匹配，且其总量不低于该调用的完整启发式锚点时，才会复用提供方用量；后续成功会替换较早锚点。否则会对当前 envelope 与表层进行完整估算。表层变更保持相对于匹配锚点的带符号值，包括缩减替换后的负 delta。
 
@@ -33,9 +35,9 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 `contextPressure` 携带可选的 `pressureTokens`（提供方报告的最新提示词规模，为未缓存输入加缓存读取与写入之和）、可选的 `projectedTokens`，以及来自最新一条 `request/context` 记录的可选 `contextWindow`。提供方报告用量前两个数字都保持缺失；路由适配器未公布容量时容量也保持缺失。输出不计入其中，因此轮次流式输出期间 `pressureTokens` 保持不动，等到下一个请求报告用量时才前进。
 
-`projectedTokens` 是「下一个请求的提示词要花多少」：在该样本之上，加上自取样以来表层增减部分的启发式重新计价，下界钳制为零，折叠走的是测量服务重放的同一份 `surface-fold.ts`。只有增量部分是估算的，因此这个数字既锚定在提供方读数上，又能在内容落地——或压缩遮蔽一段区间——的瞬间做出反应。最后这种情况正是该字段存在的理由：压缩通过直连的 `ctx.llm.stream()` 调用生成摘要，自身不追加任何用量，所以仅凭 `pressureTokens` 会一直报告压缩前的提示词规模，直到再完成一整个轮次为止。占用率展示读取 `projectedTokens`。
+`projectedTokens` 估算下一个请求的提示词规模：在该样本之上，加上自取样以来表层增减部分的固定启发式价格，下界钳制为零。其有界投影通过 `surface-projection.ts` 消费持久追加与遮蔽价格记录，不解析请求时文件路径或图片价格。只有增量部分是估算的，因此这个数字既锚定在提供方读数上，又能在内容落地或压缩遮蔽区间时做出反应。压缩通过直连的 `ctx.llm.stream()` 调用生成摘要，自身不追加任何用量，所以仅凭 `pressureTokens` 会一直报告压缩前的提示词规模，直到再完成一轮为止。占用率展示读取 `projectedTokens`。
 
-`contextBreakdown` 携带启发式的 `systemTokens`、`toolsTokens` 与 `messageTokens`，描述上下文的组成而非提供方计费规模。envelope 数字在每条 `request/header` 上按后者胜重新计价；消息数字重放 `surface-fold.ts`——也就是 `measure()` 运行的同一个带位置 fold——因此它在每个事件边界上都等于 `measure().surfaceTokens`，压缩会像缩小下一个请求那样缩小它。三个数字都使用测量服务的固定启发式规则，属于估算值：它们加起来不等于 `projectedTokens`——后者的提供方锚点所体现的恰好是这些明细行仍然带着的误差（按「4 字符 ≈ 1 token」计价，CJK 文本与 JSON schema 会被严重低估）。请把它们当作近似的**组成**呈现，而不是总量。
+`contextBreakdown` 携带固定启发式的 `systemTokens`、`toolsTokens` 与 `messageTokens`，描述上下文的组成而非提供方计费规模。envelope 数字在每条 `request/header` 上按后者胜重新计价；消息价格遵循持久表层追加与遮蔽计数。附件引用保留结构价格，因此这些数字可以不同于解析当前文件句柄和路由图片价格的 `measure().surfaceTokens`。三个数字均为估算值，合计不必等于 `projectedTokens`；每个 token 按四个字符估算可能低估 CJK 文本和 JSON schema。请把它们当作近似的组成呈现，而不是总量。
 
 浏览器安全的 `deriveTurnTokenUsage()` fold 只聚合已完成轮次中完整且持久记录的模型 attempt。所有必填字段存在时它会保留精确总量和路由归因；生命周期不完整或记账矛盾时返回空值，不显示 disclosure。
 
@@ -56,7 +58,7 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 - name: '@deepseek-ai/dsh-compaction-basic'
 ```
 
-两个插件都有可用默认值。meter 保持与模型路由和可选压缩无关。部署会在 LLM（大语言模型）适配器上配置容量，并在 `dsh-compaction-basic` 上配置压缩策略。
+两个插件都有可用默认值。meter 保持与模型路由和可选压缩无关。部署会在 LLM 适配器上配置容量，并在 `dsh-compaction-basic` 上配置压缩策略。
 
 ## 不变量
 

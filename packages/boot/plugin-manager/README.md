@@ -45,10 +45,13 @@ A plugin toggle updates only `disabled` in the last matching override in the pro
 
 When pnpm 11 blocks dependency scripts, the failed installation reports every pending package name in the profile under `pendingBuilds`, including names left by earlier attempts; a failed run restores `package.json` and `pnpm-lock.yaml` but deliberately not `pnpm-workspace.yaml`, where pnpm records them. The Web plugin page offers **Allow these scripts and retry**; the tool can grant permission on the user's behalf through `approvedBuilds` on `install_bundle`, after the user approves those scripts in the conversation. The service validates pending names; it does not verify conversation approval. Approval persists by package name in this profile, permits commands with the host user's permissions, and survives another installation failure. Only currently undecided names can be approved; existing denials and wildcard rules cannot be overridden through this action. Approval rejects YAML anchors or aliases inside `allowBuilds`. Retry preserves the original activation choice.
 
+Gateway-managed runtimes recheck administrator authority before every service operation; tool approval and Full access do not grant this authority. `authorization: required` rejects operations while the authorization provider is unavailable; independent local profiles default to `local`. The Gateway policy is rechecked inside the persistent writer lock and configuration queue, so revoked authority cannot use queued writes. Bundle patches cannot replace or disable protected deployment plugins or their owning entries.
+
 ### Configuration
 
 | Field | Default | Meaning |
 |---|---|---|
+| `authorization` | `local` | `required` demands a deployment authorization provider; the Gateway fixes this mode and supplies fresh administrator checks. |
 | `pnpmCommand` | `pnpm` | The pnpm executable name or path, resolved through `PATH` like the `dsh plugin` command. |
 | `inspectTimeoutMs` | `20000` | Bound on one registry lookup an inspection runs, in milliseconds. |
 | `outputBytes` | `16384` | Maximum pnpm diagnostic bytes returned per operation; the full output remains in the returned log path. |

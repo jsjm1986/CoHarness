@@ -18,6 +18,8 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 本包还通过 `ToolDetails` 填充 `conversation.details.tool`。行 renderer 与详情 renderer 共用同一组面向 `terminal`、`read`、`diff`、`search` 和 `web` render intent 的纯 card model。已完成的 ask-user 调用使用经过校验、可读的问题／回答卡片；混合或格式错误的结果块会回退为完整的通用输出。未知的 intent 标签和格式错误的 wire card 数据都会回退为压平的工具结果文本。
 
+文件修改行在折叠时保留 `+A -R` 计数。摘要与展开卡片共用 `ui-primitives.diffTotals` 的有界比较，显式摘要后缀或失败信息仍具有优先权。
+
 通用行把已知工具名称归类为 search、read、shell、write、edit、code 或 generic 变体。运行中、成功、失败和中断状态只来自冻结的 call/result slice。只有用户调用 Host 打开文件回调时，文件路径才相对会话 `cwd` 解析；展示代码不读取会话服务。
 
 携带 `AUTO_REVIEW_DENIED` 的原生或 PTC 分发失败优先于 keyed 专用视图：通用行在折叠摘要中标识 Auto review，省略从未执行的参数，展开后显示一条归一化的未执行原因——去除首尾空白并把行分隔符折叠为空格，缺失或全空白时使用本地化回退文案。Session 与 SDK 中的结构化错误仍保留原始 reason。

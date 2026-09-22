@@ -165,7 +165,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28], current: 28 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29], current: 29 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -181,7 +181,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 28 })
+      .toEqual({ applied: [], current: 29 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -240,6 +240,75 @@ describePg('PostgreSQL baseline', () => {
   }, 60_000)
 
   afterAll(async () => { await pool?.end() })
+
+  it('rechecks plugin management authority through HTTP after PostgreSQL revocation', async () => {
+    const suffix = randomUUID()
+    const profileSlug = `profile-management-${suffix}`
+    const organization = await pool.query<{ id: string }>(
+      `INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Profile tests') RETURNING id`, [profileSlug])
+    const profileOrganizationId = organization.rows[0]!.id
+    const inserted = await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(
+      organization_id,username,display_name,home_path
+    ) VALUES($1,$2,'Profile administrator','/tmp/profile-admin') RETURNING id,public_id`,
+    [profileOrganizationId, `profile-admin-${suffix}`])
+    const administrator = inserted.rows[0]!
+    const publicId = Number(administrator.public_id)
+    await pool.query(`INSERT INTO harness.memberships(organization_id,user_id,role,status)
+      VALUES($1,$2,'admin','active')`, [profileOrganizationId, administrator.id])
+    const nodeName = `profile-admin-${suffix}`
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)`,
+      [profileOrganizationId, nodeName])
+    const context = await resolvePostgresRuntimeContext(pool, profileSlug, nodeName)
+    const instances = new PostgresInstanceRepository(context, 47000)
+    await instances.initialize(true)
+    const runtimeToken = randomUUID()
+    const target = { kind: 'user' as const, id: publicId }
+    const generation = await instances.beginStart(target, Date.now(),
+      createHash('sha256').update(runtimeToken).digest())
+    const { privateKey } = generateKeyPairSync('ed25519')
+    const principals = new GatewayPrincipalSigner(privateKey, profileSlug, 60_000)
+    const assertion = principals.issue({
+      user: { id: publicId, username: `profile-admin-${suffix}`, displayName: 'Profile administrator',
+        role: 'admin', status: 'active', mustChangePassword: false, homePath: '/tmp/profile-admin' },
+      scope: { kind: 'personal' }, runtime: { ...target, generation },
+    })
+    const runtime = await serveRuntime(createRuntimeApiHandler({
+      context, instances, principals,
+      conversations: new ConversationRepository(pool),
+      collaboration: new PostgresCollaborationService(context),
+      governance: { resolveOrganizationCredential: async () => null },
+    }))
+    const authorize = async (token: string = runtimeToken, principal: string | null = assertion): Promise<number> => {
+      const response = await fetch(`${runtime.base}/internal/runtime/plugin-management/authorize`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}`,
+          ...(principal === null ? {} : { [PRINCIPAL_HEADER]: principal }) },
+      })
+      await response.arrayBuffer()
+      return response.status
+    }
+    try {
+      expect(await authorize()).toBe(204)
+      expect(await authorize('wrong-runtime')).toBe(401)
+      expect(await authorize(runtimeToken, null)).toBe(403)
+      await pool.query(`UPDATE harness.memberships SET role='member'
+        WHERE organization_id=$1 AND user_id=$2`, [profileOrganizationId, administrator.id])
+      expect(await authorize()).toBe(403)
+      await pool.query(`UPDATE harness.memberships SET role='admin',status='disabled'
+        WHERE organization_id=$1 AND user_id=$2`, [profileOrganizationId, administrator.id])
+      expect(await authorize()).toBe(401)
+      await pool.query(`UPDATE harness.memberships SET status='active'
+        WHERE organization_id=$1 AND user_id=$2`, [profileOrganizationId, administrator.id])
+      expect(await authorize()).toBe(204)
+      await pool.query(`UPDATE harness.organizations SET status='disabled' WHERE id=$1`, [profileOrganizationId])
+      expect(await authorize()).toBe(403)
+      await pool.query(`UPDATE harness.organizations SET status='active' WHERE id=$1`, [profileOrganizationId])
+      expect(await authorize()).toBe(204)
+      await pool.query(`UPDATE harness.users SET status='disabled' WHERE id=$1`, [administrator.id])
+      expect(await authorize()).toBe(401)
+    } finally {
+      await runtime.close()
+    }
+  })
 
   it('rejects changed or unknown applied migrations', async () => {
     const original = await pool.query<{ name: string; checksum: string }>(

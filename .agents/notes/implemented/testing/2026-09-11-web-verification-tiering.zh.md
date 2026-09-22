@@ -12,7 +12,9 @@ Status: implemented
 
 `scripts/web-test-policy.json`（版本 1）把浏览器表面划分为八个业务组：shell、conversation、workbench、documents、settings、subagent、mobile、lifecycle。`scenarios` 的键是相对于 `apps/web/tests/` 的路径——递归发现的每个 `*.e2e.ts` 与 `*.snapshot.ts` 文件（`snapshots/` 除外）恰好映射到一个组；浏览器渲染包映射到一个组、多个组或 `all`，组列表内出现 `all` 会被拒绝，须改用裸字符串。映射与磁盘之间的双射由 `scripts/web-test-policy.spec.ts` 强制执行。
 
-`scripts/ci-pr-scope.ts` 把 `snapshot_mode` 扩展为 `skip | scoped | focused | full`。`scoped` 保留无键 ACP/CLI 快照且不做浏览器工作；`focused` 追加变更浏览器包、场景文件与被引用 golden 各自所属的组，外加始终存在的 smoke 集（vite-entry、shipped-composition、scaffold-hermetic、cold-blank-session、built-boot）；`full` 追加完整库存。在 `apps/web/tests/` 下，场景文件路由到所属组，签入的 golden 路由到属主扫描归属于其目录的全部场景所在组，inert 文档不产生任何贡献；没有任何场景引用的 golden 目录与场景表之外的共享 fixture 回退到 `full`。完整触发条件是已证实的可达性：Web 应用源码、public 与 stress 树，client runtime/connection/modules/web（Loader）、`packages/api/`、extensions、Typert、apiproxy fetch 载体、依赖与锁文件编辑、Web lane 基础设施文件，以及分类器已证无关类别之外的任何路径。未映射的浏览器渲染包回退到 `full`，因此策略缺口永远不会静默跳过验证。
+`scripts/ci-pr-scope.ts` 把 `snapshot_mode` 扩展为 `skip | scoped | focused | full`。`scoped` 保留无键 ACP/CLI 快照且不做浏览器工作；`focused` 追加变更浏览器包、场景文件与被引用 golden 各自所属的组，外加始终存在的 smoke 集（vite-entry、shipped-composition、scaffold-hermetic、cold-blank-session、built-boot）；`full` 追加完整库存。在 `apps/web/tests/` 下，场景文件路由到所属组，签入的 golden 路由到属主扫描归属于其目录的全部场景所在组，inert 文档不产生任何贡献；没有任何场景引用的 golden 目录与未分类的 Web 测试输入回退到 `full`。完整触发条件是已证实的可达性：Web 应用源码、public 与 stress 树，client runtime/connection/modules/web（Loader）、`packages/api/`、extensions、Typert、apiproxy fetch 载体、依赖与锁文件编辑、Web lane 基础设施文件，以及分类器已证无关类别之外的任何路径。未映射的浏览器渲染包回退到 `full`，因此策略缺口永远不会静默跳过验证。
+
+`sharedInputs` 将精确的仓库相对 fixture 或配置文件路径映射到全部消费它的浏览器场景。政策加载拒绝缺失文件、未知属主、重复或空属主列表及非相对路径。这些关系先于浏览器无关目录规则生效，依赖和完整库存规则仍保持优先。共享输入选择全部属主组和共同 smoke 集；已登记的 Markdown 输入不能进入仅文档路径。无关 examples 保持既有选择。
 
 浏览器 lane 从 `node-24-consumers` 移入始终存在的专用 `web-verification` PR job，固定检查名 `web verification` 使分支保护可以要求它；所选层级与组写入 job 摘要。`skip`/`scoped` 记录选择原因并直接通过；`focused` 以两个 worker 重放所选组；`full` 重放完整库存。无键 consumer 聚合在 `scoped`、`focused`、`full` 三种模式下完全相同，master/nightly 的 web-snapshot-sweep 工作流在每次合并后仍然重放完整库存。
 

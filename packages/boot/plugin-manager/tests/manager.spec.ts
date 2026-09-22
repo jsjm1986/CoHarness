@@ -63,6 +63,73 @@ async function fixture(reload: 'live' | 'startup' = 'live', overlay = false, pre
   return { ctx, dir, manager: ctx.pluginManager, bundle, profile, stopHmr, overlays }
 }
 
+it('requires deployment authorization before exposing a managed profile', async () => {
+  const authorize = vi.fn(async () => { throw new Error('administrator required') })
+  const { manager } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { authorize, protectedModules: new Set<string>() })
+  }, { authorization: 'required' })
+  await expect(manager.listPlugins()).rejects.toThrow('administrator required')
+  expect(authorize).toHaveBeenCalledOnce()
+})
+
+it('fails closed when a required deployment authority is unavailable', async () => {
+  const { manager } = await fixture('startup', false, undefined, { authorization: 'required' })
+  await expect(manager.listPlugins()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+})
+
+it('rejects every management entry before profile mutation when deployment authority denies', async () => {
+  const { manager, dir } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => { throw new Error('administrator required') },
+    })
+  }, { authorization: 'required' })
+  const profileFiles = () => ['package.json', 'pnpm-workspace.yaml', 'cordis.patch.yml'].map((name) => {
+    const path = join(dir, name)
+    return existsSync(path) ? readFileSync(path, 'utf8') : undefined
+  })
+  const before = profileFiles()
+  const operations = [
+    () => manager.listPlugins(), () => manager.listBundles(), () => manager.inspect('bundle'),
+    () => manager.setPluginEnabled('include:managed' as Parameters<PluginManager['setPluginEnabled']>[0], false),
+    () => manager.setBundleEnabled('extra', false), () => manager.installBundle('bundle'),
+    () => manager.cancelInstall('unstarted' as PluginInstallRequestId), () => manager.removeBundle('extra'),
+  ]
+  for (const operation of operations) await expect(operation()).rejects.toThrow('administrator required')
+  expect(profileFiles()).toEqual(before)
+})
+
+it('refuses a bundle that replaces a protected entry or overrides its owner', async () => {
+  const { manager, dir, bundle, ctx } = await fixture()
+  const owner = ctx.loader.resolve('include:manager').fiber
+  for (const patch of [{ id: 'manager', disabled: true }, { id: 'include', disabled: true },
+    { insert: [{ id: 'manager', name: './plugin.mjs' }] }]) {
+    bundle('replacement', [])
+    writeFileSync(join(dir, 'node_modules', 'replacement', 'cordis.patch.yml'), JSON.stringify([patch]))
+    expect(await manager.setBundleEnabled('replacement', true)).toMatchObject({
+      changed: false, application: 'failed', error: { code: 'management-required' },
+    })
+    expect(ctx.loader.resolve('include:manager').fiber === owner).toBe(true)
+    expect(readProfileManifest('test', dir).dsh?.profile?.bundles).not.toContain('replacement')
+  }
+})
+
+it('protects deployment policy modules from profile toggles and bundle removal', async () => {
+  const modules = new Set<string>()
+  const { manager, dir } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { protectedModules: modules, authorize: async () => {} })
+  }, { authorization: 'required' })
+  modules.add(pathToFileURL(join(dir, 'node_modules', 'extra', 'plugin.mjs')).href)
+  const entry = (await manager.listPlugins()).find(row => row.entryId === 'include:managed')!
+  expect(entry.readOnlyReason).toBe('management-required')
+  expect(await manager.setPluginEnabled(entry.entryId, false)).toMatchObject({
+    changed: false, application: 'failed', error: { code: 'management-required' },
+  })
+  expect(await manager.setBundleEnabled('extra', false)).toMatchObject({
+    changed: false, application: 'failed', error: { code: 'management-required' },
+  })
+  expect(await manager.removeBundle('extra')).toMatchObject({ changed: false, application: 'failed' })
+})
+
 it('lists bundle versions and current-profile plugin targets', async () => {
   const { manager, dir } = await fixture()
   const plugins = await manager.listPlugins()

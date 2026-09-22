@@ -98,6 +98,15 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Keep change counts readable beside a truncated path. */
+.diffStat {
+  margin-left: 10px;
+  font-family: var(--ds-font-family-code);
+  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 2px);
+  color: var(--dsw-alias-label-caption);
+  transform: translateY(0.5px);
+}
+
 /* File-tool path: same geometry as .summary, with a persistent link affordance. */
 .fileLink {
   flex: 1 1 auto;

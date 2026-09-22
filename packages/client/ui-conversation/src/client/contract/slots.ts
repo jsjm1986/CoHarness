@@ -22,7 +22,7 @@ import type {
 import type { createConversationViewportStore } from '../viewport.ts'
 import type { createChatStore } from '../stores.ts'
 import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
-import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
+import type { BusyEnterBehavior } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { ToolCallId, SelectionTarget, ViewTab } from './views.ts'
 
@@ -647,12 +647,6 @@ export interface ComposerBarInjected {
   retryDocument: ((id: DraftDocumentId) => void) | undefined
   /** Resolve ordered input ids to browser-owned draft images. */
   draftImages: ((ids: readonly DraftAttachmentId[]) => readonly ComposerAttachment[]) | undefined
-  /** Resolve one keyboard submission gesture against the current running state and persisted preference. */
-  resolveSubmitMode: (
-    running: boolean,
-    gesture: ComposerSubmitGesture,
-    steeringAvailable: boolean,
-  ) => InputSubmitMode
   /** Toggle the shared slash menu with only its command source; absent without ui-input-trigger or a session. */
   toggleCommandMenu: ((selection: EditSelection) => void) | undefined
   /** Cancel the in-flight turn; absent with the session. */
@@ -670,6 +664,8 @@ export interface ComposerBarInjected {
    * order stays constant).
    */
   hooks: {
+    /** Account preference used by Enter and the primary Send button. */
+    busyEnter: ObservableSnapshot<BusyEnterBehavior>
     /** Latest surfaced notice (null after none; seq keys re-render of repeats). */
     notices: ObservableSnapshot<InputNotice | null>
     /** Hot plain-text reference lexicon for the decoration scan (plain-text-reference decision;

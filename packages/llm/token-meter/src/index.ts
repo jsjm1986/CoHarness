@@ -7,7 +7,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { assembleAssistantStream, deepFreeze } from '@deepseek-ai/dsh-llm'
-import type { Message, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { LlmRuntime, Message, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type {
   EpochHeader,
@@ -120,9 +120,10 @@ export class TokenMeter extends Service {
    * that call's full heuristic anchor; otherwise the complete envelope and
    * surface are heuristically repriced.
    *
-   * `requestHeader` affects request pressure only; surface fields always
-   * describe the current session surface. Every call clones those positional
-   * nodes, so measurement is O(surface).
+   * `requestHeader` affects pressure and route-owned image pricing; the node
+   * set always describes the current session. File handles resolve in the
+   * current execution environment for both the surface and its anchor.
+   * Every call clones those positional nodes, so measurement is O(surface).
    *
    * @param session - session to replay through its current durable tail.
    * @param requestHeader - optional effective request envelope replacing the latest logged header.
@@ -135,7 +136,8 @@ export class TokenMeter extends Service {
       : canonicalHeader(requestHeader)
     const anchor = state.anchor
     const pricing = this._routeImagePricing(header)
-    const priced = priceSurface(state.surface, pricing)
+    const fileText = this._fileRequestText()
+    const priced = priceSurface(state.surface, pricing, fileText)
 
     let baseline: TokenMeasurementBaseline
     let surfaceDeltaTokens: number
@@ -143,7 +145,7 @@ export class TokenMeter extends Service {
       // Matching headers share one route, so the anchored snapshot reprices
       // under the same pricing as the current surface and the signed delta
       // compares like with like.
-      const anchorSurfaceTokens = priceSurface(anchor.nodes, pricing).surfaceTokens
+      const anchorSurfaceTokens = priceSurface(anchor.nodes, pricing, fileText).surfaceTokens
         + anchor.assistantTokens
       const estimatedAnchorTokens = estimateToolsTokens(header) + anchorSurfaceTokens
       const usage = anchor.usage
@@ -179,6 +181,12 @@ export class TokenMeter extends Service {
     const config = header?.config
     if (config === undefined) return undefined
     return this.ctx.get('llm')?.imageRequestPricing(config.provider, config.model)
+  }
+
+  /** Resolve the current execution-world file representation without caching its path. */
+  private _fileRequestText(): ((ref: Parameters<LlmRuntime['fileRequestText']>[0]) => string) | undefined {
+    const llm = this.ctx.get('llm')
+    return llm === undefined ? undefined : ref => llm.fileRequestText(ref)
   }
 
   /**

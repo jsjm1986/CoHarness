@@ -243,14 +243,22 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
 /**
  * Project-scope Remote methods whose wire arguments carry no Session identity
  * because only the owning service's registry can resolve it. The service
- * enforces the per-Session ACL itself; this table only admits the call after
- * principal capture has verified project membership.
+ * enforces its Session ACL or deployment management policy itself; this table
+ * only admits the call after principal capture has verified project membership.
  */
 const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',
   'dynamicCordisRunner/syncInspectManifest',
   'agentPresets/list',
+  'pluginManager/listPlugins',
+  'pluginManager/listBundles',
+  'pluginManager/inspect',
+  'pluginManager/setPluginEnabled',
+  'pluginManager/setBundleEnabled',
+  'pluginManager/installBundle',
+  'pluginManager/cancelInstall',
+  'pluginManager/removeBundle',
 ])
 
 /**
@@ -729,20 +737,32 @@ class FrameQueue<F extends RpcRequest<{ type: string }>> {
     this.waiter?.()
   }
 
-  async *iterate(signal: AbortSignal, cleanup: () => void): AsyncGenerator<F> {
+  async *iterate(
+    signal: AbortSignal,
+    cleanup: () => void,
+    authorizeBatch?: (items: readonly F[]) => Promise<readonly F[]>,
+  ): AsyncGenerator<F> {
     const onAbort = (): void => { this.end() }
+    const isAborted = (): boolean => signal.aborted
     signal.addEventListener('abort', onAbort, { once: true })
     try {
       while (true) {
-        while (this.head < this.buffer.length) {
-          const next = this.buffer[this.head] as { item: F; bytes: number }
-          this.head++
-          this.bufferedBytes -= next.bytes
-          yield next.item
+        if (isAborted()) return
+        if (this.head < this.buffer.length) {
+          const batch = this.buffer.slice(this.head).map(entry => entry.item)
+          this.buffer = []
+          this.head = 0
+          this.bufferedBytes = 0
+          const allowed = authorizeBatch === undefined ? batch : await authorizeBatch(batch)
+          for (const item of allowed) {
+            if (isAborted()) return
+            yield item
+          }
+          continue
         }
         this.buffer = []
         this.head = 0
-        if (this.done || signal.aborted) return
+        if (this.done || isAborted()) return
         await new Promise<void>((resolve) => { this.waiter = resolve })
         this.waiter = undefined
       }
@@ -816,7 +836,6 @@ function createSessionReadTracker(
   const readable = new Set<SessionId>()
   const pending = new Map<SessionId, Promise<boolean>>()
   const ensureReadable = (sessionId: SessionId): Promise<boolean> => {
-    if (readable.has(sessionId)) return Promise.resolve(true)
     if (authority === undefined) {
       readable.add(sessionId)
       return Promise.resolve(true)
@@ -826,6 +845,7 @@ function createSessionReadTracker(
     const check = authority.readableSessionIds([sessionId]).then((ids) => {
       const allowed = ids.has(sessionId)
       if (allowed) readable.add(sessionId)
+      else readable.delete(sessionId)
       return allowed
     }, (error: unknown) => {
       fail(error)
@@ -837,6 +857,52 @@ function createSessionReadTracker(
     return check
   }
   return { readable, ensureReadable }
+}
+
+/** Recheck the bounded publication batch, including frames queued before a revocation. */
+function authorizeReadBatch<F extends MuxFrame | HostFrame>(
+  authority: CollaborationAuthority | undefined,
+  fail: (error: unknown) => void,
+): ((items: readonly RpcRequest<F>[]) => Promise<readonly RpcRequest<F>[]>) | undefined {
+  if (authority === undefined) return undefined
+  return async (items) => {
+    const sessionIds = new Set<SessionId>()
+    for (const { payload } of items) {
+      if ('sessionId' in payload) sessionIds.add(payload.sessionId)
+      if (payload.type === 'host/workspace-changed') {
+        for (const id of payload.workspace.sessionIds) sessionIds.add(id)
+      }
+      if (payload.type === 'host/archived-sessions-changed') {
+        for (const id of payload.archivedSessionIds) sessionIds.add(id)
+      }
+      if (payload.type === 'host/remote-event' && payload.event === 'agent-preset/selected') {
+        sessionIds.add(payload.args[0] as SessionId)
+      }
+    }
+    if (sessionIds.size === 0) return items
+    let allowed: ReadonlySet<SessionId>
+    try {
+      allowed = await authority.readableSessionIds([...sessionIds])
+    } catch (error: unknown) {
+      fail(error)
+      return []
+    }
+    return items.flatMap((item): RpcRequest<F>[] => {
+      const payload = item.payload
+      if ('sessionId' in payload && !allowed.has(payload.sessionId)) return []
+      if (payload.type === 'host/remote-event' && payload.event === 'agent-preset/selected'
+        && !allowed.has(payload.args[0] as SessionId)) return []
+      if (payload.type === 'host/workspace-changed') {
+        return [{ ...item, payload: { ...payload, workspace: {
+          ...payload.workspace, sessionIds: payload.workspace.sessionIds.filter(id => allowed.has(id)),
+        } } }]
+      }
+      if (payload.type === 'host/archived-sessions-changed') {
+        return [{ ...item, payload: { ...payload, archivedSessionIds: payload.archivedSessionIds.filter(id => allowed.has(id)) } }]
+      }
+      return [item]
+    })
+  }
 }
 
 /**
@@ -5259,6 +5325,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const { readable, ensureReadable } = createSessionReadTracker(authority, fail)
 
           const publishFor = (sessionId: SessionId, deliver: () => void): void => {
+            // Materialize observed events before mutable producer state advances.
+            // The publication batch owns the current Session access check.
             if (readable.has(sessionId)) {
               deliver()
               return
@@ -5448,7 +5516,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           yield* queue.iterate(streamSignal, () => {
             cleanup()
-          })
+          }, authorizeReadBatch<MuxFrame>(authority, fail))
         })())
       },
 
@@ -5542,14 +5610,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               publish(() => {
                 if (readable.has(agent.id)) {
                   queue.push(frame({ type: 'host/session-status', sessionId: agent.id, running: status === 'running' }))
+                  return
                 }
+                void ensureReadable(agent.id).then((allowed) => { if (allowed) {
+                  queue.push(frame({ type: 'host/session-status', sessionId: agent.id, running: status === 'running' }))
+                } })
               })
             }),
             ctx.on('agent/error', ({ agent, error }: { agent: Agent; error: unknown }) => {
               publish(() => {
                 if (readable.has(agent.id)) {
                   queue.push(frame({ type: 'host/agent-error', sessionId: agent.id, message: errorChain(error) }))
+                  return
                 }
+                void ensureReadable(agent.id).then((allowed) => { if (allowed) {
+                  queue.push(frame({ type: 'host/agent-error', sessionId: agent.id, message: errorChain(error) }))
+                } })
               })
             }),
             ctx.on('domain/changed', (change) => {
@@ -5610,10 +5686,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                     return
                   }
                   const sessionId = args[0] as SessionId
-                  if (readable.has(sessionId)) {
-                    queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
-                    return
-                  }
                   void ensureReadable(sessionId).then((allowed) => {
                     if (allowed) queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
                   })
@@ -5642,7 +5714,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             yield frame({ type: 'stream/error', error: collaborationRefusal(error, 'read') })
             return
           }
-          yield* queue.iterate(streamSignal, cleanup)
+          yield* queue.iterate(streamSignal, cleanup, authorizeReadBatch<HostFrame>(authority, fail))
         })())
       },
     },

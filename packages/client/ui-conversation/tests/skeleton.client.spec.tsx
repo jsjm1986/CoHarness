@@ -219,7 +219,7 @@ function mount(
           removeDocument={() => {}}
           retryDocument={() => {}}
           draftImages={() => []}
-          resolveSubmitMode={() => 'queue'}
+          useBusyEnter={bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue'))}
           toggleCommandMenu={vi.fn()}
           useNotices={bindSnapshotSelector(wiring.notices)}
           useLexicon={bindSnapshotSelector(wiring.lexicon)}

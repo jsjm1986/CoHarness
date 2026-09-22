@@ -212,6 +212,18 @@ export function classifyWebVerification(
   if (paths.length === 0) return FULL_WEB_VERIFICATION
   const groups = new Set<string>()
   for (const path of paths) {
+    if (policy.fullPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
+    if (DEPENDENCY_PATH.test(path)) return FULL_WEB_VERIFICATION
+    if (policy.webInfraPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
+    const owners = Object.hasOwn(policy.sharedInputs, path) ? policy.sharedInputs[path] : undefined
+    if (owners !== undefined) {
+      for (const owner of owners) {
+        const group = policy.scenarios[owner]
+        if (group === undefined) throw new Error(`web-test-policy: shared input ${JSON.stringify(path)} references unknown scenario ${JSON.stringify(owner)}.`)
+        groups.add(group)
+      }
+      continue
+    }
     if (path.startsWith(WEB_TESTS_ROOT)) {
       const route = routeWebTestPath(path, policy, goldenOwners)
       if (route === 'inert') continue
@@ -219,9 +231,6 @@ export function classifyWebVerification(
       for (const group of route) groups.add(group)
       continue
     }
-    if (policy.fullPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
-    if (DEPENDENCY_PATH.test(path)) return FULL_WEB_VERIFICATION
-    if (policy.webInfraPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
     const pkg = scopedPackage(path)
     if (pkg !== undefined) {
       if (!clientPackages.has(pkg)) continue
@@ -295,7 +304,8 @@ export function classifyCiPrScope(
 ): CiPrScope {
   const changedSourceFiles = paths.filter(path => /^packages\/[^/]+\/[^/]+\/src\//.test(path))
   const changedPackageFiles = paths.filter(path => path.endsWith('/package.json') || path === 'package.json' || path === 'pnpm-lock.yaml')
-  const inertOnly = paths.length > 0 && paths.every(isInertPath)
+  const sharedWebInput = paths.some(path => Object.hasOwn(policy.sharedInputs, path))
+  const inertOnly = !sharedWebInput && paths.length > 0 && paths.every(isInertPath)
   const fullRuntime = paths.some(isFullRuntimePath)
   const modelInput = paths.some(isModelInputPath)
   const reasons = consumerReasons(paths.filter(path => !isInertPath(path) || isModelInputPath(path)))
@@ -315,7 +325,7 @@ export function classifyCiPrScope(
   // SDK are provably outside their input domain; `scripts/**` is deliberately not
   // exempt, because it holds the gate runner every lane invokes and the fixture
   // generator the snapshot lane consumes.
-  const nodeLanesUnreachable = !modelInput && paths.length > 0
+  const nodeLanesUnreachable = !modelInput && !sharedWebInput && paths.length > 0
     && paths.every(path => isInertPath(path) || path.startsWith('python/') || path.startsWith(scopePolicy.adminUiPrefix))
   // The runtime wheel executes the TypeScript loop and Session protocol too.
   const pythonLanesReachable = reasons.python.length > 0 || paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
@@ -354,7 +364,7 @@ export function classifyCiPrScope(
   const removed = changedLines.filter(line => line.startsWith('-')).map(line => line.slice(1))
   const normalizedAdded = added.map(normalizeRef).sort()
   const normalizedRemoved = removed.map(normalizeRef).sort()
-  const actionOnly = paths.every(path => path.startsWith('.github/workflows/'))
+  const actionOnly = !sharedWebInput && paths.every(path => path.startsWith('.github/workflows/'))
     && added.length > 0
     && added.length === removed.length
     && [...added, ...removed].every(line => SETUP_USES.test(line))
