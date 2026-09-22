@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.md
-2026-09-22-cross-gateway-access-invalidation.md: b2063e49ddf47dce36fa7fd049c2be875fb9e4a3
-2026-09-22-cross-gateway-access-invalidation.zh.md: 78a1ccc449a6a81bfc8d06c804004b1de641dffd
+2026-09-22-cross-gateway-access-invalidation.md: 2b1641b2b93576f235432ef6670ba6c0267973bd
+2026-09-22-cross-gateway-access-invalidation.zh.md: 1219d939330bf4f8f310ec867b54530912537dd2

@@ -16,6 +16,8 @@ The [Gateway](../../../../gateway/README.md) records access changes in the exist
 
 The [API proxy](../../../../packages/host/apiproxy/README.md) deduplicates pending reads without retaining positive authorization indefinitely. Mux and Host publication batches recheck Session visibility before delivery, including buffered baselines and aggregate references. Cancellation discards buffered frames. Session operations retain their current per-operation authorization and directory containment rules.
 
+Gateway-owned selected-scope document responses share this monitor. Registration precedes authorization; it ends after response cleanup. Every matching listener starts cancellation before the monitor awaits runtime stops. Concurrent EOF and cancellation share one lease-release result, including failure, and a late response is cancelled even when its downstream already closed. Failed cleanup remains observable to subsequent synchronization, so a closed HTTP response alone cannot acknowledge the revision. Download cancellation leaves unrelated subjects, metadata, and ordinary upload registration unaffected.
+
 ## Alternatives considered
 
 **Publish a best-effort notification after the service call.** A crash between the commit and notification loses the revocation. Transactional triggers cover all writers of the same access rows.

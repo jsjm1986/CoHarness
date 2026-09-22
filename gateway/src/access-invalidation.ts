@@ -115,16 +115,25 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     console.error(`[gateway] access invalidation unavailable (${errorCodeForDiagnostics(error)})`)
   }
 
+  private async notify(subject: AccessInvalidationSubject): Promise<void> {
+    // Every transport sees cancellation before a slow runtime stop is awaited.
+    const settled = await Promise.allSettled([...this.listeners].map(async listener => { await listener(subject) }))
+    const errors: unknown[] = settled.flatMap(result => result.status === 'rejected' ? [result.reason as unknown] : [])
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, 'access invalidation did not settle')
+  }
+
   private disconnect(): void {
     const client = this.client
     if (client === undefined && this.cancelling) return
     this.client = undefined
     if (client !== undefined) client.release(true)
     this.cancelling = true
-    const pending = Promise.all([
-      this.cancellations,
-      ...[...this.listeners].map(async listener => { await listener({}) }),
-    ]).then(() => {})
+    const pending = (async () => {
+      const settled = await Promise.allSettled([this.cancellations, this.notify({})])
+      const failed = settled.find(result => result.status === 'rejected')
+      if (failed?.status === 'rejected') throw failed.reason
+    })()
     this.cancellations = pending
     void pending.finally(() => {
       if (this.cancellations === pending) this.cancelling = false
@@ -195,7 +204,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
       }
     }
     for (const subject of changes.values()) {
-      for (const listener of this.listeners) await listener(subject)
+      await this.notify(subject)
     }
     if (this.closed || this.client !== client) throw new Error('access invalidation listener disconnected')
     if (cursor > initial) {

@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto'
+import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
-import { createServer, type Server } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import WebSocket, { WebSocketServer } from 'ws'
 import { PostgresAccessMonitor, type AccessInvalidationSubject } from '../src/access-invalidation.ts'
 import { loadConfig } from '../src/config.ts'
+import { createGatewayDocumentScopeHandler, type GatewayDocumentScopeHandler } from '../src/document-transfer.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
@@ -18,6 +19,7 @@ import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import type { PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { createProxyHandlers } from '../src/proxy.ts'
+import { GatewayPrincipalSigner } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { barrier } from './barrier.ts'
 
@@ -38,7 +40,10 @@ async function listen(server: Server): Promise<string> {
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
 }
 
-async function fixture() {
+async function fixture(options: {
+  runtime?: (req: IncomingMessage, res: ServerResponse) => boolean
+  wrapDocumentScope?: (handler: GatewayDocumentScopeHandler) => GatewayDocumentScopeHandler
+} = {}) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-access-'))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const slug = randomUUID()
@@ -83,6 +88,7 @@ async function fixture() {
       VALUES($1,'project',$2,$3,'new upload',1,'text/plain',1,$4)`, [organizationId, projectId, randomUUID(), aliceId])
   }
   const runtime = createServer((req, res) => {
+    if (options.runtime?.(req, res) === true) return
     if (req.url?.startsWith('/api/hold')) { res.write('authorized-prefix'); return }
     if (req.url?.startsWith('/api/register-document')) {
       void registerDocument().then(() => { res.end('registered') }, () => { res.writeHead(500); res.end() })
@@ -101,6 +107,7 @@ async function fixture() {
     return new Promise<void>(resolveClose => { webSockets.close(() => { resolveClose() }) })
   })
   const port = Number(new URL(runtimeBase).port)
+  const principals = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, slug, 30_000)
   const gateways: Array<{
     base: string
     monitor: PostgresAccessMonitor
@@ -119,12 +126,18 @@ async function fixture() {
       instances: {
         portOf: async () => port, generationOf: async () => 1, stateOf: async () => 'ready',
         isLive: async () => true, touch: async () => {}, wsRef: async () => {},
+        operationRef: vi.fn<NonNullable<GatewayDeps['instances']['operationRef']>>(async () => {}),
         ensureRunning: async () => ({ port, generation: 1 }), reapIdle: async () => 0,
         stop, stopAll: async () => {}, withStopped: async (_target, operation) => operation(),
       },
     }
     const proxy = createProxyHandlers(deps)
-    const server = createGatewayServer(deps, proxy)
+    const documentScope = createGatewayDocumentScopeHandler({
+      instances: deps.instances, users, projects: deps.projects, collaboration: deps.collaboration!, principals,
+    })
+    const server = createGatewayServer(deps, {
+      ...proxy, documentScope: options.wrapDocumentScope?.(documentScope) ?? documentScope,
+    })
     const base = await listen(server)
     cleanup.push(async () => { proxy.close(); await monitor.close() })
     cfg.publicOrigins.push(base)
@@ -391,5 +404,223 @@ describePg('cross-Gateway access invalidation', () => {
     } finally {
       await expect(monitor.close()).rejects.toBe(failure)
     }
+  })
+
+  it('cancels document content before a slow runtime stop and acknowledges only after the stream lease is released', async () => {
+    let upstream!: ServerResponse
+    const upstreamClosed = barrier()
+    const f = await fixture({ runtime(req, res) {
+      if (!req.url?.startsWith('/api/documents/content')) return false
+      upstream = res
+      res.once('close', upstreamClosed.resolve)
+      res.write('already-sent-prefix')
+      return true
+    } })
+    const gateway = f.gateways[1]!
+    const stopStarted = barrier(), releaseStop = barrier()
+    const leaseReleasing = barrier(), releaseLease = barrier()
+    gateway.stop.mockImplementation(async () => { stopStarted.resolve(); await releaseStop.promise })
+    const operationRef = vi.mocked(gateway.deps.instances.operationRef!)
+    operationRef.mockImplementation(async (_target, delta) => {
+      if (delta === -1) { leaseReleasing.resolve(); await releaseLease.promise }
+    })
+    const originalSubscribe = gateway.monitor.subscribe.bind(gateway.monitor)
+    let contentSubscriptions = 0
+    gateway.monitor.subscribe = (listener) => {
+      contentSubscriptions++
+      const dispose = originalSubscribe(listener)
+      return () => { contentSubscriptions--; dispose() }
+    }
+    const acknowledged = async () => (await pool.query<{ revision: string }>(
+      'SELECT access_applied_revision::text AS revision FROM harness.compute_nodes WHERE id=$1', [gateway.owner.nodeId],
+    )).rows[0]!.revision
+    const before = await acknowledged()
+    const response = await fetch(`${gateway.base}/api/documents/scope/content?scope=project:${f.project.id}&docId=file`, {
+      headers: { cookie: f.aliceCookie },
+    })
+    const reader = response.body!.getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe('already-sent-prefix')
+    const tail = reader.read().then(
+      result => { expect(result.done).toBe(true) },
+      (error: unknown) => { expect(error).toBeInstanceOf(Error) },
+    )
+    try {
+      await f.projects.removeMember(f.project.id, f.alice.id)
+      await stopStarted.promise
+      await upstreamClosed.promise
+      await leaseReleasing.promise
+      expect(upstream.destroyed).toBe(true)
+      expect(upstream.write('forbidden-suffix')).toBe(false)
+      await tail
+      expect(contentSubscriptions).toBe(1)
+      expect(await acknowledged()).toBe(before)
+      releaseStop.resolve()
+      expect(await acknowledged()).toBe(before)
+      releaseLease.resolve()
+      await gateway.monitor.synchronize()
+      expect(operationRef.mock.calls).toEqual([
+        [{ kind: 'project', id: f.project.id }, 1, 1],
+        [{ kind: 'project', id: f.project.id }, -1, 1],
+      ])
+      expect(contentSubscriptions).toBe(0)
+      expect(await acknowledged()).toBe(await f.revision())
+    } finally {
+      releaseStop.resolve()
+      releaseLease.resolve()
+      await reader.cancel().catch(() => {})
+      reader.releaseLock()
+    }
+  })
+
+  it('keeps unrelated subjects, ordinary uploads, and metadata from cancelling a document download', async () => {
+    let upstream!: ServerResponse
+    const f = await fixture({ runtime(req, res) {
+      const url = new URL(req.url ?? '/', 'http://runtime')
+      if (url.pathname === '/api/documents/content') {
+        upstream = res
+        res.write('prefix')
+        return true
+      }
+      if (url.pathname === '/api/documents') { res.end('{"documents":[]}'); return true }
+      return false
+    } })
+    const gateway = f.gateways[1]!
+    const response = await fetch(`${gateway.base}/api/documents/scope/content?scope=project:${f.project.id}&docId=file`, {
+      headers: { cookie: f.aliceCookie },
+    })
+    const reader = response.body!.getReader()
+    try {
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe('prefix')
+      await f.gateways[0]!.deps.auth.revoke(f.bobCookie.slice('hgw_session='.length))
+      await pool.query('SELECT harness.invalidate_access($1,$2::jsonb)', [
+        f.organizationId, JSON.stringify({ projectId: f.project.id + 1000 }),
+      ])
+      await gateway.monitor.synchronize()
+      const upload = await fetch(`${gateway.base}/api/register-document`, { headers: { cookie: f.aliceCookie } })
+      expect(await upload.text()).toBe('registered')
+      const metadata = await fetch(`${gateway.base}/api/documents/scope?scope=project:${f.project.id}`, {
+        headers: { cookie: f.aliceCookie },
+      })
+      expect(await metadata.json()).toEqual({ documents: [] })
+      await gateway.monitor.synchronize()
+      upstream.end('authorized-suffix')
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe('authorized-suffix')
+      expect((await reader.read()).done).toBe(true)
+      expect(vi.mocked(gateway.deps.instances.operationRef!).mock.calls.reduce((sum, call) => sum + call[1], 0)).toBe(0)
+    } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+  })
+
+  it.each(['authorization', 'lease'] as const)('cancels content waiting for %s and releases any late lease', async (waiting) => {
+    const calls: string[] = []
+    const f = await fixture({ runtime(req, res) {
+      calls.push(req.url ?? '/')
+      res.end('must-not-be-requested')
+      return true
+    } })
+    const gateway = f.gateways[1]!
+    const started = barrier(), release = barrier()
+    const operationRef = vi.mocked(gateway.deps.instances.operationRef!)
+    if (waiting === 'authorization') {
+      const validate = gateway.deps.auth.validate.bind(gateway.deps.auth)
+      let validations = 0
+      gateway.deps.auth.validate = async (token) => {
+        const user = await validate(token)
+        if (++validations === 2) { started.resolve(); await release.promise }
+        return user
+      }
+    } else {
+      operationRef.mockImplementation(async (_target, delta) => {
+        if (delta === 1) { started.resolve(); await release.promise }
+      })
+    }
+    const fetching = fetch(`${gateway.base}/api/documents/scope/content?scope=project:${f.project.id}`, {
+      headers: { cookie: f.aliceCookie },
+    }).then(() => { throw new Error('revoked download returned a response') }, (error: unknown) => { expect(error).toBeInstanceOf(Error) })
+    try {
+      await started.promise
+      await f.projects.removeMember(f.project.id, f.alice.id)
+      await fetching
+      if (waiting === 'authorization') await gateway.monitor.synchronize()
+      release.resolve()
+      await gateway.monitor.synchronize()
+      expect(calls).toEqual([])
+      expect(operationRef.mock.calls.map(call => call[1])).toEqual(waiting === 'lease' ? [1, -1] : [])
+    } finally { release.resolve(); await fetching }
+  })
+
+  it('cancels a late document Response body and releases its lease before acknowledging revocation', async () => {
+    const ready = barrier(), deliver = barrier()
+    const f = await fixture({
+      runtime(_req, res) { res.end('buffered-before-revocation'); return true },
+      wrapDocumentScope: handler => async input => {
+        const response = await handler(input)
+        ready.resolve()
+        await deliver.promise
+        return response
+      },
+    })
+    const gateway = f.gateways[1]!
+    const operationRef = vi.mocked(gateway.deps.instances.operationRef!)
+    const fetching = fetch(`${gateway.base}/api/documents/scope/content?scope=project:${f.project.id}`, {
+      headers: { cookie: f.aliceCookie },
+    }).then(() => { throw new Error('late response reached the revoked caller') }, (error: unknown) => { expect(error).toBeInstanceOf(Error) })
+    try {
+      await ready.promise
+      expect(operationRef.mock.calls.map(call => call[1])).toEqual([1])
+      await f.projects.removeMember(f.project.id, f.alice.id)
+      await fetching
+      expect(operationRef.mock.calls.map(call => call[1])).toEqual([1])
+      deliver.resolve()
+      await gateway.monitor.synchronize()
+      expect(operationRef.mock.calls.map(call => call[1])).toEqual([1, -1])
+    } finally { deliver.resolve(); await fetching }
+  })
+
+  it.each(['revocation', 'response limit', 'empty body'] as const)('does not acknowledge document revocation when lease cleanup fails during %s', async (trigger) => {
+    const f = await fixture({ runtime(req, res) {
+      if (req.method === 'HEAD') res.end()
+      else res.write('prefix')
+      return true
+    } })
+    const gateway = f.gateways[1]!
+    if (trigger === 'response limit') gateway.deps.cfg.upstreamResponseLimitBytes = 3
+    const failure = new Error('lease release unavailable')
+    const operationRef = vi.mocked(gateway.deps.instances.operationRef!)
+    operationRef.mockImplementation(async (_target, delta) => { if (delta === -1) throw failure })
+    const diagnostics = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const close = gateway.monitor.close.bind(gateway.monitor)
+    vi.spyOn(gateway.monitor, 'close').mockImplementation(async () => {
+      await expect(close()).rejects.toMatchObject({ name: 'DocumentLeaseReleaseError', cause: failure })
+    })
+    const before = await pool.query<{ revision: string }>(
+      'SELECT access_applied_revision::text AS revision FROM harness.compute_nodes WHERE id=$1', [gateway.owner.nodeId],
+    )
+    const request = fetch(`${gateway.base}/api/documents/scope/content?scope=project:${f.project.id}`, {
+      method: trigger === 'empty body' ? 'HEAD' : 'GET', headers: { cookie: f.aliceCookie },
+    })
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+    let tail: Promise<unknown> | undefined
+    if (trigger === 'response limit') {
+      await expect(request.then(response => response.arrayBuffer())).rejects.toBeInstanceOf(Error)
+    } else if (trigger === 'empty body') {
+      const response = await request
+      expect(response.status).toBe(503)
+      await response.arrayBuffer()
+    } else {
+      reader = (await request).body!.getReader()
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe('prefix')
+      tail = reader.read().catch(() => undefined)
+    }
+    try {
+      await f.projects.removeMember(f.project.id, f.alice.id)
+      await tail
+      await expect(gateway.monitor.synchronize()).rejects.toMatchObject({ name: 'DocumentLeaseReleaseError', cause: failure })
+      await expect(gateway.monitor.synchronize()).rejects.toMatchObject({ name: 'DocumentLeaseReleaseError', cause: failure })
+      expect((await pool.query<{ revision: string }>(
+        'SELECT access_applied_revision::text AS revision FROM harness.compute_nodes WHERE id=$1', [gateway.owner.nodeId],
+      )).rows).toEqual(before.rows)
+      expect(operationRef.mock.calls.map(call => call[1])).toEqual([1, -1])
+      expect(diagnostics).toHaveBeenCalledWith('[gateway] document lease cleanup failed:', expect.objectContaining({ cause: failure }))
+    } finally { await reader?.cancel().catch(() => {}); reader?.releaseLock(); diagnostics.mockRestore() }
   })
 })

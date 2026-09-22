@@ -17,6 +17,7 @@ import { MIN_PASSWORD_LENGTH } from './password.ts'
 import {
   DOCUMENT_TRANSFER_UPLOADS_PATH,
   DOCUMENT_SCOPE_PATH,
+  DocumentLeaseReleaseError,
   DocumentTransferError,
   parseDocumentScopeKey,
   type GatewayDocumentScopeHandler,
@@ -146,6 +147,7 @@ function send(res: ServerResponse, status: number, body: string, type = 'text/ht
 
 function requestAbort(req: IncomingMessage, res: ServerResponse): {
   signal: AbortSignal
+  cancel: (reason: unknown) => void
   dispose: () => void
 } {
   const controller = new AbortController()
@@ -155,6 +157,7 @@ function requestAbort(req: IncomingMessage, res: ServerResponse): {
   res.once('close', onResponseClose)
   return {
     signal: controller.signal,
+    cancel: reason => { controller.abort(reason) },
     dispose: () => {
       req.removeListener('aborted', onRequestAbort)
       res.removeListener('close', onResponseClose)
@@ -190,6 +193,10 @@ async function waitForResponseWritable(res: ServerResponse): Promise<'drain' | '
 }
 
 async function sendGatewayResponse(res: ServerResponse, response: Response, limit: number): Promise<void> {
+  if (res.destroyed || res.writableEnded) {
+    await response.body?.cancel()
+    return
+  }
   const declared = response.headers.get('content-length')
   if (declared !== null) {
     const length = Number(declared)
@@ -213,30 +220,40 @@ async function sendGatewayResponse(res: ServerResponse, response: Response, limi
     return
   }
   const reader = response.body.getReader()
-  const cancelOnClose = (): void => { void reader.cancel().catch(() => {}) }
+  let releaseFailure: DocumentLeaseReleaseError | undefined
+  let cancellation: Promise<void> | undefined
+  const cancel = (): Promise<void> => cancellation ??= reader.cancel().catch((error: unknown) => {
+    // Upstream abort/read failures have already closed the response. A lease
+    // failure is independent and must reach the access monitor's acknowledgment.
+    if (error instanceof DocumentLeaseReleaseError) releaseFailure = error
+  })
+  const cancelOnClose = (): void => { void cancel() }
   res.once('close', cancelOnClose)
   try {
     let total = 0
     for (;;) {
       const next = await reader.read()
       if (next.done) break
+      if (res.destroyed || res.writableEnded) break
       total += next.value.byteLength
       if (total > limit) {
-        await reader.cancel().catch(() => {})
+        await cancel()
         if (!res.destroyed) res.destroy(new ResponseBodyTooLargeError(limit))
-        return
+        break
       }
       if (!res.write(next.value) && await waitForResponseWritable(res) === 'close') break
       if (res.destroyed) break
     }
     if (!res.writableEnded) res.end()
   } catch (error) {
+    if (error instanceof DocumentLeaseReleaseError) releaseFailure = error
     if (!res.destroyed) res.destroy(error as Error)
   } finally {
     res.removeListener('close', cancelOnClose)
-    await reader.cancel().catch(() => {})
+    await cancel()
     reader.releaseLock()
   }
+  if (releaseFailure !== undefined) throw releaseFailure
 }
 
 function isScopedUploadDataPath(method: string | undefined, pathname: string): boolean {
@@ -829,6 +846,22 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       const abort = requestAbort(req, res)
+      let handlingContent = false
+      let cleanupFailure: DocumentLeaseReleaseError | undefined
+      let contentFinished!: () => void
+      const contentCompletion = new Promise<void>((resolve) => { contentFinished = resolve })
+      const unsubscribeAccess = scopedOperation !== 'content' ? undefined : deps.accessMonitor?.subscribe(async (subject) => {
+        if (subject.userId !== undefined && subject.userId !== user.id) return
+        if (subject.projectId !== undefined && (scope.kind !== 'project' || scope.projectId !== subject.projectId)) return
+        abort.cancel(new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Document access was revoked.'))
+        res.destroy()
+        // Admission itself may be waiting on this monitor's synchronize call.
+        // Once body handling starts, its cleanup owns the response and lease.
+        if (handlingContent) {
+          await contentCompletion
+          if (cleanupFailure !== undefined) throw cleanupFailure
+        }
+      })
       res.once('finish', () => {
         void Promise.resolve(audit.write({
           userId: user.id,
@@ -839,24 +872,47 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         })).catch(error => { console.error('[gateway] API audit write failed:', error) })
       })
       try {
+        let actor = user
+        if (scopedOperation === 'content') {
+          await deps.accessMonitor?.synchronize()
+          abort.signal.throwIfAborted()
+          const current = await auth.validate(token)
+          if (current === null || current.id !== user.id || current.mustChangePassword) {
+            send(res, 401, '{"error":"unauthorized"}', 'application/json')
+            return
+          }
+          actor = current
+          await deps.accessMonitor?.synchronize()
+          abort.signal.throwIfAborted()
+          handlingContent = true
+        }
         const response = await handlers.documentScope({
-          user,
+          user: actor,
           request: req,
           pathname,
           operation: scopedOperation,
           scope,
           signal: abort.signal,
         })
-        if (!abort.signal.aborted && !res.writableEnded) await sendGatewayResponse(res, response, cfg.upstreamResponseLimitBytes)
+        if (abort.signal.aborted || res.destroyed || res.writableEnded) await response.body?.cancel(abort.signal.reason)
+        else await sendGatewayResponse(res, response, cfg.upstreamResponseLimitBytes)
       } catch (error: unknown) {
-        if (abort.signal.aborted || res.writableEnded) return
+        if (error instanceof DocumentLeaseReleaseError) {
+          cleanupFailure = error
+          console.error('[gateway] document lease cleanup failed:', error)
+        }
+        if (abort.signal.aborted || res.destroyed || res.writableEnded) return
         if (error instanceof DocumentTransferError) {
           send(res, error.status, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
         } else {
           send(res, 503, JSON.stringify({ error: { code: 'DOCUMENT_TRANSFER_UNAVAILABLE', message: 'Document scope is temporarily unavailable.' } }), 'application/json')
         }
       } finally {
+        // An unconfirmed lease keeps its failure attached to the monitor;
+        // reconnect must not acknowledge it merely because the HTTP body closed.
+        if (cleanupFailure === undefined) unsubscribeAccess?.()
         abort.dispose()
+        contentFinished()
       }
       return
     }
