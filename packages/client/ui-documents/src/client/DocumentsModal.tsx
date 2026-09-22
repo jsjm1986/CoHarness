@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type FC, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FC, type SyntheticEvent } from 'react'
 import {
   Button,
   IconBrowseOutline16,
@@ -1901,7 +1901,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     setFolderEditor({ mode: 'rename', directory })
   }
 
-  const handleFolderSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleFolderSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (writeLocked) return
     if (folderEditor === null || folderName.trim() === '') return
