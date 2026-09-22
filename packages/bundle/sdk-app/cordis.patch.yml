@@ -9,6 +9,11 @@
 - id: session-title-llm
   disabled: true
 
+# The SDK default file-tool set stays at read/write/edit; deployments opt the
+# editor in with an explicit insertion patch (documented in the base guide).
+- id: tool-str-replace-editor
+  disabled: true
+
 - insert:
     - id: sdk-app-startup
       name: '@deepseek-ai/dsh-sdk-app'

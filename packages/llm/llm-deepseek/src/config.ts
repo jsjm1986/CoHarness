@@ -106,6 +106,22 @@ export const PUBLIC_BASE_URL = 'https://api.deepseek.com'
 /** Official Messages protocol root. */
 export const MESSAGES_BASE_URL = 'https://api.deepseek.com/anthropic'
 
+/**
+ * $DEEPSEEK_BASE_URL names the service root an OpenAI-compatible proxy exposes,
+ * while Messages resources on the official API live under the `/anthropic`
+ * namespace. Map the bare official root (optionally spelled `/v1`) to the
+ * official Messages base; every other endpoint spelling — custom gateways or an
+ * explicit `/anthropic` root — stays literal.
+ * @param baseURL - configured or environment-supplied endpoint base.
+ * @returns the endpoint base the Messages protocol resolves beneath.
+ */
+function messagesServiceBase(baseURL: string): string {
+  const stripped = baseURL.replace(/\/+$/u, '')
+  return stripped === PUBLIC_BASE_URL || stripped === `${PUBLIC_BASE_URL}/v1`
+    ? MESSAGES_BASE_URL
+    : baseURL
+}
+
 /** Environment variable naming this provider's endpoint, honored only from trusted layers. */
 const BASE_URL_ENV = 'DEEPSEEK_BASE_URL'
 
@@ -289,8 +305,9 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
     || fileQuotaCleanupBatch > 1_000) {
     throw new Error('llm-deepseek: fileQuotaCleanupBatch must be an integer from 1 through 1000')
   }
-  const baseURL = config.baseURL ?? environment?.get(BASE_URL_ENV)?.value
+  const configuredBaseURL = config.baseURL ?? environment?.get(BASE_URL_ENV)?.value
     ?? (protocol === 'messages' ? MESSAGES_BASE_URL : PUBLIC_BASE_URL)
+  const baseURL = protocol === 'messages' ? messagesServiceBase(configuredBaseURL) : configuredBaseURL
   if (protocol === 'messages') {
     const parsed = new URL(baseURL)
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
