@@ -2,7 +2,7 @@
 
 [English](testing.md) | 中文
 
-命令位于根目录 [AGENTS.md](../AGENTS.md)，链接的 Agent Note 记录设计理由。
+命令：[AGENTS.md](../AGENTS.md)。
 
 ## 层级
 
@@ -22,7 +22,7 @@
 
 ## 带密钥策略：推理（inference）在这里很便宜
 
-手动运行 [DeepSeek 工作流](../.github/workflows/e2e.yml)需要 `DEEPSEEK_API_KEY_EXTERNAL`；自动运行还要求 `DSH_REAL_API_E2E_ENABLED=true`——手动验证不会启用定时计划。
+手动 [DeepSeek 运行](../.github/workflows/e2e.yml)和必需 PR 证明需要 `DEEPSEEK_API_KEY_EXTERNAL`；其他自动运行还需要 `DSH_REAL_API_E2E_ENABLED=true`。手动运行不会启用定时计划。Fork 无法满足必需证明。
 
 我们是 DeepSeek，不要吝惜真实 API 测试。无密钥测试只能证明底层通路；只有带密钥运行才能证明 agent（智能体）能对接真实模型正常工作。覆盖文件写入提示词、包含多个轮次的对话、工具使用和流中取消。价值最高的是**冒烟测试**：启动真实示例、发送一条提示词，并检查外部世界；它们能捕获 mock 无法发现的「单元测试全绿、产品却坏了」问题（[事故复盘 0001](postmortem/0001-acp-default-export-drops-inject.zh.md)）。自动跳过让无密钥 CI 和无密钥贡献者不受阻塞；它不是成本信号。每个示例都提供无密钥和带密钥冒烟测试（[examples/AGENTS.md](../examples/AGENTS.md)）。
 

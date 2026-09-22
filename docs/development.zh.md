@@ -128,9 +128,15 @@ keyless [CI 工作流](../.github/workflows/ci.yml) 按影响范围选择 lane�
 
 ### 日常命令
 
+运行 `pnpm run pr:preflight --base <verified-base-ref>`，一起检查已提交和工作区变更。只读报告列出选中的 CI 检查、生成文件、双语配对与缺失入口；它不表示这些检查已通过，也不要求在本地重复全部 CI 工作。`--check` 运行列出的机械检查。`--fix-generated` 显式修复登记的确定性输出，留下可审查的差异；请手动更新译文，仅在审阅两种语言后确认指定配对。详见[验证提速决策](../.agents/notes/implemented/process/2026-09-22-pr-verification-throughput.zh.md)。
+
 根目录的[贡献者说明](../AGENTS.md#commands)概述常用命令，[`package.json`](../package.json) 与 [scripts/run-gates.ts](../scripts/run-gates.ts) 则负责当前脚本和门禁清单。请选择覆盖变更表面的最小检查集。文档变更在本地使用 `pnpm run test:docs`；`pnpm run doc-sync` 是 CI 负责的完整验收车道。包公开行为变更还需更新所属 README 或 JSDoc，而基于构建产物的检查需要先运行 `pnpm run build`。
 
+把相关修复和定向验证集中完成后再推送。同一 SHA 只重跑失败 job 及其必要依赖；代码变化需要重新判定范围。保留最初失败与每次 attempt。准备合并时再更新落后的 base；只有在审查、必需的候选证明及合并基线均获验证后，才为该 PR 显式启用自动合并。
+
 ### 插件表面与性能
+
+`pnpm run test:web:focused -- --scenarios '<JSON array>'` 针对已完整构建的产物运行登记的场景键；数组必须包含全部必需冒烟场景。使用 `--print-plan` 可在执行前查看选择结果。分组与精确场景互斥。`pnpm run verify:web-fixtures -- --focused --scenarios '<JSON array>'` 在构建前校验已录制的 Session 输入。本地 `DSH_SNAPSHOT=refresh` 只改选中的所属场景；随后应使用相同选择，在 `DSH_SNAPSHOT=replay` 下回放。保留完整组装场景验证公共界面，在功能所属区域采集 golden，不削弱文字、状态、顺序或几何断言。
 
 `pnpm run verify-plugin-surfaces` 报告运行时插件、静态客户端、Bundle 与浏览器预取分层，不向运行时增加元数据。普通 Web 启动会禁用客户端插件 HMR，因此 Host 不会轮询客户端 bundle；只有在 `pnpm run dev:web` 正在重建 bundle 且需要无刷新重载时才设置 `DSH_CLIENT_HMR=1`。`pnpm run perf:command -- --label <name> -- <command> [args...]` 会带预热运行构建命令并输出 P95；性能测量应与正确性测试分开，并使用相同的 Node、平台和构建产物进行比较。
 

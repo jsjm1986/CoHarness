@@ -8,10 +8,13 @@ import {
   COVERAGE_PARTITION_MODE_ENV,
   COVERAGE_PARTITIONS_ENV,
   COVERAGE_TEST_TIMEOUT_ENV,
+  COVERAGE_TIMING_PROFILE_ENV,
+  COVERAGE_TIMINGS_FILE,
   CoveragePartitionCoordinator,
   assignWeightedPartitions,
   collectPartitionDurations,
   coverageTestTimeoutArgs,
+  coverageTimingCacheKey,
   forwardedCoverageArgs,
   parseCoveragePartitionCount,
   parseListOutput,
@@ -32,6 +35,7 @@ const passed: CoverageCommandResult = { exitCode: 0, signalCode: null }
 const roots: string[] = []
 afterEach(async () => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
@@ -189,9 +193,22 @@ describe('weighted partition assignment', () => {
     const buckets = assignWeightedPartitions(files, new Map(), 2)
     expect(buckets.map(bucket => bucket.length).sort()).toEqual([2, 2])
   })
+
+  it('keeps every real inventory file exactly once regardless of cached names and weights', () => {
+    const files = ['a.spec.ts', 'b.spec.ts', 'c.spec.ts', 'new.spec.ts']
+    const weights = new Map([['a.spec.ts', 10_000], ['b.spec.ts', 0], ['deleted.spec.ts', 99_000]])
+    const buckets = assignWeightedPartitions(files, weights, 3)
+    expect(buckets.flat().sort()).toEqual([...files].sort())
+    expect(new Set(buckets.flat()).size).toBe(files.length)
+  })
 })
 
 describe('coverage file inventory', () => {
+  it('rejects ambiguous ownership before a file can execute in two projects', async () => {
+    const root = await temporaryRoot()
+    expect(() => parseListOutput('[thread-safe] a.spec.ts\n[process-bound] a.spec.ts', root))
+      .toThrow('belongs to both')
+  })
   it('parses vitest list --filesOnly output, keeps project ownership, and drops exempt suites', async () => {
     const root = await temporaryRoot()
     const exemptDir = join(root, 'packages/typert/generator/tests')
@@ -234,7 +251,7 @@ describe('coverage file inventory', () => {
     expect([...inventory.projectOf]).toEqual(retainedFiles.map(file => [file, 'thread-safe']))
   })
 
-  it('averages recorded durations per file from the results cache', async () => {
+  it('does not use unversioned Vitest timings without a successful coverage verdict', async () => {
     const root = await temporaryRoot()
     await writeVitestCache(root, [
       ['thread-safe:packages/a/tests/x.spec.ts', { duration: 10 }],
@@ -242,8 +259,7 @@ describe('coverage file inventory', () => {
       ['thread-safe:packages/a/tests/y.spec.ts', { duration: 5 }],
     ])
     const durations = readFileDurations(root)
-    expect(durations.get('packages/a/tests/x.spec.ts')).toBe(20)
-    expect(durations.get('packages/a/tests/y.spec.ts')).toBe(5)
+    expect(durations.size).toBe(0)
   })
 
   it('prefers the persisted duration file over the vitest cache', async () => {
@@ -264,6 +280,45 @@ describe('coverage file inventory', () => {
     expect(durations.get('packages/a/tests/x.spec.ts')).toBe(55)
     expect(durations.get('packages/a/tests/y.spec.ts')).toBe(7)
   })
+
+  it('names a cache by environment and policy while preserving fresh same-environment weights', async () => {
+    const root = await temporaryRoot()
+    vi.stubEnv(COVERAGE_TIMING_PROFILE_ENV, 'hosted-linux-2-workers')
+    const firstKey = coverageTimingCacheKey(root)
+    writeFileDurations(root, new Map([['a.spec.ts', 42], ['deleted.spec.ts', 9]]))
+    const saved = JSON.parse(await readFile(join(root, COVERAGE_TIMINGS_FILE), 'utf8')) as { version: number; identity: string }
+    expect(saved.version).toBe(1)
+    expect(JSON.parse(saved.identity)).toMatchObject({ node: process.version, platform: process.platform, arch: process.arch })
+    expect(readFileDurations(root).get('a.spec.ts')).toBe(42)
+    writeFileDurations(root, new Map([['new.spec.ts', 2]]), ['a.spec.ts', 'new.spec.ts'])
+    expect([...readFileDurations(root)]).toEqual([['a.spec.ts', 42], ['new.spec.ts', 2]])
+
+    vi.stubEnv(COVERAGE_TIMING_PROFILE_ENV, 'different-resource-class')
+    expect(coverageTimingCacheKey(root)).not.toBe(firstKey)
+    expect(readFileDurations(root).size).toBe(0)
+    vi.stubEnv(COVERAGE_TIMING_PROFILE_ENV, 'hosted-linux-2-workers')
+    await writeFile(join(root, 'pnpm-lock.yaml'), 'changed dependency toolchain')
+    expect(coverageTimingCacheKey(root)).not.toBe(firstKey)
+    expect(readFileDurations(root).size).toBe(0)
+  })
+
+  it.each(['corrupt', 'legacy', 'expired', 'future', 'negative', 'traversal'] as const)(
+    'treats %s persisted data as a cold miss without reviving the unversioned fallback', async (kind) => {
+      const root = await temporaryRoot()
+      await writeVitestCache(root, [['thread-safe:a.spec.ts', { duration: 999 }]])
+      writeFileDurations(root, new Map([['a.spec.ts', 42]]))
+      const path = join(root, COVERAGE_TIMINGS_FILE)
+      const saved = JSON.parse(await readFile(path, 'utf8')) as { recordedAt: number; durations: Record<string, number> }
+      if (kind === 'expired') saved.recordedAt = Date.now() - 15 * 24 * 60 * 60 * 1000
+      if (kind === 'future') saved.recordedAt = Date.now() + 60_000
+      if (kind === 'negative') saved.durations['a.spec.ts'] = -1
+      if (kind === 'traversal') saved.durations['../outside.spec.ts'] = 1
+      await writeFile(path, kind === 'corrupt' ? '{' : kind === 'legacy' ? '{"a.spec.ts":42}' : JSON.stringify(saved))
+      expect(readFileDurations(root).size).toBe(0)
+      writeFileDurations(root, new Map([['a.spec.ts', 7]]))
+      expect([...readFileDurations(root)]).toEqual([['a.spec.ts', 7]])
+    },
+  )
 
   it('extracts per-file durations from partition json reports', async () => {
     const root = await temporaryRoot()
@@ -439,6 +494,30 @@ describe('coverage partition coordinator', () => {
     ['b.spec.ts', 'process-bound'],
     ['c.spec.ts', 'process-bound'],
   ])
+  it.each(['none', 'partition', 'merge', 'filtered'] as const)('updates weights only after complete acceptance: run=%s', async (failure) => {
+    const root = await temporaryRoot()
+    writeFileDurations(root, new Map([['a.spec.ts', 99]]))
+    const runCommand = vi.fn(async (command: CoverageCommand) => {
+      await writeBlob(command)
+      const jsonArgument = command.args.find(argument => argument.startsWith('--outputFile.json='))
+      if (jsonArgument !== undefined) {
+        await writeFile(join(root, jsonArgument.slice('--outputFile.json='.length)), JSON.stringify({
+          testResults: [{ name: join(root, 'a.spec.ts'), startTime: 10, endTime: 20 }],
+        }))
+      }
+      const fails = failure === 'partition' && command.label === 'partition 1/2'
+        || failure === 'merge' && command.label === 'merged coverage report'
+      return fails ? { exitCode: 1, signalCode: null } : passed
+    })
+    const coordinator = new CoveragePartitionCoordinator({
+      root, partitions: 2, pnpmEntrypoint: '/pnpm.cjs',
+      files: ['a.spec.ts', 'b.spec.ts'], runCommand,
+      vitestArgs: failure === 'filtered' ? ['--testNamePattern=selected-case'] : [],
+    })
+    await expect(coordinator.run()).resolves.toBe(failure === 'none' || failure === 'filtered' ? 0 : 1)
+    expect(readFileDurations(root).get('a.spec.ts')).toBe(failure === 'none' ? 10 : 99)
+  })
+
   it('passes the canonicalizing reporter to every partition', async () => {
     const root = await temporaryRoot()
     const commands: CoverageCommand[] = []

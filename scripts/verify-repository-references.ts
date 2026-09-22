@@ -55,7 +55,11 @@ export function findRepositoryReferences(
     if (organizationUrl.test(canonicalReferenceText(line).replace(kitRepositoryUrl, ''))) {
       references.push({ file, line: index + 1, kind: 'organization-url' })
     }
-    if ([...line.matchAll(commitCandidate)].some(match => commits.has(match[0].toLowerCase()))) {
+    // The temporary selector oracle stores its one machine-consumed source
+    // identity here. Prose and other fields retain the ordinary reference rule.
+    const selectionPin = file === 'scripts/fixtures/pr-scope-baseline/inputs.json'
+      && /^\s*"sourceCommit": "[a-f0-9]{40}",?\s*$/.test(line)
+    if (!selectionPin && [...line.matchAll(commitCandidate)].some(match => commits.has(match[0].toLowerCase()))) {
       references.push({ file, line: index + 1, kind: 'commit-hash' })
     }
   }

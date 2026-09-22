@@ -53,10 +53,8 @@ jobs:
 
   # TODO(hosted-serial-ci): Re-enable the one remaining disabled hosted serial
   # reference job (serial-macos) before release. The self-hosted standby lanes
-  # below require DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true. Re-enabling
-  # serial-macos does not restore a Linux hosted-cache producer: decide whether
-  # to add a master seeder or remove the restore-only steps if cold starts become
-  # a concern.
+  # below require DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true. The master release
+  # pack owns the Linux dependency cache; browser sweep owns Chromium's cache.
 
   # Pull-request changes that only update workflow action pins or documentation
   # do not need the release-sized coverage, browser, runtime, and native lanes.
@@ -74,6 +72,7 @@ jobs:
       coverage_mode: ${{ steps.scope.outputs.coverage_mode }}
       snapshot_mode: ${{ steps.scope.outputs.snapshot_mode }}
       web_groups: ${{ steps.scope.outputs.web_groups }}
+      web_scenarios: ${{ steps.scope.outputs.web_scenarios }}
       compat_mode: ${{ steps.scope.outputs.compat_mode }}
       python_mode: ${{ steps.scope.outputs.python_mode }}
       windows_mode: ${{ steps.scope.outputs.windows_mode }}
@@ -81,6 +80,14 @@ jobs:
       admin_ui_mode: ${{ steps.scope.outputs.admin_ui_mode }}
       android_mode: ${{ steps.scope.outputs.android_mode }}
       scoped_packages: ${{ steps.scope.outputs.scoped_packages }}
+      validation_plan: ${{ steps.scope.outputs.validation_plan }}
+      proof_release_pack: ${{ steps.scope.outputs.proof_release_pack }}
+      proof_vendor_pack: ${{ steps.scope.outputs.proof_vendor_pack }}
+      proof_native_pack: ${{ steps.scope.outputs.proof_native_pack }}
+      proof_sandbox: ${{ steps.scope.outputs.proof_sandbox }}
+      proof_provider: ${{ steps.scope.outputs.proof_provider }}
+      proof_pi_ai: ${{ steps.scope.outputs.proof_pi_ai }}
+      proof_native_windows: ${{ steps.scope.outputs.proof_native_windows }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -239,6 +246,13 @@ jobs:
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '4' || '2' }}
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000'
+      DSH_COVERAGE_TIMING_PROFILE: >-
+        ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && 'selfhosted-vm-backup'
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-ubuntu-24-04-16core' || 'github-ubuntu-standard' }}
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -299,6 +313,20 @@ jobs:
           if (( install_status != 0 )); then exit "$install_status"; fi
           exit "$sandbox_status"
 
+      - name: Resolve coverage timing identity
+        if: needs.pr-scope.outputs.coverage_mode == 'full'
+        id: coverage-timing
+        run: node --import tsx/esm scripts/coverage-timing-key.ts >> "$GITHUB_OUTPUT"
+
+      - name: Restore compatible scheduling weights
+        if: needs.pr-scope.outputs.coverage_mode == 'full'
+        uses: actions/cache/restore@v4
+        with:
+          path: .coverage-times.json
+          key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ steps.coverage-timing.outputs.key }}-
+
       # Scoped PRs run only the changed packages' tests and then enforce the
       # per-file 100% gate over exactly the changed source files
       # (scripts/incremental-coverage.ts); full PRs keep the complete lane.
@@ -311,6 +339,12 @@ jobs:
       - name: Run exhaustive coverage
         if: needs.pr-scope.outputs.coverage_mode != 'scoped'
         run: pnpm run check:ci:coverage
+      - name: Save successful scheduling weights
+        if: success() && needs.pr-scope.outputs.coverage_mode == 'full' && hashFiles('.coverage-times.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .coverage-times.json
+          key: ${{ steps.coverage-timing.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
@@ -385,11 +419,8 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      # Pull requests restore the pnpm store without paying compression and
-      # upload on the required path. No master job saves these hosted cache
-      # keys, so each restore-keys fallback hits the matching archived entry
-      # until it evicts, after which the store is cold. Skipped under failover
-      # — the self-hosted VM's persistent store is already warm.
+      # Pull requests read the store produced by the master release-pack job.
+      # The persistent failover VM already owns a warm store.
       - uses: actions/cache/restore@v4
         if: >-
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
@@ -579,6 +610,7 @@ jobs:
         if: needs.pr-scope.outputs.snapshot_mode == 'focused'
         env:
           DSH_WEB_GROUPS: ${{ needs.pr-scope.outputs.web_groups }}
+          DSH_WEB_SCENARIOS: ${{ needs.pr-scope.outputs.web_scenarios != '[]' && needs.pr-scope.outputs.web_scenarios || '' }}
           DSH_WEB_SNAPSHOT_WORKERS: '2'
         run: pnpm run check:ci:web:focused
 
@@ -868,6 +900,9 @@ jobs:
       - name: Fetch pinned public upstream inputs
         run: node scripts/fetch-upstream-baseline.ts
 
+      - name: Install Playwright Chromium and hosted dependencies
+        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
+
       - name: Run full Linux audit
         run: pnpm run check:ci:linux-primary
 
@@ -916,7 +951,29 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
-          cache: pnpm
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - uses: actions/cache/restore@v4
+        id: browser-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install (immutable)
         run: |
@@ -938,6 +995,13 @@ jobs:
 
       - name: Install Playwright Chromium and hosted dependencies
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
+
+      - name: Populate the PR browser cache from master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.browser-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browser-cache.outputs.cache-primary-key }}
 
       # DSH_SNAPSHOT stays off the step environment: every consumer defaults to
       # replay, and exporting it here would leak the replay config swap
@@ -1196,14 +1260,8 @@ jobs:
           cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/"
           du -sh "$HOME/wine-debs"
 
-  # Platform coverage runs after the merge, not on every pull request. This job
-  # re-runs the complete gate inventory on a real Windows kernel - build, docs
-  # build, the full coverage suite, and the observational static gates - which
-  # measured 1391s of a 3703s pull-request run and was the only 22-minute
-  # critical path. It is deliberately absent from all-checks-passed.needs, so it
-  # never gated a merge: it only added wall clock and runner minutes to each one.
-  # It now runs on every master move plus a nightly sweep, which keeps the
-  # platform coverage while charging it to the merge instead of the review.
+  # Native Windows proves selected kernel/process changes before merge and
+  # preserves the exhaustive master/nightly sweep for unrelated changes.
   # The portable default is windows-2025. A deployment with the named
   # larger pool may set DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true; Windows failover
   # (DSH_CI_FAILOVER_WINDOWS=selfhosted) takes priority and retargets onto the
@@ -1215,10 +1273,12 @@ jobs:
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
+    needs: pr-scope
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/master')
+      always() && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
       || github.event_name == 'schedule'
       || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
+      || (github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_native_windows == 'true'))
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -1648,18 +1708,58 @@ jobs:
           DSH_GATE_CONCURRENCY: ${{ matrix.workers }}
         run: pnpm run check:ci:windows-blocking
 
-  # Single stable required check for branch protection: require "all checks
-  # passed" instead of enumerating matrix legs whose names change as lanes and
-  # node versions evolve. Every pull-request job is listed in `needs`, including
-  # jobs that `pr-scope` may intentionally skip. The verdict requires each of
-  # those jobs only when the selector set that job's own mode to `full`, so a
-  # lane skipped by content never counts against the verdict; `windows-native`
-  # remains independent so its result never changes this required verdict.
-  # (`needs` cannot reach across workflow files; e2e.yml stays its own check.)
-  # `if: always()` is load-bearing: without it a failed dependency would SKIP
-  # this job, and GitHub counts a skipped required check as passing. The first
-  # step rejects failed or cancelled always-run jobs and any failed job whose
-  # mode selected it; scope-selected skips are accepted explicitly there.
+  release-pack:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_release_pack == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/release.yml
+    with:
+      required_proof: true
+
+  vendor-pack:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_vendor_pack == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/release-vendor.yml
+    with:
+      required_proof: true
+
+  native-pack:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_native_pack == 'true'
+    uses: ./.github/workflows/landlock-run.yml
+    with:
+      required_proof: true
+
+  sandbox-proof:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_sandbox == 'true'
+    uses: ./.github/workflows/sandbox.yml
+    with:
+      required_proof: true
+
+  provider-proof:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_provider == 'true'
+    uses: ./.github/workflows/e2e.yml
+    with:
+      required_proof: true
+    secrets: inherit
+
+  pi-ai-proof:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_pi_ai == 'true'
+    uses: ./.github/workflows/pi-ai-provider-e2e.yml
+    with:
+      required_proof: true
+    secrets: inherit
+
+  # Required proof jobs and this verdict consume the same candidate-bound plan.
+  # Always run the verdict: a selected job skipped after a failure is not proof.
   all-checks-passed:
     name: all checks passed
     # This bookkeeping-only verdict must not depend on custom-pool
@@ -1674,43 +1774,17 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof]
     if: always() && github.event_name == 'pull_request'
     steps:
-      - name: Fail if any needed job did not succeed
-        if: >-
-          needs.pr-scope.result != 'success'
-          || needs.node-24.result != 'success'
-          || (needs.pr-scope.outputs.gateway_mode == 'full'
-            && needs.gateway.result != 'success')
-          || (needs.pr-scope.outputs.admin_ui_mode == 'full'
-            && needs.gateway-admin-ui.result != 'success')
-          || (needs.pr-scope.outputs.compat_mode == 'full'
-            && needs.node-compat.result != 'success')
-          || (needs.pr-scope.outputs.python_mode == 'full'
-            && needs.python-sdk.result != 'success')
-          || (needs.pr-scope.outputs.run_expensive == 'true'
-            && (needs.node-24-coverage.result != 'success'
-              || needs.node-24-consumers.result != 'success'))
-          || (needs.pr-scope.outputs.python_mode == 'full'
-            && needs.python-runtime.result != 'success')
-          || (needs.pr-scope.outputs.windows_mode == 'full'
-            && needs.windows.result != 'success')
-          || needs.web-verification.result != 'success'
-        run: |
-          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, gatewayMode=${{ needs.pr-scope.outputs.gateway_mode }}, gateway=${{ needs.gateway.result }}, adminUiMode=${{ needs.pr-scope.outputs.admin_ui_mode }}, adminUi=${{ needs.gateway-admin-ui.result }}, compatMode=${{ needs.pr-scope.outputs.compat_mode }}, compat=${{ needs.node-compat.result }}, pythonMode=${{ needs.pr-scope.outputs.python_mode }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverageMode=${{ needs.pr-scope.outputs.coverage_mode }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, web=${{ needs.web-verification.result }}, runtime=${{ needs.python-runtime.result }}, windowsMode=${{ needs.pr-scope.outputs.windows_mode }}, wine=${{ needs.windows.result }}"
-          exit 1
-      - name: All checks passed
-        run: |
-          echo "Required checks passed"
-          echo "scope reason=${{ needs.pr-scope.outputs.reason }}"
-          echo "changed docs only=${{ needs.pr-scope.outputs.changed_docs_only }}"
-          echo "coverage mode=${{ needs.pr-scope.outputs.coverage_mode }}"
-          echo "snapshot mode=${{ needs.pr-scope.outputs.snapshot_mode }}"
-          echo "web groups=${{ needs.pr-scope.outputs.web_groups }}"
-          echo "compat mode=${{ needs.pr-scope.outputs.compat_mode }}"
-          echo "python mode=${{ needs.pr-scope.outputs.python_mode }}"
-          echo "windows mode=${{ needs.pr-scope.outputs.windows_mode }}"
-          echo "gateway mode=${{ needs.pr-scope.outputs.gateway_mode }}"
-          echo "admin UI mode=${{ needs.pr-scope.outputs.admin_ui_mode }}"
-          echo "scoped packages=${{ needs.pr-scope.outputs.scoped_packages }}"
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+      - name: Require current-candidate evidence
+        env:
+          DSH_PR_VALIDATION_PLAN: ${{ needs.pr-scope.outputs.validation_plan }}
+          DSH_CI_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/verify-pr-results.ts

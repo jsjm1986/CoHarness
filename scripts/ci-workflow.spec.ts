@@ -65,7 +65,7 @@ describe('CI workflow', () => {
     }
   })
 
-  it('keeps portable required pools, explicit external-runner opt-ins, and non-blocking native Windows coverage', () => {
+  it('keeps portable pools and requires native Windows for selected platform changes', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     if (!isRecord(workflow.jobs)
       || !isRecord(workflow.jobs.windows)
@@ -120,11 +120,11 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
     expect(windowsNative['runs-on']).toContain('windows-2025')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
-    // Platform coverage moved off the pull-request path: this job runs after the
-    // merge and on a nightly sweep, so it no longer reads a scope output.
+    // Native platform changes require the real kernel; unrelated changes keep the sweep.
     expect(windowsNative.if).toContain("github.event_name == 'schedule'")
     expect(windowsNative.if).toContain("github.ref == 'refs/heads/master'")
-    expect(windowsNative.if).not.toContain('pull_request')
+    expect(windowsNative.if).toContain("needs.pr-scope.outputs.proof_native_windows == 'true'")
+    expect(windowsNative.needs).toBe('pr-scope')
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
@@ -156,10 +156,10 @@ describe('CI workflow', () => {
       .find(step => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'))
     expect(serialWindowsCheckout).toMatchObject({ with: { 'fetch-depth': 0 } })
 
-    // Aggregate: Wine `windows` required, native `windows-native` excluded.
+    // Both Windows owners participate when selected; standby drills do not.
     expect(aggregate.needs).toContain('pr-scope')
     expect(aggregate.needs).toContain('windows')
-    expect(aggregate.needs).not.toContain('windows-native')
+    expect(aggregate.needs).toContain('windows-native')
     expect(aggregate.needs).not.toContain('serial-windows')
 
     // Linux uses standard hosted capacity by default, with explicit enterprise
@@ -287,6 +287,8 @@ describe('CI workflow', () => {
     // `pull_request` yet IS push-reachable, so matching on the event name alone
     // would silently misclassify it as gated.
     const NOT_PUSH_REACHABLE = new Set([
+      ...['release_pack', 'vendor_pack', 'native_pack', 'sandbox', 'provider', 'pi_ai'].map(proof =>
+        `github.event_name == 'pull_request' && needs.pr-scope.outputs.proof_${proof} == 'true'`),
       ...['compat', 'python', 'gateway', 'admin_ui'].map(mode =>
         `always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit') || (github.event_name == 'pull_request' && needs.pr-scope.outputs.${mode}_mode == 'full'))`),
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'",
@@ -404,7 +406,8 @@ describe('CI workflow', () => {
       const workflow = loadWorkflow(file)
       const trigger = workflow.on
       if (!isRecord(trigger)) throw new TypeError(`${file} must define trigger mappings`)
-      expect(isRecord(trigger.pull_request) || file.endsWith('sandbox.yml')).toBe(true)
+      expect(isRecord(trigger.workflow_call)).toBe(true)
+      expect(trigger.pull_request).toBeUndefined()
       const push = trigger.push
       if (isRecord(push)) {
         const paths = push.paths

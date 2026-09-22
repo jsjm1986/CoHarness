@@ -608,6 +608,7 @@ describe('Node 24 lane ownership', () => {
       source: 'ci-consumers gate count',
     })
     expect(subject.map(item => item.id)).toEqual([
+      'web-fixtures',
       'test-dsh-directory-guard',
       'test-dsh-model-governance',
       'build',
@@ -634,13 +635,13 @@ describe('Node 24 lane ownership', () => {
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])
     for (const id of [
       'snapshot',
-      'web-snapshot',
       'doc-typecheck',
       'node-next-types',
       'built-bin-smoke',
     ]) {
       expect(subject.find(item => item.id === id)?.needs).toEqual(['built-package-invariants'])
     }
+    expect(subject.find(item => item.id === 'web-snapshot')?.needs).toEqual(['built-package-invariants', 'web-fixtures'])
     expect(subject.find(item => item.id === 'snapshot')?.env).toEqual({ DSH_EXAMPLE_MODE: 'lib' })
     expect(subject.find(item => item.id === 'doc-typecheck')?.env).toEqual({
       DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1',
@@ -702,13 +703,33 @@ describe('web verification lanes', () => {
     'runs the complete build before the %s browser gate',
     (mode) => {
       const subject = withPnpmEntrypoint(() => gatesForMode(mode))
-      const browser = subject.find(item => item.id !== 'build')
+      const browser = subject.find(item => item.id.startsWith('web-snapshot'))
 
-      expect(subject.map(item => item.id)).toEqual(['build', browser?.id])
+      expect(subject.map(item => item.id)).toEqual(['web-fixtures', 'build', browser?.id])
+      expect(subject.find(item => item.id === 'build')?.needs).toEqual(['web-fixtures'])
       expect(browser?.needs).toEqual(['build'])
       expect(subject.some(item => item.id === 'build:web')).toBe(false)
     },
   )
+
+  it('does not build or start a browser after recorded input admission fails', async () => {
+    const subject = withPnpmEntrypoint(() => gatesForMode('ci-web-full'))
+    const started: string[] = []
+    const results = await runGates(subject, 3, async (gate) => {
+      started.push(gate.id)
+      return { gate, status: 'failed', durationMs: 1, output: [], exitCode: 1, signalCode: null }
+    })
+    expect(started).toEqual(['web-fixtures'])
+    expect(results.map(result => [result.gate.id, result.status])).toEqual([
+      ['web-fixtures', 'failed'], ['build', 'skipped'], ['web-snapshot', 'skipped'],
+    ])
+  })
+
+  it('does not read generated declarations before the complete local build', () => {
+    const subject = withPnpmEntrypoint(() => gatesForMode('check-all'))
+    expect(subject.find(gate => gate.id === 'lint')?.needs).toEqual(['build'])
+    expect(subject.find(gate => gate.id === 'build')?.needs ?? []).not.toContain('lint')
+  })
 })
 
 describe('scoped coverage lane', () => {
@@ -740,13 +761,13 @@ describe('scoped coverage lane', () => {
       .toThrow('DSH_INCREMENTAL_BASE must name the pull-request base ref')
   })
 
-  it('drops only the web browser snapshot from the scoped consumer lane', () => {
+  it('leaves browser verification and its fixture admission to the dedicated lane', () => {
     const full = withPnpmEntrypoint(() => gatesForMode('ci-consumers'))
     const scoped = withPnpmEntrypoint(() => gatesForMode('ci-consumers-scoped'))
 
     expect(full.map(subject => subject.id)).toContain('web-snapshot')
     expect(scoped.map(subject => subject.id)).not.toContain('web-snapshot')
-    expect(full.filter(subject => subject.id !== 'web-snapshot').map(subject => subject.id))
+    expect(full.filter(subject => !['web-snapshot', 'web-fixtures'].includes(subject.id)).map(subject => subject.id))
       .toEqual(scoped.map(subject => subject.id))
   })
 
@@ -769,7 +790,7 @@ describe('Linux primary graph', () => {
     expect(web).toMatchObject({
       displayCommand: 'DSH_SNAPSHOT=replay pnpm run test:web:built',
       env: { DSH_SNAPSHOT: 'replay' },
-      needs: ['built-package-invariants'],
+      needs: ['built-package-invariants', 'web-fixtures'],
     })
   })
 })

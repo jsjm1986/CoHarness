@@ -33,3 +33,5 @@ Windows and serial reference aggregates retain their own build ownership. The ch
 Static and consumer queue delays overlap instead of accumulating. The consumer's active time includes the build, while the static job becomes shorter and artifact upload, download, compression, and extraction disappear. Total Linux build count remains one.
 
 A static failure no longer prevents the consumer inventory from producing its own evidence; the final verdict still fails. Build and documentation-typecheck failures appear under `node 24 / snapshots and artifacts` rather than `node 24 / static`, matching the job that owns their output dependency.
+
+The [browser tiering decision](../testing/2026-09-11-web-verification-tiering.md) assigns the dedicated Web job its own build. The [verification throughput decision](2026-09-22-pr-verification-throughput.md) governs bounded sharing experiments for those independent consumers; this note retains the source/static separation and queue-delay rationale.

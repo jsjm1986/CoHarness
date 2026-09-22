@@ -68,7 +68,7 @@ describe('public gate and workflow wiring', () => {
     const jobs = workflow('ci').jobs
     expect(jobs['all-checks-passed']!.needs).not.toContain('android-build')
     expect(jobs['all-checks-passed']!.needs).not.toContain('android-bridge')
-    expect(jobs['all-checks-passed']!.steps![0]!.if).not.toContain('needs.android-bridge.result')
+    expect(jobs['all-checks-passed']!.steps!.some(step => step.run === 'node scripts/verify-pr-results.ts')).toBe(true)
     for (const id of ['android-build', 'android-bridge']) {
       expect(jobs[id]!.if).toBe("github.event_name == 'workflow_dispatch' && inputs.suite == 'android-audit'")
     }

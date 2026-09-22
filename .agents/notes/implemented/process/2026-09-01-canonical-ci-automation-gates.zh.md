@@ -23,3 +23,5 @@ Status: implemented
 ## Consequences
 
 正式仓库必须先配置 `DSH_REAL_API_E2E_ENABLED`、`DSH_ISSUE_AUTOMATION_ENABLED`、`DEEPSEEK_API_KEY_EXTERNAL` 和 GitHub App 凭据，再启用对应工作流。该 App 必须安装在 `jsjm1986` 账户下，并获得 `CoHarness` 与所需 Project 权限。配置的 Project 所有者是 `jsjm1986` 用户账户，因此 policy 使用用户 Project 查询，而不会假定 Project 属于组织。非正式仓库和不受信任的拉取请求事件会跳过这些 job，而不是报错。仓库和 Project 身份在配置、工作流门禁和 policy 运行时校验中均显式记录；变更任一所有者时必须同步更新配置和回归测试。
+
+[验证提速决策](2026-09-22-pr-verification-throughput.zh.md)将选中的必需 PR 证明作为显式 E2E 调用，独立于定时运行开关。仓库与可信 PR 限制仍然保留；需要凭据的 job 不可用时，必需证明汇总失败。Issue 自动化和普通定时运行仍由各自的仓库变量显式启用。

@@ -1,5 +1,10 @@
 {
   "version": 1,
+  "providerAcceptance": {
+    "deepseek": "required",
+    "azureOpenai": "unsupported",
+    "anthropic": "unsupported"
+  },
   "inertPrefixes": [
     ".agents/",
     "docs/",
