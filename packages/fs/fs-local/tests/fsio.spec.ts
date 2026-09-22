@@ -8,11 +8,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chmod, mkdtemp, readFile, rename, rm, stat, symlink, unlink, writeFile, mkdir, readdir, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { createServer } from 'node:net'
 import {
   applyLiteralEdit,
   listDirectory,
+  localDisplayPath,
   probe,
   probeNoFollow,
   readForEdit,
@@ -42,6 +43,16 @@ async function collect(chunks: AsyncIterable<string>): Promise<string> {
   for await (const chunk of chunks) out += chunk
   return out
 }
+
+describe('localDisplayPath', () => {
+  it('resolves a plain relative path against cwd', () => {
+    expect(localDisplayPath(dir, 'a.txt')).toBe(join(dir, 'a.txt'))
+  })
+
+  it.skipIf(process.platform === 'win32')('keeps parent traversal physical instead of resolving through symlinked roots', () => {
+    expect(localDisplayPath(dir, '../outside.txt')).toBe(`${dir}${sep}../outside.txt`)
+  })
+})
 
 describe('resolveLocalTarget', () => {
   it('resolves a relative path from cwd and realpaths it', async () => {
