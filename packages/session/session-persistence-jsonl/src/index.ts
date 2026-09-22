@@ -1200,6 +1200,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     readonly origin?: 'subagent'
     readonly delegationDepth: number
     readonly agentPreset?: string
+    readonly draft?: boolean
   }): SessionHeader {
     /* v8 ignore next 3 -- readable catalog results are restored to its configured current version. */
     if (header.version !== SESSION_FORMAT_VERSION) {
@@ -1217,6 +1218,7 @@ class JsonlSessionPersistence extends SessionPersistence {
       ...(header.origin === undefined ? {} : { origin: header.origin }),
       delegationDepth: header.delegationDepth,
       ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
+      ...(header.draft === undefined ? {} : { draft: header.draft }),
     }
   }
 
