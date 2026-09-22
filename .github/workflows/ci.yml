@@ -634,18 +634,21 @@ jobs:
       - name: Install Gateway dependencies
         run: npm ci --prefix gateway
       # The paths map keeps vendored packages on their emitted lib/types
-      # (their source needs the loose vendored compiler flags); emit just
-      # those declarations with the lane's own tsc instead of a workspace
-      # build a standalone npm-ci checkout cannot produce. tsc resolves
-      # @types and bare specifiers upward from each vendored project, so
-      # expose the gateway install's type packages and schema spec on that
-      # walk.
-      - name: Emit vendored type declarations the Gateway paths consume
+      # (their source needs the loose vendored compiler flags) and
+      # session-format on its emitted lib/types (its durable JSON index
+      # signatures need exactOptionalPropertyTypes, which the gateway's
+      # own source does not satisfy); emit those declarations with the
+      # lane's own tsc instead of a workspace build a standalone npm-ci
+      # checkout cannot produce. tsc resolves @types and bare specifiers
+      # upward from each project, so expose the gateway install's type
+      # packages and schema spec plus the vendored cosmokit on that walk.
+      - name: Emit type declarations the Gateway paths consume
         run: |
-          mkdir -p node_modules
+          mkdir -p node_modules/@deepseek-ai
           ln -s ../gateway/node_modules/@types node_modules/@types
           ln -s ../gateway/node_modules/@standard-schema node_modules/@standard-schema
-          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery
+          ln -s ../../vendor/cosmokit node_modules/@deepseek-ai/cosmokit
+          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their

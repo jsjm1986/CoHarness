@@ -9,18 +9,23 @@
     "paths": {
       "@deepseek-ai/cordis": ["../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-attachment": ["../packages/attachment/attachment/src/index.ts"],
-      "@deepseek-ai/dsh-typert-protocol": ["../packages/typert/protocol/src/index.ts"],
       "@deepseek-ai/dsh-brand": ["../packages/util/brand/src/index.ts"],
       "@deepseek-ai/dsh-llm": ["../packages/llm/llm/src/index.ts"],
+      "@deepseek-ai/dsh-timeout": ["../packages/util/timeout/src/index.ts"],
       "@deepseek-ai/schemastery": ["../vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/src/discovery.ts"],
-      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/src/catalog-default.ts"],
-      "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/src/surface.ts"],
+      // session-format's durable JSON index signatures only compile under
+      // exactOptionalPropertyTypes, which the gateway's own source does not
+      // satisfy; consume its emitted declarations instead of source so the
+      // declaration-internal check does not run under this flag set.
+      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/catalog-default.d.ts"],
+      "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/lib/types/surface.d.ts"],
       "@deepseek-ai/dsh-util-crypto": ["../packages/util/crypto/src/index.ts"],
       "@deepseek-ai/dsh-util-values": ["../packages/util/values/src/index.ts"]
     },
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "skipLibCheck": true
   },
   "include": ["src", "tests", "scripts"]
 }
