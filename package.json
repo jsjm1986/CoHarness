@@ -222,7 +222,7 @@
     "fast-check": "^4.9.0",
     "istanbul-lib-report": "^3.0.1",
     "js-yaml": "^5.2.3",
-    "jscpd": "^5.0.12",
+    "jscpd": "^5.0.16",
     "jsdom": "30.1.1",
     "knip": "^6.32.1",
     "lefthook": "^2.1.9",
