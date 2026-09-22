@@ -215,9 +215,14 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
  * @returns whether a real `pwsh` answered the trivial probe.
  */
 export function probePwshAvailable(): boolean {
-  const probe = spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8', timeout: 15000 })
-  if (probe.error !== undefined && 'code' in probe.error && probe.error.code === 'ETIMEDOUT') {
-    throw new Error('coverage policy: PowerShell availability probe timed out')
+  const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'] as const
+  const timedOut = (probe: ReturnType<typeof spawnSync>): boolean => probe.error !== undefined && 'code' in probe.error && probe.error.code === 'ETIMEDOUT'
+  const probe = spawnSync(resolvePwshPath(), [...args], { encoding: 'utf8', timeout: 15000 })
+  // A cold runner can stall the first spawn; retry once with a wider window
+  // before calling pwsh unavailable rather than dying on a transient.
+  if (timedOut(probe)) {
+    const retry = spawnSync(resolvePwshPath(), [...args], { encoding: 'utf8', timeout: 30000 })
+    return !timedOut(retry) && retry.status === 0
   }
   return probe.status === 0
 }

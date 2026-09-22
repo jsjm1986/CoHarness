@@ -639,7 +639,9 @@ describe('DirectoryBrowser', () => {
     expect(within(columns()[1]!).getByText('harness')).toBeTruthy()
     // The submitted navigation unmounted the focused input; focus parks on
     // the crumb edit zone that replaced it.
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'browser.editPath' }))
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'browser.editPath' }))
+    })
     fireEvent.click(screen.getByRole('button', { name: 'browser.editPath' }))
     const again = screen.getByLabelText<HTMLInputElement>('browser.editPath')
     fireEvent.change(again, { target: { value: '   ' } })
@@ -650,7 +652,9 @@ describe('DirectoryBrowser', () => {
     fireEvent.keyDown(again, { key: 'Escape' })
     expect(screen.queryByLabelText('browser.editPath', { selector: 'input' })).toBeNull()
     // Escape with focus in the input parks focus on the returning edit zone.
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'browser.editPath' }))
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'browser.editPath' }))
+    })
   })
 
   it('prefix-filters the listed level from the draft tail, dot revealing hidden matches', async () => {
@@ -934,7 +938,9 @@ describe('DirectoryBrowser', () => {
     // has no focus trap.
     rowButton(screen.getByRole('listitem')).focus()
     await waitFor(() => { expect(within(columns()[0]!).getByText('harness')).toBeTruthy() })
-    expect(document.activeElement).toBe(screen.getByLabelText('browser.editPath'))
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText('browser.editPath'))
+    })
   })
 
   it('keeps the panes and stays silent when a draft-following scan fails', async () => {
