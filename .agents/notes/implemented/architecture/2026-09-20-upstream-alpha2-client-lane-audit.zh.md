@@ -14,7 +14,7 @@ Status: implemented
 
 - `ui-tool` + `runtime`——Auto-review 拒绝呈现（见姊妹 note `2026-09-20-auto-review-denial-presentation`）。
 - `host/directory-picker-native`——Win32 Alt 按键前台授权（见 `2026-09-20-win32-directory-dialog-foreground`）。
-- `extensions/tool-cordis`——`inspect.ts` 的运行时检视精简；`fiber-state.ts` 已删除。`present.ts`/`prompt.ts` 有意停留在 alpha.1：上游把 `cordis_define`/`cordis_run`/`cordis_stop`/`cordis_undefine` 的注册迁入了 `cordis-host-runner`，而本地接缝把全部 `cordis_*` 模型工具保留在 `tool-cordis`，runner 仅提供服务。
+- `extensions/tool-cordis`——采用 `inspect.ts` 的运行时检视精简；`fiber-state.ts` 已删除。模型执行注册遵循上游退役，本地只读 `cordis_inspect_self` 与显式引用仍保留。[退役决策](../simplification/2026-09-22-retire-dynamic-cordis-model-tools.zh.md)替代此前保留执行工具的选择。
 - `subagent/subagent`——`SubagentCatalogEntry` 的 client 再导出（上游现已一致）。
 - `client/ui-settings-general` locales——`connection.*` 文案，减去本地 Web 壳从不渲染的 desktop-update 键；`connection.retry` 保留，因本地消费方仍在使用。
 - `client/ui-user-questions`——模块注释改写；内容已与上游一致。

@@ -14,11 +14,11 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 <root>/
   --<normalized-cwd>--/          # readable project directory (or _no-cwd/)
     <encoded-id>/                # session-owned directory
-      session.v4.jsonl.zstd      # default: checksummed header frame + append frames
-      session.v4.jsonl           # only with compression: 'none'
+      session.v5.jsonl.zstd      # default: checksummed header frame + append frames
+      session.v5.jsonl           # only with compression: 'none'
 ```
 
-- 当前 artifact 为 `session.v4.jsonl.zstd` 或 `session.v4.jsonl`；已提交的旧 generation 保留各自的版本名称。第一个逻辑行是标记为 `{ type: 'session', version: 4, id, cwd?, createdAt, parentSession?, isSeeded, origin?, delegationDepth, agentPreset?, draft? }` 的 header。`isSeeded` 必须显式提供；继承前缀长度由带继承标记的 `session/end-seed` 记录携带。`delegationDepth` 在磁盘上必需，顶层 Session 为 `0`。可选 `draft` 字段只接受布尔值，两个显式取值都会在列表、检查和冷读取时保留；省略仍保持缺失。未知 header 字段仍然无效。`agentPreset` 必须持久化，因为它决定恢复后的工具与提示词。当前格式的后续每行存储一条已收敛的 Session 事件，包括其中嵌套的 Assistant 流数据，事件序号保持连续。
+- 当前 artifact 为 `session.v5.jsonl.zstd` 或 `session.v5.jsonl`；已提交的旧 generation 保留各自的版本名称。第一个逻辑行是标记为 `{ type: 'session', version: 5, id, cwd?, createdAt, parentSession?, isSeeded, origin?, delegationDepth, agentPreset?, draft? }` 的 header。`isSeeded` 必须显式提供；继承前缀长度由带继承标记的 `session/end-seed` 记录携带。`delegationDepth` 在磁盘上必需，顶层 Session 为 `0`。可选 `draft` 字段只接受布尔值，两个显式取值都会在列表、检查和冷读取时保留；省略仍保持缺失。未知 header 字段仍然无效。`agentPreset` 必须持久化，因为它决定恢复后的工具与提示词。当前格式的后续每行存储一条已收敛的 Session 事件，包括其中嵌套的 Assistant 流数据，事件序号保持连续。
 - 存储记录是逐条原样的 `SessionEvent` JSON。发布版 v0/v1 artifact 可能包含**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`）；当前写入端从不打包——打包行只会经由 catalog 解码的历史 generation 进入此后端，加载结果与非打包行一致。
 - surface 的 `sourceEventSeqs` 数组在连续段有收益时使用无损闭区间范围；读取方同时接受范围形式和旧的数字数组形式。
 - 项目目录保留规范化 cwd 的可读形式，便于导航，并限制在文件系统组件上限内。分隔符替换和截断刻意有损，因此规范化相同的 cwd 字符串共享项目目录；会话 id 仍选择不同会话目录。在不区分大小写的文件系统上，只有文件系统规范化将两种写法解析到同一 transcript（文本记录）时，身份验证才接受备选路径写法。配置根仍由部署控制：可以是项目本地、共享、临时或集中式。[项目会话目录决策](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.zh.md) 记录这项取舍。

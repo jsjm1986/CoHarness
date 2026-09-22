@@ -143,6 +143,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
                     key={option.id}
                     role="option"
                     aria-selected={index === state.active}
+                    aria-disabled={option.disabled === true}
                     className={clsx(css.row, index === state.active && css.rowActive)}
                     // mousedown would race the document capture listener; the shell
                     // owns focus anyway, so a plain click (inside the card → no

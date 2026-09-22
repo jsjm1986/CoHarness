@@ -1011,6 +1011,18 @@
     },
     "session/session-format-v3-to-v4": {
       "sovereignty": "owned"
+    },
+    "context/execution-authority": {
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md"
+    },
+    "context/gateway-execution": {
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md"
+    },
+    "session/session-format-v4-to-v5": {
+      "sovereignty": "owned",
+      "note": "packages/session/session-format-v4-to-v5/README.md"
     }
   },
   "upstreamOnly": [

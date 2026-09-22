@@ -27,6 +27,16 @@ function event(overrides: Partial<UsageEvent> = {}): UsageEvent {
 }
 
 describe('ModelGovernanceService', () => {
+  it('refuses execution proofs in SQLite instead of silently accepting unverified attribution', async () => {
+    const { governance, user, db } = await setup()
+    try {
+      expect(() => governance.ingest({ kind: 'user', id: user.id }, event({
+        sessionId: 'managed-session', actorUserId: user.id, executionInputIds: ['unverified-input'],
+      }))).toThrow('execution attribution requires the PostgreSQL intake')
+      expect(db.prepare('SELECT COUNT(*) AS count FROM model_usage').get()).toEqual({ count: 0 })
+    } finally { db.close() }
+  })
+
   it('chooses an authorized route that the managed runtime actually serves', () => {
     expect(defaultModelFromPolicy({
       models: [

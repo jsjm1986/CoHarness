@@ -120,9 +120,10 @@ async authorize(): Promise<void>
  * @param spec One package spec, including local paths relative to the invocation directory.
  * @param options Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and
  * the pending build scripts to allow for this profile before pnpm runs.
+ * @param signal Cancellation from the calling tool or Remote transport.
  * @returns Package-manager diagnostics and observed activation outcome.
  */
-@Remote async installBundle(spec: string, options?: InstallBundleOptions): Promise<ChangeResult>
+@Remote async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult>
 
 /** Stop an installation this manager owns and wait until its files are back.
  * @param requestId The id the installation was started with.
@@ -133,9 +134,10 @@ async authorize(): Promise<void>
 
 /** Unload and remove a profile-owned bundle dependency through dsh plugin's pnpm path.
  * @param name Installed dependency name.
+ * @param signal Cancellation from the calling tool or Remote transport.
  * @returns Removal diagnostics and the remaining profile state.
  */
-@Remote async removeBundle(name: string): Promise<ChangeResult>
+@Remote async removeBundle(name: string, signal?: AbortSignal): Promise<ChangeResult>
 ```
 
 Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)

@@ -155,6 +155,8 @@ export type {
   ProjectionsBaseline, ProjectionValueStore, SessionProjectionMap, UseProjection,
 } from './sessions/projection-store.ts'
 export type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+export { permissionAvailabilityFor, permissionAvailabilitySource, permissionUnavailableReason } from './contract/permission-availability.ts'
+export type { AccountPermissionAvailability, PermissionAvailability, PermissionUnavailableReason } from './contract/permission-availability.ts'
 export type {
   AddPaneResult, ConversationViewport, ConversationViewportMode, ConversationViewportSnapshot,
 } from './contract/conversation-viewport.ts'
@@ -284,6 +286,7 @@ export function apply(ctx: Context): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const baseSessions = new SessionRuntime(ctx, connection.api, ctx.remote, conversation, {
     provideService: false,
+    hostDescription: connection.hostDescription,
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
   ctx.typert.contexts.registerClient('agent', {

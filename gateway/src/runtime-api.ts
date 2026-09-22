@@ -1,5 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
+import { ExecutionIdentityError, GatewayExecutionIdentity, watchExecutionAccess } from './execution-identity.ts'
+import type { GatewayAccessMonitor } from './access-invalidation.ts'
+import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS } from './config.ts'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
 import {
   SESSION_SURFACE_EVENT_TYPES,
@@ -81,6 +84,10 @@ const EVENT_ENVELOPE_KEYS = new Set([
 ])
 
 interface RuntimeApiDependencies {
+  /** Initialized organization invalidations; streamed as hints to managed runtimes. */
+  accessMonitor?: GatewayAccessMonitor
+  /** Configured liveness interval for execution-watch connections. */
+  executionWatchHeartbeatMs?: number
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
@@ -428,6 +435,7 @@ function draftScopeKey(
 export function createRuntimeApiHandler(
   deps: RuntimeApiDependencies,
 ): (req: IncomingMessage, res: ServerResponse, pathname: string, body: string) => Promise<boolean> {
+  const execution = new GatewayExecutionIdentity(deps.context.pool)
   const authenticate = async (req: IncomingMessage): Promise<RuntimeCredentialSubject | null> => {
     const token = authorizationToken(req)
     return token === undefined ? null : deps.instances.authenticateRuntimeToken(token)
@@ -663,6 +671,58 @@ export function createRuntimeApiHandler(
     }
     try {
       const url = new URL(req.url ?? '/', 'http://runtime')
+      if (pathname === '/internal/runtime/execution/watch' && req.method === 'GET') {
+        if (deps.accessMonitor === undefined) { send(res, 503, { error: 'execution-watch-unavailable' }); return true }
+        watchExecutionAccess(deps.accessMonitor, res, deps.executionWatchHeartbeatMs ?? DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS)
+        return true
+      }
+      if (pathname.startsWith('/internal/runtime/execution/') && req.method === 'POST') {
+        const value: unknown = JSON.parse(body)
+        const payload = record(value)
+        const action = pathname.slice('/internal/runtime/execution/'.length)
+        if (payload === undefined || typeof payload.sessionId !== 'string') throw new ExecutionIdentityError(400, 'invalid execution Session')
+        if (payload.creationAuthorization !== undefined) {
+          if (typeof payload.creationAuthorization !== 'string') throw new ExecutionIdentityError(400, 'invalid execution creation authorization')
+          verifyCreation(payload.creationAuthorization, subject, payload.sessionId)
+        }
+        res.setHeader('cache-control', 'no-store')
+        if (action === 'register-session') {
+          const header = subject.target.kind === 'project'
+            ? await storedHeader(payload.sessionId, subject, requestSignal(req, res)) : undefined
+          await execution.register(subject, value, header)
+          send(res, 200, { registered: true })
+        } else if (action === 'capture') {
+          send(res, 200, await execution.capture(subject, value))
+        } else if (action === 'selection') {
+          await execution.selection(subject, assertionFor(req, deps.principals, subject, true)!, value)
+          res.writeHead(204)
+          res.end()
+        } else if (action === 'input' || action === 'question') {
+          const principal = assertionFor(req, deps.principals, subject, true)!
+          send(res, 200, action === 'input'
+            ? await execution.input(subject, principal, value)
+            : await execution.question(subject, principal, value))
+        } else if (action === 'enter') {
+          send(res, 200, await execution.enter(subject, value))
+        } else if (action === 'inherit' || action === 'relay') {
+          if (subject.target.kind === 'project') {
+            const header = await storedHeader(payload.sessionId, subject, requestSignal(req, res))
+            const sender = action === 'relay' && typeof payload.senderSessionId === 'string'
+              ? await storedHeader(payload.senderSessionId, subject, requestSignal(req, res)) : undefined
+            const related = action === 'inherit'
+              ? header !== undefined && header.parentSessionId === payload.parentSessionId
+              : header !== undefined && sender !== undefined
+                && (header.parentSessionId === sender.id || sender.parentSessionId === header.id)
+            if (!related) {
+              throw new ExecutionIdentityError(403, 'execution inheritance differs from persisted lineage')
+            }
+          }
+          send(res, 200, action === 'inherit' ? await execution.inherit(subject, value) : await execution.relay(subject, value))
+        } else if (action === 'authorize') {
+          send(res, 200, await execution.authorize(subject, value))
+        } else return false
+        return true
+      }
       if (pathname === '/internal/runtime/plugin-management/authorize' && req.method === 'POST') {
         const claims = assertionFor(req, deps.principals, subject, true)!
         if (claims.user.role !== 'admin' || claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
@@ -1537,6 +1597,12 @@ export function createRuntimeApiHandler(
 
       return false
     } catch (error) {
+      if (error instanceof ExecutionIdentityError) {
+        const code = error.status === 403 ? 'execution-forbidden' : error.status === 404 ? 'execution-not-found'
+          : error.status === 409 ? 'execution-conflict' : 'invalid-execution-request'
+        send(res, error.status, { error: code, message: error.message })
+        return true
+      }
       if (error instanceof DocumentCatalogError) {
         send(res, error.status, { error: error.code, message: error.message })
         return true

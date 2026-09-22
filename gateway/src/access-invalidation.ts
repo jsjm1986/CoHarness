@@ -14,6 +14,8 @@ export interface AccessInvalidationSubject {
 
 /** Admission catches up with durable changes; subscribers also receive live revocations. */
 export interface GatewayAccessMonitor {
+  /** Initial/reconnect catch-up and disconnect cleanup have settled; fresh admission still calls synchronize. */
+  readonly available: boolean
   /** Read committed changes before admitting a runtime operation. */
   synchronize(): Promise<void>
   /** Register cancellation/projection work, awaited before its revision is acknowledged. */
@@ -48,6 +50,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
   private readonly timer: NodeJS.Timeout
   private closed = false
   private unavailable = false
+  private caughtUp = false
 
   /**
    * Construct the monitor; call synchronize before accepting traffic.
@@ -58,6 +61,10 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     if (!Number.isSafeInteger(pollMs) || pollMs < 1 || pollMs > 2_147_483_647) throw new Error('invalid access invalidation poll interval')
     this.timer = setInterval(() => { this.wake() }, pollMs)
     this.timer.unref()
+  }
+
+  get available(): boolean {
+    return this.caughtUp && this.client !== undefined && !this.closed && !this.cancelling && !this.unavailable
   }
 
   /**
@@ -126,6 +133,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
   }
 
   private disconnect(): void {
+    this.caughtUp = false
     const client = this.client
     if (client === undefined && this.cancelling) return
     this.client = undefined
@@ -217,5 +225,6 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     }
     this.cursor = cursor
     this.unavailable = false
+    this.caughtUp = true
   }
 }

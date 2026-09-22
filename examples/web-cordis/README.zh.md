@@ -2,9 +2,9 @@
 
 [English](README.md) | 中文
 
-[`@deepseek-ai/dsh-tool-cordis`](../../packages/extensions/tool-cordis/README.zh.md) 的自指示例。agent（智能体）可以检查当前 Cordis 进程，并在内存中挂载或卸载模型编写的插件。临时插件会在卸载或进程退出时消失，并可能影响同一进程中的其他会话。
+通过正式 Web 或 ACP Profile 使用只读 [Cordis 运行时检查](../../packages/extensions/tool-cordis/README.zh.md)。Agent 发现确切的 Host API；Web 还提供实时 Client API 与 Slot 信息。该演示不提供执行动态 Plugin 代码的模型工具。
 
-## 运行
+## 运行方式
 
 启动浏览器界面：
 
@@ -12,10 +12,10 @@
 pnpm run demo:cordis
 ```
 
-改为启动 ACP（Agent Client Protocol）自动化服务器：
+也可以启动 ACP 自动化服务：
 
 ```sh
 pnpm run demo:cordis acp
 ```
 
-这两条命令都需要 `DEEPSEEK_API_KEY`。[Cordis 工具参考](../../packages/extensions/tool-cordis/README.zh.md)定义了四类约定：工具参数、存续时间、清理行为和安全性。
+两个命令都通过标准 `dsh` Profile 启动器加载检查覆盖层。模型对话需要 `DEEPSEEK_API_KEY`。可以要求 Agent 列出检查提供者、查询 Tool 提供者，并说明可用的只读 API。持久化 Plugin 变更由创造模式及插件管理器的授权安装流程负责。

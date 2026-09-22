@@ -44,10 +44,10 @@ describe('admin api URLs', () => {
   it('PATCHes /admin/api/users/:id without a handwritten Origin', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonOk(undefined, 204))
     vi.stubGlobal('fetch', fetchMock)
-    await patchUser(7, { status: 'disabled' })
+    await patchUser(7, { status: 'disabled', autoReviewEligible: false })
     expect(fetchMock).toHaveBeenCalledWith('/admin/api/users/7', {
       method: 'PATCH',
-      body: JSON.stringify({ status: 'disabled' }),
+      body: JSON.stringify({ status: 'disabled', autoReviewEligible: false }),
       credentials: 'same-origin',
       headers: { 'content-type': 'application/json' },
     })

@@ -226,6 +226,7 @@ function mount(
           useMenuLauncher={bindSnapshotSelector(createSnapshotStore<string | null>(null))}
           useDocuments={(() => []) as InputBarProps['useDocuments']}
           usePermissionCatalog={(() => undefined) as InputBarProps['usePermissionCatalog']}
+          usePermissionAvailability={(() => 'local') as InputBarProps['usePermissionAvailability']}
           stop={stop}
           command={() => Promise.resolve(true)}
           t={t}

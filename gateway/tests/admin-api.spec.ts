@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
@@ -107,6 +107,74 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('validates Auto eligibility as a strict boolean before changing any user field', async () => {
+    const { deps, base, cookie, member, invalidated } = await setup()
+    for (const autoReviewEligible of [null, 0, 1, 'true', [], {}]) {
+      const response = await fetch(`${base}/admin/api/users/${member.id}`, {
+        method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ displayName: 'must not change', autoReviewEligible }),
+      })
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'invalid autoReviewEligible' })
+    }
+    expect((await deps.users.getById(member.id))?.displayName).toBe(member.displayName)
+    expect(invalidated).toEqual([])
+  })
+
+  it('refuses Auto eligibility updates when a legacy user service has no atomic patch', async () => {
+    const { deps, base, cookie, member, invalidated } = await setup()
+    const descriptor = Object.getOwnPropertyDescriptor(deps.users, 'patch')
+    Object.defineProperty(deps.users, 'patch', { value: undefined, configurable: true })
+    try {
+      const response = await fetch(`${base}/admin/api/users/${member.id}`, {
+        method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ autoReviewEligible: true, displayName: 'must not change' }),
+      })
+      expect(response.status).toBe(503)
+      expect(await response.json()).toEqual({ error: 'user-eligibility-update-unavailable' })
+      expect(await deps.users.getById(member.id)).toMatchObject({ displayName: member.displayName, autoReviewEligible: false })
+      expect(invalidated).toEqual([])
+    } finally {
+      if (descriptor === undefined) delete deps.users.patch
+      else Object.defineProperty(deps.users, 'patch', descriptor)
+    }
+  })
+
+  it('lets only administrators grant Auto eligibility without selecting a session preset', async () => {
+    const { deps, base, cookie, member, root, invalidated, stoppedTargets } = await setup()
+    const settingsPath = join(root, 'users/worker/dsh/settings.yaml')
+    const permissionDefaults = 'permission:\n  defaultPreset: workspace-write\n'
+    writeFileSync(settingsPath, permissionDefaults)
+    expect(await deps.users.getById(member.id)).toMatchObject({ autoReviewEligible: false })
+    const workerCookie = await login(base, 'worker', 'pw-12345678')
+    const project = await deps.projects.createManaged!({ name: 'owned', ownerUserId: member.id })
+    for (const forbiddenCookie of [workerCookie, `${workerCookie}; hgw_scope=project:${project.id}`]) {
+      const forbidden = await fetch(`${base}/admin/api/users/${member.id}`, {
+        method: 'PATCH', headers: { cookie: forbiddenCookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ autoReviewEligible: true }),
+      })
+      expect(forbidden.status).toBe(403)
+    }
+    for (const autoReviewEligible of [true, false]) {
+      const response = await fetch(`${base}/admin/api/users/${member.id}`, {
+        method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ autoReviewEligible }),
+      })
+      expect(response.status).toBe(204)
+      expect(await deps.users.getById(member.id)).toMatchObject({ autoReviewEligible })
+      const list = await fetch(`${base}/admin/api/users`, { headers: { cookie } })
+      expect(await list.json()).toEqual(expect.arrayContaining([expect.objectContaining({ id: member.id, autoReviewEligible })]))
+    }
+    expect(invalidated).toEqual([{ userId: member.id }, { userId: member.id }])
+    expect(stoppedTargets).toEqual([])
+    expect(readFileSync(settingsPath, 'utf8')).toBe(permissionDefaults)
+    const audits = await deps.audit.query({ action: 'admin.users.auto-review-eligibility' })
+    expect(audits).toHaveLength(2)
+    expect(audits.map(row => JSON.parse(row.detail))).toEqual(expect.arrayContaining([
+      { id: member.id, autoReviewEligible: true }, { id: member.id, autoReviewEligible: false },
+    ]))
+  })
+
   it('lists, reads, and batches archive lifecycle actions for administrators', async () => {
     const row: ConversationArchiveRow = {
       rootSessionId: 'session-archive-1', title: '已归档对话', contentPreview: '首条用户内容摘要', creator: { id: 2, displayName: 'worker' },

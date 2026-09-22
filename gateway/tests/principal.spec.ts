@@ -12,7 +12,7 @@ const USER: UserRow = {
   displayName: 'Alice',
   role: 'user',
   status: 'active',
-  mustChangePassword: false,
+  mustChangePassword: false, autoReviewEligible: false,
   homePath: '/tmp/alice',
 }
 

@@ -11,7 +11,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { ConnectionHttpHandler, ConnectionRequestBoundary } from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import { gatewayPluginManagementAuthorization } from './plugin-management.ts'
+import type {} from '@deepseek-ai/dsh-execution-authority'
 
 /** HTTP header carrying one Gateway-signed browser principal. */
 export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
@@ -408,7 +408,7 @@ export class GatewayRuntime extends Service {
   private readonly credential: GatewayRuntimeCredential
   private readonly gatewayUrl: URL
   private readonly publicKey: KeyObject
-  private readonly requests = new AsyncLocalStorage<GatewayRequestPrincipal>()
+  private readonly requests = new AsyncLocalStorage<{ principal: GatewayRequestPrincipal; interactive: boolean }>()
   private readonly readinessRequests = new AsyncLocalStorage<string>()
   private readonly sessionCreations = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
 
@@ -419,10 +419,10 @@ export class GatewayRuntime extends Service {
     this.organization = this.credential.organization
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
     this.publicKey = createPublicKey(this.credential.principalPublicKey)
-    const managementLifetime = new AbortController()
-    ctx.effect(() => () => { managementLifetime.abort(new Error('Gateway management authorization is unavailable')) },
-      'gateway-runtime: stop management authorization')
-    ctx.provide('pluginManagementAuthorization', gatewayPluginManagementAuthorization(this, managementLifetime.signal))
+    if (ctx.root.get('executionAuthorityRequired') !== true) {
+      ctx.root.effect(() => ctx.root.provide('executionAuthorityRequired', true),
+        'gateway-runtime: managed application identity')
+    }
     ctx.on('connection/request', (request: ConnectionRequestBoundary, next) => {
       const requestMeta = request as ConnectionRequestBoundary & { method?: string; pathname?: string }
       const header = request.headers[GATEWAY_PRINCIPAL_HEADER]
@@ -441,7 +441,10 @@ export class GatewayRuntime extends Service {
         assertion: header,
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
       }
-      return this.requests.run(principal, next)
+      const requestScope = { principal, interactive: request.kind === 'http' }
+      return this.requests.run(requestScope, async () => {
+        try { await next() } finally { requestScope.interactive = false }
+      })
     })
     const connection = ctx.get('connection')
     if (connection === undefined) throw new Error('gateway runtime requires the connection service')
@@ -482,7 +485,16 @@ export class GatewayRuntime extends Service {
    * @returns the verified principal, or undefined outside an authenticated operation.
    */
   current(): GatewayRequestPrincipal | undefined {
-    return this.requests.getStore()
+    return this.requests.getStore()?.principal
+  }
+
+  /**
+   * Read the live HTTP caller; detached work cannot keep interactive authority.
+   * @returns the caller while the HTTP operation remains active, otherwise undefined.
+   */
+  interactive(): GatewayRequestPrincipal | undefined {
+    const scope = this.requests.getStore()
+    return scope?.interactive === true ? scope.principal : undefined
   }
 
   /**

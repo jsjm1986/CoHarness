@@ -26,6 +26,8 @@ The `/client` entrypoint exports the plugin body (`apply`/`inject`), `CommandUiR
 
 Typing a `/` command opens a registered popup, a client action, a host command's input, or direct execution; a command line is never silently downgraded to a plain prompt. Business packages register popupSelect specs (`/model`, `/permission`) or actions through `ctx.commandUi`, or decorate existing host commands with either kind while preserving their catalog rows and argument claims. Space and Enter resolve the line against the session's directory: a host descriptor with `input` is `leadingInput`, a registered `CommandUiSpec` is `popupSelect` or `action`, and everything else is `execute`.
 
+Popup options can be disabled with an explanation; pointer and keyboard selection both refuse them. A business spec may subscribe to invalidation of its captured options. That subscription exists only while its popup is open and dismisses only that popup; close, replacement, successful selection, and scope disposal release it. Reopening obtains fresh options without another directory cache.
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. The command directory is a session-keyed cache refetched through the owning command surface; it mirrors host data rather than owning a relation.

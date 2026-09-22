@@ -51,6 +51,8 @@ describe('SessionRuntimePool', () => {
 
     await expect(pool.ensureSession({ kind: 'project', projectId: 7, projectName: 'Demo' }, 'project-session' as SessionId)).resolves.toBe(true)
     expect(pool.runtimeTargetFor('project-session' as SessionId)).toEqual({ kind: 'project', projectId: 7, projectName: 'Demo' })
+    expect(pool.binding('project-session' as SessionId)?.hostDescription).toBe(targetConnection.hostDescription)
+    expect(pool.binding('project-session' as SessionId)?.hostDescription).not.toBe(baseConnection.hostDescription)
     expect(pool.list.getSnapshot().byId['project-session' as SessionId]).toMatchObject({
       cwd: '/projects/demo', projectId: 7, workspaceName: 'Demo',
     })

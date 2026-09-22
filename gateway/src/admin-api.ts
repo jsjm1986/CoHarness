@@ -637,6 +637,13 @@ async function dispatch(
     const displayName = str(input, 'displayName')
     const role = str(input, 'role')
     const status = str(input, 'status')
+    const autoReviewEligible = input.autoReviewEligible
+    if (Object.hasOwn(input, 'autoReviewEligible') && typeof autoReviewEligible !== 'boolean') {
+      sendError(res, 400, 'invalid autoReviewEligible'); return true
+    }
+    if (autoReviewEligible !== undefined && deps.users.patch === undefined) {
+      sendError(res, 503, 'user-eligibility-update-unavailable'); return true
+    }
     if (role !== undefined && role !== 'admin' && role !== 'user') { sendError(res, 400, 'invalid role'); return true }
     if (status !== undefined && status !== 'active' && status !== 'disabled') { sendError(res, 400, 'invalid status'); return true }
     if (deps.users.patch !== undefined) {
@@ -644,8 +651,10 @@ async function dispatch(
         ...(role === undefined ? {} : { role }),
         ...(status === undefined ? {} : { status }),
         ...(displayName === undefined ? {} : { displayName }),
+        ...(typeof autoReviewEligible === 'boolean' ? { autoReviewEligible } : {}),
       })
-      if (role !== undefined || status !== undefined) invalidateAccess?.({ userId })
+      if (role !== undefined || status !== undefined || autoReviewEligible !== undefined) invalidateAccess?.({ userId })
+      if (autoReviewEligible !== undefined) await write('admin.users.auto-review-eligibility', { id: userId, autoReviewEligible })
       if (role !== undefined) {
         await applyGrantsToUser(deps, userId, admin.id)
         if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)

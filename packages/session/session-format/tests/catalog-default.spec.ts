@@ -505,7 +505,7 @@ describe('v3-to-v4 assistant stream fold', () => {
       event('step/end', 5, { turn: 1, step: 1 }),
       event('turn/end', 6, { turn: 1, reason: { kind: 'completed' } }),
     ], 3)
-    expect(migrated.header.version).toBe(4)
+    expect(migrated.header.version).toBe(5)
     expect(migrated.events.map(item => item.type)).toEqual([
       'turn/start', 'step/start', 'assistant/message', 'step/end', 'turn/end',
     ])
@@ -743,6 +743,6 @@ describe('v3-to-v4 inherited cut', () => {
       { version: 2, id: 's', createdAt: 1, isSeeded: true }, 2,
       { emitEvent: () => {} },
     )
-    expect(flow.header.version).toBe(4)
+    expect(flow.header.version).toBe(5)
   })
 })

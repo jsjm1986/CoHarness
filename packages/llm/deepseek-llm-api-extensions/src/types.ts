@@ -24,7 +24,7 @@ export interface DeepSeekLlmApiExtensionRequest {
   /** Resolved provider endpoint, when the adapter can identify it. */
   readonly endpoint?: string
   /** Auxiliary request classification, when present. */
-  readonly purpose?: 'compaction' | 'session-title'
+  readonly purpose?: 'compaction' | 'session-title' | 'auto-review'
   /** Cancellation for request preparation; providers must stop promptly after abort. */
   readonly signal: AbortSignal
 }

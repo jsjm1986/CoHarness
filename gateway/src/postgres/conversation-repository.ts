@@ -1029,7 +1029,13 @@ export class ConversationRepository {
     events: readonly ConversationEvent[],
     header?: ConversationHeader,
   ): Promise<'inserted' | 'duplicate'> {
-    if (events.length === 0) return 'inserted'
+    if (events.length === 0) {
+      if (header !== undefined) {
+        if (header.id !== sessionId) throw new Error('conversation append header id mismatch')
+        await this.create(header)
+      }
+      return 'inserted'
+    }
     for (let index = 0; index < events.length; index++) {
       if (events[index]!.seq !== events[0]!.seq + index) throw new Error('conversation event batch must be contiguous')
     }

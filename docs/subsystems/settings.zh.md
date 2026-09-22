@@ -46,6 +46,13 @@ interface SettingsRegisterOptions<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /**
+   * Authorize a resolved in-process write before persistence. Registration and
+   * provider reloads do not call this hook; their validation stays synchronous.
+   * @param value - immutable, schema-valid next section at the front of its write queue.
+   * @returns completion when persistence is authorized; rejection leaves storage unchanged.
+   */
+  authorizeWrite?: (value: T) => Promise<void>
   /** Logical owner shown by remote configuration surfaces. */
   owner?: SettingsOwner
   /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
@@ -61,6 +68,8 @@ interface SettingsRegisterOptions<T> {
 ```
 
 `validate` 在 schema 接纳该值之后运行，因此它看到的默认值和组合 base 与 owner 实际看到的完全一致。`dsh-llm-pi-ai` 用它在写入处拒绝自己无法服务的提供方 profile，而不是先存下来、再让该 namespace 下每条路由失效。
+
+`authorizeWrite` 只在进程内写入时运行，位于解析之后、持久化之前。它可以等待部署的实时授权；等待期间的拒绝、卸载或外部版本改变都会拒绝写入。它不参与注册或提供方重载。
 
 `applies` 是 UI 提示而非机制：`restart` 的 owner 只是从不 watch，其值在构造期读取一次，配置界面可为待生效变更加标。
 

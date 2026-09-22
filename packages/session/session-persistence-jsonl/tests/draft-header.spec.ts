@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import type { SessionHeader } from '@deepseek-ai/dsh-session'
+import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
+import { releasedV4SessionFormatCodec } from '@deepseek-ai/dsh-session-format-v3-to-v4'
 import { meta, oneTurnLog } from '../../session-persistence/tests/contract.ts'
-import { logPath, parseGenerationLogFilename, toHeaderLine, type JsonlCompression } from '../src/format.ts'
+import { generationLogPath, logPath, parseGenerationLogFilename, toHeaderLine, type JsonlCompression } from '../src/format.ts'
 import { compressZstdFrame } from '../src/zstd.ts'
 
 const contexts: Context[] = []
@@ -34,6 +36,44 @@ async function backend(root: string, compression: JsonlCompression): Promise<Con
 }
 
 describe.each(['none', 'zstd'] as const)('browser-draft headers with %s', (compression) => {
+  it.each([undefined, false, true])('publishes V5 beside old-writer V4 draft=%j without changing the source generation', async (draft) => {
+    const root = await temporaryRoot()
+    const currentHeader: SessionHeader = { ...meta('old-writer-draft', join(root, 'workspace')), delegationDepth: 0,
+      ...draft === undefined ? {} : { draft } }
+    const events = oneTurnLog()
+    const sourceHeader = { ...currentHeader, version: 4, delegationDepth: 0 }
+    const lines = [releasedV4SessionFormatCodec.encodeHeader(sourceHeader, 0),
+      ...events.map(event => releasedV4SessionFormatCodec.encodeEvent(event as unknown as SessionFormatEvent))]
+    const text = Buffer.from(lines.map(line => JSON.stringify(line)).join('\n') + '\n')
+    const bytes = compression === 'zstd' ? Buffer.concat([
+      await compressZstdFrame(Buffer.from(JSON.stringify(lines[0]) + '\n')),
+      await compressZstdFrame(Buffer.from(lines.slice(1).map(line => JSON.stringify(line)).join('\n') + '\n')),
+    ]) : text
+    const sourcePath = generationLogPath(root, currentHeader.cwd, currentHeader.id, 4, compression)
+    const targetPath = logPath(root, currentHeader.cwd, currentHeader.id, compression)
+    await mkdir(dirname(sourcePath), { recursive: true })
+    await writeFile(sourcePath, bytes)
+    const before = await stat(sourcePath, { bigint: true })
+    const cold = await backend(root, compression)
+    expect(await cold.sessionPersistence.listHeaders()).toContainEqual(currentHeader)
+    await expect(stat(targetPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    const restored = await cold.sessionPersistence.inspect(currentHeader.id)
+    expect(restored.meta).toEqual(currentHeader)
+    expect(restored.events).toEqual(events)
+    await expect(stat(targetPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    const reopened = await cold.sessionPersistence.open(currentHeader.id, 'read')
+    try { expect(reopened.header).toEqual(currentHeader); expect((await reopened.read()).events).toEqual(events) }
+    finally { await reopened.close() }
+    await expect(stat(targetPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    const writer = await cold.sessionPersistence.open(currentHeader.id, 'write')
+    try { await writer.flush() } finally { await writer.close() }
+    expect((await stat(targetPath)).size).toBeGreaterThan(0)
+    expect(await readFile(sourcePath)).toEqual(bytes)
+    const after = await stat(sourcePath, { bigint: true })
+    expect({ inode: after.ino, mtime: after.mtimeNs, size: after.size })
+      .toEqual({ inode: before.ino, mtime: before.mtimeNs, size: before.size })
+  })
+
   it.each([undefined, false, true])('preserves draft=%j across a real write, cold inspect and read handle', async (draft) => {
     const root = await temporaryRoot()
     const header: SessionHeader = { ...meta('browser-draft', join(root, 'workspace')), delegationDepth: 0,

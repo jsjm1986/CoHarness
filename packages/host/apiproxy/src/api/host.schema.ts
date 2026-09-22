@@ -19,6 +19,7 @@ export const hostDescribeValueSchema = z.object({
   attachedSessions: z.number().int().nonnegative(),
   home: z.string(),
   canOpenPath: z.boolean(),
+  executionAuthorityRequired: z.boolean().optional(),
   workspaceFiles: z.object({
     maxBytes: z.number().int().positive(),
     maxLines: z.number().int().positive(),

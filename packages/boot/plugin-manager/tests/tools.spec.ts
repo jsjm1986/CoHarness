@@ -186,13 +186,13 @@ it('forwards all mutation actions and renders the returned outcome', async () =>
   await call({ action: 'set_bundle', target: 'bundle', enabled: true })
   expect(manager.setBundleEnabled).toHaveBeenCalledWith('bundle', true)
   await call({ action: 'install_bundle', target: 'bundle' })
-  expect(manager.installBundle).toHaveBeenLastCalledWith('bundle', {})
+  expect(manager.installBundle).toHaveBeenLastCalledWith('bundle', {}, expect.any(AbortSignal))
   await call({ action: 'install_bundle', target: 'bundle', enabled: false })
-  expect(manager.installBundle).toHaveBeenLastCalledWith('bundle', { enabled: false })
+  expect(manager.installBundle).toHaveBeenLastCalledWith('bundle', { enabled: false }, expect.any(AbortSignal))
   await call({ action: 'install_bundle', target: 'bundle', approvedBuilds: ['native'] })
-  expect(manager.installBundle).toHaveBeenLastCalledWith('bundle', { approvedBuilds: ['native'] })
+  expect(manager.installBundle).toHaveBeenLastCalledWith('bundle', { approvedBuilds: ['native'] }, expect.any(AbortSignal))
   expect(resultText(await call({ action: 'remove_bundle', target: 'bundle' }))).toContain('"application":"failed"')
-  expect(manager.removeBundle).toHaveBeenCalledWith('bundle')
+  expect(manager.removeBundle).toHaveBeenCalledWith('bundle', expect.any(AbortSignal))
 })
 
 it.each([

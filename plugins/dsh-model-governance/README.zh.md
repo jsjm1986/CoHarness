@@ -6,7 +6,9 @@
 
 该 bundle 会为 Gateway 启动的每个个人和项目实例挂载 `dsh-gateway-runtime`。它的 peer 服务包由宿主安装提供，因此插件与挂载的运行时共享同一份 Cordis 实例。
 
-策略与用量记录不包含 API Key、提示词或回复内容。组织凭据在 Gateway 数据库中保持加密，只在适配器解析其引用时通过已鉴权的回环运行时 API 传递。凭据来源只是用于区分公司与个人成本的非秘密层标识。共享项目用量在 durable request 消息中存在已验证 participant 时会携带其用户 ID 与项目 ID；Gateway 会校验项目作用域，这些 ID 只用于活动报告，不改变账务归属。若 actor 校验失败，outbox 会用同一事件去掉活动字段重试，使项目账务仍记录为未归属。以 UUID 命名的 outbox 文件通过同目录 rename 提交，仅在 intake 成功响应后删除；intake 去重使重试安全。
+策略与用量记录不包含 API Key、提示词或回复内容。组织凭据在 Gateway 数据库中保持加密，只在适配器解析其引用时通过已鉴权的回环运行时 API 传递。凭据来源用于区分公司与个人成本。受管模型请求使用实际发起 Agent 的执行权威，或已授权 Auto review 提供的不可变见证。outbox 记录一位主要发起人和 `executionInputIds`；即使请求包含多位参与人也只产生一笔账单。没有存活 Agent 的冷启动辅助请求明确保持未归属。受管权威缺失或 Auto 归因不完整时，在适配器派发前拒绝请求。
+
+PostgreSQL intake 校验见证属于指定 Session 与运行时，并校验主要发起人的历史参与事实。撤权或账户删除不能抹去已证明输入产生的费用；这些历史事实不授予执行权限。项目记录保持项目账务归属和一位活动发起人，个人记录只以账户所有者作为账务用户。无效证明保留在 outbox 中，绝不删掉归因字段后重试。无证明的旧记录保留既有当前可写成员检查与去归因重试。UUID 文件只在 intake 成功后删除，事件去重防止重复扣费。
 
 个人 settings 成功提交后，还会为 Provider/model 的新增、修改和删除生成 `model-registration` 记录。插件挂载时会为 user settings 层中已经存在的身份生成确定性基线记录，重启重放时按事件 ID 幂等。记录只包含路由身份、动作、作用域和时间戳，绝不包含凭据引用值、profile 内容、标头、提示词或回复。它们与用量记录共用 outbox 和 intake 令牌，但 Gateway 存储和管理员查询会把登记历史与调用用量分开。项目运行时不会产生个人登记记录。
 
@@ -37,7 +39,7 @@
 
 ## 模型体验
 
-被禁止的路由在 provider 派发前以 `MODEL_FORBIDDEN` 结束 stream。发起 Agent 身份与显式 `sessionId` 不一致时以 `MODEL_ATTRIBUTION_CONFLICT` 结束。插件不添加任何提示词内容。
+被禁止的路由在 provider 派发前以 `MODEL_FORBIDDEN` 结束 stream。发起 Agent 身份与显式 `sessionId` 不一致时以 `MODEL_ATTRIBUTION_CONFLICT` 结束。执行归因缺失或被拒绝时以 `MODEL_EXECUTION_IDENTITY_FAILED` 结束。插件不添加任何提示词内容。
 
 #### KV Cache 影响
 

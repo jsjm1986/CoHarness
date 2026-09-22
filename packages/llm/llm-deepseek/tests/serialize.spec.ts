@@ -17,6 +17,13 @@ function request(overrides: Partial<GenerateOptions> = {}): GenerateOptions {
   return { provider: 'deepseek-official', model: 'deepseek-v4-flash', messages: [], ...overrides }
 }
 
+it('keeps Auto billing identity and purpose out of the Chat Completions wire request', () => {
+  const internal = Object.assign(request({ purpose: 'auto-review' }), {
+    sessionId: 'billing-session', executionIdentity: { inputs: ['private-input'], primaryActorUserId: 7 },
+  })
+  expect(serializeRequest(internal)).toEqual(serializeRequest(request()))
+})
+
 function imageRef(mediaType: ImageMediaType = 'image/png', bytes = 3): ImageAttachmentRef {
   const digit = ({
     'image/png': 'a',

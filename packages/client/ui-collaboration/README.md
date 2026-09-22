@@ -20,6 +20,8 @@ Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client
 - New `rw` project-session flows pass the staged visibility through `sessions/prepare-create`. Before reusing a blank candidate, `sessions/confirm-blank-reuse` revalidates its root visibility through the Gateway and accepts only an exact match; a mismatch creates a new root with the prepared visibility. HTTP responses are decoded at the browser trust boundary through a streaming 16 MiB byte budget before any state is published.
 - All registrations are effects and unload cleanly. Personal scope keeps the ordinary Web UI and clears project conversation detail state.
 
+Account context also publishes the current account's Full and Auto choice qualifications into the existing runtime UI policy. Refresh starts by withdrawing verification; a failed request keeps display context but does not retain permission eligibility. Connection reset aborts and discards the previous context request. Consumers combine that account value with their own connection's deployment facts, following the [permission UI rules](../ui-permission-presets/README.md).
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. Collaboration truth lives on the Gateway behind authenticated endpoints; the plugin stages only request-scoped selections and composer policy in the page.

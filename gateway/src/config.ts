@@ -38,6 +38,8 @@ export interface GatewayConfig {
   upstreamTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
   accessInvalidationPollMs: number
+  /** Heartbeat interval for a managed runtime's execution revocation stream. */
+  executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
   upstreamResponseLimitBytes: number
   /** Maximum buffered body bytes accepted by one authenticated runtime API call. */
@@ -108,6 +110,7 @@ export const DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES = 64 * 1024 * 1024
 export const DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS = 1_000
 export const DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS = 30_000
 export const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000
+export const DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS = 15_000
 export const DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES = 64 * 1024 * 1024
 /** Maximum delay accepted by Node's timer-backed APIs (setTimeout/setInterval). */
 export const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -470,6 +473,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
     accessInvalidationPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_POLL_MS, 1_000, 'HGW_ACCESS_INVALIDATION_POLL_MS'),
+    executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,
     bootstrapAdminPasswordFile,

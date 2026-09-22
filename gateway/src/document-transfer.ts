@@ -1066,6 +1066,7 @@ function syntheticUser(principal: GatewayPrincipalClaims): UserRow {
     status: 'active',
     homePath: '',
     mustChangePassword: false,
+    autoReviewEligible: false,
   }
 }
 

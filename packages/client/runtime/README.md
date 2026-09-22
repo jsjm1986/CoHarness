@@ -19,6 +19,8 @@ Settings owners share the React-free `SettingsScopeSpec`, `SettingsScope`, and s
 Use `dsh-client-runtime` as the client-side object layer: it boots the Cordis browser context and owns `Session`/`Workspace` runtime objects, the shared Host event stream fan-out, projection stores, and history paging that conversation views subscribe to. Client sessions are always Host-born; domain packages read their owner events and projection slices through this layer instead of holding session state themselves.
 
 
+`SessionBinding.hostDescription` retains the description source of the connection that owns that Session, including separately staged workbench targets. The existing UI policy carries the current account's derived permission qualification. `permissionAvailabilitySource` observes those two sources without caching a second catalog; an unknown target never borrows another pane's standalone status.
+
 ## Workspace file resources
 
 `WorkspaceResourceRegistry` keeps metadata by explicit runtime target and Session-relative resource address. The bootstrap connection has a distinct `base` identity; each project connection registers `workspaceResourceProvider(api)` with its own API client after the Host handshake advertises file support. File requests never derive a target from the focused pane. The Host-configured `workspaceFileMaxResources` bounds retained records per runtime; idle records are evicted in usage order, while active resources refuse admission at the bound.

@@ -6,6 +6,7 @@ export type AdminUser = {
   status: 'active' | 'disabled'
   homePath: string
   mustChangePassword: boolean
+  autoReviewEligible: boolean
   port: number
   instanceState: string
 }
@@ -273,6 +274,7 @@ export function patchUser(id: number, body: {
   displayName?: string
   role?: 'admin' | 'user'
   status?: 'active' | 'disabled'
+  autoReviewEligible?: boolean
 }): Promise<void> {
   return request(`/admin/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }

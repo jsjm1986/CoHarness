@@ -52,6 +52,7 @@ function snapshot(partial: Partial<CollaborationSnapshot> = {}): CollaborationSn
     status: 'ready',
     context: projectContext,
     stagedVisibility: 'project',
+    contextVerified: true,
     scopeBusy: false,
     conversations: {},
     ...partial,

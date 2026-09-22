@@ -21,7 +21,7 @@ describe('catalog preset migration', () => {
     const restore = sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })
     for (const row of source) restore.decodeRow(row)
     const artifact = restore.finish()
-    expect(artifact.header).toMatchObject({ version: 4, id: 'code', agentPreset: 'ptc', isSeeded: true })
+    expect(artifact.header).toMatchObject({ version: 5, id: 'code', agentPreset: 'ptc', isSeeded: true })
     expect(artifact.inheritedEventCount).toBe(2)
     expect(artifact.events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5])
     expect(artifact.events.filter(event => event.type === 'agent-preset/selected').map(event => event.data))

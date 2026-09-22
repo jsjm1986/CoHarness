@@ -2,6 +2,10 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'unavailable.unverified': '暂时无法确认账户资格，请重新连接后重试。',
+  'unavailable.admin-required': '仅管理员可选择完全权限，请选择普通权限模式。',
+  'unavailable.auto-ineligible': 'Auto 只能逐会话启用，不能设为新会话默认值。',
+
   'title': '权限',
   'description': '选择新会话的默认权限模式',
   'managedByProject': '项目 owner 或组织管理员管理新会话的默认权限。',
@@ -25,6 +29,10 @@ export type PermissionSettingsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'unavailable.unverified': 'Account eligibility is unconfirmed. Reconnect and try again.',
+  'unavailable.admin-required': 'Full access is available to administrators only. Choose a standard mode.',
+  'unavailable.auto-ineligible': 'Auto must be enabled per session and cannot be a new-session default.',
+
   'title': 'Permission',
   'description': 'Choose the default permission mode for new sessions',
   'managedByProject': 'The project owner or an organization administrator manages the default for new sessions.',
@@ -45,6 +53,11 @@ export const en = {
 
 /** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
+  'currentUnavailable': '当前模式无法用于此账户，请选择普通权限模式。',
+  'unavailable.unverified': '暂时无法确认账户资格，请重新连接后重试。',
+  'unavailable.admin-required': '仅管理员可选择完全权限。',
+  'unavailable.auto-ineligible': '此账户没有 Auto 资格，请选择普通权限模式。',
+
   'preset.readOnly': '仅可查看',
   'preset.workspaceWrite': '工作区内修改',
   'preset.fullAccess': '完全权限',
@@ -60,6 +73,11 @@ export type PermissionAccessKey = keyof typeof accessZh
 
 /** English dictionary for the current-session popup gate. */
 export const accessEn = {
+  'currentUnavailable': 'The selected mode is unavailable for this account. Choose a standard mode.',
+  'unavailable.unverified': 'Account eligibility is unconfirmed. Reconnect and try again.',
+  'unavailable.admin-required': 'Full access is available to administrators only.',
+  'unavailable.auto-ineligible': 'This account is not eligible for Auto. Choose a standard mode.',
+
   'preset.readOnly': 'Read Only',
   'preset.workspaceWrite': 'Workspace Write',
   'preset.fullAccess': 'Full access',

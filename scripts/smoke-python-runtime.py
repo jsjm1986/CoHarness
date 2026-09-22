@@ -47,24 +47,6 @@ SNAPSHOT_SESSION_ID = "advanced-executable"
 SNAPSHOT_DIRECT_CHILD_PROMPT = "Reply with exactly DIRECT_CHILD_OK and nothing else."
 SNAPSHOT_WORKFLOW_CHILD_PROMPT = "Reply with exactly WORKFLOW_CHILD_OK and nothing else."
 SNAPSHOT_FINAL_TEXT = "ADVANCED_EXECUTABLE_OK"
-SNAPSHOT_PLUGIN_CODE = """\
-return (ctx) => {
-  harness.registerTool(ctx, harness.defineTool({
-    name: 'snapshot_double',
-    description: 'Double a number for executable snapshot verification.',
-    parameters: { value: { type: 'number', required: true } },
-    output: {
-      schema: { type: 'number' },
-      render(_args, value) {
-        return [{ type: 'text', text: String(value) }]
-      }
-    },
-    async execute(args) {
-      return args.value * 2
-    }
-  }))
-}
-"""
 SNAPSHOT_WORKFLOW_SCRIPT = (
     "phase('Delegate')\n"
     f"const reply = await agent('{SNAPSHOT_WORKFLOW_CHILD_PROMPT}', {{ label: 'workflow-child' }})\n"
@@ -372,17 +354,9 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
     if prompt == SNAPSHOT_WORKFLOW_CHILD_PROMPT:
         return text_chunks("WORKFLOW_CHILD_OK")
     if prompt == SNAPSHOT_PROMPT:
-        assert_advertised_tool(body, "cordis_define")
-        return tool_call_chunks(
-            "advanced-define",
-            "cordis_define",
-            {
-                "plugin": {"kind": "new", "idPrefix": "snap"},
-                "name": "Snapshot Double",
-                "purpose": "Expose a deterministic doubling tool for executable snapshot verification.",
-                "code": {"host": SNAPSHOT_PLUGIN_CODE},
-            },
-        )
+        assert_read_only_cordis(body)
+        assert_advertised_tool(body, "cordis_inspect_list")
+        return tool_call_chunks("advanced-inspect", "cordis_inspect_list", {})
     if prompt == CODE_PROMPT:
         assert_advertised_tool(body, "run_code")
         return tool_call_chunks(
@@ -508,6 +482,14 @@ def minimal_tool_followup(
     raise AssertionError(f"unexpected minimal-agent follow-up: {call_id} {tool_name}: {tool_text}")
 
 
+def assert_read_only_cordis(body: dict[str, object]) -> None:
+    """Reject a packaged runtime that advertises retired dynamic execution tools."""
+    retired = {"cordis_define", "cordis_run", "cordis_stop", "cordis_undefine"}
+    exposed = retired.intersection(advertised_tool_names(body))
+    if exposed:
+        raise AssertionError(f"retired Cordis tools remain callable: {sorted(exposed)}")
+
+
 def advanced_tool_followup(
     body: dict[str, object],
     call_id: str,
@@ -517,33 +499,23 @@ def advanced_tool_followup(
     """Advance the executable snapshot's deterministic parent tool chain."""
     if not call_id.startswith("advanced-"):
         return None
-    if call_id == "advanced-define" and tool_name == "cordis_define":
-        if "Defined snap-1/pkg-1 (Snapshot Double)" not in tool_text:
-            raise AssertionError(f"cordis_define returned no dynamic Package ids: {tool_text}")
-        if "snapshot_double" in advertised_tool_names(body):
-            raise AssertionError("snapshot_double was advertised before cordis_run")
-        assert_advertised_tool(body, "cordis_run")
-        return tool_call_chunks(
-            "advanced-run",
-            "cordis_run",
-            {"pluginId": "snap-1", "packageId": "pkg-1", "mode": "run"},
-        )
-    if call_id == "advanced-run" and tool_name == "cordis_run":
-        if "snap-1/pkg-1 is running (run-1)" not in tool_text:
-            raise AssertionError(f"cordis_run returned no running Package ids: {tool_text}")
+    assert_read_only_cordis(body)
+    if call_id == "advanced-inspect" and tool_name == "cordis_inspect_list":
+        providers = json.loads(tool_text).get("providers", [])
+        if not any(provider.get("id") == "Tool" for provider in providers):
+            raise AssertionError(f"Cordis inspection returned no Tool provider: {tool_text}")
         assert_advertised_tool(body, "run_code")
-        assert_advertised_tool(body, "snapshot_double")
         return tool_call_chunks(
             "advanced-code",
             "run_code",
             {
-                "code": "return await tools.snapshot_double({ value: 21 })",
-                "description": "Run the temporary Plugin tool",
+                "code": "const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }",
+                "description": "Inspect callable tools through the packaged PTC runtime",
             },
         )
     if call_id == "advanced-code" and tool_name == "run_code":
-        if "42" not in tool_text:
-            raise AssertionError(f"run_code returned no dynamic-tool value: {tool_text}")
+        if "42" not in tool_text or "cordis_inspect_query" not in tool_text:
+            raise AssertionError(f"run_code returned no inspection result: {tool_text}")
         assert_advertised_tool(body, "subagent")
         return tool_call_chunks(
             "advanced-direct-child",
@@ -572,17 +544,6 @@ def advanced_tool_followup(
     if call_id == "advanced-workflow" and tool_name == "workflow":
         if "WORKFLOW_CHILD_OK" not in tool_text:
             raise AssertionError(f"workflow returned no expected child value: {tool_text}")
-        assert_advertised_tool(body, "cordis_undefine")
-        return tool_call_chunks(
-            "advanced-undefine",
-            "cordis_undefine",
-            {"pluginId": "snap-1"},
-        )
-    if call_id == "advanced-undefine" and tool_name == "cordis_undefine":
-        if "Removed dynamic Plugin snap-1 and all of its Packages." not in tool_text:
-            raise AssertionError(f"cordis_undefine returned no removal result: {tool_text}")
-        if "snapshot_double" in advertised_tool_names(body):
-            raise AssertionError("snapshot_double remained advertised after cordis_undefine")
         return text_chunks(SNAPSHOT_FINAL_TEXT)
     raise AssertionError(f"unexpected advanced tool follow-up: {call_id} {tool_name}: {tool_text}")
 

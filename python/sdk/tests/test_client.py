@@ -42,6 +42,12 @@ for line in sys.stdin:
         print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {"sessionId": params["sessionId"], "event": {"type": "agent/inbox/spliced", "data": {"target": "next-turn", "start": 0, "inserted": [{"id": "message-1"}]}}}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "method": "session.status", "params": {"sessionId": params["sessionId"], "status": "running"}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {"messageId": "message-1"}}), flush=True)
+        print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {
+            "sessionId": params["sessionId"], "event": {"type": "gateway/execution", "data": {
+                "kind": "accepted", "state": {"revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
+                    "actors": [{"userId": 7}], "primaryActorUserId": 7, "unverifiedHistory": False}
+            }}
+        }}), flush=True)
         print(json.dumps({
             "jsonrpc": "2.0",
             "method": "session.event",
@@ -108,6 +114,13 @@ for line in sys.stdin:
         result = harness.run("say hello", session_id="main")
 
     assert result.final_response == "hello from runtime"
+    execution = next(event for event in result.events if event["type"] == "gateway/execution")
+    assert execution["data"] == {
+        "kind": "accepted", "state": {
+            "revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
+            "actors": [{"userId": 7}], "primaryActorUserId": 7, "unverifiedHistory": False,
+        },
+    }
     assert result.finish_reason == "max-tokens"
     assert result.events[-1]["type"] == "turn/end"
     dumped_env = json.loads(env_dump.read_text())

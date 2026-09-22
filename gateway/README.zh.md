@@ -7,7 +7,8 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 ## 工具链
 
 - **Node 25**（`.nvmrc`；dsh 仓库 engines `^22.19 || >=24` 亦兼容）。`better-sqlite3` 与 `argon2` 是原生模块，ABI 绑定安装时的 Node 大版本——切换 Node 后运行 `npm rebuild better-sqlite3 argon2`，否则报 `NODE_MODULE_VERSION` 不匹配。
-- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（单元测试）、`npm run typecheck`。`HGW_TEST_DATABASE_URL` 为 `npm run test:postgres` 指定可丢弃数据库；两个套件串行执行并替换 `harness` schema。CI 执行这两个测试命令。
+- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（单元测试）、`npm run typecheck`。`HGW_TEST_DATABASE_URL` 为 `npm run test:postgres` 指定可丢弃数据库；PostgreSQL 套件串行执行并替换 `harness` schema。CI 执行这两个测试命令。
+- 托管执行：在仓库根目录，将 `HGW_TEST_DATABASE_URL` 指向可丢弃的 PostgreSQL 数据库，再运行 `pnpm run test:gateway:execution`。它需要工作区和 Gateway 运行时依赖，通过真实 Loader 和 HTTP 授权验证，无需模型 API Key；CI 在 Gateway 相关变更时于现有消费者任务中执行它。
 
 `npm run build` 会把 Gateway 源码图生成到 `lib/`，并将相对导入改写为 `.js`；生产 supervisor 必须在同一个 release 目录中执行 `node lib/index.js`。源码 `tsx` 入口只用于开发和测试。
 
@@ -32,6 +33,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | 用于签发浏览器请求 principal 的仅所有者可读 Ed25519 密钥对 |
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
 | `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 秒 | 持久授权变更的兜底读取及重连间隔；通知与请求准入也会触发读取 |
+| `HGW_EXECUTION_WATCH_HEARTBEAT_MS` | 15 秒 | 运行时执行监视流的存活帧间隔；必须为正数且不超过 2,147,483,647 毫秒 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
@@ -93,6 +95,14 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。个人 runtime 暂时不可用时，Gateway 仍会返回已有的 ACL 过滤账户记录，个人启动失败不会隐藏项目对话。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
+
+Auto 审查资格是每个用户独立的管理员授权（`autoReviewEligible`），普通用户与管理员的初始值均为 false。用户列表和编辑对话框在桌面与手机布局中展示该资格。只有管理员可以通过 `/admin/api/users/:id` PATCH 修改它，且要求严格的布尔值、审计记录和跨 Gateway 访问失效通知。授予资格不会启用 Auto，不会改变当前 Session，也不会改变新会话的默认权限；项目访问继续使用既有成员权限与对话 ACL。详见[管理员所有的资格记录](../.agents/notes/implemented/bug-fix/2026-09-22-admin-auto-review-eligibility.zh.md)。
+
+执行授权使用 PostgreSQL 保存的已认证消息输入和问题回答的精确记录。来源记录 ID 只证明来源，不授予权限；参与者元数据与调用方提交的角色都不能赋权。编辑保留先前发起人，Session 发起人集合在不同步骤与相邻父子交换中只增不减。每次授权都会检查每位发起人的当前账户与 Session 写权限；插件管理还要求每位发起人都是管理员，Auto 则要求每位发起人都获得资格授权。未知历史输入会永久拒绝这两项特权能力，而普通执行仍要求有已验证且可写的发起人。显式模式选择检查选择者与现有发起人，但不增加发起人。个人正文仍在 JSONL 中保存；登记其运行时作用域内的谱系不会赋权。
+
+私有执行 API 随精简的来源记录 ID 集合和主发起人返回单调递增的十进制 `revision`。其 `capture` 操作可在撤权后读取这些事实，但不授予执行权限。空的历史继承必须显式声明未知历史，且发送方集合确实为空；不能遗漏已记录的发起人。重放已消费输入、初始继承或接收消息不会重设后续归因。父子传递会验证捕获的主发起人属于所选来源记录，并保留该归因；发送方的后续输入不会改变它。
+
+运行时监视连接接收 `ready`、失效提示和按配置发送的心跳帧；连接关闭或背压会释放订阅与计时器。数据库监听连接丢失会关闭这些流；在监控器重连、补读并完成待处理的本机取消前，新监视请求返回 `503`。监视通知不证明远端任务已经停止；运行时负责取消与重新授权。
 
 Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scope 的 Host 操作最多在 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 内使用已签名模式（默认 30 秒），长连接 stream 会在 principal 过期时断开。删除项目时，Gateway 会在该运行时的串行操作槽内停止共享运行时，再由 PostgreSQL 级联删除项目所属的运行时与协作记录；项目目录仍保留在磁盘上。
 

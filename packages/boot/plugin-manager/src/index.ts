@@ -357,14 +357,17 @@ export class PluginManager extends TypertRemoteService {
    * @param spec One package spec, including local paths relative to the invocation directory.
    * @param options Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and
    * the pending build scripts to allow for this profile before pnpm runs.
+   * @param signal Cancellation from the calling tool or Remote transport.
    * @returns Package-manager diagnostics and observed activation outcome.
    */
   @Remote
-  async installBundle(spec: string, options?: InstallBundleOptions): Promise<ChangeResult> {
+  async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult> {
+    signal?.throwIfAborted()
     await this.authorize()
     const requestId = options?.requestId
     const control: InstallControl = { abort: new AbortController(), phase: 'installing', settled: Promise.resolve() }
-    const stopped = (): boolean => control.abort.signal.aborted
+    const operationSignal = signal === undefined ? control.abort.signal : AbortSignal.any([control.abort.signal, signal])
+    const stopped = (): boolean => operationSignal.aborted
     if (requestId !== undefined) this.installs.set(requestId, control)
     const announce = (phase: PluginInstallProgress['phase']): void => {
       if (requestId !== undefined) this.ownerContext.emit('plugin-manager/install-state', { requestId, phase })
@@ -381,7 +384,7 @@ export class PluginManager extends TypertRemoteService {
       announce('installing')
       let name: string
       try {
-        result.packageResult = await this.runPnpm(['add', spec], control.abort.signal, requestId)
+        result.packageResult = await this.runPnpm(['add', spec], operationSignal, requestId)
         if (stopped()) throw new InstallCancelledError()
         if (result.packageResult.exitCode !== 0) {
           // pnpm-workspace.yaml is not restored, so the names pnpm left undecided there can be offered for approval.
@@ -402,6 +405,8 @@ export class PluginManager extends TypertRemoteService {
         const manifest = bundleManifest(name, this.profile.dir, this.profile.installAnchor)
         if (manifest?.dsh?.bundle?.patch === undefined) throw new ManagementFailure('not-bundle')
         loadOverlayPatches('dsh', join(dir, manifest.dsh.bundle.patch))
+        await this.authorize()
+        if (stopped()) throw new InstallCancelledError()
       } catch (error) {
         // pnpm has exited by now, so the files it rewrote go back as they were.
         await this.restoreFiles(files)
@@ -413,6 +418,7 @@ export class PluginManager extends TypertRemoteService {
       result.target = name
       result.stage = 'enable'
       return this.configure(async () => {
+        if (stopped()) throw new InstallCancelledError()
         if (options?.enabled !== false) await this.selectBundle(name, true)
         if (Object.hasOwn(before, name)) return 'restart-required'
         if (options?.enabled !== false) result.warnings = await this.reload()
@@ -442,13 +448,16 @@ export class PluginManager extends TypertRemoteService {
 
   /** Unload and remove a profile-owned bundle dependency through dsh plugin's pnpm path.
    * @param name Installed dependency name.
+   * @param signal Cancellation from the calling tool or Remote transport.
    * @returns Removal diagnostics and the remaining profile state.
    */
   @Remote
-  async removeBundle(name: string): Promise<ChangeResult> {
+  async removeBundle(name: string, signal?: AbortSignal): Promise<ChangeResult> {
+    signal?.throwIfAborted()
     await this.authorize()
     return this.change(async (result) => {
       await this.configure(async () => {
+        signal?.throwIfAborted()
         const bundle = (await this.listBundles()).find(item => item.name === name)
         if (bundle === undefined || !bundle.removable) throw new ManagementFailure('not-removable')
         if (this.ownerContext.get('hmr') === undefined && (this.profile.startedBundles.includes(name)
@@ -466,7 +475,9 @@ export class PluginManager extends TypertRemoteService {
           throw new ManagementFailure('bundle-in-use')
         }
       })
-      result.packageResult = await this.runPnpm(['remove', name])
+      signal?.throwIfAborted()
+      await this.authorize()
+      result.packageResult = await this.runPnpm(['remove', name], signal)
       if (result.packageResult.exitCode !== 0) throw new Error(result.packageResult.output)
     }, { stage: 'remove', target: name }, 'remove')
   }

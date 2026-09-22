@@ -834,3 +834,54 @@ it('installs and removes with the bundled pnpm when PATH contains no pnpm', asyn
   expect(removed.packageResult?.exitCode).toBe(0)
   expect(readProfileManifest('test', dir).dependencies ?? {}).not.toHaveProperty('@test/desktop-manager')
 })
+
+it('cancels a tool-owned installation and restores its manifest before settling', async () => {
+  const { manager, dir } = await fixture('startup')
+  const controller = new AbortController()
+  const started = Promise.withResolvers<undefined>()
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, _args, options) => {
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, pending: '1' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    const cancelled = Promise.withResolvers<undefined>()
+    options.signal!.addEventListener('abort', () => { cancelled.resolve(undefined) }, { once: true })
+    started.resolve(undefined)
+    await cancelled.promise
+    return { exitCode: 1, output: 'cancelled', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { controller.abort(); install.mockRestore() })
+  const run = manager.installBundle('pending', undefined, controller.signal)
+  try {
+    await started.promise
+    controller.abort(new Error('executing agent lost its authority'))
+    await expect(run).resolves.toMatchObject({ application: 'cancelled', changed: false })
+    expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  } finally {
+    controller.abort()
+    await run
+  }
+})
+
+it('restores an installation when its administrator loses permission before activation', async () => {
+  let allowed = true
+  const { manager, dir, bundle, ctx } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { protectedModules: new Set<string>(), authorize: async () => {
+      if (!allowed) throw new Error('administrator revoked')
+    } })
+  }, { authorization: 'required' })
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async () => {
+    bundle('pending', [{ id: 'pending', name: './plugin.mjs', config: { service: 'revokedActivation' } }])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, pending: '1' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    allowed = false
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  await expect(manager.installBundle('pending')).resolves.toMatchObject({ application: 'failed', changed: false, error: { diagnostic: 'administrator revoked' } })
+  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  const remaining: unknown = ctx.get('revokedActivation', false)
+  expect(remaining).toBeUndefined()
+})

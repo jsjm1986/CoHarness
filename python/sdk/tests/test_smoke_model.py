@@ -103,3 +103,23 @@ def test_mcp_smoke_accepts_the_external_server_result() -> None:
         for event in chunks
         if event.get("type") == "content_block_delta"
     )
+
+
+def test_advanced_smoke_starts_with_read_only_cordis_discovery() -> None:
+    chunks = SMOKE["completion_chunks"]({
+        "messages": [{"role": "user", "content": SMOKE["SNAPSHOT_PROMPT"]}],
+        "tools": [{"name": "cordis_inspect_list", "input_schema": {"type": "object"}}],
+    })
+    uses = [event["content_block"]["name"] for event in chunks
+            if event.get("type") == "content_block_start"
+            and event["content_block"].get("type") == "tool_use"]
+    assert uses == ["cordis_inspect_list"]
+
+
+@pytest.mark.parametrize("retired", ["cordis_define", "cordis_run", "cordis_stop", "cordis_undefine"])
+def test_advanced_smoke_rejects_dynamic_cordis_execution(retired: str) -> None:
+    with pytest.raises(AssertionError, match="retired Cordis tools remain callable"):
+        SMOKE["completion_chunks"]({
+            "messages": [{"role": "user", "content": SMOKE["SNAPSHOT_PROMPT"]}],
+            "tools": [{"name": "cordis_inspect_list"}, {"name": retired}],
+        })

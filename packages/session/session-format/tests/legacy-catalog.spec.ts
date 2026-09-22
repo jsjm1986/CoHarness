@@ -10,16 +10,16 @@ function event(type: string, seq: number, data: Record<string, unknown>, extra: 
 describe('Session format catalog', () => {
   it('classifies headers without reading events and migrates each adjacent generation', () => {
     const result = sessionFormatCatalog.readHeader({ version: 0, id: 'old', createdAt: 1 })
-    expect(result).toMatchObject({ status: 'migration-required', storedVersion: 0, targetVersion: 4 })
+    expect(result).toMatchObject({ status: 'migration-required', storedVersion: 0, targetVersion: 5 })
     if (result.status !== 'migration-required') throw new Error('expected migration-required header')
-    expect(result.header).toEqual({ version: 4, id: 'old', createdAt: 1 })
+    expect(result.header).toEqual({ version: 5, id: 'old', createdAt: 1 })
   })
 
   it('refuses newer generations before body decoding', () => {
-    expect(sessionFormatCatalog.readHeader({ version: 5, id: 'newer', createdAt: 1 })).toMatchObject({
+    expect(sessionFormatCatalog.readHeader({ version: 6, id: 'newer', createdAt: 1 })).toMatchObject({
       status: 'unsupported',
-      storedVersion: 5,
-      targetVersion: 4,
+      storedVersion: 6,
+      targetVersion: 5,
     })
   })
 
@@ -30,7 +30,7 @@ describe('Session format catalog', () => {
       events: [{ type: 'turn/start', seq: 0, time: 3, data: { turn: 1 } }],
     } as const
     const migrated = sessionFormatCatalog.migrate(source)
-    expect(migrated.header.version).toBe(4)
+    expect(migrated.header.version).toBe(5)
     expect(migrated.events).toEqual(source.events)
     expect(migrated).not.toBe(source)
   })
@@ -45,7 +45,7 @@ describe('Session format catalog', () => {
       ],
     } as const
     const migrated = sessionFormatCatalog.migrate(source)
-    expect(migrated.header.version).toBe(4)
+    expect(migrated.header.version).toBe(5)
     expect(migrated.events.map(event => event.type)).toEqual(['step/start', 'system/message', 'system/message', 'request/header'])
     expect(migrated.events[2]?.data).toMatchObject({ message: { role: 'system', content: [{ type: 'text', text: 'Be concise.' }] } })
     expect(migrated.events[3]?.data).toEqual({ header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
@@ -70,7 +70,7 @@ describe('Session format catalog', () => {
       ],
     } as const
     const migrated = sessionFormatCatalog.migrate(source)
-    expect(migrated.header).toMatchObject({ version: 4, agentPreset: 'code' })
+    expect(migrated.header).toMatchObject({ version: 5, agentPreset: 'code' })
     expect(migrated.inheritedEventCount).toBeGreaterThan(0)
     expect(migrated.events.map(item => item.type)).toContain('system/message')
     const replacement = migrated.events.find(item => item.type === 'request/header'
@@ -150,7 +150,7 @@ describe('Session format catalog', () => {
         event('session/end-seed', 3, {}),
       ],
     })
-    expect(migrated.header.version).toBe(4)
+    expect(migrated.header.version).toBe(5)
     expect(migrated.inheritedEventCount).toBe(0)
     expect(migrated.events.filter(item => item.type === 'session/end-seed')).toHaveLength(2)
   })
@@ -166,7 +166,7 @@ describe('Session format catalog', () => {
         event('turn/start', 3, { turn: 2 }),
       ],
     })
-    expect(migrated.header.version).toBe(4)
+    expect(migrated.header.version).toBe(5)
     expect(migrated.inheritedEventCount).toBe(2)
   })
 
@@ -202,7 +202,7 @@ it('streams both default legacy generations without changing event identity', ()
   const stream = sessionFormatCatalog.createStream({ version: 0, id: 'stream', createdAt: 1 }, 0, { emitEvent: (value) => { output.push(value) } })
   stream.emitEvent(event)
   stream.finish()
-  expect(stream.header.version).toBe(4)
+  expect(stream.header.version).toBe(5)
   expect(output).toEqual([event])
 })
 

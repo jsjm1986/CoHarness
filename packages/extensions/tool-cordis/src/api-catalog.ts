@@ -861,6 +861,59 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'executionAuthority',
+    summary: 'Authority operations shared by input transports, delegated work, and privilege consumers.',
+    description: 'Authority operations shared by input transports, delegated work, and privilege consumers.',
+    methods: [
+      {
+        signature: 'abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>',
+        description: 'Attest the live caller and exact human input, retaining all earlier editors.',
+        parameters: [{ name: 'session', description: 'Session which owns the input.' }, { name: 'message', description: 'content and display metadata accepted by the input transport.' }],
+        returns: 'immutable input with verified origin reference.',
+      },
+      {
+        signature: 'abstract answer(session: Session, questionId: string, answer: unknown): Promise<boolean>',
+        description: 'Claim a verified human answer and include its responder before delivery.',
+        parameters: [{ name: 'session', description: 'Session owning the live question.' }, { name: 'questionId', description: 'exact pending question identity verified by the transport.' }, { name: 'answer', description: 'parser-validated answer.' }],
+        returns: 'whether the caller owns this answer, including an identical retry.',
+      },
+      {
+        signature: 'abstract capture(agent: Agent): ExecutionInheritance',
+        description: 'Capture the current participants before awaiting delegated work.',
+        parameters: [{ name: 'agent', description: 'exact live parent Agent.' }],
+        returns: 'immutable inheritance for the new or continued child.',
+      },
+      {
+        signature: 'abstract captureSession(sessionId: SessionId): Promise<ExecutionInheritance>',
+        description: 'Capture the complete authority of a cold or live source for an explicit fork.',
+        parameters: [{ name: 'sessionId', description: 'source already authorized by the fork transport.' }],
+        returns: 'current participant references, independently of the selected history cut.',
+      },
+      {
+        signature: 'abstract inherit(session: Session, scope: ExecutionInheritance): void',
+        description: 'Persist captured restrictions in the child\'s own log.',
+        parameters: [{ name: 'session', description: 'child Session, including the unpublished setup window.' }, { name: 'scope', description: 'participants captured from its actual parent.' }],
+      },
+      {
+        signature: 'abstract relay(session: Session, scope: ExecutionInheritance, messageId: MessageId, signal?: AbortSignal): Promise<ExecutionInheritance>',
+        description: 'Include an adjacent sender\'s restrictions before admitting its durable delivery.',
+        parameters: [{ name: 'session', description: 'actual recipient, including a Team\'s routing host.' }, { name: 'scope', description: 'sender facts captured before asynchronous delivery.' }, { name: 'messageId', description: 'stable delivery identity for retry deduplication.' }, { name: 'signal', description: 'delivery cancellation.' }],
+        returns: 'recipient restrictions for an onward delegation of this delivery.',
+      },
+      {
+        signature: 'abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal): Promise<ExecutionState>',
+        description: 'Recheck every participant against current permissions.',
+        parameters: [{ name: 'capability', description: 'required privilege; identity alone grants none.' }, { name: 'agent', description: 'actual executing Agent.' }, { name: 'signal', description: 'operation-owned cancellation.' }],
+        returns: 'verified participants for attribution; one call incurs one charge.',
+      },
+      {
+        signature: 'abstract authorizeSelection(agent: Agent, preset: string): Promise<void>',
+        description: 'Authorize an explicit preset selection before its synchronous commit.',
+        parameters: [{ name: 'agent', description: 'target Agent.' }, { name: 'preset', description: 'requested preset name.' }],
+      },
+    ],
+  },
+  {
     key: 'fileReferences',
     summary: 'Host capability for cancellable file-reference discovery.',
     description: 'Host capability for cancellable file-reference discovery.',
@@ -990,6 +1043,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Return the principal bound to the current HTTP or WebSocket operation.',
         parameters: [],
         returns: 'the verified principal, or undefined outside an authenticated operation.',
+      },
+      {
+        signature: 'interactive(): GatewayRequestPrincipal | undefined',
+        description: 'Read the live HTTP caller; detached work cannot keep interactive authority.',
+        parameters: [],
+        returns: 'the caller while the HTTP operation remains active, otherwise undefined.',
       },
       {
         signature: 'requireCurrent(): GatewayRequestPrincipal',
@@ -1387,6 +1446,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'name', description: 'preset table key requested by the account.' }],
         returns: 'whether the request may select the preset.',
       },
+      {
+        signature: 'authorizeSelection?(agent: Agent, name: string): Promise<void>',
+        description: 'Recheck deployment authority before an explicit command commits its preset.',
+        parameters: [{ name: 'agent', description: 'Agent whose current Session receives the selection.' }, { name: 'name', description: 'validated preset name.' }],
+        returns: 'completion when selection is authorized; rejection leaves the Session unchanged.',
+      },
+      {
+        signature: 'authorizeDefault?(name: string): Promise<void>',
+        description: 'Authorize an explicit future-session default using the live account request.',
+        parameters: [{ name: 'name', description: 'schema-valid configured preset name; Auto is never a default.' }],
+        returns: 'completion when the default may be persisted.',
+      },
     ],
   },
   {
@@ -1517,9 +1588,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Persisted and runtime outcomes.',
       },
       {
-        signature: '@Remote async installBundle(spec: string, options?: InstallBundleOptions): Promise<ChangeResult>',
+        signature: '@Remote async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult>',
         description: 'Install a package using the same pnpm implementation as dsh plugin. A run that fails, is cancelled, or adds a package without a bundle patch restores `package.json` and `pnpm-lock.yaml` as they were; downloaded files can stay.',
-        parameters: [{ name: 'spec', description: 'One package spec, including local paths relative to the invocation directory.' }, { name: 'options', description: 'Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and the pending build scripts to allow for this profile before pnpm runs.' }],
+        parameters: [{ name: 'spec', description: 'One package spec, including local paths relative to the invocation directory.' }, { name: 'options', description: 'Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and the pending build scripts to allow for this profile before pnpm runs.' }, { name: 'signal', description: 'Cancellation from the calling tool or Remote transport.' }],
         returns: 'Package-manager diagnostics and observed activation outcome.',
       },
       {
@@ -1529,9 +1600,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: '`cancelled` once pnpm exited and the files are restored, `too-late` once the bundle is being applied, `not-running` for any other id.',
       },
       {
-        signature: '@Remote async removeBundle(name: string): Promise<ChangeResult>',
+        signature: '@Remote async removeBundle(name: string, signal?: AbortSignal): Promise<ChangeResult>',
         description: 'Unload and remove a profile-owned bundle dependency through dsh plugin\'s pnpm path.',
-        parameters: [{ name: 'name', description: 'Installed dependency name.' }],
+        parameters: [{ name: 'name', description: 'Installed dependency name.' }, { name: 'signal', description: 'Cancellation from the calling tool or Remote transport.' }],
         returns: 'Removal diagnostics and the remaining profile state.',
       },
     ],
@@ -4377,7 +4448,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeepSeekLlmApiExtensionRequest',
-    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly endpoint?: string;\n    readonly purpose?: \'compaction\' | \'session-title\';\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly endpoint?: string;\n    readonly purpose?: \'compaction\' | \'session-title\' | \'auto-review\';\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'DeepSeekLlmApiJson',
@@ -4500,6 +4571,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    tools?: ToolSchema[];\n}',
   },
   {
+    name: 'ExecutionCapability',
+    declaration: 'export type ExecutionCapability = \'execute\' | \'plugin-management\' | \'auto-review\';',
+  },
+  {
+    name: 'ExecutionInheritance',
+    declaration: 'export interface ExecutionInheritance {\n    readonly parentSessionId: SessionId;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly unverifiedHistory: boolean;\n    readonly primaryActorUserId?: number;\n}',
+  },
+  {
+    name: 'ExecutionInputId',
+    declaration: 'export type ExecutionInputId = Branded<\'ExecutionInputId\'>;',
+  },
+  {
+    name: 'ExecutionState',
+    declaration: 'export interface ExecutionState {\n    readonly revision: string;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly actors: readonly {\n        readonly userId: number;\n    }[];\n    readonly primaryActorUserId?: number;\n    readonly unverifiedHistory: boolean;\n}',
+  },
+  {
     name: 'FiberState',
     declaration: 'export const enum FiberState {\n    PENDING,\n    LOADING,\n    ACTIVE,\n    FAILED,\n    DISPOSED,\n    UNLOADING\n}',
   },
@@ -4601,7 +4688,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'auto-review\';\n}',
   },
   {
     name: 'GenericCallView',
@@ -5853,11 +5940,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SettingsRegisterOptions',
-    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n}',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n    authorizeWrite?: (value: T) => Promise<void>;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n}',
   },
   {
     name: 'SettingsSectionHooks',
-    declaration: 'export interface SettingsSectionHooks<T> {\n    setSource(current: () => T): void;\n    onChange(): void;\n    validate?: (value: T) => void;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n}',
+    declaration: 'export interface SettingsSectionHooks<T> {\n    setSource(current: () => T): void;\n    onChange(): void;\n    validate?: (value: T) => void;\n    authorizeWrite?: (value: T) => Promise<void>;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n}',
   },
   {
     name: 'SettingsUpdateSource',

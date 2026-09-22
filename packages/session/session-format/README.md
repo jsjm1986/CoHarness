@@ -1,5 +1,5 @@
 ---
-description: "Pure adjacent Session format migration chain for provider-owned v0–v2 to v3 conversion."
+description: "Pure adjacent Session format migration chain for provider-owned historical-to-current conversion."
 kind: "package-library"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 `dsh-session-format` is the provider-independent migration seam for Session persistence. It validates detached JSON headers and event artifacts, compiles a complete adjacent migration chain, classifies headers without reading event bodies, and converts an old generation in memory before a provider decides whether to publish a new generation. It also exposes an optional event-by-event migration stream for providers that can read legacy rows incrementally; the whole-artifact method remains the compatibility path.
 
-The default catalog in `src/catalog-default.ts` contains the static v0 → v1 → v2 → v3 chain. First-party providers supply the released physical codecs and event normalizers through this catalog; provider code must not copy the chain or invent a parallel format version.
+The default catalog in `src/catalog-default.ts` contains the static v0 → v1 → v2 → v3 → v4 → v5 chain. First-party providers supply the released physical codecs and event normalizers through this catalog; provider code must not copy the chain or invent a parallel format version.
 
 ## Summary
 

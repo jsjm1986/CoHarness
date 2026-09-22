@@ -12,6 +12,14 @@ The `/client` exports are the plugin body (`apply`/`inject`).
 
 Choose permission presets for the current Web session or future sessions. General settings changes only the future default; the composer and `/permission` pickers switch the current session. Default Web offers Read Only, Workspace Write, and Full access. Explicitly loading the experimental Auto integration adds Auto review with an `EXP` badge to current-session pickers. Visible Full access and Auto selections require their own risk acknowledgement; a complete `/permission <preset>` command executes directly. The host confirms each change through the Session projection.
 
+## Account qualifications
+
+The current-session controls and General default row combine the existing account-context qualification with the owning connection's `host.describe.executionAuthorityRequired` flag. Only explicit `false` means independent local operation; missing Host facts, account refresh, failed verification, or disconnection leave Full and Auto unavailable. Managed accounts need administrator qualification for Full and explicit Auto eligibility for Auto. The Host catalog remains unchanged.
+
+Unavailable choices retain their explanation. A selected but unavailable Auto mode remains selected until the user chooses a standard mode; the browser never silently changes Session policy. Eligibility changes close the current confirmation or that permission popup, and submission reads eligibility again. Each Session uses its own runtime connection; the default row uses its Settings transport. Ordinary choices remain available under the existing write policy.
+
+Auto is a per-session opt-in and is absent from the new-session default schema. The default controller additionally refuses Auto and ignores it in stale or embedded option tables. Browser qualification is presentation and admission feedback; the Host and Gateway enforce the actual authorization.
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. The row binds one Host-owned Settings descriptor and preset data stays in the host permission domain; nothing package-owned persists to compare.

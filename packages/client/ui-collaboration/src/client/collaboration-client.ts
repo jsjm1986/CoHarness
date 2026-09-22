@@ -72,6 +72,8 @@ export interface CollaborationContext {
   projects: ProjectMembership[]
   /** Whether the current account may select the administrator full-access preset. */
   fullAccess?: boolean
+  /** Whether this account may use automatic approval review. */
+  autoReviewEligible?: boolean
 }
 
 /** Project configuration facts consumed by the user-facing project panel. */
@@ -139,6 +141,8 @@ export type ConversationDetailState =
 /** Stable observable state shared by the collaboration UI entries. */
 export interface CollaborationSnapshot {
   status: 'idle' | 'loading' | 'ready' | 'unavailable'
+  /** Current-generation account eligibility; retained display data is not authority. */
+  contextVerified: boolean
   context?: CollaborationContext
   stagedVisibility: CollaborationVisibility
   scopeBusy: boolean
@@ -305,7 +309,8 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
     },
     scope: parsedScope,
     projects: root.projects.map(project),
-    ...(root.fullAccess === true ? { fullAccess: true } : {}),
+    ...(root.fullAccess === undefined ? {} : { fullAccess: boolean(root.fullAccess) }),
+    ...(root.autoReviewEligible === undefined ? {} : { autoReviewEligible: boolean(root.autoReviewEligible) }),
   }
 }
 
@@ -522,6 +527,7 @@ export function createBrowserCollaborationTransport(options: {
 function initialSnapshot(): CollaborationSnapshot {
   return {
     status: 'idle',
+    contextVerified: false,
     stagedVisibility: 'project',
     scopeBusy: false,
     conversations: {},
@@ -534,7 +540,7 @@ export class CollaborationClient {
   private readonly abortController = new AbortController()
   private readonly conversationLoads = new Map<string, Promise<void>>()
   private readonly conversationRefreshPending = new Set<string>()
-  private contextLoad: Promise<void> | undefined
+  private contextLoad: { promise: Promise<void>; controller: AbortController } | undefined
   private disposed = false
 
   /**
@@ -583,32 +589,43 @@ export class CollaborationClient {
    * @returns settlement after the current coalesced request.
    */
   load(force = false): Promise<void> {
-    if (this.contextLoad !== undefined) return this.contextLoad
+    if (this.contextLoad !== undefined) return this.contextLoad.promise
     if (this.disposed) return Promise.resolve()
+    const controller = new AbortController()
+    this.store.update((draft) => { draft.contextVerified = false })
     if (!force && this.getSnapshot().status !== 'ready') {
       this.store.update((draft) => { draft.status = 'loading' })
     }
-    const operation = this.transport.loadContext(this.abortController.signal)
+    const operation = this.transport.loadContext(controller.signal)
       .then((context) => {
-        if (this.disposed) return
+        if (this.disposed || controller.signal.aborted) return
         this.store.update((draft) => {
           draft.status = 'ready'
+          draft.contextVerified = true
           draft.context = context
           delete draft.scopeError
           if (context.scope.kind === 'personal') draft.conversations = {}
         })
       })
       .catch((_contextLoadFailure: unknown) => {
-        if (this.disposed) return
+        if (this.disposed || controller.signal.aborted) return
         this.store.update((draft) => {
+          draft.contextVerified = false
           if (draft.status !== 'ready') draft.status = 'unavailable'
         })
       })
       .finally(() => {
-        this.contextLoad = undefined
+        if (this.contextLoad?.controller === controller) this.contextLoad = undefined
       })
-    this.contextLoad = operation
+    this.contextLoad = { promise: operation, controller }
     return operation
+  }
+
+  /** Revoke account eligibility and pending context reads from an old connection generation. */
+  invalidateContext(): void {
+    this.contextLoad?.controller.abort()
+    this.contextLoad = undefined
+    this.store.update((draft) => { draft.contextVerified = false })
   }
 
   /**
@@ -894,6 +911,7 @@ export class CollaborationClient {
 
   /** Abort in-flight HTTP operations and suppress later publications. */
   dispose(): void {
+    this.contextLoad?.controller.abort()
     if (this.disposed) return
     this.disposed = true
     this.abortController.abort()

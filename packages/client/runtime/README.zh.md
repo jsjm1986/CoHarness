@@ -17,6 +17,8 @@
 使用 `dsh-client-runtime` 作为客户端对象层：它引导 Cordis 浏览器上下文，持有 `Session`/`Workspace` 运行时对象、共享宿主事件流的分发、投影存储与会话视图订阅的历史分页。客户端会话一律由宿主创建；域包经此层读取属主事件与投影切片，自身不持有会话状态。
 
 
+`SessionBinding.hostDescription` 保留所属会话连接的描述源，也涵盖工作台单独暂存的运行时目标。现有 UI 策略携带当前账户的派生权限资格。`permissionAvailabilitySource` 观察这两个来源，不缓存第二份目录；未知目标不会借用其他窗格的独立本机状态。
+
 ## Workspace 文件资源
 
 `WorkspaceResourceRegistry` 按明确的 runtime 目标和 Session 相对资源地址保留元数据。启动连接使用独立的 `base` 身份；各项目连接在 Host 握手声明支持文件后，以自己的 API client 注册 `workspaceResourceProvider(api)`。文件请求不从当前焦点面板推导目标。Host 的 `workspaceFileMaxResources` 配置限制每个 runtime 保留的记录数；空闲记录按使用顺序淘汰，全部记录活跃时拒绝超限接入。

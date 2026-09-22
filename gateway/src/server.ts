@@ -1019,6 +1019,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         // The shared project runtime remains confined to its project path;
         // this flag only advertises the administrator-only preset choice.
         fullAccess: user.role === 'admin',
+        autoReviewEligible: user.autoReviewEligible,
       }), 'application/json')
       return
     }

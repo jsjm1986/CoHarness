@@ -170,6 +170,8 @@ interface AgentMessageSource {
   readonly form: 'relay'
   /** Session id of the Agent whose tool call produced the message. */
   readonly senderSessionId: SessionId
+  /** Participants captured when the sender produced this delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
 }
 ```
 
@@ -209,6 +211,8 @@ interface SubagentSettledMessageSource {
   readonly summary: string
   /** Session id of the child that settled. */
   readonly senderSessionId: SessionId
+  /** Participants captured when the sender produced this delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
 }
 ```
 

@@ -148,7 +148,7 @@ pnpm run build
 pnpm dsh --profile headless "summarize this workspace"
 ```
 
-自指的 cordis 演示可以检查并修改其实时插件运行时，并需要相同的凭证（默认 `web`，也可用 `acp`）：
+Cordis 演示提供实时运行时的只读检查，使用相同的凭据（默认 `web`，也可选择 `acp`）：
 
 ```sh
 pnpm run demo:cordis

@@ -40,6 +40,7 @@
     "test:coverage:partitioned": "tsx scripts/run-coverage-partitions.ts",
     "test:coverage:incremental": "tsx scripts/incremental-coverage.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:gateway:execution": "node -e \"if (!process.env.HGW_TEST_DATABASE_URL) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database')\" && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0",
     "test:bench": "npm run build:bench && npm run build:web && npm run test:bench:built",
     "test:bench:built": "vitest run --config vitest.bench.config.ts",
     "test:issue-management": "node .github/issue-management/policy.test.mjs",

@@ -927,7 +927,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(4)
+      expect(suffix.meta.version).toBe(5)
       expect(suffix.events.map(event => event.type)).toEqual([
         'step/start', 'system/message', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
@@ -990,13 +990,13 @@ describe('PersistenceCoordinator session preparations', () => {
     try {
       // The sequential readFrom path publishes the successor through its prefix read.
       const suffix = await coordinator.readFrom(readId, SessionLogOffset(0))
-      expect(suffix.meta.version).toBe(4)
+      expect(suffix.meta.version).toBe(5)
       expect(suffix.events.map(event => event.type)).toEqual(['turn/start', 'user/message', 'turn/end'])
-      expect(medium.store.get(readId)?.meta.version).toBe(4)
+      expect(medium.store.get(readId)?.meta.version).toBe(5)
       // The cold load path publishes through its preparation pass.
       const loaded = await coordinator.load(loadId)
-      expect(loaded.meta.version).toBe(4)
-      expect(medium.store.get(loadId)?.meta.version).toBe(4)
+      expect(loaded.meta.version).toBe(5)
+      expect(medium.store.get(loadId)?.meta.version).toBe(5)
       expect(migrateStored).toHaveBeenCalledTimes(2)
       // Re-running a load over the already-published log is a no-op.
       await coordinator.load(readId)
@@ -1025,7 +1025,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const loaded = await coordinator.load(id)
-      expect(loaded.meta.version).toBe(4)
+      expect(loaded.meta.version).toBe(5)
       expect(backend.store.get(id)?.meta.version).toBe(0)
 
       const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })

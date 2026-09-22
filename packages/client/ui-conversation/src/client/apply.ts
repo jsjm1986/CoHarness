@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
+  permissionAvailabilitySource, permissionUnavailableReason,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
@@ -420,12 +421,16 @@ export function apply(ctx: Context): void {
             menuLauncher: ABSENT_MENU_LAUNCHER,
             documents: ABSENT_DOCUMENTS,
             permissionCatalog: ABSENT_PERMISSION_CATALOG,
+            permissionAvailability: permissionAvailabilitySource(undefined, undefined),
           },
         }
       }
       const conversation = concreteConversation(ctx)
       const shell = inputHub.shell(sessionId)
       const inputTriggers = inputHub.inputTriggers(sessionId)
+      const permissionAvailability = permissionAvailabilitySource(
+        ctx.get('projectUiPolicy'), sessions.binding(sessionId)?.hostDescription,
+      )
       return {
         keyboard: shell,
         addImages: (files) => {
@@ -483,6 +488,9 @@ export function apply(ctx: Context): void {
           })
         },
         command: async (line) => {
+          const permission = /^\/permission\s+(\S+)\s*$/.exec(line)?.[1]
+          if (permission !== undefined
+            && permissionUnavailableReason(permission, permissionAvailability.getSnapshot()) !== undefined) return false
           const session = sessions.binding(sessionId)?.session
           if (session === undefined) return false
           const result = await session.command(line)
@@ -495,6 +503,7 @@ export function apply(ctx: Context): void {
           menuLauncher: inputTriggers?.launcher ?? ABSENT_MENU_LAUNCHER,
           documents: conversation.documentStore(sessionId),
           permissionCatalog: permissionCatalogSource,
+          permissionAvailability,
         },
       }
     },

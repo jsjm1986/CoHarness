@@ -25,7 +25,7 @@ const USER: UserRow = {
   role: 'user',
   status: 'active',
   homePath: '/tmp/lin',
-  mustChangePassword: false,
+  mustChangePassword: false, autoReviewEligible: false,
 }
 
 const PRINCIPAL: GatewayPrincipalClaims = {

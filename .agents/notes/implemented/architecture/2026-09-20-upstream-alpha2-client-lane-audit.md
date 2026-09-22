@@ -14,7 +14,7 @@ The `dsh-v0.1.5-alpha.1 → dsh-v0.1.6-alpha.2` residue report listed 20 stale f
 
 - `ui-tool` + `runtime` — Auto-review denial presentation (see the companion note `2026-09-20-auto-review-denial-presentation`).
 - `host/directory-picker-native` — Win32 Alt-press foreground grant (see `2026-09-20-win32-directory-dialog-foreground`).
-- `extensions/tool-cordis` — the runtime-inspection reductions in `inspect.ts`; `fiber-state.ts` is deleted. `present.ts`/`prompt.ts` stay at alpha.1 deliberately: upstream moved `cordis_define`/`cordis_run`/`cordis_stop`/`cordis_undefine` registration into `cordis-host-runner`, while the local seam keeps every `cordis_*` model tool in `tool-cordis` and the runner service-only.
+- `extensions/tool-cordis` — the runtime-inspection reductions in `inspect.ts`; `fiber-state.ts` is deleted. The model execution registrations follow upstream retirement, while local read-only `cordis_inspect_self` and explicit references remain. The [retirement decision](../simplification/2026-09-22-retire-dynamic-cordis-model-tools.md) supersedes the earlier retention choice.
 - `subagent/subagent` — the `SubagentCatalogEntry` client re-export (upstream now matches).
 - `client/ui-settings-general` locales — the `connection.*` wording, minus the desktop-update keys the local web shell never renders; `connection.retry` stays because a local consumer still uses it.
 - `client/ui-user-questions` — the module-comment rewrite; content now matches upstream.

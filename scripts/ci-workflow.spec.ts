@@ -65,6 +65,49 @@ describe('CI workflow', () => {
     }
   })
 
+  it('runs selected keyless Gateway execution with isolated PostgreSQL and one evidence upload', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const consumer = workflowJob(workflow, 'node-24-consumers')
+    expect(consumer.services).toMatchObject({
+      'execution-postgres': {
+        image: "${{ needs.pr-scope.outputs.gateway_mode == 'full' && 'postgres:16' || '' }}",
+        env: { POSTGRES_USER: 'hgw', POSTGRES_PASSWORD: 'hgw', POSTGRES_DB: 'hgw_execution' },
+        ports: ['5432/tcp'],
+      },
+    })
+    const steps = (consumer.steps as unknown[]).filter(isRecord)
+    const install = steps.findIndex(step => step.run === 'npm ci --prefix gateway --omit=dev')
+    const execution = steps.findIndex(step => step.id === 'gateway-execution')
+    const record = steps.findIndex(step => step.name === 'Record Gateway execution evidence')
+    const upload = steps.findIndex(step => step.uses === './.github/actions/gate-evidence')
+    expect(execution).toBeGreaterThan(install)
+    expect(record).toBeGreaterThan(execution)
+    expect(upload).toBeGreaterThan(record)
+    expect(steps[execution]).toMatchObject({
+      if: "needs.pr-scope.outputs.gateway_mode == 'full'",
+      run: 'pnpm run test:gateway:execution',
+      env: { HGW_TEST_DATABASE_URL: "postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution" },
+    })
+    expect(steps[execution]?.['continue-on-error']).toBeUndefined()
+    expect(steps[record]).toMatchObject({
+      if: "always() && needs.pr-scope.outputs.gateway_mode == 'full'",
+      run: 'node scripts/gate-evidence.ts',
+      env: {
+        EVIDENCE_CHECK: 'gateway-execution',
+        EVIDENCE_COMMAND: 'pnpm run test:gateway:execution',
+        EVIDENCE_STATUS: "${{ steps.gateway-execution.outcome == 'skipped' && 'cancelled' || steps.gateway-execution.outcome }}",
+      },
+    })
+    expect(steps.filter(step => step.uses === './.github/actions/gate-evidence')).toHaveLength(1)
+    expect(steps.filter(step => step.run === 'npm ci --prefix gateway --omit=dev')).toHaveLength(1)
+    expect(isRecord(consumer.env) && consumer.env.HGW_TEST_DATABASE_URL).toBeUndefined()
+    const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+    expect(manifest.scripts['test:gateway:execution']).toBe(
+      'node -e "if (!process.env.HGW_TEST_DATABASE_URL) throw new Error(\'HGW_TEST_DATABASE_URL must select a disposable test database\')"'
+      + ' && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0',
+    )
+  })
+
   it('keeps portable required pools, explicit external-runner opt-ins, and non-blocking native Windows coverage', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     if (!isRecord(workflow.jobs)
@@ -406,6 +449,12 @@ describe('CI workflow', () => {
       external: 'gateway',
       command: 'npm test --prefix gateway && npm run test:postgres --prefix gateway',
     })
+    const manifest = JSON.parse(readFileSync(resolve(root, 'gateway/package.json'), 'utf8')) as { scripts: Record<string, string> }
+    expect(manifest.scripts['test:postgres']).toContain('--no-file-parallelism')
+    for (const suite of ['postgres', 'access-invalidation', 'execution']) {
+      expect(manifest.scripts['test:postgres']).toContain(`tests/${suite}.spec.ts`)
+      expect(manifest.scripts.test).toContain(`--exclude tests/${suite}.spec.ts`)
+    }
   })
 
   it('limits release and sandbox workflows to relevant changes while retaining manual or scheduled runs', () => {

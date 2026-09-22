@@ -6,8 +6,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { Pool } from 'pg'
+import type { Notification, Pool } from 'pg'
 import { loadConfig } from '../src/config.ts'
+import { createAdminApiHandler } from '../src/admin-api.ts'
+import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { writeProjectModelGovernanceFile } from '../src/apply-model-governance.ts'
 import { openDb, SCHEMA_VERSION } from '../src/db.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
@@ -32,10 +34,14 @@ import {
 } from '../src/postgres/runtime-context.ts'
 import { importSqliteControlPlane } from '../src/postgres/sqlite-import.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
-import type { RuntimeTarget } from '../src/instances.ts'
+import { InstanceManager, type RuntimeTarget } from '../src/instances.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
-import { createRuntimeApiHandler } from '../src/runtime-api.ts'
+import { createRuntimeApiHandler, type RuntimeCredentialSubject } from '../src/runtime-api.ts'
+import { GatewayExecutionIdentity } from '../src/execution-identity.ts'
+import { createUsageIntakeServer } from '../src/usage-intake.ts'
+import type { UserRow } from '../src/auth.ts'
+import type { UsageEvent } from '../src/model-governance.ts'
 
 const DATABASE_URL = process.env.HGW_TEST_DATABASE_URL
 const describePg = DATABASE_URL === undefined ? describe.skip : describe
@@ -165,7 +171,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29], current: 29 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31], current: 31 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -181,7 +187,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 29 })
+      .toEqual({ applied: [], current: 31 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -241,6 +247,122 @@ describePg('PostgreSQL baseline', () => {
 
   afterAll(async () => { await pool?.end() })
 
+  async function executionBillingFixture(kind: 'user' | 'project' = 'project') {
+    const slug = `billing-${randomUUID()}`, nodeName = randomUUID()
+    const org = (await pool.query<{ id: string }>(`INSERT INTO harness.organizations(slug,display_name)
+      VALUES($1,'Execution billing') RETURNING id`, [slug])).rows[0]!.id
+    await pool.query('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)', [org, nodeName])
+    const context = await resolvePostgresRuntimeContext(pool, slug, nodeName)
+    const people: Array<UserRow & { uuid: string }> = []
+    for (const name of ['primary', 'second', 'unrelated']) {
+      const row = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(
+        organization_id,username,display_name,home_path,auto_review_eligible)
+        VALUES($1,$2::text,$2::text,$3,true) RETURNING id,public_id`, [org, name, `/tmp/${slug}/${name}`])).rows[0]!
+      await pool.query(`INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'member')`, [org, row.id])
+      people.push({ uuid: row.id, id: Number(row.public_id), username: name, displayName: name,
+        homePath: `/tmp/${slug}/${name}`, role: 'user', status: 'active', mustChangePassword: false, autoReviewEligible: true })
+    }
+    const primary = people[0]!, second = people[1]!, unrelated = people[2]!
+    const project = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(
+      organization_id,name,created_by) VALUES($1,'Billing project',$2) RETURNING id,public_id`, [org, primary.uuid])).rows[0]!
+    for (const person of people) await pool.query(`INSERT INTO harness.project_members(organization_id,project_id,user_id,access_mode)
+      VALUES($1,$2,$3,'rw')`, [org, project.id, person.uuid])
+    const target = kind === 'project' ? { kind, id: Number(project.public_id) } : { kind, id: primary.id }
+    const subject: RuntimeCredentialSubject = { organizationId: org, target, generation: 1,
+      ...kind === 'project' ? { projectInternalId: project.id } : { userInternalId: primary.uuid } }
+    const authority = new GatewayExecutionIdentity(pool)
+    const conversations = new ConversationRepository(pool)
+    const sessionId = randomUUID()
+    const register = async (id: string, parentSessionId?: string) => {
+      if (kind === 'project') await conversations.create({ id, organizationId: org, projectId: project.id,
+        creatorUserId: primary.uuid, sessionFormatVersion: 3, createdAt: Date.now(), visibility: 'project',
+        ...parentSessionId === undefined ? {} : { parentSessionId } })
+      await authority.register(subject, { sessionId: id, ...parentSessionId === undefined ? {} : { parentSessionId } },
+        kind === 'project' ? await conversations.readHeader(id) : undefined)
+    }
+    await register(sessionId)
+    const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, slug, 60_000)
+    const admit = async (person: UserRow, entered = true) => {
+      const messageId = randomUUID(), contentHash = createHash('sha256').update(messageId).digest('hex')
+      const principal = signer.verify(signer.issue({ user: person, runtime: { ...target, generation: 1 },
+        scope: kind === 'project' ? { kind: 'project', projectId: target.id, projectName: 'Billing project', mode: 'rw' } : { kind: 'personal' } }))
+      const receipt = await authority.input(subject, principal, { sessionId, messageId, contentHash, kind: 'message' })
+      if (entered) await authority.enter(subject, { sessionId, messageId, contentHash, inputId: receipt.inputId })
+      return receipt.inputId
+    }
+    const inputIds = [await admit(primary)]
+    if (kind === 'project') inputIds.push(await admit(second))
+    const governance = new PostgresModelGovernanceService(context, new OrganizationModelCredentialCipher(Buffer.alloc(32, 19)))
+    await governance.upsertProvider({ provider: 'org-billing', displayName: 'Billing', driver: 'pi-ai', protocol: 'openai-completions',
+      baseURL: 'https://billing.example.test/v1', authMode: 'none', status: 'draft' })
+    await governance.upsertModel({ provider: 'org-billing', model: 'review', displayName: 'Review', enabled: true,
+      inputMicrosPerMillion: 1_000_000, outputMicrosPerMillion: 2_000_000, cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
+    const token = await governance.issueIntakeToken(target)
+    const server = createUsageIntakeServer(governance)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const post = async (event: unknown) => {
+      const response = await fetch(`http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(event),
+      })
+      return { status: response.status, body: await response.json() as unknown }
+    }
+    const usage: UsageEvent = { eventId: randomUUID(), occurredAt: Date.now(), provider: 'org-billing', model: 'review', purpose: 'auto-review',
+      sessionId, actorUserId: primary.id, executionInputIds: inputIds, credentialSource: 'organization', credentialClass: 'company',
+      status: 'succeeded', usage: { inputTokens: 3, outputTokens: 2 } }
+    return { org, people, primary, second, unrelated, target, subject, authority, governance, sessionId, register, admit, post, usage,
+      close: () => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
+  }
+
+  it('records delayed Auto fees once against historical project inputs after revocation and deletion', async () => {
+    const f = await executionBillingFixture()
+    try {
+      await pool.query('UPDATE harness.users SET auto_review_eligible=false,status=\'disabled\',deleted_at=now() WHERE id=$1', [f.primary.uuid])
+      await expect(f.authority.authorize(f.subject, { sessionId: f.sessionId, capability: 'auto-review' })).rejects.toThrow(/eligible/)
+      expect(await f.post(f.usage)).toEqual({ status: 200, body: { inserted: true, alerts: 0 } })
+      expect(await f.post(f.usage)).toEqual({ status: 200, body: { inserted: false, alerts: 0 } })
+      const rows = await pool.query<{ actor_user_id: string; user_id: string | null; purpose: string }>(`SELECT actor_user_id,user_id,purpose
+        FROM harness.model_usage WHERE organization_id=$1`, [f.org])
+      expect(rows.rows).toEqual([{ actor_user_id: f.primary.uuid, user_id: null, purpose: 'auto-review' }])
+      expect(await f.governance.summary(f.target)).toMatchObject({ totalTokens: 5, estimatedCostMicros: 7, companyCostMicros: 7 })
+      const { executionInputIds: _proof, ...legacy } = f.usage
+      expect((await f.post({ ...legacy, eventId: randomUUID() })).status).toBe(400)
+    } finally { await f.close() }
+  })
+
+  it('refuses malformed or unrelated fee proofs through the real intake without actorless fallback', async () => {
+    const f = await executionBillingFixture()
+    try {
+      const unentered = await f.admit(f.unrelated, false)
+      const { actorUserId: _actor, ...withoutActor } = f.usage
+      for (const invalid of [
+        { ...f.usage, executionInputIds: [] }, { ...f.usage, executionInputIds: [randomUUID()] },
+        { ...f.usage, executionInputIds: [unentered] }, { ...f.usage, executionInputIds: null },
+        { ...f.usage, sessionId: randomUUID() }, { ...f.usage, actorUserId: f.unrelated.id }, withoutActor,
+      ]) expect((await f.post({ ...invalid, eventId: randomUUID() })).status).toBe(400)
+      expect((await pool.query('SELECT event_id FROM harness.model_usage WHERE organization_id=$1', [f.org])).rows).toEqual([])
+      const child = randomUUID()
+      await f.register(child, f.sessionId)
+      await f.authority.inherit(f.subject, { sessionId: child, parentSessionId: f.sessionId, inputs: f.usage.executionInputIds,
+        primaryActorUserId: f.primary.id, unverifiedHistory: false })
+      expect((await f.post({ ...f.usage, sessionId: child })).status).toBe(200)
+      expect(await f.governance.summary(f.target)).toMatchObject({ totalTokens: 5, estimatedCostMicros: 7 })
+    } finally { await f.close() }
+  })
+
+  it('keeps proved personal Auto fees on the owner only after revocation and deletion', async () => {
+    const f = await executionBillingFixture('user')
+    try {
+      expect((await f.post({ ...f.usage, actorUserId: f.unrelated.id })).status).toBe(400)
+      await pool.query('UPDATE harness.users SET auto_review_eligible=false,status=\'disabled\',deleted_at=now() WHERE id=$1', [f.primary.uuid])
+      expect(await f.post(f.usage)).toEqual({ status: 200, body: { inserted: true, alerts: 0 } })
+      const rows = await pool.query<{ actor_user_id: string | null; user_id: string; project_id: string | null }>(`SELECT actor_user_id,user_id,project_id
+        FROM harness.model_usage WHERE organization_id=$1`, [f.org])
+      expect(rows.rows).toEqual([{ actor_user_id: null, user_id: f.primary.uuid, project_id: null }])
+      expect(await f.governance.summary(f.target)).toMatchObject({ totalTokens: 5, estimatedCostMicros: 7 })
+    } finally { await f.close() }
+  })
+
+
   it('rechecks plugin management authority through HTTP after PostgreSQL revocation', async () => {
     const suffix = randomUUID()
     const profileSlug = `profile-management-${suffix}`
@@ -269,7 +391,7 @@ describePg('PostgreSQL baseline', () => {
     const principals = new GatewayPrincipalSigner(privateKey, profileSlug, 60_000)
     const assertion = principals.issue({
       user: { id: publicId, username: `profile-admin-${suffix}`, displayName: 'Profile administrator',
-        role: 'admin', status: 'active', mustChangePassword: false, homePath: '/tmp/profile-admin' },
+        role: 'admin', status: 'active', mustChangePassword: false, autoReviewEligible: false, homePath: '/tmp/profile-admin' },
       scope: { kind: 'personal' }, runtime: { ...target, generation },
     })
     const runtime = await serveRuntime(createRuntimeApiHandler({
@@ -1434,7 +1556,7 @@ describePg('PostgreSQL baseline', () => {
         displayName: input.displayName,
         role: 'user',
         status: 'active',
-        mustChangePassword: false,
+        mustChangePassword: false, autoReviewEligible: false,
         homePath: `/tmp/${input.username}`,
       },
       scope: {
@@ -2328,6 +2450,135 @@ describePg('PostgreSQL baseline', () => {
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it('persists Auto eligibility and broadcasts revocation to another PostgreSQL connection', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hgw-pg-auto-'))
+    const slug = `auto-eligibility-${randomUUID()}`
+    const created = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(slug,display_name)
+      VALUES($1,'Auto eligibility') RETURNING id`, [slug])
+    const ownOrganization = created.rows[0]!.id
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'auto-node')`, [ownOrganization])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'auto-node')
+    const cfg = loadConfig({
+      HGW_USERS_ROOT: join(directory, 'users'), HGW_STATE_ROOT: join(directory, 'state'),
+      HGW_PROJECTS_ROOT: join(directory, 'projects'), HGW_USER_PROJECTS_ROOT: join(directory, 'managed-projects'),
+    })
+    const users = new PostgresUserService(context, cfg)
+    const auth = new PostgresAuthService(context, cfg)
+    const observer = await pool.connect()
+    const notifications: Notification[] = []
+    const onNotification = (notice: Notification): void => { notifications.push(notice) }
+    let server: ReturnType<typeof createGatewayServer> | undefined
+    try {
+      const admin = await users.create({ username: 'admin', password: 'pw-12345678', role: 'admin' })
+      const member = await users.create({ username: 'member', password: 'pw-12345678' })
+      expect(admin.autoReviewEligible).toBe(false)
+      expect(member.autoReviewEligible).toBe(false)
+      await users.changeOwnPassword(admin.id, 'pw-12345678')
+      await users.changeOwnPassword(member.id, 'pw-12345678')
+      const instances = new InstanceManager(new PostgresInstanceRepository(context, cfg.instancePortBase), cfg)
+      await instances.stateOf(member.id)
+      const projects = new PostgresProjectService(context, cfg)
+      const deps: GatewayDeps = { cfg, users, auth, instances, projects, audit: new PostgresAuditService(context) }
+      const invalidated: Array<{ userId?: number; projectId?: number }> = []
+      server = createGatewayServer(deps, { admin: createAdminApiHandler(deps, undefined, subject => invalidated.push(subject)) })
+      await new Promise<void>(resolveListen => server!.listen(0, '127.0.0.1', resolveListen))
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+      cfg.publicOrigins.push(base)
+      const signIn = async (username: string): Promise<string> => {
+        const response = await fetch(`${base}/login`, {
+          method: 'POST', redirect: 'manual',
+          headers: { origin: base, 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username, password: 'pw-12345678' }),
+        })
+        const cookie = response.headers.get('set-cookie')?.split(';')[0]
+        if (cookie === undefined) throw new Error('the HTTP fixture account could not sign in')
+        return cookie
+      }
+      const adminCookie = await signIn('admin')
+      const memberCookie = await signIn('member')
+      const ownedProject = await projects.createManaged({ name: 'Auto test project', ownerUserId: member.id })
+      const patch = (cookie: string, body: unknown) => fetch(`${base}/admin/api/users/${member.id}`, {
+        method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(body),
+      })
+      for (const cookie of [memberCookie, `${memberCookie}; hgw_scope=project:${ownedProject.id}`]) {
+        expect((await patch(cookie, { autoReviewEligible: true })).status).toBe(403)
+      }
+      expect((await patch(adminCookie, { autoReviewEligible: 'true', displayName: 'invalid grant' })).status).toBe(400)
+      expect((await users.getById(member.id))?.displayName).toBe('member')
+      const loggedIn = await auth.login('member', 'pw-12345678', '127.0.0.1', 'auto-test')
+      if (typeof loggedIn === 'string') throw new Error('the fixture account could not sign in')
+      expect(loggedIn.user.autoReviewEligible).toBe(false)
+      expect((await patch(adminCookie, { autoReviewEligible: true })).status).toBe(204)
+      expect((await users.getById(member.id))?.autoReviewEligible).toBe(true)
+      expect((await auth.validate(loggedIn.token))?.autoReviewEligible).toBe(true)
+      await users.patch(member.id, { displayName: 'Qualified member' })
+      expect(await users.getByUsername('member')).toMatchObject({ displayName: 'Qualified member', autoReviewEligible: true })
+
+      observer.on('notification', onNotification)
+      await observer.query('LISTEN harness_access_invalidation')
+      const before = await pool.query<{ revision: string }>(
+        'SELECT access_revision::text revision FROM harness.organizations WHERE id=$1', [ownOrganization])
+      expect((await patch(adminCookie, { autoReviewEligible: false })).status).toBe(204)
+      await expect.poll(() => notifications.some(notice => notice.channel === 'harness_access_invalidation'
+        && notice.payload === ownOrganization)).toBe(true)
+      const after = await pool.query<{ revision: string }>(
+        'SELECT access_revision::text revision FROM harness.organizations WHERE id=$1', [ownOrganization])
+      expect(BigInt(after.rows[0]!.revision)).toBe(BigInt(before.rows[0]!.revision) + 1n)
+      const invalidation = await pool.query<{ payload: { subjects: unknown[] } }>(`SELECT payload FROM harness.outbox
+        WHERE organization_id=$1 AND topic='access.invalidate' AND payload->>'revision'=$2`, [ownOrganization, after.rows[0]!.revision])
+      expect(invalidation.rows[0]?.payload.subjects).toContainEqual({ userId: member.id, restartRuntime: true })
+      expect((await auth.validate(loggedIn.token))?.autoReviewEligible).toBe(false)
+      expect((await users.list()).find(user => user.id === member.id)?.autoReviewEligible).toBe(false)
+      expect(invalidated).toEqual([{ userId: member.id }, { userId: member.id }])
+      const audit = await deps.audit.query({ action: 'admin.users.auto-review-eligibility' })
+      expect(audit).toHaveLength(2)
+      await expect(access(join(directory, 'users/member/dsh/settings.yaml'))).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      if (server !== undefined) await new Promise<void>(resolveClose => server!.close(() => resolveClose()))
+      observer.removeListener('notification', onNotification)
+      try { await observer.query('UNLISTEN harness_access_invalidation') } finally { observer.release() }
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it.each([7, 8])('imports SQLite v%s Auto eligibility without writing the source', async (version) => {
+    const fixture = await sqliteFixture()
+    try {
+      const source = new Database(fixture.file)
+      try {
+        if (version === 7) {
+          source.exec('ALTER TABLE users DROP COLUMN auto_review_eligible; UPDATE schema_meta SET version=7')
+        } else {
+          source.prepare('UPDATE users SET auto_review_eligible=1 WHERE id=2').run()
+        }
+      } finally { source.close() }
+      const original = await readFile(fixture.file)
+      const imported = await importSqliteControlPlane(pool, {
+        sqliteFile: fixture.file, organizationSlug: `auto-import-${version}-${randomUUID()}`,
+      })
+      const users = await pool.query<{ username: string; auto_review_eligible: boolean }>(
+        'SELECT username::text,auto_review_eligible FROM harness.users WHERE organization_id=$1 ORDER BY username',
+        [imported.organizationId])
+      expect(users.rows).toEqual([
+        { username: 'admin', auto_review_eligible: false },
+        { username: 'member', auto_review_eligible: version === 8 },
+      ])
+      expect(await readFile(fixture.file)).toEqual(original)
+    } finally { await fixture.cleanup() }
+  })
+
+  it('rejects a current SQLite source missing its Auto eligibility column', async () => {
+    const fixture = await sqliteFixture()
+    const slug = `auto-invalid-import-${randomUUID()}`
+    try {
+      const source = new Database(fixture.file)
+      try { source.exec('ALTER TABLE users DROP COLUMN auto_review_eligible') } finally { source.close() }
+      await expect(importSqliteControlPlane(pool, { sqliteFile: fixture.file, organizationSlug: slug }))
+        .rejects.toThrow(/invalid auto_review_eligible/)
+      expect((await pool.query('SELECT id FROM harness.organizations WHERE slug=$1', [slug])).rows).toEqual([])
+    } finally { await fixture.cleanup() }
+  })
 
   it('rejects a versioned SQLite source with a missing required table', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'hgw-postgres-invalid-'))

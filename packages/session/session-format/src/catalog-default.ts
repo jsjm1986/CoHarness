@@ -1232,10 +1232,38 @@ function assertV2CarrierShape(event: SessionFormatEvent): void {
   }
 }
 
-/** The complete static v0→v1→v2→v3→v4 chain used by provider adapters. */
+/** Header-only successor for the fork's declared draft metadata. */
+const v4ToV5 = defineSessionFormatMigration({
+  name: '@deepseek-ai/dsh-session-format-v4-to-v5',
+  fromVersion: 4,
+  toVersion: 5,
+  migrateHeader: (header: SessionFormatHeader) => ({ ...header, version: 5 }),
+  migrate: (artifact: SessionFormatArtifact) => ({ ...artifact, header: { ...artifact.header, version: 5 } }),
+  createStage: ({ sourceHeader, sourceInheritedEventCount }) => {
+    let inherited = sourceInheritedEventCount
+    return {
+      ...(inherited === undefined ? {} : { headerInheritedEventCount: inherited }),
+      transformEvent(event, context) {
+        if (event.type === 'session/end-seed' && event.data !== null && typeof event.data === 'object'
+          && !Array.isArray(event.data) && event.data['inherited'] === true) inherited = event.seq
+        context.emitEvent(event)
+      },
+      finish() {
+        if (sourceHeader.isSeeded === true && inherited === undefined) {
+          throw new SessionFormatError('format v4 seeded artifact has no inherited cut')
+        }
+        return inherited ?? 0
+      },
+    }
+  },
+  validateTargetHeader: () => {},
+  validateTarget: () => {},
+})
+
+/** The complete static v0→v1→v2→v3→v4→v5 chain used by provider adapters. */
 export const sessionFormatCatalog = createSessionFormatCatalog({
-  currentVersion: 4,
-  migrations: [v0ToV1, v1ToV2, v2ToV3, v3ToV4],
+  currentVersion: 5,
+  migrations: [v0ToV1, v1ToV2, v2ToV3, v3ToV4, v4ToV5],
   restoreCurrentHeader: header => header,
   restoreCurrent: artifact => artifact,
 })

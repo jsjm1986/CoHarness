@@ -8,6 +8,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { executionAuthorityOf, type ExecutionState } from '@deepseek-ai/dsh-execution-authority'
 import type {} from '@deepseek-ai/dsh-agent-instructions'
 import {
   BlockAssembler,
@@ -63,6 +64,9 @@ type AutoReviewDecision =
   | { readonly risk: 'low'; readonly decision: 'allow' }
   | { readonly risk: 'medium'; readonly decision: 'allow' }
   | { readonly risk: 'medium' | 'high'; readonly decision: 'deny'; readonly reason?: string }
+
+/** A reviewable managed execution has one verified billing primary. */
+type ReviewExecution = ExecutionState & { readonly primaryActorUserId: number }
 
 type ReviewSourceRole =
   | 'human-instruction'
@@ -617,6 +621,7 @@ async function classifyRisk(
   agent: Agent,
   exec: ToolExecution,
   signal: AbortSignal,
+  execution: ReviewExecution | undefined,
 ): Promise<AutoReviewDecision> {
   const snapshot = snapshotAutoReview(agent, exec)
   const options: GenerateOptions = deepFreeze({
@@ -628,13 +633,21 @@ async function classifyRisk(
       source: { kind: 'plugin', plugin: 'dsh-experimental-auto-review' },
     })],
     temperature: 0,
+    sessionId: agent.session.id,
+    purpose: 'auto-review',
+    ...execution === undefined ? {} : {
+      executionIdentity: {
+        inputs: execution.inputs,
+        primaryActorUserId: execution.primaryActorUserId,
+      },
+    },
     signal,
   })
   return readDecision(ctx.llm.stream(options))
 }
 
 /** Materialize the fixed model-facing Auto denial plus optional UI detail. */
-function denied(exec: ToolExecution, reason?: string): PreToolDecision {
+function denied(exec: ToolExecution, reason?: string): Extract<PreToolDecision, { kind: 'deny' }> {
   return {
     kind: 'deny',
     reason: `Auto review rejected tool "${exec.name}"; its body was not executed`,
@@ -646,6 +659,21 @@ function denied(exec: ToolExecution, reason?: string): PreToolDecision {
   }
 }
 
+/** Deny before execution without confusing failed eligibility checks with reviewer approval. */
+function eligibilityDenied(exec: ToolExecution): PreToolDecision {
+  const reason = 'This execution is not authorized for Auto review. Switch to a standard permission mode or ask an administrator to verify Auto eligibility.'
+  return { ...denied(exec, reason), reason }
+}
+
+/** The same verified inputs and primary actor must still own an allowed review. */
+function unchangedExecution(before: ExecutionState, after: ExecutionState): boolean {
+  return before.revision === after.revision
+    && before.primaryActorUserId === after.primaryActorUserId
+    && before.unverifiedHistory === after.unverifiedHistory
+    && before.inputs.length === after.inputs.length
+    && before.inputs.every(input => after.inputs.includes(input))
+}
+
 /** Install the Auto preset and its prepended per-call review gate. */
 export function apply(ctx: Context): void {
   // Retain the injected service while this context drains on disposal.
@@ -653,6 +681,7 @@ export function apply(ctx: Context): void {
   let accepting = true
   const active = new Set<Promise<void>>()
   const lifecycle = new AbortController()
+  let managed = ctx.get('executionAuthorityRequired') === true
 
   ctx.effect(function* () {
     const stopListener = ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
@@ -671,12 +700,41 @@ export function apply(ctx: Context): void {
       active.add(completed.promise)
       try {
         const signal = AbortSignal.any([exec.signal, lifecycle.signal])
-        const decision = await classifyRisk(ctx, agent, exec, signal).catch(() => undefined)
+        managed ||= ctx.get('executionAuthorityRequired') === true
+        let execution: ReviewExecution | undefined
+        try {
+          const authority = executionAuthorityOf(ctx)
+          if (managed && authority === undefined) return eligibilityDenied(exec)
+          managed ||= authority !== undefined
+          const current = await authority?.authorize('auto-review', agent, signal)
+          if (current !== undefined) {
+            if (current.unverifiedHistory || current.primaryActorUserId === undefined) return eligibilityDenied(exec)
+            execution = { ...current, primaryActorUserId: current.primaryActorUserId }
+          }
+        } catch {
+          // Missing providers, revoked grants, and failed fresh checks cannot authorize Auto.
+          return isAborted(lifecycle.signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
+        }
+        if (isAborted(signal)) return { kind: 'cancel' }
+        const decision = await classifyRisk(ctx, agent, exec, signal, execution).catch(() => undefined)
         if (isAborted(lifecycle.signal)) return { kind: 'cancel' }
         if (decision === undefined) return denied(exec)
         if (decision.decision === 'deny') return denied(exec, decision.reason)
         const downstream = await next()
         if (isAborted(lifecycle.signal)) return { kind: 'cancel' }
+        if (execution !== undefined || ctx.get('executionAuthorityRequired') === true) {
+          try {
+            if (execution === undefined) return eligibilityDenied(exec)
+            const authority = executionAuthorityOf(ctx)
+            if (authority === undefined) return eligibilityDenied(exec)
+            const current = await authority.authorize('auto-review', agent, signal)
+            if (!unchangedExecution(execution, current)) return eligibilityDenied(exec)
+          } catch {
+            // Revoke or provider failure during review prevents the pending tool body.
+            return isAborted(lifecycle.signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
+          }
+        }
+        if (isAborted(signal)) return { kind: 'cancel' }
         return downstream
       } finally {
         active.delete(completed.promise)
@@ -693,7 +751,8 @@ export function apply(ctx: Context): void {
       try {
         for (const session of ctx.sessions.list()) {
           if (permissionPresets.current(session) !== AUTO_PRESET) continue
-          permissionPresets.set(session, 'danger-full-access')
+          const fallback = managed || ctx.get('executionAuthorityRequired') === true ? 'workspace-write' : 'danger-full-access'
+          permissionPresets.set(session, fallback)
         }
       } finally {
         lifecycle.abort(new Error('auto-review integration disposed'))

@@ -22,10 +22,7 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../boot/plugin-manager"
-    },
-    {
-      "path": "../../typert/protocol"
+      "path": "../execution-authority"
     }
   ]
 }

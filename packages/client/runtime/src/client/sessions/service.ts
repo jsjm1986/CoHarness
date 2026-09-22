@@ -14,6 +14,7 @@
  * mirrors remain resident until the ordinary eligibility prune tears them down.
  */
 import type { Context, Fiber } from '@deepseek-ai/cordis'
+import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   IApiClient, RpcError, RpcResult, SessionId, SubagentAddress, WorkspaceId, JobView,
 } from '@deepseek-ai/dsh-api-remotes/client'
@@ -156,6 +157,8 @@ export interface SessionBinding {
   /** The outward session face only — feature code never sees the concrete class. */
   readonly session: SessionFace
   readonly ctx: AgentContext
+  /** Description of the exact connection that owns this Session. */
+  readonly hostDescription?: HostDescriptionSource
 }
 
 // Scope primitives live in ../scope.ts (the client mirror of host
@@ -284,6 +287,7 @@ export class SessionRuntime implements ISessions {
   private readonly deferredRemovals = new Set<SessionId>()
   /** Scope-fiber teardowns in progress; root disposal waits for every one. */
   private readonly pendingScopeDisposals = new Set<Promise<void>>()
+  private readonly hostDescription: HostDescriptionSource | undefined
 
   /**
    * @param ctx - client root context (scope fibers mount under it).
@@ -297,8 +301,9 @@ export class SessionRuntime implements ISessions {
     api: IApiClient,
     remote: SessionRemotes,
     conversationRuntime?: ConversationRuntime,
-    options: { persistSelection?: boolean; provideService?: boolean } = {},
+    options: { persistSelection?: boolean; provideService?: boolean; hostDescription?: HostDescriptionSource } = {},
   ) {
+    this.hostDescription = options.hostDescription
     this.selection = createSnapshotStore<SessionSelection>(
       {},
       options.persistSelection === false ? undefined : { persist: { name: 'dsh.sessions.current' } })
@@ -742,7 +747,10 @@ export class SessionRuntime implements ISessions {
     // The Session owns its scoped dispatch point (host Agent.loopCtx mirror);
     // mint and bind are one step so a live scope record implies a bound actx.
     session.bindScope(ctx)
-    const binding: SessionBinding = { sessionId: id, session, ctx }
+    const binding: SessionBinding = {
+      sessionId: id, session, ctx,
+      ...this.hostDescription === undefined ? {} : { hostDescription: this.hostDescription },
+    }
     const record: ScopeRecord = {
       fiber,
       ctx,

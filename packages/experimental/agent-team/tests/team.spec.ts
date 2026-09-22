@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { ExecutionInheritance, ExecutionInputId } from '@deepseek-ai/dsh-execution-authority'
 import { Context } from '@deepseek-ai/cordis'
 import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -847,6 +848,44 @@ describe('Team shared task DAG', () => {
 })
 
 describe('Team mailbox and waiting', () => {
+  it('persists the captured peer identity through the Lead before asynchronous delivery', async () => {
+    const { ctx, lead } = await setup(['hang', 'hang'])
+    const first = await spawn(ctx, lead, 'alpha')
+    const alpha = await waitRunning(ctx, first.member.id)
+    const second = await spawn(ctx, lead, 'beta')
+    const beta = await waitRunning(ctx, second.member.id)
+    const input = '00000000-0000-4000-8000-000000000001' as ExecutionInputId
+    const captured: ExecutionInheritance = { parentSessionId: alpha.id, inputs: [input], primaryActorUserId: 1, unverifiedHistory: false }
+    const routed: ExecutionInheritance = { ...captured, parentSessionId: lead.id }
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<ExecutionInheritance>()
+    let current = captured
+    const relay = vi.fn((_session, scope) => { expect(scope).toEqual(captured); entered.resolve(undefined); return release.promise })
+    ctx.provide('executionAuthority', {
+      capture: (agent: Agent) => ({ ...current, parentSessionId: agent.id }), relay,
+    } as never)
+    const delivered = vi.spyOn(beta, 'inject')
+    const pending = ctx.agentTeams.sendMessage(alpha, { target: 'beta', content: content('captured result'), delivery: 'quiet', signal: SIGNAL })
+    try {
+      await Promise.race([entered.promise, pending.then(() => { throw new Error('Delivery completed without routing its captured identity') })])
+      current = { ...captured, primaryActorUserId: 2 }
+      release.resolve(routed)
+      const receipt = await pending
+      expect(relay).toHaveBeenCalledWith(lead.session, captured, receipt.messageId, expect.any(AbortSignal))
+      const queued = foldTeam(lead.id, lead.session.snapshotEvents()).messages.get(receipt.messageId)!
+      expect(queued.gatewayExecutionScope).toEqual(routed)
+      expect(delivered).toHaveBeenCalledOnce()
+      expect(delivered.mock.calls[0]?.[0]?.source).toMatchObject({ gatewayExecutionScope: routed })
+      await ctx.sessions.flush(lead.session)
+      const stored = await ctx.sessionPersistence.inspect(lead.id)
+      expect(foldTeam(lead.id, stored.events).messages.get(receipt.messageId)?.gatewayExecutionScope).toEqual(routed)
+    } finally {
+      release.resolve(routed)
+      await pending
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('acknowledges waking messages persisted by a busy Lead before model claim', async () => {
     const { ctx, lead, teamFiber } = await setup(['hang', 'hang'], { maxPendingMessagesPerMember: 1 })
     const started = await spawn(ctx, lead, 'lead-reporter')

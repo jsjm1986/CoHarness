@@ -14,6 +14,7 @@ import type { ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runti
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
+import type { PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ComposerBlock } from '../input/blocks.ts'
 import type {
@@ -677,6 +678,8 @@ export interface ComposerBarInjected {
     documents: ObservableSnapshot<readonly ComposerDocument[]>
     /** Host permission catalog; `undefined` until the remote read settles or on a permission-less host. */
     permissionCatalog: ObservableSnapshot<PermissionCatalog | undefined>
+    /** Current account eligibility combined with this Session's own connection generation. */
+    permissionAvailability: ObservableSnapshot<PermissionAvailability>
   }
 }
 

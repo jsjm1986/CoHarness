@@ -100,6 +100,10 @@ function runTurn(sessionId: string): void {
     return
   }
   event(sessionId, 'turn/start', { turn: 0 })
+  if (env.FAKE_EXECUTION_EVENT !== undefined) {
+    event(sessionId, 'gateway/execution', { kind: 'accepted', state: { revision: '1',
+      inputs: ['00000000-0000-4000-8000-000000000001'], actors: [{ userId: 7 }], primaryActorUserId: 7, unverifiedHistory: false } })
+  }
   if (env.FAKE_MALFORMED_MESSAGE !== undefined) {
     event(sessionId, 'assistant/attempt', {
       turn: 0,

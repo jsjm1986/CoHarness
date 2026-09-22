@@ -2265,6 +2265,26 @@
       "doc": "docs/subsystems/session.md",
       "symbol": "TodoItem",
       "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "ExecutionCapability",
+      "source": "packages/context/execution-authority/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "ExecutionState",
+      "source": "packages/context/execution-authority/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "ExecutionInheritance",
+      "source": "packages/context/execution-authority/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "ExecutionQuestionId",
+      "source": "packages/context/execution-authority/src/types.ts"
     }
   ]
 }

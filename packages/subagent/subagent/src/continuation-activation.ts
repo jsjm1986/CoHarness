@@ -9,6 +9,7 @@
  * @module @deepseek-ai/dsh-subagent/continuation-activation
  */
 
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   Agent,
@@ -925,6 +926,12 @@ export class ContinuableActivationRegistry {
         ))
       }
     }
+    let executionScope: ExecutionInheritance | undefined
+    try {
+      executionScope = executionAuthorityOf(this.ctx)?.capture(activation.handle.agent)
+    } catch (error: unknown) {
+      failures.push(new SubagentError('Child execution identity could not be captured.', 'ACTIVATION_TEARDOWN_FAILED', { cause: error }))
+    }
     try {
       await activation.handle.dispose()
     } catch (error: unknown) {
@@ -947,19 +954,19 @@ export class ContinuableActivationRegistry {
       )
     }
     this.removeActivation(activation)
-    this.notifySettlement(activation, activation.observer.terminal(failure))
+    this.notifySettlement(activation, activation.observer.terminal(failure), executionScope)
     this.releaseOwnership(childId)
     activation.observer.settle(failure)
     if (failure !== undefined) throw failure
   }
 
   /** Tell the durable direct parent how this Activation ended. */
-  private notifySettlement(activation: Activation, terminal: ActivationTerminal): void {
+  private notifySettlement(activation: Activation, terminal: ActivationTerminal, executionScope?: ExecutionInheritance): void {
     if (!activation.announced) return
     try {
       const parent = this.ctx.agents.get(activation.parentSession)
       if (parent === undefined) return
-      const message = createSettlementMessage(activation.childId, terminal)
+      const message = createSettlementMessage(activation.childId, terminal, executionScope)
       if (this.closingTeardownFor(parent) !== undefined) {
         parent.inject(message)
         return

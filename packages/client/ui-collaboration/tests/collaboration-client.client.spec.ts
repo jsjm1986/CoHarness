@@ -63,6 +63,14 @@ function transport(overrides: Partial<CollaborationTransport> = {}): Collaborati
 }
 
 describe('response parsing', () => {
+  it('retains explicit account eligibility and rejects malformed eligibility fields', () => {
+    expect(parseCollaborationContext({ ...personalContext, fullAccess: true, autoReviewEligible: true }))
+      .toMatchObject({ fullAccess: true, autoReviewEligible: true })
+    expect(() => parseCollaborationContext({ ...personalContext, autoReviewEligible: 'true' }))
+      .toThrow('invalid collaboration response')
+    expect(() => parseCollaborationContext({ ...personalContext, fullAccess: 'true' }))
+      .toThrow('invalid collaboration response')
+  })
   it('accepts personal and project contexts plus full and null conversation details', () => {
     expect(parseCollaborationContext(personalContext)).toEqual(personalContext)
     expect(parseCollaborationContext(projectContext)).toEqual(projectContext)
@@ -250,6 +258,35 @@ describe('browser transport', () => {
 })
 
 describe('CollaborationClient', () => {
+  it('ignores an earlier connection generation after the account context was invalidated', async () => {
+    const old = deferred<CollaborationContext>()
+    const fresh = deferred<CollaborationContext>()
+    const loadContext = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
+    const client = new CollaborationClient(transport({ loadContext }))
+    const first = client.load()
+    client.invalidateContext()
+    const second = client.load(true)
+    old.resolve({ ...personalContext, fullAccess: true, autoReviewEligible: true })
+    await first
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: false })
+    fresh.resolve({ ...personalContext, fullAccess: false, autoReviewEligible: false })
+    await second
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: true, context: { fullAccess: false, autoReviewEligible: false } })
+    client.dispose()
+  })
+  it('withdraws verified account eligibility while refreshing and after an HTTP failure', async () => {
+    const pending = deferred<CollaborationContext>()
+    const loadContext = vi.fn().mockResolvedValueOnce({ ...personalContext, autoReviewEligible: true })
+      .mockReturnValueOnce(pending.promise)
+    const client = new CollaborationClient(transport({ loadContext }))
+    await client.load()
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: true })
+    const refresh = client.load(true)
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: false })
+    pending.reject(new CollaborationRequestError(503))
+    await refresh
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: false })
+  })
   it('coalesces context loads, publishes project context, stages visibility, and clears details in personal scope', async () => {
     const first = deferred<CollaborationContext>()
     const loadContext = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValueOnce(personalContext)

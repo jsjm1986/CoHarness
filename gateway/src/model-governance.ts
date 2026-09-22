@@ -209,6 +209,8 @@ export interface UsageEvent {
   actorUserId?: number
   /** Public project id carried by the participant claim for scope verification. */
   actorProjectId?: number
+  /** Immutable execution-input witnesses used to validate historical billing attribution. */
+  executionInputIds?: readonly string[]
   credentialSource: string
   credentialClass: CredentialClass
   status: UsageStatus
@@ -670,6 +672,7 @@ export class ModelGovernanceService {
   ingest(subject: ModelUsageSubject, event: UsageEvent): { inserted: boolean; alerts: number } {
     const userId = this.userId(subject)
     if (event === null || typeof event !== 'object') throw new Error('usage event must be an object')
+    if (Object.hasOwn(event, 'executionInputIds')) throw new Error('execution attribution requires the PostgreSQL intake')
     nonEmpty(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) throw new Error('occurredAt must be a non-negative safe integer')
     if (event.actorUserId !== undefined && (!Number.isSafeInteger(event.actorUserId) || event.actorUserId <= 0 || event.actorUserId !== userId)) {

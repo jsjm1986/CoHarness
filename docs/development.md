@@ -144,7 +144,7 @@ The one-shot Headless coding agent needs `DEEPSEEK_API_KEY` in the environment o
 pnpm dsh --profile headless "summarize this workspace"
 ```
 
-The self-referential cordis demo can inspect and modify its live plugin runtime and needs the same credentials (`web` by default, or `acp`):
+The Cordis demo provides read-only inspection of its live runtime and needs the same credentials (`web` by default, or `acp`):
 
 ```sh
 pnpm run demo:cordis

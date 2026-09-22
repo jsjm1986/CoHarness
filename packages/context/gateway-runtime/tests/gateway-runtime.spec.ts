@@ -118,6 +118,7 @@ describe('Gateway request context', () => {
     await fiber.await()
     expect(ctx.gatewayRuntime.identity).toEqual(credential.runtime)
     expect(ctx.gatewayRuntime.organization).toBe('acme')
+    expect(ctx.get('executionAuthorityRequired')).toBe(true)
 
     const sessionId = SessionId('pending-root')
     const authorization = Promise.resolve(GatewaySessionCreationAuthorization('creation-authorization'))
@@ -160,7 +161,14 @@ describe('Gateway request context', () => {
         kind: 'http', headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion },
       }, operation)
 
+    const detachedRelease = Promise.withResolvers<undefined>()
+    let detached: Promise<void> | undefined
     const firstRun = run(first, async () => {
+      expect(ctx.gatewayRuntime.interactive()?.claims.user.id).toBe(9)
+      detached = detachedRelease.promise.then(() => {
+        expect(ctx.gatewayRuntime.current()?.claims.user.id).toBe(9)
+        expect(ctx.gatewayRuntime.interactive()).toBeUndefined()
+      })
       expect(ctx.gatewayRuntime.requireCurrent().claims.user.id).toBe(9)
       firstEntered()
       await blocked
@@ -174,6 +182,8 @@ describe('Gateway request context', () => {
     })
     releaseFirst()
     await firstRun
+    detachedRelease.resolve(undefined)
+    await detached
     await ctx.gatewayRuntime.request('/internal/runtime/session/list')
 
     expect(seen).toEqual([
@@ -195,6 +205,7 @@ describe('Gateway request context', () => {
     ])
     expect(ctx.gatewayRuntime.current()).toBeUndefined()
     await fiber.dispose()
+    expect(ctx.get('executionAuthorityRequired')).toBe(true)
     await rm(root, { recursive: true, force: true })
   })
 

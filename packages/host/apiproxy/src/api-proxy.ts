@@ -10,6 +10,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
@@ -4221,6 +4222,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: {},
           })
         }
+        const authority = executionAuthorityOf(ctx)
+        const executionScope = await authority?.captureSession(sessionId)
         const events = source.events
         // An in-log anchor belongs to the turn containing it and must never
         // clip backward to an earlier completed turn. Omitted and past-end
@@ -4279,7 +4282,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             },
             inheritedEventCount: SessionLogOffset(cut),
             agentOptions: agentOptions(),
-            setup: forkComposition.setup,
+            setup: (agentCtx, agent) => {
+              if (executionScope !== undefined && authority !== undefined) authority.inherit(agent.session, executionScope)
+              return forkComposition.setup(agentCtx, agent)
+            },
           })
         } catch (error: unknown) {
           return err(request, {
@@ -4355,7 +4361,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             const messageSource: MessageSource = durable.documents.length === 0
               ? source
               : { ...source, documents: durable.documents }
-            const message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
+            let message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
+            const execution = executionAuthorityOf(ctx)
+            if (execution !== undefined) message = await execution.stamp(agent.session, message)
             if (mode === 'steer') agent.steer(message)
             else agent.followup(message)
           } catch (error: unknown) {
@@ -4502,11 +4510,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { itemId },
           })
         }
+        let replacement = action.kind === 'edit'
+          ? freezeMessage({ ...message, content: action.content }) : message
+        const execution = executionAuthorityOf(ctx)
+        if (action.kind !== 'remove' && execution !== undefined) {
+          replacement = await execution.stamp(agent.session, replacement)
+        }
+        const current = (target === 'next-turn' ? agent.inbox.nextTurn : agent.inbox.nextStep)
+          .find(candidate => candidate.id === itemId)
+        if (current !== message || (action.kind === 'steer' && agent.status !== 'running')) {
+          return err(request, { code: 'queue-item-not-found', message: 'queued item changed before the update completed', details: { itemId } })
+        }
         if (action.kind === 'edit') {
-          agent.inbox.replace(itemId, freezeMessage({ ...message, content: action.content }))
+          agent.inbox.replace(itemId, replacement)
         } else {
           agent.inbox.remove(itemId)
-          if (action.kind === 'steer') agent.steer(message)
+          if (action.kind === 'steer') agent.steer(replacement)
         }
         return ok(request, { accepted: true as const })
       },
@@ -4881,6 +4900,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           attachedSessions,
           home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
+          executionAuthorityRequired: ctx.get('executionAuthorityRequired') === true,
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
             maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,
@@ -5859,7 +5879,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       if ('error' in authorized) return { accepted: false, reason: 'bad-response' }
       if (pendingQuestions.get(message.rpcId) !== pending) return { accepted: false, reason: 'not-pending' }
       try {
-        if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(
+        const execution = executionAuthorityOf(ctx)
+        const session = ctx.sessions.get(pending.sessionId)
+        if (execution !== undefined) {
+          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer)) {
+            return { accepted: false, reason: 'not-pending' }
+          }
+        } else if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(
           pending.sessionId,
           'question',
           String(pending.rpcId),

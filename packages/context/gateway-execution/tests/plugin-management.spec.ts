@@ -1,6 +1,6 @@
 /** Management authority is checked independently of profile and tool permissions. */
 import { expect, it, vi } from 'vitest'
-import type { GatewayRequestPrincipal } from '../src/index.ts'
+import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
 import { gatewayPluginManagementAuthorization } from '../src/plugin-management.ts'
 
 function fixture() {

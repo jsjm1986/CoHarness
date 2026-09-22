@@ -232,6 +232,41 @@ Project runtimes persist shared session headers and events through [`dsh-session
 
 Deleting a project stops its shared runtime while the Gateway retains that runtime's serialized operation slot, then removes the project row. PostgreSQL cascades the runtime, memberships, mounts, conversation trees and events, participant and interaction rows, project model usage and quota data, intake token, alerts, and content-file metadata. The filesystem project directory is retained.
 
+## Execution participants
+
+Managed execution retains verified human input references across queued edits, answers, forks, and delegation. The Gateway checks every retained participant before privileged execution; a display participant or approval response does not grant authority. Input without verified attribution prevents privileged execution. See the [execution identity service](../../packages/context/execution-authority/README.md) for consumer ownership and the [Gateway provider](../../packages/context/gateway-execution/README.md) for invalidation and recovery.
+
+```ts type-equiv
+/** Host RPC identity of the pending human question claimed by the Gateway. */
+type ExecutionQuestionId = Branded<'rpc-id'>
+```
+
+```ts type-equiv
+/** Privilege checked against every current execution participant. */
+type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review'
+```
+
+```ts type-equiv
+/** Gateway-confirmed participant set, with bounded identity witnesses. */
+interface ExecutionState {
+  readonly revision: string
+  readonly inputs: readonly ExecutionInputId[]
+  readonly actors: readonly { readonly userId: number }[]
+  readonly primaryActorUserId?: number
+  readonly unverifiedHistory: boolean
+}
+```
+
+```ts type-equiv
+/** A delegation captures its parent before awaiting child creation. */
+interface ExecutionInheritance {
+  readonly parentSessionId: SessionId
+  readonly inputs: readonly ExecutionInputId[]
+  readonly unverifiedHistory: boolean
+  readonly primaryActorUserId?: number
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -270,6 +305,82 @@ abstract withSessionCreation<T>( creation: CollaborationSessionCreation, operati
 
 Source: [`packages/context/collaboration/src/index.ts`](../../packages/context/collaboration/src/index.ts)
 
+<a id="ctxexecutionauthority--executionauthority-abstract-seam"></a>
+
+### `ctx.executionAuthority` — `ExecutionAuthority` (abstract seam)
+
+Authority operations shared by input transports, delegated work, and privilege consumers.
+
+```ts cordis-catalog
+/**
+ * Attest the live caller and exact human input, retaining all earlier editors.
+ * @param session - Session which owns the input.
+ * @param message - content and display metadata accepted by the input transport.
+ * @returns immutable input with verified origin reference.
+ */
+abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>
+
+/**
+ * Claim a verified human answer and include its responder before delivery.
+ * @param session - Session owning the live question.
+ * @param questionId - exact pending question identity verified by the transport.
+ * @param answer - parser-validated answer.
+ * @returns whether the caller owns this answer, including an identical retry.
+ */
+abstract answer(session: Session, questionId: string, answer: unknown): Promise<boolean>
+
+/**
+ * Capture the current participants before awaiting delegated work.
+ * @param agent - exact live parent Agent.
+ * @returns immutable inheritance for the new or continued child.
+ */
+abstract capture(agent: Agent): ExecutionInheritance
+
+/**
+ * Capture the complete authority of a cold or live source for an explicit fork.
+ * @param sessionId - source already authorized by the fork transport.
+ * @returns current participant references, independently of the selected history cut.
+ */
+abstract captureSession(sessionId: SessionId): Promise<ExecutionInheritance>
+
+/**
+ * Persist captured restrictions in the child's own log.
+ * @param session - child Session, including the unpublished setup window.
+ * @param scope - participants captured from its actual parent.
+ */
+abstract inherit(session: Session, scope: ExecutionInheritance): void
+
+/**
+ * Include an adjacent sender's restrictions before admitting its durable delivery.
+ * @param session - actual recipient, including a Team's routing host.
+ * @param scope - sender facts captured before asynchronous delivery.
+ * @param messageId - stable delivery identity for retry deduplication.
+ * @param signal - delivery cancellation.
+ * @returns recipient restrictions for an onward delegation of this delivery.
+ */
+abstract relay(session: Session, scope: ExecutionInheritance, messageId: MessageId, signal?: AbortSignal): Promise<ExecutionInheritance>
+
+/**
+ * Recheck every participant against current permissions.
+ * @param capability - required privilege; identity alone grants none.
+ * @param agent - actual executing Agent.
+ * @param signal - operation-owned cancellation.
+ * @returns verified participants for attribution; one call incurs one charge.
+ */
+abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal): Promise<ExecutionState>
+
+/**
+ * Authorize an explicit preset selection before its synchronous commit.
+ * @param agent - target Agent.
+ * @param preset - requested preset name.
+ */
+abstract authorizeSelection(agent: Agent, preset: string): Promise<void>
+```
+
+Types: [Agent](core.md) · [MessageId](llm-streaming.md) · [Session](session.md) · [SessionId](core.md) · [UserMessage](session.md)
+
+Source: [`packages/context/execution-authority/src/index.ts`](../../packages/context/execution-authority/src/index.ts)
+
 <a id="ctxgatewayruntime--gatewayruntime"></a>
 
 ### `ctx.gatewayRuntime` — `GatewayRuntime`
@@ -282,6 +393,12 @@ Authenticated Gateway context for one launched Harness runtime.
  * @returns the verified principal, or undefined outside an authenticated operation.
  */
 current(): GatewayRequestPrincipal | undefined
+
+/**
+ * Read the live HTTP caller; detached work cannot keep interactive authority.
+ * @returns the caller while the HTTP operation remains active, otherwise undefined.
+ */
+interactive(): GatewayRequestPrincipal | undefined
 
 /**
  * Return the current principal or reject an operation outside an authenticated request.

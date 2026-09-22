@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import Database from 'better-sqlite3'
 
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled')),
   home_path TEXT NOT NULL,
   must_change_password INTEGER NOT NULL DEFAULT 1,
+  auto_review_eligible INTEGER NOT NULL DEFAULT 0 CHECK (auto_review_eligible IN (0,1)),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   deleted_at INTEGER
@@ -312,6 +313,10 @@ function migrate(db: Database.Database): void {
     }
 
     const userColumns = columnNames(db, 'users')
+    if (!userColumns.has('auto_review_eligible')) {
+      db.exec(`ALTER TABLE users ADD COLUMN auto_review_eligible INTEGER NOT NULL DEFAULT 0
+        CHECK (auto_review_eligible IN (0,1))`)
+    }
     if (!userColumns.has('deleted_at')) {
       db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER')
     }

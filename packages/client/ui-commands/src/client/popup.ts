@@ -36,6 +36,8 @@ export interface PopupSpec<TCtx> {
   options(context: TCtx, signal: AbortSignal): Promise<readonly SelectOption[]>
   /** Settle the picked option against the open-time context. */
   onSelect(option: SelectOption, context: TCtx): void | Promise<void>
+  /** Subscribe to loss of validity of this popup's captured options. */
+  subscribeInvalidation?(context: TCtx, listener: () => void): () => void
 }
 
 /** Injected session-wiring callbacks of one controller (tests pass fakes). */
@@ -137,7 +139,14 @@ export class PopupSelectController<TCtx = unknown> {
     const binding: OpenBinding<TCtx> = { command, spec, context, segment, abort: new AbortController() }
     this.binding = binding
     this.state.set({ ...CLOSED, open: true, command })
-    this.load(binding)
+    const unsubscribe = spec.subscribeInvalidation?.(context, () => {
+      if (this.binding === binding) this.dismiss()
+    })
+    if (unsubscribe !== undefined) {
+      if (binding.abort.signal.aborted) unsubscribe()
+      else binding.abort.signal.addEventListener('abort', unsubscribe, { once: true })
+    }
+    if (this.binding === binding) this.load(binding)
   }
 
   /** Run the one options fetch of a binding; settlement rights die with the binding. */
@@ -185,8 +194,12 @@ export class PopupSelectController<TCtx = unknown> {
     if (!s.open || s.status !== 'ready' || s.submitting || s.confirming !== null) return
     const rows = filterOptions(s.options, s.search)
     if (rows.length === 0) return
-    const active = (s.active + dir + rows.length) % rows.length
-    this.state.set({ ...s, active })
+    for (let offset = 1; offset <= rows.length; offset += 1) {
+      const active = (s.active + dir * offset + rows.length) % rows.length
+      if (rows[active]?.disabled === true) continue
+      this.state.set({ ...s, active })
+      return
+    }
   }
 
   /**
@@ -197,7 +210,8 @@ export class PopupSelectController<TCtx = unknown> {
   highlight(index: number): void {
     const s = this.state.getSnapshot()
     if (!s.open || s.status !== 'ready' || s.submitting || s.confirming !== null) return
-    if (index < 0 || index >= filterOptions(s.options, s.search).length || index === s.active) return
+    const rows = filterOptions(s.options, s.search)
+    if (index < 0 || index >= rows.length || rows[index]?.disabled === true || index === s.active) return
     this.state.set({ ...s, active: index })
   }
 
@@ -216,7 +230,7 @@ export class PopupSelectController<TCtx = unknown> {
     const s = this.state.getSnapshot()
     if (binding === null || !s.open || s.status !== 'ready' || s.submitting || s.confirming !== null) return
     const option = filterOptions(s.options, s.search)[index]
-    if (option === undefined) return
+    if (option === undefined || option.disabled === true) return
     if (option.confirmation !== undefined) {
       this.state.set({ ...s, confirming: option, acknowledged: false, error: null })
       return
@@ -265,6 +279,7 @@ export class PopupSelectController<TCtx = unknown> {
     if (this.binding !== binding) return // late success: no state write, no consumption
     this.deps.consume(binding.segment)
     this.binding = null
+    binding.abort.abort()
     this.state.set(CLOSED)
     this.deps.focusComposer()
   }

@@ -207,6 +207,7 @@ function bench(over?: BenchOptions) {
     useLexicon: bindSnapshotSelector(shell.lexicon),
     useMenuLauncher: bindSnapshotSelector(menuLauncher),
     useDocuments: bindSnapshotSelector(documentStore),
+    usePermissionAvailability: (() => 'local') as InputBarProps['usePermissionAvailability'],
     usePermissionCatalog: bindSnapshotSelector(createSnapshotStore(
       over?.permissions === undefined ? undefined : { options: over.permissions.options })),
     stop,

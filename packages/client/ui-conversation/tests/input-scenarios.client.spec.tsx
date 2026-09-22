@@ -178,6 +178,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     useMenuLauncher: bindSnapshotSelector(controller.launcher),
     useDocuments: (() => []) as InputBarProps['useDocuments'],
     usePermissionCatalog: (() => undefined) as InputBarProps['usePermissionCatalog'],
+    usePermissionAvailability: (() => 'local') as InputBarProps['usePermissionAvailability'],
     renderSlot: (() => null) as InputBarProps['renderSlot'],
     stop: vi.fn(),
     command: () => Promise.resolve(true),

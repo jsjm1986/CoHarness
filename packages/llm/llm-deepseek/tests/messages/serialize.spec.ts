@@ -23,6 +23,13 @@ const capable = resolveAdapterOptions({ models: [{ id: MODEL, systemPromptUpdate
 const nativeBody = (messages: Message[]) => serialize(options({ messages }), capable, messages, new Map(), () => undefined)
 
 describe('Messages request conversion', () => {
+  it('keeps Auto billing identity and purpose out of the Messages wire request', () => {
+    const internal = Object.assign(options({ purpose: 'auto-review' }), {
+      sessionId: 'billing-session', executionIdentity: { inputs: ['private-input'], primaryActorUserId: 7 },
+    })
+    expect(serialize(internal, connection, [user()], new Map(), () => undefined)).toEqual(body())
+  })
+
   it('keeps the original top-level prompt and cached prefix while appending native system updates', () => {
     const head = createSystemMessage('original', 'test')
     const first = [head, user('first')]

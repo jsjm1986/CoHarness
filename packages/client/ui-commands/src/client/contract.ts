@@ -23,6 +23,8 @@ export interface SelectOption {
   readonly label: string
   readonly detail?: string
   readonly active?: boolean
+  /** Display the option and its explanation without allowing selection. */
+  readonly disabled?: boolean
   /** Optional in-page risk gate owned by the shared popup shell. */
   readonly confirmation?: SelectConfirmation
 }
@@ -37,6 +39,8 @@ export type CommandUiSpec = {
   readonly kind: 'popupSelect'
   options(session: ClientSessionContext, signal: AbortSignal): Promise<readonly SelectOption[]>
   onSelect(option: SelectOption, session: ClientSessionContext): void | Promise<void>
+  /** Subscribe only while this popup is open; a change invalidates its captured options. */
+  subscribeInvalidation?(session: ClientSessionContext, listener: () => void): () => void
 }
 
 /**

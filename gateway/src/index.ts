@@ -202,6 +202,7 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
       status: 'active',
       homePath: '/',
       mustChangePassword: false,
+      autoReviewEligible: false,
     },
     scope,
     runtime: { kind: runtime.kind, id: runtime.id, generation: running.generation },
@@ -347,6 +348,8 @@ const server = createGatewayServer(deps, {
   }),
   admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
   runtime: createRuntimeApiHandler({
+    accessMonitor,
+    executionWatchHeartbeatMs: cfg.executionWatchHeartbeatMs,
     context,
     instances: instanceRepository,
     conversations,

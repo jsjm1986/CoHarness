@@ -52,6 +52,8 @@ export interface HostApi {
     attachedSessions: number
     home: string
     canOpenPath: boolean
+    /** Explicit deployment identity; absence is unknown, never proof of independent local access. */
+    executionAuthorityRequired?: boolean
     /** Present only when a filesystem provider serves read-only Workspace resources. */
     workspaceFiles?: { maxBytes: number; maxLines: number; maxEntries: number; maxResources: number }
   }>>

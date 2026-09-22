@@ -8,8 +8,8 @@ import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { generationLogPath, scanLog, SessionLogScanner } from '../src/format.ts'
 
-const id = SessionId('v4-admission')
-const header = { type: 'session', version: 4, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 }
+const id = SessionId('v5-admission')
+const header = { type: 'session', version: 5, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 }
 const start = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }
 const prefix = [header, start].map(row => JSON.stringify(row)).join('\n') + '\n'
 const obsoleteTypes = ['tool/code-dispatch-start', 'tool/code-dispatch'] as const
@@ -22,12 +22,12 @@ function obsoleteEvent(type: string, ignorable?: true) {
   }
 }
 
-describe('native V4 event admission at EOF', () => {
+describe('current V5 event admission at EOF', () => {
   let root: string
   let ctx: Context
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'dsh-v4-admission-'))
+    root = await mkdtemp(join(tmpdir(), 'dsh-v5-admission-'))
     ctx = new Context()
     await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
   })
@@ -41,7 +41,7 @@ describe('native V4 event admission at EOF', () => {
   })
 
   async function store(bytes: Buffer): Promise<string> {
-    const path = generationLogPath(root, undefined, id, 4, 'none')
+    const path = generationLogPath(root, undefined, id, 5, 'none')
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, bytes)
     return path

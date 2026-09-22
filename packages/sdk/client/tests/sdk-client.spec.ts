@@ -112,6 +112,16 @@ describe('DeepSeekHarness', () => {
     expect(closed).toBe(true)
   })
 
+  it('preserves execution constraints as events without treating them as assistant output', async () => {
+    const harness = harnessWith({ FAKE_EXECUTION_EVENT: '1', FAKE_TEXT: 'visible response' })
+    const result = await harness.run('go')
+    expect(result.finalResponse).toBe('visible response')
+    expect(result.events.find(event => event.type === 'gateway/execution')).toMatchObject({
+      data: { kind: 'accepted', state: { revision: '1', primaryActorUserId: 7,
+        inputs: ['00000000-0000-4000-8000-000000000001'], actors: [{ userId: 7 }], unverifiedHistory: false } },
+    })
+  })
+
   it('runs a turn end to end and reuses the runtime across sessions', async () => {
     const harness = harnessWith({ FAKE_TEXT: 'turn answer' })
     const first = await harness.run('say hi')

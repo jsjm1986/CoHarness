@@ -18,19 +18,31 @@
     },
     "gateway": {
       "manifest": "gateway/package.json",
+      "additionalEntries": [
+        {
+          "manifest": "package.json",
+          "scripts": ["test:gateway:execution"]
+        }
+      ],
       "scripts": [
         "typecheck",
         "build:check",
-        "test"
+        "test",
+        "test:postgres"
       ],
       "workflow": ".github/workflows/ci.yml",
       "jobs": [
-        "gateway"
+        "gateway",
+        "node-24-consumers"
       ],
       "sources": [
         "gateway/tests/runtime-api.spec.ts",
         "gateway/tests/server.spec.ts",
-        "gateway/src/runtime-api.ts"
+        "gateway/src/runtime-api.ts",
+        "gateway/tests/execution-fixture.ts",
+        "gateway/tests/execution-fixture-server.ts",
+        "packages/context/gateway-execution/tests/pg-composition.e2e.ts",
+        "packages/context/gateway-execution/tests/fixtures/postgres.cordis.yml"
       ]
     },
     "adminUi": {
@@ -165,6 +177,38 @@
         "gateway"
       ],
       "basis": "Gateway composes these context plugins into its runtime; a change inside them alters Gateway behavior without touching gateway/."
+    },
+    {
+      "id": "gateway-execution",
+      "paths": [
+        "packages/context/execution-authority",
+        "packages/context/gateway-execution",
+        "packages/context/gateway-runtime",
+        "packages/experimental/auto-review",
+        "packages/interaction/permission-presets",
+        "packages/subagent/subagent",
+        "packages/subagent/subagent-in-process-driver",
+        "packages/experimental/agent-team",
+        "packages/experimental/agent-team-profile",
+        "packages/extensions/cordis-host-runner",
+        "packages/extensions/cordis-client-runner",
+        "packages/boot/plugin-manager",
+        "packages/core/tools",
+        "packages/core/agent",
+        "packages/core/agent-loop",
+        "packages/host/apiproxy",
+        "packages/client/connection",
+        "packages/client/runtime/src/client/contract/permission-availability.ts",
+        "packages/ptc-runtime",
+        "packages/workflow",
+        "packages/schedule/schedule",
+        "packages/goal/goal-round-driver",
+        "plugins/dsh-model-governance"
+      ],
+      "lanes": [
+        "gateway"
+      ],
+      "basis": "Managed model, tool, delegation, mode-selection and billing consumers retain authenticated execution actors across asynchronous work; the existing root consumer job verifies the real Loader against PostgreSQL."
     },
     {
       "id": "admin-app",

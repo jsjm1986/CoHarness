@@ -15,6 +15,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, contentHasImage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
@@ -50,7 +51,7 @@ import type {
 } from './types.ts'
 
 /** Inputs shared by model steering and human prompt delivery. */
-type ChildDeliveryOptions =
+type ChildDeliveryOptions = { readonly message?: ReturnType<typeof createUserMessage> } & (
   | {
     readonly delivery: 'steer'
     /**
@@ -60,7 +61,7 @@ type ChildDeliveryOptions =
     readonly source?: MessageSource
     readonly signal: AbortSignal
   }
-  | { readonly delivery: 'queue'; readonly source: MessageSource; readonly signal: AbortSignal }
+  | { readonly delivery: 'queue'; readonly source: MessageSource; readonly signal: AbortSignal })
 
 /** Package-private hooks supplied by the owning service. */
 interface ContinuationHost {
@@ -178,7 +179,8 @@ export class SubagentContinuationManager {
           isAdjacentAgentSendMessageTool(this.ctx.get('tools')?.get('send_message', activation.handle.agent))
             ? withContinuableReturnGuidance(parent.id, request.prompt)
             : request.prompt,
-          { source: { kind: 'user' }, signal: spec.signal, delivery: 'queue' },
+          { source: { kind: 'user', ...(delegatedPolicies.executionScope === undefined ? {}
+            : { gatewayExecutionScope: delegatedPolicies.executionScope }) }, signal: spec.signal, delivery: 'queue' },
           parent,
           () => { establishCatalogChild(parent.session, childHeader, descriptor) },
         )
@@ -278,9 +280,12 @@ export class SubagentContinuationManager {
     options: ChildDeliveryOptions,
   ): Promise<MessageId> {
     this.activations.assertAdmitting(parent)
+    const message = options.source === undefined
+      ? createAgentMessage(parent, content) : createUserMessage({ content, source: options.source })
+    const capturedOptions = { ...options, message }
     const releaseHold = this.activations.holdOwnership(parent, childId)
     try {
-      return await this.deliverFollowup(parent, childId, content, options)
+      return await this.deliverFollowup(parent, childId, content, capturedOptions)
     } catch (error: unknown) {
       releaseHold()
       throw error
@@ -311,7 +316,7 @@ export class SubagentContinuationManager {
             return undefined
           }
         }
-        const messageId = this.submitAdmitted(activation, content, options, parent)
+        const messageId = await this.submitAdmitted(activation, content, options, parent)
         activation.announced = true
         return messageId
       })
@@ -473,7 +478,7 @@ export class SubagentContinuationManager {
           throw new SubagentError(`subagent "${activation.childId}" is closing`, 'ACTIVATION_CLOSING')
         }
       }
-      const messageId = this.submitAdmitted(activation, content, options, parent)
+      const messageId = await this.submitAdmitted(activation, content, options, parent)
       commit?.()
       activation.announced = true
       return messageId
@@ -489,16 +494,20 @@ export class SubagentContinuationManager {
     }
   }
 
-  /** Build and submit one message across the final synchronous admission cutoff. */
-  private submitAdmitted(
+  /** Attest human input before the final synchronous admission cutoff. */
+  private async submitAdmitted(
     activation: Activation,
     content: ContentBlock[],
     options: ChildDeliveryOptions,
     parent: Agent,
-  ): MessageId {
-    const message = options.source === undefined
+  ): Promise<MessageId> {
+    let message = options.message ?? (options.source === undefined
       ? createAgentMessage(parent, content)
-      : createUserMessage({ content, source: options.source })
+      : createUserMessage({ content, source: options.source }))
+    const authority = executionAuthorityOf(this.ctx)
+    if (authority !== undefined && message.source.kind === 'user' && !('gatewayExecutionScope' in message.source)) {
+      message = await authority.stamp(activation.handle.agent.session, message)
+    }
     return this.activations.submitAdmitted(
       activation,
       message,

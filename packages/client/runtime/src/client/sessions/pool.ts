@@ -205,6 +205,7 @@ export class SessionRuntimePool implements ISessions {
       const runtime = new Runtime(fiber.ctx, connection.api, this.remote, this.conversation, {
         persistSelection: false,
         provideService: false,
+        hostDescription: connection.hostDescription,
       })
       entry = { key, target, runtime, connection, fiber }
       this.entries.set(key, entry)

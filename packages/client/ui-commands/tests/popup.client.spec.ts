@@ -66,6 +66,35 @@ describe('filterOptions', () => {
 })
 
 describe('open and options load', () => {
+  it('refuses disabled options and skips them during keyboard navigation', async () => {
+    const onSelect = vi.fn()
+    const { popup, deps } = await readyPopup({ options: () => Promise.resolve([
+      OPTIONS[0]!, { ...OPTIONS[1]!, disabled: true }, OPTIONS[2]!,
+    ]), onSelect })
+    popup.move(1)
+    expect(popup.state.getSnapshot().active).toBe(2)
+    popup.highlight(1)
+    expect(popup.state.getSnapshot().active).toBe(2)
+    await popup.select(1)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(deps.consume).not.toHaveBeenCalled()
+    popup.dispose()
+  })
+
+  it('closes only a popup subscribed to changed eligibility and releases that subscription', async () => {
+    let invalidate: (() => void) | undefined
+    const unsubscribe = vi.fn()
+    const permission = await readyPopup({ subscribeInvalidation: (_context, listener) => {
+      invalidate = listener
+      return unsubscribe
+    } })
+    const unrelated = await readyPopup()
+    invalidate?.()
+    expect(permission.popup.state.getSnapshot().open).toBe(false)
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(unrelated.popup.state.getSnapshot().open).toBe(true)
+    unrelated.popup.dispose()
+  })
   it('publishes pending immediately, ready when options land', async () => {
     const popup = new PopupSelectController<Ctx>(makeDeps())
     let release!: (options: readonly SelectOption[]) => void

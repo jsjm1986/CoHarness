@@ -9,7 +9,7 @@ kind: "package-library"
 
 `dsh-session-format` 是 provider 无关的 Session 持久化迁移接缝。它校验脱离原对象的 JSON header 和事件 artifact，编译完整的相邻迁移链，在读取事件体前完成 header 分类，并在 provider 决定发布新代次之前于内存中转换旧代次。它还为能够增量读取旧数据行的提供方提供可选的逐事件迁移流；整体 artifact 方法保留为兼容路径。
 
-`src/catalog-default.ts` 提供静态的 v0 → v1 → v2 → v3 链。第一方 provider 通过这条 catalog 提供发布版物理 codec 和事件归一化；provider 代码不得复制这条链或另行发明格式版本。
+`src/catalog-default.ts` 提供静态的 v0 → v1 → v2 → v3 → v4 → v5 链。第一方 provider 通过这条 catalog 提供发布版物理 codec 和事件归一化；provider 代码不得复制这条链或另行发明格式版本。
 
 ## 概述
 

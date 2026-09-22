@@ -571,6 +571,7 @@ export class InstanceManager {
       }
       if (runtime.kind === 'project') patchText += PROJECT_RUNTIME_PATCH
       patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
+      patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
       writeFileSync(join(dshHome, 'cordis.patch.yml'), patchText)
     } catch (error) {
       throw new Error(`policy bundle mount failed for ${runtime.runtimeKey ?? runtime.username}: ${String(error)}`)

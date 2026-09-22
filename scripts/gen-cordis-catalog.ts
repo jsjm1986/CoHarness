@@ -79,6 +79,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   fileReferences: 'session-reference.md',
   fs: 'filesystem.md',
   gatewayRuntime: 'collaboration.md',
+  executionAuthority: 'collaboration.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
@@ -148,6 +149,7 @@ export const SERVICE_PAGE: Record<string, string> = {
  * to a model as `cordis_runtime_inspect what:"client"`).
  */
 export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
+  executionAuthorityRequired: 'managed-deployment marker is owned by packages/context/execution-authority/README.md',
   appExit: 'not a service: launcher-provided bounded process-exit callback — packages/boot/cmdline/README.md owns the launcher contract',
   appReady: 'not a service: launcher-provided successful-startup signal — packages/boot/cmdline/README.md owns the launcher contract',
   pluginPackages: 'profile-boot-owned package resolver service used by optional consumers — packages/boot/app-boot/README.md owns this internal API',
@@ -264,6 +266,10 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   AgentStatus: 'core.md',
   AssistantStreamFrame: 'core.md',
   CollaborationAccess: 'collaboration.md',
+  ExecutionInheritance: 'collaboration.md',
+  ExecutionQuestionId: 'collaboration.md',
+  ExecutionCapability: 'collaboration.md',
+  ExecutionState: 'collaboration.md',
   CollaborationAction: 'collaboration.md',
   CollaborationAuthority: 'collaboration.md',
   CollaborationErrorCode: 'collaboration.md',

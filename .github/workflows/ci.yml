@@ -329,6 +329,20 @@ jobs:
           && 'dsh-ubuntu-24-04-16core'
           || 'ubuntu-latest' }}
     name: node 24 / snapshots and artifacts
+    services:
+      execution-postgres:
+        image: ${{ needs.pr-scope.outputs.gateway_mode == 'full' && 'postgres:16' || '' }}
+        env:
+          POSTGRES_USER: hgw
+          POSTGRES_PASSWORD: hgw
+          POSTGRES_DB: hgw_execution
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U hgw -d hgw_execution"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       DSH_EVIDENCE_JOB_NAME: "node 24 / snapshots and artifacts"
       DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-consumers-${{ github.run_attempt }}
@@ -419,6 +433,21 @@ jobs:
       # production dependency graph before the consumer gate starts.
       - name: Install Gateway runtime dependencies
         run: npm ci --prefix gateway --omit=dev
+
+      - name: Test Gateway execution through Loader and PostgreSQL
+        id: gateway-execution
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        env:
+          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution
+        run: pnpm run test:gateway:execution
+
+      - name: Record Gateway execution evidence
+        if: always() && needs.pr-scope.outputs.gateway_mode == 'full'
+        env:
+          EVIDENCE_CHECK: gateway-execution
+          EVIDENCE_COMMAND: pnpm run test:gateway:execution
+          EVIDENCE_STATUS: ${{ steps.gateway-execution.outcome == 'skipped' && 'cancelled' || steps.gateway-execution.outcome }}
+        run: node scripts/gate-evidence.ts
 
       # The browser snapshot left this aggregate: the keyless consumer gates run
       # here for every snapshot mode, and the dedicated web-verification lane

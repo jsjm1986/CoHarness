@@ -56,6 +56,7 @@ function user(id: number, role: UserRow['role'] = 'user'): UserRow {
     status: 'active',
     homePath: `/tmp/user-${String(id)}`,
     mustChangePassword: false,
+    autoReviewEligible: false,
   }
 }
 

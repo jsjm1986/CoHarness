@@ -2,10 +2,11 @@
 import type { PluginManagementAuthorization } from '@deepseek-ai/dsh-plugin-manager/types'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import type { GatewayRuntime } from './index.ts'
+import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 
 const protectedModules = new Set([
   '@deepseek-ai/dsh-gateway-runtime',
+  '@deepseek-ai/dsh-gateway-execution',
   '@deepseek-ai/dsh-collaboration',
   '@deepseek-ai/dsh-collaboration-gateway',
   '@deepseek-ai/dsh-collaboration-context',

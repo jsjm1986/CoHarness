@@ -9,8 +9,8 @@
  * its Settings row and invalidates that row on host settings changes.
  */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it } from 'vitest'
-import { SlotRegistry, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { describe, expect, it, vi } from 'vitest'
+import { createSnapshotStore, ProjectUiPolicyRuntime, SlotRegistry, type SessionId, type AccountPermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -38,6 +38,11 @@ const SELECT: PermissionSelection = {
 
 async function bench() {
   const ctx = new Context()
+  const policy = new ProjectUiPolicyRuntime()
+  ctx.provide('projectUiPolicy', policy)
+  const localHost = createSnapshotStore<{ executionAuthorityRequired?: boolean } | undefined>({ executionAuthorityRequired: false })
+  const managedHost = createSnapshotStore<{ executionAuthorityRequired?: boolean } | undefined>({ executionAuthorityRequired: true })
+  const managed = new Set<SessionId>()
   await ctx.plugin(SlotRegistry)
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('en')
@@ -98,12 +103,15 @@ async function bench() {
     },
   })
   ctx.provide('sessions', {
-    binding: (id: SessionId) => (values.has(id) ? { sessionId: id, session: session(id) } : undefined),
+    binding: (id: SessionId) => (values.has(id)
+      ? { sessionId: id, session: session(id), hostDescription: managed.has(id) ? managedHost : localHost }
+      : undefined),
   })
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
   return {
-    ctx, fiber, values, commands,
+    ctx, fiber, values, commands, managed, localHost, managedHost,
+    qualify: (value: AccountPermissionAvailability) => { policy.setAccountPermissions(value) },
     setResult: (r: { ok: boolean; matched?: boolean }) => { commandResult = r },
     setCatalog: (next: PermissionCatalog) => {
       catalog = next
@@ -120,6 +128,49 @@ async function bench() {
 }
 
 describe('ui-permission browser plugin', () => {
+  it('keeps the Host catalog intact and refuses unavailable account selections', async () => {
+    const b = await bench()
+    const c = b.decoration()!
+    const session = { sessionId: sid('managed') }
+    b.values.set(session.sessionId, { currentValue: 'auto' })
+    b.managed.add(session.sessionId)
+    b.setCatalog({ options: [...CATALOG.options, { value: 'auto', name: 'auto' }] })
+    b.qualify('standard')
+    const rows = await c.ui.options(session, new AbortController().signal)
+    expect(rows.find(row => row.id === 'danger-full-access')).toMatchObject({ disabled: true })
+    expect(rows.find(row => row.id === 'auto')).toMatchObject({ disabled: true, active: true })
+    expect(rows.find(row => row.id === 'auto')?.detail).toContain('selected mode is unavailable')
+    await expect(c.ui.onSelect({ id: 'auto', label: 'Auto' }, session)).rejects.toThrow('not eligible')
+    expect(b.commands).toEqual([])
+    expect(b.values.get(session.sessionId)?.currentValue).toBe('auto')
+    b.qualify('full-and-auto')
+    expect((await c.ui.options(session, new AbortController().signal)).every(row => row.disabled !== true)).toBe(true)
+    expect(CATALOG.options).toHaveLength(3)
+    await b.fiber.dispose()
+  })
+
+  it('invalidates only the owning target source and rechecks a stale option at submission', async () => {
+    const b = await bench()
+    const c = b.decoration()!
+    const managed = { sessionId: sid('managed') }
+    const local = { sessionId: sid('local') }
+    b.values.set(managed.sessionId, SELECT)
+    b.values.set(local.sessionId, SELECT)
+    b.managed.add(managed.sessionId)
+    b.qualify('full-and-auto')
+    const managedChanged = vi.fn()
+    const localChanged = vi.fn()
+    const stopManaged = c.ui.subscribeInvalidation!(managed, managedChanged)
+    const stopLocal = c.ui.subscribeInvalidation!(local, localChanged)
+    b.managedHost.set(undefined)
+    expect(managedChanged).toHaveBeenCalledOnce()
+    expect(localChanged).not.toHaveBeenCalled()
+    await expect(c.ui.onSelect({ id: 'danger-full-access', label: 'Full access' }, managed)).rejects.toThrow('unconfirmed')
+    await c.ui.onSelect({ id: 'danger-full-access', label: 'Full access' }, local)
+    expect(b.commands).toEqual(['/permission danger-full-access'])
+    stopManaged(); stopLocal()
+    await b.fiber.dispose()
+  })
   it('hangs the /permission popup decoration on the host command', async () => {
     const b = await bench()
     const c = b.decoration()!
