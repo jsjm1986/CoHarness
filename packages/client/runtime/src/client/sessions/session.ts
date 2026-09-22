@@ -713,7 +713,10 @@ export class Session implements SessionFace {
       case 'session/queue': {
         this.queueMirror.replace(frame.items)
         this.observeSubmissionQueue(frame.items)
-        this.notifier.markDirty()
+        // Queue baselines ride the stream's per-turn cadence; publish on the
+        // frame channel like other hot producers instead of per-envelope
+        // microtask flushes.
+        this.notifier.markFrameDirty()
         return
       }
       case 'session/subscribed': {

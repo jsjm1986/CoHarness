@@ -235,26 +235,26 @@ describe('SubagentHeaderLineage', () => {
     expect(screen.queryByRole('tree')).toBeNull()
 
     fireEvent.mouseEnter(trigger.parentElement!)
-    await vi.advanceTimersByTimeAsync(149)
+    await act(() => vi.advanceTimersByTimeAsync(149))
     expect(screen.queryByRole('tree')).toBeNull()
-    await vi.advanceTimersByTimeAsync(1)
+    await act(() => vi.advanceTimersByTimeAsync(1))
     const tree = screen.getByRole('tree')
     fireEvent.resize(window)
     fireEvent.mouseLeave(trigger.parentElement!)
     fireEvent.mouseEnter(tree)
-    await vi.advanceTimersByTimeAsync(120)
+    await act(() => vi.advanceTimersByTimeAsync(120))
     expect(screen.getByRole('tree')).toBeTruthy()
 
     fireEvent.mouseLeave(tree)
-    await vi.advanceTimersByTimeAsync(119)
+    await act(() => vi.advanceTimersByTimeAsync(119))
     expect(screen.getByRole('tree')).toBeTruthy()
-    await vi.advanceTimersByTimeAsync(1)
+    await act(() => vi.advanceTimersByTimeAsync(1))
     expect(screen.queryByRole('tree')).toBeNull()
 
     hoverCatalog(trigger)
     fireEvent.mouseLeave(trigger.parentElement!)
     view.unmount()
-    await vi.advanceTimersByTimeAsync(120)
+    await act(() => vi.advanceTimersByTimeAsync(120))
   })
 
   it('cancels a pending hover when the trigger becomes hidden', async () => {
@@ -263,11 +263,11 @@ describe('SubagentHeaderLineage', () => {
     const trigger = screen.getByRole('button', { name: /2 个子代理/ })
 
     fireEvent.mouseEnter(trigger.parentElement!)
-    await vi.advanceTimersByTimeAsync(149)
+    await act(() => vi.advanceTimersByTimeAsync(149))
     view.rerender(<SubagentHeaderLineage {...props(catalog({ entries: [] }))} />)
     expect(screen.queryByRole('button')).toBeNull()
 
-    await vi.advanceTimersByTimeAsync(1)
+    await act(() => vi.advanceTimersByTimeAsync(1))
     fireEvent.resize(window)
     expect(screen.queryByRole('tree')).toBeNull()
   })
@@ -400,7 +400,7 @@ describe('SubagentHeaderLineage', () => {
     expect(screen.getByText('约2年3个月')).toBeTruthy()
     expect(screen.getByText('约1年')).toBeTruthy()
 
-    await vi.advanceTimersByTimeAsync(1_000)
+    await act(() => vi.advanceTimersByTimeAsync(1_000))
     expect(screen.getByRole('treeitem', { name: /running.*4\.6K tok · 1分11秒/ })).toBeTruthy()
     expect(screen.getByRole('treeitem', { name: /finished.*123 tok · 1小时02分03秒/ })).toBeTruthy()
     expect(screen.getByRole('treeitem', { name: /interrupted.*123M tok · 6秒/ })).toBeTruthy()

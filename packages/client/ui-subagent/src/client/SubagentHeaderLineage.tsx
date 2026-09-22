@@ -495,7 +495,7 @@ function CatalogDropdown({
   const hoverOpenTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const observedCatalogs = useRef(new Set<SessionId>())
-  const requestedInitialCatalog = useRef<SessionId>()
+  const requestedInitialCatalog = useRef<SessionId>(undefined)
   const setCatalogOpenRef = useRef(setCatalogOpen)
   setCatalogOpenRef.current = setCatalogOpen
   const currentEntry = currentSessionId === undefined

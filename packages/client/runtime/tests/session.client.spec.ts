@@ -490,6 +490,39 @@ describe('live event path', () => {
     expect(published).toHaveLength(2)
   })
 
+  it('publishes session/queue frames on the animation-frame channel', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const { session } = await opened()
+    const published: number[] = []
+    session.subscribe(() => {
+      published.push(session.getSnapshot().queue.length)
+    })
+
+    const message = createUserMessage({
+      content: [{ type: 'text', text: '排队消息' }] as never,
+      source: { kind: 'user', rpcId: 'rpc-q' } as never,
+    })
+    session.handleMuxEnvelope('queue-1' as never, {
+      type: 'session/queue', sessionId: SID,
+      items: [{ id: 'q-1' as never, placement: 'queued' as const, message }],
+    })
+    session.handleMuxEnvelope('queue-2' as never, {
+      type: 'session/queue', sessionId: SID,
+      items: [{ id: 'q-1' as never, placement: 'queued' as const, message },
+        { id: 'q-2' as never, placement: 'queued' as const, message }],
+    })
+
+    // The two baselines coalesce into one frame publication — no per-envelope flush.
+    expect(published).toEqual([])
+    expect(frames).toHaveLength(1)
+    frames.shift()!(0)
+    expect(published).toEqual([2])
+  })
+
   it('publishes a timeline-only boundary even when no Definition claims the event', async () => {
     const api = new FakeApiClient()
     api.onHistory = () => histResponse([])

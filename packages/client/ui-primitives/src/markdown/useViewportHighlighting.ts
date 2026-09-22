@@ -52,7 +52,7 @@ const highlightViewport = new HighlightViewport()
  * @returns whether this component may build highlighted output.
  */
 export function useViewportHighlighting(
-  target: RefObject<Element>,
+  target: RefObject<Element | null>,
   lang: string | undefined,
 ): boolean {
   const supported = supportsHighlighting(lang)

@@ -178,8 +178,12 @@ export class ProjectionValueStore {
 
   private changed(key: string): void {
     this.valuesCache = undefined
-    this.channels.get(key)?.notifier.markDirty()
-    this.anyNotifier.markDirty()
+    // Projection frames arrive once per streamed unit during bursts; the
+    // per-key faces and the any-key channel publish on the frame cadence
+    // designed for stream producers (Notifier.markFrameDirty) so React's
+    // render work can commit between publications.
+    this.channels.get(key)?.notifier.markFrameDirty()
+    this.anyNotifier.markFrameDirty()
   }
 
   private channel(key: string): Channel {

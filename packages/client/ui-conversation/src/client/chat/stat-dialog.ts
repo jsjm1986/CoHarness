@@ -2,7 +2,7 @@
 // (TurnUsagePanel) and the composer-dock session stats pills (StatsPills);
 // the matching dialog surface skin lives in stat-dialog.module.css.
 
-import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /** Viewport margin the placement clamp keeps (the Menu portal margin). */
@@ -21,8 +21,8 @@ export const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top
 export interface StatDialogSeat {
   open: boolean
   setOpen: (open: boolean) => void
-  rootRef: MutableRefObject<HTMLSpanElement | null>
-  panelRef: MutableRefObject<HTMLDivElement | null>
+  rootRef: RefObject<HTMLSpanElement | null>
+  panelRef: RefObject<HTMLDivElement | null>
   pos: CSSProperties | null
 }
 
