@@ -50,7 +50,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC workflow engine with-key e2e
     ctx = await harness()
     const parentHandle = await ctx.agents.create({
       sessionId: 'wf-ptc-e2e-session' as never,
-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      agentOptions: { provider: 'deepseek-official', model: 'deepseek-flash' },
     })
 
     const events: string[] = []
