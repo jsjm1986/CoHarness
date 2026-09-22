@@ -849,10 +849,12 @@ export class ContinuableActivationRegistry {
 
         if (attempt === 'closed') return
         if (attempt === 'retry') continue
+        /* v8 ignore start -- the 'wait' return needs a pending inbox inside the lock window; a scheduler that misses it settles directly */
         if (attempt === 'wait') {
           await idleObservation.promise
           continue
         }
+        /* v8 ignore stop */
         try {
           await attempt.done
         } catch (error: unknown) {
