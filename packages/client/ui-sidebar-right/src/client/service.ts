@@ -167,12 +167,14 @@ export type SidebarRightCloseHandler = (sessionId: SessionId, tab: TabRecord) =>
 export interface ISidebarRight {
   /**
    * The session whose seat is mounted, or `undefined` while no seat is on
-   * screen (a global panel is active, or no session is selected). Moves when a
-   * seat binds or releases, so a consumer that wants to open content as soon as
-   * a seat is on screen subscribes to it instead of assuming one is bound when
-   * its own effect runs: the frame mounts the Conversation column ahead of the
-   * seat, and the seat publishes its binding from a passive effect of the same
-   * commit.
+   * screen (a global panel is active, or no session is selected). Moves only
+   * when a seat binds or releases; a seat republishing its binding for the
+   * same session is silent. A component that opens content from its own
+   * effect reads it through a bound hook, acts once it is defined, reads
+   * `getSnapshot()` again when it acts, and retries when the value changes:
+   * the frame mounts the Conversation column ahead of the seat, so in a
+   * commit that switches sessions the departing seat releases before the
+   * Conversation's effects run and the arriving seat binds after them.
    */
   readonly mounted: ObservableSnapshot<SessionId | undefined>
   /**
@@ -296,7 +298,8 @@ export class SidebarRightController implements ISidebarRight {
   /**
    * Adopt the mounted seat's binding, replacing any previous one.
    *
-   * Called from the seat while it is mounted, and released when it leaves.
+   * Called from the seat after each commit while it is active, and released
+   * when it leaves.
    * @param binding - the mounted seat's session, actions, and the store's surfaces.
    * @returns a release callback that clears exactly this binding.
    */

@@ -81,10 +81,12 @@ export interface SidebarRightInjected {
    * Publish this seat's session, actions, and the store's surfaces to `ctx.sidebarRight`.
    *
    * The service is root-scoped and cannot read a per-entry store, so the only
-   * honest source is the mounted seat. Held for as long as the seat is mounted;
-   * the service publishes the bound session through `ctx.sidebarRight.mounted`.
+   * honest source is the mounted seat. The seat calls it after each commit
+   * while it is active, each call replacing the previous binding, and calls
+   * the latest release when it leaves the screen; the service publishes the
+   * bound session through `ctx.sidebarRight.mounted`.
    * @param binding - what a command needs to act on this session, and what a tab's own action needs to act on its.
-   * @returns a release callback.
+   * @returns a release callback that clears this binding while it is still the latest.
    */
   readonly bindService: (binding: {
     sessionId: SessionId
@@ -452,16 +454,21 @@ export function RightbarSeat({
     : undefined, [syncPresentation, active])
 
   // Republished on every committed change: the service's readers answer from the
-  // last commit, and its commands act on the session actually on screen.
-  useEffect(
-    () => active
-      ? bindService({ sessionId, actions, surfaces, autoFullscreen,
+  // last commit, and its commands act on the session actually on screen. A
+  // republish replaces the previous binding without releasing it, because a
+  // release between them would leave the service unbound while the rest of
+  // that commit's effects run; the latest binding is released only when the
+  // seat leaves the screen.
+  const release = useRef<(() => void) | undefined>(undefined)
+  useEffect(() => {
+    if (active) {
+      release.current = bindService({ sessionId, actions, surfaces, autoFullscreen,
         closeWithFocus: (paneId, close) => { closeWithPaneFocus(document, sessionId, paneId, close) },
         openWithFocus: (open) => { openWithPaneFocus(document, sessionId, open) },
         canSplitPane: paneId => room.current.get(paneId)?.row !== false })
-      : undefined,
-    [bindService, sessionId, actions, surfaces, autoFullscreen, active],
-  )
+    }
+  }, [bindService, sessionId, actions, surfaces, autoFullscreen, active])
+  useEffect(() => active ? () => { release.current?.() } : undefined, [active])
   // The Tab domain is not synced here: the controller adopted this session's
   // store as the runtime minted it and reconciles on the store's own commits,
   // on screen or not.
