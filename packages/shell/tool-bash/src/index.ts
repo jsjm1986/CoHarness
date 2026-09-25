@@ -100,6 +100,8 @@ function bashDescription(backgroundEnabled: boolean, escalationModes: readonly S
     + `Current harness environment facts are exposed through managed \`$${DSH_ENV_PREFIX}*\` variables; inspect them when needed. `
     + 'Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. '
     + 'Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. '
+    + 'Before any delete or move, verify that the resolved absolute target path is the intended one; never run it against a computed path you have not checked. '
+    + 'An unset variable expands to an empty string, so guard variables in such paths with `${VAR:?}`. '
     + background
   if (escalationModes.length === 0) return base
   return base + ' Attempting a command the sandbox may deny is safe and expected: run it and read the '
