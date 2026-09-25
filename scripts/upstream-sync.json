@@ -67,10 +67,7 @@
       "sovereignty": "tracked"
     },
     "bundle/headless": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/bundle/headless/tests/fixtures/provider-cwd.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "bundle/sdk-app": {
       "sovereignty": "tracked"
@@ -765,10 +762,7 @@
       "sovereignty": "adapted"
     },
     "sdk/client": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/sdk/client/src/launch.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "sdk/protocol": {
       "sovereignty": "adapted"
@@ -984,7 +978,7 @@
       "sovereignty": "adapted"
     },
     "subprocess/subprocess": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "subprocess/subprocess-local": {
       "sovereignty": "adapted"
