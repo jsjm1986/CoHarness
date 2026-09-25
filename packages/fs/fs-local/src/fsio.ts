@@ -15,10 +15,15 @@ import { TextDecoder, promisify } from 'node:util'
 import { FsError, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 import { copyFileDaclWin32, replaceFileWin32 } from './win32.ts'
 
-const realpath = promisify(realpathCallback.native)
 const BINARY_SAMPLE_BYTES = 8192
 // Bound one non-abortable FileHandle.read so cancellation is observed between chunks.
 const DIFF_BASIS_READ_CHUNK_BYTES = 64 * 1024
+// Native realpath follows the filesystem's component-by-component lookup: a
+// symlinked component resolves before `..` climbs, matching chdir/spawn and
+// the sandbox enforcement layers. The JavaScript implementation collapses
+// `..` lexically first and would read `link/../x` beside the link, not the
+// link target's parent.
+const realpath = promisify(realpathCallback.native)
 
 function isENOENT(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
