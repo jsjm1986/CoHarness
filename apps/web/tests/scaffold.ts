@@ -66,9 +66,9 @@ import type {} from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { REPO_ROOT, requireDist } from './support.ts'
 
-import { webSnapshotMode, type WebSnapshotMode } from './golden.ts'
+import { webSnapshotMode, type WebSnapshotMode } from './expected.ts'
 import { normalizeAria } from './aria-normalize.ts'
-export { webSnapshotMode, compareOrRefreshGolden } from './golden.ts'
+export { webSnapshotMode, compareOrRefreshGolden } from './expected.ts'
 
 /** The shipped composition under test: the dsh-base and dsh-web-app bundle patches over the empty profile root. */
 const BASE_PATCH_PATH = join(REPO_ROOT, 'packages/bundle/base/cordis.patch.yml')

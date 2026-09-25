@@ -710,7 +710,23 @@ function main(): void {
     `proof_pi_ai=${String(proofs.piAi)}`,
     `proof_native_windows=${String(proofs.nativeWindows)}`,
     `proofs=${JSON.stringify(proofs)}`,
-    `validation_plan=${JSON.stringify({ version: 1, commit, scope: result, proofs })}`,
+    // Job outputs are capped at 1 MiB, so the plan carries only the fields
+    // verify-pr-results reads; the full scope stays in the selection artifact.
+    `validation_plan=${JSON.stringify({
+      version: 1, commit, proofs,
+      scope: {
+        runExpensive: result.runExpensive,
+        coverageMode: result.coverageMode,
+        snapshotMode: result.snapshotMode,
+        webGroups: result.webGroups,
+        webScenarios: result.webScenarios,
+        compatMode: result.compatMode,
+        pythonMode: result.pythonMode,
+        windowsMode: result.windowsMode,
+        gatewayMode: result.gatewayMode,
+        adminUiMode: result.adminUiMode,
+      },
+    })}`,
   ].join('\n')}\n`)
 }
 

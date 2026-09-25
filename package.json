@@ -208,7 +208,7 @@
     "verify-ci-consumers": "tsx scripts/ci-consumer-relations.ts",
     "verify-github-protection": "tsx scripts/verify-github-protection.ts",
     "replay:ci-scope": "tsx scripts/replay-ci-scope.ts",
-    "summarize:goldens": "tsx scripts/summarize-golden-changes.ts",
+    "summarize:expected": "tsx scripts/summarize-expected-changes.ts",
     "build:admin": "npm --prefix gateway run typecheck:browser && npm --prefix gateway/admin-ui run typecheck && npm --prefix gateway/admin-ui run build",
     "build:coharness": "tsx scripts/build.ts --profile coharness",
     "test:web:live": "DSH_WEB_LIVE=1 vitest run --config vitest.web.config.ts apps/web/tests/smoke-real.e2e.ts",

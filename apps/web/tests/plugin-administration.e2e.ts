@@ -8,7 +8,7 @@ import { resolve, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
-import { compareOrRefreshGolden, webSnapshotMode } from './golden.ts'
+import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
 import { fileURLToPath } from 'node:url'
 
 const DIRECTORY = fileURLToPath(new URL('./snapshots/plugin-administration', import.meta.url))

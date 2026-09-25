@@ -13,7 +13,7 @@
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/aria-normalize.ts",
     "apps/web/tests/aria-normalize.spec.ts",
-    "apps/web/tests/golden.ts",
+    "apps/web/tests/expected.ts",
     "apps/web/tests/web-live.ts",
     "apps/web/tests/auto-review-fixture.ts",
     "apps/web/tests/auto-review-denial.e2e.ts",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedGoldenPaths } from './summarize-golden-changes.ts'
+import { changedGoldenPaths } from './summarize-expected-changes.ts'
 import { assertRequiredCiVerdict } from './verify-github-protection.ts'
 
 describe('gate review signals', () => {
