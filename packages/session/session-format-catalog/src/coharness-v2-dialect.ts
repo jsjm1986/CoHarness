@@ -34,6 +34,12 @@ import {
   sessionFormatV2ToV3,
   SURFACE_TYPES,
 } from '@deepseek-ai/dsh-session-format-v2-to-v3'
+import {
+  hideDialectMembers,
+  isDialectOnlyEvent,
+  restoreDialectMembers,
+  type DialectEvent,
+} from './coharness-dialect-members.ts'
 
 /* jscpd:ignore-start -- ports the released v0→v1 lexical normalization to the v2
  * logical edge: upstream does not export it, and its v0-era exact-key
@@ -589,6 +595,8 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
   private readonly mapping: number[] = []
   private readonly originalIds = new Set<string>()
   private readonly generatedIds = new Set<string>()
+  /** Hidden dialect members awaiting re-attachment, keyed by source seq. */
+  private readonly ledgers = new Map<number, DialectEvent>()
   private targetSeq = 0
   private sourceSeen = 0
   private inheritedCut = 0
@@ -612,7 +620,11 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
   }
 
   transformEvent(raw: SessionFormatEvent, context: SessionFormatMigrationContext): void {
-    if (raw.seq !== this.sourceSeen++) {
+    /* Dialect-only types carry their pre-migration seq: the upstream dialect
+     * edges emit them beside the dense released stream rather than inside
+     * it, so they skip the density check without consuming a position. */
+    const dialectOnly = isDialectOnlyEvent(raw)
+    if (!dialectOnly && raw.seq !== this.sourceSeen++) {
       throw new SessionFormatError('format v2 source events must be dense')
     }
     this.lastTime = raw.time
@@ -624,7 +636,14 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
     if (SURFACE_TYPES.has(event.type) && event['surfaceOp'] === undefined) {
       event = { ...event, surfaceOp: 'append' }
     }
-    assertEvent(event, 2)
+    const dialect = hideDialectMembers(event)
+    if (dialect.presetOrigin !== undefined || dialect.sourceMembers.length > 0) {
+      this.ledgers.set(event.seq, dialect)
+    }
+    event = dialect.event
+    /* Dialect-only types have no released classification; they keep the
+     * dialect's ordering and placement but bypass released admission. */
+    if (!dialectOnly) assertEvent(event, 2)
     this.observeMessageIds(event)
     if (event.type === 'step/start') {
       const data = record(event.data, event.type)
@@ -743,7 +762,10 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
 
   private emitMapped(event: SessionFormatEvent, context: SessionFormatMigrationContext): void {
     const targetSeq = this.targetSeq++
-    this.mapping[event.seq] = targetSeq
+    /* Dialect-only events carry a pre-migration seq that collides with the
+     * stream's source positions; nothing references them, so they never
+     * enter the citation mapping. */
+    if (!isDialectOnlyEvent(event)) this.mapping[event.seq] = targetSeq
     /* The cut counts the events before the marker; a real marker states the
      * boundary in-band so a downstream edge never maps a header count into
      * this sequence space. */
@@ -753,7 +775,9 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
     } else if (this.sourceCut !== undefined && event.seq < this.sourceCut) {
       this.inheritedCut = this.targetSeq
     }
-    context.emitEvent(canonicalizeTransformedEvent(renamePtcEvent(remapEvent(event, targetSeq, this.mapping))))
+    const emitted = canonicalizeTransformedEvent(renamePtcEvent(remapEvent(event, targetSeq, this.mapping)))
+    const ledger = this.ledgers.get(event.seq)
+    context.emitEvent(ledger === undefined ? emitted : restoreDialectMembers(emitted, ledger))
   }
 
   private emitMarker(data: SessionFormatJsonObject, time: number, context: SessionFormatMigrationContext): void {

@@ -5,9 +5,9 @@
  * reads). It reuses the released adjacent migration chain and current-artifact
  * restoration; the only difference from the physical catalog is the input
  * boundary: logical headers and events are projected onto the released
- * requirements, the declared CoHarness v2 database dialect is normalized by
- * {@link coharnessV2ToV3Dialect}, and everything else is refused exactly as the
- * released stages refuse it.
+ * requirements, the declared CoHarness v0 and v2 database dialects are
+ * normalized by {@link coharnessV0ToV1Dialect} and {@link coharnessV2ToV3Dialect},
+ * and everything else is refused exactly as the released stages refuse it.
  */
 
 import { KNOWN_SESSION_EVENT_TYPES } from '@deepseek-ai/dsh-session'
@@ -29,8 +29,8 @@ import type {
   SessionFormatMigrationContext,
   SessionFormatMigrationStream,
 } from '@deepseek-ai/dsh-session-format'
-import { assertReleasedV1Header, sessionFormatV0ToV1 } from '@deepseek-ai/dsh-session-format-v0-to-v1'
-import { assertReleasedV2Header, sessionFormatV1ToV2 } from '@deepseek-ai/dsh-session-format-v1-to-v2'
+import { assertReleasedV1Header } from '@deepseek-ai/dsh-session-format-v0-to-v1'
+import { assertReleasedV2Header } from '@deepseek-ai/dsh-session-format-v1-to-v2'
 import {
   assertReleasedV3Header,
   assertV3EventAdmission,
@@ -38,6 +38,8 @@ import {
 import { assertReleasedV4Header, assertV4EventAdmission, sessionFormatV3ToV4 } from '@deepseek-ai/dsh-session-format-v3-to-v4'
 import { assertReleasedV5Header, sessionFormatV4ToV5 } from '@deepseek-ai/dsh-session-format-v4-to-v5'
 import { assertReleasedV6Header, restoreReleasedV6Artifact, sessionFormatV5ToV6 } from '@deepseek-ai/dsh-session-format-v5-to-v6'
+import { coharnessV0ToV1Dialect } from './coharness-v0-dialect.ts'
+import { coharnessV1ToV2Dialect } from './coharness-v1-dialect.ts'
 import { coharnessV2ToV3Dialect } from './coharness-v2-dialect.ts'
 import { validateInstalledCurrentSessionArtifact, validateInstalledCurrentSessionHeader } from './current.ts'
 
@@ -199,12 +201,12 @@ function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** The compiled logical chain shares every released edge; only the v2 edge adds dialect admission. */
+/** The compiled logical chain shares released validation; the v0, v1, and v2 edges add dialect admission. */
 const logicalChain = createSessionFormatChain({
   currentVersion: 6,
   migrations: [
-    sessionFormatV0ToV1,
-    sessionFormatV1ToV2,
+    coharnessV0ToV1Dialect,
+    coharnessV1ToV2Dialect,
     coharnessV2ToV3Dialect,
     sessionFormatV3ToV4,
     sessionFormatV4ToV5,

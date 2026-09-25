@@ -943,3 +943,119 @@ describe('dialect stage direct entry points', () => {
       .toThrow('must be dense')
   })
 })
+
+/** Migrate a stored artifact from any declared source version through the logical chain. */
+function migrateVersion(
+  version: number,
+  events: readonly SessionFormatEvent[],
+  header: Record<string, unknown> = {},
+  inheritedEventCount?: number,
+) {
+  return sessionLogicalFormatCatalog.migrate(
+    { version, id: 's', createdAt: 1, ...header } as SessionFormatHeader,
+    events,
+    inheritedEventCount,
+  )
+}
+
+const USERDOC_ATTACHED = {
+  version: 1,
+  messageId: 'u-1',
+  index: 0,
+  ref: { docId: 'd-1', path: '/docs/d-1.zip', name: 'd-1.zip', bytes: 4, mediaType: 'application/zip', modifiedAt: 1 },
+  representation: { kind: 'path' },
+}
+
+const DIALECT_USER_SOURCE = {
+  kind: 'user',
+  rpcId: 'r-1',
+  clientTimeZone: 'Asia/Shanghai',
+  participant: {
+    userId: 1, username: 'admin', displayName: 'admin', role: 'admin',
+    scope: { kind: 'project', projectId: 7, projectName: 'p', mode: 'rw', canManage: true },
+  },
+  documents: [{ ref: USERDOC_ATTACHED.ref, representation: { kind: 'path' } }],
+}
+
+describe('dialect member admission', () => {
+  it('preserves permission/preset origin through migration from v0 and v1', () => {
+    for (const version of [0, 1]) {
+      const migrated = migrateVersion(version, turnWithStep([
+        event('permission/preset', 0, { preset: 'workspace-write', origin: 'selection' }),
+        event('user/message', 0, USER_MESSAGE),
+      ]), {}, 0)
+      const preset = migrated.events.find(item => item.type === 'permission/preset')
+      expect(preset?.data).toMatchObject({ preset: 'workspace-write', origin: 'selection' })
+    }
+  })
+
+  it('refuses an undeclared permission/preset origin', () => {
+    expect(() => migrateVersion(0, turnWithStep([
+      event('permission/preset', 0, { preset: 'workspace-write', origin: 'invented' }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)).toThrow()
+  })
+
+  it('rewrites a v2 descriptor stamp to the identical v3 schema', () => {
+    const migrated = migrateVersion(0, turnWithStep([
+      event('subagent/descriptor', 0, {
+        version: 2, mode: 'continuable', provider: 'spawn', label: 'child',
+        agentProvider: 'p', agentModel: 'm', agentReasoningEffort: 'max',
+      }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)
+    const descriptor = migrated.events.find(item => item.type === 'subagent/descriptor')
+    expect(descriptor?.data).toMatchObject({ version: 3, mode: 'continuable', provider: 'spawn', label: 'child' })
+  })
+
+  it('still refuses a descriptor version outside the declared dialect', () => {
+    expect(() => migrateVersion(0, turnWithStep([
+      event('subagent/descriptor', 0, { version: 9, mode: 'continuable', provider: 'spawn', label: 'c' }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)).toThrow('descriptor version')
+  })
+
+  it('preserves user source documents and project-scope canManage', () => {
+    const migrated = migrateVersion(0, turnWithStep([
+      event('user/message', 0, { ...USER_MESSAGE, source: DIALECT_USER_SOURCE }),
+    ]), {}, 0)
+    const message = migrated.events.find(item => item.type === 'user/message')
+    expect(message?.data).toMatchObject({ source: DIALECT_USER_SOURCE })
+  })
+
+  it('preserves documents on inserted message sources inside agent/inbox/spliced', () => {
+    const migrated = migrateVersion(0, turnWithStep([
+      event('agent/inbox/spliced', 0, {
+        target: 'next-turn', start: 0,
+        inserted: [{ id: 'u-9', role: 'user', content: [{ type: 'text', text: 'q' }], source: DIALECT_USER_SOURCE }],
+      }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)
+    const spliced = migrated.events.find(item => item.type === 'agent/inbox/spliced')
+    expect((spliced?.data as { inserted: Array<{ source: unknown }> }).inserted[0]?.source)
+      .toMatchObject(DIALECT_USER_SOURCE)
+  })
+
+  it('carries userdoc/attached through the chain unchanged', () => {
+    const migrated = migrateVersion(0, turnWithStep([
+      event('user/message', 0, { ...USER_MESSAGE, source: DIALECT_USER_SOURCE }),
+      event('userdoc/attached', 0, USERDOC_ATTACHED),
+    ]), {}, 0)
+    const attached = migrated.events.find(item => item.type === 'userdoc/attached')
+    expect(attached?.data).toMatchObject(USERDOC_ATTACHED)
+  })
+
+  it('refuses a userdoc/attached payload outside the declared form', () => {
+    expect(() => migrateVersion(0, turnWithStep([
+      event('user/message', 0, USER_MESSAGE),
+      event('userdoc/attached', 0, { ...USERDOC_ATTACHED, version: 2 }),
+    ]), {}, 0)).toThrow('undeclared payload')
+  })
+
+  it('still refuses unknown event types', () => {
+    expect(() => migrateVersion(0, turnWithStep([
+      event('invented/event', 0, { anything: true }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)).toThrow()
+  })
+})
