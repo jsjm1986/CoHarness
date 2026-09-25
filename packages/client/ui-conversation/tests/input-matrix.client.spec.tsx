@@ -40,7 +40,7 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
     SessionProvider: ({ children }) => children(SID),
     useSession: bindSnapshotSelector(session),
     useSessions: bindSnapshotSelector(createSnapshotStore({
-      ids: [], byId: {}, current: undefined, phase: 'ready',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({

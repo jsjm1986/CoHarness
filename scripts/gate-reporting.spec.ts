@@ -3,6 +3,10 @@ import { changedGoldenPaths } from './summarize-golden-changes.ts'
 import { assertRequiredCiVerdict } from './verify-github-protection.ts'
 
 describe('gate review signals', () => {
+  it('includes JSONL expectations outside directories named snapshots', () => {
+    const path = 'examples/headless-agent/tests/semantic-checkpoint-snapshots/fork/parent.expected.jsonl'
+    expect(changedGoldenPaths([path, 'docs/replay.jsonl'])).toEqual([path])
+  })
   it('keeps Markdown goldens visible without flagging ordinary docs', () => {
     expect(changedGoldenPaths(['docs/testing.md', 'apps/web/tests/snapshots/chat/ui.expected.md', 'snapshots/acp/session.jsonl']))
       .toEqual(['apps/web/tests/snapshots/chat/ui.expected.md', 'snapshots/acp/session.jsonl'])

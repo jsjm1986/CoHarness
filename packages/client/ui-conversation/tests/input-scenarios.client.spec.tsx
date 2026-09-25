@@ -117,6 +117,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
   await ctx.plugin(InputTriggerService).await()
   const inputTriggers = ctx.get('inputTriggers') as InputTriggerService
   register?.(inputTriggers)
+  sessions.open(sessionId)
   const actx = sessions.scope(sessionId)!
   const controller = inputTriggers.sessionOf(actx)
   const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
@@ -140,7 +141,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     SessionProvider: ({ children }) => children(sessionId),
     useSession: bindSnapshotSelector(sessionStore),
     useSessions: bindSnapshotSelector(createSnapshotStore({
-      ids: [], byId: {}, current: undefined, phase: 'ready',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({

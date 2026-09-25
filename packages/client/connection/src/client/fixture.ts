@@ -1710,6 +1710,14 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     ['my-agent', { trust: 'user', content: "- id: tool-read\n  name: '@deepseek-ai/dsh-tool-read'\n" }],
   ])
   let fixtureDefaultPreset = 'standard'
+  /**
+   * The deployment-side default and the picker policy the roster reports:
+   * while `fixtureModeSelection` is off, `isDefault` marks the deployment
+   * choice and the saved `fixtureDefaultPreset` stays parked until the
+   * policy comes back.
+   */
+  const FIXTURE_DEPLOYMENT_DEFAULT = 'standard'
+  let fixtureModeSelection = true
   const nextTurn = new Map<SessionId, number>([[sid('fx-alpha'), 75]])
   let nextSession = 1
   let nextRpc = 1
@@ -1738,6 +1746,10 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   // Registry-global archive set mirroring the host: archived sessions keep
   // their workspace accounting slot and only grouping surfaces hide them.
   const archivedSessionIds: SessionId[] = []
+  // Monotonic archive snapshot revision, mirroring the host registry counter:
+  // versioned echoes/frames let the client replace rather than merge, which
+  // is what makes an unarchive's smaller set win over the older snapshot.
+  let archiveRevision = 0
 
   // In-memory browse tree behind the fixture's `browse` picker capability —
   // deterministic content mirroring the design mock so assembled Web tests
@@ -2482,6 +2494,10 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   }
 
   const api: ApiProxy = {
+    desktop: {
+      status: request => ok(request, null),
+      confirm: request => err(request, { code: 'internal', message: 'Fixture has no managed desktop.', details: {} }),
+    },
     sessions: {
       list: request => ok(request, { items: [...sessions].sort((a, b) => b.updatedAt - a.updatedAt) }),
       search: (request, signal) => {
@@ -2888,6 +2904,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       list: request => ok(request, {
         items: workspaces.map(w => ({ ...w })),
         archivedSessionIds: [...archivedSessionIds],
+        archiveRevision,
       }),
       create: (request) => {
         const { path } = request.payload
@@ -3011,12 +3028,38 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         const { sessionId } = request.payload
         if (!archivedSessionIds.includes(sessionId)) {
           archivedSessionIds.push(sessionId)
-          emitHost({ type: 'host/archived-sessions-changed', archivedSessionIds: [...archivedSessionIds] })
+          archiveRevision++
+          emitHost({
+            type: 'host/archived-sessions-changed',
+            archivedSessionIds: [...archivedSessionIds],
+            archiveRevision,
+          })
         }
-        return ok(request, { archivedSessionIds: [...archivedSessionIds] })
+        return ok(request, { archivedSessionIds: [...archivedSessionIds], archiveRevision })
+      },
+      unarchiveSession: (request) => {
+        const { sessionId } = request.payload
+        const index = archivedSessionIds.indexOf(sessionId)
+        if (index >= 0) {
+          archivedSessionIds.splice(index, 1)
+          archiveRevision++
+          emitHost({
+            type: 'host/archived-sessions-changed',
+            archivedSessionIds: [...archivedSessionIds],
+            archiveRevision,
+          })
+        }
+        return ok(request, { archivedSessionIds: [...archivedSessionIds], archiveRevision })
       },
     },
+    workspaceChanges: {
+      summary: request => ok(request, null),
+      diff: request => ok(request, null),
+    },
     workspaceFiles: {
+      renderOffice: r => Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: {
+        code: 'document-error', message: 'Office conversion is unavailable in this fixture.', details: { reason: 'unavailable' },
+      } } }),
       list: request => ok(request, { path: request.payload.path ?? '', entries: [], truncated: false }),
       stat: request => ok(request, { path: request.payload.path, type: 'file', bytes: 0, version: 'fixture' }),
       read: request => ok(request, {
@@ -3134,15 +3177,46 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           applies: 'live',
           secrets: [{ path: ['apiKey'], set: false }],
           revision: 0,
+        }, {
+          ns: 'agent-presets',
+          schema: {},
+          value: { default: fixtureDefaultPreset, modeSelectionEnabled: fixtureModeSelection },
+          applies: 'live',
+          secrets: [],
+          revision: 0,
+          writable: true,
         }],
       }),
       // Native opens are deterministic no-op successes in this fixture, as is host.openPath.
       openDocument: request => ok(request, { opened: true as const }),
-      update: request => err(request, {
-        code: 'settings-rejected',
-        message: 'fixture: the minimal readiness settings descriptor is read-only',
-        details: { ns: request.payload.ns },
-      }),
+      update: (request) => {
+        // The picker-policy journeys write for real: the roster they re-read
+        // afterwards must answer with the patch this call accepted.
+        if (request.payload.ns === 'agent-presets') {
+          const patch = request.payload.patch as { default?: unknown; modeSelectionEnabled?: unknown }
+          if (typeof patch.default === 'string') fixtureDefaultPreset = patch.default
+          if (typeof patch.modeSelectionEnabled === 'boolean') fixtureModeSelection = patch.modeSelectionEnabled
+          // The Host announces a committed settings write; every surface
+          // reading the roster re-reads on the same frame.
+          emitHost({
+            type: 'host/remote-event', event: 'settings/document-updated', args: ['agent-presets'],
+          })
+          return ok(request, {
+            ns: 'agent-presets',
+            schema: {},
+            value: { default: fixtureDefaultPreset, modeSelectionEnabled: fixtureModeSelection },
+            applies: 'live' as const,
+            secrets: [],
+            revision: 0,
+            writable: true,
+          })
+        }
+        return err(request, {
+          code: 'settings-rejected',
+          message: 'fixture: the minimal readiness settings descriptor is read-only',
+          details: { ns: request.payload.ns },
+        })
+      },
       replace: request => err(request, {
         code: 'settings-rejected',
         message: 'fixture: the minimal readiness settings descriptor is read-only',
@@ -3260,13 +3334,17 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         case 'goals/resume': return Promise.resolve(goalRemotes.resume(sessionId, args.ref as FxGoalRef))
         case 'goals/complete': return Promise.resolve(goalRemotes.complete(sessionId, args.ref as FxGoalRef))
         case 'goals/clear': return Promise.resolve(goalRemotes.clear(sessionId, args.ref as FxGoalRef))
-        case 'agentPresets/list': return Promise.resolve({
-          ok: true,
-          value: {
-            presets: [...fixturePresets].map(([id, preset]) => ({ id, trust: preset.trust, isDefault: id === fixtureDefaultPreset })),
-            authorable: true,
-          },
-        })
+        case 'agentPresets/list': {
+          const effective = fixtureModeSelection ? fixtureDefaultPreset : FIXTURE_DEPLOYMENT_DEFAULT
+          return Promise.resolve({
+            ok: true,
+            value: {
+              presets: [...fixturePresets].map(([id, preset]) => ({ id, trust: preset.trust, isDefault: id === effective })),
+              authorable: true,
+              modeSelectionEnabled: fixtureModeSelection,
+            },
+          })
+        }
         case 'agentPresets/read': {
           const agentPreset = args.agentPreset ?? ''
           const preset = fixturePresets.get(agentPreset)
@@ -3381,6 +3459,8 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)
       case 'session.cancel': return this.api.sessions.cancel(request)
       case 'subagent.history': return this.api.subagents.history(request, signal)
+      case 'desktop.status': return this.api.desktop.status(request, signal)
+      case 'desktop.confirm': return this.api.desktop.confirm(request, signal)
       case 'host.describe': return this.api.host.describe(request)
       case 'host.pickDirectory': return this.api.host.pickDirectory(request, new AbortController().signal)
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)
@@ -3393,7 +3473,11 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'workspace.insertBefore': return this.api.workspace.insertBefore(request)
       case 'workspace.insertSessionBefore': return this.api.workspace.insertSessionBefore(request)
       case 'workspace.archiveSession': return this.api.workspace.archiveSession(request)
+      case 'workspace.unarchiveSession': return this.api.workspace.unarchiveSession(request)
+      case 'workspaceChanges.summary': return this.api.workspaceChanges.summary(request, signal)
+      case 'workspaceChanges.diff': return this.api.workspaceChanges.diff(request, signal)
       case 'workspaceFiles.list': return this.api.workspaceFiles.list(request)
+      case 'workspaceFiles.renderOffice': return this.api.workspaceFiles.renderOffice(request, signal)
       case 'workspaceFiles.stat': return this.api.workspaceFiles.stat(request)
       case 'workspaceFiles.read': return this.api.workspaceFiles.read(request, signal)
       case 'workspaceFiles.readBytes': return this.api.workspaceFiles.readBytes(request, signal)

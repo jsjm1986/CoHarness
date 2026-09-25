@@ -21,7 +21,9 @@
       "additionalEntries": [
         {
           "manifest": "package.json",
-          "scripts": ["test:gateway:execution"]
+          "scripts": [
+            "test:gateway:execution"
+          ]
         }
       ],
       "scripts": [
@@ -270,6 +272,20 @@
         "android"
       ],
       "basis": "Shared resolver, dependency graph, build and lane configuration require consumers of generated or dynamically loaded output."
+    },
+    {
+      "id": "admin-plugin-management",
+      "paths": [
+        "packages/boot/plugin-manager",
+        "packages/host/plugin-inventory",
+        "packages/host/apiproxy",
+        "packages/typert/generator",
+        "packages/client/connection"
+      ],
+      "lanes": [
+        "adminUi"
+      ],
+      "basis": "The administrator workflow consumes Host Remote codecs and the shared correlated stream reader."
     }
   ]
 }

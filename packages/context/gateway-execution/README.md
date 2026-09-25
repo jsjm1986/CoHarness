@@ -32,6 +32,11 @@ The Gateway database requires [execution identity migration 030](../../../gatewa
 |---|---|---|
 | `reconnectDelayMs` | `1000` | Delay before reconnecting a lost authorization update stream; a positive integer no greater than `2147483647`. |
 | `jobStopTimeoutMs` | `30000` | Maximum wait for a revoked background job to release its resources; a positive integer no greater than `2147483647`. |
+| `desktop` | absent | Node-local desktop identifier; absence denies managed driver effects. Requires migrations 032 and 033. |
+| `desktopPollMs` | `1000` | Queue polling and maximum lease renewal interval in milliseconds; positive integer at most `2147483647`. |
+| `desktopCleanupMs` | `30000` | Desktop cleanup request timeout in milliseconds; positive integer at most `2147483647`. |
+
+The Gateway launch composition supplies `desktop` when the node declares `HGW_DESKTOP_ID` ([managed desktop](../../../gateway/deploy/README.md)). A configured desktop mounts `computerUseAuthorization`. Qualification and each participant's explicit confirmation apply to the live root Agent tree; historical parentage does not grant access. Root, descendants and owned jobs retain one lease across calls. Driver effects are serialized and verify the current lease before execution and output delivery. Lost permission, confirmation or renewal cancels work. Normal quiescence releases the lease; uncertain cancellation marks it stopping and requires independent drainage confirmation or an explicit administrator recovery action. This provider cannot prove native operating-system drainage from an MCP cancellation response.
 
 <a id="execution-authorization"></a>
 ## Execution authorization

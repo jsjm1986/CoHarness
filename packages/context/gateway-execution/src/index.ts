@@ -16,6 +16,11 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { executionInputOf, executionScope, executionState, hasUnverifiedExecutionInput, inputDigest } from './input.ts'
 import { EXECUTION_PROJECTION, type ExecutionProjectionState } from './projection.ts'
 import type {} from '@deepseek-ai/dsh-session-projection'
+import { desktopConfirmationController } from './desktop-confirmation.ts'
+import { GatewayDesktopPolicy } from './desktop.ts'
+import { GatewaySshAuthorization } from './ssh.ts'
+import { GatewayUserTerminalAuthorization } from './user-terminal.ts'
+import { registerWebhookDispatch } from './webhook.ts'
 import { gatewayPluginManagementAuthorization } from './plugin-management.ts'
 import type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
 
@@ -27,6 +32,12 @@ export interface Config {
   reconnectDelayMs?: number
   /** Maximum wait for a revoked background job to release its resources, in milliseconds. */
   jobStopTimeoutMs?: number
+  /** Node-local interactive desktop identifier; absent disables managed desktop effects. */
+  desktop?: string
+  /** Queue polling and maximum lease-renewal interval, in milliseconds. */
+  desktopPollMs?: number
+  /** Maximum wait for desktop lease cleanup, in milliseconds. */
+  desktopCleanupMs?: number
 }
 
 const MAX_UPDATE_CHARS = 8192
@@ -37,6 +48,9 @@ export class GatewayExecution extends ExecutionAuthority {
   static Config: Schema<Config> = Schema.object({
     reconnectDelayMs: Schema.natural().min(1).max(2_147_483_647).default(1000),
     jobStopTimeoutMs: Schema.natural().min(1).max(2_147_483_647).default(30_000),
+    desktop: Schema.string().min(1).max(256),
+    desktopPollMs: Schema.natural().min(1).max(2_147_483_647).default(1000),
+    desktopCleanupMs: Schema.natural().min(1).max(2_147_483_647).default(30_000),
   })
 
   private readonly lifetime = new AbortController()
@@ -45,16 +59,30 @@ export class GatewayExecution extends ExecutionAuthority {
   private readonly admitted = new WeakMap<Agent, Map<string, { inputId: ExecutionInputId; hash: string }>>()
   private readonly required = new Map<Agent, Set<ExecutionCapability>>()
   private readonly grants = new WeakMap<Agent, Map<ExecutionCapability, string>>()
-  private readonly checks = new Set<Promise<void>>()
+  private readonly checks = new Set<Promise<unknown>>()
+  private readonly desktops = new WeakMap<Agent, Set<string>>()
   private readonly invalidations = new WeakMap<Agent, number>()
   private readonly jobStopTimeoutMs: number
   private readonly dependencies: { readonly ctx: Context }
+  private readonly userTerminals: GatewayUserTerminalAuthorization
+  private readonly ssh: GatewaySshAuthorization
   private watching = false
   private watchGeneration = 0
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx)
     this.dependencies = { ctx }
+    this.userTerminals = new GatewayUserTerminalAuthorization(ctx.gatewayRuntime, () => this.watching)
+    this.ssh = new GatewaySshAuthorization(ctx.gatewayRuntime, () => this.watching)
+    ctx.provide('userTerminalAuthorization', this.userTerminals)
+    ctx.provide('userTerminalAdministration', this.userTerminals)
+    ctx.provide('sshAuthorization', this.ssh)
+    registerWebhookDispatch(ctx, this.lifetime.signal)
+    ctx.effect(() => async () => {
+      this.userTerminals.dispose()
+      this.ssh.dispose()
+      await ctx.get('terminalController')?.drainRevoked()
+    }, 'gateway-execution: user terminal authority')
     ctx.sessionProjections.register(EXECUTION_PROJECTION)
     /* v8 ignore next -- Cordis resolves the schema default before mounting this plugin. */
     this.jobStopTimeoutMs = config.jobStopTimeoutMs ?? 30_000
@@ -83,6 +111,46 @@ export class GatewayExecution extends ExecutionAuthority {
         if (preset === 'danger-full-access') await policy.authorize()
       },
     })
+    if (config.desktop !== undefined) {
+      const desktop = config.desktop
+      const rootOf = (agent: Agent): Agent => {
+        const id = this.desktopOwners(agent).at(-1)
+        return id === undefined ? agent : ctx.agents.get(id) ?? agent
+      }
+      const policy = new GatewayDesktopPolicy({
+        root: rootOf,
+        authorize: async (agent, signal) => { await this.authorizeDesktop(agent, desktop, signal) },
+        request: async (agent, action, body, signal) => {
+          // Cleanup retains a root even after removal from the live registry.
+          const cleanup = action === 'cancel' || action === 'stop' || action === 'release'
+          const owners = cleanup ? [] : this.desktopOwners(agent)
+          const response = await ctx.gatewayRuntime.request(`/internal/runtime/desktop/${action}`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId: agent.id, desktop, ownerSessionIds: owners, ...body }), signal,
+          })
+          if (!response.ok) {
+            await response.body?.cancel()
+            throw this.denied('desktop', `Desktop coordination failed (${String(response.status)}).`)
+          }
+          return readGatewayResponseJson(response, undefined, signal)
+        },
+        idle: root => ctx.agents.list().every(agent => rootOf(agent) !== root
+          || (agent.status === 'idle' && this.activeJobs(agent).length === 0)),
+      }, config.desktopPollMs ?? 1000, config.desktopCleanupMs ?? 30_000,
+      desktopConfirmationController(ctx.gatewayRuntime, rootOf, desktop))
+      ctx.provide('computerUseAuthorization', policy)
+      const settle = () => Promise.all(ctx.agents.roots().map(root => policy.settled(root)))
+      const track = (task: Promise<unknown>) => {
+        this.checks.add(task)
+        void task.catch((error: unknown) => { ctx.logger.error('Desktop cleanup failed: %s', String(error)) })
+          .finally(() => { this.checks.delete(task) })
+      }
+      ctx.on('agent/status', () => { track(settle()) })
+      ctx.on('agent/disposed', ({ agent }) => { track(policy.settled(agent).then(settle)) })
+      ctx.inject(['jobs'], (jobCtx) => { jobCtx.jobs.onJobsChanged(() => {
+        track(settle())
+      }) })
+      ctx.effect(() => () => policy.dispose(), 'gateway-execution: desktop workflows')
+    }
     ctx.on('agent/created', async ({ agent }) => {
       await this.register(agent.session)
       await this.restoreInheritance(agent.session)
@@ -247,14 +315,15 @@ export class GatewayExecution extends ExecutionAuthority {
   }
 
   /**
-   * Attest a new or edited human message using its live HTTP caller.
+   * Attest a new or edited human message using its live HTTP caller; managed
+   * webhook dispatch attests through its purpose-bound Gateway assertion instead.
    * @param session - actual target Session, never a caller-supplied actor.
    * @param message - admitted content and display attribution.
    * @returns a frozen message carrying the opaque immutable input reference.
    */
   async stamp(session: Session, message: UserMessage): Promise<UserMessage> {
-    const principal = this.dependencies.ctx.gatewayRuntime.interactive()
-    if (principal === undefined || principal.claims.purpose !== undefined) throw this.denied('execute', 'A verified interactive caller is required.')
+    const principal = this.admissionPrincipal()
+    if (principal === undefined) throw this.denied('execute', 'A verified interactive caller is required.')
     await this.register(session)
     const previousInputId = executionInputOf(message)
     const value = await this.post('/input', {
@@ -267,6 +336,27 @@ export class GatewayExecution extends ExecutionAuthority {
     const stamped = freezeMessage({ ...message, source: { ...message.source, gatewayExecutionInput: value.inputId } })
     executionInputOf(stamped)
     return stamped
+  }
+
+  /**
+   * Verified caller allowed to admit execution inputs: an interactive principal
+   * without a restricted purpose, or the managed webhook dispatch assertion.
+   * @returns the caller to attest inputs under, or undefined.
+   */
+  private admissionPrincipal(): GatewayRequestPrincipal | undefined {
+    const interactive = this.dependencies.ctx.gatewayRuntime.interactive()
+    if (interactive !== undefined) return interactive.claims.purpose === undefined ? interactive : undefined
+    return this.dispatchPrincipal()
+  }
+
+  /**
+   * The purpose-bound dispatch assertion; the Gateway request hook restricts it
+   * to the managed intake route, so reaching it here proves dispatch authority.
+   * @returns the live dispatch principal, or undefined outside dispatch admission.
+   */
+  private dispatchPrincipal(): GatewayRequestPrincipal | undefined {
+    const current = this.dependencies.ctx.gatewayRuntime.current()
+    return current?.claims.purpose === 'webhook-dispatch' ? current : undefined
   }
 
   /**
@@ -398,6 +488,50 @@ export class GatewayExecution extends ExecutionAuthority {
   }
 
   /**
+   * Validate root-shared consent for the actual executing desktop resource.
+   * @param agent - live caller; PTC uses its owning Agent.
+   * @param desktop - resource selected by the deployment policy.
+   * @param signal - driver cancellation.
+   * @returns canonical actor state after qualification and consent checks.
+   */
+  async authorizeDesktop(agent: Agent, desktop: string, signal: AbortSignal): Promise<ExecutionState> {
+    await this.authorize('desktop', agent, signal)
+    const owners = this.desktopOwners(agent)
+    const generation = this.watchGeneration, invalidation = this.invalidations.get(agent)
+    const value = executionState(await this.post('/desktop-authorize', {
+      sessionId: agent.id, desktop, ownerSessionIds: owners,
+    }, undefined, signal))
+    if (!this.available(agent) || generation !== this.watchGeneration || invalidation !== this.invalidations.get(agent)
+      || signal.aborted || JSON.stringify(owners) !== JSON.stringify(this.desktopOwners(agent))) {
+      throw this.denied('desktop', 'Desktop runtime ownership changed during authorization.')
+    }
+    this.record(agent.session, value)
+    const desktops = this.desktops.get(agent) ?? new Set<string>()
+    desktops.add(desktop)
+    this.desktops.set(agent, desktops)
+    return value
+  }
+
+  /**
+   * Resolve live runtime owners for desktop consent inheritance.
+   * @param agent - the exact registered desktop caller.
+   * @returns immediate parent through runtime root; historical lineage supplies no ownership.
+   */
+  private desktopOwners(agent: Agent): SessionId[] {
+    const registry = this.dependencies.ctx.agents
+    const owners: SessionId[] = [], visited = new Set<Agent>([agent])
+    let current = agent
+    while (!registry.roots().includes(current)) {
+      const parent = registry.list().find(candidate => registry.isOwnedBy(current.id, candidate))
+      if (parent === undefined || visited.has(parent)) throw this.denied('desktop', 'The live desktop ownership chain is unavailable.')
+      owners.push(parent.id)
+      visited.add(parent)
+      current = parent
+    }
+    return owners
+  }
+
+  /**
    * Validate the live selector and all existing participants before selecting a privileged preset.
    * @param agent - Agent whose preset will change.
    * @param preset - requested preset; ordinary modes remain selectable without privilege.
@@ -405,7 +539,7 @@ export class GatewayExecution extends ExecutionAuthority {
   async authorizeSelection(agent: Agent, preset: string): Promise<void> {
     if (preset !== 'auto' && preset !== 'danger-full-access') return
     const capability = preset === 'auto' ? 'auto-review' : 'plugin-management'
-    const principal = this.dependencies.ctx.gatewayRuntime.interactive()
+    const principal = this.dependencies.ctx.gatewayRuntime.interactive() ?? this.dispatchPrincipal()
     if (principal === undefined) {
       await this.authorize(capability, agent)
       return
@@ -430,6 +564,13 @@ export class GatewayExecution extends ExecutionAuthority {
   private invalidate(subject?: { userId?: number; projectId?: number }): void {
     const runtime = this.dependencies.ctx.gatewayRuntime.identity
     if (subject?.projectId !== undefined && (runtime.kind !== 'project' || runtime.id !== subject.projectId)) return
+    const terminals = this.userTerminals.invalidate(subject).then(async () => {
+      await this.dependencies.ctx.get('terminalController')?.drainRevoked()
+    })
+    this.ssh.invalidate(subject)
+    this.checks.add(terminals)
+    void terminals.catch((error: unknown) => { this.dependencies.ctx.logger.error('Revoked user terminal cleanup failed', error) })
+      .finally(() => { this.checks.delete(terminals) })
     for (const agent of this.dependencies.ctx.agents.list()) {
       if (agent.status !== 'running' && this.activeJobs(agent).length === 0) continue
       const state = this.mirror(agent.session).state
@@ -440,6 +581,9 @@ export class GatewayExecution extends ExecutionAuthority {
           if (subject === undefined) throw new Error('Gateway authorization updates were interrupted')
           for (const capability of this.required.get(agent) ?? ['execute'] as const) {
             await this.authorize(capability, agent)
+            if (capability === 'desktop') for (const desktop of this.desktops.get(agent) ?? []) {
+              await this.authorizeDesktop(agent, desktop, this.lifetime.signal)
+            }
           }
         } catch {
           // Failed or unavailable current authorization cannot keep work running.

@@ -54,8 +54,24 @@ export interface GatewayConfig {
   runtimeCredentialDir: string
   /** Owner-only AES-GCM master-key file for organization model credentials. */
   organizationModelCredentialKeyFile: string
+  /** Owner-only AES-GCM master-key file for webhook endpoint signing secrets. */
+  webhookSecretKeyFile: string
   /** Owner-only one-time file for a newly generated bootstrap administrator password. */
   bootstrapAdminPasswordFile: string
+  /** Deployment backup directory holding dumps plus managed-file snapshots. */
+  backupDir: string
+  /** pg_dump command prefix (e.g. `pg_dump` or `docker compose exec -T postgres pg_dump`); the database URL is appended. */
+  pgDumpCommand: string[]
+  /** pg_restore command prefix used for dump verification and restores. */
+  pgRestoreCommand: string[]
+  /** Interval at which this node publishes its maintenance acknowledgement heartbeat. */
+  nodeHeartbeatMs: number
+  /** Heartbeat age at which a node stops counting as a live writer for quiesce checks. */
+  nodeStaleMs: number
+  /** Migration directory the standalone applier diffs against `schema_migrations`. */
+  deployMigrationsDir: string
+  /** State root whose key and credential material the backup manifest covers. */
+  stateRoot: string
   dshCommand: string[]
   dshRepoRoot: string
   instancePortBase: number
@@ -102,6 +118,21 @@ export interface GatewayConfig {
   jpushMasterSecret?: string
   /** Interactive-desktop grant/queue TTLs and capacity (HGW_DESKTOP_*). */
   desktop: DesktopCoordinatorConfig
+  /**
+   * Node-local interactive desktop identifier launched runtimes report to the
+   * coordinator; absent keeps managed desktop drivers unmounted
+   * (HGW_DESKTOP_ID).
+   */
+  desktopId?: string
+  /**
+   * Absolute path of the provisioned Cua Driver MCP package directory
+   * materialized into runtime profiles (HGW_DESKTOP_DRIVER_PACKAGE).
+   */
+  desktopDriverPackage: string
+  /** Driver executable path or PATH command overriding the `cua-driver` default (HGW_DESKTOP_DRIVER_COMMAND). */
+  desktopDriverCommand?: string
+  /** Driver argv replacing the default `mcp` arguments (HGW_DESKTOP_DRIVER_ARGS, JSON string array). */
+  desktopDriverArgs?: string[]
 }
 
 const gatewayRoot = resolve(import.meta.dirname, '..')
@@ -178,7 +209,7 @@ function timerDelay(value: string | undefined, fallback: number, variable: strin
 }
 
 /** Parse a command line without invoking a shell or losing quoted argv fields. */
-function parseCommandLine(value: string): string[] {
+function parseCommandLine(value: string, variable = 'HGW_DSH_COMMAND'): string[] {
   const args: string[] = []
   let current = ''
   let quote: '\'' | '"' | undefined
@@ -218,9 +249,9 @@ function parseCommandLine(value: string): string[] {
     current += character
     started = true
   }
-  if (escaped || quote !== undefined) throw new Error('HGW_DSH_COMMAND contains an unterminated quote or escape')
+  if (escaped || quote !== undefined) throw new Error(`${variable} contains an unterminated quote or escape`)
   if (started) args.push(current)
-  if (args.length === 0) throw new Error('HGW_DSH_COMMAND must contain an executable')
+  if (args.length === 0) throw new Error(`${variable} must contain an executable`)
   return args
 }
 
@@ -244,6 +275,21 @@ function portNumber(value: string | undefined, fallback: number, variable: strin
     throw new Error(`${variable} must be an integer between 1 and 65535`)
   }
   return resolved
+}
+
+/** Parse a bounded JSON string array used as an external process argv override. */
+function parseDesktopDriverArgs(value: string): string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value)
+  } catch {
+    throw new Error('HGW_DESKTOP_DRIVER_ARGS must be a JSON array of strings')
+  }
+  if (!Array.isArray(parsed) || parsed.length > 64
+    || parsed.some(arg => typeof arg !== 'string' || arg === '' || arg.length > 4096 || /[\u0000-\u001f\u007f]/u.test(arg))) {
+    throw new Error('HGW_DESKTOP_DRIVER_ARGS must be a JSON array of at most 64 non-empty strings without control characters')
+  }
+  return parsed as string[]
 }
 
 function requireReleasePath(actual: string, expected: string, variable: string): void {
@@ -279,6 +325,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const runtimeCredentialDir = resolve(env.HGW_RUNTIME_CREDENTIAL_DIR ?? join(stateRoot, 'runtime-credentials'))
   const organizationModelCredentialKeyFile = resolve(
     env.HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE ?? join(stateRoot, 'organization-model-credentials.key'),
+  )
+  const webhookSecretKeyFile = resolve(
+    env.HGW_WEBHOOK_SECRET_KEY_FILE ?? join(stateRoot, 'webhook-secrets.key'),
   )
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
   const configuredProjectPathRoots = projectPathRoots(env.HGW_PROJECT_PATH_ROOTS)
@@ -321,7 +370,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     || pathsOverlap(bootstrapAdminPasswordFile, gatewayDir)
     || pathsOverlap(bootstrapAdminPasswordFile, principalKeyDir)
     || pathsOverlap(bootstrapAdminPasswordFile, runtimeCredentialDir)
-    || pathsOverlap(bootstrapAdminPasswordFile, organizationModelCredentialKeyFile)) {
+    || pathsOverlap(bootstrapAdminPasswordFile, organizationModelCredentialKeyFile)
+    || pathsOverlap(bootstrapAdminPasswordFile, webhookSecretKeyFile)) {
     throw new Error('HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE overlaps a runtime, project, Gateway, or credential path')
   }
   // The default source-run entry is resolved to ABSOLUTE paths against
@@ -443,6 +493,27 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     queueCapacity: positiveSafeInteger(
       env.HGW_DESKTOP_QUEUE_CAPACITY, DEFAULT_DESKTOP_COORDINATOR_CONFIG.queueCapacity, 'HGW_DESKTOP_QUEUE_CAPACITY'),
   }
+  const desktopId = env.HGW_DESKTOP_ID?.trim()
+  if (desktopId !== undefined && (desktopId === '' || desktopId.length > 256 || /[\u0000-\u001f\u007f]/u.test(desktopId))) {
+    throw new Error('HGW_DESKTOP_ID must be 1–256 characters without control characters')
+  }
+  const releaseDesktopDriverPackage = releaseRoot === undefined
+    ? undefined
+    : join(releaseRoot, 'packages/experimental/computer-use-cua-driver-mcp')
+  if (releaseDesktopDriverPackage !== undefined && env.HGW_DESKTOP_DRIVER_PACKAGE !== undefined) {
+    requireReleasePath(env.HGW_DESKTOP_DRIVER_PACKAGE, releaseDesktopDriverPackage, 'HGW_DESKTOP_DRIVER_PACKAGE')
+  }
+  const desktopDriverPackage = releaseDesktopDriverPackage
+    ?? normalizedAbsolutePath(env.HGW_DESKTOP_DRIVER_PACKAGE
+      ?? join(dshRepoRoot, 'packages/experimental/computer-use-cua-driver-mcp'))
+  if (!posix.isAbsolute(desktopDriverPackage)) {
+    throw new Error('HGW_DESKTOP_DRIVER_PACKAGE must be an absolute path')
+  }
+  const desktopDriverCommand = env.HGW_DESKTOP_DRIVER_COMMAND?.trim()
+  if (desktopDriverCommand !== undefined && (desktopDriverCommand === '' || /[\u0000-\u001f\u007f]/u.test(desktopDriverCommand))) {
+    throw new Error('HGW_DESKTOP_DRIVER_COMMAND must be a non-empty executable name or path without control characters')
+  }
+  const desktopDriverArgs = env.HGW_DESKTOP_DRIVER_ARGS === undefined ? undefined : parseDesktopDriverArgs(env.HGW_DESKTOP_DRIVER_ARGS)
   const memoryMax = systemdMemoryValue(env.HGW_MEMORY_MAX ?? '1G', 'HGW_MEMORY_MAX')
   const cpuQuota = systemdCpuValue(env.HGW_CPU_QUOTA ?? '100%', 'HGW_CPU_QUOTA')
   const systemdUnitDir = env.HGW_SYSTEMD_UNIT_DIR ?? '/etc/systemd/system'
@@ -476,7 +547,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,
+    webhookSecretKeyFile,
     bootstrapAdminPasswordFile,
+    backupDir: env.HGW_BACKUP_DIR ?? join(stateRoot, 'backups'),
+    pgDumpCommand: env.HGW_PGDUMP_COMMAND === undefined ? ['pg_dump'] : parseCommandLine(env.HGW_PGDUMP_COMMAND, 'HGW_PGDUMP_COMMAND'),
+    pgRestoreCommand: env.HGW_PGRESTORE_COMMAND === undefined ? ['pg_restore'] : parseCommandLine(env.HGW_PGRESTORE_COMMAND, 'HGW_PGRESTORE_COMMAND'),
+    nodeHeartbeatMs: timerDelay(env.HGW_NODE_HEARTBEAT_MS, 5_000, 'HGW_NODE_HEARTBEAT_MS'),
+    nodeStaleMs: timerDelay(env.HGW_NODE_STALE_MS, 30_000, 'HGW_NODE_STALE_MS'),
+    deployMigrationsDir: env.HGW_DEPLOY_MIGRATIONS_DIR ?? join(gatewayRoot, 'deploy/postgres/migrations'),
+    stateRoot,
     dshCommand,
     dshRepoRoot,
     instancePortBase,
@@ -500,5 +579,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     jpushAppKey,
     jpushMasterSecret,
     desktop,
+    desktopId,
+    desktopDriverPackage,
+    desktopDriverCommand,
+    desktopDriverArgs,
   }
 }

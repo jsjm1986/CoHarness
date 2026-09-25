@@ -10,6 +10,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { join } from 'node:path'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
@@ -75,11 +76,11 @@ describe('web e2e: plugin configuration section', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-cards'))
     const dialog = await openPlugins()
 
-    // Every card the shipped web composition exposes: the shell executor, the
-    // agent loop, and the DeepSeek search provider.
+    // Each card belongs to a Host settings namespace served by this composition.
     await dialog.getByText('终端', { exact: true }).waitFor({ timeout: 10_000 })
     expect(await dialog.getByText('Agent 循环', { exact: true }).count()).toBe(1)
     expect(await dialog.getByText('网页搜索', { exact: true }).count()).toBe(1)
+    expect(await dialog.getByText('Subagent', { exact: true }).count()).toBe(1)
     // Collapsed: a card's fields appear only once it is expanded.
     expect(await dialog.getByLabel('命令超时（毫秒）').count()).toBe(0)
 
@@ -172,8 +173,113 @@ describe('web e2e: plugin configuration section', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('keeps edits made while a real settings save is awaiting its reply', async () => {
+    const dialog = await openPlugins()
+    await dialog.getByText('终端', { exact: true }).click()
+    const timeout = dialog.getByLabel('命令超时（毫秒）')
+    await timeout.fill('9000')
+    const arrived = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const drained = Promise.withResolvers<undefined>()
+    const pattern = '**/api/settings.mutate'
+    await page.route(pattern, async (route) => {
+      try {
+        const response = await route.fetch()
+        arrived.resolve(undefined)
+        await release.promise
+        await route.fulfill({ response })
+      } finally { drained.resolve(undefined) }
+    }, { times: 1 })
+    try {
+      await dialog.getByRole('button', { name: '保存', exact: true }).click()
+      await arrived.promise
+      expect(await settingsDocument()).toContain('timeoutMs: 9000')
+      await timeout.fill('12000')
+      release.resolve(undefined)
+      await drained.promise
+      const save = dialog.getByRole('button', { name: '保存', exact: true })
+      await expect.poll(() => save.isEnabled()).toBe(true)
+      expect(await timeout.inputValue()).toBe('12000')
+      await save.click()
+      await expect.poll(async () => (await settingsDocument()).includes('timeoutMs: 12000')).toBe(true)
+    } finally {
+      release.resolve(undefined)
+      await page.unroute(pattern)
+    }
+  })
+
+  it('shows a refused credential replacement without erasing the draft or the stored key', async () => {
+    const ref = credentialRef('DEEPSEEK_API_KEY')
+    await scaffold.ctx.credentials.set(ref, 'plugin-fixture-original')
+    const dialog = await openPlugins()
+    await dialog.getByText('网页搜索', { exact: true }).click()
+    const key = dialog.getByLabel('API Key', { exact: true })
+    await key.fill('plugin-fixture-replacement')
+    const removeLayer = scaffold.ctx.credentials.registerReadOnlyLayer({
+      id: 'plugin-card-refusal', owns: candidate => candidate === ref,
+      resolve: async () => ({ value: 'plugin-fixture-original', source: 'acceptance' }),
+      describe: async () => ({ configured: true, writable: false, source: 'acceptance' }),
+    })
+    try {
+      await dialog.getByRole('button', { name: '保存', exact: true }).click()
+      await dialog.getByText('本部署没有接受这些值，已保留供你修改。', { exact: true }).waitFor()
+      expect(await key.inputValue()).toBe('plugin-fixture-replacement')
+      expect((await scaffold.ctx.credentials.resolve(ref))?.value).toBe('plugin-fixture-original')
+      const snapshot = await captureStableAria(page, 'li:has(#plugin-config-web-search-key)', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'refused-key.expected.md'), snapshot, MODE)
+    } finally { removeLayer() }
+    expect(tripwire.pageErrors).toEqual([])
+  })
+
+  it('edits subagent depth and capacity through the real settings owner', async () => {
+    const dialog = await openPlugins()
+    await dialog.getByText('Subagent', { exact: true }).click()
+    const depth = dialog.getByLabel('最大递归深度', { exact: true })
+    const capacity = dialog.getByLabel('Subagent 并行数量上限', { exact: true })
+    expect(await depth.inputValue()).toBe('1')
+    expect(await capacity.inputValue()).toBe('8')
+    await dialog.getByRole('button', { name: '最大递归深度说明', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Subagent 并行数量上限说明', exact: true }).click()
+    const snapshot = await captureStableAria(page, 'li:has(#plugin-config-subagent-depth)', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'subagent-limits.expected.md'), snapshot, MODE)
+    await depth.fill('-1')
+    await expect.poll(() => dialog.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
+    await depth.fill('0')
+    await capacity.fill('3')
+    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(async () => (await settingsDocument()).includes('maxDepth: 0')).toBe(true)
+    await expect.poll(async () => (await settingsDocument()).includes('maxActiveSubagents: 3')).toBe(true)
+    expect(scaffold.ctx.subagents.resolveMaxDepth()).toBe(0)
+    expect(tripwire.pageErrors).toEqual([])
+  })
+
+  it('saves model authorization atomically and retains choices when disabled', async () => {
+    const dialog = await openPlugins()
+    await dialog.getByRole('button', { name: '展开设置: 模型选择', exact: true }).click()
+    const card = dialog.locator('li').filter({ has: page.getByRole('switch', { name: '允许 Agent 为 Subagent 选择模型' }) })
+    const enabled = card.getByRole('switch')
+    expect(await enabled.getAttribute('aria-checked')).toBe('false')
+    await enabled.click()
+    await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).waitFor()
+    expect(await card.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
+    await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).check()
+    const snapshot = await captureStableAria(page, 'li:has([role="switch"])', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'subagent-models.expected.md'), snapshot, MODE)
+    await card.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(() => scaffold.ctx.subagentModelSelection.current()).toEqual({
+      enabled: true, allowedModels: [{ provider: 'deepseek-official', model: 'deepseek-v4-flash' }],
+    })
+    await expect.poll(() => card.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
+    await enabled.click()
+    await card.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(() => scaffold.ctx.subagentModelSelection.current()).toEqual({
+      enabled: false, allowedModels: [{ provider: 'deepseek-official', model: 'deepseek-v4-flash' }],
+    })
+    expect(tripwire.pageErrors).toEqual([])
+  })
+
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md', 'refused-key.expected.md', 'subagent-limits.expected.md', 'subagent-models.expected.md'])
   })
 })

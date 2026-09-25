@@ -1,4 +1,6 @@
-import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -16,6 +18,89 @@ import {
 const root = resolve(import.meta.dirname, '..')
 
 const SYNCED_COMMIT = 'ddefc45fbc7f8e46dd73185e68295696d1297887'
+
+function sourceFixture(run: (directory: string, commit: string, git: (...args: string[]) => string) => void): void {
+  const directory = mkdtempSync(resolve(tmpdir(), 'dsh-sovereignty-test-'))
+  try {
+    const git = (...args: string[]): string => execFileSync('git', ['-C', directory, ...args], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+    git('init')
+    git('config', 'user.name', 'Sovereignty fixture')
+    git('config', 'user.email', 'fixture@example.invalid')
+    git('config', 'commit.gpgsign', 'false')
+    git('config', 'core.autocrlf', 'false')
+    mkdirSync(resolve(directory, 'packages/test/sample/src'), { recursive: true })
+    writeFileSync(resolve(directory, 'packages/test/sample/src/index.ts'), 'export const value = 1\n')
+    writeFileSync(resolve(directory, '.gitignore'), '*.generated.ts\n')
+    git('add', '.')
+    git('commit', '-m', 'baseline')
+    run(directory, git('rev-parse', 'HEAD'), git)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+describe('working source comparison', () => {
+  it('rejects staged, unstaged, deleted and new sources without changing the real index', () => {
+    sourceFixture((directory, commit, git) => {
+      const path = resolve(directory, 'packages/test/sample/src/index.ts')
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(true)
+      writeFileSync(path, 'export const value = 2\n')
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(false)
+      git('add', '.')
+      const index = readFileSync(resolve(directory, '.git/index'))
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(false)
+      expect(readFileSync(resolve(directory, '.git/index'))).toEqual(index)
+      writeFileSync(path, 'export const value = 1\n')
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(true)
+      expect(readFileSync(resolve(directory, '.git/index'))).toEqual(index)
+      rmSync(path)
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(false)
+      writeFileSync(path, 'export const value = 1\n')
+      writeFileSync(resolve(directory, 'packages/test/sample/src/new.ts'), 'export {}\n')
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(false)
+    })
+  })
+
+  it('accepts an untracked upstream import and ignores generated output', () => {
+    sourceFixture((directory, commit, git) => {
+      git('rm', '--cached', 'packages/test/sample/src/index.ts')
+      git('commit', '-m', 'remove carried source')
+      writeFileSync(resolve(directory, 'packages/test/sample/src/output.generated.ts'), 'generated\n')
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(true)
+      const manifest = validateUpstreamSyncManifest({ version: 2, syncedTag: 'baseline', syncedCommit: commit,
+        packages: { 'test/sample': { sovereignty: 'tracked' } }, upstreamOnly: [] }, directory)
+      git('tag', 'baseline', commit)
+      expect(checkUpstreamSovereignty(directory, manifest).violations).toEqual([])
+      writeFileSync(resolve(directory, 'packages/test/sample/src/extra.ts'), 'export {}\n')
+      expect(checkUpstreamSovereignty(directory, manifest).violations).toEqual([
+        'classified "tracked" but packages/test/sample/src differs from baseline',
+      ])
+    })
+  })
+
+  it('compares CRLF checkouts using Git clean normalization', () => {
+    sourceFixture((directory, commit, git) => {
+      git('config', 'core.autocrlf', 'true')
+      writeFileSync(resolve(directory, 'packages/test/sample/src/index.ts'), 'export const value = 1\r\n')
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(true)
+    })
+  })
+
+  // POSIX modes and symlinks are not available on every Windows checkout.
+  it.skipIf(process.platform === 'win32')('rejects executable and symlink changes', () => {
+    sourceFixture((directory, commit, git) => {
+      git('config', 'core.filemode', 'true')
+      const path = resolve(directory, 'packages/test/sample/src/index.ts')
+      chmodSync(path, 0o755)
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(false)
+      rmSync(path)
+      symlinkSync('missing.ts', path)
+      expect(packageSrcMatchesCommit(directory, commit, 'test/sample')).toBe(false)
+    })
+  })
+})
 
 function synthetic(overrides: Record<string, unknown> = {}): unknown {
   return {
@@ -156,16 +241,6 @@ describe('checked-in manifest', () => {
     expect(resolveTagCommit(root, manifest.syncedTag)).toBe(manifest.syncedCommit)
   })
 
-  it.runIf(tagPresent)('keeps every tracked package diff-free against the synced commit', () => {
-    const tracked = Object.entries(manifest.packages)
-      .filter(([, entry]) => entry.sovereignty === 'tracked')
-      .map(([key]) => key)
-    expect(tracked.length).toBeGreaterThan(0)
-    for (const key of tracked) {
-      expect(packageSrcMatchesCommit(root, manifest.syncedCommit, key), `${key} must have an empty src diff`).toBe(true)
-    }
-  })
-
   it.runIf(tagPresent)('partitions upstream packages into tracked|adapted|replaced and upstreamOnly', () => {
     const upstream = packageKeysAtCommit(root, manifest.syncedCommit)
     const upstreamOnly = new Set(manifest.upstreamOnly.map(item => item.package))
@@ -183,6 +258,7 @@ describe('checked-in manifest', () => {
   })
 
   it.runIf(tagPresent)('reports zero violations for the checked-in state', { timeout: 120_000 }, () => {
+    expect(Object.values(manifest.packages).some(entry => entry.sovereignty === 'tracked')).toBe(true)
     const report: UpstreamSovereigntyReport = checkUpstreamSovereignty(root, manifest)
     expect(report.violations).toEqual([])
   })

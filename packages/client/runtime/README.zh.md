@@ -2,9 +2,9 @@
 
 [English](README.md) | 中文
 
-客户端 cordis 启动与不依赖 React 的对象服务：SlotRegistry 包装 SlotCore 并提供 renderer 数据源；SessionRuntime 拥有 Session 对象、列表与 scope 状态，以及供已注册 conversation view target 共用的事件窗口与历史分页。WorkspaceRuntime 依赖 SessionRuntime，拥有 Workspace 对象、列表／操作、默认目标派生、历史优先的 Workspace 入口（`openWorkspace`），以及 New Session 空会话复用入口（`connectWorkspace`）。运行时把共享 Host 流分发给 Session 与 Workspace 所有者，并把每个通用 `host/remote-event` 帧交给 `ctx.remote.$dispatch`；各领域包通过 `ctx.remote.$on` 订阅自身 owner 事件，并自行决定使哪些缓存或会话行失效。客户端会话一律由 Host 创建（一次 `session.create` 同时产生 Session、agent（智能体）和 cwd）；客户端不持有任何实体化之前的会话状态——agent scope（host dsh-scope 的客户端镜像，以 agent/session 共用 id 为键）在会话行进入列表镜像时创建，并随 prune 销毁。约定：api-contracts v3 §4。每个 `Session` 持有一个通用的 `ProjectionValueStore`，由历史记录尾部的 `projections` 块播种，并经 `session/projection` 帧按 seq 高者胜更新；领域键（含 `todos`）经 `projections.faceOf`／`useProjection` 读取，不经 `ConversationSnapshot`。该 store 还会通过 `SessionSummary.projectionValues` 发布一份引用稳定的完整值映射，使全局列表消费方无需为每个会话创建订阅，即可复用同一组投影。
+客户端 cordis 启动与不依赖 React 的对象服务：SlotRegistry 包装 SlotCore 并提供 renderer 数据源；SessionRuntime 拥有 Session 对象、列表与 scope 状态，以及供已注册 conversation view target 共用的事件窗口与历史分页。WorkspaceRuntime 依赖 SessionRuntime，拥有 Workspace 对象、列表／操作、默认目标派生、历史优先的 Workspace 入口（`openWorkspace`），以及 New Session 空会话复用入口（`connectWorkspace`）。运行时把共享 Host 流分发给 Session 与 Workspace 所有者，并把每个通用 `host/remote-event` 帧交给 `ctx.remote.$dispatch`；各领域包通过 `ctx.remote.$on` 订阅自身 owner 事件，并自行决定使哪些缓存或会话行失效。客户端会话由 Host 创建；目录成员关系本身不分配浏览器 scope。首个显式引用创建本地代次，最后一个引用释放后销毁 scope 和历史窗口，但不终止 Host Agent。每个 `Session` 持有一个通用的 `ProjectionValueStore`，由历史记录尾部的 `projections` 块播种，并经 `session/projection` 帧按 seq 高者胜更新；领域键（含 `todos`）经 `projections.faceOf`／`useProjection` 读取，不经 `ConversationSnapshot`。该 store 还会通过 `SessionSummary.projectionValues` 发布一份引用稳定的完整值映射，使全局列表消费方无需为每个会话创建订阅，即可复用同一组投影。
 
-账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放历史窗口，不会停止目标运行时中的任务。
+账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放其引用，不会停止 Host 任务。独立消费方持有引用期间，目标连接继续保留。
 
 直接读取 JSON 的浏览器消费方共用 Host carrier 的流式 reader；它会在解析前拒绝声明长度或实际分块超过默认 16 MiB 的 body。该 helper 只负责传输上限，不替代端点自己的响应校验。
 
@@ -12,10 +12,15 @@
 
 设置所有者共用本包定义的不依赖 React 的 `SettingsScopeSpec`、`SettingsScope` 与快照类型。ui-settings 拥有 `ctx.settingsScope.bind(spec)`、对应的 Host 传输、schema 校验与生命周期；详见[该包的约定](../ui-settings/README.zh.md)。
 
+`SlotRegistry.bindStore(handle, sessionId?)` 解析已注册 handle 对应的框架实例。服务消费方与渲染入口共享该实例，并通过已声明的 actions 写入；未注册的 handle 或缺失的 Session 作用域会抛错。
+
+`Session.readCallHistory(callId, signal)` 通过已注册的 Conversation 定义组装独立聊天快照。它使用该 Session 的普通传输或带父地址的子会话传输，不改变可见历史，并随读取者或 Session 生命周期取消。调用者持有读取结果，不另建 Session 或持久缓存。
+
 ## 概述
 
 使用 `dsh-client-runtime` 作为客户端对象层：它引导 Cordis 浏览器上下文，持有 `Session`/`Workspace` 运行时对象、共享宿主事件流的分发、投影存储与会话视图订阅的历史分页。客户端会话一律由宿主创建；域包经此层读取属主事件与投影切片，自身不持有会话状态。
 
+## 权限资格
 
 `SessionBinding.hostDescription` 保留所属会话连接的描述源，也涵盖工作台单独暂存的运行时目标。现有 UI 策略携带当前账户的派生权限资格。`permissionAvailabilitySource` 观察这两个来源，不缓存第二份目录；未知目标不会借用其他窗格的独立本机状态。
 
@@ -27,13 +32,23 @@
 
 <a id="slot-declaration-injection"></a>
 
-`SlotRegistry.bindStore(handle, sessionId?)` 解析已注册 handle 对应的框架实例。服务消费方与渲染入口共享该实例，并通过已声明的 actions 写入；未注册的 handle 或缺失的 Session 作用域会抛错。
-
 ## Slot 声明注入
 
 `ctx.slots.inject(name, callback)` 将完整的 `SlotMap` key 作为贡献项的依赖，适用于贡献方插件可独立于声明条目激活的情形。声明存在时，它会同步运行 `callback`，否则等待；声明折叠会 dispose（资源释放）回调 effect，重新声明则会再次运行回调。控制器归调用方的插件 fiber 所有，因此卸载贡献方会取消等待或移除其活跃注册项。直接调用 `slots.register()` 向未声明 slot 注册仍会抛出异常。
 
 回调返回一个同步 disposer 或由多个 disposer 构成的 iterable。因此，generator 可以 yield 多个 `slots.register()` 调用，并将它们组成一项事务：setup 失败会回滚先前 yield 的 effect，teardown 则按逆序运行它们。声明生命周期使用专用的单调 declaration epoch（声明代次），因此，即使折叠与重新声明合并在同一次 renderer 通知中，回调仍会重启，而普通条目变更不会重启它。声明绑定的 teardown 与账本变更同步运行，在同一 tick 内的后续注册之前释放运行时资源。详见 [slot 声明注入决策](../../../.agents/notes/implemented/architecture/2026-08-05-slot-declaration-injection.zh.md)。
+
+## Session 所有权
+
+`retain(target, { source, signal? })` 持有确切的本地代次，并启动共享历史打开过程。`binding` 可立即使用；`ready` 等待当前引用的打开尝试。取消等待不会释放引用，也不会取消其他消费方。清理时调用 `release()`、使用 disposal 协议，或者通过 `using(target, options, operation)` 在回调结束后释放。根节点销毁会使所有引用失效，包括尚未完成的就绪等待。
+
+`binding()`、`scope()` 和 `provideInfoFor()` 只借用仍被持有的代次。`retainInfo(id)` 观察不可变的来源计数，不创建 scope 或读取历史；同 ID 重建后，观察源身份仍稳定。会话选择与 Workbench 适配器共用这一分配器。输入草稿和正在提交的操作分别持有引用，使切换视图不会丢失输入。目录移除不释放这些所有者；明确撤权仍必须销毁所属运行时。
+
+每个 scope 的对象身份独立于持久 Session id。作用域事件分发与 `sessionOf()` 必须匹配确切代次，因此异步清理不会把旧 context 路由到替代对象。详见[所有权决策](../../../.agents/notes/implemented/architecture/2026-09-23-client-session-references.zh.md)。
+
+`beginNavigation()` 取代尚未完成的视图选择意图，并返回取消信号。异步导航在加载完成后、选择视图前检查信号；`open`、`openSubagent`、`clear`、目标切换与明确拒绝访问都会使旧意图失效。被取代的请求仍将已完成的 Host 操作保留在目录中，并保留当前视图和草稿。插件发起的请求还须响应插件销毁。
+
+`commitSessionNavigation()` 在打开尝试完成前持有目标，确认历史可用后只提交当前意图。接收视图先获取自己的引用，再释放临时引用。加载失败保留原视图；取消同时抑制过期提交和过期错误。`SessionReference.ready` 的语义不变：它表示尝试结束，不等同于加载成功。
 
 ## Workspace 与 Session 列表
 
@@ -73,7 +88,7 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 ## Conversation 组装
 
-每个 `Session` 都把连续事件窗口交给 `ConversationNodeAssembler`。`open()` 与 `loadOlder()` 在该会话尚未补全时请求 `detail: 'conversation'`；`ensureHistoryDetail()` 拉取 `detail: 'full'` 并按 seq 合并。窗口的 `baseSeq` 与尾部包含 `omittedSpans`，因此 conversation 档空洞不是 mux 缺口（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。处于舞台的会话从 `historyWindowMode: 'tail'` 开始；接受 prompt 或观察到 `running` 后在后台最多补齐 `LIVE_HISTORY_RETAINED_PAGES` 页更早页面（[有界活动窗口](../../../.agents/notes/implemented/bug-fix/2026-09-03-bounded-live-window-and-incremental-reconnect.zh.md)），空闲且处于舞台的阅读器接近顶部时会自动请求一页更早历史。较早历史控件在自动分页失败或触及上限时保留为无障碍重试入口。离开舞台会释放浏览器窗口，下一次进入重新读取尾页。模型请求和实时事件流不等待补齐。普通会话在第一页完成后还会异步请求有界的 `session.historyIndex`；索引只包含轮次范围和简短预览，尚未驻留的标记会先读取所需的更早页面再跳转。插件注册业务 Definition，把单个事件映射为稳定的 `{kind, id}`，在唯一 start 事件处创建 State，折叠有关联的 update，再为已注册的视图目标构造最终节点。Assembler 负责 Context 索引、只读前序 Context 查询，以及引用稳定的 Turn/Step Location 索引。实时 append 只对每个 Definition 求值一次，并且只更新命中的 Context；加载更早分页时保留已有 Context 与节点身份，只匹配新 prepend 的事件，并重放前序依赖或 Location 事实发生变化的 Context。完整替换仅用于首次打开、舞台重进、对仍在加载的窗口的重连，以及恢复的尾页不再与窗口相接的情况；对已打开窗口的重连和其余缺口修复都会把恢复的尾页合并进现有窗口，不会丢弃已显示历史。
+每个 `Session` 都把连续事件窗口交给 `ConversationNodeAssembler`。`open()` 与 `loadOlder()` 在该会话尚未补全时请求 `detail: 'conversation'`；`ensureHistoryDetail()` 拉取 `detail: 'full'` 并按 seq 合并。窗口的 `baseSeq` 与尾部包含 `omittedSpans`，因此 conversation 档空洞不是 mux 缺口（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。处于舞台的会话从 `historyWindowMode: 'tail'` 开始；接受 prompt 或观察到 `running` 后在后台最多补齐 `LIVE_HISTORY_RETAINED_PAGES` 页更早页面（[有界活动窗口](../../../.agents/notes/implemented/bug-fix/2026-09-03-bounded-live-window-and-incremental-reconnect.zh.md)），空闲且处于舞台的阅读器接近顶部时会自动请求一页更早历史。较早历史控件在自动分页失败或触及上限时保留为无障碍重试入口。释放最后一个引用会销毁浏览器窗口；再次获取引用时重新读取尾页。模型请求和实时事件流不等待补齐。普通会话在第一页完成后还会异步请求有界的 `session.historyIndex`；索引只包含轮次范围和简短预览，尚未驻留的标记会先读取所需的更早页面再跳转。插件注册业务 Definition，把单个事件映射为稳定的 `{kind, id}`，在唯一 start 事件处创建 State，折叠有关联的 update，再为已注册的视图目标构造最终节点。Assembler 负责 Context 索引、只读前序 Context 查询，以及引用稳定的 Turn/Step Location 索引。实时 append 只对每个 Definition 求值一次，并且只更新命中的 Context；加载更早分页时保留已有 Context 与节点身份，只匹配新 prepend 的事件，并重放前序依赖或 Location 事实发生变化的 Context。完整替换仅用于首次打开、舞台重进、对仍在加载的窗口的重连，以及恢复的尾页不再与窗口相接的情况；对已打开窗口的重连和其余缺口修复都会把恢复的尾页合并进现有窗口，不会丢弃已显示历史。
 
 `IncrementalAssistantBlocks` 用追加的 chunk 片段维护助手输出。文本、推理和工具参数前缀只在消费方请求快照时拼接并清理，因此长流不会在每个 chunk 上复制完整前缀。
 
@@ -124,5 +139,4 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 ## 已知限制与暂缓事项
 
 - **`loader.unload` 是 stub**：它会抛出 not-implemented；客户端没有从 fiber dispose 到注册与样式移除的卸载链。
-- **scope 拆卸由阶段驱动**：staged 集合包含 `list.current` 以及多 pane viewport 请求的 id；staging 就是打开信号，被移除但仍处于 staged 的会话会保持冻结，直到离开集合。解析（`binding()`／`scope()`）只是纯寻址，可安全用于渲染；渲染层经 `currentProvideInfo` 读取当前 bundle，并经 `provideInfoFor(id)` 读取明确 Session bundle。
 - **插件 bundle 从该包导入值时必须使用 `/client` 子路径**：裸包名不在 loader externals 表中，会内联第二个模块实例；其私有 scope-tag Symbol 永远无法匹配。

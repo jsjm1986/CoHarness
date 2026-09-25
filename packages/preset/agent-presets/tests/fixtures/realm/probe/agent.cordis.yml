@@ -1,0 +1,5 @@
+# Probe preset: one row that records which `fs` its mount context resolved.
+- id: probe
+  name: ../../plugins/service-probe.js
+  config:
+    tool: probe

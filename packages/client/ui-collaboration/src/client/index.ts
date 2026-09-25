@@ -71,6 +71,7 @@ export function apply(ctx: ClientContext): void {
     const syncPolicy = (): void => {
       const snapshot = collaboration.getSnapshot()
       const context = snapshot.context
+      projectUiPolicy?.setVerifiedAccountId(snapshot.contextVerified ? context?.user.id : undefined)
       const scope = context?.scope
       const full = context?.user.role === 'admin' && context.fullAccess === true
       const auto = context?.autoReviewEligible === true
@@ -86,6 +87,7 @@ export function apply(ctx: ClientContext): void {
     syncPolicy()
     return () => {
       unsubscribe()
+      projectUiPolicy?.setVerifiedAccountId(undefined)
       projectUiPolicy?.setAccountPermissions('unknown')
       collaboration.dispose()
     }
@@ -124,6 +126,8 @@ export function apply(ctx: ClientContext): void {
     getInvitationCount: () => collaboration.getInvitationCount(),
     loadProjectConfiguration: projectId => collaboration.loadProjectConfiguration(projectId),
     setProjectThemePolicy: (projectId, policy) => collaboration.setProjectThemePolicy(projectId, policy),
+    listProjectSshTargets: projectId => collaboration.listProjectSshTargets(projectId),
+    shareProjectSshTarget: (projectId, targetId, shared) => collaboration.shareProjectSshTarget(projectId, targetId, shared),
   })
   const conversationInjected = (sessionId: SessionId): ConversationShareInjected => ({
     hooks,

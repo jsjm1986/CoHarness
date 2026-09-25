@@ -1,0 +1,871 @@
+{
+  "sourceCommit": "4ff54a4353ff63e79bb2d3533c647ea889c32799",
+  "sourceBlobs": {
+    "scripts/ci-pr-scope.ts": "c3b640482e5d3fefd4e2845fbf698e9ffe350f38",
+    "scripts/ci-scope-policy.json": "9edebb5db0b40ff51026fa23725e45c982d57b6d",
+    "scripts/web-test-policy.ts": "cafcb748e52f9aa5733e82e7469c9b9da584c6c0",
+    "scripts/web-test-policy.json": "5f33827269c37ef0c961122631933bbe7e03e9d2",
+    "scripts/ci-consumer-relations.ts": "fbab547771c44ec36cd1116cf14979511145dc65",
+    "scripts/ci-consumer-relations.json": "308f327c512706a0176c1fbe5969e5422de65c0b"
+  },
+  "scopePolicy": {
+    "version": 1,
+    "inertPrefixes": [
+      ".agents/",
+      "docs/",
+      "engineering/",
+      "upgrades/",
+      "website/"
+    ],
+    "fullRuntimePrefixes": [
+      "vendor/",
+      "gateway/",
+      "native/"
+    ],
+    "fullRuntimePackagePrefixes": [
+      "packages/client/connection/",
+      "packages/host/apiproxy/"
+    ],
+    "scopedPackageGroups": [
+      "acp",
+      "attachment",
+      "compaction",
+      "context",
+      "credentials",
+      "feedback",
+      "fs",
+      "goal",
+      "guard",
+      "hooks",
+      "identity",
+      "interaction",
+      "jobs",
+      "lsp",
+      "mcp",
+      "plan",
+      "preset",
+      "runtime-diagnostics",
+      "schedule",
+      "sdk",
+      "session-query",
+      "settings",
+      "skill",
+      "spill",
+      "storage",
+      "test-support",
+      "todo",
+      "util",
+      "web",
+      "workflow",
+      "workspace",
+      "client"
+    ],
+    "modelInputPrefixes": [
+      "apps/cli/config/",
+      "packages/skill/skill-badge/assets/"
+    ],
+    "modelInputSuffixes": [
+      "/AGENTS.md",
+      "/SKILL.md"
+    ],
+    "gatewayPrefixes": [
+      "gateway/",
+      "plugins/dsh-directory-guard/",
+      "plugins/dsh-model-governance/",
+      "packages/api/",
+      "packages/host/apiproxy/"
+    ],
+    "adminUiPrefix": "gateway/admin-ui/"
+  },
+  "webPolicy": {
+    "version": 1,
+    "groups": [
+      "shell",
+      "conversation",
+      "workbench",
+      "documents",
+      "settings",
+      "subagent",
+      "mobile",
+      "lifecycle"
+    ],
+    "scenarios": {
+      "access-confirmation.e2e.ts": "shell",
+      "agent-preset-authoring.e2e.ts": "settings",
+      "agent-preset-selection.e2e.ts": "settings",
+      "approval-composer.e2e.ts": "conversation",
+      "auto-review-denial.e2e.ts": "conversation",
+      "background-job-list.e2e.ts": "workbench",
+      "bash-abort-row.e2e.ts": "conversation",
+      "built-boot.snapshot.ts": "shell",
+      "chat-continuous-conversation.e2e.ts": "conversation",
+      "chat-long-interactions.e2e.ts": "conversation",
+      "chat-scroll-contract.e2e.ts": "conversation",
+      "chat-sender-attribution.e2e.ts": "conversation",
+      "cold-blank-session.e2e.ts": "lifecycle",
+      "cold-inbox.snapshot.ts": "lifecycle",
+      "command-image-envelope.snapshot.ts": "conversation",
+      "compact-chrome-visual-audit.e2e.ts": "workbench",
+      "composer-draft-scroll.e2e.ts": "conversation",
+      "composer-model-mobile.e2e.ts": "mobile",
+      "composer-tab-geometry.e2e.ts": "conversation",
+      "conversation-column-overflow.e2e.ts": "conversation",
+      "cordis-tool-round.e2e.ts": "conversation",
+      "declared-reasoning.e2e.ts": "conversation",
+      "default-model.e2e.ts": "settings",
+      "details-session-lifecycle.e2e.ts": "lifecycle",
+      "document-manager.e2e.ts": "documents",
+      "feedback-command.e2e.ts": "conversation",
+      "goal-bar.e2e.ts": "conversation",
+      "goal-command-presentation.e2e.ts": "conversation",
+      "goal-multi-turn-actions.e2e.ts": "conversation",
+      "hmr-live.e2e.ts": "shell",
+      "home-path-tilde.snapshot.ts": "shell",
+      "image-display.snapshot.ts": "conversation",
+      "lifecycle-chrome.e2e.ts": "lifecycle",
+      "live-interactions.e2e.ts": "conversation",
+      "lossless-history-wire.e2e.ts": "lifecycle",
+      "markdown-cjk-strong.e2e.ts": "conversation",
+      "markdown-images.e2e.ts": "conversation",
+      "markdown-inline-code-links.e2e.ts": "conversation",
+      "math-rendering.e2e.ts": "conversation",
+      "max-tokens-notice.snapshot.ts": "conversation",
+      "message-actions.e2e.ts": "conversation",
+      "message-feedback-layout.e2e.ts": "conversation",
+      "message-feedback-protocol.snapshot.ts": "conversation",
+      "message-feedback.e2e.ts": "conversation",
+      "minimal-preset.snapshot.ts": "shell",
+      "models-settings.e2e.ts": "settings",
+      "navigation-panes.e2e.ts": "workbench",
+      "onboarding-deepseek-config.e2e.ts": "settings",
+      "onboarding-usable-provider.e2e.ts": "settings",
+      "permission-policy-context.e2e.ts": "settings",
+      "plan-control-row.e2e.ts": "conversation",
+      "plan-review.e2e.ts": "conversation",
+      "plugin-config.e2e.ts": "settings",
+      "produced-file-mentions.e2e.ts": "conversation",
+      "produced-files.e2e.ts": "documents",
+      "project-collaboration.e2e.ts": "workbench",
+      "ptc-round.e2e.ts": "conversation",
+      "pwa-manifest.e2e.ts": "shell",
+      "pwsh-terminal.e2e.ts": "conversation",
+      "question-composer.e2e.ts": "conversation",
+      "queue-actions.e2e.ts": "conversation",
+      "rail-search-expand.e2e.ts": "workbench",
+      "reference-composer.e2e.ts": "conversation",
+      "reference-drill.e2e.ts": "conversation",
+      "replay-round-trip.e2e.ts": "lifecycle",
+      "responsive-shell.e2e.ts": "shell",
+      "scaffold-hermetic.e2e.ts": "shell",
+      "schedule-after.e2e.ts": "conversation",
+      "search-card.snapshot.ts": "conversation",
+      "seeded-history.e2e.ts": "lifecycle",
+      "settings-chrome.e2e.ts": "settings",
+      "settings-compact.e2e.ts": "settings",
+      "shipped-composition.e2e.ts": "shell",
+      "sidebar-scrollbar.e2e.ts": "workbench",
+      "sidebar-subagent-activity.e2e.ts": "subagent",
+      "skill-invocation-policy.e2e.ts": "conversation",
+      "skill-tool-row.e2e.ts": "conversation",
+      "skill-user-invoke.e2e.ts": "conversation",
+      "smoke-real.e2e.ts": "shell",
+      "startup-auto-selection.e2e.ts": "lifecycle",
+      "startup-rpc-budget.e2e.ts": "lifecycle",
+      "stats-paged-history.e2e.ts": "workbench",
+      "steering.e2e.ts": "conversation",
+      "subagent-conversation.e2e.ts": "subagent",
+      "subagent-interrupt-ui.e2e.ts": "subagent",
+      "subagent-interrupt.e2e.ts": "subagent",
+      "todo-row.snapshot.ts": "conversation",
+      "trajectory-virtualization.e2e.ts": "conversation",
+      "turn-tail-actions.e2e.ts": "conversation",
+      "vite-entry.e2e.ts": "shell",
+      "web-search-round.e2e.ts": "conversation",
+      "workbench.e2e.ts": "workbench",
+      "workflow-run.e2e.ts": "workbench",
+      "workspace-files.e2e.ts": "workbench",
+      "workspace-history-entry.e2e.ts": "documents",
+      "workspace-management.e2e.ts": "documents"
+    },
+    "packages": {
+      "client/hmr": "shell",
+      "client/locale": "all",
+      "client/ui-agent-preset": "settings",
+      "client/ui-attachment": "conversation",
+      "client/ui-brand-official": "shell",
+      "client/ui-collaboration": [
+        "conversation",
+        "workbench"
+      ],
+      "client/ui-commands": [
+        "conversation",
+        "workbench"
+      ],
+      "client/ui-conversation": [
+        "conversation",
+        "workbench",
+        "mobile",
+        "subagent"
+      ],
+      "client/ui-deliverables": [
+        "conversation",
+        "documents"
+      ],
+      "client/ui-directory-picker-browse": "documents",
+      "client/ui-directory-picker-native": "documents",
+      "client/ui-documents": "documents",
+      "client/ui-goal": "conversation",
+      "client/ui-input-trigger": "conversation",
+      "client/ui-jobs": "workbench",
+      "client/ui-layout": "all",
+      "client/ui-message-feedback": "conversation",
+      "client/ui-model-selection": [
+        "conversation",
+        "settings",
+        "mobile"
+      ],
+      "client/ui-open-in-app": [
+        "shell",
+        "workbench"
+      ],
+      "client/ui-permission-presets": "settings",
+      "client/ui-plan": "conversation",
+      "client/ui-primitives": "all",
+      "client/ui-reference": "conversation",
+      "client/ui-renderer": "all",
+      "client/ui-schedule": "conversation",
+      "client/ui-settings": "settings",
+      "client/ui-settings-general": "settings",
+      "client/ui-settings-models": "settings",
+      "client/ui-settings-plugin-inventory": "settings",
+      "client/ui-settings-plugins": "settings",
+      "client/ui-sidebar": [
+        "shell",
+        "subagent",
+        "workbench"
+      ],
+      "client/ui-skill": "conversation",
+      "client/ui-slots": "all",
+      "client/ui-subagent": "subagent",
+      "client/ui-theme": "all",
+      "client/ui-tool": "conversation",
+      "client/ui-trajectory": [
+        "conversation",
+        "workbench"
+      ],
+      "client/ui-usage-alert": "conversation",
+      "client/ui-user-questions": "conversation",
+      "client/ui-workbench": [
+        "shell",
+        "workbench",
+        "lifecycle"
+      ],
+      "client/ui-workflow-run": "workbench",
+      "client/ui-workspace": [
+        "documents",
+        "lifecycle",
+        "workbench"
+      ],
+      "client/userdoc-upload": "documents",
+      "experimental/agent-team": "subagent",
+      "goal/goal": "conversation",
+      "interaction/permission-presets": "settings",
+      "llm/token-meter": "conversation",
+      "plan/plan-mode": "conversation",
+      "schedule/schedule": "conversation",
+      "session/session-stats": "workbench",
+      "session/session-title": "workbench",
+      "session/session-turn-outline": "workbench",
+      "session-query/session-log-export": "workbench",
+      "subagent/subagent": "subagent",
+      "todo/tool-todo": "conversation"
+    },
+    "fullPrefixes": [
+      "apps/web/public/",
+      "apps/web/src/",
+      "apps/web/stress-tests/",
+      "packages/api/",
+      "packages/client/connection/",
+      "packages/client/modules/",
+      "packages/client/runtime/",
+      "packages/client/web/",
+      "packages/extensions/",
+      "packages/host/apiproxy/",
+      "packages/typert/"
+    ],
+    "webInfraPrefixes": [
+      "gateway/",
+      "scripts/run-web-snapshots.ts",
+      "scripts/snapshot-preflight.ts",
+      "scripts/web-test-policy.json",
+      "scripts/web-test-policy.ts",
+      "vitest.web-stress.config.ts",
+      "vitest.web.perf.config.ts",
+      "vitest.web.config.ts"
+    ],
+    "smokeScenarios": [
+      "built-boot.snapshot.ts",
+      "cold-blank-session.e2e.ts",
+      "scaffold-hermetic.e2e.ts",
+      "shipped-composition.e2e.ts",
+      "vite-entry.e2e.ts"
+    ],
+    "unknown": "full"
+  },
+  "consumerPolicy": {
+    "version": 1,
+    "lanes": {
+      "python": {
+        "manifest": "package.json",
+        "scripts": [
+          "check:python:static"
+        ],
+        "workflow": ".github/workflows/ci.yml",
+        "jobs": [
+          "python-sdk",
+          "python-runtime"
+        ],
+        "sources": [
+          "python/sdk/pyproject.toml",
+          ".github/workflows/build-exe-for-python-sdk.yml"
+        ]
+      },
+      "gateway": {
+        "manifest": "gateway/package.json",
+        "scripts": [
+          "typecheck",
+          "build:check",
+          "test"
+        ],
+        "workflow": ".github/workflows/ci.yml",
+        "jobs": [
+          "gateway"
+        ],
+        "sources": [
+          "gateway/tests/runtime-api.spec.ts",
+          "gateway/tests/server.spec.ts",
+          "gateway/src/runtime-api.ts"
+        ]
+      },
+      "adminUi": {
+        "manifest": "gateway/admin-ui/package.json",
+        "scripts": [
+          "test",
+          "build"
+        ],
+        "workflow": ".github/workflows/ci.yml",
+        "jobs": [
+          "gateway-admin-ui"
+        ],
+        "sources": [
+          "gateway/admin-ui/src/components/OrganizationModelsEditor.tsx"
+        ]
+      },
+      "android": {
+        "manifest": "package.json",
+        "scripts": [
+          "check:android",
+          "check:android:bridge",
+          "test:android:protocol"
+        ],
+        "workflow": ".github/workflows/ci.yml",
+        "jobs": [
+          "android-build",
+          "android-bridge"
+        ],
+        "sources": [
+          "scripts/check-android.ts",
+          "apps/web/tests/native-push.spec.ts",
+          "apps/android-shell/android/app/src/androidTest/java/com/coharness/NativePushBridgeTest.java",
+          "scripts/android-bridge-fixture.ts"
+        ]
+      }
+    },
+    "standalonePrefixes": [
+      "gateway/admin-ui/"
+    ],
+    "relations": [
+      {
+        "id": "loop-session-sdk",
+        "paths": [
+          "packages/core",
+          "packages/session",
+          "packages/sdk",
+          "packages/boot",
+          "packages/preset",
+          "packages/bundle"
+        ],
+        "lanes": [
+          "python",
+          "gateway"
+        ],
+        "basis": "Both SDKs project the loop; Gateway consumes sessionFormatCatalog and spawns composed runtimes."
+      },
+      {
+        "id": "model-governance",
+        "paths": [
+          "packages/llm",
+          "packages/credentials",
+          "packages/settings",
+          "plugins/dsh-model-governance"
+        ],
+        "lanes": [
+          "gateway",
+          "adminUi"
+        ],
+        "basis": "Gateway imports LLM discovery; organization model settings reuse the Web editor and governance provider."
+      },
+      {
+        "id": "admin-shared-ui",
+        "paths": [
+          "packages/client/ui-settings-models",
+          "packages/client/ui-settings",
+          "packages/client/ui-primitives",
+          "packages/client/runtime"
+        ],
+        "lanes": [
+          "adminUi"
+        ],
+        "basis": "OrganizationModelsEditor imports these workspace sources and the Vite runtime store alias."
+      },
+      {
+        "id": "native-notification",
+        "paths": [
+          "apps/android-shell",
+          "apps/web/src/native-push.ts",
+          "gateway/src/push-notifications.ts",
+          "gateway/tests/push-notifications.spec.ts"
+        ],
+        "lanes": [
+          "android",
+          "gateway"
+        ],
+        "basis": "Native Intent extras, push payloads, registration and session navigation share one protocol."
+      },
+      {
+        "id": "runtime-notification",
+        "paths": [
+          "gateway/src/runtime-api.ts",
+          "gateway/src/server.ts",
+          "packages/client/ui-session-list"
+        ],
+        "lanes": [
+          "android",
+          "gateway"
+        ],
+        "basis": "Runtime completion and server push-device routes supply native notification navigation."
+      },
+      {
+        "id": "fork-runtime-bridge",
+        "paths": [
+          "packages/api",
+          "packages/host/apiproxy",
+          "packages/client/connection",
+          "plugins/dsh-directory-guard",
+          "gateway"
+        ],
+        "lanes": [
+          "gateway"
+        ],
+        "basis": "BFF and Gateway protocol, authorization and runtime process consumers."
+      },
+      {
+        "id": "gateway-context-plugins",
+        "paths": [
+          "packages/context/gateway-runtime",
+          "packages/context/collaboration-gateway"
+        ],
+        "lanes": [
+          "gateway"
+        ],
+        "basis": "Gateway composes these context plugins into its runtime; a change inside them alters Gateway behavior without touching gateway/."
+      },
+      {
+        "id": "admin-app",
+        "paths": [
+          "gateway/admin-ui"
+        ],
+        "lanes": [
+          "adminUi"
+        ],
+        "basis": "Independent administration application."
+      },
+      {
+        "id": "python-runtime-build",
+        "paths": [
+          "scripts/build-exe-for-python-sdk.ts",
+          ".github/workflows/build-exe-for-python-sdk.yml",
+          "scripts/snapshots/python-sdk-single-exe"
+        ],
+        "lanes": [
+          "python"
+        ],
+        "basis": "The exe build script, its reusable workflow, and the single-exe golden fixtures produce the python-runtime proof the lane executes."
+      },
+      {
+        "id": "python-surface",
+        "paths": [
+          "python",
+          "scripts/build-python-release.py",
+          "scripts/smoke-python-runtime.py",
+          "scripts/finalize-python-runtime-artifact.py"
+        ],
+        "lanes": [
+          "python"
+        ],
+        "basis": "Python SDK and the installed bundled runtime share release tooling."
+      },
+      {
+        "id": "shared-foundation",
+        "paths": [
+          "vendor",
+          "packages/typert",
+          "packages/extensions",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "package.json",
+          "tsconfig.base.json",
+          "scripts/run-gates.ts",
+          "scripts/ci-pr-scope.ts",
+          "scripts/ci-consumer-relations.ts",
+          "scripts/ci-consumer-relations.json",
+          "scripts/ci-scope-policy.json",
+          "scripts/build.ts",
+          ".github/workflows/ci.yml"
+        ],
+        "lanes": [
+          "python",
+          "gateway",
+          "adminUi",
+          "android"
+        ],
+        "basis": "Shared resolver, dependency graph, build and lane configuration require consumers of generated or dynamically loaded output."
+      }
+    ]
+  },
+  "clientPackages": [
+    "api/gateway",
+    "api/remotes",
+    "client/connection",
+    "client/hmr",
+    "client/locale",
+    "client/modules",
+    "client/runtime",
+    "client/ui-agent-preset",
+    "client/ui-attachment",
+    "client/ui-brand-official",
+    "client/ui-collaboration",
+    "client/ui-commands",
+    "client/ui-conversation",
+    "client/ui-deliverables",
+    "client/ui-directory-picker-browse",
+    "client/ui-directory-picker-native",
+    "client/ui-documents",
+    "client/ui-goal",
+    "client/ui-input-trigger",
+    "client/ui-jobs",
+    "client/ui-layout",
+    "client/ui-message-feedback",
+    "client/ui-model-selection",
+    "client/ui-open-in-app",
+    "client/ui-permission-presets",
+    "client/ui-plan",
+    "client/ui-primitives",
+    "client/ui-reference",
+    "client/ui-renderer",
+    "client/ui-schedule",
+    "client/ui-settings",
+    "client/ui-settings-general",
+    "client/ui-settings-models",
+    "client/ui-settings-plugin-inventory",
+    "client/ui-settings-plugins",
+    "client/ui-sidebar",
+    "client/ui-skill",
+    "client/ui-slots",
+    "client/ui-subagent",
+    "client/ui-theme",
+    "client/ui-tool",
+    "client/ui-trajectory",
+    "client/ui-usage-alert",
+    "client/ui-user-questions",
+    "client/ui-workbench",
+    "client/ui-workflow-run",
+    "client/ui-workspace",
+    "client/userdoc-upload",
+    "client/web",
+    "experimental/agent-team",
+    "extensions/cordis-client-runner",
+    "extensions/ui-cordis",
+    "goal/goal",
+    "host/apiproxy",
+    "interaction/permission-presets",
+    "llm/token-meter",
+    "plan/plan-mode",
+    "schedule/schedule",
+    "session-query/session-log-export",
+    "session/session-stats",
+    "session/session-title",
+    "session/session-turn-outline",
+    "subagent/subagent",
+    "todo/tool-todo",
+    "typert/registry"
+  ],
+  "goldenOwners": {
+    "access-confirmation": [
+      "access-confirmation.e2e.ts"
+    ],
+    "agent-preset-authoring": [
+      "agent-preset-authoring.e2e.ts"
+    ],
+    "agent-preset-selection": [
+      "agent-preset-selection.e2e.ts"
+    ],
+    "approval-composer": [
+      "approval-composer.e2e.ts",
+      "workbench.e2e.ts"
+    ],
+    "auto-review-denial": [
+      "auto-review-denial.e2e.ts"
+    ],
+    "background-job-list": [
+      "background-job-list.e2e.ts"
+    ],
+    "bash-abort-row": [
+      "bash-abort-row.e2e.ts"
+    ],
+    "cancel-tool-calls": [
+      "bash-abort-row.e2e.ts"
+    ],
+    "chat-scroll-contract": [
+      "chat-scroll-contract.e2e.ts"
+    ],
+    "chat-sender-attribution": [
+      "chat-sender-attribution.e2e.ts"
+    ],
+    "cold-blank-session": [
+      "cold-blank-session.e2e.ts"
+    ],
+    "composer-draft-scroll": [
+      "composer-draft-scroll.e2e.ts"
+    ],
+    "composer-model-mobile": [
+      "composer-model-mobile.e2e.ts"
+    ],
+    "composer-tab-geometry": [
+      "composer-tab-geometry.e2e.ts"
+    ],
+    "conversation-column-overflow": [
+      "conversation-column-overflow.e2e.ts"
+    ],
+    "cordis-tool-round": [
+      "cordis-tool-round.e2e.ts"
+    ],
+    "declared-reasoning": [
+      "declared-reasoning.e2e.ts"
+    ],
+    "details-session-lifecycle": [
+      "details-session-lifecycle.e2e.ts"
+    ],
+    "document-manager": [
+      "document-manager.e2e.ts"
+    ],
+    "feedback-command": [
+      "feedback-command.e2e.ts"
+    ],
+    "fresh-round-trip": [
+      "background-job-list.e2e.ts",
+      "replay-round-trip.e2e.ts"
+    ],
+    "goal-bar": [
+      "goal-bar.e2e.ts"
+    ],
+    "goal-command-presentation": [
+      "goal-command-presentation.e2e.ts"
+    ],
+    "goal-multi-turn-actions": [
+      "goal-multi-turn-actions.e2e.ts"
+    ],
+    "home-path-tilde": [
+      "home-path-tilde.snapshot.ts"
+    ],
+    "lifecycle-chrome": [
+      "details-session-lifecycle.e2e.ts",
+      "lifecycle-chrome.e2e.ts"
+    ],
+    "live-interactions": [
+      "live-interactions.e2e.ts",
+      "queue-actions.e2e.ts",
+      "subagent-conversation.e2e.ts",
+      "subagent-interrupt-ui.e2e.ts",
+      "workbench.e2e.ts"
+    ],
+    "lossless-history-wire": [
+      "lossless-history-wire.e2e.ts"
+    ],
+    "markdown-cjk-strong": [
+      "markdown-cjk-strong.e2e.ts"
+    ],
+    "markdown-images": [
+      "markdown-images.e2e.ts"
+    ],
+    "markdown-inline-code-links": [
+      "markdown-inline-code-links.e2e.ts"
+    ],
+    "math-rendering": [
+      "math-rendering.e2e.ts"
+    ],
+    "max-tokens-notice": [
+      "max-tokens-notice.snapshot.ts"
+    ],
+    "message-actions": [
+      "message-actions.e2e.ts"
+    ],
+    "message-feedback-layout": [
+      "message-feedback-layout.e2e.ts"
+    ],
+    "message-feedback-protocol": [
+      "message-feedback-protocol.snapshot.ts"
+    ],
+    "minimal-preset": [
+      "minimal-preset.snapshot.ts"
+    ],
+    "models-settings": [
+      "models-settings.e2e.ts"
+    ],
+    "navigation-panes": [
+      "compact-chrome-visual-audit.e2e.ts",
+      "navigation-panes.e2e.ts"
+    ],
+    "onboarding-deepseek-config": [
+      "onboarding-deepseek-config.e2e.ts"
+    ],
+    "onboarding-usable-provider": [
+      "onboarding-usable-provider.e2e.ts"
+    ],
+    "permission-policy-context": [
+      "permission-policy-context.e2e.ts"
+    ],
+    "plan-narrow-viewport": [
+      "plan-control-row.e2e.ts"
+    ],
+    "plan-review": [
+      "plan-review.e2e.ts"
+    ],
+    "plugin-config": [
+      "plugin-config.e2e.ts"
+    ],
+    "project-collaboration": [
+      "project-collaboration.e2e.ts"
+    ],
+    "ptc-round": [
+      "ptc-round.e2e.ts"
+    ],
+    "pwsh-terminal": [
+      "pwsh-terminal.e2e.ts"
+    ],
+    "question-composer": [
+      "question-composer.e2e.ts"
+    ],
+    "queue-actions": [
+      "queue-actions.e2e.ts"
+    ],
+    "reference-composer": [
+      "reference-composer.e2e.ts"
+    ],
+    "reference-drill": [
+      "reference-drill.e2e.ts"
+    ],
+    "responsive-shell": [
+      "responsive-shell.e2e.ts"
+    ],
+    "schedule-after": [
+      "schedule-after.e2e.ts"
+    ],
+    "search-card": [
+      "search-card.snapshot.ts"
+    ],
+    "seeded-history": [
+      "details-session-lifecycle.e2e.ts",
+      "message-actions.e2e.ts",
+      "message-feedback-layout.e2e.ts",
+      "message-feedback.e2e.ts",
+      "project-collaboration.e2e.ts",
+      "seeded-history.e2e.ts",
+      "sidebar-scrollbar.e2e.ts",
+      "workbench.e2e.ts",
+      "workspace-files.e2e.ts",
+      "workspace-history-entry.e2e.ts",
+      "workspace-management.e2e.ts"
+    ],
+    "settings-chrome": [
+      "settings-chrome.e2e.ts"
+    ],
+    "settings-compact": [
+      "settings-compact.e2e.ts"
+    ],
+    "sidebar-scrollbar": [
+      "sidebar-scrollbar.e2e.ts"
+    ],
+    "sidebar-subagent-activity": [
+      "sidebar-subagent-activity.e2e.ts"
+    ],
+    "skill-invocation-policy": [
+      "skill-invocation-policy.e2e.ts"
+    ],
+    "skill-load": [
+      "skill-tool-row.e2e.ts"
+    ],
+    "skill-tool-row": [
+      "skill-tool-row.e2e.ts"
+    ],
+    "skill-user-invoke": [
+      "skill-user-invoke.e2e.ts"
+    ],
+    "stats-paged-history": [
+      "stats-paged-history.e2e.ts"
+    ],
+    "steer-all": [
+      "steering.e2e.ts"
+    ],
+    "steering": [
+      "steering.e2e.ts"
+    ],
+    "subagent-conversation": [
+      "subagent-conversation.e2e.ts"
+    ],
+    "subagent-interrupt": [
+      "subagent-interrupt-ui.e2e.ts"
+    ],
+    "todo-row": [
+      "todo-row.snapshot.ts"
+    ],
+    "trajectory-virtualization": [
+      "trajectory-virtualization.e2e.ts"
+    ],
+    "turn-tail-actions": [
+      "turn-tail-actions.e2e.ts"
+    ],
+    "web-runtime-context": [
+      "shipped-composition.e2e.ts",
+      "smoke-real.e2e.ts"
+    ],
+    "web-search-round": [
+      "web-search-round.e2e.ts"
+    ],
+    "workbench": [
+      "workbench.e2e.ts"
+    ],
+    "workflow-run": [
+      "workflow-run.e2e.ts"
+    ],
+    "workspace-files": [
+      "workspace-files.e2e.ts"
+    ],
+    "workspace-history-entry": [
+      "workspace-history-entry.e2e.ts"
+    ],
+    "workspace-management": [
+      "workspace-management.e2e.ts"
+    ]
+  }
+}

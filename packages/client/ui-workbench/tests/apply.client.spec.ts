@@ -1,10 +1,12 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry, createSnapshotStore, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry, NavigationController, createSnapshotStore, workspaceResourceAddress, WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationViewportSnapshot, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '../src/client/apply.ts'
 import type { WorkbenchCatalog, WorkbenchConversation } from '../src/client/catalog.ts'
+import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { apply as nodeApply } from '../src/index.ts'
 
 const A = 'a' as SessionId
@@ -30,16 +32,28 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     deleteWorkbench: vi.fn(),
     switchWorkbench: vi.fn(),
   }
+  const navigation = new NavigationController()
+  ctx.effect(() => () => { navigation.dispose() })
   const sessions = {
+    beginNavigation: () => navigation.begin(),
+    retain: vi.fn(() => ({
+      ready: Promise.resolve({ session: { getSnapshot: () => ({ openState: 'open', openError: null }) } }),
+      release: vi.fn(),
+    })),
     ensureSession: vi.fn(async () => true), createSession: vi.fn(async () => A), setBaseRuntimeTarget: vi.fn(),
     runtimeTargetFor: vi.fn((_id: SessionId) => undefined as { kind: 'project'; projectId: number } | undefined),
     list: { getSnapshot: () => ({ current: A as SessionId | undefined }) },
   }
+  const sidebarRight = { openSessionResource: vi.fn() }
+  const layout = { focusRightbar: vi.fn() }
+  ctx.provide('sidebarRight', sidebarRight as never)
+  ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
+  ctx.provide('layout', layout as never)
   ctx.provide('conversationViewport', viewport as never)
   ctx.provide('sessions', sessions as never)
   ctx.provide('workspaces', {} as never)
   if (services.connection !== undefined) ctx.provide('connection', services.connection as never)
-  if (services.workspaceResources !== undefined) ctx.provide('workspaceResources', services.workspaceResources as never)
+  ctx.provide('workspaceResources', (services.workspaceResources ?? new WorkspaceResourceRegistry()) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   slots.register({ name: 'root', children: {
     'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
@@ -69,7 +83,10 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     filesAvailable(): boolean
     openFiles(): void
   })()
-  return { ctx, slots, fiber, sessions, viewport, snapshot, actions }
+  return {
+    ctx, slots, fiber, sessions, viewport, snapshot, sidebarRight, layout,
+    actions: { ...actions, ...createWorkspacePreviewReaders(services.connection as ConnectionHandle | undefined) },
+  }
 }
 
 describe('workbench navigation lifecycle', () => {
@@ -97,6 +114,25 @@ describe('workbench navigation lifecycle', () => {
       pane.replacePane()
       pane.movePane('next')
       expect(h.viewport.move).toHaveBeenCalledWith(A, 'next')
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['choose', 'create'] as const)('a late %s cannot replace a newer navigation', async (operation) => {
+    const h = await harness()
+    const loading = Promise.withResolvers<boolean>()
+    const creating = Promise.withResolvers<SessionId>()
+    try {
+      h.sessions.ensureSession.mockReturnValue(loading.promise)
+      h.sessions.createSession.mockReturnValue(creating.promise)
+      const pending = operation === 'choose'
+        ? h.actions.chooseSession(item, true)
+        : h.actions.createSession(item.runtime, true)
+      h.sessions.beginNavigation()
+      loading.resolve(true)
+      creating.resolve(A)
+      await expect(pending).resolves.toEqual({ ok: false, reason: 'unknown' })
+      expect(h.viewport.replaceActive).not.toHaveBeenCalled()
+      expect(h.viewport.add).not.toHaveBeenCalled()
     } finally { await h.ctx.fiber.dispose() }
   })
 
@@ -291,6 +327,9 @@ describe('workspace file serving', () => {
     const h = await harness({ connection: conn, workspaceResources: resources })
     try {
       expect(h.ctx.bail('workspace/resource-open', openRequest)).toBe(true)
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledWith(A, openRequest.address, { kind: 'workspace-file' })
+      expect(h.layout.focusRightbar).toHaveBeenCalledWith(A)
+      expect(() =>{  h.actions.openWorkspaceResource({ ...openRequest, runtimeTarget: { kind: 'project', projectId: 9 } }) }).toThrow('runtime no longer owns')
       const pane = (h.slots.entries('conversation.workbench.pane.header')[0]!.inject as unknown as (id: SessionId) => {
         filesAvailable(): boolean
         openFiles(): void

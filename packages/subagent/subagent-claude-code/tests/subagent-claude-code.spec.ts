@@ -23,7 +23,7 @@ import {
   vi,
 } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { type ContentBlock } from '@deepseek-ai/dsh-llm'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type {
   SubprocessHandle,
@@ -336,6 +336,33 @@ afterEach(() => {
   queryMock.mockReset()
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
+})
+
+describe('named persistent member routes', () => {
+  it('keeps default and named routes independent through registration and disposal', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      const first = await ctx.plugin(claudeCode, { providerName: 'claude-code', model: 'first-model' })
+      await ctx.plugin(claudeCode, { providerName: 'claude-code-secondary', model: 'second-model' })
+      const firstRoute = ctx.subagents.getProvider('claude-code')!.agentRouteDefaults!
+      const secondRoute = ctx.subagents.getProvider('claude-code-secondary')!.agentRouteDefaults!
+      expect(firstRoute.provider).not.toBe(secondRoute.provider)
+      expect(firstRoute.model).toBe('first-model')
+      expect(secondRoute.model).toBe('second-model')
+      expect(ctx.llm.listProviders().map(provider => provider.id).sort())
+        .toEqual([firstRoute.provider, secondRoute.provider].sort())
+      await first.dispose()
+      expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual([secondRoute.provider])
+      expect(ctx.subagents.getProvider('claude-code-secondary')!.agentRouteDefaults).toEqual(secondRoute)
+      await ctx.plugin(claudeCode, { providerName: 'claude-code' })
+      expect(ctx.subagents.getProvider('claude-code')!.agentRouteDefaults!.provider).toBe(firstRoute.provider)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
 })
 
 describe('task admission and package contracts', () => {

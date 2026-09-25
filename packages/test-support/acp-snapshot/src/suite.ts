@@ -28,7 +28,7 @@ import {
   type NormalizeContext,
   extractSnapshotSpillPaths,
   normalizeSessionLog,
-  normalizeSessionSnapshot,
+  normalizeSessionSnapshots,
   normalizeStdout,
   scrubRequestHeaders,
   scrubSessionSnapshot,
@@ -1346,12 +1346,16 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         if (comparesLog) {
           // The harvested logs (primary-first) must match their committed fixtures 1:1.
           expect(result.sessionLogs.length, 'this scenario must persist one log per session fixture').toBe(fixtureFiles.length)
-          for (let i = 0; i < fixtureFiles.length; i++) {
-            const harvested = scrub((result.sessionLogs[i] as HarvestedLog).content)
-            const fixture = scrub(await readFile(join(dir, fixtureFiles[i] as string), 'utf8'))
-            expect(normalizeSessionSnapshot(harvested, ctx), `${fixtureFiles[i]} mismatch`)
-              .toEqual(normalizeSessionSnapshot(fixture, fixtureContext(fixture)))
+          const harvested = result.sessionLogs.map(log => scrub(log.content))
+          const fixtures = await Promise.all(fixtureFiles.map(async file => scrub(await readFile(join(dir, file), 'utf8'))))
+          const fixtureContexts = fixtures.map(fixtureContext)
+          const expectedContext: NormalizeContext = {
+            sessionIds: fixtureContexts.flatMap(context => context.sessionIds),
+            cwd: fixtureContexts[0]!.cwd,
+            cwdAliases: fixtureContexts.slice(1).map(context => context.cwd),
           }
+          expect(normalizeSessionSnapshots(harvested, ctx), 'primary and child Session relationships')
+            .toEqual(normalizeSessionSnapshots(fixtures, expectedContext))
         }
 
         // Every live full header must equal its class pin reconstructed from

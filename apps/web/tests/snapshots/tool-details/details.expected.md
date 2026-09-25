@@ -1,0 +1,16 @@
+- tablist:
+  - tab "call_00_OsndvlcKnCcUmae7QXal8633 Close" [selected]:
+    - text: call_00_OsndvlcKnCcUmae7QXal8633
+    - button "Close":
+      - img
+  - button "New tab":
+    - img
+  - button "Fullscreen"
+  - button "Collapse right sidebar":
+    - img
+- text: read
+- button "Close details"
+- text: Input json
+- button "Copy"
+- code: "{ \"file_path\": \"a.txt\" }"
+- text: "Output <path>{{cwd}}/a.txt</path> <type>file</type> <content> 1: alpha (End of file - total 1 lines) </content>"

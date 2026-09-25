@@ -21,6 +21,8 @@ import {
 import { COVERAGE_SCOPED_MODE_ENV, SCOPED_BASE_ENV, SCOPED_PACKAGES_ENV, scopedPackageTestDirs } from './coverage-scoped.ts'
 import { pnpmInvocation } from './pnpm-invocation.ts'
 import { writeGateEvidence } from './gate-evidence.ts'
+import { createWebSnapshotPlan } from './run-web-snapshots.ts'
+import { loadWebTestPolicy } from './web-test-policy.ts'
 
 /** A named aggregate exposed by the gate runner. */
 export type Mode =
@@ -217,11 +219,11 @@ function pnpmScript(id: string, script: string, options: Partial<Gate> = {}): Ga
   }
 }
 
-/** Build official client artifacts inside a CI aggregate without changing sibling gate environments. */
+/** Build CoHarness client artifacts inside a CI aggregate without changing sibling gate environments. */
 function ciBuildGate(id = 'build', options: Partial<Gate> = {}): Gate {
   return pnpmScript(id, 'build', {
     ...options,
-    env: { ...options.env, [CLIENT_BUILD_PROFILE_SELECTOR]: 'official' },
+    env: { ...options.env, [CLIENT_BUILD_PROFILE_SELECTOR]: 'coharness' },
   })
 }
 
@@ -247,7 +249,7 @@ export function gatesForMode(selected: Mode): Gate[] {
     case 'ci-linux-primary':
       // The HMR web test rewrites the shared `lib/` and `apps/web/dist/`
       // trees; let every built-artifact reader in this mode settle first.
-      return [...ciPrimaryGates(), webSnapshotGate(['built-package-invariants'], [
+      return [webFixturesGate(), ...ciPrimaryGates(), adminBuildGate(['build']), webSnapshotGate(['built-package-invariants', 'web-fixtures', 'admin-build'], [
         'publint',
         'snapshot',
         'doc-typecheck',
@@ -291,7 +293,7 @@ export function gatesForMode(selected: Mode): Gate[] {
       // and the CI platform matrix, which the hosted lanes own. `test` runs
       // the suite; per-file coverage thresholds stay a `test:coverage` gate.
       return [
-        lintGate(),
+        lintGate({ needs: ['build'] }),
         ...staticPolicyGates(),
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
@@ -519,6 +521,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     'built-bin-smoke',
   ]
   return [
+    ...options.includeWebSnapshot === false ? [] : [webFixturesGate()],
     ...pluginTestGates(),
     ciBuildGate(),
     pnpmScript('node-compat', 'check:node-compat', {
@@ -529,7 +532,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
       // prevents a second typecheck/build from writing lib/ concurrently with
       // the browser, built-bin, and documentation consumers.
       env: {
-        [CLIENT_BUILD_PROFILE_SELECTOR]: 'official',
+        [CLIENT_BUILD_PROFILE_SELECTOR]: 'coharness',
         DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
         DSH_NODE_COMPAT_USE_BUILD_OUTPUT: '1',
       },
@@ -543,7 +546,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     snapshotGate(validatedBuild),
     ...options.includeWebSnapshot === false
       ? []
-      : [webSnapshotGate(validatedBuild, buildArtifactReaders)],
+      : [adminBuildGate(validatedBuild), webSnapshotGate([...validatedBuild, 'web-fixtures', 'admin-build'], buildArtifactReaders)],
     pnpmScript('doc-typecheck', 'doc-typecheck:contracts-ready', {
       needs: validatedBuild,
       env: { DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
@@ -580,26 +583,38 @@ function webSnapshotGate(needs: string[], after?: string[]): Gate {
   })
 }
 
-/**
- * The dedicated web verification aggregates behind the `web-verification` CI
- * lane: the complete build, which includes the web bundle and the client
- * build record, then either the complete browser inventory or the focused
- * selection read from `DSH_WEB_GROUPS` by the runner.
- * @param focused - Whether the aggregate narrows to the policy-selected groups.
- * @returns The aggregate's gate graph.
- */
+function adminBuildGate(needs: string[]): Gate {
+  return pnpmScript('admin-build', 'build:admin', { label: 'Admin browser build', needs })
+}
+
+function webFixturesGate(focused = false): Gate {
+  return pnpmExec('web-fixtures', [
+    'tsx', 'scripts/verify-web-fixtures.ts', ...focused ? ['--focused'] : [],
+  ], { label: 'browser fixture admission' })
+}
+
+/** Browser-only builds require admitted fixtures; shared consumer builds remain independent. */
 function ciWebGates(focused: boolean): Gate[] {
+  const selected = focused && (process.env.DSH_WEB_GROUPS || process.env.DSH_WEB_SCENARIOS)
+    ? createWebSnapshotPlan(resolve(import.meta.dirname, '..'), ['--focused']).scenarios : []
+  const policy = selected.length === 0 ? undefined : loadWebTestPolicy(resolve(import.meta.dirname, '..'))
+  const adminScenarios = new Set(Object.entries(policy?.sharedInputs ?? {})
+    .filter(([path]) => path.startsWith('gateway/admin-ui/')).flatMap(([, owners]) => owners))
+  const admin = !focused || selected.some(scenario => adminScenarios.has(scenario))
+  const browserNeeds = admin ? ['build', 'admin-build'] : ['build']
   return [
-    ciBuildGate(),
+    webFixturesGate(focused),
+    ciBuildGate('build', { needs: ['web-fixtures'] }),
+    ...admin ? [adminBuildGate(['build'])] : [],
     focused
       ? pnpmScript('web-snapshot-focused', 'test:web:focused', {
         label: 'web browser snapshot (focused)',
         displayCommand: 'DSH_SNAPSHOT=replay pnpm run test:web:focused',
         env: { DSH_SNAPSHOT: 'replay' },
-        needs: ['build'],
+        needs: browserNeeds,
         streamOutput: true,
       })
-      : webSnapshotGate(['build']),
+      : webSnapshotGate(browserNeeds),
   ]
 }
 
@@ -912,6 +927,7 @@ function builtBinSmokeGate(needs: string[] = ['build']): Gate {
     'vitest.e2e.config.ts',
     'apps/cli/tests/profiles/headless/tests/keyless-smoke.e2e.ts',
     'apps/cli/tests/built-bin.e2e.ts',
+    'apps/cli/tests/profiles/web/tests/web-default-isolation.expected.e2e.ts',
     'packages/host/directory-picker-native/tests/built-worker.e2e.ts',
     'packages/sdk/server/tests/built-scope-carrier.e2e.ts',
     'packages/deliverables/tool-present/tests/built-errors.e2e.ts',

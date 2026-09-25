@@ -30,7 +30,7 @@ Status: implemented
 
 `tests/remote.spec.ts` 断言无关抛出包装为 `gateway/internal`、无根名册抛空 id `PresetNotWritableError`、仅 command/plugin 活动的会话可切换。`tests/mount.spec.ts` 断言 `nested-broken` 组夹具下 `PresetMountError` 携带展平成员行。
 
-名册 API 不含 `includeShippedRoot`、`modeSelectionEnabled`、`authorable` 标志；shipped root 由 `profile-boot` derived patch 承接（见[派生 shipped preset 根](2026-08-29-derived-shipped-preset-root.zh.md)），模式选择属云端产品不在此 remote 暴露的面。
+名册 API 不含 `includeShippedRoot` 标志；shipped root 由 `profile-boot` derived patch 承接（见[派生 shipped preset 根](2026-08-29-derived-shipped-preset-root.zh.md)）。远程名册会报告调用方维度的 `authorable` 提示与 `modeSelectionEnabled` 策略标志——只读事实，写入仍落在 `agent-presets` settings 命名空间（见[选择器可见性策略 note](../feature/2026-09-25-agent-preset-picker-visibility-policy.zh.md)）。
 
 ## 验证
 

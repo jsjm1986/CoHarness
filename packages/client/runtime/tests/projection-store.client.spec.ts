@@ -7,7 +7,7 @@
  * seeding, session/projection frame routing pre- and post-instantiation, the
  * list rows' title projection).
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { ProjectionValueStore } from '../src/client/sessions/projection-store.ts'
 import { Session } from '../src/client/sessions/session.ts'
@@ -24,6 +24,8 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 }
 
 const SID = 'fk-s1' as SessionId
+
+afterEach(() => { vi.unstubAllGlobals() })
 
 describe('ProjectionValueStore semantics', () => {
   it('reads undefined until a value lands (capability absence)', () => {
@@ -79,6 +81,30 @@ describe('ProjectionValueStore semantics', () => {
     expect(anyTicks).toBe(1)
     store.apply('test/marks', { marks: ['replay'] }, 3)
     await Promise.resolve()
+    expect(keyTicks).toBe(1)
+    expect(anyTicks).toBe(1)
+  })
+
+  it('publishes face and any-key notifications on the animation-frame channel', () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const store = new ProjectionValueStore()
+    let keyTicks = 0
+    let anyTicks = 0
+    store.faceOf('test/marks').subscribe(() => { keyTicks += 1 })
+    store.subscribeAny(() => { anyTicks += 1 })
+    store.apply('test/marks', { marks: ['a'] }, 5)
+    store.apply('test/marks', { marks: ['a', 'b'] }, 6)
+    // Stream-cadence: both applications coalesce into one frame publication
+    // per notifier (the per-key channel and the any-key channel are separate
+    // batched notifiers, so two frame callbacks queue).
+    expect(keyTicks).toBe(0)
+    expect(anyTicks).toBe(0)
+    expect(frames).toHaveLength(2)
+    for (const frame of frames.splice(0)) frame(0)
     expect(keyTicks).toBe(1)
     expect(anyTicks).toBe(1)
   })

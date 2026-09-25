@@ -36,6 +36,7 @@ lines.on('line', (line) => {
       break
     case 'tools/call':
       record('call', { name: request.params.name, arguments: request.params.arguments })
+      if (mode === 'pending') return
       result = request.params.name === 'screenshot'
         ? { content: [{ type: 'text', text: `Display ${request.params.arguments.display}` }, { type: 'image', mimeType: 'image/png', data: png }], structuredContent: { display: request.params.arguments.display } }
         : { content: [{ type: 'text', text: 'Disconnected.' }] }

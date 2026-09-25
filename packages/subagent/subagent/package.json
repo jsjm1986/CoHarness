@@ -22,6 +22,10 @@
       "types": "./lib/types/internal.d.ts",
       "default": "./lib/types/internal.js"
     },
+    "./external": {
+      "types": "./lib/types/external.d.ts",
+      "default": "./lib/types/external.js"
+    },
     "./invariant": {
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"

@@ -18,6 +18,8 @@ This decision supersedes the ACP-specific placement and controller ownership in 
 
 The recorded session remains the primary input and, for current-generation scenarios, the expected output. Human-originated messages drive the selected public interface, recorded assistant chunks drive deterministic model replay, and the normalized persisted result must equal the fixture. Parent and child sessions share one typed redaction map. Committed fixtures contain relationship-preserving identity tokens and replace request system prompts and tool schemas with tokens; each distinct header class retains one explicit sidecar owner.
 
+Empty durable system messages remain empty; only nonempty content becomes a prompt token. Redaction cannot manufacture model input or merge distinct request identities. Web fixture admission accepts both legacy single-request tokens and indexed RPC tokens, while rejecting run-local request IDs.
+
 Fixture decoding and comparison depend only on the selected JSONL content; filenames identify inventory roles but are not parser inputs. The same strict static catalog validates replay, seed, record, refresh, and normalized comparison paths.
 
 Headless stderr reconstruction expands embedded reasoning from both `assistant/message` and log-only `assistant/attempt` settlements, so failed or retried reasoning remains part of the projected process output.

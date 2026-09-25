@@ -1,8 +1,11 @@
+import { TerminalManagementError } from '../src/terminal-management.ts'
+import { WebhookReceiptError } from '../src/postgres/webhook-delivery-service.ts'
+import { DesktopAccessError } from '../src/desktop-access.ts'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { AuditService } from '../src/audit.ts'
 import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
@@ -107,6 +110,59 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('restricts bounded webhook delivery diagnostics to authenticated administrators', async () => {
+    const { deps, base, cookie } = await setup()
+    const url = `${base}/admin/api/webhook-deliveries?endpointId=70ee10ba-3cb9-4e4f-91dd-03606a5527cb&limit=10`
+    expect((await fetch(url, { headers: { cookie } })).status).toBe(503)
+    const list = vi.fn(async () => ({ items: [], nextCursor: null }))
+    deps.webhookDeliveries = { list }
+    const member = await login(base, 'worker', 'pw-12345678')
+    expect((await fetch(url, { headers: { cookie: member } })).status).toBe(403)
+    expect(list).not.toHaveBeenCalled()
+    const response = await fetch(url, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ items: [], nextCursor: null })
+    expect(list).toHaveBeenCalledWith('70ee10ba-3cb9-4e4f-91dd-03606a5527cb', undefined, 10)
+    list.mockRejectedValueOnce(new WebhookReceiptError(400, 'invalid webhook receipt query'))
+    expect((await fetch(`${url}&cursor=invalid`, { headers: { cookie } })).status).toBe(400)
+  })
+
+  it('restricts terminal metadata and generation-bound cleanup to administrators', async () => {
+    const { deps, base, cookie, admin, member } = await setup()
+    const target = { kind: 'user' as const, id: member.id }
+    const entry = { nodeId: 'node-a', generation: 3, ownerId: 'b0e81aa9-219c-44d6-8d42-af333c722db6', id: 'terminal-1' }
+    const list = vi.fn(async () => ({ nodeId: entry.nodeId, target, generation: 3, terminals: [] }))
+    const close = vi.fn(async () => {})
+    deps.terminalManagement = { list, close }
+    const url = `${base}/admin/api/terminals?kind=user&id=${member.id}`
+    const worker = await login(base, 'worker', 'pw-12345678')
+    expect((await fetch(url, { headers: { cookie: worker } })).status).toBe(403)
+    const request = (auth = cookie, origin = base) => fetch(`${base}/admin/api/terminals/close`, {
+      method: 'POST', headers: { cookie: auth, origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: target.kind, targetId: target.id, ...entry }),
+    })
+    expect((await request(worker)).status).toBe(403)
+    expect((await request(cookie, 'https://foreign.invalid')).status).toBe(403)
+    expect(list).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+    const response = await fetch(url, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ nodeId: 'node-a', target, generation: 3, terminals: [] })
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ id: admin.id }), target)
+    close.mockRejectedValueOnce(new TerminalManagementError(409, 'terminal runtime changed; reload inventory'))
+    expect((await request()).status).toBe(409)
+    expect(await deps.audit.query({ action: 'admin.terminals.close' })).toEqual([])
+    expect((await request()).status).toBe(200)
+    expect(close).toHaveBeenLastCalledWith(expect.objectContaining({ id: admin.id }), target, entry)
+    const audit = await deps.audit.query({ action: 'admin.terminals.close' })
+    expect(audit).toHaveLength(1)
+    expect(JSON.parse(audit[0]!.detail)).toEqual({ target, ...entry })
+    expect((await fetch(`${base}/admin/api/terminals?kind=unknown&id=1`, { headers: { cookie } })).status).toBe(400)
+    delete deps.terminalManagement
+    expect((await fetch(url, { headers: { cookie } })).status).toBe(503)
+    expect((await request()).status).toBe(503)
+  })
+
   it('validates Auto eligibility as a strict boolean before changing any user field', async () => {
     const { deps, base, cookie, member, invalidated } = await setup()
     for (const autoReviewEligible of [null, 0, 1, 'true', [], {}]) {
@@ -601,6 +657,36 @@ describe('admin JSON API', () => {
 })
 
 describe('admin desktop coordination API', () => {
+  it.each(['desktop', 'terminal'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
+    const { base, cookie, deps } = await setup()
+    const get = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: false, revision: '0' }))
+    const set = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: true, revision: '1' }))
+    deps[`${resource}Access`] = { get, set }
+    const worker = await login(base, 'worker', 'pw-12345678')
+    const url = `${base}/admin/api/${resource}s/permissions`
+    expect((await fetch(`${url}?kind=user&id=1`, { headers: { cookie: worker } })).status).toBe(403)
+    expect((await fetch(url, { method: 'POST', headers: { cookie: worker, origin: base }, body: '{}' })).status).toBe(403)
+    expect((await fetch(url, { method: 'POST', headers: { cookie, origin: 'https://untrusted.example' }, body: '{}' })).status).toBe(403)
+    expect(get).not.toHaveBeenCalled()
+    expect(set).not.toHaveBeenCalled()
+    const read = await fetch(`${url}?kind=user&id=1`, { headers: { cookie } })
+    expect(read.status).toBe(200)
+    expect(await read.json()).toMatchObject({ enabled: false, revision: '0' })
+    const saved = await fetch(url, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'user', id: 1, enabled: true, revision: '0' }),
+    })
+    expect(saved.status).toBe(200)
+    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 1 }, true, '0')
+    expect(await deps.audit.query({ action: `admin.${resource}s.permission` })).toHaveLength(1)
+    set.mockRejectedValueOnce(new DesktopAccessError(409, 'desktop policy changed'))
+    const stale = await fetch(url, { method: 'POST', headers: { cookie, origin: base }, body: JSON.stringify({ kind: 'user', id: 1, enabled: false, revision: '0' }) })
+    expect(stale.status).toBe(409)
+    expect((await fetch(`${url}?kind=all&id=1`, { headers: { cookie } })).status).toBe(400)
+    delete deps[`${resource}Access`]
+    expect((await fetch(`${url}?kind=user&id=1`, { headers: { cookie } })).status).toBe(503)
+  })
+
   it('lists resources and returns a resource snapshot for administrators', async () => {
     const { base, cookie, desktops } = await setup(undefined, undefined, true)
     const acquired = await desktops!.acquire(desktopClaims(), { node: 'node-a', desktop: 'seat-1', requestId: 'r1' })
@@ -671,4 +757,28 @@ describe('admin desktop coordination API', () => {
     const list = await fetch(`${base}/admin/api/desktops`, { headers: { cookie } })
     expect(list.status).toBe(503)
   })
+})
+
+it('admin plugin routes preserve target identity, stream bytes and deny ordinary users', async () => {
+  const { deps, base, cookie } = await setup()
+  const binding = { nodeId: 'node', target: { kind: 'user' as const, id: 3 }, generation: 7 }
+  const invocation = { ...binding, endpoint: 'pluginManager/installBundleStream', rpcId: '00000000-0000-4000-8000-000000000077', args: {} }
+  const target = vi.fn(async () => binding)
+  const bytes = new TextEncoder().encode(JSON.stringify({ rpcId: invocation.rpcId, type: 'end' }) + '\n')
+  const invoked: unknown[] = []
+  deps.pluginManagement = { target, async *invoke(admin, input, signal) {
+    expect(admin.role).toBe('admin'); expect(signal.aborted).toBe(false); invoked.push(input)
+    yield bytes
+  } }
+  const bound = await fetch(`${base}/admin/api/plugins/target?kind=user&id=3`, { headers: { cookie } })
+  expect(await bound.json()).toEqual(binding)
+  const response = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })
+  expect(response.status).toBe(200)
+  expect(response.headers.get('content-type')).toBe('application/x-ndjson')
+  expect(await response.text()).toBe(new TextDecoder().decode(bytes))
+  expect(invoked).toEqual([invocation])
+  const memberCookie = await login(base, 'worker', 'pw-12345678')
+  const denied = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie: memberCookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })
+  expect(denied.status).toBe(403)
+  expect(invoked).toHaveLength(1)
 })

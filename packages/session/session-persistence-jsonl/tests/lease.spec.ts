@@ -447,47 +447,32 @@ describe('cross-process write lock', () => {
     await mkdir(dir, { recursive: true })
     const lock = join(dir, LOCK)
     const acquire = () => SessionWriteLease.acquire(dir, SessionId('legacy'))
-    // An unexpected success must still release the lease it took, or every
-    // later assertion in this test contends against the leaked holder.
-    const expectOwned = async (): Promise<void> => {
-      const lease = await acquire().catch((error: unknown) => error)
-      if (lease instanceof SessionWriteLease) {
-        await lease.release()
-        throw new Error('expected SessionAlreadyOwnedError, acquire succeeded')
-      }
-      expect(lease).toBeInstanceOf(SessionAlreadyOwnedError)
-    }
-    // Legacy pid-record arbitration is a POSIX path: the Windows native lock
-    // handles contention without reading pid records, so the liveness cases
-    // only bind where `process.kill(pid, 0)` probes are the mechanism.
-    if (process.platform !== 'win32') {
-      const kill = vi.spyOn(process, 'kill')
-      try {
-        // A live foreign pid record means a legacy writer still owns the lock.
-        await writeFile(lock, JSON.stringify({ pid: process.ppid }))
-        await expectOwned()
+    const kill = vi.spyOn(process, 'kill')
+    try {
+      // A live foreign pid record means a legacy writer still owns the lock.
+      await writeFile(lock, JSON.stringify({ pid: process.ppid }))
+      await expect(acquire()).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
 
-        // EPERM still means live: the holder is another user's process.
-        kill.mockImplementation(() => {
-          throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
-        })
-        await writeFile(lock, JSON.stringify({ pid: 424242 }))
-        await expectOwned()
+      // EPERM still means live: the holder is another user's process.
+      kill.mockImplementation(() => {
+        throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+      })
+      await writeFile(lock, JSON.stringify({ pid: 424242 }))
+      await expect(acquire()).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
 
-        // A dead recorded pid is residue, not ownership.
-        kill.mockImplementation(() => {
-          throw Object.assign(new Error('no such process'), { code: 'ESRCH' })
-        })
-        await writeFile(lock, JSON.stringify({ pid: 424242 }))
-        await (await acquire()).release()
-      } finally {
-        kill.mockRestore()
-      }
-
-      // The holder's own published pid record is residue after release.
-      await writeFile(lock, JSON.stringify({ pid: process.pid }))
+      // A dead recorded pid is residue, not ownership.
+      kill.mockImplementation(() => {
+        throw Object.assign(new Error('no such process'), { code: 'ESRCH' })
+      })
+      await writeFile(lock, JSON.stringify({ pid: 424242 }))
       await (await acquire()).release()
+    } finally {
+      kill.mockRestore()
     }
+
+    // The holder's own published pid record is residue after release.
+    await writeFile(lock, JSON.stringify({ pid: process.pid }))
+    await (await acquire()).release()
 
     // An unreadable record degrades to kernel-lock arbitration.
     refuse.lockRead = true

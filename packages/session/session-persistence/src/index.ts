@@ -89,6 +89,8 @@ export interface SessionDraftReservationRequest {
   readonly cwd: string
   readonly visibility?: 'personal' | 'project' | 'private'
   readonly agentPreset?: string
+  /** Managed SSH target bound at creation; part of the reservation's scope identity. */
+  readonly sshTarget?: number
 }
 
 /** Canonical identity returned by a draft reservation provider. */

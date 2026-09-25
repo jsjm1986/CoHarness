@@ -8,16 +8,12 @@
 name: Release (vendor)
 
 on:
-  pull_request:
-    paths:
-      - 'vendor/**'
-      - 'scripts/release/**'
-      - 'scripts/rescope-vendor.ts'
-      - '.github/workflows/release-vendor.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig*.json'
+  workflow_call:
+    inputs:
+      required_proof:
+        description: Verify packed vendored installation only; this interface cannot publish.
+        type: boolean
+        default: false
   push:
     branches: [master]
     paths:
@@ -48,7 +44,7 @@ permissions:
 concurrency:
   # A newer commit supersedes an in-flight pull-request pack. Pushes and manual
   # publication runs remain serialized and are never cancelled.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release-vendor-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -126,7 +122,7 @@ jobs:
           DSH_GATE_REPORT_DIR: .artifacts/gates
           DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-vendor-pack-${{ github.run_attempt }}
           DSH_EVIDENCE_JOB_NAME: Pack npm tarballs
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
           DSH_GATE_ARTIFACT_GLOBS: '["dist/npm-vendor/*.tgz"]'
         with:
           external: npm-pack
@@ -142,7 +138,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    if: inputs.publish
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && !inputs.required_proof
     needs: pack
     runs-on: ubuntu-24.04
     environment: npm-publish

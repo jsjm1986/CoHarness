@@ -87,6 +87,7 @@ function snapshotItem(item: MessageFeedbackItem): MessageFeedbackItem {
     messageId: item.messageId,
     rating: item.rating,
     ...(item.note === undefined ? {} : { note: item.note }),
+    ...(item.category === undefined ? {} : { category: item.category }),
     version: item.version,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -255,7 +256,8 @@ export class MessageFeedbackService extends TypertRemoteService {
       }
       if (existing !== undefined
         && existing.rating === request.rating
-        && existing.note === note.value) {
+        && existing.note === note.value
+        && existing.category === request.category) {
         return success(snapshotItem(existing))
       }
 
@@ -264,6 +266,7 @@ export class MessageFeedbackService extends TypertRemoteService {
         messageId: request.messageId,
         rating: request.rating,
         ...(note.value === undefined ? {} : { note: note.value }),
+        ...(request.category === undefined ? {} : { category: request.category }),
         version: nextVersion(),
         createdAt: existing?.createdAt ?? now,
         updatedAt: existing === undefined ? now : Math.max(now, existing.updatedAt),

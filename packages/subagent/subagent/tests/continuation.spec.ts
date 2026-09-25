@@ -278,6 +278,9 @@ describe('continuable activation capacity', () => {
     try {
       await ctx.plugin(MemorySettings)
       const fiber = await ctx.plugin(SubagentRuntime, { maxDepth: 4 })
+      expect(ctx.settings.describe().find(section => section.ns === SUBAGENT_SETTINGS_NAMESPACE)).toMatchObject({
+        owner: 'project', projectWrite: 'manager', projectWritePaths: [['maxDepth'], ['maxActiveSubagents']],
+      })
       expect(ctx.subagents.resolveMaxDepth()).toBe(4)
       await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 0 })
       expect(ctx.subagents.resolveMaxDepth()).toBe(0)

@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - img
 - text: plan Plan mode on. Use /plan off to leave.
 - button "1 tool call · 2 intermediate messages":

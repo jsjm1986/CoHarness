@@ -91,8 +91,19 @@ export interface ProjectConfiguration {
     runtimeSettings: boolean
     projectModels: boolean
     members: boolean
+    sshTargets: boolean
     filesystem: false
   }
+}
+
+/** One organization SSH target with its share state toward the viewed project. */
+export interface ProjectSshTarget {
+  publicId: number
+  name: string
+  host: string
+  workspace: string
+  enabled: boolean
+  shared: boolean
 }
 
 /** One user who has contributed to a shared root conversation. */
@@ -164,6 +175,15 @@ export interface CollaborationTransport {
   setProjectThemePolicy?: (projectId: number, policy: ProjectThemePolicy, signal: AbortSignal) => Promise<ProjectConfiguration>
   /** Gateway-owned project Provider settings; available to project managers. */
   projectModels?: ProjectModelSettingsTransport
+  /** Organization SSH targets with this project's share flags; project managers only. */
+  listProjectSshTargets?: (projectId: number, signal: AbortSignal) => Promise<ProjectSshTarget[]>
+  /** Share or unshare one organization SSH target with the project; project managers only. */
+  shareProjectSshTarget?: (
+    projectId: number,
+    targetId: number,
+    shared: boolean,
+    signal: AbortSignal,
+  ) => Promise<{ publicId: number; name: string; shared: boolean }>
   /** Optional account project-management operations. */
   createProject?: (name: string, signal: AbortSignal) => Promise<{ projectId: number }>
   listInvitations?: (projectId: number | undefined, signal: AbortSignal) => Promise<ProjectInvitation[]>
@@ -327,7 +347,8 @@ export function parseProjectConfiguration(value: unknown): ProjectConfiguration 
     || typeof capabilities.themePolicy !== 'boolean'
     || typeof capabilities.runtimeSettings !== 'boolean'
     || typeof capabilities.projectModels !== 'boolean'
-    || typeof capabilities.members !== 'boolean') {
+    || typeof capabilities.members !== 'boolean'
+    || typeof capabilities.sshTargets !== 'boolean') {
     throw new Error('invalid project configuration response')
   }
   const origin = projectValue.origin
@@ -349,9 +370,30 @@ export function parseProjectConfiguration(value: unknown): ProjectConfiguration 
       runtimeSettings: capabilities.runtimeSettings,
       projectModels: capabilities.projectModels,
       members: capabilities.members,
+      sshTargets: capabilities.sshTargets,
       filesystem: false,
     },
   }
+}
+
+/** Decode the project SSH target list at the browser trust boundary.
+ * @param value - untrusted JSON response.
+ * @returns the validated project-scoped target rows.
+ */
+export function parseProjectSshTargets(value: unknown): ProjectSshTarget[] {
+  const root = object(value)
+  if (!Array.isArray(root.targets)) throw new Error('invalid ssh target response')
+  return root.targets.map((row: unknown) => {
+    const target = object(row)
+    return {
+      publicId: integer(target.publicId),
+      name: string(target.name),
+      host: string(target.host),
+      workspace: string(target.workspace),
+      enabled: target.enabled === true,
+      shared: target.shared === true,
+    }
+  })
 }
 
 function participant(value: unknown): ConversationParticipant {
@@ -476,6 +518,24 @@ export function createBrowserCollaborationTransport(options: {
       parseProjectConfiguration,
     ),
     ...(projectModels === undefined ? {} : { projectModels }),
+    listProjectSshTargets: (projectId, signal) => jsonRequest(
+      fetcher,
+      `/account/api/projects/${String(projectId)}/ssh-targets`,
+      { signal },
+      parseProjectSshTargets,
+    ),
+    shareProjectSshTarget: (projectId, targetId, shared, signal) => jsonRequest(
+      fetcher,
+      `/account/api/projects/${String(projectId)}/ssh-targets`,
+      {
+        method: 'POST', signal, headers: jsonHeaders,
+        body: JSON.stringify({ targetId, shared }),
+      },
+      (value) => {
+        const target = object(value)
+        return { publicId: integer(target.publicId), name: string(target.name), shared: target.shared === true }
+      },
+    ),
     createProject: (name, signal) => jsonRequest(
       fetcher, '/account/api/projects', {
         method: 'POST', signal, headers: jsonHeaders, body: JSON.stringify({ name }),
@@ -785,6 +845,34 @@ export class CollaborationClient {
     const value = await operation(projectId, policy, this.abortController.signal)
     await this.load(true)
     return value
+  }
+
+  /** List the organization SSH targets with this project's share flags.
+   * @param projectId - public project id.
+   * @returns the project-scoped target rows.
+   */
+  listProjectSshTargets(projectId: number): Promise<ProjectSshTarget[]> {
+    if (this.disposed) return Promise.reject(new CollaborationRequestError(499, 'client-disposed'))
+    const operation = this.transport.listProjectSshTargets
+    if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'ssh-targets-unavailable'))
+    return operation(projectId, this.abortController.signal)
+  }
+
+  /** Share or unshare one organization SSH target with the project.
+   * @param projectId - public project id.
+   * @param targetId - public target id.
+   * @param shared - the share direction to write.
+   * @returns the updated target row.
+   */
+  shareProjectSshTarget(
+    projectId: number,
+    targetId: number,
+    shared: boolean,
+  ): Promise<{ publicId: number; name: string; shared: boolean }> {
+    if (this.disposed) return Promise.reject(new CollaborationRequestError(499, 'client-disposed'))
+    const operation = this.transport.shareProjectSshTarget
+    if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'ssh-targets-unavailable'))
+    return operation(projectId, targetId, shared, this.abortController.signal)
   }
 
   /**

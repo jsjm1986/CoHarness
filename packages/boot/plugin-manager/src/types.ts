@@ -187,6 +187,12 @@ export interface PluginInstallLogChunk {
   readonly exitCode?: number | null
 }
 
+/** One installation's private stream; the final result follows all retained diagnostics. */
+export type PluginInstallFrame =
+  | { readonly type: 'progress'; readonly progress: PluginInstallProgress }
+  | { readonly type: 'log'; readonly chunk: PluginInstallLogChunk }
+  | { readonly type: 'result'; readonly value: ChangeResult }
+
 /** What changed in the profile, for consumers that show it. */
 export interface PluginChange {
   /** The operation that changed it. */

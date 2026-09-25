@@ -353,15 +353,15 @@ export class TeamRoster {
         )
       }
 
-      const progress = Promise.withResolvers<void>()
+      const progress = Promise.withResolvers<undefined>()
       // Abort can win while the durability flush is still pending; mark the
       // later-awaited rejection handled without changing its eventual result.
       void progress.promise.catch(() => undefined)
       const stopEvent = this.ctx.on('session/event', (candidate) => {
-        if (candidate === session) progress.resolve()
+        if (candidate === session) progress.resolve(undefined)
       })
       const stopDisposed = this.ctx.on('session/disposed', (candidate) => {
-        if (candidate === session) progress.resolve()
+        if (candidate === session) progress.resolve(undefined)
       })
       const onAbort = (): void => {
         const reason: unknown = signal.reason

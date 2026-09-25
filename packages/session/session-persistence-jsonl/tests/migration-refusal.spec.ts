@@ -174,7 +174,7 @@ describe.each(modes)('EOF migration refusal ($compression, $access)', ({ compres
     const ctx = await mount(compression)
     const reader = await ctx.sessionPersistence.open(id, 'read')
     try {
-      expect(reader.header.version).toBe(5)
+      expect(reader.header.version).toBe(6)
       const restored = await reader.read()
       expect(restored.events.map(event => event.type)).toEqual([
         'turn/start', 'step/start', 'system/message', 'user/message', 'system/message', 'request/header',

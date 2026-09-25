@@ -6,7 +6,7 @@ npm scope: `@deepseek-ai/dsh-*`; Cordis `Service` subclasses and function plugin
 
 ## Summary
 
-The harness is assembled from `packages/` capability groups. Use this page as the top-level map to each group's package list.
+The harness comprises `packages/` capability groups. Each group README lists its packages.
 
 ## Hierarchy
 
@@ -51,6 +51,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable API |
 | [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable API |
 | [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form | Product — stable API |
+| [`webhook/`](webhook/README.md) | Authenticated event rules and Session creation | Product — optional ingress |
 | [`workspace/`](workspace/README.md) | Workspace entity | Product — stable API |
 | [`sdk/`](sdk/README.md) | Out-of-process runtime SDK: JSON-RPC protocol, TypeScript client, and server plugin | Product — stable API |
 | [`acp/`](acp/README.md) | Automation-only Agent Client Protocol server | Product — stable API |

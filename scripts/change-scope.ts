@@ -9,7 +9,8 @@ const FORMAT_VERSION = 1
 const MAX_GIT_OUTPUT = 64 * 1024 * 1024
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true })
 
-interface ChangeScopeReport {
+/** Committed changes and each independent dirty layer relative to explicit Git objects. */
+export interface ChangeScopeReport {
   formatVersion: typeof FORMAT_VERSION
   repositoryRoot: string
   input: {
@@ -231,9 +232,18 @@ function collectReport(options: ChangeScopeOptions, cwd: string): ChangeScopeRep
  * @returns JSON report with a trailing newline.
  */
 export function renderChangeScope(args: string[], cwd: string): string {
-  const options = parseOptions(args)
-  const report = collectReport(options, cwd)
+  const report = readChangeScope(args, cwd)
   return `${JSON.stringify(report, null, 2)}\n`
+}
+
+/**
+ * Collect the same read-only scope used by the CLI without serializing it.
+ * @param args - Explicit --base and optional --head arguments.
+ * @param cwd - Directory whose containing Git worktree is inspected.
+ * @returns Resolved Git identities and separate committed, index, and worktree paths.
+ */
+export function readChangeScope(args: string[], cwd: string): ChangeScopeReport {
+  return collectReport(parseOptions(args), cwd)
 }
 
 const entryPath = process.argv[1]

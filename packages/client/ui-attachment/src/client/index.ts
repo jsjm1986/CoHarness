@@ -17,4 +17,10 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.message.images',
     locale: 'conversation',
   }, MessageImages))
+  // The details panel's sibling seat renders the same gallery for a read_image
+  // tool result; slot names are global, so it cannot reuse the chat slot name.
+  ctx.slots.inject('conversation.details.images', () => ctx.slots.register({
+    name: 'conversation.details.images',
+    locale: 'conversation',
+  }, MessageImages))
 }

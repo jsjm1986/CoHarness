@@ -196,7 +196,7 @@ describe('TerminalBlock states', () => {
 })
 
 describe('TerminalBlock status pill', () => {
-  it('distinguishes an explicitly unknown settled exit from an omitted status or exit zero', () => {
+  it('renders the no-exit-code pill for an explicitly unknown settled exit', () => {
     const view = render(<TerminalBlock command="terminated" output="partial" exitCode={null} />)
     expect(view.getByText('无退出码')).toBeTruthy()
     expect(view.queryByText('退出码 null')).toBeNull()
@@ -211,8 +211,13 @@ describe('TerminalBlock status pill', () => {
     expect(view.queryByText(/退出码|信号/u)).toBeNull()
   })
 
-  it('renders no pill while the exit status is unknown', () => {
+  it('renders the no-exit-code pill when a settled command reported no status', () => {
     const view = render(<TerminalBlock command="ls" output="a" />)
+    expect(view.getByText('无退出码')).toBeTruthy()
+  })
+
+  it('renders no status pill while the command still runs', () => {
+    const view = render(<TerminalBlock command="sleep 5" running />)
     expect(view.queryByText(/退出码|信号/u)).toBeNull()
   })
 
@@ -239,9 +244,9 @@ describe('TerminalBlock run-state dot', () => {
     expect(runStateOf(view.container)).toEqual({ state: 'done', label: '已完成' })
   })
 
-  it('counts a settled command with no exit status as a clean settle', () => {
+  it('shows the error dot for a settled command whose exit status never arrived', () => {
     const view = render(<TerminalBlock command="ls" output="a" />)
-    expect(runStateOf(view.container)).toEqual({ state: 'done', label: '已完成' })
+    expect(runStateOf(view.container)).toEqual({ state: 'error', label: '失败' })
   })
 
   it('shows the error dot for a non-zero exit', () => {
@@ -369,7 +374,7 @@ describe('TerminalBlock copy', () => {
     // While the ok label is showing, further clicks are no-ops.
     fireEvent.click(screen.getByRole('button', { name: '复制成功' }))
     expect(writeText).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(1000)
+    await act(() => vi.advanceTimersByTimeAsync(1000))
     expect(screen.getByRole('button', { name: '复制' })).toBeTruthy()
   })
 

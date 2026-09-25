@@ -9,6 +9,11 @@
 - id: session-title-llm
   disabled: true
 
+# SDK agents use the structured read/write/edit file tools. The legacy editor
+# remains available to the minimal Web preset and the base/TUI composition.
+- id: tool-str-replace-editor
+  disabled: true
+
 - insert:
     - id: sdk-app-startup
       name: '@deepseek-ai/dsh-sdk-app'

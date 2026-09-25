@@ -91,6 +91,8 @@ export type RenderMessageImages = (owner: Omit<MessageImagesOwnerProps, 'loadIma
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Auxiliary-panel control bound to this exact conversation pane. */
+    'conversation.session.header.corner': { kind: 'single'; scope: 'session' }
     /** One explicit Session pane rendered by the conversation viewport. */
     'conversation.pane': { kind: 'single'; scope: 'session-maybe'; owner: ConversationPaneOwnerProps }
     /** Workbench controls rendered above the multi-pane surface. */
@@ -208,6 +210,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * instead; this one is the whole panel.
      */
     'conversation.details.tool': { kind: 'single'; scope: 'session'; owner: DetailsToolOwnerProps }
+    /**
+     * The details panel's image-gallery seat for a `read_image` result. The
+     * chat transcript's images slot is already declared under
+     * `conversation.view` (slot names are global), so the panel's owner-side
+     * gallery renderer reaches the same attachment presentation through this
+     * sibling seat.
+     */
+    'conversation.details.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
     /**
      * The composer takeover chain: entries are selector-routed replacements
      * of the default InputBar. Declared by this package's 'conversation'
@@ -477,11 +487,17 @@ export interface ChatNodeTurnDataInjected {
 
 /** Stable owner currency delivered to one keyed Chat business renderer. */
 export interface ChatNodeOwnerProps {
+  /** Open an independent auxiliary detail tab when the shell provides one. */
+  openCallDetails?: ((callId: ToolCallId) => void) | undefined
   /** Selected Tool call, when the shared details store names one. */
   selectedCallId?: ToolCallId | undefined
   /** Session workspace root; Tool summaries display paths relative to it. */
   cwd?: string | undefined
-  openFile: (path: string) => void
+  /**
+   * Open a Tool argument path. A caller that knows which line the call was
+   * about passes it through `options`, and the opened surface lands there.
+   */
+  openFile: (path: string, options?: { line?: number }) => void
   inspectCall: (callId: ToolCallId) => void
   forkAt: (seq: number) => void
   /** Render a historical image group through the attachment slot. */
@@ -501,6 +517,12 @@ export interface DetailsToolOwnerProps {
   block: ToolCallBlock
   /** Session workspace root for card cwd and relative-path display. */
   cwd?: string | undefined
+  /**
+   * Slot-backed image gallery renderer for a settled image-bearing call. The
+   * details composition supplies the same renderer the chat node hands to its
+   * Tool rows, so an image card draws its gallery at both render sites.
+   */
+  renderMessageImages?: RenderMessageImages | undefined
 }
 
 /**
@@ -832,6 +854,7 @@ export type ConversationSessionHeaderSlotProps =
     'conversation.session.header.lineage'
     | 'conversation.session.header.actions'
     | 'conversation.session.header.utilities'
+    | 'conversation.session.header.corner'
   >
   & PropsStore<ChatStore>
   & ConversationSessionHeaderInjected
@@ -916,15 +939,17 @@ export interface ChatScrollPosition {
  * outside the view (layout orchestration; the session object layer).
  */
 export interface ChatViewInjected {
+  /** Open an HTTP(S) link beside this Session; absent delegates preserve native navigation. */
+  openExternalLink?: ((url: string) => void) | undefined
   /** Selection write + details panel opening in one gesture (store action + layout orchestration). */
   openDetails: (target: SelectionTarget) => void
   /**
-   * Open a tool-arg filesystem path with the host OS default application
-   * (relative paths resolve against the session cwd). Always returns a
-   * promise: fulfills when the Host opens the path, rejects when it cannot
-   * hand the path off (the chat view shows that reason and a retry).
+   * Open a Session-authorized workspace preview at an optional line. Independent
+   * loopback Hosts may fall back to their desktop application. Gateway Hosts
+   * never open server-desktop paths. A refusal rejects with the reason shown
+   * by the chat view and preserved for retry.
    */
-  openFile: (path: string) => Promise<void>
+  openFile: (path: string, options?: { line?: number }) => Promise<void>
   loadOlder: () => void
   /** Materialize older pages for an index-only turn marker before scrolling. */
   loadHistoryUntil?: (targetSeq: number) => Promise<boolean>
@@ -968,22 +993,26 @@ export type ComposerAttachmentsProps =
 export type MessageImagesProps = PropsRuntime<'conversation.message.images'> & PropsLocale<'conversation'>
 
 /**
- * Injected share of the details slot: the panel is otherwise a pure reader of
- * the shared chat store, but its close button is a layout orchestration call.
+ * Injected call reader and layout close action for explicitly addressed details.
  */
 export interface DetailsInjected {
+  /** Read a call independently of the visible chat window; authorization errors reject. */
+  readCall: (callId: string, signal: AbortSignal) => Promise<ToolCallBlock | undefined>
+  /** Session-authorized image loader backing the Tool output's image gallery. */
+  loadImage: MessageImageLoader
   /** Close the details panel (layout geometry stays with ctx.layout). */
   closeDetails: () => void
 }
 
-/** Full details-slot props: selection store, Tool output seat, injected close callback, and locale. */
-export type DetailsSlotProps = PropsRuntime<'details'> & PropsRenderSlots<'conversation.details.tool'>
-  & PropsStore<ChatStore> & DetailsInjected & PropsLocale<'conversation'>
+/** Full details-slot props: addressed call, Tool output + image seats, read/close callbacks, and locale. */
+export type DetailsSlotProps = PropsRuntime<'details'>
+  & PropsRenderSlots<'conversation.details.tool' | 'conversation.details.images'>
+  & DetailsInjected & PropsLocale<'conversation'>
 
 /** Owner share common to the hero / New-Session Workspace pickers. */
 export interface EmptyWorkspaceOwnerProps {
   open: boolean
-  anchorRef?: RefObject<HTMLElement>
+  anchorRef?: RefObject<HTMLElement | null>
   /** Currently active workspace (renders a trailing check in the picker list). */
   selectedId?: WorkspaceId | undefined
   onPick: (workspaceId: WorkspaceId) => void

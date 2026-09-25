@@ -16,6 +16,7 @@ import {
 import type {} from '@deepseek-ai/dsh-hmr'
 import type { ProfileContext, ProfileManifest } from '@deepseek-ai/dsh-app-boot'
 import { bundleManifest, runProfilePnpm, saveManifest, viewProfilePackage } from './operations.ts'
+import { installationStream } from './install-stream.ts'
 import { classifyInstallFailure } from './install-failure.ts'
 import { InvalidInstallSpecError, parseInstallSpec } from './install-spec.ts'
 import { writePluginEnabled } from './patch.ts'
@@ -23,7 +24,7 @@ import { ManagementFailure } from './failure.ts'
 import { approveBuilds, readPendingBuilds } from './build-approval.ts'
 import type {
   BundleInfo, BundleRowInfo, ChangeResult, InstallBundleOptions, ManagementError, PackageResult, PluginChange, PluginEntryId, PluginInfo,
-  PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress, PluginInstallRequestId,
+  PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress, PluginInstallRequestId, PluginInstallFrame,
   PluginSpecInspection, PluginManagementAuthorization,
 } from './types.ts'
 export type * from './types.ts'
@@ -38,6 +39,8 @@ export interface Config {
   pnpmCommand?: string
   /** Maximum retained pnpm diagnostic bytes per operation. */
   outputBytes?: number
+  /** Maximum queued UTF-8 bytes for one installation progress stream. */
+  progressBufferBytes?: number
   /** Maximum time to wait for another process's profile package operation. */
   lockWaitMs?: number
   /** Bound on one registry lookup an inspection runs, in milliseconds. */
@@ -139,6 +142,7 @@ export class PluginManager extends TypertRemoteService {
     authorization: z.union(['local', 'required']).default('local'),
     pnpmCommand: z.string().default('pnpm'),
     outputBytes: z.number().step(1).min(1).default(16384),
+    progressBufferBytes: z.number().step(1).min(1).default(1048576),
     lockWaitMs: z.number().step(1).min(0).default(120000),
     inspectTimeoutMs: z.number().step(1).min(1000).default(20000),
   })
@@ -146,6 +150,7 @@ export class PluginManager extends TypertRemoteService {
   private readonly packageOperations = new Set<Promise<unknown>>()
   private readonly profile: ProfileContext
   private readonly outputBytes: number
+  private readonly progressBufferBytes: number
   private readonly lockWaitMs: number
   private readonly inspectTimeoutMs: number
   private readonly pnpmCommand: string
@@ -162,6 +167,7 @@ export class PluginManager extends TypertRemoteService {
     this.authorizationRequired = config.authorization === 'required'
     this.profile = ctx.profileContext
     this.outputBytes = (config as Required<Config>).outputBytes
+    this.progressBufferBytes = (config as Required<Config>).progressBufferBytes
     this.lockWaitMs = (config as Required<Config>).lockWaitMs
     this.inspectTimeoutMs = (config as Required<Config>).inspectTimeoutMs
     this.pnpmCommand = (config as Required<Config>).pnpmCommand
@@ -364,7 +370,14 @@ export class PluginManager extends TypertRemoteService {
   async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult> {
     signal?.throwIfAborted()
     await this.authorize()
+    return this.startInstallation(spec, options, signal)
+  }
+
+  private startInstallation(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult> {
     const requestId = options?.requestId
+    if (requestId !== undefined && this.installs.has(requestId)) {
+      throw new Error('Plugin installation request is already running.')
+    }
     const control: InstallControl = { abort: new AbortController(), phase: 'installing', settled: Promise.resolve() }
     const operationSignal = signal === undefined ? control.abort.signal : AbortSignal.any([control.abort.signal, signal])
     const stopped = (): boolean => operationSignal.aborted
@@ -372,6 +385,7 @@ export class PluginManager extends TypertRemoteService {
     const announce = (phase: PluginInstallProgress['phase']): void => {
       if (requestId !== undefined) this.ownerContext.emit('plugin-manager/install-state', { requestId, phase })
     }
+    announce('installing')
     const result = this.change(async (result) => {
       if (spec.trim() === '' || spec.startsWith('-')) throw new ManagementFailure('invalid-spec')
       if (stopped()) throw new InstallCancelledError()
@@ -381,7 +395,6 @@ export class PluginManager extends TypertRemoteService {
       }
       const files = await this.readRestoredFiles()
       const before = readProfileManifest('dsh', this.profile.dir).dependencies ?? {}
-      announce('installing')
       let name: string
       try {
         result.packageResult = await this.runPnpm(['add', spec], operationSignal, requestId)
@@ -427,6 +440,21 @@ export class PluginManager extends TypertRemoteService {
     /* v8 ignore next -- change() folds every failure into its result; only a lock or disposal error rejects */
     control.settled = result.then(() => undefined, () => undefined)
     return result.finally(() => { if (requestId !== undefined) this.installs.delete(requestId) })
+  }
+
+  /** Install with request-scoped progress; disconnect cancels and waits for cleanup.
+   * @param spec - Registry, Git, tarball or absolute path package spec.
+   * @param options - Activation, build-script approval and unique request identity.
+   * @param signal - Transport lifetime; cancellation does not imply cleanup has finished.
+   * @returns Ordered progress, diagnostics and the final installation result.
+   */
+  @Remote({ mode: 'stream' })
+  async * installBundleStream(
+    spec: string, options: InstallBundleOptions & { requestId: PluginInstallRequestId }, signal: AbortSignal,
+  ): AsyncIterable<PluginInstallFrame> {
+    await this.authorize()
+    yield* installationStream(this.ownerContext, options.requestId,
+      operationSignal => this.startInstallation(spec, options, operationSignal), this.progressBufferBytes, signal)
   }
 
   /** Stop an installation this manager owns and wait until its files are back.

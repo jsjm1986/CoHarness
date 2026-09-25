@@ -8,6 +8,7 @@ import type {
   TrajectoryConversationViewNode, TrajectoryRequestHeaderState,
   TrajectorySnapshot,
 } from './trajectory-contract.ts'
+import { COMPACTION_INTERRUPTED_ERROR } from './copy-codes.ts'
 
 const EMPTY_LIST: readonly never[] = []
 type AssistantRequest = Extract<RequestView, { purpose: 'assistant' }>
@@ -106,7 +107,7 @@ function interruptCompactions(
       ...request,
       completedAt: boundary.time,
       status: 'error',
-      error: 'Compaction was interrupted before completion.',
+      error: COMPACTION_INTERRUPTED_ERROR,
     }
   }
 }

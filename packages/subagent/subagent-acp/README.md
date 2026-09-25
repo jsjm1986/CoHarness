@@ -36,6 +36,9 @@ ACP advertises no start-time capabilities because this process cannot enforce th
 | `env` | `{}` | Explicit child environment layered over a credential-scrubbed parent environment. |
 | `disposeEofGraceMs` | `6000` | Positive grace after stdin EOF before platform termination; it cannot exceed [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md). |
 | `disposeGraceMs` | `3000` | Positive POSIX grace after SIGTERM before SIGKILL (Windows force-terminates directly); it cannot exceed [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md). |
+| `resume` | `false` | Enable persistent members: the provider gains `prepareContinuable`, and member children run as in-process continuation-managed Agents whose model calls drive durable ACP sessions through `session/load`. Requires the `llm` service and an agent advertising `loadSession`. |
+| `stateDir` | `~/.dsh/external-members` | Directory holding the member binding store (`acp.jsonl`). Used only with `resume`. |
+| `memberCwd` | `cwd`, else harness launch directory | Workspace for member ACP sessions. Used only with `resume`. |
 
 ```yaml
 - id: subagent-acp
@@ -48,6 +51,14 @@ ACP advertises no start-time capabilities because this process cannot enforce th
     env:
       DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
 ```
+
+## Persistent members (`resume`)
+
+With `resume: true` the provider advertises `prepareContinuable`, so `ctx.subagents.startContinuable` accepts it — the Team roster's provider-selection channel included. A member child is an ordinary in-process Agent owned by the continuation manager (durable identity, inbox, persistence, restart); this package contributes only the model route: every member model call spawns one ACP child process, attaches to the member's durable ACP session (`session/load` when bound, `session/new` on the first turn), issues one prompt, and disposes the process.
+
+`session/load` is an optional ACP capability, so the provider probes it once at member creation — an agent that cannot resume is rejected before the durable child exists. The binding store records the harness child session ↔ ACP session mapping and the last issued prompt; a crash mid-turn leaves the prompt provable from the replayed `session/load` transcript on the next call: a settled answer replays without resending, a provably absent prompt resends once, and an unprovable one is dropped rather than duplicated.
+
+With `resume` unset the provider stays one-shot only — no `prepareContinuable`, so continuable starts reject `UNSUPPORTED_CAPABILITY`.
 
 ## Stop-reason mapping
 

@@ -1,0 +1,19 @@
+- listitem:
+  - 'button "收起设置: 网页搜索" [expanded]':
+    - text: 网页搜索 DeepSeek 搜索提供方。 未保存
+    - img
+  - text: API Key 已配置密钥。
+  - textbox "API Key" [disabled]: plugin-fixture-replacement
+  - paragraph: 此密钥由部署管理员管理，项目空间中不能修改。
+  - text: 接口地址
+  - textbox "接口地址":
+    - /placeholder: ""
+  - paragraph: 留空则使用提供方默认地址。
+  - text: 单次请求最多搜索次数
+  - textbox "单次请求最多搜索次数":
+    - /placeholder: ""
+    - text: "5"
+  - paragraph: 一次请求在必须作答前最多可以搜索多少次。
+  - status: 本部署没有接受这些值，已保留供你修改。
+  - button "放弃修改"
+  - button "保存"

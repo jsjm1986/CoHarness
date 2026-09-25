@@ -49,3 +49,13 @@ it('rejects a retained authority after its provider unloads', async () => {
   await expect(policy.authorize()).rejects.toThrow('provider stopped')
   expect(request).not.toHaveBeenCalled()
 })
+
+it('accepts the dedicated profile-management assertion and still rechecks the Gateway', async () => {
+  const { principal, policy, request } = fixture()
+  principal.claims.purpose = 'plugin-admin'
+  await policy.authorize()
+  expect(request).toHaveBeenCalledTimes(1)
+  principal.claims.purpose = 'terminal-admin'
+  await expect(policy.authorize()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  expect(request).toHaveBeenCalledTimes(1)
+})

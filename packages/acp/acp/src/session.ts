@@ -248,7 +248,7 @@ export class AcpSession {
     this.assertActive()
     if (this.inflight !== undefined) throw invalidParams('a prompt is already in flight for this session')
     const completion = Promise.withResolvers<StopReason>()
-    const admission = Promise.withResolvers<void>()
+    const admission = Promise.withResolvers<undefined>()
     const admissionController = new AbortController()
     const inflight: InflightPrompt = {
       resolve: completion.resolve,
@@ -258,7 +258,7 @@ export class AcpSession {
       turn: undefined,
       endReason: undefined,
       admissionDone: admission.promise,
-      finishAdmission: admission.resolve,
+      finishAdmission: () => { admission.resolve(undefined) },
       admissionController,
       cancelRequested: false,
       settlementStarted: false,

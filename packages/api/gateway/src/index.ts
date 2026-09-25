@@ -5,6 +5,7 @@
  */
 
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
+import { createRpcStreamHttpHandler, RPC_STREAM_PATH } from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import {
   RemoteError,
@@ -100,6 +101,9 @@ export class TypertGatewayService extends Service implements TypertGateway {
       this.srcClaims = undefined
     })
     ctx.inject(['connection'], (connectionCtx) => {
+      const streams = createRpcStreamHttpHandler((endpoint, payload, signal) => this.dispatchStream(endpoint, payload, signal))
+      connectionCtx.effect(() => () => streams.close(), 'api-gateway: logical stream shutdown')
+      connectionCtx.connection.http.handlePrefix(RPC_STREAM_PATH, streams.handle, { authority: 'trusted-host' })
       connectionCtx.connection.rpc.intercept(
         '/api',
         endpoint => this.claimsEndpoint(endpoint),
@@ -143,6 +147,7 @@ export class TypertGatewayService extends Service implements TypertGateway {
   async invoke(request: InvokeRemoteRequest): Promise<unknown> {
     const endpoint = endpointOf(request.namespace, request.method)
     const descriptor = this.resolveDescriptor(request.namespace, request.method, endpoint)
+    if (descriptor.mode !== request.mode) throw new TypertGatewayError('gateway/signature-invalid', endpoint, 'Remote invocation mode does not match its declaration')
     assertExactArguments(request.args, descriptor, endpoint)
     const args = decodeArguments(descriptor, request.args, endpoint)
     const authorization: TypertGatewayAuthorizationRequest = {
@@ -184,11 +189,38 @@ export class TypertGatewayService extends Service implements TypertGateway {
       if (request.signal?.aborted === true) throw remoteCancelled(endpoint, error)
       throw error
     }
+    if (descriptor.mode === 'stream') {
+      if (!isObject(result) || typeof Reflect.get(result, Symbol.asyncIterator) !== 'function') {
+        throw new TypertGatewayError('gateway/result-invalid', endpoint, 'Stream endpoint did not return an AsyncIterable')
+      }
+      const stream = result as AsyncIterable<unknown>, ctx = this.ctx
+      return (async function* () {
+        for await (const item of stream) {
+          request.signal?.throwIfAborted()
+          await ctx.serial('typert-gateway/authorize', { ...authorization, phase: 'stream-item' })
+          request.signal?.throwIfAborted()
+          yield decode(descriptor.result, item, 'gateway/result-invalid', endpoint, 'result')
+        }
+      })()
+    }
     // A weak descriptor declares no return type, so nothing returned is a void
     // result and rides the wire as an absent value field. A strict descriptor
     // keeps its schema: there, undefined has to be a declared result.
     if (result === undefined && descriptor.result.mode !== 'strict') return result
     return decode(descriptor.result, result, 'gateway/result-invalid', endpoint, 'result')
+  }
+
+  private async *dispatchStream(endpoint: string, payload: unknown, signal: AbortSignal): AsyncGenerator<ConnectionRpcResult> {
+    try {
+      const segments = endpoint.split('/')
+      if (segments.length !== 2 || segments.some(segment => segment === '') || !isObject(payload) || !isPlainObject(payload)
+        || Reflect.ownKeys(payload).length !== 1 || !isObject(payload.args) || !isPlainObject(payload.args)) {
+        throw new Error('Remote stream payload must contain exactly one plain-object args field')
+      }
+      const [namespace, method] = segments as [string, string]
+      const stream = await this.invoke({ namespace, method, args: payload.args, signal, mode: 'stream' }) as AsyncIterable<unknown>
+      for await (const value of stream) yield { ok: true, value }
+    } catch (error) { if (!signal.aborted) yield rpcFailure(error) }
   }
 
   private async dispatchRpc(
@@ -358,6 +390,7 @@ export class TypertGatewayService extends Service implements TypertGateway {
       method,
       ...(marker.method === method ? {} : { implementation: marker.method }),
       invocation: receiver,
+      ...(marker.mode === undefined ? {} : { mode: marker.mode }),
       parameters,
       ...(cancellation === undefined ? {} : { cancellation }),
       result: { mode: 'src-json' },

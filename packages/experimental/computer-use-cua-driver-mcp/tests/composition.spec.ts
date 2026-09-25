@@ -10,7 +10,7 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import ComputerUse from '@deepseek-ai/dsh-computer-use'
 import { ComputerUseProviderName } from '@deepseek-ai/dsh-computer-use/brand'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { type ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import LlmRuntime, { LlmAdapter, ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -161,6 +161,53 @@ describe('installed Cua Driver Loader composition', () => {
     expect(ctx.computerUse.providerName).toBeUndefined()
     const events = await driverEvents(root)
     for (const event of events.filter(event => event.event === 'start')) expectProcessExited(event.pid)
+  })
+
+  it('rejects managed desktop calls before the MCP child receives them', async () => {
+    const { ctx, root } = await load()
+    ctx.provide('executionAuthorityRequired', true)
+    const result = await ctx.tools.execute({
+      name: TOOL, arguments: { display: 0 }, callId: ToolCallId('denied'), signal: new AbortController().signal,
+    })
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain('authorized Session')
+    expect((await driverEvents(root)).filter(event => event.event === 'call')).toEqual([])
+  })
+
+  it('cancels an admitted MCP transport call when desktop authority is revoked', async () => {
+    const { ctx, root } = await load('pending')
+    const revoked = new AbortController()
+    ctx.provide('computerUseAuthorization', {
+      async run(_execution, operation) { return operation(revoked.signal) },
+    })
+    const pending = ctx.tools.execute({
+      name: TOOL, arguments: { display: 0 }, callId: ToolCallId('revoked'), signal: new AbortController().signal,
+    })
+    try {
+      await vi.waitFor(async () => {
+        expect((await driverEvents(root)).filter(event => event.event === 'call')).toHaveLength(1)
+      })
+      revoked.abort(new Error('desktop authorization revoked'))
+      const result = await pending
+      expect(result.isError).toBe(true)
+      await vi.waitFor(async () => {
+        expect((await driverEvents(root)).filter(event => event.event === 'cancelled')).toHaveLength(1)
+      })
+    } finally {
+      revoked.abort()
+      await pending
+    }
+  })
+
+  it('delegates calls for other MCP servers without applying the desktop policy', async () => {
+    const { ctx } = await load()
+    ctx.provide('executionAuthorityRequired', true)
+    const next = vi.fn(async () => 'other server result')
+    const execution = { name: 'other', arguments: {}, callId: ToolCallId('other'), rootCallId: ToolCallId('other'),
+      token: Symbol('other') as ToolExecutionToken, signal: new AbortController().signal }
+    await expect(ctx.waterfall('mcp/tool-call', 'other-server', { execution, signal: execution.signal }, next))
+      .resolves.toBe('other server result')
+    expect(next).toHaveBeenCalledOnce()
   })
 
   it('retains exclusive ownership when the external process disconnects and reconnects', async () => {

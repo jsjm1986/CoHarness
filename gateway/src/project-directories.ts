@@ -101,6 +101,7 @@ function blockedDirectoryRoots(cfg: GatewayConfig): string[] {
     cfg.principalKeyDir,
     cfg.runtimeCredentialDir,
     dirname(cfg.organizationModelCredentialKeyFile),
+    dirname(cfg.webhookSecretKeyFile),
     cfg.gatewayDir,
     cfg.dshRepoRoot,
     cfg.modelGovernancePackage,

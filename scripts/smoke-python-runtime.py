@@ -8,6 +8,7 @@ import difflib
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import tempfile
@@ -26,7 +27,7 @@ CODE_PROMPT = "Use run_code to compute the packaged worker smoke value."
 CODE_WORKER_TEXT = "code worker smoke ok"
 WORKFLOW_PROMPT = "Use workflow to compute the packaged worker smoke value without agents."
 WORKFLOW_WORKER_TEXT = "workflow worker smoke ok"
-MINIMAL_PROMPT = "Exercise the packaged minimal agent's persistent Bash and string-replacement editor."
+MINIMAL_PROMPT = "Exercise the packaged minimal agent's persistent shell and string-replacement editor."
 MINIMAL_TEXT = "minimal agent smoke ok"
 MINIMAL_EDITOR_PATH_PREFIX = "Editor path: "
 FS_SEARCH_PROMPT = "Exercise the packaged filesystem search tools."
@@ -34,14 +35,20 @@ FS_SEARCH_TEXT = "filesystem search smoke ok"
 FS_SEARCH_MARKER = "PACKAGED_FS_SEARCH_OK"
 MCP_PROMPT = "Exercise the packaged MCP client with one external stdio server."
 MCP_TEXT = "MCP client smoke ok"
-MINIMAL_CORDIS = (
-    Path(__file__).resolve().parent.parent / "examples" / "jsonrpc-agent" / "minimal.cordis.yml"
+IS_WINDOWS = sys.platform == "win32"
+MINIMAL_SHELL_TOOL = "pwsh" if IS_WINDOWS else "bash"
+MINIMAL_SHELL_COMMAND = (
+    "$global:dshSdkCounter = [int]$global:dshSdkCounter + 1; "
+    'Write-Output "COUNT=$global:dshSdkCounter CWD=$((Get-Location).Path)"; '
+    "if ($global:dshSdkCounter -eq 1) { Set-Location $env:TEMP }"
+    if IS_WINDOWS
+    else (
+        "counter=$(( ${counter:-0} + 1 )); export counter; "
+        "printf 'COUNT=%s CWD=%s\\n' \"$counter\" \"$PWD\"; "
+        "if [ \"$counter\" -eq 1 ]; then cd /tmp; fi"
+    )
 )
-MINIMAL_BASH_COMMAND = (
-    "counter=$(( ${counter:-0} + 1 )); export counter; "
-    "printf 'COUNT=%s CWD=%s\\n' \"$counter\" \"$PWD\"; "
-    "if [ \"$counter\" -eq 1 ]; then cd /tmp; fi"
-)
+MINIMAL_SHELL_SECOND_CWD = str(Path(tempfile.gettempdir()).resolve()) if IS_WINDOWS else "/tmp"
 SNAPSHOT_PROMPT = "Run the advanced packaged-runtime snapshot scenario."
 SNAPSHOT_SESSION_ID = "advanced-executable"
 SNAPSHOT_DIRECT_CHILD_PROMPT = "Reply with exactly DIRECT_CHILD_OK and nothing else."
@@ -59,89 +66,15 @@ ADVANCED_SNAPSHOT_FILENAMES = ("result.json", "session.jsonl", "session.1.jsonl"
 MINIMAL_SNAPSHOT_DIRECTORY = (
     Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "minimal"
 )
+# The persistent-shell schema, command echo, and working-directory token differ
+# between dialects, so Windows keeps its own expected output beside the shared one.
+if IS_WINDOWS:
+    MINIMAL_SNAPSHOT_DIRECTORY /= "win-x64"
 MINIMAL_SNAPSHOT_FILENAMES = ("model-visible.json",)
 # The agent loop's dynamic runtime-context snapshot is the one model-visible message this
 # expected output cannot carry: the same composition emits it on macOS and not on Linux
 # (deepseek-harness#2488), and the file must replay on both. Everything else is compared.
 RUNTIME_CONTEXT_PREFIX = "Current runtime context"
-CUSTOM_CORDIS = """\
-- id: sdk-jsonrpc-server
-  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
-- id: agent-core
-  name: '@deepseek-ai/dsh-agent-spine-demo'
-  config:
-    workspaceContext: false
-    skills:
-      enabled: false
-    toolBash: false
-    tools:
-      mode: both
-- id: sessions
-  name: '@deepseek-ai/dsh-session-persistence-jsonl'
-  config:
-    root: !!js process.env.DSH_SESSION_ROOT
-    compression: 'none'
-- id: subprocess
-  name: '@deepseek-ai/dsh-subprocess-local'
-- id: fs-local
-  name: '@deepseek-ai/dsh-fs-local'
-  config:
-    cwd: !!js process.env.DSH_CWD ?? process.cwd()
-- id: session-projection
-  name: '@deepseek-ai/dsh-session-projection'
-- id: sandbox
-  name: '@deepseek-ai/dsh-sandbox-local'
-- id: sandbox-policy
-  name: '@deepseek-ai/dsh-sandbox-policy'
-  config:
-    mode: danger-full-access
-    workspaceRoot: !!js process.cwd()
-- id: code-runtime
-  name: '@deepseek-ai/dsh-ptc-runtime-node'
-- id: subagents
-  name: '@deepseek-ai/dsh-subagent'
-- id: subagent-spawn-in-process
-  name: '@deepseek-ai/dsh-subagent-spawn-in-process'
-  config:
-    providerName: spawn
-- id: subagent-tool
-  name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: spawn
-- id: workflow-engine
-  name: '@deepseek-ai/dsh-workflow-ptc'
-  config:
-    provider: spawn
-- id: workflow-tool
-  name: '@deepseek-ai/dsh-tool-workflow'
-- id: cordis-host-runner
-  name: '@deepseek-ai/dsh-cordis-host-runner'
-- id: cordis-tool
-  name: '@deepseek-ai/dsh-tool-cordis'
-"""
-FS_SEARCH_CORDIS = """\
-- id: sdk-jsonrpc-server
-  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
-- id: agent-core
-  name: '@deepseek-ai/dsh-agent-spine-demo'
-  config:
-    workspaceContext: false
-    skills:
-      enabled: false
-    toolBash: false
-    toolJobs: false
-- id: sessions
-  name: '@deepseek-ai/dsh-session-persistence-jsonl'
-  config:
-    root: !!js process.env.DSH_SESSION_ROOT
-    compression: 'none'
-- id: subprocess
-  name: '@deepseek-ai/dsh-subprocess-local'
-- id: fs-search
-  name: '@deepseek-ai/dsh-tool-fs-search'
-  config:
-    sampleOverCapGlobResults: false
-"""
 MCP_SERVER_SCRIPT = """\
 import json
 import os
@@ -220,28 +153,80 @@ for line in sys.stdin:
 """
 
 
-def mcp_cordis(server_script: Path) -> str:
-    """Build an external config that mounts the packaged MCP client."""
-    return json.dumps([
+LEGACY_CUSTOM_DISABLED_ROWS = (
+    "agent-instructions",
+    "goal",
+    "goal-round-driver",
+    "command-goal",
+    "plan-mode",
+    "skill",
+    "skill-filesystem",
+    "tool-fs",
+    "tool-fs-search",
+    "tool-goal",
+    "tool-ralph",
+    "tool-skill",
+    "tool-str-replace-editor",
+    "tool-subagent-control",
+    "tool-subagent-list-agents",
+    "tool-subagent-fork",
+    "tool-todo",
+    "tool-web",
+)
+
+
+def write_profile_patch(
+    root: Path,
+    name: str,
+    sessions: Path,
+    patches: list[dict[str, object]],
+) -> Path:
+    """Write one JSON-form dsh profile patch with deterministic persistence."""
+    path = root / name
+    path.write_text(json.dumps([
         {
-            "id": "sdk-jsonrpc-server",
-            "name": "@deepseek-ai/dsh-sdk-jsonrpc-server",
+            "id": "session-persistence-jsonl",
+            "config": {"root": str(sessions), "compression": "none"},
         },
+        {"id": "session-telemetry-otel", "disabled": True},
+        *patches,
+    ], indent=2))
+    return path
+
+
+def write_advanced_profile_patch(root: Path, name: str, sessions: Path) -> Path:
+    """Write the shared custom, snapshot, and restart profile patch."""
+    return write_profile_patch(root, name, sessions, [
+        {"id": "tools", "config": {"mode": "both"}},
         {
-            "id": "agent-core",
-            "name": "@deepseek-ai/dsh-agent-spine-demo",
+            "id": "system-prompt",
             "config": {
-                "workspaceContext": False,
-                "skills": {"enabled": False},
-                "toolBash": False,
+                "persona": "You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.",
             },
         },
+        {"id": "session-log-deepseek", "config": {"enabled": True}},
+        *({"id": row_id, "disabled": True} for row_id in LEGACY_CUSTOM_DISABLED_ROWS),
+        {"id": "tool-bash", "disabled": True},
+        {"id": "tool-pwsh", "disabled": True},
         {
-            "id": "sessions",
-            "name": "@deepseek-ai/dsh-session-persistence-jsonl",
-            "config": {"root": "./sessions", "compression": "none"},
+            "id": "tool-subagent",
+            "config": {
+                "provider": "spawn",
+                "toolName": "subagent",
+                "backgroundMode": "one-shot",
+            },
         },
-        {
+        {"insert": [
+            {"id": "cordis-host-runner", "name": "@deepseek-ai/dsh-cordis-host-runner"},
+            {"id": "cordis-tool", "name": "@deepseek-ai/dsh-tool-cordis"},
+        ]},
+    ])
+
+
+def write_mcp_patch(root: Path, sessions: Path, server_script: Path) -> Path:
+    """Write a profile patch that mounts the packaged MCP client."""
+    return write_profile_patch(root, "mcp.patch.yml", sessions, [{
+        "insert": [{
             "id": "mcp-fixture",
             "name": "@deepseek-ai/dsh-mcp-client",
             "config": {
@@ -253,8 +238,8 @@ def mcp_cordis(server_script: Path) -> str:
                 "failOnStartupError": True,
                 "reconnect": {"enabled": False},
             },
-        },
-    ], indent=2)
+        }],
+    }])
 
 
 class MockModelHandler(BaseHTTPRequestHandler):
@@ -333,8 +318,8 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
     if minimal_prompt is not None:
         return tool_call_chunks(
             "minimal-bash-1",
-            "bash",
-            {"command": MINIMAL_BASH_COMMAND},
+            MINIMAL_SHELL_TOOL,
+            {"command": MINIMAL_SHELL_COMMAND},
         )
     scenario_prompts = {
         SNAPSHOT_DIRECT_CHILD_PROMPT,
@@ -440,17 +425,18 @@ def minimal_tool_followup(
     """Verify the checked-in minimal composition's PTY and editor."""
     if not call_id.startswith("minimal-"):
         return None
-    if call_id == "minimal-bash-1" and tool_name == "bash":
+    if call_id == "minimal-bash-1" and tool_name == MINIMAL_SHELL_TOOL:
         if "COUNT=1" not in tool_text:
-            raise AssertionError(f"first persistent bash call lost its output: {tool_text}")
+            raise AssertionError(f"first persistent shell call lost its output: {tool_text}")
         return tool_call_chunks(
             "minimal-bash-2",
-            "bash",
-            {"command": MINIMAL_BASH_COMMAND},
+            MINIMAL_SHELL_TOOL,
+            {"command": MINIMAL_SHELL_COMMAND},
         )
-    if call_id == "minimal-bash-2" and tool_name == "bash":
-        if "COUNT=2 CWD=/tmp" not in tool_text:
-            raise AssertionError(f"persistent bash did not retain state: {tool_text}")
+    if call_id == "minimal-bash-2" and tool_name == MINIMAL_SHELL_TOOL:
+        expected = f"COUNT=2 CWD={MINIMAL_SHELL_SECOND_CWD}"
+        if expected not in tool_text:
+            raise AssertionError(f"persistent shell did not retain state: {tool_text}")
         messages = body.get("messages")
         if not isinstance(messages, list):
             raise AssertionError("persistent editor smoke request has no messages")
@@ -707,12 +693,14 @@ def smoke_sdk_default(base_url: str) -> None:
 
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-default-") as temporary:
         root = Path(temporary).resolve()
-        sessions = root / "sessions"
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
-            session_root=str(sessions),
+            dsh_home=str(dsh_home),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
             api_key="sk-keyless-smoke",
             base_url=base_url,
             request_timeout_seconds=60,
@@ -731,16 +719,17 @@ def smoke_sdk_custom(base_url: str, executable: Path) -> None:
 
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-custom-") as temporary:
         root = Path(temporary).resolve()
-        sessions = root / "sessions"
-        cordis = root / "cordis.yml"
-        cordis.write_text(CUSTOM_CORDIS)
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
+        patch = write_advanced_profile_patch(root, "custom.patch.yml", sessions)
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
-            session_root=str(sessions),
-            cordis=str(cordis),
-            runtime_bin=str(executable),
+            dsh_home=str(dsh_home),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
+            patches=(str(patch),),
+            dsh_bin=str(executable),
             api_key="sk-keyless-smoke",
             base_url=base_url,
             request_timeout_seconds=60,
@@ -777,14 +766,22 @@ def smoke_sdk_minimal(base_url: str, executable: Path, update_snapshots: bool) -
         root = Path(temporary).resolve()
         editor_path = root / "created.txt"
         prompt = f"{MINIMAL_PROMPT}\n{MINIMAL_EDITOR_PATH_PREFIX}{editor_path}"
-        sessions = root / "sessions"
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
+        patch = root / "editor.patch.yml"
+        patch.write_text(json.dumps([{"insert": [
+            {"id": "fs-local", "name": "@deepseek-ai/dsh-fs-local", "config": {"cwd": str(root)}},
+            {"id": "str-replace-editor", "name": "@deepseek-ai/dsh-tool-str-replace-editor", "config": {"maxOutputChars": 16000}},
+        ]}]))
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
-            session_root=str(sessions),
-            cordis=str(MINIMAL_CORDIS),
-            runtime_bin=str(executable),
+            dsh_home=str(dsh_home),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
+            profile="sdk-minimal",
+            patches=(str(patch),),
+            dsh_bin=str(executable),
             api_key="sk-keyless-smoke",
             base_url=base_url,
             request_timeout_seconds=60,
@@ -796,7 +793,7 @@ def smoke_sdk_minimal(base_url: str, executable: Path, update_snapshots: bool) -
             raise AssertionError(f"minimal agent run emitted no final response: {result.events}")
         if editor_path.read_text() != "created by packaged editor\n":
             raise AssertionError(f"packaged editor wrote unexpected content: {editor_path.read_text()!r}")
-        assert_session_log(sessions, root, MINIMAL_TEXT, "COUNT=1", "COUNT=2 CWD=/tmp")
+        assert_session_log(sessions, root, MINIMAL_TEXT, "COUNT=1", "COUNT=2")
 
         files = build_minimal_snapshot_files(MockModelHandler.requests[first_request:], root)
         compare_snapshot_files(
@@ -811,16 +808,19 @@ def smoke_sdk_fs_search(base_url: str, executable: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-fs-search-") as temporary:
         root = Path(temporary).resolve()
         (root / "needle.txt").write_text(f"{FS_SEARCH_MARKER}\n")
-        sessions = root / "sessions"
-        cordis = root / "cordis.yml"
-        cordis.write_text(FS_SEARCH_CORDIS)
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
+        patch = write_profile_patch(root, "fs-search.patch.yml", sessions, [
+            {"id": "tool-fs-search", "config": {"sampleOverCapGlobResults": False}},
+        ])
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
-            session_root=str(sessions),
-            cordis=str(cordis),
-            runtime_bin=str(executable),
+            dsh_home=str(dsh_home),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
+            patches=(str(patch),),
+            dsh_bin=str(executable),
             api_key="sk-keyless-smoke",
             base_url=base_url,
             request_timeout_seconds=60,
@@ -837,19 +837,20 @@ def smoke_sdk_mcp(base_url: str, executable: Path | None) -> None:
 
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-mcp-") as temporary:
         root = Path(temporary).resolve()
-        sessions = root / "sessions"
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
         server_script = root / "mcp_server.py"
         server_script.write_text(MCP_SERVER_SCRIPT)
-        cordis = root / "cordis.yml"
-        cordis.write_text(mcp_cordis(server_script))
+        patch = write_mcp_patch(root, sessions, server_script)
         discovery_log = server_script.with_suffix(".log")
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
-            session_root=str(sessions),
-            cordis=str(cordis),
-            runtime_bin=None if executable is None else str(executable),
+            dsh_home=str(dsh_home),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
+            patches=(str(patch),),
+            dsh_bin=None if executable is None else str(executable),
             api_key="sk-keyless-smoke",
             base_url=base_url,
             request_timeout_seconds=60,
@@ -873,16 +874,17 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
 
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-snapshot-") as temporary:
         root = Path(temporary).resolve()
-        sessions = root / "sessions"
-        cordis = root / "cordis.yml"
-        cordis.write_text(CUSTOM_CORDIS)
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
+        patch = write_advanced_profile_patch(root, "custom.patch.yml", sessions)
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
-            session_root=str(sessions),
-            cordis=str(cordis),
-            runtime_bin=str(executable),
+            dsh_home=str(dsh_home),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
+            patches=(str(patch),),
+            dsh_bin=str(executable),
             api_key="sk-keyless-smoke",
             base_url=base_url,
             request_timeout_seconds=60,
@@ -919,18 +921,19 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
 def smoke_direct(base_url: str, executable: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="dsh-direct-") as temporary:
         root = Path(temporary).resolve()
-        sessions = root / "sessions"
-        cordis = root / "cordis.yml"
-        cordis.write_text(CUSTOM_CORDIS)
+        dsh_home = root / "home"
+        sessions = dsh_home / "sessions"
+        patch = write_advanced_profile_patch(root, "custom.patch.yml", sessions)
         environment = {
             **os.environ,
-            "DSH_CORDIS_CONFIG": str(cordis),
-            "DSH_SESSION_ROOT": str(sessions),
+            "DSH_HOME": str(dsh_home),
+            "DSH_PERMISSION_MODE": "danger-full-access",
+            "DSH_TELEMETRY_DISABLED": "1",
             "DSH_CWD": str(root),
             "DEEPSEEK_API_KEY": "sk-keyless-smoke",
             "DEEPSEEK_BASE_URL": base_url,
         }
-        peer = RuntimePeer([str(executable)], root, environment)
+        peer = RuntimePeer([str(executable), "--profile", "sdk", "--patch", str(patch)], root, environment)
         try:
             peer.send({"jsonrpc": "2.0", "id": "initialize", "method": "initialize", "params": {"cwd": str(root), "provider": "deepseek-official", "model": "smoke-model"}})
             peer.read_until(lambda message: message.get("id") == "initialize")
@@ -1206,23 +1209,15 @@ def build_snapshot_files(
             {"method": notification.method, "payload": notification.payload}
             for notification in result.notifications
         ],
-        "session_root": result.session_root,
     }
-    normalized_result = normalize_snapshot_value(result_value, replacements)
-    files = {
-        "result.json": json.dumps(normalized_result, indent=2, ensure_ascii=False) + "\n",
-        "session.jsonl": render_jsonl(
-            project_session_snapshot([
-                normalize_snapshot_value(record, replacements) for record in logs[SNAPSHOT_SESSION_ID]
-            ])
-        ),
-    }
-    for index, child_id in enumerate(child_ids, start=1):
-        files[f"session.{index}.jsonl"] = render_jsonl(
-            project_session_snapshot([
-                normalize_snapshot_value(record, replacements) for record in logs[child_id]
-            ])
-        )
+    normalized = normalize_snapshot_value({"result": result_value, "logs": logs}, replacements)
+    assert isinstance(normalized, dict)
+    normalized_logs = normalized["logs"]
+    assert isinstance(normalized_logs, dict)
+    files = {"result.json": json.dumps(normalized["result"], indent=2, ensure_ascii=False) + "\n"}
+    for index, session_id in enumerate([SNAPSHOT_SESSION_ID, *child_ids]):
+        name = "session.jsonl" if index == 0 else f"session.{index}.jsonl"
+        files[name] = render_jsonl(project_session_snapshot(normalized_logs[session_id]))
     return files
 
 
@@ -1261,65 +1256,106 @@ def normalize_snapshot_value(
     value: object,
     replacements: list[tuple[str, str]],
 ) -> object:
-    """Scrub volatile values and bulky request headers without losing behavior."""
-    if isinstance(value, str):
-        normalized = value
-        for actual, token in replacements:
-            normalized = normalized.replace(actual, token)
-        return normalized
-    if isinstance(value, list):
-        return [normalize_snapshot_value(item, replacements) for item in value]
-    if not isinstance(value, dict):
-        return value
-
-    normalized = {
-        key: normalize_snapshot_value(item, replacements)
-        for key, item in value.items()
+    """Normalize owned identities and event clocks while keeping prompts and schemas exact."""
+    tokens = dict(replacements)
+    next_by_kind: dict[str, int] = {}
+    uuid = re.compile(r"^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$", re.I)
+    canonical = re.compile(r"^\{\{([a-z]+):([1-9][0-9]*)\}\}$")
+    fields = {
+        "sessionId": "session", "parentSessionId": "session", "rootSessionId": "session",
+        "messageId": "message", "participantId": "principal", "principalId": "principal",
+        "projectId": "project", "runtimeId": "runtime", "executionTargetId": "target",
+        "resourceId": "resource", "commandId": "command", "rpcId": "rpc",
+        "retryId": "retry", "runId": "workflow",
     }
-    if normalized.get("type") == "session" and "createdAt" in normalized:
-        normalized["createdAt"] = 0
-    if "childCreatedAt" in normalized:
-        normalized["childCreatedAt"] = 0
-    if "seq" in normalized and "time" in normalized:
-        normalized["time"] = 0
-    if isinstance(normalized.get("id"), str) and normalized.get("role") in ("system", "assistant", "user"):
-        normalized["id"] = "{{messageId}}"
-    scrub_snapshot_header(normalized)
-    return normalized
 
+    def reserve(item: object) -> None:
+        if isinstance(item, str):
+            match = canonical.fullmatch(item)
+            if match:
+                kind, ordinal = match.groups()
+                next_by_kind[kind] = max(next_by_kind.get(kind, 0), int(ordinal))
+        elif isinstance(item, list):
+            for child in item:
+                reserve(child)
+        elif isinstance(item, dict):
+            for child in item.values():
+                reserve(child)
 
-def scrub_snapshot_header(value: dict[object, object]) -> None:
-    """Tokenize prompt bulk and compact-stream clocks while retaining payloads."""
-    data = value.get("data")
-    if not isinstance(data, dict):
-        return
-    if value.get("type") == "system/message":
-        message = data.get("message")
-        if isinstance(message, dict) and isinstance(message.get("content"), list):
-            message["content"] = [{"type": "text", "text": "{{system}}"}]
-    if value.get("type") in ("assistant/message", "assistant/attempt"):
-        stream = data.get("stream")
-        if isinstance(stream, list):
-            for record in stream:
-                if not isinstance(record, dict):
-                    continue
-                for key in ("time", "time0"):
-                    if key in record:
-                        record[key] = 0
-                if isinstance(record.get("dt"), list):
-                    record["dt"] = [0 for _ in record["dt"]]
-    if value.get("type") == "request/header":
-        header = data.get("header")
-        if not isinstance(header, dict):
+    def claim(item: object, kind: str, always: bool = False) -> None:
+        if not isinstance(item, str) or not item or item in tokens:
             return
-        if "system" in header:
-            header["system"] = "{{system}}"
-        tools = header.get("tools")
-        if isinstance(tools, list):
-            header["tools"] = [
-                tool.get("name") if isinstance(tool, dict) else "{{tools}}"
-                for tool in tools
-            ]
+        if canonical.fullmatch(item):
+            tokens[item] = item
+        elif always or uuid.fullmatch(item) or item in ("{{messageId}}", "{{sessionId}}"):
+            ordinal = next_by_kind.get(kind, 0) + 1
+            next_by_kind[kind] = ordinal
+            tokens[item] = "{{" + kind + ":" + str(ordinal) + "}}"
+
+    def collect(item: object, event_type: object = None) -> None:
+        if isinstance(item, list):
+            for child in item:
+                collect(child, event_type)
+        elif isinstance(item, dict):
+            event_type = item.get("type", event_type)
+            if item.get("type") == "session":
+                claim(item.get("id"), "session", True)
+            if isinstance(item.get("role"), str) and isinstance(item.get("content"), list) and isinstance(item.get("source"), dict):
+                claim(item.get("id"), "message")
+            if item.get("type") == "feedback/message-put":
+                data = item.get("data")
+                feedback = data.get("item") if isinstance(data, dict) else None
+                if isinstance(feedback, dict):
+                    claim(feedback.get("version"), "id")
+            if item.get("type") in ("compaction/start", "compaction/summary", "compaction/end"):
+                data = item.get("data")
+                if isinstance(data, dict):
+                    claim(data.get("compactionId"), "compaction")
+            for key, child in item.items():
+                if key in {"content", "args", "arguments", "parameters", "schema", "inputSchema", "input_schema"}:
+                    continue
+                if key == "id" and event_type in ("approval/asked", "approval/decided"):
+                    claim(child, "approval")
+                elif key in fields:
+                    claim(child, fields[key], key in ("commandId", "rpcId"))
+                collect(child, event_type)
+
+    reserve(value)
+    collect(value)
+    pattern = re.compile(r"(?<![\w-])(?:" + "|".join(re.escape(source) for source in sorted(tokens, key=len, reverse=True)) + r")(?![\w-])") if tokens else None
+
+    def normalize(item: object) -> object:
+        if isinstance(item, str):
+            if item in tokens:
+                return tokens[item]
+            return pattern.sub(lambda match: tokens[match.group()], item) if pattern else item
+        if isinstance(item, list):
+            return [normalize(child) for child in item]
+        if not isinstance(item, dict):
+            return item
+        result = {key: normalize(child) for key, child in item.items()}
+        if result.get("type") == "session" and "createdAt" in result:
+            result["createdAt"] = 0
+        data = result.get("data")
+        if isinstance(result.get("type"), str) and isinstance(data, dict):
+            if "seq" in result and "time" in result:
+                result["time"] = 0
+            if result["type"] == "subagent/catalog" and "childCreatedAt" in data:
+                data["childCreatedAt"] = 0
+            if result["type"] in ("assistant/message", "assistant/attempt"):
+                stream = data.get("stream")
+                if isinstance(stream, list):
+                    for row in stream:
+                        if not isinstance(row, dict):
+                            continue
+                        for key in ("time", "time0"):
+                            if key in row:
+                                row[key] = 0
+                        if isinstance(row.get("dt"), list):
+                            row["dt"] = [0] * len(row["dt"])
+        return result
+
+    return normalize(value)
 
 
 def render_jsonl(records: list[object]) -> str:

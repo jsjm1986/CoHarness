@@ -23,9 +23,7 @@ export function assertReleasedV5Header(header: SessionFormatHeader): void {
  */
 export function restoreReleasedV5Artifact(artifact: SessionFormatArtifact, knownEventTypes: ReadonlySet<string>): SessionFormatArtifact {
   assertReleasedV5Header(artifact.header)
-  // Historical artifact validation delegates through the V2 header key set; draft is already checked above.
-  const { draft: _draft, ...eventHeader } = artifact.header
-  const restored = restoreReleasedV4Artifact({ ...artifact, header: { ...eventHeader, version: 4 } }, knownEventTypes)
+  const restored = restoreReleasedV4Artifact({ ...artifact, header: { ...artifact.header, version: 4 } }, knownEventTypes)
   return { ...restored, header: artifact.header }
 }
 

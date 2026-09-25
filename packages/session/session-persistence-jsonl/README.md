@@ -57,7 +57,7 @@ Plaintext body reads scan bounded byte windows and retain decoded events without
 
 ## Invariants
 
-**Runtime invariant:** No companion is published. Each session is one append-only log whose lifecycle is covered by the shared coordinator specs; the backend adds only byte-level storage.
+No runtime invariant companion is published: immutable-generation and append ordering are enforced by the storage coordinator and checked against files in persistence tests; this provider keeps no independent domain index.
 
 ## Model Experience
 
@@ -77,7 +77,7 @@ JSONL storage does not mutate live request prefixes. A resumed loop can reuse pr
 
 ## Known Limitations and Deferred Work
 
-- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2/v3 artifacts to current v4 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
+- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2/v3/v4 artifacts to current v5 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
 - **The flat-file storage layout does not load** — use a separate root or move pre-release artifacts into the project/session directory layout before loading.
 - **Compressed files are not directly line-readable** — use the backend to load them, or select `compression: 'none'` before writing a fresh root when external line readers are required.
 - **Nothing deletes session files** — logs accumulate under `root` until removed externally (the seam has no deletion API).

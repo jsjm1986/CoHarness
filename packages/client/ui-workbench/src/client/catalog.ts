@@ -60,8 +60,13 @@ export function parseWorkbenchCatalog(value: unknown): WorkbenchCatalog {
       || (row.title !== undefined && typeof row.title !== 'string')
       || (row.cwd !== undefined && typeof row.cwd !== 'string')
       || (row.visibility !== 'personal' && row.visibility !== 'project' && row.visibility !== 'private')
-      || typeof row.creatorUserId !== 'number' || !Number.isSafeInteger(row.creatorUserId)
+      || typeof row.creatorUserId !== 'number' || !Number.isSafeInteger(row.creatorUserId) || row.creatorUserId <= 0
       || typeof row.creatorDisplayName !== 'string' || typeof row.updatedAt !== 'number'
+      || !Number.isFinite(row.updatedAt) || row.updatedAt < 0
+      || (row.visibleContentSeq !== undefined && (typeof row.visibleContentSeq !== 'number'
+        || !Number.isSafeInteger(row.visibleContentSeq) || row.visibleContentSeq < 0))
+      || (row.lastPromptAt !== undefined && (typeof row.lastPromptAt !== 'number'
+        || !Number.isFinite(row.lastPromptAt) || row.lastPromptAt < 0))
       || typeof row.blank !== 'boolean' || typeof row.canWrite !== 'boolean') throw new Error('invalid workbench conversation')
     return row as unknown as WorkbenchConversation
   })

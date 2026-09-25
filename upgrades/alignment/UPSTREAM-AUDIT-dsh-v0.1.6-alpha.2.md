@@ -4,7 +4,7 @@
 
 - 本轮目标由 `dsh-v0.1.6-alpha.1`（`0a15e36e7f82b6ed45af6fa9759f29b40dcd965d`）调整为 `dsh-v0.1.6-alpha.2`（`ddefc45fbc7f8e46dd73185e68295696d1297887`），发布页 https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.6-alpha.2（2026-09-17 发布，prerelease）。
 - 证据来源：GitHub compare API（`0a15e36e...ddefc45f`：`total_commits` 887、300 个返回文件页）与 recursive git/trees 全树 blob 比较。2026-09-18 以本地拉取的上游 tag 复核：`git diff --name-status --no-renames dsh-v0.1.6-alpha.1 dsh-v0.1.6-alpha.2` 为 2,641 个变化文件（901 新增、57 删除、1,683 修改），累计 rc.2→alpha.2 为 5,507；新增包 9、删除包 1（`fs/tool-present` 实为迁移到 `deliverables/tool-present`）；`packages/session/session-format/src` 无变化。首版库存多计 2 个路径，原因是本地 `git ls-tree` 默认对非 ASCII 路径加引号转义而 GitHub trees 返回原始 UTF-8，`snapshots/web/present/workspace.expected/说明.txt`（三个 tag 内容相同）被同时计为删除和新增并生成一行伪行；矩阵已删除伪行并以 `core.quotePath=false` 对账。alpha.1 是 alpha.2 的直接祖先（merge-base 即 alpha.1），增量可与累计线性叠加。这些是范围证据，不是逐文件语义审查。
-- alpha.1 的实施与验收历史保留在 [alpha.1 计划](../plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md)、[alpha.1 审计](UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)及对应清单/矩阵中，不并入本文件。
+- alpha.1 的实施与验收历史保留在 [alpha.1 计划](../../plans/UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md)、[alpha.1 审计](UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)及对应清单/矩阵中，不并入本文件。
 
 ## alpha.1 → alpha.2 影响核验
 
@@ -33,7 +33,7 @@
 
 ## 主权对账（2026-09-18）
 
-- 2026-09-22 批次 0 归并后的当前矩阵为 329 个唯一 area，其中 295 个包级行登记 `localSovereignty`：adapted 221、replaced 2、tracked 6、upstreamOnly 38、unmanifested 28；另有 34 个 non-package 行。归并的 4 个已携带包统一为 `adapt`，源码审查仍 pending；其 ownership 取自当前 [同步记录](../../scripts/upstream-sync.json)，其余路由仍须逐阶段核实，不能由分类数字推导实现完成度。
+- 矩阵 333 行全部标注 `localSovereignty`（`scripts/upstream-sync.json` 与 upstreamOnly 清单）：adapted 227、replaced 2、tracked 3、upstreamOnly 35、unmanifested 32（上游新包，在各自阶段决定携带并登记）。
 - 不携带包的行为归属已逐行写清：35 个 upstreamOnly 行中 13 行标 `adapt`（增量须审查并把行为移植到替代面，如 `api/session-controller` 的 38 文件多实例增量归 7A 经 `host/apiproxy`、`ui-sidebar-documentpreview` 的 58 文件预览增量归 7C）、4 行 `defer`（agent-team×3、`client/file-upload`）、13 行 `reject`（含 `apps/desktop`、`apps/desktop-host` 与无消费者的实验/工具包）。
 - `.github`、`scripts`、`lefthook.yml` 三行门禁面归 0R，在实施批次开工前完成差异比对与新增必需检查登记。
 - 开发阶段姿态：允许破坏性更新，目标为上游全量对齐；全局管理设置经 `/admin`（`gateway/admin-ui`）落地；无生产数据，Phase 8 以合成数据迁移演练替代脱敏副本恢复。
@@ -72,15 +72,15 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 
 ## 本审计的边界
 
-- 尚未完成全部累计与增量文件的逐文件语义审查，未完成所有消费者验收。当前 schema v3 矩阵为 329 行：320 行 `pending-cumulative-source-review`，9 行保留 `implemented-local-tests-passing`；后者仅保留已记录范围的本地验证，不覆盖新候选或未运行环境。批次 0 已使累计 5,507 路径、增量 2,641 路径与固定 Git 原始差异逐一一致，这只证明范围完整，不证明语义等价。
+- 尚未完成 2,641 个变化文件的逐文件语义审查，未完成逐提交归属；矩阵行与清单决定只声明范围与待验证要求，不声明实现完成。矩阵 333 行中只有 `apps/desktop`、`apps/desktop-host` 两行为用户确认路由，其余仍为初始路由。
 - 本地规划检查点 `6f0ec56328` 与上游 tag 无祖先关系；树差异不证明等价。
-- alpha.1 遗留的未验证项、环境阻塞、不稳定用例与观察项集中在下表，初始为 23 项，后续追加 L24、L25，当前共 25 项。alpha.1 记录中没有独立枚举清单，本表由旧审计及后续验证逐条整理。换目标不清空欠账；销账须记录验证提交、命令与环境。
+- alpha.1 遗留的未验证项、环境阻塞、不稳定用例与观察项集中在下表，共 23 项；alpha.1 记录中没有独立枚举清单，本表由 alpha.1 审计各批次的"未验证／待完成"陈述与 alpha.1 Phase 1/2 代码审查逐条整理。换目标不清空欠账；销账须记录验证提交、命令与环境。
 
 ## 未验证与环境阻塞台账
 
 | 编号 | 项 | 类型 | 来源 | 承接阶段 |
 | --- | --- | --- | --- | --- |
-| L1 | 早期 Phase 1/2 覆盖率缺口及本轮候选重验 | 历史已验证；新候选待验 | alpha.1 审计"Phase 1：Node 内部加载器依赖"、两处收口 | 保留 8-e.1 本地记录：4 分区 1201 插桩文件 + exempt-heavy 21138 测试，合并阈值零违规；另核实 `2ba86fcbb908dd90226dbf5a62148099d24d6607` 的 [CI 全量覆盖率步骤](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271/job/106620429647)成功。本轮候选不得复用该提交的结果 |
+| L1 | `pnpm run test:coverage` per-file 100% 从未对 Phase 1/2 源码执行；coverage 分片 3/3 曾被主动终止 | 已验证 | alpha.1 审计"Phase 1：Node 内部加载器依赖"、两处收口 | 8-e.1 销账：`check:ci:coverage` 分区模式三腿全绿（4 分区 1201 插桩文件 + exempt-heavy 21138 测试，合并阈值零违规），缺口清单逐项收口详见 8-e.1 节 |
 | L2 | 真实 provider e2e：DeepSeek 双协议、BYOK 与组织代理路由、凭据归因 | 未验证 | alpha.1 审计各批 | 3A |
 | L3 | 组装快照未覆盖 Messages、图片、PTC 新面 | 未验证 | alpha.1 审计"Phase 2 收口" | 3A、3B、4A |
 | L4 | Python SDK 打包产物仅 macOS arm64 carrier 冒烟通过，Linux/Windows 产物未验 | 部分验证 | alpha.1 审计"Phase 2 收口" | 8 |
@@ -97,7 +97,7 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 | L15 | 快照请求数 2 而非 1 偶发，原因未定 | 不稳定 | alpha.1 审计"串行创建与启动 hooks" | 2B |
 | L16 | Claude/Codex hooks、Landlock 后台分类 5 秒超时偶发 | 不稳定 | alpha.1 审计"非事务 Loader 适配收口" | 2B、4B |
 | L17 | `watch-config.spec.ts` 首次配置添加未生效偶发，隔离通过 | 不稳定 | alpha.1 审计"Node 内部加载器依赖" | 1B 迁移后复测 |
-| L18 | 当前候选的 CI 必需任务及尚未运行的原生平台验收 | 历史 CI 已验证；新候选与缺失平台待验 | 计划证据要求 | `2ba86fcbb908dd90226dbf5a62148099d24d6607` 的 [CI 35688456271](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271)为 success：15 个 job 成功、11 个 skipped；覆盖率、Wine、Web、SDK/Gateway 等已执行任务的证据只属于该提交。该次原生 Windows complete、macOS serial、manual full audit 等未运行，不能据汇总绿灯销账；新候选重新验收 |
+| L18 | CI 必需任务（平台矩阵、windows-wine、coverage lane）未在本地或分支执行 | 未验证 | 计划证据要求 | 8 |
 | L19 | `Fiber.update()` 返回 void 后，运行期配置更新失败只留在 fiber `_error` 与日志，无等价于启动路径的审计 | 观察项 | alpha.1 Phase 1 代码审查 | 1B |
 | L20 | 串行 `agent/created` 监听器顺序为隐式注册顺序，无显式编排 | 观察项 | alpha.1 Phase 2 代码审查 | 2B |
 | L21 | `tool-cordis` api-catalog 的 `agent/created` 参数描述缺 `agent`／`source`，goal `resume` 描述有语法错误 | 已验证 | alpha.1 Phase 2 代码审查 | 7D 销账：`@param payload.*` 点名在 `parseTags` 正则处坍缩为 `payload`，末位标签覆盖前者——改为单 `@param payload` 续行枚举三字段；`resume` 措辞对齐上游 `session-start edge`；`gen-cordis-api` 重生 + `verify-cordis-api` 105 产物同步；上游同缺陷，修复可上游化 |
@@ -132,7 +132,7 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - → 2B（`generationLogFilename`/`JsonlCompression` 已落地）：`session-format-guard.expected.e2e.ts` **已重拷**，keyless 4/4 过
 - → 3A/2B（`dsh-session-snapshot`）：acp 7 件、headless 5 件 **不移植**——本地快照车道为 `*.snapshot.ts` 脚本/示例架构（`session-format-guard.snapshot.ts` 等已覆盖同场景回放），上游 harness 包无本地消费者
 - → 4A（`ptc-runtime-node` 已落地）：`ptc.e2e.ts` **已重拷**，5 过 + 2 凭据门控 skip；`Tool` provider 名册断言适配本地 cordis 全量自修改工具面（7 项 vs 上游 inspect-only 2 项）
-- → 7A（`WebBootGraph.batches` 未移植——combo 调度层是上游 bundle 架构，移植属产品决定）：`runtime-roster.ts`/`runtime-roster-observer.ts`/`default-web-process.ts`/`web-default-isolation.expected.e2e.ts` **继续挂 7A**
+- → 7A：`WebBootGraph.batches` 与 `ClientEntries` 已在 2026-09-23 的隔离工作树采用，`runtime-roster.ts`/`runtime-roster-observer.ts`/`default-web-process.ts`/`web-default-isolation.expected.e2e.ts` 已恢复；Host 与浏览器从实际注册表验证默认产品隔离，并用测试专用实验插件证明检查能拒绝污染。保留 CoHarness runtime 预加载、鉴权、Workbench 与插件分组，见[页面级条目说明](../../.agents/notes/implemented/architecture/2026-09-23-page-owned-client-entries.md)。此项完成不代表 Session 引用、整个 7A 或最终候选已验收。
 - → 7B/7D（mcp@2.0 已落地）：`creator-plugin-manager.expected.e2e.ts` + fixture **已重拷**，1/1 过（真实 `apps/cli/lib/bin.js --profile web`，MCP 安装→重启恢复→移除全生命周期）。**重拷暴露真实产品缺口**：上游 preset 携带 `tool-plugin-manager` 行（cordis 启用、standard/ptc 禁用占位）而本地 preset 缺失，web 宿主面又已按上游禁用宿主行——本地 web agent 实际无 `plugin_manager`。已按上游构图补齐三个 preset 行
 - → 7E（`SHIPPED_PRESET_ROOT`/`modeSelectionEnabled` 未移植）：`web-agent-presets.e2e.ts` **不移植**——移植试跑 24/32 失败，preset 名册/`str_replace_editor`/session create-vs-load 语义/`userdoc-http` 宿主服务深度分歧；`mount.spec`/`session.spec`/`settings.spec` 包级套件覆盖同语义空间，`agent-preset-*.e2e`/`shipped-composition.e2e` 覆盖 web 面
 - `packages/test-support/session-snapshot` 包整体不落地（本地 `*.snapshot.ts` 车道承接回放；级联缺 `prepareSessionSnapshotFixtureForComparison`/`parseSessionFormatLogFilename`）
@@ -235,11 +235,9 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - **真实源修复（spec 移植暴露，非测试问题）**：`agent-presets/mount.ts` 的 `mountDetail` 不识别 cause 包装 AggregateError——移植上游 `detailBranches` 递归缩进展平（嵌套组内失败行现在点名 `inner-first`/`inner-second` 而非止于 group 消息）；`discovery.ts` 的 `compositionProblem` 未兜 package-lookup 异常——补 try/catch 降级为该 preset 的 broken 理由（`the composition's plugins cannot be checked: …`），一个 preset 的查找失败不再中止整个名册列举。
 - **移植并全过**：`mount.spec` 五组上游新增用例（inactiveRows 集合 settle 报告、nested-broken 组内归因、packageOf 名册检查两例、无 baseUrl 名册拒绝；夹具 `throws.js`/`nested-broken/` 随拷，harness 补 `PluginPackages`+`builtins.group`，6 处 mkdtemp 接入 roots 清理）53/53、remote.spec 24/24（按本地契约适配见下）、hmr `transport` spec（按本地 `modules.invalidate/prefetch`+`entry.refresh()` 语义重写，jsdom 环境+异步 `fiber.dispose()`）、cordis-client-runner `api-catalog`/`providers` spec（按本地槽位模型重写，120/120）、agent-loop `continuation-messages`/`adapter` spec、`session-log-deepseek` `config` spec（适配本地默认关）与 `feedback-composition` spec（真实 loader 组合，storage 三件套经 namespace import 挂载）、`subagent-codex` `real-product-cleanup` 助手+spec（9/9）。
 - **不移植（有意分歧，已核）**：`system-prompt-admission.spec`（in-history admission 语义深度分歧，本地 `systemPromptUpdate` 管线）、`request-freeze.spec`（本地 `freezeRestoredObject` 恢复即深冻属 baseline 硬化，上游 dispatch 才冻——前提不成立）、`WeakMapWithValues`（唯一消费者 `ui-session` 未携带）、`shipped-root.spec`（本地 `profile-boot.ts` derived patch 承接，`shipped-preset-root`/`resolved-profile-boot` spec 覆盖）、`test-session-query.ts` 助手（本地 subagent spec 走"无查询服务"直面路径+内存后端，无 stub 需求）、`serial-created.mjs`（上游 patches 机制在本地 SDK 客户端为 `cordis=` 参数，`serial-listener-review.spec` 覆盖同语义）。
-- **agent-presets 语义分歧登记**（本地架构有意面，remote.spec 断言已按本地契约写）：preset remote 对非 RemoteError 一律包装 `gateway/internal`（错误边界不变式 vs 上游原始透传）；blank 判定走 `turnBoundary` 投影（仅 command/plugin 活动的会话仍可切换 vs 上游 `hasConversationContent` 消息内容判定）；无可写根时 `PresetNotWritableError` 携空 preset id（拒绝与 id 无关）；`PresetMountError` 包装 mount 失败（vs 上游逐条 RemoteError）；名册 API 无 `includeShippedRoot`/`modeSelectionEnabled`/`authorable`（`SHIPPED_PRESET_ROOT` 由 profile-boot derived patch 承接，line 127 已记）。
+- **agent-presets 语义分歧登记**（本地架构有意面，remote.spec 断言已按本地契约写）：preset remote 对非 RemoteError 一律包装 `gateway/internal`（错误边界不变式 vs 上游原始透传）；blank 判定走 `turnBoundary` 投影（仅 command/plugin 活动的会话仍可切换 vs 上游 `hasConversationContent` 消息内容判定）；无可写根时 `PresetNotWritableError` 携空 preset id（拒绝与 id 无关）；`PresetMountError` 包装 mount 失败（vs 上游逐条 RemoteError）；名册 API 无 `includeShippedRoot`/`authorable`（`SHIPPED_PRESET_ROOT` 由 profile-boot derived patch 承接，line 127 已记；`modeSelectionEnabled` 已由 B6 增量落地——注册进 `projectWritePaths` 成为项目管理者策略，个人部署下保持上游个人设置语义，见收口台账 B6 段）。
 - **session-log-deepseek Config 分歧**：本地 `enabled` 默认 false＋`killSwitch`/`allowlist`/`audit` 为有意硬化面，上游默认 true；config spec 按本地契约适配。
 - **矩阵销账**：`packages/e2b/{e2b,fs-e2b,subprocess-e2b}` 上游已自行移除（alpha.2 树无），矩阵行由 adapt 改 `reject`/`not-carried`/`upstreamOnly` 并补 note 记上游移除；`compaction-image-offload`/`session-format-v2-to-v3` 双侧俱在，行有效。
-- **session-format-v2-to-v3 `draft` 适配（2026-09-22 补登）**：本地 `SessionHeader.draft`（草稿会话推迟物化，归属 `2026-08-26-session-draft-lifecycle-and-content-watermarks`）是 alpha.1 时代 v3 头既有字段；上游 alpha.2 的 v3 codec 委托 released-v2 键集校验，直接拒收 `draft`。本地 v3 层在解码头/编码头边界先剥离 `draft`、断言布尔、再回写，v2 codec 严格性不变；`upstream-sync.json` 该包分类由 `tracked` 改 `adapted`。同时修复 `ui-conversation` 插件访问 `ctx.remote.permissionPresets` 漏声明 `remote.permissionPresets` inject（catalog 懒源被注入守卫拒绝、权限选择器空渲染），并将 9 份 alpha.1 时代 v2 web 夹具迁移至 released 链承认面（turn/start 弃 `trigger`、step/start 先于 surface、裸 `assistant/chunk` 折入 `assistant/message`/`attempt` 的 `stream`、`sourceEventSeqs`/`messageSeqs` 按投影序号重算、`tool/result` message 补 `id`/`role`/`source`）。
-- **session-format-v0-to-v1 `participant` 源适配（2026-09-22 补登）**：项目协作把认证参与者元数据记进 `user/message` source 与 `collaboration-context` 插件源（`participant`/`participantMessageId`，归属 `2026-08-15-project-collaborative-conversations`）；上游 alpha.2 的 released-v0 源词汇无此二字段，PG 持久化真实日志的 v0 边界校验拒收。本地校验器承认两字段并按既有 released 源惯例检查参与者记录必需键；`upstream-sync.json` 该包分类由 `tracked` 改 `adapted`。
 - **文档/元数据补齐**：tier-1 发布面（telemetry-otel peer+dev 对位、apiproxy 补 `dsh-scope`/`dsh-session`/`dsh-session-persistence`/`dsh-session-projection`/`dsh-tools`、pi-ai 补 `dsh-fs` peer、benchmarks `dsh-terminal` dev、`tsconfig.host.json` 补 `dsh-http-proxy` 引用并对齐上游序）与 tier-2 测试 devDep（15 包按测试实引补齐，`dsh-client-store` 本地无包跳过）；`glossary` seam 例改上游 `dsh-user-approval`（本地同构，llm 无内置 Consumer）；website docs.ts 补 `dynamic-cordis` 投影条目（order 3）与 wire-extensions repo-only 注释。
 - **验证**：agent-presets 172/172、subagent-codex 72/72（含真实 codex 子进程 real-product 7 项）、hmr 6/6、cordis-client-runner 120/120、session-log-deepseek 全量绿；`pnpm install` 解析后 devDep 链接就位。
 - **subagent-dsh-sdk 失败诊断层（后续亲验追加）**：上游 alpha.2 在 `run.ts` 落地完整失败分类学（`SdkFailureStage`/`SdkFailureCategory`→固定安全 `Subagent failure (provider: DSH SDK; stage: …; category: …)` 诊断行）——本地基线期拷贝缺失。已移植：`SdkRunFailure`/`failureDiagnostic`/`sdkFailure`（TransportClosed→transport、JsonRpc/Protocol→protocol）、`sdkChildOutcome` 替 `sdkStopReason`（新增 `blocked`→`refusal`、disposed-abort→`child-disposed`、无终末→`missing-terminal`、未知→`child-unknown` 诊断）、`sdkConfigurationFailure`（cwd 解析失败安全包装）、`sdkStartupFailure`（initialize+cleanup AggregateError 拆分）、`internals.createHarness` 测试缝、`collectDiagnostic` 挂进 `settleRunResult`、teardown 包装 shutdown 失败；index.ts 的 `start` 前置 abort 检查 + `resolveChildCwd` 经 `sdkConfigurationFailure`+warn。e2e 同步升级上游三场景（夹具 `scoped-tool-subagent.ts` agent-scope 挂载+`subagent-model-selection-settings` 行、`mock-delegating-llm` 路由选择+resolveModel 记录、`child-mock-llm` RouteEcho 校验+失败模式；本地 `cordis=`/`resolveExampleLaunch`/`DSH_TEST_CHILD_*` env 机制承接上游 patches/dshHome 面）：路由 `mock/mock-routed/max/777`+maxTokens 转发+cwd 继承、子失败诊断与部分输出分离——2/2 + 单元 34/34 全绿；共享夹具 `sdk/client/tests/fake-runtime.ts` 同步升级上游 turn/end 发射块（`none` 真缺省、`FAKE_ABORT_REASON_KIND`、`FAKE_MALFORMED_REASON` 五变体），sdk-client 34/34 无回归。**登记待办**：`subagent-acp` 同型诊断层（`AcpFailureCategory`/`diagnosticText`/`remote-limit` 映射+权限决策诊断）未移植——上游 run.ts 是含 managed-range teardown 的整文件重写（619 vs 367 行），与本地树作用域 teardown 架构分歧，需专项移植协调两种生命周期模型，暂列挂起而非嫁接。**【已收口 2026-09-21】**：诊断分类学按 SDK 同型嫁接入本地 run.ts——`AcpFailureStage`/`AcpFailureCategory`/`AcpFailureFacts`/`AcpPermissionDecision`/`ACP_TOOL_KINDS`/`failureDiagnostic`/`permissionDiagnostic`/`diagnosticText`/`AcpRunFailure`/`acpConfigurationFailure`/`permissionRequestKind`/`startupFailure`/`terminalFailure`/`reportFailure` 全量移植；`latestPermission` 追踪挂进 onRequest；prompt 成功路径接 `terminalFailure`（max_turn_requests→remote-limit+stop reason、未知原因→unknown 固定回退不含原文、max_tokens/refusal/cancelled 携权限事实）、失败路径经 `settledOutcome` 有界观察（done 已 settle→`stage: process; process-exit`+退出码/信号，live→`transport`）；startup 失败按 `startupStage`（initialize/new-session）分类并经 `AcpRunFailure` 安全包装（配置 cwd 失败→`stage: initialize; configuration`，session id 缺失→`new-session; protocol`，spawn/done 失败携 `process-exit` 退出码）；dispose/teardown 失败同款包装。managed-range teardown 本体不移植（架构分歧维持）。夹具补 `MOCK_PERMISSION_IGNORE_DECISION`/`MOCK_TOOL_KIND`/`MOCK_CRASH_ON_INITIALIZE`/`MOCK_CRASH_AFTER_CHUNK`；spec 补 `expectedFailure`/`expectedPermission` 助手 + 既有断言 diagnostic 字段 + 6 个新测试（权限事实×2、cancelled 无诊断、remote-limit、未知回退、crash-after-chunk process-exit、initialize process-exit）——54/54 绿 + loader-composition e2e 绿。
@@ -268,45 +266,198 @@ doc-sync 车道现状：31/31 通过，含三个新接门禁（npm dependency ca
 - **如实登记未修（LOW/观察项）**：`discovery.ts` group 行自身 `name` 不查 + `disabled` 语义与 loader 分歧（group 行的 disabled 在挂载期被忽略）；`internals.createHarness` 测试缝本仓暂无消费方（结构随上游保留）；`fakeLaunch` 透传 `process.env` 使环境 FAKE_* 可泄入 fake 脚本；`index.ts` `%o` 对 plain Error 渲染 `{}`（SDK 同款惯例，保留一致性）；`settledOutcome` 一宏任务窗的 transport/process-exit 分类竞态（代码注释已声明）；`gateway/server.ts` `/account/api/projects` 的 `canManage` 未计 `authority.administrator`（未发现消费方）；`api-catalog` spec 的 `referencedTypes` 仅查数组形态。
 - **验证**：全量 typecheck/lint 绿；受影响 spec 全绿（client-runtime 453、cordis-client-runner 120、agent-presets 172、subagent-dsh-sdk 37+34、subagent-acp 54、hmr 7）；`doc-sync` 维持 40/40。
 
-## 本轮补全批次 0（2026-09-22）
+## 7A 启动与插件生命周期增量（2026-09-23，未提交候选）
 
-本轮实施基线为 `aa98a628f4e0e41316af25279c5d922f4bd7b5cd`，分支为 `codex/alpha2-complete-alignment`，上游目标仍固定 `ddefc45fbc7f8e46dd73185e68295696d1297887`。顶层状态为 `implementation-in-progress`，继承全部已批准阶段及产品决定；记录修复没有把新候选、后续 UI/能力补全或发布验收标为完成。此前各节保留对应时点的历史记录。
+本批在 `codex/alpha2-complete-alignment` 隔离工作树实现，保留正在进行的主线合并检查点；尚未提交、推送或开放发布。采用目标 tag 的启动批次、ClientEntries、图事件和局部重试，保留本地 Workbench、认证接线、runtime 预加载及插件分组。生产环境保留图传输，仅文件产物轮询需要显式开发配置，见[页面级条目说明](../../.agents/notes/implemented/architecture/2026-09-23-page-owned-client-entries.md)。
 
-当前矩阵和清单升级为 schema v3；冻结的 alpha.1 记录保持原样。矩阵消除 4 组同 area 的 `required`／`adapt` 冲突，按现有代码归入 `adapt`，累计与增量原始路径仍归其实际消费者 owner，审查状态全部保留 pending。
+- 启动、条目、传输及组合守卫的 144 项聚焦用例通过。新增 entries、entry-lifecycle、events 三个实际测量文件的逐文件覆盖率为 100%；这不代表已有覆盖率欠账文件也达到 100%。
+- [真实插件生命周期](../../apps/web/tests/client-plugin-live.e2e.ts) 5 项、[默认产品隔离](../../apps/web/tests/default-product-isolation.e2e.ts) 1 项、[设置页](../../apps/web/tests/settings-chrome.e2e.ts) 9 项、[真实 HMR](../../apps/web/tests/hmr-live.e2e.ts) 1 项通过。默认隔离含主动挂载实验插件的负例；主题加载测试拦截实际启动图声明的 application 批次。
+- [四窗格回归](../../apps/web/tests/workbench.e2e.ts)覆盖并发流、审批、草稿恢复与后台完成；[文档管理](../../apps/web/tests/document-manager.e2e.ts)覆盖桌面、窄屏、跨作用域和上传，共 11 项通过。使用既有预期输出只读回放，没有扩大 normalization 或批量重录。
+- Web 夹具显式隔离文档目录，避免测试访问操作者默认目录。相同本机、相同 5 个插件生命周期场景的用例耗时合计由约 152 秒降至约 11 秒；这是本次本机对照，不是 CI 中位数、跨平台性能或全仓提速结论。
+- 隔离调查发现孤儿准入锁恢复检查 `.admission`，真实工具却持有 `.admission.lock`；修正负例在旧实现下约 30 秒失败，旧构建经真实 HTTP 返回 500。修正路径、串行恢复并重新核验所有者后，文档存储与原子写共 142 项回归通过；[真实组装](../../apps/web/tests/scaffold-hermetic.e2e.ts)的文档隔离、技能隔离与后端重启恢复 3 项通过。不能证明进程退出的锁保持不动，恢复协调锁中断后的操作员处理边界见[恢复说明](../../.agents/notes/implemented/bug-fix/2026-09-07-userdoc-orphan-admission-lock.md)。
+- 完整构建、后续 Host 增量构建、Host 类型检查、受影响源码严格 lint、升级记录校验和双语配对已执行。门禁接受与拒绝用例保护生产图传输和轮询配置；上游接入点重放记录保留执行器三态与既有调度关系。
 
-| area | 累计原始路径 | 增量原始路径 | 单独保留的历史归一化别名 |
-| --- | --- | --- | --- |
-| `packages/ptc-runtime/ptc-runtime` | 18 | 1 | 0 |
-| `packages/ptc-runtime/ptc-runtime-node` | 52 | 6 | 5 |
-| `packages/experimental/ptc-runtime-python` | 31 | 1 | 0 |
-| `packages/workflow/workflow-ptc` | 50 | 1 | 6 |
+本批不关闭 SessionReference、导航代次、统一右侧栏、SSH、终端、Office、Webhook、完整 Admin、真实 DeepSeek 与最终跨平台验收。现有 pending 项不得根据上述局部绿灯批量改为完成，发布验收基线仍待最终候选。
 
-按 `git diff --no-renames --name-only -z` 对账，补回 76 个被旧 code-runtime／workflow-worker-thread 路径归一化掩盖的真实变化路径，消除 9 个同一行内的重复路径引用，并把不属于真实 diff 的 11 个历史归一化路径移入各 owner 的 `historicalPathAliases`，保留原始 `sourcePath` 和 alpha.1 来源记录。最终 329 行逐一认领累计 5,507 路径、增量 2,641 路径，无缺失、多余或重复；其中 320 行待累计源码审查、9 行保留既有本地验证状态。路径与旧名归属一致，无需为了计数新增 area。
+## 7A：Client Session 显式引用增量（2026-09-23）
 
-[记录检查器](../../scripts/verify-upgrade-records.ts)对 schema v3 拒绝重复 area、重复 decision id、缺少对应身份字段、原始路径漏项／多项／重复认领和错误摘要计数。重命名的删除与新增路径分别对账，历史别名不能代替实际变化路径。当前同步目标要求 schema v3 或更新版本，不能通过降级字段绕过校验；较早目标的 schema v2 及更早记录继续使用其历史解释，没有重写历史来满足新格式。[回归测试](../../scripts/verify-upgrade-records.spec.ts)通过临时 Git 仓库运行真实 CLI，覆盖含中文文件名的重命名、累计和增量缺口、无效重复身份及历史兼容。新增身份与库存拒绝用例在修复前均观察到未被阻断；修复后 35 项测试通过，真实仓库入口校验 16 份记录通过。
+本地 `client/runtime` 接入 alpha.2 的 `SessionTarget`、`SessionReference`、`retain/using/retainInfo`，保留 CoHarness 的选择与 Workbench 适配器，但这些视图通过同一分配器持有引用。读取 binding、scope 或引用统计不创建资源；最后一个引用释放后拆本地历史与 scope，不取消 Host Agent。作用域事件与 `sessionOf()` 按确切代次解析，Typert 发起身份不接受旧 context。池化 runtime 保护独立消费者的连接；composer 用引用保留未发送草稿及正在提交的输入。
 
-[CI 输入准备入口](../../scripts/fetch-upstream-baseline.ts)读取当前矩阵的累计与增量基线提交，校验完整 SHA 和一致的目标固定值，仅从固定公开上游以 `--depth=1 --no-tags` 补取缺失快照。已有但身份不符的 tag 会失败而不被覆盖，输入不可取得时不能跳过对账。[直接测试](../../scripts/fetch-upstream-baseline.spec.ts)使用真实浅 Git 仓库和本地传输，证明两个缺失比较提交被取得、较早的未请求祖先仍不存在、再次执行不 fetch、非法／缺失 SHA 和错误 tag 被拒绝。6 项测试通过；连同记录检查器共 41 项。实际执行现有 CI 顺序 `node scripts/fetch-upstream-baseline.ts` → `node --import tsx/esm scripts/verify-upgrade-records.ts`，3 个固定比较树就绪，16 份记录通过。这里没有新增工作流或全量历史拉取。
+验证：Client 全域 329 个文件、4,745 个测试通过；其后针对重入、跨 runtime 引用及真实 apply 的定向 20 项通过。完整构建通过。真实浏览器 Workbench、工作区历史入口与导航验证最初为 10 通过、1 失败、1 条录制专用分支跳过；失败定位为 ZIP 测试仍断言 `session.v4`，实际产物为已实施的 V5。修正版本断言后，Session Header 与 `/export` 双入口、实际 ZIP 内容和观察者隔离的定向重跑通过；未重录 golden。
 
-GitHub API 核实 [CI 35688456271](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271)的 `head_sha` 为 `2ba86fcbb908dd90226dbf5a62148099d24d6607`，完成于 `2026-09-22T05:12:36Z`，结论 success；`node 24 / coverage` 的 `Run exhaustive coverage` 步骤成功，执行 `pnpm run check:ci:coverage`。该次共有 15 个 job 成功、11 个 skipped，原生 Windows complete、macOS serial、manual full audit、可选 Android 等未运行。清单因此修正“从未运行”的陈述，同时保留当前候选 `pending`：旧 CI、不带提交身份的旧命令记录及仅有汇总状态都不能作为本轮发布通过证据。
+局部证据不能关闭整个 7A：异步导航代次、Host 转发事件的调用期引用、统一右侧栏的引用所有者以及最终候选验收仍须完成。此处不修改累计源码审查和发布就绪状态。临时测试日志位于 `/tmp/coharness-alpha2-reference-*.log`，不是可跨提交复用的发布凭据。
 
-## 本轮补全的局部实现与验证（2026-09-22）
+## 7A：异步导航增量（2026-09-23）
 
-以下记录对应 `codex/alpha2-complete-alignment` 的局部实现，不关闭整项产品决定或累计源码审查。最终候选、GitHub CI、真实 Provider 和平台验收仍待完成。独立提交 `f599b9fca0` 固定批次 0 校验；`c7a95773d7` 修复 ACP 清理；`974ad9a198` 修复草稿 Session 读取。
+`beginNavigation()` 为初始选择、工作区打开／新建、fork 和跨 runtime Workbench 加载建立同一导航代次。显式选择、清空、切换布局／展示模式、目标切换、明确访问拒绝以及发起插件卸载均能使旧结果失效。请求完成后仍保留 Host 已创建的会话，但不再抢占新视图或丢弃其草稿。四窗格的焦点与布局操作使用同一判定，未创建第二个 ConversationRoot。
 
-| 改动 | 本地承接与保留差异 | 已执行的局部证据 |
-| --- | --- | --- |
-| Profile 管理授权 | `boot/plugin-manager` 所有公开操作与工具共用部署授权，排队后重验；Gateway 实时读取有效管理员资格。独立本机仍按本机权限执行。该包登记为 adapted，不再 unmanifested。 | 89 项 owning package 回归；3 个指定源文件四维覆盖率 100%；真实 PostgreSQL＋HTTP 证明过期前的旧管理员断言在降权、禁用后被拒绝。 |
-| 跨 Gateway 撤权 | 同事务 outbox、按节点确认游标、代理和文档下载取消；事件发布重验 ACL。批量主体先全部收到取消，再等待停止完成。下载的 EOF／取消共用释放结果，失败不确认撤权；不宣称收回已发送字节。 | 真实 `test:postgres` 两套件 43/43（25 项基线、18 项撤权）；既有文档传输／server／proxy 55/55，API 515/515，纯 Node 构建产物 mux／Host smoke 2/2。上游运行时仍是受控传输夹具，不替代完整多用户产品验收。 |
-| ACP 清理 | `subagent-acp` 的退出观测失败不能跳过终止与最后退出等待，错误保留。 | 60 项包测试；真实子进程负例先失败后通过；构建后的 Loader 场景通过。 |
-| 文件计价 | `token-meter` 接入普通文件事实与实际文本请求长度，保留本地不可变折叠和缓存。 | 79 项包测试、135 项 compaction 回归；3 个源文件四维覆盖率 100%，退役 `route-pricing.ts` 的覆盖率排除。 |
-| 草稿恢复 | 当前格式读取器保留 writer 已有的 boolean `draft` 字段，不新增格式代次，也不重写已提交文件。 | 507 项持久化测试；真实 Steer 场景和构建后迁移 smoke 通过。 |
-| 运行中发送 | 鼠标与 Enter 使用同一 Queue／Steer 偏好；保留本地输入、上传、命令及 Stop 行为。 | 153 项源测试；真实 Queue／Steer、设置与持久化验证。 |
-| 模型菜单 | 上游键盘和 portal 行为接入治理数据源；保留手机 Settings Sheet 及原触控尺寸。 | 40 项源测试；真实 Web 4/4，390／375／320 手机几何 golden 未变。 |
-| 工具 diff／终端 | 上游有界 diff、准确增删数及未知退出状态接入现有工具卡片；保留本地 8 行预览。 | 真实 `read/edit`、文件字节及持久结果验证；精确 diff 与 130 删除／130 新增／0 上下文场景均通过。bounded golden 仅适配 8 行上限引起的两行变化。 |
-| 思考正文 | 上游紧凑 Markdown 进入现有 Think 行；保留摘要节流，不截断展开正文，折叠按钮保持可达。 | 115 项相关组件与 Markdown 回归；长流式内容保留首段、全部 900 段及后续追加；实际 Web 生命周期 7/7、会话往返 7/7。 |
+定向单元验证 6 个文件、85 项通过，Client 类型检查与完整构建通过。真实 Web 的现有 Workbench、桌面／窄屏历史入口与夹具清单 4 项通过；新增迟到响应场景在真实 HTTP 路径持有创建请求，再执行新的历史选择，验证草稿、选中视图及既有 a11y 输出。首次失败是有草稿状态与空草稿 golden 比较不符；修正用例先断言草稿保留，再由真实输入清空以回放既有输出，定向重跑通过。没有重录 golden 或放宽归一化。日志位于 `/tmp/coharness-alpha2-navigation-*.log`。
 
-真实 Web 验证使用现有 keyless replay 及实际产品、工具和文件操作；它不等同于真实 DeepSeek Provider、GUI 发布演示或 Gateway 多用户验收。只调整对应 owner 的期望和断言，没有全量重录 a11y 快照。共享录制输入通过现有 `web-test-policy.sharedInputs` 登记全部 owner，引用不存在时失败；未来整合 #219 时必须保留这些 owner 与共同 smoke。
+仍未关闭 Host 转发事件的调用期引用、辅助栏完整迁移、直接打开时的加载失败呈现及最终候选验收。运行时覆盖率沿用既有基线排除，新增导航文件的定向覆盖率输出为未测量，不据此声称 100%。
 
-插件管理的请求级授权只是完整发起人传播的基础。共享会话中的混合人工输入、排队及恢复工作的真实身份、Auto 资格和子 Agent／PTC 传播仍未验收；不能用仍然有效的某个管理员请求上下文代表另一个参与者的权限。跨 Gateway 断流、下一次请求拒绝和目录授权进程重建也不能代表共享 runtime 中所有既有模型／工具任务都已停止。这些差异继续阻止相应产品决定被标为完成。
+后续导航加载交接采用 `commitSessionNavigation`，不修改上游引用 `ready` 的尝试结束语义。工作区历史、新建与初始选择、Workspace 选择和跨 runtime Workbench 接入成功后切换；错误／取消释放临时引用，真实视图成功接管前不拆目标代次。相关 11 个文件、215 项单元测试通过；实际 Web 的 Workbench、桌面／窄屏历史、迟到创建响应、历史网络失败保留草稿及重试共 6 项通过。公开历史加载失败呈现已覆盖侧栏选择；其他直接导航入口仍在累计核对中。
 
-SessionReference、batches／ClientEntries、统一右侧标签、D7、SSH、用户终端、Browser、Office、Webhook、完整 Admin、桌面执行授权、外部 Team、部署迁移及最终平台／产物验收仍按已批准计划实施。上述局部证据不将它们转为通过，也不将旧提交的 CI 结果转移到新候选。
+## 7A：辅助栏、独立详情与会话反馈增量（2026-09-23）
+
+Workbench 保持唯一主布局，辅助栏采用上游 dockkit 与标签生命周期。浏览器身份经过确认后，持久化按 principal／runtime／Session 隔离；同名标签在身份切换后重新建立组件生命期。Browser 使用上游 iframe、未知地址、临时 sandbox 与访客 loopback 语义。Markdown 文件链接保留行号，并交由既有工作区资源服务读取；受管 Gateway 不回退到本机打开。
+
+工具详情通过明确 Session／call 地址读取所属完整回合，不依赖聊天窗口仍持有该调用。Host 沿用 Session 与子会话归属授权，冷读不创建 Agent；传输不截去目标调用。隐藏标签不启动详情读取，销毁、换调用或身份变化取消旧请求。真实 Web 验证冷读、分页后打开、刷新后聊天窗口未包含旧调用但详情仍可读，以及没有新增模型回合。
+
+裸 `/feedback` 采用上游分类与备注弹窗；带参数命令和可编辑单消息 sidecar 保持原语义。每个 Session 代次持有独立控制器，销毁后丢弃草稿与读取缓存，迟到成功不能恢复旧弹窗。提交失败保留草稿，重试经过真实 Remote 写入 `feedback/record`；日志共享取决于管理策略，评分不构成共享授权。
+
+证据：全 Client JSON 报告覆盖 367 个文件、5,303 项测试，全部通过；随后反馈生命期增量 6 个文件、117 项通过。完整构建通过。最后一组只读 Web 回放覆盖工具详情、会话反馈及文本反馈命令，3 个文件、7 项通过；原单消息反馈另有通过记录。反馈命令 golden 收窄到其确认行，精确保留 Session 标识与共享策略；公共界面由独立组装场景承接。日志与 JSON 位于 `/tmp/coharness-alpha2-*-feedback*`、`/tmp/coharness-alpha2-ui-integrated-client.json` 及相关 tool-details 日志。它们描述本地未提交检查点，不充当最终发布凭据。
+
+文档首轮检查为 34 通过、6 失败，定位到生成目录陈旧、遗漏的 API 参数说明与 README 格式，继续修复并复核。`ui-dockkit/src` 与固定上游目录逐文件一致；主权门禁比较已提交 HEAD，故在新包尚未提交时仍报告该 tracked 项缺失。保留正确分类，等待统一提交后重新核验，不为本地绿灯改写处分。交付物 Review、远端执行、部署及其环境验收仍未关闭。
+
+## D7：交付物与历史 Review 增量（2026-09-23）
+
+`tool-present` 和 `workspace-changes` 接入实际 base／Web 组装；`deliverables/presented` 与 `workspace/changes` 是当前 Session 格式的必读事件，两个 SDK 保留原始事件。Review 通过明确 Session／事件／文件索引读取回合快照；普通预览读取当前文件。RPC 在读取前后核验 Session、项目目录和文件权限，冷读不创建 Agent，不向浏览器输出快照内部路径。资源由保留的 Session 和对应 runtime 连接持有，释放时清空私有缓存；桌面动作同时核验连接能力与工作区。
+
+证据：交付物 UI 8 个文件、95 项测试通过，定向语句／分支／函数／行覆盖率均为 100%；新增历史读取模块经 85 项 API／传输测试验证，四项覆盖率均为 100%。完整构建通过；真实 Web 只读回放 6 个文件、11 项通过，场景调用真实 present 工具并在回合结束后再次修改文件，独立验证历史 diff 与当前预览。Python 客户端 29 项与 Session 不可变代次 22 项另有通过记录。日志位于 `/tmp/coharness-alpha2-review-*`，对应未提交工作树，不是最终发布凭据。
+
+当前 recorder 保留上游的本机文件与临时目录实现，远端快照还需执行目标适配；Host 重启后的历史内容保留也未实现。不得据此关闭远端 D7 或累计升级验收。
+
+
+## Office、远端 Review 与桌面授权增量（2026-09-23）
+
+Office/PDF 沿用上游转换及渲染方案，文件读取通过已有 ApiProxy 权限与资源服务。原生 macOS arm64 和 Linux arm64 WASM 的 doc/docx/xls/xlsx/ppt/pptx 转换已实跑，独立核验 PDF 文字；macOS 浏览器还验证页面像素与无效文件拒绝。Linux 镜像补齐字体后通过，保留第一次缺字体失败。Provider 与技能 71 项、客户端 188 项定向测试通过，各自测量源码四项覆盖率 100%。当前 Web 只读回放 Office、Review 和实际组装共 12 项通过，完整构建通过；后台 Office 配置及最终发行环境证据仍待收口。
+
+远端 Review 已通过统一 FS/subprocess 提供方在目标机器执行 Git，临时索引与对象不污染目标仓库；文件工具捕获经版本化、有界 FS 窗口传回 Host。该增量取代上一节的“远端 recorder 尚未适配”状态。51 项定向测试及四项覆盖率 100%，真实 SSH 场景 1 项通过，核验历史内容不随后续编辑变化、仓库索引不变及清理完成。Host 重启后的历史内容保留仍沿用上游临时生命周期；远端断连清理失败不能计作成功。SSH 全部产品资格、连接共享与设置流程仍未关闭。
+
+桌面 native／MCP 驱动接入部署授权回调，缺政策的受管环境不能借用本机权限。161 项定向测试、四项源码覆盖率 100% 与包级编译通过；真实 stdio 子进程验证拒绝不发送指令、撤权传输取消。Gateway 迁移 032 增加版本化用户／项目资格，真实 PostgreSQL 执行身份测试 21 项、管理 HTTP 测试 31 项、管理 UI 与 API 测试 13 项通过。用户资格、项目授权、只读限制、并发版本冲突和通知通道均有拒绝验证。桌面会话确认、租约到实际驱动的完整提供方和三平台 GUI 验收仍未完成，不能据资格编辑页面宣称功能可用。
+
+上述证据来自当前未提交工作树，日志分别为 `/tmp/coharness-alpha2-office-*`、`/tmp/coharness-alpha2-remote-review-*` 与 `/tmp/coharness-alpha2-desktop-*`，不能替代最终候选 CI 或发布证明。未提交、推送或创建 PR；累计升级状态保持未完成。
+
+Desktop confirmation and lease binding: PostgreSQL migration 033 stores authenticated per-user consent for the exact Session, node, runtime generation and desktop, with qualification revision invalidation. Real PostgreSQL execution plus private HTTP tests passed 73 cases; the coordinator and private API tests passed 66 cases after adding Session-bound grant keys. Source and built CLI desktop transcripts each passed two read-only replays; optional fixture plugins are installed in the temporary Profile. These results do not prove the pending complete Gateway driver policy, user-facing confirmation workflow or three-platform GUI acceptance.
+
+## 桌面根会话确认与工作流租约接线（2026-09-23）
+
+当前增量已补齐 Gateway 执行提供者到实际驱动政策的接线，以及 Web 输入区的个人确认／撤回流程。确认由活动根 Agent 所有权继承，历史 fork 不借用父会话确认；每个实际参与者仍分别核验。受管根工作流跨调用持有同一租约，串行化驱动操作，执行和返回前复核资格、确认及租约；不确定的驱动取消保持 stopping，不能自动宣称操作系统输入已排空。
+
+真实 PostgreSQL／HTTP 的执行身份测试 27 项通过，覆盖当前用户确认查询、节点变化、撤权再授权及拒绝伪造身份。31 项定向测试通过，测量的工作流政策和确认组件源码四项覆盖率均为 100%。实际构建 Web 的 2 项新场景完成局部快照生成及只读回放，证明空白会话入口、保存失败后重查、确认和撤回均走真实 ApiProxy；该场景使用确定性 Gateway 传输，不冒称完整真实 Gateway／桌面 GUI 验收。构建、日志和覆盖率绑定当前未提交检查点；三平台 GUI、节点部署设置及最终候选验收仍未关闭。
+
+## Gateway SSH／Webhook 面、PTC 检查器与三处缺陷修复增量（2026-09-24，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。本增量取代上文的"SSH 全部产品资格、连接共享与设置流程仍未关闭"（远端 Review 段）、"本地补强剩管理员开关、重放防护、限流与 Session 归属策略（7B）"（源码级事实段）及"本批不关闭 …SSH…Webhook…"（7A 启动段）三处待办陈述的相应部分。
+
+**三处审查缺陷修复。** Session 版本准入补齐 3／4 代；权限目录改为单一缓存并修复旧响应失效竞态；`tool-terminal` 的 `presentResult` 只在本次发送实际等到会话退出时才携带退出码或信号，仍在运行的会话不再被呈现为成功退出（`sendExitStatus` 收窄 `tool/result` 元数据，缺失或畸形元数据按未知处理）。
+
+**SSH Gateway 面（新增，CoHarness 自有设计）。** PostgreSQL 迁移 038 建立 SSH 目标登记、按用户资格策略与项目共享三张表，资格与共享变更接入既有访问失效外发。`PostgresSshTargetService` 提供管理员 CRUD、按目标列出与共享管理；共享要求项目所有者身份，每个用户仍需独立资格。`/internal/runtime/ssh/resolve` 端点由签名执行主体驱动 `authorizeSsh` 资格校验后下发连接配置；`context/gateway-execution` 新增 `GatewaySshAuthorization` 服务作为唯一放行通道，`ssh/ssh` 包声明授权契约。Admin API 与 `gateway/admin-ui` 的 SSH 页提供目标编辑、共享与资格管理。真实 PostgreSQL 集成测试 4 项通过（CRUD、共享权限矩阵、resolve 授权拒绝）。Gateway 全部既有 PostgreSQL 测试组复核通过。
+
+**Webhook Gateway 面（新增，CoHarness 自有设计）。** PostgreSQL 迁移 039 建立管理员管理的 Webhook 端点表：结构化 Provider 规则与提示词模板（无任意 JavaScript）、执行账号、目标运行时、受理限值、防重放窗口及只写 AES-256-GCM 签名密钥（复用组织凭据密钥文件，新增 `HGW_WEBHOOK_SECRET_KEY_FILE` 配置），并向投递回执表追加保留的已验证事件载荷供管理员重跑。`webhook-intake.ts` 编排公共 Provider 路由：签名校验先于 CSRF 检查（Provider 签名即认证），严格请求校验、内容去重与限流经投递账本实现，重放别名绑定每个已见投递 ID。派发经 `webhook-dispatch` 用途断言调用 runtime 回环端点 `/api/internal/gateway/webhook-dispatch`，该端点强制 POST、当前 principal 用途与未过期校验、有界请求体，并经 `createWebhookSession` 完成会话创建归属与执行授权；runtime→gateway 方向在 `/internal/runtime/*` 拒绝 webhook-dispatch 用途断言，双向用途隔离。管理员重跑走审计路径且不复用自动投递 ID。Admin API／UI 暴露端点管理与投递诊断（不含载荷与密钥），端点默认禁用、需管理员显式开启。真实 PostgreSQL 集成测试 4 项通过（签名校验、无效 JSON、去重、过滤与限流），runtime 派发路由测试 9 项通过（缺失主体、错误方法、过期主体、错误用途、校验失败、派发失败映射）。
+
+**PTC 轨迹检查器移植。** `code-program.ts`／`copy-codes.ts` 自上游原样移植，`TrajectoryTable` 新增 Code/Result 面板：`run_code` 按确切工具名识别，源代码从已记录工具参数解析，语言由已记录 schema 描述推断（不从源码猜测），输入面板支持原始 JSON 切换与复制，输出面板经本地 JsonTree 渲染 JSON、否则按纯文本/错误呈现。保留本地虚拟化桌面表格、移动端 feed、本地化字典与既有 JsonTree 架构；上游 `string-wrapping-store.ts` 对应可展开 JSON 字符串换行偏好，本地 JsonTree 无可展开字符串组件故不携带，`upstream-sync.json` 的 `removedUpstreamPaths` 维持该条目。压缩中断标记 `COMPACTION_INTERRUPTED_ERROR` 随检查器一并落地。`ui-primitives` 的 `CodeBlock` 增补 `contentRef`/`lineNumbers`/`showHeader` 与 `.content`/`.numbered` 样式，保留本地 token 命名与移动端规则。轨迹表测试 30 项、ui-primitives 相关测试与 DOM parity 快照复核通过。
+
+**台账与门禁。** `scripts/upstream-sync.json` 复核：`ssh/fs-ssh`、`ssh/ssh`、`webhook/webhook` 维持 `adapted`（能力包携带本地增量），`context/gateway-execution` 维持 `owned`（SSH 授权与 Webhook 派发属 CoHarness 自有面），`api/terminal-controller` 等新包已登记。本轮 lint 合规改造把 `boot/hmr`、`ptc-runtime/ptc-runtime-node`、`subprocess/subprocess-local`、`terminal/terminal`、`terminal/terminal-bash` 的 `withResolvers<void>` 统一为仓库约定的 `withResolvers<undefined>`，连同 `tool-terminal` 的 `presentResult` 行为修复一并重分类为 `adapted`；`verify-upstream-sovereignty` 现 78 tracked／189 adapted／29 owned／2 replaced／22 upstreamOnly 全绿。`verify-client-packages` 修复 `api/terminal-controller`、`client/ui-sidebar-terminal`、`client/ui-renderer` 三个 manifest 的 peer/dev 分类后全绿。全仓 lint（3,908 文件）0 警告 0 错误，全仓 typecheck 通过，Admin UI 生产构建通过，`gateway-execution` 全部 149 项测试通过。`gateway/deploy/postgres/README*` 双语补齐迁移 032–039 条目。
+
+**仍未关闭。** 外部持续 Team 持久化与重启恢复、部署迁移协调（单写者切换、备份恢复演练、滚动重启顺序）、平台验收（真实 DeepSeek 流程、三平台桌面/native、五平台 Python、LAN/公网双用户、Linux/macOS PostgreSQL 部署）、2,641 个变化文件的逐文件语义审查与累计对账、前后性能对比证据，以及绑定最终候选的发布证据均未完成；本批局部绿灯不得据以宣称发布就绪。管理 UI 与轨迹检查器属用户可见 GUI 变更，打包 PR 前需按仓库规范补真实服务端/模型流程的 GIF 证据。
+
+## Session 双迁移准入收敛与 legacy 目录移除（2026-09-24，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。收敛"两套迁移准入"这一审计遗留分歧：此前 JSONL 读侧走上游严格生成目录，而 SQLite/PostgreSQL/Gateway 逻辑读侧走本地 `dsh-session-format` 的 legacy 批量目录（`catalog-default.ts`/`legacy-*`），同一历史输入在两条路径上准入结论不同。
+
+**单一规则来源。** `dsh-session-format-catalog` 新增 `sessionLogicalFormatCatalog` 作为逻辑（已解码）存储的唯一入口：逻辑头投影（`seedLength`→`isSeeded`、`delegationDepth` 缺省补 0、拒绝未知键与矛盾种子元数据）→ 逐版本 admission（v3 行跑 `assertV3EventAdmission`、v4/v5 行跑 `assertV4EventAdmission`，与物理 codec 的 decoded 检查一致）→ 共享严格链（v0→v1、v1→v2、v3→v4、v4→v5 直接复用上游 stage）→ `finish` 经 `restoreReleasedV5Artifact`＋`validateInstalledCurrentSessionArtifact` 做当前工件校验。v2 边由新 `coharnessV2ToV3Dialect` 承担：先归一已发布的 CoHarness v2 数据库方言（`compact/*`→`compaction/*` 重命名与 bracket 归属、裸 `end-seed` 标记、steering 消息、扁平消息载体与确定性 legacy ID、`request/header` 系统提示提升为 system head、重试链归属、非 surface 封套元数据剥离与引用重映射），再复用严格 stage 的 `assertEvent`/`remapEvent`/`renamePtcEvent`/`canonicalizeTransformedEvent` 原语。物理路径拒绝的畸形探针（如 `{ turn: 1, unexpected: 1 }`）在逻辑路径同样被拒。
+
+**移除项。** 删除 `dsh-session-format` 的 `catalog-default.ts`、`legacy-catalog.ts`、`legacy-chain.ts`、`legacy-json.ts`、`legacy-types.ts`、`legacy.ts` 与公开 `/legacy` 子路径及其三套规格；包入口只保留现代模块。消费方重接：PersistenceCoordinator 与 Gateway `runtime-api` 改用 `sessionLogicalFormatCatalog`；`core/session` 的 `validateSessionHeader` 恢复上游语义——Session 构造边界拒绝非当前版本头，迁移职责唯一归 coordinator 存储边界（消除 core/session→format-catalog 的反向依赖与潜在项目引用环）。夹具修复：v0 头配 v2 词汇的不协调夹具改标 `version: 2`，陈旧期望版本 4→5，`assertVersion` 助手放开为 `< currentVersion`。
+
+**验证证据。** `packages/session/` 85 文件 2230 测试全绿（含 session-format-catalog 5 文件 138 测试）；`logical.ts` 与 `coharness-v2-dialect.ts` 在 `vitest --coverage` 下逐文件 100%（语句/分支/函数/行）；`verify-export-jsdoc`、`verify-agent-note-format`（931 条）、`verify-md-links`、`verify-doc-budgets` 全绿；新测试文件与源码经 `run-oxlint` 零告警；`jscpd` 全仓 0.04%（方言文件对 v0→v1 正规化与 v2→v3 生成头簿记的镜像以 `jscpd:ignore` 区域注明移植理由）。删除的 legacy 规格的归一化覆盖已移植进 `tests/logical-dialect.spec.ts`（89 用例），含紧凑词汇、转向消息、扁平载体、重试链、压缩归属、引用重映射、种子边界与各畸形拒绝路径；严格 stage 校验后仍不可达的防御分支按仓库惯例删简或以 `v8 ignore` 附理由标注。
+
+**仍未关闭。** 本批不关闭 L18（CI 平台矩阵/覆盖率车道须对最终候选重跑）与累计逐文件语义审查；Session 迁移的其他后端验收（真实 PostgreSQL 库回归）仍挂 2B/8 台账。
+
+## 工作区文件预览 Markdown/HTML 正文增量（2026-09-25，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。对应 7C 面中 `ui-sidebar-documentpreview` upstreamOnly 行的承接部分：上游注册的 HTML 与 Markdown 预览正文落到本地 Workbench 文件标签，而非移植上游渲染器注册表。
+
+**同一授权资源服务。** `WorkspaceFileTab` 按扩展名路由到四种正文：Markdown（`md`/`markdown`）复用带版本保护的 `readPreview` 分页累计到 `eof` 后经 `MarkdownText` 不换行渲染；HTML（`html`/`htm`）经新增 `readFileBytes`（`stat`＋锚定首观测版本的 `readBytes` 窗口）读完整源，`packHtml` 打包直接声明的相对 `.js` classic 脚本与 `.css` 样式表（客户端折叠 `.`/`..`/query/fragment 后走同一授权 `stat`+`readBytes`，限值 4 MiB/资源、32 MiB、64 资源；外部/根相对/scheme/反斜杠/NUL 引用不读取；module、CSS `url()`/`@import`、运行时 `fetch` 不支持），产物在仅 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行，替换/卸载吊销 Blob URL。PDF/Office 与其余文件路径不变。生命周期、ACL、取消沿用 `WorkspaceResourceRegistry`：同一 `WorkspaceResourceOpenRequest`、撤权 `resources.disconnect`、替换/卸载 abort、await 前查信号防迟到发布；无第二 registry、无新 RPC（上游 `readAll`/`readRelated` 由客户端解析＋既有窗口读取承接）。
+
+**验证证据。** 新增 bootstrap 4、pack 9、read-relative 15、markdown 7、html 12、tab 路由 4、真实 apply 组装 2 项 spec；`packages/client/ui-workbench` 239/239 全绿；`apps/web/tests/workspace-files.e2e.ts` 真实浏览器链路验收 Markdown 渲染、打包 iframe `sandbox`/脚本置位、changed/reload 收敛并录 `markdown.expected.md` golden；oxlint 40 文件零告警、仓库 typecheck、verify-export-jsdoc、verify-agent-note-format 937 条、包 bundle 与 apps/web Vite 构建均绿。`upstream-sync.json` 的 `client/ui-sidebar-documentpreview` 补 `replacedBy: client/ui-workbench`；新增笔记 2026-09-25-workbench-html-markdown-previews；就地修正 2026-09-08 note 中未落地机制断言。
+
+**仍未关闭。** 本批属产品可见 GUI 变更，PR 需按规范附真实服务端/模型流程 GIF——与 B6 同一阻塞（无 `.env`/DEEPSEEK_API_KEY、未提交工作树无法归因干净 commit）；上游 code/image/SVG 独立渲染器与 viewer 切换面未携带（本地 `data:` 图片与文本回退承接，代码源查看经文本路径），累计逐文件语义审查与发布证据仍挂台账。
+
+## Webhook 结构化仓库筛选增量（2026-09-25，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。对应审计 B8：此前端点 schema、Admin UI 与派发只实现 events/actions 筛选，repository 仅能出现在模板里；现把批准的结构化仓库筛选贯通到执行入口。
+
+**筛选贯通。** 迁移 `gateway/deploy/postgres/migrations/042_webhook_repository_filter.sql` 为 `harness.webhook_endpoints` 增加 `repositories text[] NOT NULL DEFAULT '{}'`（基数 ≤ 64），存量端点保持接收全部仓库。注册 zod 校验每条为结构化 `owner/repo` 完整名（`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`），非法条目在 create/update 处即 400。`GatewayWebhookIntake.dispatch()` 在为投递预留运行时工作前评估筛选：已验证载荷的 `repository.full_name` 与配置条目做大小写不敏感精确匹配（贴合 GitHub 命名语义），配置了筛选即失败关闭——字段缺失、畸形或不匹配均不派发。`repositories` 与其他规则走同一 revision 校验更新与 `dispatchConfig` 路径，管理员重跑按当前筛选重新评估。
+
+**诊断与界面。** 筛选未命中统一记 `state: 'ignored'` 并附 `errorCode` 指明未命中规则（`event-unmatched`/`action-unmatched`/`repository-unmatched`）；回执 `error_code` 列与 Admin 投递视图徽标本已渲染该字段，被排除投递现在显示具体规则而非无解释忽略。Admin 端点表单新增逗号分隔 `owner/repo` 编辑框，端点表新增仓库筛选列。`ignored` 回执 shape 扩展为可选 `errorCode`，complete() 的幂等比对不受影响。
+
+**验证证据。** `gateway/tests/webhook.spec.ts` 真实 PostgreSQL 套件 5/5 通过：端点 create/update 的 repositories 往返、非法条目 400、匹配仓库派发、不匹配仓库 `ignored`+`repository-unmatched` 且 runtime 零请求、缺失 repository 字段失败关闭、`ACME/Widget` 大小写变体照常派发；事件筛选既有断言升级为校验 `event-unmatched` 代码。`gateway` 与 `admin-ui` typecheck 干净。
+
+**文档与台账。** `gateway/README*` 双语补端点字段清单中的结构化仓库筛选与 `ignored` 的 reason-code 语义；`gateway/deploy/postgres/README*` 迁移清单补齐至 042（一并补记此前未登记的 040 会话级 SSH 绑定与 041 部署控制面）；新增笔记 2026-09-25-webhook-structured-repository-filter（双语），与 2026-09-23-webhook-execution-identity 交叉链接（筛选发生在签名验证与持久预留之后、受管派发之前，投递身份与执行账号契约不变）。`upstream-sync.json` 无需变更：本次改动面（`gateway/` 部署件与 Admin UI）在包追踪之外，`webhook/webhook` 维持 `adapted`、`context/gateway-execution` 维持 `owned`。
+
+**仍未关闭。** 跨节点部署形态下经真实 Provider（GitHub App/Webhook 配置）的端到端验收、Admin UI 生产构建回归与发布证据仍挂台账；本批局部绿灯不得据以宣称发布就绪。
+
+## Python SDK 运行时 Windows x64 目标增量（2026-09-25，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。对应审计 B9：上游 alpha.2 的 `build-exe-for-python-sdk` 可复用构建器与发布管线已含 `node24-win-x64`，本地清单与构建脚本虽早已建模 `win` 平台，但无任何工作流构建该目标，且运行时、组合与冒烟面残留多处 POSIX 假设；本批把 Windows x64 补齐为一等运行时目标。
+
+**运行时与组合。** `tool-fs-search` 的 `resolveRgPath` 移植上游 Windows 伴随文件命名：win32 下由 `process.execPath` 解析出的主干名推导 `<stem>-rg.exe`，其余平台保留 `<execPath>-rg`；上游同函数内的 Electron `.asar.unpacked` 分支未携带——本地无 Electron 宿主（`apps/desktop` 未移植），按「要求当前 owner」原则记为有意差异，随桌面宿主引入时补；新增 `rg-sidecar.spec.ts`（4 用例：POSIX/win32 伴随命名、普通 Node 依赖回退、无 sidecar 回退），上游同文件的 Electron ASAR 用例随之未携带。`examples/jsonrpc-agent/minimal.cordis.yml` 用 `disabled: !!js` 条件按平台选择持久 shell 方言（win32 挂 `dsh-tool-pwsh-persistent`＋`pwsh` 方言终端后端，其余平台挂 `dsh-tool-bash-persistent`），`python/sdk-runtime/package.json` 补齐 PowerShell/终端组合所需依赖使闭包在新组合下闭合（4 preset＋151 包）。`smoke-python-runtime.py` 按 `sys.platform` 选择 `pwsh`/`bash` 工具名、PowerShell/bash 命令体与 `tempfile.gettempdir()`/`/tmp` 期望；极简模型可见快照新增 `minimal/win-x64/model-visible.json` 变体（工具名、描述与命令参数文本随方言不同，上游同款布局），advanced 快照保持单份。
+
+**CI 与发布。** PR 必需 `python-runtime` 作业目标由 `node24-linux-x64` 扩为 `node24-linux-x64,node24-win-x64`（沿用上游 PR 策略，Windows 步骤原生 `pwsh`），`python-release.yml` 发布验证保留全部五目标并在精确文件名校验中补 `win_amd64` wheel；`ci-workflow.spec.ts` 同步锁定期望并新增 Windows 目标回归断言。上游 `ci-master.yml` 的 master-push 平台腿（linux-arm64＋两个 macOS）未携带——本地私有发布路径由 `.gitlab-ci.yml` 在 tag 上构建 linux-x64/arm64/macos-arm64 wheel，属有意部署差异，记此登记。
+
+**验证证据。** `verify-runtime-closure` 151 包闭合；`ci-workflow.spec.ts` 18/18；`tool-fs-search` 全套 153/153（含新增 rg-sidecar 4）；本机 macOS arm64 构建（exe≈200MB＋`-rg`＋spawn-helper）后 `smoke-python-runtime.py --scenario all` 全场景通过并重录 POSIX 快照（advanced 快照随 inspect 工具面重录：`cordis_inspect_list/query`＋本地扩展 `cordis_inspect_self`，retired `cordis_define/run/stop/undefine` 集合有显式拒绝守卫）；win-x64 快照按同一变换规则生成（`{{tool-result}}` 掩码与上游一致）；`verify-cordis-config` 181 文件、oxlint 目标文件零告警、仓库 typecheck、md-links 3007 文件、doc-budgets、note 格式/分类 939 条、translation-pairing 1499 对全绿。文档双语同步：`python/development*`、`python/sdk-runtime/README*`、`examples/jsonrpc-agent/README*`、`docs/user/guide/python-sdk*` 的平台清单、目标列表、sidecar 命名与 POSIX-only 表述全部改写为五平台现状；就地改写 2026-08-12（PR 必需 CI 两目标）与 2026-08-13（win-x64 快照变体）两条 note 的过时机制断言，新增 2026-09-25-windows-x64-python-runtime。
+
+**仍未关闭。** 原生 Windows 构建与冒烟归 CI 所有（本机未执行 Windows runner），win-x64 快照以确定性变换生成、由 Windows 腿实跑比对兜底；上游 profiles 体系的 advanced 场景代际（profile patch 预注册 `snapshot_double`、auto-review 拒绝链）未携带，本地场景围绕 inspect 面重设计属有意差异；上游 `ci-master.yml` 缺失按上段登记；#2488 运行时上下文快照平台差异不变；L18 平台矩阵与最终候选发布证据仍挂台账。
+
+## 托管桌面驱动启动组合增量（2026-09-25，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。对应审计 B10：此前发货的 base/web/governance 补丁不注册 computer-use 驱动，治理补丁也不给 `gateway-execution` 配置 `desktop`——Admin 授权与托管策略齐备，但启动的运行时从不携带驱动，托管桌面路径无法执行真实调用。本批把驱动准入做成节点配置控制的启动组合，而非可选用户 bundle。
+
+**节点声明式启用。** `HGW_DESKTOP_ID` 声明节点本地桌面标识（去空白后 1–256 字符、不含控制字符，镜像运行时 `desktop` schema 上界），缺省即完全关闭：不物化、不写补丁行、不读驱动包。设置后 `mountPolicyBundles` 把驱动包物化进运行时 profile 并向组合补丁追加三行：`gateway-execution` 的 `config.desktop`（由该提供者发布托管策略）以及 `dsh-computer-use` 与 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` 两条 insert。`dsh-computer-use` 经安装模块回退解析（`gateway-execution` 的 peer），仅驱动包需物化；补丁只发一行驱动，保持 computer-use 服务的单提供者不变量。
+
+**物化与覆盖。** 驱动物化与治理/目录守卫包走同一原子暂存机制（`materializePolicyPackage`）：只复制 `package.json`、`lib/`、`cordis.patch.yml`，`cpSync` 解引用、不符号链接源码检出，staging＋rename 原子就位。`HGW_DESKTOP_DRIVER_PACKAGE` 指向绝对包目录；发布模式下默认钉在 `HGW_RELEASE_ROOT/packages/experimental/computer-use-cua-driver-mcp`，显式覆盖必须解析到同一发布路径内；包缺失或不完整在挂载处大声失败。`HGW_DESKTOP_DRIVER_COMMAND`/`HGW_DESKTOP_DRIVER_ARGS` 以字面量命令与 JSON 参数列表覆盖提供者的 `cua-driver` 可执行文件查找与 `mcp` 参数向量，不经 shell。
+
+**范围边界。** browser-use 保持显式本地组合——它无托管授权缝，挂载进受管运行时会脱离策略运行；`OPTIONAL_BUNDLES` 通道未用于本路径（可选 bundle 是用户为个人 profile 选择的 CLI 层，托管桌面是管理员控制面）；实验驱动包不进默认产品组合与默认模板；个人与项目运行时在同一节点下共享同一启用面，运行时策略仍按当前资格与活动根确认逐次拦截。
+
+**验证证据。** `gateway/tests/config.spec.ts` 20/20（缺省、`HGW_DESKTOP_ID` 校验、驱动包默认/覆盖、命令覆盖、JSON 参数解析、发布根钉定与越界拒绝）；`gateway/tests/instances.spec.ts` 22/22（新增：启用全量覆盖——物化产物、patch 三行、`config.desktop`、驱动 config 覆盖；裸 seat 无进程覆盖行；驱动包缺失失败；既有用例确认缺省无驱动行）；gateway typecheck 干净。
+
+**文档与台账。** 双语同步：`gateway/README*` 桌面段补启动组合事实；`gateway/deploy/README*` 新增托管桌面供应段（驱动包供应、`HGW_DESKTOP_*` 清单、资格/确认链）；`packages/context/gateway-execution/README*` 记录 `desktop` 配置来源；`docs/subsystems/computer-use*` 记录受管挂载条件。新增笔记 2026-09-25-managed-desktop-launch-composition（双语），与 2026-09-23-managed-desktop-execution（策略面）及 2026-09-12-computer-use-provider-registration（注册契约）交叉链接。`upstream-sync.json` 无需变更：`gateway/` 部署件在包追踪之外，`experimental/computer-use-cua-driver-mcp` 维持既有登记。
+
+**仍未关闭。** 真实桌面宿主的端到端验收（Cua Driver 实跑＋OS 桌面权限授予＋资格/确认/租约全链）属跨节点部署证据，仍挂台账；本批局部绿灯不得据以宣称发布就绪。
+
+## 门禁遗留修复增量（2026-09-25，未提交候选，B10 验证暴露）
+
+B10 验证中运行 `verify-default-product-isolation`、`verify-package-dependencies`、`knip` 发现四处此前批次的门禁红灯并就地修复：
+
+**外部 kit 包豁免丢失。** `verify-default-product-isolation.ts` 漏带上游 `EXTERNAL_KIT_PACKAGES` 豁免——`@deepseek-ai/libreoffice-kit` 是独立发布的平台引擎入口包（pnpm-workspace catalog 声明 wasm＋四平台变体，lockfile 已按外部包安装），并非工作区包。按上游逐字补回豁免常量与 `reference()` 分支；上游同文件仅另有 `PRESET_PATTERN` 路径差异（本地 preset 布局不同，有意保留）。
+
+**休眠实验依赖。** `apps/cli` 的 `dependencies` 残留 `@deepseek-ai/dsh-experimental-agent-team-web-profile`——该包已按 FIXME 移出 `OPTIONAL_BUNDLES`（待 `api/session-controller` 与 `client/ui-session` 随 Web session 栈落地），实验包不可留在默认产品依赖内（隔离门禁即为此设，`packages/experimental/AGENTS.md` 明禁）。移除该依赖并把 FIXME 扩为「恢复 OPTIONAL_BUNDLES 条目与 apps/cli 运行时依赖」；`agent-team-web-profile` 包本体保留在工作区，families/规格清单不受影响。
+
+**依赖策略漂移。** `package-dependency-policy.ts` 三项：补上游已评审的 `dsh-deque#Deque` SAFE 分类（上游 terminal-controller 同款 import；同步把本地 spec 的 `toBeUndefined` 快照断言改为上游同款 `toEqual(['Deque'])`——SAFE 清单的人工评审 tripwire 由 spec 显式断言承担，本次为同步上游既有评审结论而非新增例外）；删本地多出的 `dsh-session-format-catalog` peer-required 行（policy scope 只覆盖 Client 面与 configured-host 包，`session-persistence-jsonl` 等纯 host 消费方不在扫描集内，条目判 unused，上游本无此行）；补 `dsh-subprocess#SubprocessExecutableNotFoundError`（上游 PEER 行，本地 terminal-controller 同款 import 漏分类）与 `dsh-client-connection#createRpcStreamHttpHandler/RPC_STREAM_PATH`（CoHarness 自有的 gateway HTTP 传输导出，按 peer-required 归类强制单实例解析）。
+
+**清单与 knip 配置。** `ssh/ssh` 的 `dsh-credentials` 由 dependencies 改 peerDependencies（共享服务包惯例，dev 保留）并补 `dsh-typert-protocol` peer＋dev（`declare module` 合并惯例，同 llm/collaboration）；`session-format` 删除无引用的 `dsh-llm` 依赖；`knip.json` 为 `agent-team-web-profile` 补 resolver-manifest 豁免（`cordis.patch.yml` 声明的 `client-ui-agent-team`，同 `agent-team-profile` 惯例）并为 `ui-settings-unarchive-sessions` 补 `.tsx` entry/project 模式（包测试全为 tsx，通配 `packages/*/*` 的 `.ts` 模式无匹配）。
+
+**验证证据。** `verify-default-product-isolation` 283 包/1661 runtime sources/160 Web plugins 排除实验包；`verify-package-dependencies` 61 包符合策略；`knip` 零 findings 零 hints；相关 spec 112/112（verify-package-dependencies＋verify-default-product-isolation）；`app-boot` 82/82（OPTIONAL_BUNDLES↔cli deps 一致性）；ssh 153/153、session-format 54/54；pnpm-lock 同步；改动文件 oxlint 零告警。
+
+## read_image 画廊渲染增量（2026-09-25，未提交候选，B11）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。对应审计累计审查发现的真实功能缺口：本地 `read_image` 后端、附件存储与授权加载链路齐备，但 Web 工具 UI 没有图片卡片材料与 keyed `read_image` 行——结果只能走 generic 文本渲染，丢失上游 alpha.2 的画廊呈现。
+
+**卡片材料与行。** 移植上游 `image-card-model.ts`：仅受理落定、非错误的 `read_image` 调用；校验 `file_path`、持久化 meta（根调用必须有有效 `{path}`，嵌套调用回退自身参数路径）、内容仅含受支持 text/image 块；从结果内容提取持久图片引用并单独抽出文本信封，杜绝原始附件对象被 JSON.stringify 打到图片下方；标签经工作区相对化与 home 缩写。新增共享 `read-family-row.tsx` 组装（浏览图标、标题、摘要、输出/错误、路径处理），`read-row.tsx` 改写复用；keyed `read-image-row.tsx` 注册 `read_image`，模型为 null 时回落 generic 渲染，不吞内容。
+
+**渲染通道的本地适配。** 上游的 `tool.call.images` 子槽未移植：本地 chat 节点本就把 `renderMessageImages` owner prop（背后是 `conversation.message.images` 单槽）递给工具树，`ToolCallOwnerProps`/`ToolCallTree` 只需把渲染器与 `nested` 旗标沿 root/嵌套递归下传；details 面板槽名全局唯一约束下新增 `conversation.details.images` 姐妹槽位，`ui-attachment` 用同一 `MessageImages` 组件注册两处——槽位授权规则（children 声明才可 renderSlot）一处不违。`loadImage` 始终来自 session/conversation 层，ui-tool 不推导 URL、不绕授权。
+
+**附带移植。** `readCallLine`/`filePathLine`——read 卡片按调用自身 offset 携带 `{line}` 打开文件；`fs/tool-fs` `read_image` 的 `presentationMeta` 路径投影（初版误置 output 外层被 typecheck 拦下，已按上游校正进 output 内，并证实 `result.meta` 端到端写入）。
+
+**验证证据。** `image-card.client.spec.tsx` 23/23（模型各分支、画廊经 renderMessageImages、文本信封不打印附件 JSON、空画廊可读、无渲染器降级、running/error/nested/键注册）；`read-card.client.spec.tsx` 30/30（含 `readCallLine` 与 `{line:41}` 打开断言）；`tool-detail-read.client.spec.tsx` 4/4（新增：details 经 `conversation.details.images` 转发 session loader）；`apply-inject` 16/16（`DetailsInjected.loadImage`）；`ui-attachment` spec 33/33（双槽注册/卸载）；`tool-fs` 349/349（新增 meta 投影与 live `result.meta` 断言）。四包 oxlint 零告警、typecheck 干净、`verify-package-dependencies` 0 violation（`dsh-attachment` 按共享附件引用归类 peer+dev）、`gen-client-catalog` 已重生成、`verify-client-catalog` 通过。
+
+**仍未关闭。** 浏览器真实链路 GIF 验收按仓库 GUI 政策属 PR 随附义务；本批局部绿灯不得据以宣称发布就绪。
+
+## 性能基准套件移植与 CI 门禁（2026-10-06，未提交候选）
+
+本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。上游 `benchmarks/` 六个场景目录此前全部缺失，对应 `node 24 / benchmarks` 必需 CI job 及其 spec 钉住、五个支撑 Agent Note 三件套与 `request-freeze.spec.ts` 均未携带。本批将其完整落地，全部测量为真实运行数据。
+
+**移植面。** `session-open`（17 用例：released-v0 合成日志迁移、四阶段剖面、首屏历史、冷 Agent resume、128 MB 受限堆）、`agent-continuation`（请求历史/工具续跑/子体目录/sdk-minimal profile 全路径）、`terminal-io`（4 用例）、`long-session-browser`（真实 Chromium 经 shipped-composition Web scaffold）、`conversation-fold`、`active-stream-reconnect` 与 `synthetic-history` 夹具校验。
+
+**本地适配（四处，均为架构差异而非语义放宽）。** `session-history-adapter.ts`：上游 `api/session-controller` 未携带，以本地 `SessionQueryEngine`/`observeSession` 加 `host/apiproxy` 的 model-selection 投影重建同款跟随语义（promote 仍在首帧 yield 后的下一次拉动发生）。`conversation-fold/runtime-client-shim.ts`：`dsh-client-runtime/client` 是浏览器模块表工厂无法在 plain-Node 解析，tsdown alias＋neverBundle 收窄把所需叶模块内联进 worker，其余包导入仍走 lib 出口。`agent-continuation` 改用本地 SDK 嵌套 launch 形态（`command/args/cwd/env`＋`--patch`）驱动 sdk-minimal profile。`long-session-browser` 适配本地 scaffold（`baseUrl` 字段、`<textarea>` composer、可重渲染的 Load earlier 交互）。
+
+**conversation-fold 缩放比重校准（有依据的本地分化）。** 上游期望 2.5×/上限 3.125× 假定 fold 成本与记录数成比例；本地 fold 每次窗口替换还重建 location、turn-navigation 与 timeline 投影，小窗口固定成本抬高比值。实测缩放稳定 4.6–5.3，期望改为 5×/上限 6.25×——判别力保留（逐 delta 重放退化约 11× 仍被拒），绝对时间预算 16 ms/40 ms 不变。依据写入 `session-open-performance-gate` note 双语。
+
+**CI 门禁补齐（真实缺口）。** `ci.yml` 新增 `node-24-bench` job：标准托管 `ubuntu-24.04`、不经 failover 路由、无 `needs`（独立测量车道）、15 分钟超时、pnpm store 无条件恢复、Chromium 安装与 `DSH_GATE_VERBOSE=1` 的 `check:ci:bench`；`all-checks-passed` 收编该 job。`ci-workflow.spec.ts` 移植上游三组断言（failover 无关性、cache 形态、步骤与超时钉住），21/21 通过。
+
+**附带发现的真实缺口（已修复）。** `request-freeze.spec.ts`（WeakSet 冻结证明的专属 spec）未随优化一同移植——已按本地语义适配补入：`dsh-llm` 携带自有 `deepFreeze`（避免 client bundle 依赖 host-only util 包，spy 目标随之改到 `dsh-llm` 再导出面），且本地 `fromRestore` 在收养时即深冻结恢复图（`freezeRestoredObject`），"包装器可变"断言按本地更强冻结语义反转，5/5 通过。上游五个支撑 note 三件套补齐：`session-open-performance-gate`（fold 校准行按本地化）、`frontend-performance-budgets`、`standard-hosted-benchmark-runner`、`backend-continuation-performance`、`agent-request-freeze-evidence`，及被其引用的 `minimal-profiles-persistent-shell-only`（对未采纳的 base-editor 决策的交叉引用按本地事实改写）。六个配对全部经 `verify-translation-pairing` 重录/通过，note 内零死链。
+
+**验证证据。** `vitest.bench.config.ts` 全套 7 文件 41 测试在 M4/arm64/Node 25.8.1 实测全绿：session-open 首屏历史 ~837–976 ms、reopen agent-resume 中位 34.7 ms、128 MB 受限堆完成；agent-continuation request-history 68.07 ms（预算 297）、tool-continuation 199.45 ms（1125）、catalog 324.7 ms（1125）、profile ~980 ms；terminal-io 五 MiB 中位 104.4 ms（300）；long-session 浏览器 open 177/page 181/trajectory 263/first 242/streamTask 1458/streamWall 2285 ms，三样本 `inputOverlapped` 全真；conversation-fold 500k delta 大窗 fold 19.5 ms（40）；reconnect replace 13.36 ms（63）/驻留 22.27 MiB（30）。测量记录于 `upgrades/alignment/UPSTREAM-ALIGNMENT-PERFORMANCE-dsh-v0.1.6-alpha.2.json`（verify-upgrade-records 16 记录合规）。
+
+**仍未关闭。** 全部数字为 arm64 参考机证据；标准托管 x64（ubuntu-24.04）上的 CI 实测尚不存在——上游 2× CI 时间系数与各终点托管预期已就位，首个真实托管运行后才能确认。浏览器计时含源解析测试 Host 与 Playwright 可动作性，不构成已发布 Host 证据。本批局部绿灯不得据以宣称发布就绪。

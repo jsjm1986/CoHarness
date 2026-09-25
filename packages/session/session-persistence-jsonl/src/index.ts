@@ -1201,6 +1201,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     readonly delegationDepth: number
     readonly agentPreset?: string
     readonly draft?: boolean
+    readonly sshTarget?: number
   }): SessionHeader {
     /* v8 ignore next 3 -- readable catalog results are restored to its configured current version. */
     if (header.version !== SESSION_FORMAT_VERSION) {
@@ -1219,6 +1220,7 @@ class JsonlSessionPersistence extends SessionPersistence {
       delegationDepth: header.delegationDepth,
       ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
       ...(header.draft === undefined ? {} : { draft: header.draft }),
+      ...(header.sshTarget === undefined ? {} : { sshTarget: header.sshTarget }),
     }
   }
 

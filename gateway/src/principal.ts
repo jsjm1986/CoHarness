@@ -22,7 +22,7 @@ import type { UserRow } from './auth.ts'
 export const PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
 /** Narrow purpose carried by a Gateway assertion that is not a browser request. */
-export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin'
+export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
 
 export type PrincipalScope =
   | { kind: 'personal' }
@@ -64,6 +64,8 @@ export interface GatewaySessionCreationHeader {
   delegationDepth?: number
   agentPreset?: string
   draft?: boolean
+  /** Registered SSH target public id bound to this session's execution, when any. */
+  sshTarget?: number
 }
 
 /** Durable Gateway authorization for atomically materializing one project root. */
@@ -108,6 +110,14 @@ function verifiedPayload(assertion: string, publicKey: KeyObject, label: string)
   }
 }
 
+type PrincipalInput = {
+    user: UserRow
+    scope: PrincipalScope
+    runtime: { kind: 'user' | 'project'; id: number; generation: number }
+    purpose?: GatewayPrincipalPurpose
+    now?: number
+  }
+
 /** Signs short-lived request principals for one Gateway organization. */
 export class GatewayPrincipalSigner {
   private readonly publicKey: KeyObject
@@ -124,13 +134,23 @@ export class GatewayPrincipalSigner {
   }
 
   /** Create one compact Ed25519 assertion bound to a runtime generation. */
-  issue(input: {
-    user: UserRow
-    scope: PrincipalScope
-    runtime: { kind: 'user' | 'project'; id: number; generation: number }
-    purpose?: GatewayPrincipalPurpose
-    now?: number
-  }): string {
+  issue(input: PrincipalInput): string {
+    return this.signPrincipal(input, this.ttlMs)
+  }
+
+  /** Bind a profile operation to its server-owned deadline; runtime role checks remain mandatory. */
+  issuePluginManagement(input: Omit<PrincipalInput, 'purpose'>, lifetimeMs: number): string {
+    if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs <= 0) throw new Error('management lifetime must be a positive safe integer')
+    return this.signPrincipal({ ...input, purpose: 'plugin-admin' }, lifetimeMs)
+  }
+
+  /** Bind one verified webhook delivery to its configured execution account and deadline. */
+  issueWebhookDispatch(input: Omit<PrincipalInput, 'purpose'>, lifetimeMs: number): string {
+    if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs <= 0) throw new Error('dispatch lifetime must be a positive safe integer')
+    return this.signPrincipal({ ...input, purpose: 'webhook-dispatch' }, lifetimeMs)
+  }
+
+  private signPrincipal(input: PrincipalInput, lifetimeMs: number): string {
     const issuedAt = input.now ?? Date.now()
     const claims: GatewayPrincipalClaims = {
       version: 1,
@@ -146,7 +166,7 @@ export class GatewayPrincipalSigner {
       scope: input.scope,
       runtime: input.runtime,
       issuedAt,
-      expiresAt: issuedAt + this.ttlMs,
+      expiresAt: issuedAt + lifetimeMs,
       nonce: randomUUID(),
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }
@@ -224,10 +244,13 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || claims.expiresAt <= claims.issuedAt || typeof claims.nonce !== 'string' || claims.nonce === '') {
     throw new Error('invalid principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin'
+    && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch') {
     throw new Error('invalid principal assertion')
   }
-  if (claims.purpose !== undefined && user.role !== 'admin') {
+  // Webhook dispatch carries the endpoint's configured execution account, which
+  // is deliberately not an administrator; every other purpose is an admin power.
+  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && user.role !== 'admin') {
     throw new Error('invalid principal assertion')
   }
   if (scope.kind === 'project' && (!positiveId(scope.projectId) || typeof scope.projectName !== 'string'
@@ -252,7 +275,8 @@ function sessionCreationHeader(value: unknown): GatewaySessionCreationHeader {
       && (typeof header.delegationDepth !== 'number'
         || !Number.isSafeInteger(header.delegationDepth) || header.delegationDepth < 0))
     || (header.agentPreset !== undefined && typeof header.agentPreset !== 'string')
-    || (header.draft !== undefined && typeof header.draft !== 'boolean')) {
+    || (header.draft !== undefined && typeof header.draft !== 'boolean')
+    || (header.sshTarget !== undefined && !positiveId(header.sshTarget))) {
     throw new Error('invalid session creation authorization')
   }
   return value as GatewaySessionCreationHeader

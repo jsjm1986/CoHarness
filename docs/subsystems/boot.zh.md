@@ -14,7 +14,9 @@
 
 `InstallBundleOptions.enabled` 默认为 true，false 表示安装但不选择组合包层。`approvedBuilds` 在安装前向指定的待审批包名授予持久脚本权限。
 
-`ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名。
+`ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden`、`cancelled` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名。
+
+`PluginInstallFrame` 是一帧私有的进度、日志或最终结果。`installBundleStream` 要求唯一请求 id，仅携带本次安装的诊断，并在传输关闭时取消所属安装。消费者必须同时确认最终结果及流正常结束；不得重连并重放安装。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -124,6 +126,14 @@ async authorize(): Promise<void>
  * @returns Package-manager diagnostics and observed activation outcome.
  */
 @Remote async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult>
+
+/** Install with request-scoped progress; disconnect cancels and waits for cleanup.
+ * @param spec - Registry, Git, tarball or absolute path package spec.
+ * @param options - Activation, build-script approval and unique request identity.
+ * @param signal - Transport lifetime; cancellation does not imply cleanup has finished.
+ * @returns Ordered progress, diagnostics and the final installation result.
+ */
+@Remote({ mode: 'stream' }) async * installBundleStream( spec: string, options: InstallBundleOptions & { requestId: PluginInstallRequestId }, signal: AbortSignal, ): AsyncIterable<PluginInstallFrame>
 
 /** Stop an installation this manager owns and wait until its files are back.
  * @param requestId The id the installation was started with.

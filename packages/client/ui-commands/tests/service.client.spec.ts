@@ -14,7 +14,7 @@ import { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import { createScope, scopeOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, InputTriggerSource, SubmitImageAttachment } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import type { CommandContribution, CommandDecoration, CommandUiSpec, SelectOption } from '../src/client/contract.ts'
+import type { CommandContribution, CommandDecoration, PopupSelectSpec, SelectOption } from '../src/client/contract.ts'
 import type { CommandDescriptor } from '../src/client/directory.ts'
 import { CommandUiRuntime } from '../src/client/service.ts'
 
@@ -170,7 +170,7 @@ function menuPick(source: InputTriggerSource, name: string, session: ClientSessi
   return source.onPick(pick)
 }
 
-const themeUi = (over: Partial<CommandUiSpec> = {}): CommandUiSpec => ({
+const themeUi = (over: Partial<PopupSelectSpec> = {}): PopupSelectSpec => ({
   kind: 'popupSelect',
   options: () => Promise.resolve([{ id: 'dark', label: 'Dark' }]),
   onSelect: () => undefined,
@@ -842,5 +842,40 @@ describe('directory invalidation events', () => {
     release({ commands: S2_CMDS })
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(source.matchSpace!(proj('s2'), '/attach')).not.toBeUndefined()
+  })
+})
+
+
+describe('non-submitting command actions', () => {
+  it('consumes only the bare token and invokes the addressed Session with images attached', async () => {
+    const b = await bench()
+    try {
+      const scope = b.mint('s1')
+      const consumed: ConsumeTokenRequest[] = []
+      scope.ctx.on('slash/input-consume-token', (request) => { consumed.push(request); return true })
+      const run = vi.fn()
+      b.command.decorate({ name: 'goal', available: () => true, ui: { kind: 'action', run } })
+      expect(await b.source.matchEnter!(proj('s1'), '/goal', new AbortController().signal, { images: 1 })).toBe('handled')
+      expect(run).toHaveBeenCalledWith(proj('s1'))
+      expect(consumed).toEqual([{ guard: { kind: 'bare-token', token: '/goal' } }])
+      expect(b.executeCalls).toEqual([])
+      const argued = await b.source.matchEnter!(proj('s1'), '/goal text', new AbortController().signal, { images: 0 })
+      expect(argued).toHaveProperty('claim')
+      expect(run).toHaveBeenCalledTimes(1)
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
+  it('does not invoke an action after the draft token or Session scope disappears', async () => {
+    const b = await bench()
+    try {
+      const scope = b.mint('s1')
+      scope.ctx.on('slash/input-consume-token', () => undefined)
+      const run = vi.fn()
+      b.command.register({ name: 'inspect', available: () => true, ui: { kind: 'action', run } })
+      expect(await b.source.matchEnter!(proj('s1'), '/inspect', new AbortController().signal, { images: 0 })).toBe('handled')
+      expect(await b.source.matchEnter!(proj('gone'), '/inspect', new AbortController().signal, { images: 0 })).toBe('handled')
+      expect(run).not.toHaveBeenCalled()
+      expect(b.executeCalls).toEqual([])
+    } finally { await b.ctx.fiber.dispose() }
   })
 })

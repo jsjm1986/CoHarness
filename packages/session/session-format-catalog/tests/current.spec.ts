@@ -6,7 +6,7 @@ import {
 } from '../src/current.ts'
 
 const currentHeader: SessionFormatHeader = {
-  version: 5,
+  version: 6,
   id: 'installed-current',
   createdAt: 1,
   isSeeded: false,
@@ -16,14 +16,14 @@ const currentHeader: SessionFormatHeader = {
 describe('installed current Session restoration', () => {
   it('rejects version skew before entering current Session validation', () => {
     expect(() => { validateInstalledCurrentSessionHeader({ ...currentHeader, version: 0 }) })
-      .toThrow(/installed Session format is v5, got v0/)
+      .toThrow(/installed Session format is v6, got v0/)
     const artifact: SessionFormatArtifact = {
       header: { ...currentHeader, version: 0 },
       inheritedEventCount: 0,
       events: [],
     }
     expect(() => { validateInstalledCurrentSessionArtifact(artifact) })
-      .toThrow(/installed Session format is v5, got v0/)
+      .toThrow(/installed Session format is v6, got v0/)
   })
 
   it('accepts only current request-header reasons and the true starts-series marker', () => {

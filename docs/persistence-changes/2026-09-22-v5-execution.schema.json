@@ -183,7 +183,7 @@
       "kind": "event",
       "event": "agent/inbox/spliced",
       "surface": false,
-      "digest": "989d6d8ca9c21c4c5c0e7bbf88ca575e4165221454524cdeb7dc824fdc6b5b0c",
+      "digest": "6a12ecfb066aafd62c6a857c7898e2f8b2237aba3b5856f391d9aa7d521b1fb6",
       "schema": {
         "root": 0,
         "nodes": [
@@ -212,7 +212,7 @@
               },
               {
                 "name": "type",
-                "type": 109,
+                "type": 111,
                 "optional": false
               }
             ],
@@ -228,7 +228,7 @@
               },
               {
                 "name": "outcome",
-                "type": 105,
+                "type": 107,
                 "optional": true
               },
               {
@@ -243,7 +243,7 @@
               },
               {
                 "name": "target",
-                "type": 106,
+                "type": 108,
                 "optional": false
               }
             ],
@@ -569,21 +569,22 @@
               41,
               43,
               63,
-              68,
-              73,
-              76,
+              66,
+              71,
+              75,
               78,
-              83,
-              84,
+              80,
               85,
+              86,
               87,
-              88,
               89,
-              96,
+              90,
+              91,
               98,
               100,
-              103,
-              104
+              102,
+              105,
+              106
             ]
           },
           {
@@ -937,18 +938,67 @@
             "kind": "object",
             "properties": [
               {
-                "name": "entries",
-                "type": 64,
+                "name": "deliveryId",
+                "type": 7,
                 "optional": false
               },
               {
                 "name": "form",
-                "type": 66,
+                "type": 64,
                 "optional": false
               },
               {
                 "name": "kind",
+                "type": 65,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "ruleId",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "notice"
+          },
+          {
+            "kind": "literal",
+            "value": "webhook"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "entries",
                 "type": 67,
+                "optional": false
+              },
+              {
+                "name": "form",
+                "type": 69,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 70,
                 "optional": false
               },
               {
@@ -961,7 +1011,7 @@
           },
           {
             "kind": "array",
-            "element": 65
+            "element": 68
           },
           {
             "kind": "object",
@@ -992,17 +1042,17 @@
             "properties": [
               {
                 "name": "form",
-                "type": 69,
+                "type": 64,
                 "optional": false
               },
               {
                 "name": "gatewayExecutionScope",
-                "type": 70,
+                "type": 72,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 72,
+                "type": 74,
                 "optional": false
               },
               {
@@ -1019,15 +1069,11 @@
             "indices": []
           },
           {
-            "kind": "literal",
-            "value": "notice"
-          },
-          {
             "kind": "object",
             "properties": [
               {
                 "name": "inputs",
-                "type": 71,
+                "type": 73,
                 "optional": false
               },
               {
@@ -1061,17 +1107,17 @@
             "properties": [
               {
                 "name": "form",
-                "type": 74,
+                "type": 76,
                 "optional": false
               },
               {
                 "name": "gatewayExecutionScope",
-                "type": 70,
+                "type": 72,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 75,
+                "type": 77,
                 "optional": false
               },
               {
@@ -1100,7 +1146,7 @@
               },
               {
                 "name": "kind",
-                "type": 77,
+                "type": 79,
                 "optional": false
               },
               {
@@ -1120,12 +1166,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 79,
+                "type": 81,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1135,7 +1181,7 @@
               },
               {
                 "name": "sections",
-                "type": 81,
+                "type": 83,
                 "optional": false
               }
             ],
@@ -1151,7 +1197,7 @@
           },
           {
             "kind": "array",
-            "element": 82
+            "element": 84
           },
           {
             "kind": "object",
@@ -1174,12 +1220,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 69,
+                "type": 64,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1205,7 +1251,7 @@
               },
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1221,12 +1267,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 86,
+                "type": 88,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1246,12 +1292,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 74,
+                "type": 76,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1267,12 +1313,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 66,
+                "type": 69,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1288,22 +1334,22 @@
             "properties": [
               {
                 "name": "form",
-                "type": 86,
+                "type": 88,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 90,
+                "type": 92,
                 "optional": false
               },
               {
                 "name": "references",
-                "type": 91,
+                "type": 93,
                 "optional": false
               },
               {
                 "name": "version",
-                "type": 95,
+                "type": 97,
                 "optional": false
               }
             ],
@@ -1315,14 +1361,14 @@
           },
           {
             "kind": "array",
-            "element": 92
+            "element": 94
           },
           {
             "kind": "object",
             "properties": [
               {
                 "name": "capturedThroughSeq",
-                "type": 93,
+                "type": 95,
                 "optional": false
               },
               {
@@ -1377,7 +1423,7 @@
             "kind": "union",
             "types": [
               11,
-              94
+              96
             ]
           },
           {
@@ -1393,12 +1439,12 @@
             "properties": [
               {
                 "name": "gatewayExecutionScope",
-                "type": 70,
+                "type": 72,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 97,
+                "type": 99,
                 "optional": false
               },
               {
@@ -1438,7 +1484,7 @@
               },
               {
                 "name": "kind",
-                "type": 99,
+                "type": 101,
                 "optional": false
               },
               {
@@ -1463,7 +1509,7 @@
             "properties": [
               {
                 "name": "kind",
-                "type": 101,
+                "type": 103,
                 "optional": false
               },
               {
@@ -1478,7 +1524,7 @@
               },
               {
                 "name": "replayState",
-                "type": 102,
+                "type": 104,
                 "optional": true
               }
             ],
@@ -1497,7 +1543,7 @@
             "properties": [
               {
                 "name": "kind",
-                "type": 80,
+                "type": 82,
                 "optional": false
               },
               {
@@ -1526,8 +1572,8 @@
           {
             "kind": "union",
             "types": [
-              107,
-              108
+              109,
+              110
             ]
           },
           {
@@ -1736,7 +1782,7 @@
       "kind": "event",
       "event": "session/title-llm-request",
       "surface": false,
-      "digest": "4b7fbf29e0ae1e0d95b75903193114fce97ad18351c41a2e06bc287d86e86333",
+      "digest": "0735bc4fb1d335aad0b9b8289d5638fa8f7f1f3dc5bd79b501fe5c567f92b867",
       "schema": {
         "root": 0,
         "nodes": [
@@ -1765,7 +1811,7 @@
               },
               {
                 "name": "type",
-                "type": 110,
+                "type": 112,
                 "optional": false
               }
             ],
@@ -1791,7 +1837,7 @@
               },
               {
                 "name": "route",
-                "type": 109,
+                "type": 111,
                 "optional": false
               },
               {
@@ -2147,21 +2193,22 @@
               45,
               47,
               67,
-              72,
-              77,
-              80,
+              70,
+              75,
+              79,
               82,
-              87,
-              88,
+              84,
               89,
+              90,
               91,
-              92,
               93,
-              100,
+              94,
+              95,
               102,
               104,
-              107,
-              108
+              106,
+              109,
+              110
             ]
           },
           {
@@ -2515,18 +2562,67 @@
             "kind": "object",
             "properties": [
               {
-                "name": "entries",
-                "type": 68,
+                "name": "deliveryId",
+                "type": 9,
                 "optional": false
               },
               {
                 "name": "form",
-                "type": 70,
+                "type": 68,
                 "optional": false
               },
               {
                 "name": "kind",
+                "type": 69,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "ruleId",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "notice"
+          },
+          {
+            "kind": "literal",
+            "value": "webhook"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "entries",
                 "type": 71,
+                "optional": false
+              },
+              {
+                "name": "form",
+                "type": 73,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 74,
                 "optional": false
               },
               {
@@ -2539,7 +2635,7 @@
           },
           {
             "kind": "array",
-            "element": 69
+            "element": 72
           },
           {
             "kind": "object",
@@ -2570,17 +2666,17 @@
             "properties": [
               {
                 "name": "form",
-                "type": 73,
+                "type": 68,
                 "optional": false
               },
               {
                 "name": "gatewayExecutionScope",
-                "type": 74,
+                "type": 76,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 76,
+                "type": 78,
                 "optional": false
               },
               {
@@ -2597,15 +2693,11 @@
             "indices": []
           },
           {
-            "kind": "literal",
-            "value": "notice"
-          },
-          {
             "kind": "object",
             "properties": [
               {
                 "name": "inputs",
-                "type": 75,
+                "type": 77,
                 "optional": false
               },
               {
@@ -2639,17 +2731,17 @@
             "properties": [
               {
                 "name": "form",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
                 "name": "gatewayExecutionScope",
-                "type": 74,
+                "type": 76,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 79,
+                "type": 81,
                 "optional": false
               },
               {
@@ -2678,7 +2770,7 @@
               },
               {
                 "name": "kind",
-                "type": 81,
+                "type": 83,
                 "optional": false
               },
               {
@@ -2698,12 +2790,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 83,
+                "type": 85,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -2713,7 +2805,7 @@
               },
               {
                 "name": "sections",
-                "type": 85,
+                "type": 87,
                 "optional": false
               }
             ],
@@ -2729,7 +2821,7 @@
           },
           {
             "kind": "array",
-            "element": 86
+            "element": 88
           },
           {
             "kind": "object",
@@ -2752,12 +2844,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 73,
+                "type": 68,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -2783,7 +2875,7 @@
               },
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -2799,12 +2891,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 90,
+                "type": 92,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -2824,12 +2916,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -2845,12 +2937,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 70,
+                "type": 73,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -2866,22 +2958,22 @@
             "properties": [
               {
                 "name": "form",
-                "type": 90,
+                "type": 92,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 94,
+                "type": 96,
                 "optional": false
               },
               {
                 "name": "references",
-                "type": 95,
+                "type": 97,
                 "optional": false
               },
               {
                 "name": "version",
-                "type": 99,
+                "type": 101,
                 "optional": false
               }
             ],
@@ -2893,14 +2985,14 @@
           },
           {
             "kind": "array",
-            "element": 96
+            "element": 98
           },
           {
             "kind": "object",
             "properties": [
               {
                 "name": "capturedThroughSeq",
-                "type": 97,
+                "type": 99,
                 "optional": false
               },
               {
@@ -2955,7 +3047,7 @@
             "kind": "union",
             "types": [
               2,
-              98
+              100
             ]
           },
           {
@@ -2971,12 +3063,12 @@
             "properties": [
               {
                 "name": "gatewayExecutionScope",
-                "type": 74,
+                "type": 76,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 101,
+                "type": 103,
                 "optional": false
               },
               {
@@ -3016,7 +3108,7 @@
               },
               {
                 "name": "kind",
-                "type": 103,
+                "type": 105,
                 "optional": false
               },
               {
@@ -3041,7 +3133,7 @@
             "properties": [
               {
                 "name": "kind",
-                "type": 105,
+                "type": 107,
                 "optional": false
               },
               {
@@ -3056,7 +3148,7 @@
               },
               {
                 "name": "replayState",
-                "type": 106,
+                "type": 108,
                 "optional": true
               }
             ],
@@ -3075,7 +3167,7 @@
             "properties": [
               {
                 "name": "kind",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
@@ -3562,7 +3654,7 @@
       "kind": "event",
       "event": "user/message",
       "surface": true,
-      "digest": "0620d01028827bca4cac6c6ae7894fd34681f70b41402e0c48ac6aaf301f2b75",
+      "digest": "19cb7b6061859227ee6f7f46deb1775629d78ad9d730b69b262e36380227196e",
       "schema": {
         "root": 0,
         "nodes": [
@@ -3586,12 +3678,12 @@
               },
               {
                 "name": "sourceEventSeqs",
-                "type": 103,
+                "type": 105,
                 "optional": true
               },
               {
                 "name": "surfaceOp",
-                "type": 104,
+                "type": 106,
                 "optional": false
               },
               {
@@ -3601,7 +3693,7 @@
               },
               {
                 "name": "type",
-                "type": 107,
+                "type": 109,
                 "optional": false
               }
             ],
@@ -3923,21 +4015,22 @@
               39,
               41,
               61,
-              66,
-              71,
-              74,
+              64,
+              69,
+              73,
               76,
-              81,
-              82,
+              78,
               83,
+              84,
               85,
-              86,
               87,
-              94,
+              88,
+              89,
               96,
               98,
-              101,
-              102
+              100,
+              103,
+              104
             ]
           },
           {
@@ -4291,18 +4384,67 @@
             "kind": "object",
             "properties": [
               {
-                "name": "entries",
-                "type": 62,
+                "name": "deliveryId",
+                "type": 5,
                 "optional": false
               },
               {
                 "name": "form",
-                "type": 64,
+                "type": 62,
                 "optional": false
               },
               {
                 "name": "kind",
+                "type": 63,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "ruleId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "notice"
+          },
+          {
+            "kind": "literal",
+            "value": "webhook"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "entries",
                 "type": 65,
+                "optional": false
+              },
+              {
+                "name": "form",
+                "type": 67,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 68,
                 "optional": false
               },
               {
@@ -4315,7 +4457,7 @@
           },
           {
             "kind": "array",
-            "element": 63
+            "element": 66
           },
           {
             "kind": "object",
@@ -4346,17 +4488,17 @@
             "properties": [
               {
                 "name": "form",
-                "type": 67,
+                "type": 62,
                 "optional": false
               },
               {
                 "name": "gatewayExecutionScope",
-                "type": 68,
+                "type": 70,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 70,
+                "type": 72,
                 "optional": false
               },
               {
@@ -4373,15 +4515,11 @@
             "indices": []
           },
           {
-            "kind": "literal",
-            "value": "notice"
-          },
-          {
             "kind": "object",
             "properties": [
               {
                 "name": "inputs",
-                "type": 69,
+                "type": 71,
                 "optional": false
               },
               {
@@ -4415,17 +4553,17 @@
             "properties": [
               {
                 "name": "form",
-                "type": 72,
+                "type": 74,
                 "optional": false
               },
               {
                 "name": "gatewayExecutionScope",
-                "type": 68,
+                "type": 70,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 73,
+                "type": 75,
                 "optional": false
               },
               {
@@ -4454,7 +4592,7 @@
               },
               {
                 "name": "kind",
-                "type": 75,
+                "type": 77,
                 "optional": false
               },
               {
@@ -4474,12 +4612,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 77,
+                "type": 79,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4489,7 +4627,7 @@
               },
               {
                 "name": "sections",
-                "type": 79,
+                "type": 81,
                 "optional": false
               }
             ],
@@ -4505,7 +4643,7 @@
           },
           {
             "kind": "array",
-            "element": 80
+            "element": 82
           },
           {
             "kind": "object",
@@ -4528,12 +4666,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 67,
+                "type": 62,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4559,7 +4697,7 @@
               },
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4575,12 +4713,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4600,12 +4738,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 72,
+                "type": 74,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4621,12 +4759,12 @@
             "properties": [
               {
                 "name": "form",
-                "type": 64,
+                "type": 67,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4642,22 +4780,22 @@
             "properties": [
               {
                 "name": "form",
-                "type": 84,
+                "type": 86,
                 "optional": false
               },
               {
                 "name": "kind",
-                "type": 88,
+                "type": 90,
                 "optional": false
               },
               {
                 "name": "references",
-                "type": 89,
+                "type": 91,
                 "optional": false
               },
               {
                 "name": "version",
-                "type": 93,
+                "type": 95,
                 "optional": false
               }
             ],
@@ -4669,14 +4807,14 @@
           },
           {
             "kind": "array",
-            "element": 90
+            "element": 92
           },
           {
             "kind": "object",
             "properties": [
               {
                 "name": "capturedThroughSeq",
-                "type": 91,
+                "type": 93,
                 "optional": false
               },
               {
@@ -4731,7 +4869,7 @@
             "kind": "union",
             "types": [
               9,
-              92
+              94
             ]
           },
           {
@@ -4747,12 +4885,12 @@
             "properties": [
               {
                 "name": "gatewayExecutionScope",
-                "type": 68,
+                "type": 70,
                 "optional": true
               },
               {
                 "name": "kind",
-                "type": 95,
+                "type": 97,
                 "optional": false
               },
               {
@@ -4792,7 +4930,7 @@
               },
               {
                 "name": "kind",
-                "type": 97,
+                "type": 99,
                 "optional": false
               },
               {
@@ -4817,7 +4955,7 @@
             "properties": [
               {
                 "name": "kind",
-                "type": 99,
+                "type": 101,
                 "optional": false
               },
               {
@@ -4832,7 +4970,7 @@
               },
               {
                 "name": "replayState",
-                "type": 100,
+                "type": 102,
                 "optional": true
               }
             ],
@@ -4851,7 +4989,7 @@
             "properties": [
               {
                 "name": "kind",
-                "type": 78,
+                "type": 80,
                 "optional": false
               },
               {
@@ -4880,8 +5018,8 @@
           {
             "kind": "union",
             "types": [
-              105,
-              106
+              107,
+              108
             ]
           },
           {

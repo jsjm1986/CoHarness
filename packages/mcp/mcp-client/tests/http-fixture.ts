@@ -39,8 +39,8 @@ export async function startHttpMcpFixture(): Promise<HttpMcpFixture> {
       response.writeHead(500).end(String(error))
     })
   })
-  const listening: PromiseWithResolvers<void> = Promise.withResolvers()
-  server.listen(0, '127.0.0.1', listening.resolve)
+  const listening: PromiseWithResolvers<undefined> = Promise.withResolvers()
+  server.listen(0, '127.0.0.1', () => { listening.resolve(undefined) })
   await listening.promise
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('HTTP MCP fixture has no TCP address')

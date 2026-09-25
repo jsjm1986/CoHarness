@@ -11,6 +11,8 @@ export interface ProjectUiPolicySnapshot {
   revision: number
   /** Derived current-account choice eligibility; never a Host catalog mutation. */
   accountPermissions: AccountPermissionAvailability
+  /** Verified Gateway account for private UI persistence; absent while identity is unverified. */
+  verifiedAccountId?: number
   /** Active project id and management capability, when in project scope. */
   projectId?: number
   canManage?: boolean
@@ -46,6 +48,18 @@ export class ProjectUiPolicyRuntime {
     for (const listener of [...this.listeners]) listener()
   }
 
+  /** Publish or revoke the verified account used to scope private UI state.
+   * @param accountId - Gateway-confirmed identity; undefined revokes the current proof.
+   */
+  setVerifiedAccountId(accountId: number | undefined): void {
+    if (this.snapshot.verifiedAccountId === accountId) return
+    const { verifiedAccountId: _previous, ...snapshot } = this.snapshot
+    this.snapshot = Object.freeze({
+      ...snapshot, ...(accountId === undefined ? {} : { verifiedAccountId: accountId }), revision: snapshot.revision + 1,
+    })
+    for (const listener of [...this.listeners]) listener()
+  }
+
   /** Replace the active scope policy and notify consumers only when it moves.
    * @param scope - active account or project scope.
    * @param theme - project theme policy.
@@ -61,6 +75,7 @@ export class ProjectUiPolicyRuntime {
     this.snapshot = Object.freeze({
       scope, theme, revision: this.snapshot.revision + 1,
       accountPermissions: this.snapshot.accountPermissions,
+      ...(this.snapshot.verifiedAccountId === undefined ? {} : { verifiedAccountId: this.snapshot.verifiedAccountId }),
       ...details.projectId === undefined ? {} : { projectId: details.projectId },
       ...details.canManage === undefined ? {} : { canManage: details.canManage },
     })

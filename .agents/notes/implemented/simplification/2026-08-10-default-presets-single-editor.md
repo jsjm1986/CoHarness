@@ -23,3 +23,5 @@ This decision narrows the preset roster rather than removing the tool package or
 ## Consequences
 
 General-purpose agents use `read`, `write`, and `edit` for filesystem mutations, while the minimal agent retains `str_replace_editor`. Preset composition tests pin its absence from the standard roster, the Cordis roster, and the PTC mode SDK, while the minimal assertions continue to pin its presence.
+
+Base-backed application profiles follow the same selection: the shared base roster keeps the row so interactive compositions and user-created profiles can use it, and the [`headless`](../../../../packages/bundle/headless/cordis.patch.yml) and [`sdk`](../../../../packages/bundle/sdk-app/cordis.patch.yml) application patches disable it. The SDK profile smoke test pins both the default absence and explicit opt-in insertion.

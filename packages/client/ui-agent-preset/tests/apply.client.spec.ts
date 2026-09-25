@@ -21,6 +21,7 @@ import { AgentPresetSection } from '../src/client/AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from '../src/client/AgentPresetSection.tsx'
 import { AgentPresetSeat } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
+import { AgentPresetSeatController } from '../src/client/seat-store.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
@@ -32,6 +33,7 @@ const ROSTER_ONE = {
   value: {
     presets: [{ id: 'standard', trust: 'system', isDefault: true }],
     authorable: true,
+    modeSelectionEnabled: true,
   },
 }
 
@@ -44,6 +46,7 @@ const ROSTER_AUTHORED = {
       { id: 'mine', trust: 'user', isDefault: false },
     ],
     authorable: true,
+    modeSelectionEnabled: true,
   },
 }
 
@@ -56,15 +59,35 @@ const ROSTER_MOVED = {
       { id: 'minimal', trust: 'system', isDefault: true },
     ],
     authorable: true,
+    modeSelectionEnabled: true,
   },
 }
 
-async function bench(hostSnapshot: unknown = { canOpenPath: true }) {
+/** The deployment while mode selection is disabled: the composition default governs. */
+const ROSTER_HIDDEN = {
+  ok: true as const,
+  value: {
+    presets: [{ id: 'standard', trust: 'system', isDefault: true }],
+    authorable: true,
+    modeSelectionEnabled: false,
+  },
+}
+
+async function bench(
+  hostSnapshot: unknown = { canOpenPath: true },
+  options: { failSettingsUpdate?: boolean } = {},
+) {
   const ctx = new Context()
   // The host's answer, mutable so a spec can move the default the way the
   // settings surface does and watch who re-reads it.
-  let ROSTER: typeof ROSTER_ONE | typeof ROSTER_MOVED | typeof ROSTER_AUTHORED = ROSTER_ONE
+  let ROSTER:
+    typeof ROSTER_ONE | typeof ROSTER_MOVED | typeof ROSTER_AUTHORED | typeof ROSTER_HIDDEN
+      = ROSTER_ONE
   const moveDefault = (): void => { ROSTER = ROSTER_MOVED }
+  // The namespace's two persisted fields; the roster derives its effective
+  // default and its picker flag from them exactly as the Host does.
+  let savedDefault = 'standard'
+  let selectionEnabled = true
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
@@ -113,7 +136,23 @@ async function bench(hostSnapshot: unknown = { canOpenPath: true }) {
           rpcId: 'r',
           result: { ok: true as const, value: { writable: true, hasDocument: true, namespaces: [] } },
         }),
-        update: (payload: { patch: unknown }) => { calls.push(`settings:${JSON.stringify(payload.patch)}`); return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } }) },
+        update: (payload: { patch: { default?: unknown; modeSelectionEnabled?: unknown } }) => {
+          calls.push(`settings:${JSON.stringify(payload.patch)}`)
+          if (options.failSettingsUpdate === true) {
+            return Promise.resolve({
+              rpcId: 'r',
+              result: { ok: false as const, error: { code: 'internal', message: 'settings write disconnected', details: {} } },
+            })
+          }
+          if (typeof payload.patch.default === 'string') savedDefault = payload.patch.default
+          if (typeof payload.patch.modeSelectionEnabled === 'boolean') {
+            selectionEnabled = payload.patch.modeSelectionEnabled
+          }
+          ROSTER = !selectionEnabled
+            ? ROSTER_HIDDEN
+            : savedDefault === 'minimal' ? ROSTER_MOVED : ROSTER_ONE
+          return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } })
+        },
       },
     },
     hostDescription: { getSnapshot: () => hostSnapshot },
@@ -519,6 +558,14 @@ describe('ui-agent-preset apply', () => {
     const seat = (slots.entries('conversation.hero.agentPreset')[0]!
       .inject as unknown as () => AgentPresetSeatInjected)()
 
+    await section.load()
+    // A hidden picker cannot carry a staged pick: the entry refuses rather
+    // than landing a choice no visible control reports.
+    await section.setPickerVisible(false)
+    section.startCreatorDraft?.()
+    expect(workspaces.starts).toHaveLength(0)
+
+    await section.setPickerVisible(true)
     section.startCreatorDraft?.()
 
     // The pick is staged on the chip's own controller — the session the
@@ -556,6 +603,7 @@ describe('ui-agent-preset apply', () => {
     const seat = (slots.entries('conversation.hero.agentPreset')[0]!
       .inject as unknown as () => AgentPresetSeatInjected)()
 
+    await section.load()
     section.startCreatorDraft?.()
     state.current = 's1'
     state.byId['s1'] = { id: 's1', blank: true }
@@ -582,6 +630,167 @@ describe('ui-agent-preset apply', () => {
     // section hides its button rather than staging into nowhere.
     const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
     expect(section.startCreatorDraft).toBeUndefined()
+  })
+
+  it('syncs the picker policy and the saved default to the still-blank session', async () => {
+    const { ctx, slots, calls } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state = {
+      current: 's1',
+      byId: { s1: { id: 's1', blank: true, agentPreset: 'standard' } },
+    }
+    const sessions = sessionsDouble(state)
+    ctx.provide('sessions', sessions as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+    const seat = (slots.entries('conversation.hero.agentPreset')[0]!
+      .inject as unknown as () => AgentPresetSeatInjected)()
+    await Promise.all([section.load(), seat.load()])
+
+    // The saved default governs while selection is shown: the Settings write
+    // reaches the still-blank session rather than only the next one.
+    await section.makeDefault('minimal')
+    expect(calls.filter(call => call.startsWith('select:'))).toEqual(['select:minimal'])
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('minimal')
+    expect(state.byId.s1.agentPreset).toBe('minimal')
+
+    // Hidden: the deployment default governs new sessions, and the still-blank
+    // session adopts it — a session that has not started must not run a mode
+    // the picker no longer offers.
+    await section.setPickerVisible(false)
+    expect(calls.filter(call => call.startsWith('select:'))).toEqual([
+      'select:minimal', 'select:standard',
+    ])
+    expect(section.hooks.agentPresetSection.getSnapshot().showPicker).toBe(false)
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('standard')
+    expect(state.byId.s1.agentPreset).toBe('standard')
+
+    // Re-enabled: the saved default is what the roster reports again, so the
+    // blank session follows it back.
+    await section.setPickerVisible(true)
+    expect(calls.filter(call => call.startsWith('select:'))).toEqual([
+      'select:minimal', 'select:standard', 'select:minimal',
+    ])
+    expect(section.hooks.agentPresetSection.getSnapshot().showPicker).toBe(true)
+    expect(state.byId.s1.agentPreset).toBe('minimal')
+
+    // A session that already started keeps its composition: the sync refuses
+    // rather than switching work in progress.
+    state.byId.s1.blank = false
+    await section.makeDefault('standard')
+    expect(calls.filter(call => call.startsWith('select:'))).toEqual([
+      'select:minimal', 'select:standard', 'select:minimal',
+    ])
+    conversation()
+  })
+
+  it('reloads Host truth after a picker-policy save failure', async () => {
+    const { ctx, slots, calls } = await bench({ canOpenPath: true }, { failSettingsUpdate: true })
+    ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+    await section.load()
+    expect(section.hooks.agentPresetSection.getSnapshot().showPicker).toBe(true)
+
+    await section.setPickerVisible(false)
+
+    expect(calls.filter(call => call === 'list')).toHaveLength(2)
+    expect(section.hooks.agentPresetSection.getSnapshot()).toMatchObject({
+      showPicker: true, policySaving: false, error: 'settings write disconnected',
+    })
+  })
+
+  it('hides the General row while selection is off and brings it back on', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const row = (slots.entries('settings.general.item')[0]!.inject as unknown as () => AgentPresetRowInjected)()
+    const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+
+    await row.load()
+    expect(row.hooks.agentPreset.getSnapshot().status).toBe('ready')
+
+    // The write the row offers stops governing while selection is hidden, so
+    // the row folds rather than claim an effect the Host refuses to apply.
+    await section.load()
+    await section.setPickerVisible(false)
+    ctx.remote.$dispatch('settings/document-updated', ['agent-presets', 1])
+    await vi.waitFor(() => {
+      expect(row.hooks.agentPreset.getSnapshot().status).toBe('unavailable')
+    })
+
+    await section.setPickerVisible(true)
+    ctx.remote.$dispatch('settings/document-updated', ['agent-presets', 1])
+    await vi.waitFor(() => {
+      expect(row.hooks.agentPreset.getSnapshot().status).toBe('ready')
+    })
+  })
+})
+
+describe('AgentPresetSeatController reconciliation', () => {
+  it('does not capture a non-blank session', () => {
+    const controller = new AgentPresetSeatController(
+      {} as never,
+      () => ({ id: 'started' as never, blank: false }),
+    )
+
+    expect(controller.blankSessionId()).toBeUndefined()
+  })
+
+  it('does not retarget a different blank session after a Settings write', async () => {
+    const select = vi.fn(() => Promise.resolve({ ok: true as const, value: 'minimal' }))
+    let current: { id: never; blank: boolean; agentPreset?: string } = {
+      id: 'first' as never, blank: true, agentPreset: 'standard',
+    }
+    const controller = new AgentPresetSeatController(
+      { agentPresets: { select } } as never,
+      () => current,
+    )
+    const captured = controller.blankSessionId()
+    if (captured === undefined) throw new Error('expected a blank session')
+    current = { id: 'second' as never, blank: true, agentPreset: 'standard' }
+
+    await controller.syncBlankSession(captured, 'minimal')
+
+    expect(select).not.toHaveBeenCalled()
+  })
+
+  it('drops a staged pick once the roster reports selection hidden', async () => {
+    const select = vi.fn(() => Promise.resolve({ ok: true as const, value: 'minimal' }))
+    const controller = new AgentPresetSeatController(
+      {
+        agentPresets: {
+          select,
+          list: () => Promise.resolve({
+            ok: true as const,
+            value: {
+              presets: [{ id: 'standard', trust: 'system', isDefault: true }],
+              authorable: true,
+              modeSelectionEnabled: false,
+            },
+          }),
+        },
+      } as never,
+      () => ({ id: 's1' as never, blank: true }),
+    )
+    controller.stage('minimal')
+
+    await controller.load()
+    await controller.apply()
+
+    // The pick was staged for a control that no longer exists: dropping it is
+    // the only honest answer — composing a hidden mode would lie about policy.
+    expect(select).not.toHaveBeenCalled()
+    expect(controller.store.getSnapshot().showPicker).toBe(false)
+    expect(controller.store.getSnapshot().current).toBe('standard')
   })
 })
 

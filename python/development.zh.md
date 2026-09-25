@@ -13,7 +13,7 @@ pnpm install
 pnpm exec tsx scripts/build-exe-for-python-sdk.ts
 ```
 
-所需 `lib/` 产物已存在时使用 `--skip-build`；如需选择平台，请使用 `--targets=node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64`。产物写入 `dist-exe/`，脚本会将所选载体同步到 `python/sdk-runtime/`。macOS 构建还会同步 `node-pty` 所需的配套 spawn 辅助程序。
+所需 `lib/` 产物已存在时使用 `--skip-build`；如需选择平台，请使用 `--targets=node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64,node24-win-x64`。每个目标必须在其原生平台上构建。产物写入 `dist-exe/`，脚本会将所选载体同步到 `python/sdk-runtime/`。Windows 会生成 `.exe` 与 `-rg.exe`；macOS 构建还会同步 `node-pty` 所需的配套 spawn 辅助程序。
 
 ## 验证 SDK
 
@@ -31,10 +31,10 @@ uv run --project python/sdk pytest
 
 ```sh
 uv run --project python/sdk python scripts/smoke-python-runtime.py \
-  --scenario sdk-minimal --exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64
+  --scenario sdk-minimal --exe dist-exe/deepseek-harness-sdk-runtime-macos-arm64
 ```
 
-其中两个场景会比对 `scripts/snapshots/python-sdk-single-exe/` 下已提交的期望输出。`minimal/model-visible.json` 固定了签入的极简组合所组装的系统提示词、对外公布的工具 schema 以及模型可见消息，因此插件一旦贡献出计划外的系统分段或 user 消息，该任务即失败；它会丢弃动态运行时上下文快照——同一组合在 macOS 上会发出它，在 Linux 上不会（[#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)）。`advanced/` 固定 SDK 结果与持久化的会话日志。重新运行对应场景时加上 `--update-snapshots`，并在提交前审阅该差异。
+其中两个场景会比对 `scripts/snapshots/python-sdk-single-exe/` 下已提交的期望输出。`minimal/model-visible.json` 固定 Linux/macOS 极简组合所组装的系统提示词、对外公布的工具 schema 以及模型可见消息；`minimal/win-x64/model-visible.json` 固定其 PowerShell 对应物。插件一旦贡献出计划外的系统分段或 user 消息，该任务即失败；两个文件都会丢弃动态运行时上下文快照——同一组合在 macOS 上会发出它，在 Linux 上不会（[#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)）。`advanced/` 在每个目标平台上固定 SDK 结果与持久化的会话日志。重新运行对应场景时加上 `--update-snapshots`，并在提交前审阅该差异。
 
 交互式冒烟测试需要环境变量或仓库根目录 `.env` 中存在 `DEEPSEEK_API_KEY`：
 
@@ -69,17 +69,17 @@ print(release["pep440_version"](release["repository_version"]()))
 PY
 )"
 python scripts/build-python-release.py --package sdk --output-dir dist-python
-python scripts/build-python-release.py --package runtime --platform macos-arm64 --runtime-exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64 --output-dir dist-python
+python scripts/build-python-release.py --package runtime --platform macos-arm64 --runtime-exe dist-exe/deepseek-harness-sdk-runtime-macos-arm64 --output-dir dist-python
 pip install \
   "dist-python/deepseek_harness_sdk-$version-py3-none-any.whl" \
   "dist-python/deepseek_harness_runtime_bin-$version-py3-none-macosx_14_0_arm64.whl"
 ```
 
-运行时分发包仅提供 wheel 包。发布流水线会连同纯 SDK wheel 包一起发布四个平台 wheel 包：Linux x64、Linux arm64 和 macOS 14 或更高版本的 arm64、x64。平台清单与 wheel 构建路径还带有一行已接线的 `win-x64`——发布载体集尚未构建 `node24-win-x64`，因此暂不发布 `win_amd64` wheel 包。只有与仓库版本匹配时，才接受 `python-v<repository-version>` 标签；`0.0.1-rc.1` 之类的仓库预发布版本在 wheel 包文件名和元数据中使用规范化的 PEP 440 写法，例如 `0.0.1rc1`。CoHarness 版本 `0.1.2-alpha.3.coharness.1` 在 Python wheel 文件名和元数据中使用公开版本写法 `0.1.2a3.post1`，因为 PEP 440 local version 不适合发布到公共索引。
+运行时分发包仅提供 wheel 包。发布流水线会连同纯 SDK wheel 包一起发布五个平台 wheel 包：Linux x64、Linux arm64、macOS 14 或更高版本的 arm64、x64，以及 Windows x64（`win_amd64`）。只有与仓库版本匹配时，才接受 `python-v<repository-version>` 标签；`0.0.1-rc.1` 之类的仓库预发布版本在 wheel 包文件名和元数据中使用规范化的 PEP 440 写法，例如 `0.0.1rc1`。CoHarness 版本 `0.1.2-alpha.3.coharness.1` 在 Python wheel 文件名和元数据中使用公开版本写法 `0.1.2a3.post1`，因为 PEP 440 local version 不适合发布到公共索引。
 
 ## 验证候选发行版
 
-为拉取请求添加 `python-release-dry-run` 标签，或手动运行 GitHub 的 `Release (Python)` 工作流并设置 `publish=false`，即可构建全部四个 wheel 包，在 Python 3.10 和 3.14 上安装 Linux 发行集合，检查精确文件名和元数据，执行 PyPI 默认单文件大小限制，并保留一份带 SHA-256 哈希的汇总产物。两条路径都没有注册表凭据，拉取请求运行无法进入任何发布作业。
+为拉取请求添加 `python-release-dry-run` 标签，或手动运行 GitHub 的 `Release (Python)` 工作流并设置 `publish=false`，即可构建全部五个 wheel 包，在 Python 3.10 和 3.14 上安装 Linux 发行集合，检查精确文件名和元数据，执行 PyPI 默认单文件大小限制，并保留一份带 SHA-256 哈希的汇总产物。两条路径都没有注册表凭据，拉取请求运行无法进入任何发布作业。
 
 公开发布从私有自动化仓库运行；包元数据指向独立的只读公开源码镜像，该镜像不运行发布 Actions。私有仓库把仓库变量 `PYPI_PUBLISHER_REPOSITORY` 定义为自身的 `owner/name`，并且只在有意发布期间把 `PUBLIC_PYPI_RELEASE_ENABLED` 从 `false` 改为 `true`。
 

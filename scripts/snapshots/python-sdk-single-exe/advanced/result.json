@@ -155,13 +155,9 @@
             "maxTokens": true
           },
           "tools": [
-            "cordis_define",
             "cordis_inspect_list",
             "cordis_inspect_query",
             "cordis_inspect_self",
-            "cordis_run",
-            "cordis_stop",
-            "cordis_undefine",
             "job_kill",
             "job_list",
             "job_output",
@@ -195,9 +191,9 @@
           "content": [
             {
               "type": "tool-call",
-              "id": "advanced-define",
-              "name": "cordis_define",
-              "arguments": "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+              "id": "advanced-inspect",
+              "name": "cordis_inspect_list",
+              "arguments": "{}"
             }
           ],
           "source": {
@@ -239,8 +235,8 @@
             "time0": 0,
             "index": 0,
             "dt": [],
-            "id": "advanced-define",
-            "name": "cordis_define",
+            "id": "advanced-inspect",
+            "name": "cordis_inspect_list",
             "args": [
               ""
             ]
@@ -250,9 +246,9 @@
             "time0": 0,
             "index": 0,
             "dt": [],
-            "id": "advanced-define",
+            "id": "advanced-inspect",
             "args": [
-              "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+              "{}"
             ]
           },
           {
@@ -263,9 +259,9 @@
               "index": 0,
               "block": {
                 "type": "tool-call",
-                "id": "advanced-define",
-                "name": "cordis_define",
-                "arguments": "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+                "id": "advanced-inspect",
+                "name": "cordis_inspect_list",
+                "arguments": "{}"
               }
             }
           },
@@ -314,9 +310,9 @@
       "data": {
         "turn": 1,
         "step": 1,
-        "callId": "advanced-define",
-        "name": "cordis_define",
-        "arguments": "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+        "callId": "advanced-inspect",
+        "name": "cordis_inspect_list",
+        "arguments": "{}"
       }
     },
     {
@@ -329,16 +325,16 @@
         "message": {
           "source": {
             "kind": "tool",
-            "callId": "advanced-define"
+            "callId": "advanced-inspect"
           },
           "content": [
             {
               "type": "tool-result",
-              "toolCallId": "advanced-define",
+              "toolCallId": "advanced-inspect",
               "content": [
                 {
                   "type": "text",
-                  "text": "Defined snap-1/pkg-1 (Snapshot Double); it is not running yet. Use cordis_run to activate this Package."
+                  "text": "{\n  \"providers\": [\n    {\n      \"platform\": \"host\",\n      \"id\": \"Service\",\n      \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listService\",\n          \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"service\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Service key. Omit it for the compact Service and method-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Service directory, or one exact Service contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Event\",\n      \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listEvents\",\n          \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"event\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Event name. Omit it for the compact Event and listener-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Event directory, or one exact Event contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Builtin\",\n      \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n      \"methods\": [\n        {\n          \"name\": \"listBuiltins\",\n          \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Tool\",\n      \"description\": \"Tools visible to the requesting Agent, including scoped and dynamic registrations.\",\n      \"methods\": [\n        {\n          \"name\": \"listTools\",\n          \"description\": \"Return every Tool schema currently callable by this Agent.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    }\n  ]\n}"
                 }
               ],
               "isError": false
@@ -346,10 +342,6 @@
           ],
           "role": "user",
           "id": "{{messageId}}"
-        },
-        "meta": {
-          "pluginId": "snap-1",
-          "packageId": "pkg-1"
         }
       },
       "sourceEventSeqs": [
@@ -387,270 +379,9 @@
           "content": [
             {
               "type": "tool-call",
-              "id": "advanced-run",
-              "name": "cordis_run",
-              "arguments": "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-            }
-          ],
-          "source": {
-            "kind": "model",
-            "provider": "deepseek-official",
-            "model": "smoke-model",
-            "replayState": {
-              "response": {
-                "kind": "deepseek-messages",
-                "version": 1,
-                "model": "smoke-model"
-              },
-              "blocks": [
-                {
-                  "type": "tool-call"
-                }
-              ]
-            }
-          },
-          "id": "{{messageId}}"
-        },
-        "usage": {
-          "inputTokens": 3,
-          "outputTokens": 3,
-          "totalTokens": 6
-        },
-        "stream": [
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "block-start",
-              "index": 0,
-              "blockType": "tool-call"
-            }
-          },
-          {
-            "type": "tool-call-chunks",
-            "time0": 0,
-            "index": 0,
-            "dt": [],
-            "id": "advanced-run",
-            "name": "cordis_run",
-            "args": [
-              ""
-            ]
-          },
-          {
-            "type": "tool-call-chunks",
-            "time0": 0,
-            "index": 0,
-            "dt": [],
-            "id": "advanced-run",
-            "args": [
-              "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-            ]
-          },
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "block-end",
-              "index": 0,
-              "block": {
-                "type": "tool-call",
-                "id": "advanced-run",
-                "name": "cordis_run",
-                "arguments": "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-              }
-            }
-          },
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "usage",
-              "usage": {
-                "inputTokens": 3,
-                "outputTokens": 3,
-                "totalTokens": 6
-              }
-            }
-          },
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "finish",
-              "reason": {
-                "kind": "tool-calls"
-              },
-              "replayState": {
-                "response": {
-                  "kind": "deepseek-messages",
-                  "version": 1,
-                  "model": "smoke-model"
-                },
-                "blocks": [
-                  {
-                    "type": "tool-call"
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "surfaceOp": "append"
-    },
-    {
-      "type": "tool/call",
-      "seq": 16,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 2,
-        "callId": "advanced-run",
-        "name": "cordis_run",
-        "arguments": "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-      }
-    },
-    {
-      "type": "tool/result",
-      "seq": 17,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 2,
-        "message": {
-          "source": {
-            "kind": "tool",
-            "callId": "advanced-run"
-          },
-          "content": [
-            {
-              "type": "tool-result",
-              "toolCallId": "advanced-run",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "snap-1/pkg-1 is running (run-1)."
-                }
-              ],
-              "isError": false
-            }
-          ],
-          "role": "user",
-          "id": "{{messageId}}"
-        },
-        "meta": {
-          "pluginId": "snap-1",
-          "packageId": "pkg-1",
-          "pluginRunId": "run-1"
-        }
-      },
-      "sourceEventSeqs": [
-        16
-      ],
-      "surfaceOp": "append"
-    },
-    {
-      "type": "step/end",
-      "seq": 18,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 2
-      }
-    },
-    {
-      "type": "step/start",
-      "seq": 19,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 3
-      }
-    },
-    {
-      "type": "system/message",
-      "seq": 20,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 3,
-        "message": {
-          "role": "system",
-          "content": [
-            {
-              "type": "text",
-              "text": "{{system}}"
-            }
-          ],
-          "source": {
-            "kind": "plugin",
-            "plugin": "@deepseek-ai/dsh-system-prompt"
-          },
-          "id": "{{messageId}}"
-        }
-      },
-      "sourceEventSeqs": [
-        4
-      ],
-      "surfaceOp": {
-        "op": "replace",
-        "startSeq": 4,
-        "endSeq": 4
-      }
-    },
-    {
-      "type": "request/header",
-      "seq": 21,
-      "time": 0,
-      "data": {
-        "header": {
-          "config": {
-            "provider": "deepseek-official",
-            "model": "smoke-model",
-            "maxTokens": 256000,
-            "reasoningEffort": "high"
-          },
-          "adapterDefaults": {
-            "reasoningEffort": true,
-            "maxTokens": true
-          },
-          "tools": [
-            "cordis_define",
-            "cordis_inspect_list",
-            "cordis_inspect_query",
-            "cordis_inspect_self",
-            "cordis_run",
-            "cordis_stop",
-            "cordis_undefine",
-            "job_kill",
-            "job_list",
-            "job_output",
-            "run_code",
-            "snapshot_double",
-            "subagent",
-            "workflow"
-          ]
-        },
-        "reason": "change",
-        "startsSeries": true
-      }
-    },
-    {
-      "type": "assistant/message",
-      "seq": 22,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 3,
-        "message": {
-          "role": "assistant",
-          "content": [
-            {
-              "type": "tool-call",
               "id": "advanced-code",
               "name": "run_code",
-              "arguments": "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+              "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
             }
           ],
           "source": {
@@ -705,7 +436,7 @@
             "dt": [],
             "id": "advanced-code",
             "args": [
-              "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+              "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
             ]
           },
           {
@@ -718,7 +449,7 @@
                 "type": "tool-call",
                 "id": "advanced-code",
                 "name": "run_code",
-                "arguments": "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+                "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
               }
             }
           },
@@ -762,58 +493,62 @@
     },
     {
       "type": "tool/call",
-      "seq": 23,
+      "seq": 16,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 3,
+        "step": 2,
         "callId": "advanced-code",
         "name": "run_code",
-        "arguments": "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+        "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
       }
     },
     {
       "type": "tool/ptc-dispatch-start",
-      "seq": 24,
+      "seq": 17,
       "time": 0,
       "data": {
         "rootCallId": "advanced-code",
         "parentCallId": "advanced-code",
         "subCallId": "advanced-code:ptc:1",
-        "name": "snapshot_double",
+        "name": "cordis_inspect_query",
         "arguments": {
-          "value": 21
+          "platform": "host",
+          "provider": "Tool",
+          "method": "listTools"
         }
       }
     },
     {
       "type": "tool/ptc-dispatch",
-      "seq": 25,
+      "seq": 18,
       "time": 0,
       "data": {
         "rootCallId": "advanced-code",
         "parentCallId": "advanced-code",
         "subCallId": "advanced-code:ptc:1",
-        "name": "snapshot_double",
+        "name": "cordis_inspect_query",
         "arguments": {
-          "value": 21
+          "platform": "host",
+          "provider": "Tool",
+          "method": "listTools"
         },
         "isError": false,
         "content": [
           {
             "type": "text",
-            "text": "42"
+            "text": "{\n  \"platform\": \"host\",\n  \"provider\": \"Tool\",\n  \"method\": \"listTools\",\n  \"data\": {\n    \"tools\": [\n      {\n        \"name\": \"workflow\",\n        \"description\": \"Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.\\n\\nThe workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result.\\n\\nScript-body hooks:\\n- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly.\\n- `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages.\\n- `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.\\n- `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.\\n\\nMisused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`.\\n\\nConstraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"script\": {\n              \"type\": \"string\",\n              \"description\": \"The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`).\"\n            },\n            \"meta\": {\n              \"type\": \"object\",\n              \"description\": \"The workflow identity block (plain JSON — never code).\",\n              \"additionalProperties\": true,\n              \"properties\": {\n                \"name\": {\n                  \"type\": \"string\",\n                  \"description\": \"Short kebab-case workflow name.\"\n                },\n                \"description\": {\n                  \"type\": \"string\",\n                  \"description\": \"One-line description of what the workflow does.\"\n                },\n                \"whenToUse\": {\n                  \"type\": \"string\",\n                  \"description\": \"Optional guidance on when this workflow applies.\"\n                },\n                \"phases\": {\n                  \"type\": \"array\",\n                  \"description\": \"Optional phase declarations matched by phase() calls.\",\n                  \"items\": {\n                    \"type\": \"object\",\n                    \"additionalProperties\": true,\n                    \"properties\": {\n                      \"title\": {\n                        \"type\": \"string\",\n                        \"description\": \"The phase title phase() calls match by exact string.\"\n                      },\n                      \"detail\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional one-line description of the phase.\"\n                      },\n                      \"provider\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional provider override this phase is expected to use.\"\n                      },\n                      \"model\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional model override this phase is expected to use.\"\n                      }\n                    },\n                    \"required\": [\n                      \"title\"\n                    ]\n                  }\n                }\n              },\n              \"required\": [\n                \"name\",\n                \"description\"\n              ]\n            },\n            \"args\": {\n              \"type\": \"object\",\n              \"description\": \"Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\\\"files\\\": [...]}).\",\n              \"additionalProperties\": true\n            }\n          },\n          \"required\": [\n            \"script\",\n            \"meta\"\n          ]\n        }\n      },\n      {\n        \"name\": \"subagent\",\n        \"description\": \"Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"A short (3-5 word) description of the delegated task, for display.\"\n            },\n            \"prompt\": {\n              \"type\": \"string\",\n              \"description\": \"The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs.\"\n            },\n            \"run_in_background\": {\n              \"type\": \"boolean\",\n              \"description\": \"Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill.\"\n            }\n          },\n          \"required\": [\n            \"description\",\n            \"prompt\"\n          ]\n        }\n      },\n      {\n        \"name\": \"job_output\",\n        \"description\": \"Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"wait\": {\n              \"type\": \"boolean\",\n              \"description\": \"Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive.\"\n            },\n            \"timeout_ms\": {\n              \"type\": \"number\",\n              \"description\": \"Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"job_list\",\n        \"description\": \"List your background jobs (running and finished) with their ids, kinds, and statuses.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"job_kill\",\n        \"description\": \"Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"reason\": {\n              \"type\": \"string\",\n              \"description\": \"Optional short reason, recorded in the log and forwarded to the job.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_list\",\n        \"description\": \"List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_query\",\n        \"description\": \"Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"platform\": {\n              \"type\": \"string\",\n              \"description\": \"Runtime platform that owns the Provider.\",\n              \"enum\": [\n                \"host\",\n                \"client\"\n              ]\n            },\n            \"provider\": {\n              \"type\": \"string\",\n              \"description\": \"Exact Provider ID returned by cordis_inspect_list.\"\n            },\n            \"method\": {\n              \"type\": \"string\",\n              \"description\": \"Exact method name declared by the Provider manifest.\"\n            },\n            \"input\": {\n              \"description\": \"Optional query input; it must satisfy the method input schema.\"\n            }\n          },\n          \"required\": [\n            \"platform\",\n            \"provider\",\n            \"method\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_self\",\n        \"description\": \"Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"pluginId\": {\n              \"type\": \"string\",\n              \"description\": \"Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin.\"\n            },\n            \"packageId\": {\n              \"type\": \"string\",\n              \"description\": \"Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned.\"\n            }\n          }\n        }\n      },\n      {\n        \"name\": \"run_code\",\n        \"description\": \"Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. The working directory is the Session's current directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"code\": {\n              \"type\": \"string\",\n              \"description\": \"The program: the body of an async TypeScript function.\"\n            },\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"Clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \\\"Count TODO markers across packages\\\"; \\\"Read failing test and its fixture\\\"; \\\"Rename config key in every cordis.yml\\\".\"\n            },\n            \"timeoutMs\": {\n              \"type\": \"number\",\n              \"description\": \"Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline.\"\n            },\n            \"sandbox_permissions\": {\n              \"type\": \"string\",\n              \"description\": \"Wider sandbox mode for this complete program execution; requires justification and approval.\",\n              \"enum\": [\n                \"workspace-write\",\n                \"danger-full-access\"\n              ]\n            },\n            \"justification\": {\n              \"type\": \"string\",\n              \"description\": \"Reason this complete program needs wider access, shown to the user for approval.\"\n            }\n          },\n          \"required\": [\n            \"code\",\n            \"description\"\n          ]\n        }\n      }\n    ]\n  }\n}"
           }
         ]
       }
     },
     {
       "type": "tool/result",
-      "seq": 26,
+      "seq": 19,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 3,
+        "step": 2,
         "message": {
           "source": {
             "kind": "tool",
@@ -826,7 +561,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "42"
+                  "text": "{\n  \"value\": 42,\n  \"tools\": [\n    \"workflow\",\n    \"subagent\",\n    \"job_output\",\n    \"job_list\",\n    \"job_kill\",\n    \"cordis_inspect_list\",\n    \"cordis_inspect_query\",\n    \"cordis_inspect_self\",\n    \"run_code\"\n  ]\n}"
                 }
               ],
               "isError": false
@@ -837,13 +572,22 @@
         }
       },
       "sourceEventSeqs": [
-        23
+        16
       ],
       "surfaceOp": "append"
     },
     {
       "type": "step/end",
-      "seq": 27,
+      "seq": 20,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 2
+      }
+    },
+    {
+      "type": "step/start",
+      "seq": 21,
       "time": 0,
       "data": {
         "turn": 1,
@@ -851,21 +595,12 @@
       }
     },
     {
-      "type": "step/start",
-      "seq": 28,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 4
-      }
-    },
-    {
       "type": "assistant/message",
-      "seq": 29,
+      "seq": 22,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 4,
+        "step": 3,
         "message": {
           "role": "assistant",
           "content": [
@@ -985,11 +720,11 @@
     },
     {
       "type": "tool/call",
-      "seq": 30,
+      "seq": 23,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 4,
+        "step": 3,
         "callId": "advanced-direct-child",
         "name": "subagent",
         "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
@@ -997,7 +732,7 @@
     },
     {
       "type": "subagent/catalog",
-      "seq": 31,
+      "seq": 24,
       "time": 0,
       "data": {
         "version": 0,
@@ -1009,11 +744,11 @@
     },
     {
       "type": "tool/result",
-      "seq": 32,
+      "seq": 25,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 4,
+        "step": 3,
         "message": {
           "source": {
             "kind": "tool",
@@ -1037,13 +772,22 @@
         }
       },
       "sourceEventSeqs": [
-        30
+        23
       ],
       "surfaceOp": "append"
     },
     {
       "type": "step/end",
-      "seq": 33,
+      "seq": 26,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 3
+      }
+    },
+    {
+      "type": "step/start",
+      "seq": 27,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1051,21 +795,12 @@
       }
     },
     {
-      "type": "step/start",
-      "seq": 34,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 5
-      }
-    },
-    {
       "type": "assistant/message",
-      "seq": 35,
+      "seq": 28,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 5,
+        "step": 4,
         "message": {
           "role": "assistant",
           "content": [
@@ -1185,11 +920,11 @@
     },
     {
       "type": "tool/call",
-      "seq": 36,
+      "seq": 29,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 5,
+        "step": 4,
         "callId": "advanced-workflow",
         "name": "workflow",
         "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
@@ -1197,7 +932,7 @@
     },
     {
       "type": "tool-workflow/run-start",
-      "seq": 37,
+      "seq": 30,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -1206,7 +941,7 @@
     },
     {
       "type": "subagent/catalog",
-      "seq": 38,
+      "seq": 31,
       "time": 0,
       "data": {
         "version": 0,
@@ -1217,7 +952,7 @@
     },
     {
       "type": "tool-workflow/agent-start",
-      "seq": 39,
+      "seq": 32,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -1229,7 +964,7 @@
     },
     {
       "type": "tool-workflow/agent-end",
-      "seq": 40,
+      "seq": 33,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -1239,7 +974,7 @@
     },
     {
       "type": "tool-workflow/run-end",
-      "seq": 41,
+      "seq": 34,
       "time": 0,
       "data": {
         "runId": "{{workflow-run}}",
@@ -1248,11 +983,11 @@
     },
     {
       "type": "tool/result",
-      "seq": 42,
+      "seq": 35,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 5,
+        "step": 4,
         "message": {
           "source": {
             "kind": "tool",
@@ -1276,13 +1011,22 @@
         }
       },
       "sourceEventSeqs": [
-        36
+        29
       ],
       "surfaceOp": "append"
     },
     {
       "type": "step/end",
-      "seq": 43,
+      "seq": 36,
+      "time": 0,
+      "data": {
+        "turn": 1,
+        "step": 4
+      }
+    },
+    {
+      "type": "step/start",
+      "seq": 37,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1290,276 +1034,12 @@
       }
     },
     {
-      "type": "step/start",
-      "seq": 44,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 6
-      }
-    },
-    {
       "type": "assistant/message",
-      "seq": 45,
+      "seq": 38,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 6,
-        "message": {
-          "role": "assistant",
-          "content": [
-            {
-              "type": "tool-call",
-              "id": "advanced-undefine",
-              "name": "cordis_undefine",
-              "arguments": "{\"pluginId\": \"snap-1\"}"
-            }
-          ],
-          "source": {
-            "kind": "model",
-            "provider": "deepseek-official",
-            "model": "smoke-model",
-            "replayState": {
-              "response": {
-                "kind": "deepseek-messages",
-                "version": 1,
-                "model": "smoke-model"
-              },
-              "blocks": [
-                {
-                  "type": "tool-call"
-                }
-              ]
-            }
-          },
-          "id": "{{messageId}}"
-        },
-        "usage": {
-          "inputTokens": 3,
-          "outputTokens": 3,
-          "totalTokens": 6
-        },
-        "stream": [
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "block-start",
-              "index": 0,
-              "blockType": "tool-call"
-            }
-          },
-          {
-            "type": "tool-call-chunks",
-            "time0": 0,
-            "index": 0,
-            "dt": [],
-            "id": "advanced-undefine",
-            "name": "cordis_undefine",
-            "args": [
-              ""
-            ]
-          },
-          {
-            "type": "tool-call-chunks",
-            "time0": 0,
-            "index": 0,
-            "dt": [],
-            "id": "advanced-undefine",
-            "args": [
-              "{\"pluginId\": \"snap-1\"}"
-            ]
-          },
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "block-end",
-              "index": 0,
-              "block": {
-                "type": "tool-call",
-                "id": "advanced-undefine",
-                "name": "cordis_undefine",
-                "arguments": "{\"pluginId\": \"snap-1\"}"
-              }
-            }
-          },
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "usage",
-              "usage": {
-                "inputTokens": 3,
-                "outputTokens": 3,
-                "totalTokens": 6
-              }
-            }
-          },
-          {
-            "type": "chunk",
-            "time": 0,
-            "chunk": {
-              "type": "finish",
-              "reason": {
-                "kind": "tool-calls"
-              },
-              "replayState": {
-                "response": {
-                  "kind": "deepseek-messages",
-                  "version": 1,
-                  "model": "smoke-model"
-                },
-                "blocks": [
-                  {
-                    "type": "tool-call"
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "surfaceOp": "append"
-    },
-    {
-      "type": "tool/call",
-      "seq": 46,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 6,
-        "callId": "advanced-undefine",
-        "name": "cordis_undefine",
-        "arguments": "{\"pluginId\": \"snap-1\"}"
-      }
-    },
-    {
-      "type": "tool/result",
-      "seq": 47,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 6,
-        "message": {
-          "source": {
-            "kind": "tool",
-            "callId": "advanced-undefine"
-          },
-          "content": [
-            {
-              "type": "tool-result",
-              "toolCallId": "advanced-undefine",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "Removed dynamic Plugin snap-1 and all of its Packages."
-                }
-              ],
-              "isError": false
-            }
-          ],
-          "role": "user",
-          "id": "{{messageId}}"
-        }
-      },
-      "sourceEventSeqs": [
-        46
-      ],
-      "surfaceOp": "append"
-    },
-    {
-      "type": "step/end",
-      "seq": 48,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 6
-      }
-    },
-    {
-      "type": "step/start",
-      "seq": 49,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 7
-      }
-    },
-    {
-      "type": "system/message",
-      "seq": 50,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 7,
-        "message": {
-          "role": "system",
-          "content": [
-            {
-              "type": "text",
-              "text": "{{system}}"
-            }
-          ],
-          "source": {
-            "kind": "plugin",
-            "plugin": "@deepseek-ai/dsh-system-prompt"
-          },
-          "id": "{{messageId}}"
-        }
-      },
-      "sourceEventSeqs": [
-        20
-      ],
-      "surfaceOp": {
-        "op": "replace",
-        "startSeq": 20,
-        "endSeq": 20
-      }
-    },
-    {
-      "type": "request/header",
-      "seq": 51,
-      "time": 0,
-      "data": {
-        "header": {
-          "config": {
-            "provider": "deepseek-official",
-            "model": "smoke-model",
-            "maxTokens": 256000,
-            "reasoningEffort": "high"
-          },
-          "adapterDefaults": {
-            "reasoningEffort": true,
-            "maxTokens": true
-          },
-          "tools": [
-            "cordis_define",
-            "cordis_inspect_list",
-            "cordis_inspect_query",
-            "cordis_inspect_self",
-            "cordis_run",
-            "cordis_stop",
-            "cordis_undefine",
-            "job_kill",
-            "job_list",
-            "job_output",
-            "run_code",
-            "subagent",
-            "workflow"
-          ]
-        },
-        "reason": "change",
-        "startsSeries": true
-      }
-    },
-    {
-      "type": "assistant/message",
-      "seq": 52,
-      "time": 0,
-      "data": {
-        "turn": 1,
-        "step": 7,
+        "step": 5,
         "message": {
           "role": "assistant",
           "content": [
@@ -1663,16 +1143,16 @@
     },
     {
       "type": "step/end",
-      "seq": 53,
+      "seq": 39,
       "time": 0,
       "data": {
         "turn": 1,
-        "step": 7
+        "step": 5
       }
     },
     {
       "type": "turn/end",
-      "seq": 54,
+      "seq": 40,
       "time": 0,
       "data": {
         "turn": 1,
@@ -1895,13 +1375,9 @@
                 "maxTokens": true
               },
               "tools": [
-                "cordis_define",
                 "cordis_inspect_list",
                 "cordis_inspect_query",
                 "cordis_inspect_self",
-                "cordis_run",
-                "cordis_stop",
-                "cordis_undefine",
                 "job_kill",
                 "job_list",
                 "job_output",
@@ -1947,9 +1423,9 @@
               "content": [
                 {
                   "type": "tool-call",
-                  "id": "advanced-define",
-                  "name": "cordis_define",
-                  "arguments": "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+                  "id": "advanced-inspect",
+                  "name": "cordis_inspect_list",
+                  "arguments": "{}"
                 }
               ],
               "source": {
@@ -1991,8 +1467,8 @@
                 "time0": 0,
                 "index": 0,
                 "dt": [],
-                "id": "advanced-define",
-                "name": "cordis_define",
+                "id": "advanced-inspect",
+                "name": "cordis_inspect_list",
                 "args": [
                   ""
                 ]
@@ -2002,9 +1478,9 @@
                 "time0": 0,
                 "index": 0,
                 "dt": [],
-                "id": "advanced-define",
+                "id": "advanced-inspect",
                 "args": [
-                  "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+                  "{}"
                 ]
               },
               {
@@ -2015,9 +1491,9 @@
                   "index": 0,
                   "block": {
                     "type": "tool-call",
-                    "id": "advanced-define",
-                    "name": "cordis_define",
-                    "arguments": "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+                    "id": "advanced-inspect",
+                    "name": "cordis_inspect_list",
+                    "arguments": "{}"
                   }
                 }
               },
@@ -2072,9 +1548,9 @@
           "data": {
             "turn": 1,
             "step": 1,
-            "callId": "advanced-define",
-            "name": "cordis_define",
-            "arguments": "{\"plugin\": {\"kind\": \"new\", \"idPrefix\": \"snap\"}, \"name\": \"Snapshot Double\", \"purpose\": \"Expose a deterministic doubling tool for executable snapshot verification.\", \"code\": {\"host\": \"return (ctx) => {\\n  harness.registerTool(ctx, harness.defineTool({\\n    name: 'snapshot_double',\\n    description: 'Double a number for executable snapshot verification.',\\n    parameters: { value: { type: 'number', required: true } },\\n    output: {\\n      schema: { type: 'number' },\\n      render(_args, value) {\\n        return [{ type: 'text', text: String(value) }]\\n      }\\n    },\\n    async execute(args) {\\n      return args.value * 2\\n    }\\n  }))\\n}\\n\"}}"
+            "callId": "advanced-inspect",
+            "name": "cordis_inspect_list",
+            "arguments": "{}"
           }
         }
       }
@@ -2093,16 +1569,16 @@
             "message": {
               "source": {
                 "kind": "tool",
-                "callId": "advanced-define"
+                "callId": "advanced-inspect"
               },
               "content": [
                 {
                   "type": "tool-result",
-                  "toolCallId": "advanced-define",
+                  "toolCallId": "advanced-inspect",
                   "content": [
                     {
                       "type": "text",
-                      "text": "Defined snap-1/pkg-1 (Snapshot Double); it is not running yet. Use cordis_run to activate this Package."
+                      "text": "{\n  \"providers\": [\n    {\n      \"platform\": \"host\",\n      \"id\": \"Service\",\n      \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listService\",\n          \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"service\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Service key. Omit it for the compact Service and method-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Service directory, or one exact Service contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Event\",\n      \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listEvents\",\n          \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"event\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Event name. Omit it for the compact Event and listener-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Event directory, or one exact Event contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Builtin\",\n      \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n      \"methods\": [\n        {\n          \"name\": \"listBuiltins\",\n          \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Tool\",\n      \"description\": \"Tools visible to the requesting Agent, including scoped and dynamic registrations.\",\n      \"methods\": [\n        {\n          \"name\": \"listTools\",\n          \"description\": \"Return every Tool schema currently callable by this Agent.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    }\n  ]\n}"
                     }
                   ],
                   "isError": false
@@ -2110,10 +1586,6 @@
               ],
               "role": "user",
               "id": "{{messageId}}"
-            },
-            "meta": {
-              "pluginId": "snap-1",
-              "packageId": "pkg-1"
             }
           },
           "sourceEventSeqs": [
@@ -2169,312 +1641,9 @@
               "content": [
                 {
                   "type": "tool-call",
-                  "id": "advanced-run",
-                  "name": "cordis_run",
-                  "arguments": "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-                }
-              ],
-              "source": {
-                "kind": "model",
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "replayState": {
-                  "response": {
-                    "kind": "deepseek-messages",
-                    "version": 1,
-                    "model": "smoke-model"
-                  },
-                  "blocks": [
-                    {
-                      "type": "tool-call"
-                    }
-                  ]
-                }
-              },
-              "id": "{{messageId}}"
-            },
-            "usage": {
-              "inputTokens": 3,
-              "outputTokens": 3,
-              "totalTokens": 6
-            },
-            "stream": [
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-start",
-                  "index": 0,
-                  "blockType": "tool-call"
-                }
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-run",
-                "name": "cordis_run",
-                "args": [
-                  ""
-                ]
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-run",
-                "args": [
-                  "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-                ]
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-end",
-                  "index": 0,
-                  "block": {
-                    "type": "tool-call",
-                    "id": "advanced-run",
-                    "name": "cordis_run",
-                    "arguments": "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "usage",
-                  "usage": {
-                    "inputTokens": 3,
-                    "outputTokens": 3,
-                    "totalTokens": 6
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "finish",
-                  "reason": {
-                    "kind": "tool-calls"
-                  },
-                  "replayState": {
-                    "response": {
-                      "kind": "deepseek-messages",
-                      "version": 1,
-                      "model": "smoke-model"
-                    },
-                    "blocks": [
-                      {
-                        "type": "tool-call"
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/call",
-          "seq": 16,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2,
-            "callId": "advanced-run",
-            "name": "cordis_run",
-            "arguments": "{\"pluginId\": \"snap-1\", \"packageId\": \"pkg-1\", \"mode\": \"run\"}"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/result",
-          "seq": 17,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2,
-            "message": {
-              "source": {
-                "kind": "tool",
-                "callId": "advanced-run"
-              },
-              "content": [
-                {
-                  "type": "tool-result",
-                  "toolCallId": "advanced-run",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "snap-1/pkg-1 is running (run-1)."
-                    }
-                  ],
-                  "isError": false
-                }
-              ],
-              "role": "user",
-              "id": "{{messageId}}"
-            },
-            "meta": {
-              "pluginId": "snap-1",
-              "packageId": "pkg-1",
-              "pluginRunId": "run-1"
-            }
-          },
-          "sourceEventSeqs": [
-            16
-          ],
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/end",
-          "seq": 18,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/start",
-          "seq": 19,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "system/message",
-          "seq": 20,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3,
-            "message": {
-              "role": "system",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "{{system}}"
-                }
-              ],
-              "source": {
-                "kind": "plugin",
-                "plugin": "@deepseek-ai/dsh-system-prompt"
-              },
-              "id": "{{messageId}}"
-            }
-          },
-          "sourceEventSeqs": [
-            4
-          ],
-          "surfaceOp": {
-            "op": "replace",
-            "startSeq": 4,
-            "endSeq": 4
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "request/header",
-          "seq": 21,
-          "time": 0,
-          "data": {
-            "header": {
-              "config": {
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "maxTokens": 256000,
-                "reasoningEffort": "high"
-              },
-              "adapterDefaults": {
-                "reasoningEffort": true,
-                "maxTokens": true
-              },
-              "tools": [
-                "cordis_define",
-                "cordis_inspect_list",
-                "cordis_inspect_query",
-                "cordis_inspect_self",
-                "cordis_run",
-                "cordis_stop",
-                "cordis_undefine",
-                "job_kill",
-                "job_list",
-                "job_output",
-                "run_code",
-                "snapshot_double",
-                "subagent",
-                "workflow"
-              ]
-            },
-            "reason": "change",
-            "startsSeries": true
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "assistant/message",
-          "seq": 22,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "tool-call",
                   "id": "advanced-code",
                   "name": "run_code",
-                  "arguments": "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+                  "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
                 }
               ],
               "source": {
@@ -2529,7 +1698,7 @@
                 "dt": [],
                 "id": "advanced-code",
                 "args": [
-                  "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+                  "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
                 ]
               },
               {
@@ -2542,7 +1711,7 @@
                     "type": "tool-call",
                     "id": "advanced-code",
                     "name": "run_code",
-                    "arguments": "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+                    "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
                   }
                 }
               },
@@ -2592,14 +1761,14 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/call",
-          "seq": 23,
+          "seq": 16,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 3,
+            "step": 2,
             "callId": "advanced-code",
             "name": "run_code",
-            "arguments": "{\"code\": \"return await tools.snapshot_double({ value: 21 })\", \"description\": \"Run the temporary Plugin tool\"}"
+            "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
           }
         }
       }
@@ -2610,15 +1779,17 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/ptc-dispatch-start",
-          "seq": 24,
+          "seq": 17,
           "time": 0,
           "data": {
             "rootCallId": "advanced-code",
             "parentCallId": "advanced-code",
             "subCallId": "advanced-code:ptc:1",
-            "name": "snapshot_double",
+            "name": "cordis_inspect_query",
             "arguments": {
-              "value": 21
+              "platform": "host",
+              "provider": "Tool",
+              "method": "listTools"
             }
           }
         }
@@ -2630,21 +1801,23 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/ptc-dispatch",
-          "seq": 25,
+          "seq": 18,
           "time": 0,
           "data": {
             "rootCallId": "advanced-code",
             "parentCallId": "advanced-code",
             "subCallId": "advanced-code:ptc:1",
-            "name": "snapshot_double",
+            "name": "cordis_inspect_query",
             "arguments": {
-              "value": 21
+              "platform": "host",
+              "provider": "Tool",
+              "method": "listTools"
             },
             "isError": false,
             "content": [
               {
                 "type": "text",
-                "text": "42"
+                "text": "{\n  \"platform\": \"host\",\n  \"provider\": \"Tool\",\n  \"method\": \"listTools\",\n  \"data\": {\n    \"tools\": [\n      {\n        \"name\": \"workflow\",\n        \"description\": \"Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.\\n\\nThe workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result.\\n\\nScript-body hooks:\\n- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly.\\n- `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages.\\n- `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.\\n- `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.\\n\\nMisused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`.\\n\\nConstraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"script\": {\n              \"type\": \"string\",\n              \"description\": \"The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`).\"\n            },\n            \"meta\": {\n              \"type\": \"object\",\n              \"description\": \"The workflow identity block (plain JSON — never code).\",\n              \"additionalProperties\": true,\n              \"properties\": {\n                \"name\": {\n                  \"type\": \"string\",\n                  \"description\": \"Short kebab-case workflow name.\"\n                },\n                \"description\": {\n                  \"type\": \"string\",\n                  \"description\": \"One-line description of what the workflow does.\"\n                },\n                \"whenToUse\": {\n                  \"type\": \"string\",\n                  \"description\": \"Optional guidance on when this workflow applies.\"\n                },\n                \"phases\": {\n                  \"type\": \"array\",\n                  \"description\": \"Optional phase declarations matched by phase() calls.\",\n                  \"items\": {\n                    \"type\": \"object\",\n                    \"additionalProperties\": true,\n                    \"properties\": {\n                      \"title\": {\n                        \"type\": \"string\",\n                        \"description\": \"The phase title phase() calls match by exact string.\"\n                      },\n                      \"detail\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional one-line description of the phase.\"\n                      },\n                      \"provider\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional provider override this phase is expected to use.\"\n                      },\n                      \"model\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional model override this phase is expected to use.\"\n                      }\n                    },\n                    \"required\": [\n                      \"title\"\n                    ]\n                  }\n                }\n              },\n              \"required\": [\n                \"name\",\n                \"description\"\n              ]\n            },\n            \"args\": {\n              \"type\": \"object\",\n              \"description\": \"Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\\\"files\\\": [...]}).\",\n              \"additionalProperties\": true\n            }\n          },\n          \"required\": [\n            \"script\",\n            \"meta\"\n          ]\n        }\n      },\n      {\n        \"name\": \"subagent\",\n        \"description\": \"Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"A short (3-5 word) description of the delegated task, for display.\"\n            },\n            \"prompt\": {\n              \"type\": \"string\",\n              \"description\": \"The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs.\"\n            },\n            \"run_in_background\": {\n              \"type\": \"boolean\",\n              \"description\": \"Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill.\"\n            }\n          },\n          \"required\": [\n            \"description\",\n            \"prompt\"\n          ]\n        }\n      },\n      {\n        \"name\": \"job_output\",\n        \"description\": \"Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"wait\": {\n              \"type\": \"boolean\",\n              \"description\": \"Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive.\"\n            },\n            \"timeout_ms\": {\n              \"type\": \"number\",\n              \"description\": \"Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"job_list\",\n        \"description\": \"List your background jobs (running and finished) with their ids, kinds, and statuses.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"job_kill\",\n        \"description\": \"Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"reason\": {\n              \"type\": \"string\",\n              \"description\": \"Optional short reason, recorded in the log and forwarded to the job.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_list\",\n        \"description\": \"List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_query\",\n        \"description\": \"Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"platform\": {\n              \"type\": \"string\",\n              \"description\": \"Runtime platform that owns the Provider.\",\n              \"enum\": [\n                \"host\",\n                \"client\"\n              ]\n            },\n            \"provider\": {\n              \"type\": \"string\",\n              \"description\": \"Exact Provider ID returned by cordis_inspect_list.\"\n            },\n            \"method\": {\n              \"type\": \"string\",\n              \"description\": \"Exact method name declared by the Provider manifest.\"\n            },\n            \"input\": {\n              \"description\": \"Optional query input; it must satisfy the method input schema.\"\n            }\n          },\n          \"required\": [\n            \"platform\",\n            \"provider\",\n            \"method\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_self\",\n        \"description\": \"Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"pluginId\": {\n              \"type\": \"string\",\n              \"description\": \"Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin.\"\n            },\n            \"packageId\": {\n              \"type\": \"string\",\n              \"description\": \"Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned.\"\n            }\n          }\n        }\n      },\n      {\n        \"name\": \"run_code\",\n        \"description\": \"Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. The working directory is the Session's current directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"code\": {\n              \"type\": \"string\",\n              \"description\": \"The program: the body of an async TypeScript function.\"\n            },\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"Clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \\\"Count TODO markers across packages\\\"; \\\"Read failing test and its fixture\\\"; \\\"Rename config key in every cordis.yml\\\".\"\n            },\n            \"timeoutMs\": {\n              \"type\": \"number\",\n              \"description\": \"Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline.\"\n            },\n            \"sandbox_permissions\": {\n              \"type\": \"string\",\n              \"description\": \"Wider sandbox mode for this complete program execution; requires justification and approval.\",\n              \"enum\": [\n                \"workspace-write\",\n                \"danger-full-access\"\n              ]\n            },\n            \"justification\": {\n              \"type\": \"string\",\n              \"description\": \"Reason this complete program needs wider access, shown to the user for approval.\"\n            }\n          },\n          \"required\": [\n            \"code\",\n            \"description\"\n          ]\n        }\n      }\n    ]\n  }\n}"
               }
             ]
           }
@@ -2657,11 +1830,11 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/result",
-          "seq": 26,
+          "seq": 19,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 3,
+            "step": 2,
             "message": {
               "source": {
                 "kind": "tool",
@@ -2674,7 +1847,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "42"
+                      "text": "{\n  \"value\": 42,\n  \"tools\": [\n    \"workflow\",\n    \"subagent\",\n    \"job_output\",\n    \"job_list\",\n    \"job_kill\",\n    \"cordis_inspect_list\",\n    \"cordis_inspect_query\",\n    \"cordis_inspect_self\",\n    \"run_code\"\n  ]\n}"
                     }
                   ],
                   "isError": false
@@ -2685,7 +1858,7 @@
             }
           },
           "sourceEventSeqs": [
-            23
+            16
           ],
           "surfaceOp": "append"
         }
@@ -2697,7 +1870,22 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 27,
+          "seq": 20,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 2
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 21,
           "time": 0,
           "data": {
             "turn": 1,
@@ -2711,27 +1899,12 @@
       "payload": {
         "sessionId": "{{parent}}",
         "event": {
-          "type": "step/start",
-          "seq": 28,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 4
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
           "type": "assistant/message",
-          "seq": 29,
+          "seq": 22,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 4,
+            "step": 3,
             "message": {
               "role": "assistant",
               "content": [
@@ -2857,11 +2030,11 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/call",
-          "seq": 30,
+          "seq": 23,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 4,
+            "step": 3,
             "callId": "advanced-direct-child",
             "name": "subagent",
             "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
@@ -2950,7 +2123,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "subagent/catalog",
-          "seq": 31,
+          "seq": 24,
           "time": 0,
           "data": {
             "version": 0,
@@ -3126,18 +2299,13 @@
                 "maxTokens": true
               },
               "tools": [
-                "cordis_define",
                 "cordis_inspect_list",
                 "cordis_inspect_query",
                 "cordis_inspect_self",
-                "cordis_run",
-                "cordis_stop",
-                "cordis_undefine",
                 "job_kill",
                 "job_list",
                 "job_output",
                 "run_code",
-                "snapshot_double",
                 "subagent",
                 "workflow"
               ]
@@ -3339,11 +2507,11 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/result",
-          "seq": 32,
+          "seq": 25,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 4,
+            "step": 3,
             "message": {
               "source": {
                 "kind": "tool",
@@ -3367,7 +2535,7 @@
             }
           },
           "sourceEventSeqs": [
-            30
+            23
           ],
           "surfaceOp": "append"
         }
@@ -3379,7 +2547,22 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 33,
+          "seq": 26,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 3
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 27,
           "time": 0,
           "data": {
             "turn": 1,
@@ -3393,27 +2576,12 @@
       "payload": {
         "sessionId": "{{parent}}",
         "event": {
-          "type": "step/start",
-          "seq": 34,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 5
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
           "type": "assistant/message",
-          "seq": 35,
+          "seq": 28,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 5,
+            "step": 4,
             "message": {
               "role": "assistant",
               "content": [
@@ -3539,11 +2707,11 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/call",
-          "seq": 36,
+          "seq": 29,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 5,
+            "step": 4,
             "callId": "advanced-workflow",
             "name": "workflow",
             "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
@@ -3557,7 +2725,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/run-start",
-          "seq": 37,
+          "seq": 30,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -3647,7 +2815,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "subagent/catalog",
-          "seq": 38,
+          "seq": 31,
           "time": 0,
           "data": {
             "version": 0,
@@ -3821,18 +2989,13 @@
                 "maxTokens": true
               },
               "tools": [
-                "cordis_define",
                 "cordis_inspect_list",
                 "cordis_inspect_query",
                 "cordis_inspect_self",
-                "cordis_run",
-                "cordis_stop",
-                "cordis_undefine",
                 "job_kill",
                 "job_list",
                 "job_output",
                 "run_code",
-                "snapshot_double",
                 "subagent",
                 "workflow"
               ]
@@ -3864,7 +3027,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/agent-start",
-          "seq": 39,
+          "seq": 32,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -4052,7 +3215,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/agent-end",
-          "seq": 40,
+          "seq": 33,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -4068,7 +3231,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool-workflow/run-end",
-          "seq": 41,
+          "seq": 34,
           "time": 0,
           "data": {
             "runId": "{{workflow-run}}",
@@ -4083,11 +3246,11 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "tool/result",
-          "seq": 42,
+          "seq": 35,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 5,
+            "step": 4,
             "message": {
               "source": {
                 "kind": "tool",
@@ -4111,7 +3274,7 @@
             }
           },
           "sourceEventSeqs": [
-            36
+            29
           ],
           "surfaceOp": "append"
         }
@@ -4123,7 +3286,22 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 43,
+          "seq": 36,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 4
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 37,
           "time": 0,
           "data": {
             "turn": 1,
@@ -4137,324 +3315,12 @@
       "payload": {
         "sessionId": "{{parent}}",
         "event": {
-          "type": "step/start",
-          "seq": 44,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 6
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
           "type": "assistant/message",
-          "seq": 45,
+          "seq": 38,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 6,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "tool-call",
-                  "id": "advanced-undefine",
-                  "name": "cordis_undefine",
-                  "arguments": "{\"pluginId\": \"snap-1\"}"
-                }
-              ],
-              "source": {
-                "kind": "model",
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "replayState": {
-                  "response": {
-                    "kind": "deepseek-messages",
-                    "version": 1,
-                    "model": "smoke-model"
-                  },
-                  "blocks": [
-                    {
-                      "type": "tool-call"
-                    }
-                  ]
-                }
-              },
-              "id": "{{messageId}}"
-            },
-            "usage": {
-              "inputTokens": 3,
-              "outputTokens": 3,
-              "totalTokens": 6
-            },
-            "stream": [
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-start",
-                  "index": 0,
-                  "blockType": "tool-call"
-                }
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-undefine",
-                "name": "cordis_undefine",
-                "args": [
-                  ""
-                ]
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-undefine",
-                "args": [
-                  "{\"pluginId\": \"snap-1\"}"
-                ]
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-end",
-                  "index": 0,
-                  "block": {
-                    "type": "tool-call",
-                    "id": "advanced-undefine",
-                    "name": "cordis_undefine",
-                    "arguments": "{\"pluginId\": \"snap-1\"}"
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "usage",
-                  "usage": {
-                    "inputTokens": 3,
-                    "outputTokens": 3,
-                    "totalTokens": 6
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "finish",
-                  "reason": {
-                    "kind": "tool-calls"
-                  },
-                  "replayState": {
-                    "response": {
-                      "kind": "deepseek-messages",
-                      "version": 1,
-                      "model": "smoke-model"
-                    },
-                    "blocks": [
-                      {
-                        "type": "tool-call"
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/call",
-          "seq": 46,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 6,
-            "callId": "advanced-undefine",
-            "name": "cordis_undefine",
-            "arguments": "{\"pluginId\": \"snap-1\"}"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/result",
-          "seq": 47,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 6,
-            "message": {
-              "source": {
-                "kind": "tool",
-                "callId": "advanced-undefine"
-              },
-              "content": [
-                {
-                  "type": "tool-result",
-                  "toolCallId": "advanced-undefine",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "Removed dynamic Plugin snap-1 and all of its Packages."
-                    }
-                  ],
-                  "isError": false
-                }
-              ],
-              "role": "user",
-              "id": "{{messageId}}"
-            }
-          },
-          "sourceEventSeqs": [
-            46
-          ],
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/end",
-          "seq": 48,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 6
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/start",
-          "seq": 49,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 7
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "system/message",
-          "seq": 50,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 7,
-            "message": {
-              "role": "system",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "{{system}}"
-                }
-              ],
-              "source": {
-                "kind": "plugin",
-                "plugin": "@deepseek-ai/dsh-system-prompt"
-              },
-              "id": "{{messageId}}"
-            }
-          },
-          "sourceEventSeqs": [
-            20
-          ],
-          "surfaceOp": {
-            "op": "replace",
-            "startSeq": 20,
-            "endSeq": 20
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "request/header",
-          "seq": 51,
-          "time": 0,
-          "data": {
-            "header": {
-              "config": {
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "maxTokens": 256000,
-                "reasoningEffort": "high"
-              },
-              "adapterDefaults": {
-                "reasoningEffort": true,
-                "maxTokens": true
-              },
-              "tools": [
-                "cordis_define",
-                "cordis_inspect_list",
-                "cordis_inspect_query",
-                "cordis_inspect_self",
-                "cordis_run",
-                "cordis_stop",
-                "cordis_undefine",
-                "job_kill",
-                "job_list",
-                "job_output",
-                "run_code",
-                "subagent",
-                "workflow"
-              ]
-            },
-            "reason": "change",
-            "startsSeries": true
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "assistant/message",
-          "seq": 52,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 7,
+            "step": 5,
             "message": {
               "role": "assistant",
               "content": [
@@ -4564,11 +3430,11 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "step/end",
-          "seq": 53,
+          "seq": 39,
           "time": 0,
           "data": {
             "turn": 1,
-            "step": 7
+            "step": 5
           }
         }
       }
@@ -4579,7 +3445,7 @@
         "sessionId": "{{parent}}",
         "event": {
           "type": "turn/end",
-          "seq": 54,
+          "seq": 40,
           "time": 0,
           "data": {
             "turn": 1,

@@ -9,25 +9,25 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
       "path": "../../compaction/compaction"
     },
     {
       "path": "../../core/session"
     },
     {
+      "path": "../../llm/deepseek-llm-api-extensions"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
-      "path": "../../session/session-format"
-    },
-    {
       "path": "../../session/session-format-catalog"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/cosmokit"
     }
   ]
 }

@@ -235,14 +235,29 @@ export function collectPluginSurfaceViolations(root: string, facts = collectPlug
     const patchPath = resolve(root, dirname(path), patch)
     if (!existsSync(patchPath)) violations.push(`${manifest.name ?? path}: Bundle patch ${patch} does not exist`)
   }
-  const hmr = rowById(root, 'client-hmr')
-  const expression = isRecord(hmr?.disabled) ? hmr.disabled.__jsExpr : undefined
-  if (hmr?.name !== '@deepseek-ai/dsh-client-hmr') {
-    violations.push(`${WEB_PATCH}: client-hmr row is missing or names a different package`)
-  } else if (expression !== "process.env.DSH_CLIENT_HMR !== '1'") {
-    violations.push(`${WEB_PATCH}: client-hmr must be disabled unless DSH_CLIENT_HMR is exactly "1"`)
-  }
+  violations.push(...clientGraphTransportViolations(rowById(root, 'client-hmr')))
   return violations.sort((left, right) => left.localeCompare(right))
+}
+
+/**
+ * Validate production graph delivery and opt-in development artifact polling.
+ * @param row - Parsed Web composition row, absent when the transport was removed.
+ * @returns Missing delivery or unconditional polling violations.
+ */
+export function clientGraphTransportViolations(row: Record<string, unknown> | undefined): string[] {
+  if (row?.name !== '@deepseek-ai/dsh-client-hmr') {
+    return [`${WEB_PATCH}: client-hmr row is missing or names a different package`]
+  }
+  const config = isRecord(row.config) ? row.config : undefined
+  const watch = isRecord(config?.watchArtifacts) ? config.watchArtifacts.__jsExpr : undefined
+  const violations: string[] = []
+  if (row.disabled !== undefined && row.disabled !== false) {
+    violations.push(`${WEB_PATCH}: client-hmr graph delivery must remain enabled in ordinary Web launches`)
+  }
+  if (watch !== "process.env.DSH_CLIENT_HMR === '1'") {
+    violations.push(`${WEB_PATCH}: client-hmr artifact polling requires DSH_CLIENT_HMR to be exactly "1"`)
+  }
+  return violations
 }
 
 /** Render a stable human-readable surface summary. */

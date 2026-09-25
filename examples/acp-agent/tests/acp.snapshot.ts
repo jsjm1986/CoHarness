@@ -994,16 +994,8 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
   const packed = fixtureRecords('packed-chunks')
   const rowTypes = packed.flatMap((record) => {
     if (record === null || typeof record !== 'object') return []
-    const body = (record as { data?: unknown }).data
-    const stream = body !== null && typeof body === 'object' && !Array.isArray(body)
-      ? (body as { stream?: unknown }).stream
-      : undefined
-    const items = Array.isArray(stream) ? stream : [record]
-    return items.flatMap((item) => {
-      if (item === null || typeof item !== 'object') return []
-      const type = (item as { type?: unknown }).type
-      return type === 'text-chunks' || type === 'reasoning-chunks' || type === 'tool-call-chunks' ? [type] : []
-    })
+    const type = (record as { type?: unknown }).type
+    return type === 'text-chunks' || type === 'reasoning-chunks' || type === 'tool-call-chunks' ? [type] : []
   })
 
   expect([...new Set(rowTypes)].sort()).toStrictEqual(['reasoning-chunks', 'text-chunks', 'tool-call-chunks'])
@@ -1036,8 +1028,9 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
     return cloned
   }
   const logicalRecords = (fixture: string): unknown[] => [
-    // Packed stream items differ in generation fields, so compare header
-    // content minus the generation fields.
+    // Packed rows are a ≤v3 body encoding, so the fixture stays v3 while the
+    // source recording is current: compare header content minus the
+    // generation fields.
     ((header: Record<string, unknown>) => {
       delete header.version
       delete header.isSeeded

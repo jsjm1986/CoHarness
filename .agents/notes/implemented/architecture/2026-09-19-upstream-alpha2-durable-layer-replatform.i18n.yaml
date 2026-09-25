@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-durable-layer-replatform.md
-2026-09-19-upstream-alpha2-durable-layer-replatform.md: a306c2e9221e1f8ff0b1849b15aad5f59b74d53a
-2026-09-19-upstream-alpha2-durable-layer-replatform.zh.md: 6371cc00b51964394035f9a77f284524e6a8a4ef
+2026-09-19-upstream-alpha2-durable-layer-replatform.md: 043a50c9399e2fb45b76f9a4c8838e5b16b0b300
+2026-09-19-upstream-alpha2-durable-layer-replatform.zh.md: 68f085fa02ae2d3502c92f38cce96eb11e82d2c2

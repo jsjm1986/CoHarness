@@ -161,14 +161,12 @@
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts
 
-    # The client-plugin reload chain is development-only. Keeping it disabled
-    # in ordinary Web launches removes its stat poll and SSE route from the
-    # steady-state server. Set DSH_CLIENT_HMR=1 when a dev:web rebuild watcher
-    # is running; the exact disabled expression keeps both faces out of the
-    # Host graph and browser manifest when the switch is off.
+    # Live graph delivery keeps open pages aligned with Loader changes.
+    # Only development rebuilds require recurring artifact stat polls.
     - id: client-hmr
       name: '@deepseek-ai/dsh-client-hmr'
-      disabled: !!js process.env.DSH_CLIENT_HMR !== '1'
+      config:
+        watchArtifacts: !!js process.env.DSH_CLIENT_HMR === '1'
 
     # ── browser plugin roster (dsh.client rows; node halves are layer-2 hosts) ──
 
@@ -189,6 +187,9 @@
         # A deployment adding authorities keeps this expression and concatenates
         # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
         trustedHosts: !!js ctx.webRuntime.trustedHosts
+
+    - id: terminal-controller
+      name: '@deepseek-ai/dsh-api-terminal-controller'
 
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
@@ -226,8 +227,18 @@
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
 
+    - id: ui-settings-unarchive-sessions
+      name: '@deepseek-ai/dsh-client-ui-settings-unarchive-sessions'
+
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'
+
+    - id: ui-sidebar-right
+      name: '@deepseek-ai/dsh-client-ui-sidebar-right'
+    - id: ui-sidebar-browser
+      name: '@deepseek-ai/dsh-client-ui-sidebar-browser'
+    - id: ui-sidebar-terminal
+      name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
 
 
     # Gateway project scope, shared-conversation visibility, read-only role UI,
@@ -303,6 +314,9 @@
 
     # Per-message feedback: Like/Dislike plus an optional note in the
     # assistant-message action strip, over the messageFeedback Remote.
+    - id: workspace-changes
+      name: '@deepseek-ai/dsh-workspace-changes'
+
     - id: ui-message-feedback
       name: '@deepseek-ai/dsh-client-ui-message-feedback'
 
@@ -367,6 +381,9 @@
 # agent, so one host instance serves every session exactly as before presets.
 
 - id: tool-jobs
+  disabled: true
+
+- id: present
   disabled: true
 
 - id: tool-fs
@@ -472,6 +489,9 @@
 # `dsh-agent-presets`' own default (`includeUserRoot`), so a composition that
 # never reaches that patch still finds a person's presets.
 - insert:
+    - id: office-to-pdf
+      name: '@deepseek-ai/dsh-office-to-pdf'
+
     - id: agent-presets
       name: '@deepseek-ai/dsh-agent-presets'
       config:

@@ -41,16 +41,16 @@ describe('normalizeStdout', () => {
       params: { sessionId: ctx.sessionIds[0], cwd: ctx.cwd, note: `at ${ctx.cwd}/x` },
     })
     const out = normalizeStdout(raw, ctx)
-    expect(out).toContain('{{sessionId}}')
+    expect(out).toContain('{{session:1}}')
     expect(out).toContain('{{cwd}}')
     expect(out).not.toContain(ctx.cwd)
     expect(out).not.toContain(ctx.sessionIds[0] as string)
   })
 
-  it('normalizes platform smart quotes in stderr-like text fields', () => {
+  it('preserves command and prose quotation marks', () => {
     const raw = JSON.stringify({ jsonrpc: '2.0', result: { text: 'find: ‘/tmp/work’ failed; “retry”' } })
     const out = normalizeStdout(raw, ctx)
-    expect(out).toContain("find: '/tmp/work' failed; \\\"retry\\\"")
+    expect(JSON.parse(out).result.text).toBe('find: ‘/tmp/work’ failed; “retry”')
   })
 
   it('scrubs cwd at file URI and chained-punctuation boundaries', () => {
@@ -143,9 +143,9 @@ Additional instructions from: nested\AGENTS.md`,
     expect(frame.path).toBe(String.raw`{{cwd}}\nested\proof.txt`)
   })
 
-  it('scrubs a stray UUID not in the known list', () => {
+  it('classifies an opaque RPC parameter identity separately from a Session', () => {
     const raw = JSON.stringify({ jsonrpc: '2.0', method: 'x', params: { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' } })
-    expect(normalizeStdout(raw, ctx)).toContain('{{sessionId}}')
+    expect(normalizeStdout(raw, ctx)).toContain('{{id:1}}')
   })
 
   it('leaves notification frames without an id untouched in id-space', () => {
@@ -391,7 +391,7 @@ describe('normalizeSessionLog', () => {
 
   it('scrubs the session id in the header', () => {
     const out = normalizeSessionLog(`${header({ id: ctx.sessionIds[0] })}\n`, ctx)
-    expect(out).toContain('{{sessionId}}')
+    expect(out).toContain('{{session:1}}')
   })
 
   it('zeroes a hook/result durationMs (run-to-run noise) but keeps its decision', () => {
@@ -518,10 +518,23 @@ describe('normalizeSessionSnapshot', () => {
       '',
     ].join('\n')
     expect(normalizeSessionSnapshot(raw, ctx)).toBe([
-      JSON.stringify({ type: 'session', version: 4, id: 's', createdAt: 0, isSeeded: false, delegationDepth: 0 }),
+      JSON.stringify({ type: 'session', id: '{{session:1}}', createdAt: 0, isSeeded: false, delegationDepth: 0 }),
       JSON.stringify({ type: 'turn/start', data: { turn: 1 } }),
       JSON.stringify({ type: 'step/start', data: { turn: 1, step: 1 } }),
-      JSON.stringify({ type: 'system/message', data: { turn: 1, step: 1, message: { id: 'v2-to-v3-system-76b7b872aa62ec8e220a5cb8891c4468ebf0fb84cb0e2e236beb0e6353c653db', role: 'system', source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }, content: [{ type: 'text', text: '{{system}}' }] } }, surfaceOp: 'append' }),
+      JSON.stringify({
+        type: 'system/message',
+        data: {
+          turn: 1,
+          step: 1,
+          message: {
+            id: 'v2-to-v3-system-76b7b872aa62ec8e220a5cb8891c4468ebf0fb84cb0e2e236beb0e6353c653db',
+            role: 'system',
+            source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+            content: [],
+          },
+        },
+        surfaceOp: 'append',
+      }),
       JSON.stringify({
         type: 'assistant/attempt',
         data: { turn: 1, step: 1, stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [0, 0, 0, 0, 0], texts: ['a', 'b', 'c', 'd', 'e', 'f'] }] },
@@ -695,6 +708,12 @@ describe('scrubRequestHeaders', () => {
 })
 
 describe('scrubSystemPrompts', () => {
+  it('preserves empty durable system messages without manufacturing a prompt', () => {
+    const raw = '{ "type": "system/message", "data": { "message": { "role": "system", "content": [] } } }\n'
+    expect(scrubSystemPrompts(raw)).toBe(raw)
+    expect(scrubRequestHeaders(raw)).toBe(raw)
+  })
+
   it('tokenizes durable system messages while leaving identities, replacements, and unrelated payloads intact', () => {
     const record = {
       type: 'system/message', seq: 4, time: 5,

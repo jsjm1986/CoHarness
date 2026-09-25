@@ -62,7 +62,7 @@ Both plugins have usable defaults. The meter remains independent of model routin
 
 ## Invariants
 
-**Runtime invariant:** No companion is published. Each session's fold is a deterministic derivation of the durable log that can be refolded identically, so the meter publishes no observation independent of its source.
+No runtime invariant companion is published: the meter derives estimates from durable events and current request context without an independent authority for comparison.
 
 ## Model Experience
 

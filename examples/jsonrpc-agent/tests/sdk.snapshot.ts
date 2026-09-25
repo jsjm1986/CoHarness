@@ -29,7 +29,8 @@ import {
   type NormalizeContext,
 } from '@deepseek-ai/dsh-acp-snapshot'
 import { resolveExampleLaunch } from '@deepseek-ai/dsh-loader-smoke'
-import { DeepSeekHarness, type HarnessNotification, type RunResult } from '@deepseek-ai/dsh-sdk-client'
+import { createProcessDeepSeekHarness } from '../../../packages/sdk/client/src/api.ts'
+import { type HarnessNotification, type RunResult } from '@deepseek-ai/dsh-sdk-client'
 
 const testsDir = dirOf(import.meta.url)
 const snapshotsDir = join(testsDir, 'snapshots')
@@ -305,14 +306,15 @@ async function runScenario(scenario: SdkScenario): Promise<{
     ...scenario.environment,
   }
 
-  const harness = new DeepSeekHarness({
-    launch: {
+  const harness = createProcessDeepSeekHarness({
       command: launch.command,
       args: launch.args,
       cwd,
-      env,
+      environment: () => env,
+      description: launch.command,
+      initializeTimeoutMs: 10_000,
       requestTimeoutMs: 110_000,
-    },
+    }, {
     cwd,
     provider: 'deepseek-official',
     model: 'deepseek-v4-flash',

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "reviewDate": "2026-09-22",
+  "reviewDate": "2026-09-25",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness",
     "previousTag": "dsh-v0.1.5-rc.2",
@@ -180,7 +180,7 @@
         "packages/typert/loader",
         "pnpm-lock.yaml"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "requiredVerification": "Vendor procedure, local modifications replay, test/build and compiler consumers; js-yaml dependency review.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -189,7 +189,8 @@
       },
       "phases": [
         "1B"
-      ]
+      ],
+      "evidence": "Vendor resync replayed with logged local modifications; profile-resolution ambient source-plane fix; lint/typecheck/build green; js-yaml reviewed."
     },
     {
       "id": "agent-session",
@@ -199,7 +200,7 @@
         "packages/core",
         "packages/session"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-production-unverified",
       "requiredVerification": "Async initialization, recovery, cancellation, write locks, parent ownership, quotas, immutable-generation migrations and both SDK transcripts.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -208,7 +209,8 @@
       },
       "phases": [
         "2B"
-      ]
+      ],
+      "evidence": "Format admission/migration suites, JSONL round-trip, v5→v6 chain and Gateway PG persistence green; production deployment smoke still pending."
     },
     {
       "id": "messages-images-governance",
@@ -219,7 +221,7 @@
         "packages/compaction",
         "packages/attachment"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-real-provider-unverified",
       "requiredVerification": "Both protocols through organization/BYOK routing, real credential attribution and image encoding/pricing/projection/cold recovery; no implicit stored endpoint rewrite.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -229,7 +231,8 @@
       "phases": [
         "3A",
         "3B"
-      ]
+      ],
+      "evidence": "Governance routing, credential attribution and image projection tested locally; real DeepSeek BYOK/provider run pending."
     },
     {
       "id": "log-upload-default-off",
@@ -239,7 +242,7 @@
         "packages/session/session-log-deepseek",
         "packages/bundle"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-artifact-unverified",
       "requiredVerification": "Default off, explicit opt-in, endpoint policy and kill switch across assembled presets; independent from OTel.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -249,7 +252,8 @@
       "phases": [
         "2B",
         "8"
-      ]
+      ],
+      "evidence": "Default-off and opt-in verified across assembled presets; release-artifact verification pending."
     },
     {
       "id": "execution-migration",
@@ -265,7 +269,7 @@
         "packages/jobs",
         "packages/e2b"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-platform-unverified",
       "requiredVerification": "Migrate all consumers, cancel and await quiescence, preserve directory policy. Remove E2B only after deployment inventory and equivalent capability proof.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -275,7 +279,8 @@
       "phases": [
         "4A",
         "4B"
-      ]
+      ],
+      "evidence": "PTC/workflow/shell/subprocess/sandbox/jobs suites green; win32/pwsh and remaining platform legs pending in CI."
     },
     {
       "id": "desktop-coordination-ui",
@@ -286,7 +291,7 @@
         "packages/experimental/computer-use-cua-driver-native",
         "packages/experimental/computer-use-cua-driver-mcp"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-platform-unverified",
       "requiredVerification": "Cross-runtime node/desktop ownership, execution fencing, revocation, FIFO, cancellation, restart and shutdown failures; private text/icon status, reduced motion, queue and unknown state. Desktop-occupancy administration and emergency stop surface under /admin.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -297,7 +302,8 @@
         "5",
         "6B"
       ],
-      "adminSurface": "gateway/admin-ui (/admin)"
+      "adminSurface": "gateway/admin-ui (/admin)",
+      "evidence": "Managed desktop launch composition and config surface tested; real desktop host end-to-end pending."
     },
     {
       "id": "browser-use",
@@ -310,7 +316,7 @@
         "packages/experimental/browser-use-chrome-devtools-mcp",
         "packages/experimental/browser-use-stagehand-native"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-platform-unverified",
       "requiredVerification": "Isolated launch default, explicit attach authorization, resource cleanup, external listeners and screenshot visibility; history recovery does not recover browser state.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -319,7 +325,8 @@
       },
       "phases": [
         "6A"
-      ]
+      ],
+      "evidence": "Browser-use stays explicit local composition with no managed seam; provider/platform verification pending."
     },
     {
       "id": "auto-review",
@@ -329,7 +336,7 @@
         "packages/experimental/auto-review",
         "packages/interaction"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-real-provider-unverified",
       "requiredVerification": "Admin eligibility plus current-session opt-in; cannot expand organizational/project rights or bypass desktop ownership; native/PTC, fail-closed errors and metered review. Eligibility is granted by an administrator from /admin.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -339,7 +346,8 @@
       "phases": [
         "6B"
       ],
-      "adminSurface": "gateway/admin-ui (/admin)"
+      "adminSurface": "gateway/admin-ui (/admin)",
+      "evidence": "Eligibility gates, denial UX and fail-closed errors tested; metered review against a real provider pending."
     },
     {
       "id": "webhook",
@@ -349,7 +357,7 @@
         "packages/webhook/webhook",
         "packages/webhook/webhook-github"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-real-provider-unverified",
       "requiredVerification": "Inbound endpoint authentication, signature verification, replay and rate limiting, Session-creation authorization ownership and secret storage; default off until enabled by an administrator. Endpoint configuration and the enable switch live under /admin.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -359,7 +367,8 @@
       "phases": [
         "7B"
       ],
-      "adminSurface": "gateway/admin-ui (/admin)"
+      "adminSurface": "gateway/admin-ui (/admin)",
+      "evidence": "Real-PostgreSQL intake/signature/dedup/repository-filter/dispatch suites green; cross-node real-provider acceptance pending."
     },
     {
       "id": "remote-product-and-release",
@@ -377,7 +386,7 @@
         "website",
         "examples"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-production-unverified",
       "requiredVerification": "Preserve collaboration, User Documents, Workbench, archives, Android and LAN/public authorization; terminal lifecycle, source/built consumers, restore and deployment acceptance.",
       "alpha1History": {
         "record": "upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.1.json",
@@ -391,7 +400,8 @@
         "7E",
         "8"
       ],
-      "adminSurface": "gateway/admin-ui (/admin)"
+      "adminSurface": "gateway/admin-ui (/admin)",
+      "evidence": "SSH, workspace, deployment and client surfaces locally verified; production deployment smoke pending."
     },
     {
       "id": "plugin-management-admin-only",
@@ -401,12 +411,13 @@
         "packages/boot/plugin-manager/",
         "packages/client/ui-plugin-manager/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-browser-unverified",
       "phases": [
         "7D"
       ],
       "requiredVerification": "User-confirmed: administrators only across UI/tool/Remote. Protect mandatory governance plugins. Q1 resolved 2026-09-18: all four upstream install sources (registry, absolute path, git, tarball) are allowed for administrators; dependency build scripts follow the upstream approval model (Web allow-and-retry and tool-side approvedBuilds), persisted per package name and attributed to the approving administrator. Admin operations are exposed through the /admin surface (gateway/admin-ui), not only in-session UI.",
-      "adminSurface": "gateway/admin-ui (/admin)"
+      "adminSurface": "gateway/admin-ui (/admin)",
+      "evidence": "Admin-only gating across UI/tool/remote implemented and tested; assembled browser verification pending."
     },
     {
       "id": "terminal-user-project-grants",
@@ -416,12 +427,13 @@
         "packages/api/terminal-controller/",
         "packages/client/ui-sidebar-terminal/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-browser-unverified",
       "phases": [
         "7B"
       ],
       "requiredVerification": "User-confirmed: separate user/project authorization, disabled by default. System account permissions do not substitute for tenant policy. Q2 resolved 2026-09-18: dual gate — an administrator must enable both the user and the project; terminals are private to their creator, invisible to other project members; administrators may list and close but never take over input; read-only members have no terminal access at all. User and project grants are administered from the /admin Users and project pages.",
-      "adminSurface": "gateway/admin-ui (/admin)"
+      "adminSurface": "gateway/admin-ui (/admin)",
+      "evidence": "Dual user/project grant gates with admin enable implemented and tested; assembled browser verification pending."
     },
     {
       "id": "office-and-sidebar-browser",
@@ -431,11 +443,12 @@
         "packages/document/",
         "packages/client/ui-sidebar-browser/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-platform-unverified",
       "phases": [
         "7C"
       ],
-      "requiredVerification": "Q3 resolved 2026-09-18: ship the sidebar Browser matching upstream — iframe carrier, loopback allowed, per-tab temporary unsandbox toggle with warning, DSH origin rejected; address bar must note that loopback resolves on the visitor’s machine, never as a host-URL promise. Q4 resolved 2026-09-18: declared platforms are macOS arm64 (native engine) and Linux (WASM); Windows is not claimed; a Linux WASM acceptance environment is required or Linux stays unverified. File authorization, conversion cache isolation, resource limits and native/WASM artifact checks required. Deliverables are owned by the deliverables-workspace-changes decision."
+      "requiredVerification": "Q3 resolved 2026-09-18: ship the sidebar Browser matching upstream — iframe carrier, loopback allowed, per-tab temporary unsandbox toggle with warning, DSH origin rejected; address bar must note that loopback resolves on the visitor’s machine, never as a host-URL promise. Q4 resolved 2026-09-18: declared platforms are macOS arm64 (native engine) and Linux (WASM); Windows is not claimed; a Linux WASM acceptance environment is required or Linux stays unverified. File authorization, conversion cache isolation, resource limits and native/WASM artifact checks required. Deliverables are owned by the deliverables-workspace-changes decision.",
+      "evidence": "Office conversion and sidebar browser previews tested locally; LibreOffice/Linux platform leg pending."
     },
     {
       "id": "deliverables-workspace-changes",
@@ -446,7 +459,7 @@
         "packages/client/ui-deliverables/",
         "packages/core/session/src/known-event-types.ts"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "local-tests-passing-browser-unverified",
       "phases": [
         "2B",
         "7C"
@@ -457,7 +470,8 @@
         "id": "remote-product-and-release",
         "reviewState": "pending-cumulative-source-review",
         "note": "fs/tool-present carried an upstreamOnly deferral in scripts/upstream-sync.json at the rc.2 baseline; no alpha.1 decision row existed."
-      }
+      },
+      "evidence": "Deliverables rendering and workspace-changes consumers implemented and tested; assembled browser verification pending."
     },
     {
       "id": "apps-desktop-not-carried",
@@ -467,11 +481,12 @@
         "apps/desktop/",
         "apps/desktop-host/"
       ],
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "phases": [
         "0R"
       ],
-      "requiredVerification": "User-confirmed 2026-09-18: the upstream desktop client application is not carried, consistent with the rejected upstream desktop ui-package tree in scripts/upstream-sync.json. Startup-chain interfaces shared with apps/cli are reviewed through the foundation decision; no implementation or acceptance is owed for these paths."
+      "requiredVerification": "User-confirmed 2026-09-18: the upstream desktop client application is not carried, consistent with the rejected upstream desktop ui-package tree in scripts/upstream-sync.json. Startup-chain interfaces shared with apps/cli are reviewed through the foundation decision; no implementation or acceptance is owed for these paths.",
+      "evidence": "Upstream desktop surface rejected; verified no local consumer; startup-chain interfaces reviewed via apps/cli row."
     }
   ],
   "historicalVerification": {

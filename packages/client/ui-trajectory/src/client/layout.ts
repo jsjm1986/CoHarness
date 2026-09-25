@@ -14,6 +14,7 @@ import type {
   ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TrajectoryTranslate } from './locales.ts'
+import { COMPACTION_INTERRUPTED_ERROR } from './copy-codes.ts'
 import type {
   TrajectoryCellProps,
   TrajectorySourceBlock,
@@ -316,7 +317,9 @@ export function deriveTrajectoryLayout(
         text: request.status === 'running'
           ? t('layout.compacting')
           : request.status === 'error'
-            ? request.error ?? t('layout.compactionFailed')
+            ? request.error === COMPACTION_INTERRUPTED_ERROR
+              ? t('layout.compactionInterrupted')
+              : request.error ?? t('layout.compactionFailed')
             : request.summary === undefined
               ? t('layout.compacted')
               : '',
@@ -1065,8 +1068,9 @@ function expandSubCalls(
 function summarizeCall(
   name: string,
   argsRaw: string,
-): Pick<TrajectoryCellProps, 'text' | 'previewMarkdown'> {
+): Pick<TrajectoryCellProps, 'text' | 'previewMarkdown' | 'toolName'> {
   return {
+    toolName: name,
     text: name,
     ...(argsRaw === '' ? {} : { previewMarkdown: argsRaw }),
   }

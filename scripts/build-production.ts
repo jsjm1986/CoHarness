@@ -124,7 +124,6 @@ function verifyArtifacts(): void {
     'plugins/dsh-model-governance/lib/outbox.js',
     'plugins/dsh-model-governance/cordis.patch.yml',
     'packages/context/archive-gateway/lib/index.js',
-    'packages/context/archive-gateway/lib/invariant.js',
   ]) requireFile(resolve(root, path), failures)
   if (!gatewayRuntimePackageLinksValid()) {
     failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai'))

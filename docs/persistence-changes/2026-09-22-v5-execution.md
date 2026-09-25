@@ -36,7 +36,7 @@ changes:
     decision: version-bump
   - root: "event:agent/inbox/spliced"
     previous: "2026-09-21-v4"
-    after: "989d6d8ca9c21c4c5c0e7bbf88ca575e4165221454524cdeb7dc824fdc6b5b0c"
+    after: "6a12ecfb066aafd62c6a857c7898e2f8b2237aba3b5856f391d9aa7d521b1fb6"
     decision: version-bump
   - root: "event:gateway/execution"
     previous: null
@@ -44,7 +44,7 @@ changes:
     decision: version-bump
   - root: "event:session/title-llm-request"
     previous: "2026-09-21-v4"
-    after: "4b7fbf29e0ae1e0d95b75903193114fce97ad18351c41a2e06bc287d86e86333"
+    after: "0735bc4fb1d335aad0b9b8289d5638fa8f7f1f3dc5bd79b501fe5c567f92b867"
     decision: version-bump
   - root: "event:team/message/queued"
     previous: "2026-09-21-v4"
@@ -52,14 +52,14 @@ changes:
     decision: version-bump
   - root: "event:user/message"
     previous: "2026-09-21-v4"
-    after: "0620d01028827bca4cac6c6ae7894fd34681f70b41402e0c48ac6aaf301f2b75"
+    after: "19cb7b6061859227ee6f7f46deb1775629d78ad9d730b69b262e36380227196e"
     decision: version-bump
 ```
 
 <a id="compatibility"></a>
 ## Compatibility
 
-V4 physical header validation rejects a draft field emitted by its own encoder. V5 admits that optional boolean and changes the required header version from 4 to 5. The adjacent V4-to-V5 migration preserves events, sequence numbers, inherited cuts, and the draft value while publishing only a new V5 generation on an explicit write. Existing V4 bytes remain untouched. Optional gatewayExecutionScope values may be absent in older messages; the new gateway/execution event is required for managed authorization but older V5 logs may omit it and then receive no privileged identity. V4 readers reject V5 headers, so these additions do not claim V4 forward reading.
+V4 physical header validation rejects a draft field emitted by its own encoder. V5 admits that optional boolean and changes the required header version from 4 to 5. The adjacent V4-to-V5 migration preserves events, sequence numbers, inherited cuts, and the draft value while publishing only a new V5 generation on an explicit write. Existing V4 bytes remain untouched. Optional gatewayExecutionScope values may be absent in older messages; the new gateway/execution event is required for managed authorization but older V5 logs may omit it and then receive no privileged identity. V4 readers reject V5 headers, so these additions do not claim V4 forward reading. Message `source` unions admit the `webhook` variant; earlier V5 readers without that member reject logs that carry webhook-sourced messages.
 
 <a id="verification"></a>
 ## Verification

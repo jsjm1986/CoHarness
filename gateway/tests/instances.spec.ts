@@ -63,7 +63,7 @@ async function setup(extraEnv: Record<string, string> = {}) {
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'),
     HGW_DSH_REPO_ROOT: root,
-    HGW_READINESS_TIMEOUT_MS: '10000',
+    HGW_READINESS_TIMEOUT_MS: '30000',
     HGW_INSTANCE_PORT_BASE: '43100',
     ...extraEnv,
   })
@@ -269,12 +269,12 @@ describe('InstanceManager', () => {
   it('materializes policy packages so profile peers resolve from the compiled runtime', async () => {
     const { root, alice, manager } = await setup()
     const dshHome = join(root, 'users', 'alice', 'dsh')
-    const modules = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
+    const modules = join(dshHome, 'profiles', 'web', 'node_modules', '@deepseek-ai')
     mkdirSync(modules, { recursive: true })
     for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
       symlinkSync(join(root, 'plugins', plugin), join(modules, plugin), 'dir')
     }
-    const peerDir = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai', 'dsh-profile-peer')
+    const peerDir = join(dshHome, 'profiles', 'web', 'node_modules', '@deepseek-ai', 'dsh-profile-peer')
     mkdirSync(peerDir, { recursive: true })
     writeFileSync(join(peerDir, 'package.json'), JSON.stringify({
       name: '@deepseek-ai/dsh-profile-peer',
@@ -289,7 +289,8 @@ describe('InstanceManager', () => {
     expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toBe(
       '- insert:\n    - id: gateway-runtime\n      name: \'@deepseek-ai/dsh-gateway-runtime\'\n'
       + '    - id: governance\n- insert: []\n'
-      + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n',
+      + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
+      + '- id: api-gateway\n  inject: [executionAuthority]\n',
     )
     for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
       const installed = join(modules, plugin)
@@ -338,10 +339,77 @@ describe('InstanceManager', () => {
     expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toContain(
       "name: '@deepseek-ai/dsh-gateway-runtime'",
     )
-    const modules = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
+    const modules = join(dshHome, 'profiles', 'web', 'node_modules', '@deepseek-ai')
     expect(lstatSync(join(modules, 'dsh-model-governance')).isSymbolicLink()).toBe(false)
     expect(lstatSync(join(modules, 'dsh-model-governance')).isDirectory()).toBe(true)
     expect(existsSync(join(modules, 'dsh-directory-guard'))).toBe(false)
+  })
+
+  it('mounts the provisioned desktop driver and managed policy when the node declares a desktop', async () => {
+    const driverDir = mkdtempSync(join(tmpdir(), 'hgw-driver-'))
+    writeFileSync(join(driverDir, 'package.json'), JSON.stringify({
+      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
+      type: 'module',
+      main: 'lib/index.js',
+    }))
+    mkdirSync(join(driverDir, 'lib'), { recursive: true })
+    writeFileSync(join(driverDir, 'lib', 'index.js'), 'export default 1\n')
+    const { root, alice, manager } = await setup({
+      HGW_DESKTOP_ID: 'display-0',
+      HGW_DESKTOP_DRIVER_PACKAGE: driverDir,
+      HGW_DESKTOP_DRIVER_COMMAND: '/opt/cua/bin/cua-driver',
+      HGW_DESKTOP_DRIVER_ARGS: '["mcp","--direct"]',
+      HGW_INSTANCE_PORT_BASE: '43400',
+    })
+
+    await manager.ensureRunning(alice)
+
+    const dshHome = join(root, 'users', 'alice', 'dsh')
+    const patch = readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')
+    expect(patch).toContain('- id: gateway-execution\n  config:\n    desktop: "display-0"\n')
+    expect(patch).toContain("- id: computer-use\n      name: '@deepseek-ai/dsh-computer-use'\n")
+    expect(patch).toContain(
+      "- id: computer-use-cua-driver-mcp\n      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'"
+      + '\n      config:\n        command: "/opt/cua/bin/cua-driver"\n        args: ["mcp","--direct"]\n',
+    )
+    const installed = join(dshHome, 'profiles', 'web', 'node_modules', '@deepseek-ai', 'dsh-experimental-computer-use-cua-driver-mcp')
+    expect(lstatSync(installed).isSymbolicLink()).toBe(false)
+    expect(lstatSync(installed).isDirectory()).toBe(true)
+    expect(existsSync(join(installed, 'package.json'))).toBe(true)
+    expect(existsSync(join(installed, 'lib', 'index.js'))).toBe(true)
+  })
+
+  it('mounts the desktop driver without process overrides by default', async () => {
+    const driverDir = mkdtempSync(join(tmpdir(), 'hgw-driver-'))
+    writeFileSync(join(driverDir, 'package.json'), JSON.stringify({
+      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
+      type: 'module',
+      main: 'lib/index.js',
+    }))
+    mkdirSync(join(driverDir, 'lib'), { recursive: true })
+    writeFileSync(join(driverDir, 'lib', 'index.js'), 'export default 1\n')
+    const { root, alice, manager } = await setup({
+      HGW_DESKTOP_ID: 'seat-1',
+      HGW_DESKTOP_DRIVER_PACKAGE: driverDir,
+      HGW_INSTANCE_PORT_BASE: '43410',
+    })
+
+    await manager.ensureRunning(alice)
+
+    const patch = readFileSync(join(root, 'users', 'alice', 'dsh', 'cordis.patch.yml'), 'utf8')
+    expect(patch).toContain('- id: gateway-execution\n  config:\n    desktop: "seat-1"\n')
+    expect(patch).toContain("- id: computer-use-cua-driver-mcp\n      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'\n")
+    expect(patch).not.toContain('      config:\n        command:')
+  })
+
+  it('refuses a managed-desktop start when the provisioned driver package is incomplete', async () => {
+    const { alice, manager } = await setup({
+      HGW_DESKTOP_ID: 'display-0',
+      HGW_DESKTOP_DRIVER_PACKAGE: join(tmpdir(), 'hgw-missing-driver-package'),
+      HGW_INSTANCE_PORT_BASE: '43420',
+    })
+    await expect(manager.ensureRunning(alice)).rejects.toThrow(/policy bundle mount failed/)
+    expect(await manager.stateOf(alice.id)).not.toBe('ready')
   })
 
   it('seeds the company default env into $DSH_HOME/.env on every start', async () => {

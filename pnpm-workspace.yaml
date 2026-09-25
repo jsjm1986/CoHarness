@@ -69,6 +69,10 @@ minimumReleaseAgeExclude:
   - node-addon-require-builtin-win32-ia32-msvc@0.1.4
   - node-addon-require-builtin-win32-x64-msvc@0.1.4
   - node-addon-require-builtin@0.1.4
+  - html-encoding-sniffer@7.0.0
+  - jsdom@30.1.1
+  - w3c-xmlserializer@6.0.0
 
 patchedDependencies:
+  '@yao-pkg/pkg@6.21.0': patches/@yao-pkg__pkg@6.21.0.patch
   node-pty@1.2.0-beta.15: patches/node-pty@1.2.0-beta.15.patch

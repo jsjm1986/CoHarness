@@ -13,6 +13,8 @@ export type IndexInjection =
   | { kind: 'global'; name: string; value: unknown }
   | { kind: 'script'; placement: IndexInjectionPlacement; text: string }
   | { kind: 'script-src'; placement: IndexInjectionPlacement; src: string }
+  /** Advisory preload for an external classic script; static workers may ignore it. */
+  | { kind: 'script-preload'; src: string }
   | { kind: 'style'; text: string }
   | { kind: 'html'; placement: IndexInjectionPlacement; html: string }
 
@@ -41,6 +43,8 @@ function renderRow(row: IndexInjection): { placement: IndexInjectionPlacement; m
       return { placement: row.placement, markup: `<script>${row.text}</script>` }
     case 'script-src':
       return { placement: row.placement, markup: `<script src="${escapeHtmlAttribute(row.src)}"></script>` }
+    case 'script-preload':
+      return { placement: 'head', markup: `<link rel="preload" as="script" href="${escapeHtmlAttribute(row.src)}">` }
     case 'style':
       return { placement: 'head', markup: `<style>${row.text}</style>` }
     case 'html':

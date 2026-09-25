@@ -1,9 +1,9 @@
 /** Shared conversion from reference-machine expectations to CI time budgets. */
 
 /** Measured wall-time ratio between the x64 CI runner and the arm64 reference machine. */
-const CI_TIME_SCALE = 2
+export const CI_TIME_SCALE = 2
 /** Allowed variance above the calibrated expectation. */
-const PERFORMANCE_BUDGET_HEADROOM = 1.25
+export const PERFORMANCE_BUDGET_HEADROOM = 1.25
 
 /**
  * Convert a reference-machine duration into its CI wall-time budget.

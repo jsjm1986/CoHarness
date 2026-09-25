@@ -1,8 +1,25 @@
 name: E2E (pi-ai Azure OpenAI and Anthropic)
 
 # This suite spends tokens against two external providers and is intentionally
-# opt-in. It has no push, pull_request, schedule, or workflow_call trigger.
+# selected by CI or explicitly dispatched. It has no independent PR or nightly trigger.
 on:
+  workflow_call:
+    inputs:
+      required_proof:
+        description: Require both selected external provider protocols to succeed.
+        type: boolean
+        default: false
+      azure_openai_model:
+        type: string
+        default: gpt-5.5
+      anthropic_model:
+        type: string
+        default: claude-opus-4-8
+    secrets:
+      AZURE_OPENAI_API_KEY_EXTERNAL:
+        required: false
+      ANTHROPIC_API_KEY_EXTERNAL:
+        required: false
   workflow_dispatch:
     inputs:
       azure_openai_model:
@@ -19,6 +36,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: pi-ai-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
@@ -26,6 +47,10 @@ env:
 
 jobs:
   e2e:
+    if: >-
+      github.repository == 'jsjm1986/CoHarness'
+      && (github.event_name != 'pull_request'
+      || !(github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     name: Azure OpenAI Responses + Anthropic Messages
     timeout-minutes: 20
@@ -84,3 +109,16 @@ jobs:
           external: real-provider-pi-ai
           status: ${{ job.status }}
           command: real OpenAI Responses and Anthropic Messages tests
+
+  proof-status:
+    name: Required pi-ai proof
+    needs: e2e
+    if: always() && inputs.required_proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Reject unavailable or unsuccessful provider protocols
+        if: needs.e2e.result != 'success'
+        run: |
+          echo '::error::The required OpenAI and Anthropic proof did not succeed. Missing credentials or an untrusted event cannot satisfy it.'
+          exit 1

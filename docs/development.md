@@ -124,11 +124,17 @@ The keyless [CI workflow](../.github/workflows/ci.yml) selects lanes by impact. 
 
 ### Daily commands
 
+Run `pnpm run pr:preflight --base <verified-base-ref>` to inspect committed and worktree changes together. The read-only report lists the selected CI checks, generated files, bilingual pairs, and missing entries; it does not claim those checks passed or require repeating all CI work locally. `--check` runs the listed mechanical checks. `--fix-generated` explicitly repairs registered deterministic outputs, leaving reviewable differences; update translations manually and confirm named pairs only after reviewing both languages. See the [verification throughput decision](../.agents/notes/implemented/process/2026-09-22-pr-verification-throughput.md).
+
 The root [contributor instructions](../AGENTS.md#commands) summarize common commands, while [`package.json`](../package.json) and [scripts/run-gates.ts](../scripts/run-gates.ts) own the current script and gate inventories. Select the smallest checks that cover the changed surface. Documentation changes use `pnpm run test:docs` locally; `pnpm run doc-sync` is the full acceptance lane CI owns. Package-public behavior changes also update the owning README or JSDoc, and built-artifact checks require `pnpm run build` first.
+
+Batch related repairs and focused verification before pushing. Rerun failed jobs and their necessary dependencies for an unchanged SHA; a code change needs a fresh scope decision. Keep the original failure and each attempt. Update a stale base when preparing to merge, and enable auto-merge explicitly for that PR only after review, required candidate proofs, and the merge baseline are verified.
 
 ### Plugin surfaces and performance
 
-`pnpm run verify-plugin-surfaces` reports the runtime-plugin, static-client, Bundle, and browser-prefetch partition without adding runtime metadata. Ordinary Web launches keep client-plugin HMR disabled so the host does not poll client bundles; set `DSH_CLIENT_HMR=1` when `pnpm run dev:web` is rebuilding bundles and no-refresh reloads are required. `pnpm run perf:command -- --label <name> -- <command> [args...]` measures a built command with warm-up and P95 output; keep performance measurements outside correctness tests and compare like-for-like Node, platform, and artifact builds.
+`pnpm run test:web:focused -- --scenarios '<JSON array>'` runs registered scenario keys against an already complete build; the array must include every required smoke scenario. Use `--print-plan` to inspect the selection before execution. Groups and exact scenarios are mutually exclusive. `pnpm run verify:web-fixtures -- --focused --scenarios '<JSON array>'` validates recorded Session inputs before building. Local `DSH_SNAPSHOT=refresh` changes only the selected owners; follow it with the same selection under `DSH_SNAPSHOT=replay`. Keep complete assembly scenarios for shared chrome and capture feature goldens at their owning region without weakening text, state, order, or geometry assertions.
+
+`pnpm run verify-plugin-surfaces` reports the runtime-plugin, static-client, Bundle, and browser-prefetch partition without adding runtime metadata. Ordinary Web launches deliver plugin roster changes to open pages without polling artifacts; set `DSH_CLIENT_HMR=1` when `pnpm run dev:web` is rebuilding bundles and no-refresh code replacement is required. `pnpm run perf:command -- --label <name> -- <command> [args...]` measures a built command with warm-up and P95 output; keep performance measurements outside correctness tests and compare like-for-like Node, platform, and artifact builds.
 
 ### Demos
 

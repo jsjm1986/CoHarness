@@ -7,30 +7,14 @@ import {
   createSnapshotStore, settingsControlState, type SettingsControlState, type SettingsScope, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  BusyEnterBehavior, ComposerSubmitGesture, InputSubmitMode,
+  BusyEnterBehavior,
 } from '../contract/composer-submission.ts'
 import { BUSY_ENTER_FIELD, DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 import type { ConversationSettings } from '../../submission-settings.ts'
 
-export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
+export { resolveSubmitMode } from '../contract/composer-submission.ts'
 
-/**
- * Resolve delivery for one composer gesture from the displayed preference.
- * @param busyEnter - current account preference for Enter and the Send button.
- * @param running - whether the addressed agent currently reports busy.
- * @param gesture - plain Enter or the Cmd/Ctrl-accelerated chord.
- * @param steeringAvailable - whether this session transport supports steering.
- * @returns Queue outside steer-capable busy state; otherwise the preferred mode or its opposite.
- */
-export function resolveSubmitMode(
-  busyEnter: BusyEnterBehavior,
-  running: boolean,
-  gesture: ComposerSubmitGesture,
-  steeringAvailable: boolean,
-): InputSubmitMode {
-  if (!running || !steeringAvailable) return 'queue'
-  return gesture === 'enter' ? busyEnter : busyEnter === 'queue' ? 'steer' : 'queue'
-}
+export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 
 /**
  * Busy-Enter policy used by both the composer inject face and its Settings row.

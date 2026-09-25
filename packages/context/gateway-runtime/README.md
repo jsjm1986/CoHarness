@@ -19,6 +19,8 @@ Use `dsh-gateway-runtime` for the authenticated request context and private loop
 - Credentials and principal assertions fail closed at their parsing and request boundaries. The runtime bearer token is never exposed through the public service fields.
 - Consumers that read a private JSON response use `readGatewayResponseJson()` (or its byte-level companion) with a domain limit and optional `AbortSignal`; chunked bodies are cancelled when the limit or signal is reached, so `Content-Length` is not the only protection.
 
+The `plugin-admin` purpose permits only declared profile-management HTTP methods plus `settings.describe` and `settings.mutate`. These settings methods recheck live administrator authority; mutations require a held revision and cannot edit account preferences. The purpose grants no native document opener, credential API, terminal or Session execution access.
+
 ### Execution authorization
 
 The plugin marks its application with `executionAuthorityRequired`. That requirement remains until the application is disposed, including when an authorization provider unloads. [Gateway Execution](../gateway-execution/README.md) owns execution, permission-preset and profile-management policy. It uses this package's verified interactive caller and private transport, or the actual Agent's durable participant references for delegated and restored work.

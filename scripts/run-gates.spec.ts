@@ -608,6 +608,7 @@ describe('Node 24 lane ownership', () => {
       source: 'ci-consumers gate count',
     })
     expect(subject.map(item => item.id)).toEqual([
+      'web-fixtures',
       'test-dsh-directory-guard',
       'test-dsh-model-governance',
       'build',
@@ -616,6 +617,7 @@ describe('Node 24 lane ownership', () => {
       'built-package-invariants',
       'lint-and-duplication',
       'snapshot',
+      'admin-build',
       'web-snapshot',
       'doc-typecheck',
       'node-next-types',
@@ -623,10 +625,10 @@ describe('Node 24 lane ownership', () => {
     ])
     expect(subject.find(item => item.id === 'publint')?.needs).toEqual(['build'])
     expect(subject.find(item => item.id === 'build')?.env).toEqual({
-      DSH_BUILD_CLIENT_PROFILE: 'official',
+      DSH_BUILD_CLIENT_PROFILE: 'coharness',
     })
     expect(subject.find(item => item.id === 'node-compat')?.env).toEqual({
-      DSH_BUILD_CLIENT_PROFILE: 'official',
+      DSH_BUILD_CLIENT_PROFILE: 'coharness',
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
       DSH_NODE_COMPAT_USE_BUILD_OUTPUT: '1',
     })
@@ -634,19 +636,20 @@ describe('Node 24 lane ownership', () => {
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])
     for (const id of [
       'snapshot',
-      'web-snapshot',
       'doc-typecheck',
       'node-next-types',
       'built-bin-smoke',
     ]) {
-      expect(subject.find(item => item.id === id)?.needs).toEqual(['built-package-invariants'])
+      expect(subject.find(item => item.id === id)?.needs).toEqual(id === 'web-snapshot' ? ['built-package-invariants', 'web-fixtures', 'admin-build'] : ['built-package-invariants'])
     }
+    expect(subject.find(item => item.id === 'web-snapshot')?.needs).toEqual(['built-package-invariants', 'web-fixtures', 'admin-build'])
     expect(subject.find(item => item.id === 'snapshot')?.env).toEqual({ DSH_EXAMPLE_MODE: 'lib' })
     expect(subject.find(item => item.id === 'doc-typecheck')?.env).toEqual({
       DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1',
     })
     expect(subject.find(item => item.id === 'built-bin-smoke')?.args).toEqual(
       expect.arrayContaining([
+        'apps/cli/tests/profiles/web/tests/web-default-isolation.expected.e2e.ts',
         'packages/subprocess/subprocess-local/tests/spawn-runner-built.e2e.ts',
         'packages/subagent/subagent-codex/tests/loader-composition.e2e.ts',
         'packages/subagent/subagent-claude-code/tests/loader-composition.e2e.ts',
@@ -702,13 +705,34 @@ describe('web verification lanes', () => {
     'runs the complete build before the %s browser gate',
     (mode) => {
       const subject = withPnpmEntrypoint(() => gatesForMode(mode))
-      const browser = subject.find(item => item.id !== 'build')
-
-      expect(subject.map(item => item.id)).toEqual(['build', browser?.id])
-      expect(browser?.needs).toEqual(['build'])
+      const browser = subject.find(item => item.id.startsWith('web-snapshot'))
+      const includesAdmin = mode === 'ci-web-full'
+      expect(subject.map(item => item.id)).toEqual(['web-fixtures', 'build', ...includesAdmin ? ['admin-build'] : [], browser?.id])
+      expect(browser?.needs).toEqual(['build', ...includesAdmin ? ['admin-build'] : []])
+      if (includesAdmin) expect(subject.find(item => item.id === 'admin-build')?.needs).toEqual(['build'])
+      expect(subject.find(item => item.id === 'build')?.needs).toEqual(['web-fixtures'])
       expect(subject.some(item => item.id === 'build:web')).toBe(false)
     },
   )
+
+  it('does not build or start a browser after recorded input admission fails', async () => {
+    const subject = withPnpmEntrypoint(() => gatesForMode('ci-web-full'))
+    const started: string[] = []
+    const results = await runGates(subject, 3, async (gate) => {
+      started.push(gate.id)
+      return { gate, status: 'failed', durationMs: 1, output: [], exitCode: 1, signalCode: null }
+    })
+    expect(started).toEqual(['web-fixtures'])
+    expect(results.map(result => [result.gate.id, result.status])).toEqual([
+      ['web-fixtures', 'failed'], ['build', 'skipped'], ['admin-build', 'skipped'], ['web-snapshot', 'skipped'],
+    ])
+  })
+
+  it('does not read generated declarations before the complete local build', () => {
+    const subject = withPnpmEntrypoint(() => gatesForMode('check-all'))
+    expect(subject.find(gate => gate.id === 'lint')?.needs).toEqual(['build'])
+    expect(subject.find(gate => gate.id === 'build')?.needs ?? []).not.toContain('lint')
+  })
 })
 
 describe('scoped coverage lane', () => {
@@ -740,13 +764,13 @@ describe('scoped coverage lane', () => {
       .toThrow('DSH_INCREMENTAL_BASE must name the pull-request base ref')
   })
 
-  it('drops only the web browser snapshot from the scoped consumer lane', () => {
+  it('leaves browser verification and its fixture admission to the dedicated lane', () => {
     const full = withPnpmEntrypoint(() => gatesForMode('ci-consumers'))
     const scoped = withPnpmEntrypoint(() => gatesForMode('ci-consumers-scoped'))
 
     expect(full.map(subject => subject.id)).toContain('web-snapshot')
     expect(scoped.map(subject => subject.id)).not.toContain('web-snapshot')
-    expect(full.filter(subject => subject.id !== 'web-snapshot').map(subject => subject.id))
+    expect(full.filter(subject => !['web-snapshot', 'admin-build', 'web-fixtures'].includes(subject.id)).map(subject => subject.id))
       .toEqual(scoped.map(subject => subject.id))
   })
 
@@ -754,7 +778,7 @@ describe('scoped coverage lane', () => {
     const gate = withPnpmEntrypoint(() => gatesForMode('ci-consumers').find(subject => subject.id === 'node-compat'))
     expect(gate).toMatchObject({
       env: {
-        DSH_BUILD_CLIENT_PROFILE: 'official',
+        DSH_BUILD_CLIENT_PROFILE: 'coharness',
         DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
       },
     })
@@ -769,7 +793,7 @@ describe('Linux primary graph', () => {
     expect(web).toMatchObject({
       displayCommand: 'DSH_SNAPSHOT=replay pnpm run test:web:built',
       env: { DSH_SNAPSHOT: 'replay' },
-      needs: ['built-package-invariants'],
+      needs: ['built-package-invariants', 'web-fixtures', 'admin-build'],
     })
   })
 })
@@ -1122,4 +1146,12 @@ describe('Windows tree termination', () => {
   it('terminates the root alone when no descendant was captured', () => {
     expect(taskkillArgs(100, [])).toEqual([['/PID', '100', '/T', '/F']])
   })
+})
+
+it('builds Admin artifacts only for focused groups that execute its browser scenario', () => {
+  for (const [groups, included] of [['settings', true], ['settings,conversation', true], ['conversation', false]] as const) {
+    const gates = withPnpmEntrypoint(() => withEnv('DSH_WEB_GROUPS', groups, () => gatesForMode('ci-web-focused')))
+    expect(gates.some(gate => gate.id === 'admin-build')).toBe(included)
+    expect(gates.find(gate => gate.id === 'web-snapshot-focused')?.needs).toEqual(['build', ...included ? ['admin-build'] : []])
+  }
 })

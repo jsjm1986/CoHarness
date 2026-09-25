@@ -4,7 +4,7 @@
  * else references RequestPayload<'session.*'> / ResponseValue<'session.*'>.
  */
 
-import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
@@ -313,6 +313,12 @@ export interface SessionSummary {
    */
   agentPreset?: string
   /**
+   * Registered SSH target this session executes on (header passthrough);
+   * absent for host-local sessions. Fixed at creation — a resumed session
+   * re-authorizes the same target rather than relocalizing its remote paths.
+   */
+  sshTarget?: number
+  /**
    * Projection baseline for this row, with zero log loads: attached sessions
    * read the registry's live watermark cut; cold sessions read the persisted
    * projection cache's stored rows — as stale as that session's last durable
@@ -373,17 +379,26 @@ export interface SessionsApi {
    * the session header, so a later resume rebuilds the same agent. An unknown
    * id fails with `agent-preset-not-found`, and a preset whose composition
    * cannot be mounted fails with `agent-preset-invalid`.
+   *
+   * `sshTarget` binds the session to a registered managed SSH target: the
+   * runtime resolves the caller's authorization, mounts the remote
+   * fs/subprocess/sandbox providers into the agent scope, and records the
+   * binding on the session header. `cwd` is then a path on that host — the
+   * Host does not mkdir it locally. Adoption or resume under a different
+   * target fails with `ssh-target-conflict`; losing the grant mid-session
+   * disposes the connection.
    */
   create(request: RpcRequest<{
     workspaceId?: WorkspaceId
     cwd?: string
     sessionId?: SessionId
     agentPreset?: string
+    sshTarget?: number
     visibility?: 'project' | 'private'
     reuseWorkspaceBlank?: true
     draftId?: SessionDraftId
   }>):
-  Promise<RpcResponse<{ sessionId: SessionId; agentPreset?: string; draft?: true }>>
+  Promise<RpcResponse<{ sessionId: SessionId; agentPreset?: string; sshTarget?: number; draft?: true }>>
 
   /**
    * Reads a window of history events; page boundaries align to append-origin message
@@ -403,6 +418,10 @@ export interface SessionsApi {
    * Reading history uses an attached Session or a bounded persistence page and
    * never resumes or publishes an Agent. Providers without the page capability
    * may use their compatibility inspection path.
+   * `toolCallId` selects the complete turn containing a root or nested call,
+   * independently of the chat window, with no projections or older-page cursor.
+   * It cannot be combined with pagination or conversation-only detail. Missing
+   * calls return an empty window; reads never activate an Agent.
    * `detail` selects the download gear after pagination: `'conversation'`
    * omits `assistant/attempt` records whose turn and step completed with an
    * append-origin `assistant/message` on the same page and reports them as
@@ -414,6 +433,7 @@ export interface SessionsApi {
    */
   history(request: RpcRequest<{
     sessionId: SessionId
+    toolCallId?: ToolCallId
     beforeSeq?: number
     maxMessages?: number
     detail?: HistoryDetail

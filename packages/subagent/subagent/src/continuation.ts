@@ -16,7 +16,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, contentHasImage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
@@ -47,6 +47,7 @@ import type {
   ContinuableStart,
   ContinuableStartSpec,
   SubagentInterruptAuthority,
+  SubagentProvider,
   SubagentSendMessageOptions,
 } from './types.ts'
 
@@ -67,6 +68,12 @@ type ChildDeliveryOptions = { readonly message?: ReturnType<typeof createUserMes
 interface ContinuationHost {
   /** Resolve one provider's detached continuable-creation contribution. */
   prepareContinuable(name: string, request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>
+  /**
+   * Provider-owned static route defaults merged under the request's
+   * `agentOptions`, or `undefined` when the provider derives its route from
+   * the parent.
+   */
+  agentRouteDefaults(name: string): SubagentProvider['agentRouteDefaults']
   /** Build the lifecycle observer for one Activation residency epoch. */
   observeActivation(provider: string, childId: SessionId, parent: Agent): ActivationObserver
 }
@@ -112,7 +119,11 @@ export class SubagentContinuationManager {
     const childDepth = resolveChildDepth(parent, request.maxDepth)
     // Snapshot before any await: invalid descriptor JSON rejects the call
     // before a child exists, and the detached value is what reaches the log.
-    const agentOptions = resolveChildAgentOptions(parent, request.agentOptions, childDepth)
+    const routeDefaults = this.host.agentRouteDefaults(spec.provider)
+    const requestedOptions: AgentOptions | undefined = routeDefaults === undefined
+      ? request.agentOptions
+      : { ...routeDefaults, ...request.agentOptions }
+    const agentOptions = resolveChildAgentOptions(parent, requestedOptions, childDepth)
     const agentProvider = agentOptions.provider
     const agentModel = agentOptions.model
     const agentReasoningEffort = agentOptions.reasoningEffort

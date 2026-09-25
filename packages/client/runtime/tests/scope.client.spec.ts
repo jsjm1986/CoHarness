@@ -57,6 +57,25 @@ describe('createScope', () => {
     expect(seen).toEqual(['b:b', 'root:b'])
   })
 
+  it('isolates two generations of the same Session while admitting inherited scopes and root listeners', async () => {
+    const { root, a, seen, listen } = bench()
+    const replacement = createScope(root, sid('a'))
+    await replacement.fiber.await()
+    try {
+      listen('old', a.ctx)
+      listen('new', replacement.ctx)
+      listen('inherited', replacement.ctx.extend())
+      listen('root', root)
+      replacement.ctx.emit(replacement.ctx, 'test/scope-probe', { from: 'new' })
+      expect(seen).toEqual(['new:new', 'inherited:new', 'root:new'])
+      seen.length = 0
+      a.ctx.emit(a.ctx, 'test/scope-probe', { from: 'late' })
+      expect(seen).toEqual(['old:late', 'root:late'])
+    } finally {
+      await root.fiber.dispose()
+    }
+  })
+
   it('bail answers the first same-scope listener and skips filtered foreign ones', () => {
     const { a, b, listen } = bench()
     listen('b', b.ctx, true) // registered first, but foreign → filtered out

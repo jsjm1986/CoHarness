@@ -50,12 +50,14 @@
     "@deepseek-ai/dsh-credentials": "workspace:^",
     "@deepseek-ai/dsh-goal": "workspace:^",
     "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-fs-ssh": "workspace:^",
     "@deepseek-ai/dsh-host-directory-picker": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-model-access": "workspace:^",
     "@deepseek-ai/dsh-model-provider-config": "workspace:^",
     "@deepseek-ai/dsh-permission-presets": "workspace:^",
     "@deepseek-ai/dsh-native-command": "workspace:^",
+    "@deepseek-ai/dsh-sandbox-ssh": "workspace:^",
     "@deepseek-ai/dsh-scope": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
@@ -65,7 +67,9 @@
     "@deepseek-ai/dsh-session-title": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",
     "@deepseek-ai/dsh-skill": "workspace:^",
+    "@deepseek-ai/dsh-ssh": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
+    "@deepseek-ai/dsh-subprocess-ssh": "workspace:^",
     "@deepseek-ai/dsh-typert-protocol": "workspace:^",
     "@deepseek-ai/dsh-jobs": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
@@ -77,27 +81,40 @@
     "@deepseek-ai/dsh-workspace": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "fflate": "^0.8.2",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@deepseek-ai/dsh-workspace-changes": "workspace:^",
+    "@deepseek-ai/dsh-office-to-pdf": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent-presets": "workspace:^",
+    "@deepseek-ai/dsh-computer-use": "workspace:^",
     "@deepseek-ai/dsh-cordis-host-runner": "workspace:^",
-    "@deepseek-ai/dsh-util-time": "workspace:^",
-    "@deepseek-ai/dsh-execution-authority": "workspace:^"
+    "@deepseek-ai/dsh-execution-authority": "workspace:^",
+    "@deepseek-ai/dsh-plugin-manager": "workspace:^",
+    "@deepseek-ai/dsh-util-time": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent-presets": "workspace:^",
+    "@deepseek-ai/dsh-api-terminal-controller": "workspace:^",
+    "@deepseek-ai/dsh-computer-use": "workspace:^",
     "@deepseek-ai/dsh-cordis-host-runner": "workspace:^",
+    "@deepseek-ai/dsh-execution-authority": "workspace:^",
     "@deepseek-ai/dsh-fs-local": "workspace:^",
     "@deepseek-ai/dsh-jobs-local": "workspace:^",
+    "@deepseek-ai/dsh-plugin-manager": "workspace:^",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
     "@deepseek-ai/dsh-storage": "workspace:^",
     "@deepseek-ai/dsh-storage-domain": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-typert-registry": "workspace:^",
     "@deepseek-ai/dsh-util-time": "workspace:^",
-    "@deepseek-ai/dsh-execution-authority": "workspace:^"
+    "@deepseek-ai/libreoffice-kit": "0.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-plugin-manager": {
+      "optional": true
+    }
   }
 }

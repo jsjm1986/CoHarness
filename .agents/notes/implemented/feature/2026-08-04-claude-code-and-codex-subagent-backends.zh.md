@@ -14,7 +14,7 @@ Status: implemented
 
 harness 交付两个同级的一次性提供方包，其默认注册名称分别为 `codex` 与 `claude-code`。本说明负责它们的产品协议、结果映射和进程生命周期；[命名实例决策](2026-08-18-product-subagent-named-instances.zh.md)负责 Profile 选择的提供方身份与静态工具绑定，[生产安装排除决策](../simplification/2026-08-12-production-dsh-excludes-product-subagent-providers.zh.md)负责各自独立的可选 Bundle 与 host plane（宿主平面）放置，[产品一次性后台任务决策](2026-08-12-product-subagent-one-shot-background-tasks.zh.md)负责模型可见的调度选择，[非交互权限决策](2026-08-15-product-subagent-noninteractive-permissions.zh.md)负责各产品提供方的 Profile 模式选择与安全权限决定，[结构化失败事实决策](2026-08-18-product-subagent-failure-facts.zh.md)则负责通过同一诊断公开锁定产品版本的类别、生命周期阶段与进程结果。两个包都接受多个命名实例。加载任一提供方都不会启动产品进程，而且每个工具只接受独立文本任务；产品与实例选择仍属于部署配置。
 
-这两个提供方都报告 `inheritsParentContext: false`，不声明任何可选的启动能力，并传递父会话 cwd，但不会复制父级对话。文档所示的工具使用 `backgroundMode: 'one-shot'` 与 `maxDepth: 'provider-managed'`：消费方默认在前台收集结果，也可把同一次运行放入通用 Job 运行时，而递归策略仍由进程外产品负责。每次调用都会创建一个全新的产品进程和一次不可续接的产品对话。`ctx.subagents` 负责具名请求解析与成对生命周期事件；`dsh-tool-subagent` 负责模型可见的调度以及前台与 Job 适配；`ctx.jobs` 和 `dsh-tool-jobs` 负责 Job id、状态、输出、控制、通知与父级 owner 取消；各产品提供方负责原生结果映射，`dsh-subprocess` 则负责凭证清洗、进程树终止以及整棵进程树的退出观测。
+这两个提供方都报告 `inheritsParentContext: false`，不声明任何可选的启动能力，并传递父会话 cwd，但不会复制父级对话。文档所示的工具使用 `backgroundMode: 'one-shot'` 与 `maxDepth: 'provider-managed'`：消费方默认在前台收集结果，也可把同一次运行放入通用 Job 运行时，而递归策略仍由进程外产品负责。每次 `start()` 调用都会创建一个全新的产品进程和一次不可续接的产品对话；[外部运行时成员决策](../architecture/2026-09-25-external-runtime-continuable-members.zh.md) 拥有持续成员路径，该路径把成员的每次模型调用挂载到一次耐用的可续接产品会话。`ctx.subagents` 负责具名请求解析与成对生命周期事件；`dsh-tool-subagent` 负责模型可见的调度以及前台与 Job 适配；`ctx.jobs` 和 `dsh-tool-jobs` 负责 Job id、状态、输出、控制、通知与父级 owner 取消；各产品提供方负责原生结果映射，`dsh-subprocess` 则负责凭证清洗、进程树终止以及整棵进程树的退出观测。
 
 ```text
 configured tool -> dsh-tool-subagent -> ctx.subagents -> product provider -> product process
@@ -84,12 +84,12 @@ Claude Code 证据会锁定 Agent SDK 0.3.220、Claude Code 2.1.220 与八个 SD
 
 **由插件管理登录、产品主目录、模型、设置、沙箱规则或细粒度权限策略。** 这些选择会在每个产品的原生配置之外建立另一套权威来源，并将一次性提供方扩张为账户管理功能。两个产品除环境和清理配置外都只公开一个原生非交互模式选择；任一提供方都不会镜像产品规则或增加人工交互通道。
 
-**续接、进度、产品原生后台状态和共享父级上下文。** 提供方载荷仍是一项自包含任务的一个最终回答。通用 Job 层可以额外提供 id、状态、通知、收集与取消结果，但产品会话、恢复、后续交互、中间消息、父级 transcript（文本记录）传递、结构化输出和提供方专属后台状态都需要独立的用户约定，当前实现不会预先构建这些功能。
+**续接、进度、产品原生后台状态和共享父级上下文。** 提供方载荷仍是一项自包含任务的一个最终回答。通用 Job 层可以额外提供 id、状态、通知、收集与取消结果，但后续交互、中间消息、父级 transcript（文本记录）传递、结构化输出和提供方专属后台状态都需要独立的用户约定，当前实现不会预先构建这些功能；[外部运行时成员决策](../architecture/2026-09-25-external-runtime-continuable-members.zh.md) 仅拥有持续成员的产品会话恢复。
 
 ## 后果
 
 用户通过由 Profile 配置、并由官方产品集成支持的一次性工具进行委派。显式 Profile 安装与 host plane 提供方放置由[生产安装排除决策](../simplification/2026-08-12-production-dsh-excludes-product-subagent-providers.zh.md)负责；命名实例身份与工具绑定由[命名实例决策](2026-08-18-product-subagent-named-instances.zh.md)负责；按 Preset 暴露工具以及默认前台且可选通用 Job 的调度方式由[产品一次性后台任务决策](2026-08-12-product-subagent-one-shot-background-tasks.zh.md)负责。本说明规定的提供方生命周期会保留原生设置与行为，而共享服务继续独占作业结算与进程树完全停稳的责任。
 
-每次委派都要承担新建产品进程和独立模型上下文的开销。成功的产品载荷仍只有最终 assistant 文本；失败的产品运行可以另行公开共享安全诊断，其中包含由提供方拥有的权限事实，或锁定版本产品提供的结构化失败事实。后台调度还会额外公开通用 Job id、状态、完成通知以及收集或取消结果。两个产品都使用 Bundle 锁定的平台 CLI，并保留原生账户与工作区设置以及所选提供方权限模式。带密钥 e2e 运行还会消耗外部 API 配额，并依赖 DeepSeek 官方端点；对协议、失败、取消与审批的确定性覆盖仍由无密钥层级承担。提供方不会恢复会话、以流式方式传送进度、接受新的人工交互、回滚工具或文件副作用，也不会施加按实际经过时间触发的超时。
+每次委派都要承担新建产品进程和独立模型上下文的开销。成功的产品载荷仍只有最终 assistant 文本；失败的产品运行可以另行公开共享安全诊断，其中包含由提供方拥有的权限事实，或锁定版本产品提供的结构化失败事实。后台调度还会额外公开通用 Job id、状态、完成通知以及收集或取消结果。两个产品都使用 Bundle 锁定的平台 CLI，并保留原生账户与工作区设置以及所选提供方权限模式。带密钥 e2e 运行还会消耗外部 API 配额，并依赖 DeepSeek 官方端点；对协议、失败、取消与审批的确定性覆盖仍由无密钥层级承担。一次性 `start()` 运行不会恢复会话、以流式方式传送进度、接受新的人工交互、回滚工具或文件副作用，也不会施加按实际经过时间触发的超时。
 
 兼容性由包级单元测试覆盖率、无密钥真实产品回环测试、带密钥 DeepSeek 随机数测试、公开 Loader 组合、已构建包与 NodeNext 消费方检查、生成的文档与声明以及仓库 CI 矩阵共同锁定。更改受支持的产品基线或 DeepSeek 端点／模型基线时必须刷新这些事实；生产环境不会另行执行运行时版本探测。

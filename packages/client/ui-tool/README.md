@@ -6,6 +6,8 @@ Client Tool presentation plugin. `ui-conversation` dispatches each ordered `tool
 
 Business UI packages register only their wire Tool names and atomic views. They do not pair Session events, rebuild the transcript, or own root/subcall topology. The Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection; the conversation view remains authoritative for ChatFlow placement.
 
+Expanded generic and terminal rows expose **Open details in sidebar** when their conversation owner supplies the action. The action addresses the exact root or nested call. **Inspect** continues to navigate to the trajectory view.
+
 ## Summary
 
 `dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection.
@@ -17,6 +19,10 @@ Business UI packages register only their wire Tool names and atomic views. They 
 Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and `data-chat-call-id` DOM contract used for paging and selection.
 
 The package also fills `conversation.details.tool` with `ToolDetails`. The row and details renderers share the same pure card models for `terminal`, `read`, `diff`, `search`, and `web` render intents. Completed ask-user calls use a validated, readable question/answer card; mixed or malformed result blocks fall back to the complete generic output. Unknown intent tags and malformed wire card data fall back to flattened Tool result text.
+
+The terminal model uses `hasSpillNotice` from the browser-safe `@deepseek-ai/dsh-spill-policy/notice` entry, not an independent UI pattern; [spill-policy](../../spill/spill-policy/README.md) owns notice formatting and recognition. This check conservatively selects generic output — matching text cannot authenticate its source, and replay leaves recorded result bytes untouched. Settled persistent-shell calls (a descriptionless `bash`/`pwsh` schema) likewise stay generic, because their results carry resets and partial output without one process exit status.
+
+The keyed `read_image` row derives a dedicated image card from the settled call's persisted `meta.path` and raw result content: a shortened path label, the durable image references, and the text envelope — the raw attachment object is never flattened into JSON beneath the picture. The gallery itself renders through the conversation owner's `renderMessageImages` prop (the session-authorized `conversation.message.images` seat in chat, the `conversation.details.images` sibling seat in the details panel), so this package never mints URLs or bypasses attachment authorization; malformed or incomplete tool data declines to the generic output instead of hiding content. Nested `read_image` calls (which persist no `meta`) label the card from their own `file_path` argument.
 
 File-mutation rows retain `+A -R` counts while collapsed. Their summary and expanded card use `ui-primitives.diffTotals`’s bounded comparison, and an explicit summary suffix or failure line keeps precedence.
 

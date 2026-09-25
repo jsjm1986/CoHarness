@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import runpy
+import json
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ SMOKE = runpy.run_path(ROOT / "scripts" / "smoke-python-runtime.py")
 def test_session_v3_snapshot_retains_messages_and_compact_payloads() -> None:
     records = [
         {"type": "system/message", "data": {"message": {
-            "role": "system", "id": "system-uuid", "content": [{"type": "text", "text": "prompt"}],
+            "role": "system", "id": "33333333-3333-4333-8333-333333333333", "source": {}, "content": [{"type": "text", "text": "prompt"}],
         }}},
         {"type": "assistant/message", "data": {"stream": [
             {"type": "text-chunks", "time0": 42, "dt": [5], "index": 0, "texts": ["a", "b"]},
@@ -22,7 +23,7 @@ def test_session_v3_snapshot_retains_messages_and_compact_payloads() -> None:
     ]
     normalized = SMOKE["normalize_snapshot_value"](records, [])
     assert normalized[0]["data"]["message"] == {
-        "role": "system", "id": "{{messageId}}", "content": [{"type": "text", "text": "{{system}}"}],
+        "role": "system", "id": "{{message:1}}", "source": {}, "content": [{"type": "text", "text": "prompt"}],
     }
     assert normalized[1]["data"]["stream"] == [
         {"type": "text-chunks", "time0": 0, "dt": [0], "index": 0, "texts": ["a", "b"]},
@@ -123,3 +124,9 @@ def test_advanced_smoke_rejects_dynamic_cordis_execution(retired: str) -> None:
             "messages": [{"role": "user", "content": SMOKE["SNAPSHOT_PROMPT"]}],
             "tools": [{"name": "cordis_inspect_list"}, {"name": retired}],
         })
+
+
+@pytest.mark.parametrize("case", json.loads((ROOT / "packages/test-support/session-snapshot/tests/fixtures/comparison-cases.json").read_text()), ids=lambda case: case["name"])
+def test_shared_comparison_integrity(case: dict[str, object]) -> None:
+    normalize = SMOKE["normalize_snapshot_value"]
+    assert (normalize(case["left"], []) == normalize(case["right"], [])) is case["equal"]

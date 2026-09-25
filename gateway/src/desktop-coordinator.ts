@@ -25,17 +25,22 @@ export type DesktopGrantState = 'held' | 'stopping' | 'pending-confirm' | 'relea
 export type DesktopQueueState = 'queued' | 'cancelled' | 'expired' | 'promoted'
 export type DesktopResourceState = 'available' | 'unavailable'
 
-/** Holder identity projected from verified claims — never client-supplied. */
+/** Server-verified identity; background executions do not mint browser assertions. */
+export type DesktopIdentity = Pick<GatewayPrincipalClaims, 'organization' | 'runtime' | 'scope'> & {
+  user: Pick<GatewayPrincipalClaims['user'], 'id' | 'username'>
+}
+
+/** Holder identity projected from verified execution or interactive identity. */
 export interface DesktopHolder {
   organization: string
   runtime: { kind: 'user' | 'project'; id: number; generation: number }
   user: { id: number; username: string }
   scope: PrincipalScope
-  /** Caller-supplied correlation for the driving run; not part of trust. */
+  /** Exact driving Session or workflow; all grant operations must preserve it. */
   runId?: string
 }
 
-export function desktopHolderOf(claims: GatewayPrincipalClaims, runId?: string): DesktopHolder {
+export function desktopHolderOf(claims: DesktopIdentity, runId?: string): DesktopHolder {
   return {
     organization: claims.organization,
     runtime: { kind: claims.runtime.kind, id: claims.runtime.id, generation: claims.runtime.generation },
@@ -45,9 +50,11 @@ export function desktopHolderOf(claims: GatewayPrincipalClaims, runId?: string):
   }
 }
 
-/** Dedup/authentication key: verified identity only (runId excluded). */
+/** Bind resource ownership to verified identity and the exact driving workflow. */
 export function desktopHolderKey(holder: DesktopHolder): string {
-  const { runId: _runId, ...identity } = holder
+  const identity = holder.runId === undefined ? holder : {
+    organization: holder.organization, runtime: holder.runtime, runId: holder.runId,
+  }
   return createHash('sha256').update(JSON.stringify(identity)).digest('hex')
 }
 
@@ -197,7 +204,7 @@ export class DesktopCoordinator {
     return { kind: holder.runtime.kind, id: holder.runtime.id }
   }
 
-  private async assertCurrentGeneration(claims: GatewayPrincipalClaims): Promise<void> {
+  private async assertCurrentGeneration(claims: DesktopIdentity): Promise<void> {
     const current = await this.generations.generationOf({ kind: claims.runtime.kind, id: claims.runtime.id })
     if (current !== claims.runtime.generation) {
       throw new DesktopCoordinationError(
@@ -207,7 +214,7 @@ export class DesktopCoordinator {
     }
   }
 
-  async acquire(claims: GatewayPrincipalClaims, input: DesktopResourceRef & { requestId: string; runId?: string }): Promise<DesktopAcquireResult> {
+  async acquire(claims: DesktopIdentity, input: DesktopResourceRef & { requestId: string; runId?: string }): Promise<DesktopAcquireResult> {
     await this.assertCurrentGeneration(claims)
     const holder = desktopHolderOf(claims, input.runId)
     const holderKey = desktopHolderKey(holder)
@@ -292,8 +299,8 @@ export class DesktopCoordinator {
     return result
   }
 
-  async status(claims: GatewayPrincipalClaims, input: DesktopResourceRef & { requestId: string }): Promise<DesktopStatusResult> {
-    const holderKey = desktopHolderKey(desktopHolderOf(claims))
+  async status(claims: DesktopIdentity, input: DesktopResourceRef & { requestId: string; runId?: string }): Promise<DesktopStatusResult> {
+    const holderKey = desktopHolderKey(desktopHolderOf(claims, input.runId))
     const resourceKey = desktopResourceKey(input)
     return this.repository.transact(resourceKey, async (tx) => {
       const grant = await tx.grantByRequest(resourceKey, holderKey, input.requestId)
@@ -313,9 +320,13 @@ export class DesktopCoordinator {
     })
   }
 
-  async heartbeat(claims: GatewayPrincipalClaims, grantId: string): Promise<'held' | 'stopping' | 'lost'> {
-    const holderKey = desktopHolderKey(desktopHolderOf(claims))
+  async heartbeat(claims: DesktopIdentity, grantId: string, runId?: string, resource?: DesktopResourceRef): Promise<'held' | 'stopping' | 'lost'> {
+    await this.assertCurrentGeneration(claims)
+    const holderKey = desktopHolderKey(desktopHolderOf(claims, runId))
     const grant = await this.grantForCaller(grantId, holderKey)
+    if (grant !== undefined && resource !== undefined && grant.resourceKey !== desktopResourceKey(resource)) {
+      throw new DesktopCoordinationError('forbidden', 'desktop grant belongs to another resource')
+    }
     if (grant === undefined || grant.holderKey !== holderKey) return 'lost'
     return this.repository.transact(grant.resourceKey, async (tx) => {
       const current = await tx.grantById(grantId)
@@ -326,9 +337,31 @@ export class DesktopCoordinator {
     })
   }
 
-  async release(claims: GatewayPrincipalClaims, grantId: string): Promise<void> {
-    const holderKey = desktopHolderKey(desktopHolderOf(claims))
+  /** Mark uncertain driver drainage without allowing a queued workflow to start. */
+  async stop(claims: DesktopIdentity, grantId: string, runId?: string, resource?: DesktopResourceRef): Promise<void> {
+    const holderKey = desktopHolderKey(desktopHolderOf(claims, runId))
     const grant = await this.grantForCaller(grantId, holderKey)
+    if (grant === undefined || grant.holderKey !== holderKey
+      || (resource !== undefined && grant.resourceKey !== desktopResourceKey(resource))) {
+      throw new DesktopCoordinationError('forbidden', 'desktop grant belongs to another workflow or resource')
+    }
+    await this.repository.transact(grant.resourceKey, async tx => {
+      const current = await tx.grantById(grantId)
+      if (current === undefined || current.holderKey !== holderKey || current.state === 'released') {
+        throw new DesktopCoordinationError('conflict', 'desktop grant has already settled')
+      }
+      if (current.state === 'held') await tx.updateGrant(grantId, {
+        state: 'stopping', reason: 'driver-stop-unconfirmed', stoppingAt: this.now(),
+      })
+    })
+  }
+
+  async release(claims: DesktopIdentity, grantId: string, runId?: string, resource?: DesktopResourceRef): Promise<void> {
+    const holderKey = desktopHolderKey(desktopHolderOf(claims, runId))
+    const grant = await this.grantForCaller(grantId, holderKey)
+    if (grant !== undefined && resource !== undefined && grant.resourceKey !== desktopResourceKey(resource)) {
+      throw new DesktopCoordinationError('forbidden', 'desktop grant belongs to another resource')
+    }
     if (grant === undefined || grant.holderKey !== holderKey) {
       throw new DesktopCoordinationError('forbidden', `grant ${grantId} is not held by this runtime`)
     }
@@ -342,8 +375,8 @@ export class DesktopCoordinator {
     })
   }
 
-  async cancel(claims: GatewayPrincipalClaims, input: DesktopResourceRef & { requestId: string }): Promise<boolean> {
-    const holderKey = desktopHolderKey(desktopHolderOf(claims))
+  async cancel(claims: DesktopIdentity, input: DesktopResourceRef & { requestId: string; runId?: string }): Promise<boolean> {
+    const holderKey = desktopHolderKey(desktopHolderOf(claims, input.runId))
     const resourceKey = desktopResourceKey(input)
     return this.repository.transact(resourceKey, async (tx) => {
       const entry = await tx.queueEntryByRequest(resourceKey, holderKey, input.requestId)
@@ -353,9 +386,12 @@ export class DesktopCoordinator {
     })
   }
 
-  async confirmStopped(claims: GatewayPrincipalClaims, grantId: string): Promise<void> {
-    const holderKey = desktopHolderKey(desktopHolderOf(claims))
+  async confirmStopped(claims: DesktopIdentity, grantId: string, runId?: string, resource?: DesktopResourceRef): Promise<void> {
+    const holderKey = desktopHolderKey(desktopHolderOf(claims, runId))
     const grant = await this.grantForCaller(grantId, holderKey)
+    if (grant !== undefined && resource !== undefined && grant.resourceKey !== desktopResourceKey(resource)) {
+      throw new DesktopCoordinationError('forbidden', 'desktop grant belongs to another resource')
+    }
     if (grant === undefined || grant.holderKey !== holderKey) {
       throw new DesktopCoordinationError('forbidden', `grant ${grantId} is not held by this runtime`)
     }

@@ -20,7 +20,19 @@ No runtime invariant companion is published: this pure library has no registrati
 
 ## Model Experience
 
-None. The migration adds no model input and preserves existing event content.
+### Historical restoration
+
+#### What the model sees
+
+Existing event content is preserved, including every recorded model input and output. The optional `draft` header field does not enter model requests.
+
+#### Token effect
+
+The migration adds no model-visible text or model requests.
+
+#### KV Cache effect
+
+The migration preserves historical request content and does not change prompt prefixes.
 
 ## Known Limitations and Deferred Work
 

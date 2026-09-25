@@ -37,6 +37,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../command-feedback"
     }
   ]
 }

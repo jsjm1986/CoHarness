@@ -38,6 +38,7 @@ import type {
   GatewayUserPreferencesService,
 } from './services.ts'
 import type { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
+import { SshTargetError } from './postgres/ssh-target-service.ts'
 import { isAdminPath, serveAdmin } from './static.ts'
 import { ResponseBodyTooLargeError } from './response-budget.ts'
 import { removeBootstrapAdminPassword } from './bootstrap-admin.ts'
@@ -68,7 +69,48 @@ export interface GatewayDeps {
   push?: GatewayPushService
   /** Optional interactive-desktop coordinator; absent where desktop driving is disabled. */
   desktops?: import('./desktop-coordinator.ts').DesktopCoordinator
+  desktopAccess?: Pick<import('./desktop-access.ts').DesktopAccess, 'get' | 'set'>
+  pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke'>
+  terminalManagement?: Pick<import('./terminal-management.ts').GatewayTerminalManagement, 'list' | 'close'>
+  terminalAccess?: Pick<import('./terminal-access.ts').TerminalAccess, 'get' | 'set'>
+  sshAccess?: Pick<import('./ssh-access.ts').SshAccess, 'get' | 'set'>
+  sshTargets?: Pick<import('./postgres/ssh-target-service.ts').PostgresSshTargetService, 'list' | 'listForProject' | 'create' | 'update' | 'mutate' | 'share' | 'resolveForRuntime'>
+  webhookDeliveries?: Pick<import('./postgres/webhook-delivery-service.ts').PostgresWebhookDeliveryService, 'list'>
+  /** Optional administrator-registered webhook endpoint service. */
+  webhookEndpoints?: Pick<import('./postgres/webhook-endpoint-service.ts').PostgresWebhookEndpointService, 'list' | 'create' | 'update' | 'mutate'>
+  /** Optional public provider ingress and administrator redispatch orchestrator. */
+  webhookIntake?: Pick<import('./webhook-intake.ts').GatewayWebhookIntake, 'handle' | 'redispatch'>
+  /** Maintenance windows, writer convergence, and restore fencing for shared PostgreSQL. */
+  maintenance?: Pick<import('./postgres/maintenance-service.ts').PostgresMaintenanceService,
+    'state' | 'enterMaintenance' | 'exitMaintenance' | 'setNodeStatus' | 'listOperations' | 'requestRestore' | 'logOperation'>
+  /** Deployment backup registry. */
+  backups?: Pick<import('./postgres/backup-service.ts').PostgresBackupService, 'list' | 'get' | 'record' | 'setVerified'>
+  /** Backup execution context for administrator-driven dumps. */
+  backupWork?: GatewayBackupWork
+  /** Packaged-versus-applied migration diff for the deployment page. */
+  migrationPlan?: () => Promise<import('./postgres/database.ts').MigrationPlan>
+  /**
+   * Mutating-request gate consulted after authentication. Returns 'open'
+   * while serving, 'maintenance' during a window, and 'stale-epoch' when this
+   * process predates a completed restore. Absent leaves every write open.
+   */
+  maintenanceGate?: () => Promise<import('./postgres/maintenance-service.ts').WriteGateVerdict>
+  /**
+   * Mark one mutating request as an in-flight writer until its response
+   * closes. Called at gate admission — before the gate verdict is read — so
+   * the node's reported writer count covers work already past the gate, not
+   * just requests still waiting on it. Absent disables inflight accounting.
+   */
+  writerSpan?: (res: ServerResponse) => void
   readiness?: (signal?: AbortSignal) => Awaitable<void>
+}
+
+/** Backup execution wiring shared by the admin backup routes. */
+export interface GatewayBackupWork {
+  commands: import('./deployment-commands.ts').DeploymentCommands
+  databaseUrl: string
+  backupDir: string
+  managedPaths: string[]
 }
 
 export const SESSION_COOKIE = 'hgw_session'
@@ -543,6 +585,24 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     })
   })
 
+  /**
+   * Maintenance-mode write gate: mutating requests consult the shared
+   * PostgreSQL verdict once authenticated. Reads, session lifecycle, health
+   * probes, and the deployment control surface itself stay open so operators
+   * can observe and close the window.
+   */
+  const writesOpen = async (req: IncomingMessage, res: ServerResponse, pathname: string): Promise<boolean> => {
+    if (deps.maintenanceGate === undefined) return true
+    if (req.method === 'GET' || req.method === 'HEAD') return true
+    if (pathname === '/login' || pathname === '/logout' || pathname === '/account/password'
+      || pathname.startsWith('/admin/api/deployment') || pathname.startsWith('/admin/api/backups')) return true
+    deps.writerSpan?.(res)
+    const verdict = await deps.maintenanceGate()
+    if (verdict === 'open') return true
+    send(res, 503, JSON.stringify({ error: verdict }), 'application/json')
+    return false
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
 
@@ -584,6 +644,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 401, '{"error":"invalid-runtime-token"}', 'application/json')
         return
       }
+      if (!await writesOpen(req, res, pathname)) { req.resume(); return }
       let body = ''
       try {
         body = req.method === 'GET' || req.method === 'HEAD'
@@ -596,6 +657,18 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       if (handlers.runtime !== undefined && await handlers.runtime(req, res, pathname, body)) return
       send(res, 404, '{"error":"not-found"}', 'application/json')
+      return
+    }
+
+    // Provider ingress authenticates by signature, not cookie or Origin.
+    if (pathname.startsWith('/webhook/')) {
+      if (deps.webhookIntake === undefined || !/^\/webhook\/[1-9][0-9]*$/u.test(pathname)) {
+        req.resume()
+        send(res, 404, '{"error":"not-found"}', 'application/json')
+        return
+      }
+      if (!await writesOpen(req, res, pathname)) { req.resume(); return }
+      await deps.webhookIntake.handle(req, res)
       return
     }
 
@@ -621,6 +694,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       send(res, 401, '{"error":"unauthorized"}', 'application/json')
       return
     }
+    if (!await writesOpen(req, res, pathname)) return
     const { token, user } = session
 
     if (pathname === '/logout' && req.method === 'POST') {
@@ -1125,6 +1199,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         projectModels: canManage && deps.governance?.describeProjectModelSettings !== undefined
           && deps.governance.mutateProjectModelSettings !== undefined,
         members: canManage,
+        sshTargets: canManage && deps.sshTargets?.listForProject !== undefined,
         filesystem: false,
       }
       try {
@@ -1185,6 +1260,57 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         }
         send(res, 405, JSON.stringify({ error: 'method-not-allowed' }), 'application/json')
       } catch (error: unknown) {
+        const mapped = accountProjectError(error)
+        send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
+      }
+      return
+    }
+
+    // Self-service SSH target sharing: project managers list the organization
+    // catalog with this project's share flags and toggle shares without an
+    // administrator round-trip. Authority is revalidated inside the service's
+    // transaction, so the route's role is transport plus audit.
+    const projectSshTargets = /^\/account\/api\/projects\/(\d+)\/ssh-targets$/.exec(pathname)
+    if (projectSshTargets !== null) {
+      res.setHeader('cache-control', 'no-store')
+      const projectId = Number(projectSshTargets[1])
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+        send(res, 400, JSON.stringify({ error: 'invalid-project-id' }), 'application/json')
+        return
+      }
+      if (deps.sshTargets === undefined || deps.sshTargets.listForProject === undefined) {
+        send(res, 503, JSON.stringify({ error: 'ssh-targets-unavailable' }), 'application/json')
+        return
+      }
+      try {
+        if (req.method === 'GET') {
+          const targets = await deps.sshTargets.listForProject(user.id, projectId)
+          send(res, 200, JSON.stringify({ targets }), 'application/json')
+          return
+        }
+        if (req.method === 'POST') {
+          const input = jsonObject(await readBody(req))
+          const target = await deps.sshTargets.share(user.id, {
+            targetId: input?.targetId, projectId, shared: input?.shared,
+          })
+          await audit.write({
+            userId: user.id,
+            action: 'projects.ssh-targets.share',
+            detail: JSON.stringify({ projectId, targetId: input?.targetId, shared: input?.shared === true }),
+            ip: clientIp(req),
+          })
+          send(res, 200, JSON.stringify({
+            publicId: target.publicId, name: target.name,
+            shared: target.sharedProjects.includes(projectId),
+          }), 'application/json')
+          return
+        }
+        send(res, 405, JSON.stringify({ error: 'method-not-allowed' }), 'application/json')
+      } catch (error: unknown) {
+        if (error instanceof SshTargetError) {
+          send(res, error.status, JSON.stringify({ error: error.message }), 'application/json')
+          return
+        }
         const mapped = accountProjectError(error)
         send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
       }

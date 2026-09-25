@@ -108,9 +108,11 @@ export class ApiProxyService extends Service implements ApiProxy {
     workspaceFileMaxResources: z.number().step(1).min(1).default(DEFAULT_WORKSPACE_FILE_MAX_RESOURCES),
   })
 
+  readonly desktop: ApiProxy['desktop']
   readonly sessions: ApiProxy['sessions']
   readonly subagents: ApiProxy['subagents']
   readonly workspace: ApiProxy['workspace']
+  readonly workspaceChanges: ApiProxy['workspaceChanges']
   readonly workspaceFiles: ApiProxy['workspaceFiles']
   readonly host: ApiProxy['host']
   readonly skills: ApiProxy['skills']
@@ -141,9 +143,11 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.workspaceFileMaxEntries === undefined ? {} : { workspaceFileMaxEntries: config.workspaceFileMaxEntries }),
       ...(config.workspaceFileMaxResources === undefined ? {} : { workspaceFileMaxResources: config.workspaceFileMaxResources }),
     })
+    this.desktop = api.desktop
     this.sessions = api.sessions
     this.subagents = api.subagents
     this.workspace = api.workspace
+    this.workspaceChanges = api.workspaceChanges
     this.workspaceFiles = api.workspaceFiles
     this.host = api.host
     this.skills = api.skills

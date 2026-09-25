@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { ExecutionIdentityError, GatewayExecutionIdentity, watchExecutionAccess } from './execution-identity.ts'
 import type { GatewayAccessMonitor } from './access-invalidation.ts'
 import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS } from './config.ts'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
+import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import {
   SESSION_SURFACE_EVENT_TYPES,
   isSessionSurfaceOp,
@@ -35,6 +35,7 @@ import {
 } from './postgres/conversation-repository.ts'
 import type { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
+import { SshTargetError, type PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
@@ -88,7 +89,7 @@ interface RuntimeApiDependencies {
   accessMonitor?: GatewayAccessMonitor
   /** Configured liveness interval for execution-watch connections. */
   executionWatchHeartbeatMs?: number
-  context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug'>
+  context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug' | 'nodeId'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
     & Partial<Pick<ConversationRepository,
@@ -124,6 +125,8 @@ interface RuntimeApiDependencies {
   documentCatalogHistory?: RuntimeDocumentCatalogHistoryHandler
   /** Optional interactive-desktop coordinator; absent where desktop driving is disabled. */
   desktops?: DesktopCoordinator
+  /** Optional registered SSH targets; absent in standalone compositions without managed SSH. */
+  sshTargets?: Pick<PostgresSshTargetService, 'resolveForRuntime'>
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -166,7 +169,8 @@ function sessionHeader(value: unknown): RuntimeSessionHeader {
     || (header.origin !== undefined && header.origin !== 'subagent')
     || (header.delegationDepth !== undefined && !safeInteger(header.delegationDepth))
     || !boundedOptionalString(header.agentPreset, 256)
-    || (header.draft !== undefined && typeof header.draft !== 'boolean')) {
+    || (header.draft !== undefined && typeof header.draft !== 'boolean')
+    || (header.sshTarget !== undefined && !safeInteger(header.sshTarget, 1))) {
     throw new Error('invalid session header')
   }
   return value as RuntimeSessionHeader
@@ -262,6 +266,7 @@ function runtimeHeader(header: ConversationHeader): RuntimeSessionHeader {
     ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
     ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
     ...(header.draft === undefined ? {} : { draft: header.draft }),
+    ...(header.sshTargetId === undefined ? {} : { sshTarget: header.sshTargetId }),
   }
 }
 
@@ -279,7 +284,10 @@ function migrateSessionBody(header: ConversationHeader, events: readonly Convers
   const stream = sessionFormatCatalog.createStream(
     runtimeHeader(header) as unknown as Parameters<typeof sessionFormatCatalog.createStream>[0],
     header.seedLength ?? 0,
-    { emitEvent: event => { emitted.push(event as unknown as ConversationEvent) } },
+    {
+      emitEvent: event => { emitted.push(event as unknown as ConversationEvent) },
+      emitRun: () => { throw new Error('stored Session logical migration cannot emit compact runs') },
+    },
   )
   for (const event of events) {
     stream.emitEvent(
@@ -294,7 +302,7 @@ function migrateSessionBody(header: ConversationHeader, events: readonly Convers
   /* A seeded source header keeps its pre-migration `seedLength`; the stream's
    * finish() reports the target-generation cut, which generated events inside
    * the inherited region may have extended. */
-  const seedLength = typeof migrated.seedLength === 'number' ? inheritedEventCount : null
+  const seedLength = migrated.isSeeded === true ? inheritedEventCount : null
   if (inheritedEventCount > emitted.length) {
     throw new Error('conversation migration disagreed on the inherited event count')
   }
@@ -382,7 +390,7 @@ function assertionFor(
   authority: GatewayPrincipalSigner,
   subject: RuntimeCredentialSubject,
   required: boolean,
-  options: { readonly allowDocumentAdmin?: boolean } = {},
+  options: { readonly allowDocumentAdmin?: boolean; readonly allowTerminalAdmin?: boolean; readonly allowPluginAdmin?: boolean; readonly allowWebhookDispatch?: boolean } = {},
 ): GatewayPrincipalClaims | undefined {
   const assertion = assertionHeader(req)
   if (assertion === undefined) {
@@ -390,13 +398,18 @@ function assertionFor(
     return undefined
   }
   const claims = authority.verify(assertion)
+  // webhook-dispatch assertions authorize only the managed intake route and the
+  // execution input/selection admission it drives; every other runtime-facing
+  // API keeps rejecting the restricted purpose.
+  if (claims.purpose === 'webhook-dispatch' && options.allowWebhookDispatch !== true) throw new CollaborationDeniedError('forbidden')
   if (claims.runtime.kind !== subject.target.kind || claims.runtime.id !== subject.target.id
     || claims.runtime.generation !== subject.generation) {
     throw new CollaborationDeniedError('forbidden')
   }
   if (subject.target.kind === 'user') {
-    const documentAdmin = options.allowDocumentAdmin === true && claims.purpose === 'document-admin'
-      && claims.user.role === 'admin'
+    const documentAdmin = (options.allowDocumentAdmin === true && claims.purpose === 'document-admin'
+      || options.allowTerminalAdmin === true && claims.purpose === 'terminal-admin'
+      || options.allowPluginAdmin === true && claims.purpose === 'plugin-admin') && claims.user.role === 'admin'
     if (claims.scope.kind !== 'personal' || (claims.user.id !== subject.target.id && !documentAdmin)) {
       throw new CollaborationDeniedError('forbidden')
     }
@@ -424,11 +437,12 @@ function draftScopeKey(
   cwd: string,
   visibility: 'personal' | 'project' | 'private',
   agentPreset: string | undefined,
+  sshTarget: number | undefined,
 ): string {
   const owner = subject.target.kind === 'user'
     ? { kind: 'personal', runtime: subject.target.id, user: claims.user.id }
     : { kind: 'project', runtime: subject.target.id, project: claims.scope.kind === 'project' ? claims.scope.projectId : 0, user: claims.user.id }
-  return createHash('sha256').update(JSON.stringify({ owner, cwd, visibility, agentPreset: agentPreset ?? '' })).digest('hex')
+  return createHash('sha256').update(JSON.stringify({ owner, cwd, visibility, agentPreset: agentPreset ?? '', sshTarget: sshTarget ?? 0 })).digest('hex')
 }
 
 /** Authenticated loopback API used by Gateway-backed runtime plugins. */
@@ -578,6 +592,7 @@ export function createRuntimeApiHandler(
       ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
       ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
       ...(header.draft === undefined ? {} : { draft: header.draft }),
+      ...(header.sshTarget === undefined ? {} : { sshTargetId: header.sshTarget }),
     }
   }
 
@@ -628,6 +643,7 @@ export function createRuntimeApiHandler(
         ? {} : { delegationDepth: claims.header.delegationDepth }),
       ...(claims.header.agentPreset === undefined ? {} : { agentPreset: claims.header.agentPreset }),
       ...(claims.header.draft === undefined ? {} : { draft: claims.header.draft }),
+      ...(claims.header.sshTarget === undefined ? {} : { sshTargetId: claims.header.sshTarget }),
     }
   }
 
@@ -694,11 +710,12 @@ export function createRuntimeApiHandler(
         } else if (action === 'capture') {
           send(res, 200, await execution.capture(subject, value))
         } else if (action === 'selection') {
-          await execution.selection(subject, assertionFor(req, deps.principals, subject, true)!, value)
+          await execution.selection(subject, assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!, value)
           res.writeHead(204)
           res.end()
         } else if (action === 'input' || action === 'question') {
-          const principal = assertionFor(req, deps.principals, subject, true)!
+          const principal = assertionFor(req, deps.principals, subject, true,
+            action === 'input' ? { allowWebhookDispatch: true } : {})!
           send(res, 200, action === 'input'
             ? await execution.input(subject, principal, value)
             : await execution.question(subject, principal, value))
@@ -718,14 +735,26 @@ export function createRuntimeApiHandler(
             }
           }
           send(res, 200, action === 'inherit' ? await execution.inherit(subject, value) : await execution.relay(subject, value))
+        } else if (action === 'terminal-authorize') {
+          send(res, 200, await execution.authorizeTerminal(subject, assertionFor(req, deps.principals, subject, true)!, deps.context.nodeId, value))
+        } else if (action === 'terminal-check') {
+          send(res, 200, await execution.checkTerminal(subject, deps.context.nodeId, value))
+        } else if (action === 'desktop-confirmation') {
+          send(res, 200, await execution.desktopConfirmation(subject, assertionFor(req, deps.principals, subject, true)!, deps.context.nodeId, value))
+        } else if (action === 'desktop-confirm') {
+          await execution.confirmDesktop(subject, assertionFor(req, deps.principals, subject, true)!, deps.context.nodeId, value)
+          send(res, 200, { saved: true })
+        } else if (action === 'desktop-authorize') {
+          send(res, 200, await execution.authorizeDesktop(subject, deps.context.nodeId, value))
         } else if (action === 'authorize') {
           send(res, 200, await execution.authorize(subject, value))
         } else return false
         return true
       }
-      if (pathname === '/internal/runtime/plugin-management/authorize' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
-        if (claims.user.role !== 'admin' || claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
+      if ((pathname === '/internal/runtime/plugin-management/authorize' || pathname === '/internal/runtime/terminal-management/authorize') && req.method === 'POST') {
+        const terminal = pathname === '/internal/runtime/terminal-management/authorize'
+        const claims = assertionFor(req, deps.principals, subject, true, { allowTerminalAdmin: terminal, allowPluginAdmin: !terminal })!
+        if (claims.user.role !== 'admin' || (terminal ? claims.purpose !== 'terminal-admin' : claims.purpose !== undefined && claims.purpose !== 'plugin-admin')) throw new CollaborationDeniedError('forbidden')
         const current = await deps.context.pool.query(`SELECT u.id FROM harness.users u
           JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
           JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
@@ -735,6 +764,20 @@ export function createRuntimeApiHandler(
         if (current.rows.length !== 1) throw new CollaborationDeniedError('forbidden')
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
+        return true
+      }
+      if (pathname === '/internal/runtime/ssh/resolve' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.sshTargets === undefined) { send(res, 503, { error: 'ssh-unavailable' }); return true }
+        if (claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
+        const payload = record(JSON.parse(body))
+        const resolved = await deps.sshTargets.resolveForRuntime({
+          targetId: payload?.targetId, actorPublicId: claims.user.id,
+          runtimeKind: subject.target.kind, runtimeId: subject.target.id,
+          projectInternalId: subject.projectInternalId,
+        })
+        res.setHeader('cache-control', 'no-store')
+        send(res, 200, resolved)
         return true
       }
       if (pathname === '/internal/runtime/model-credential' && req.method === 'POST') {
@@ -938,7 +981,8 @@ export function createRuntimeApiHandler(
           || typeof payload.sessionId !== 'string' || payload.sessionId.length === 0 || payload.sessionId.length > 256
           || typeof payload.cwd !== 'string' || payload.cwd.length === 0 || payload.cwd.length > 4096
           || (payload.visibility !== 'personal' && payload.visibility !== 'project' && payload.visibility !== 'private')
-          || (payload.agentPreset !== undefined && (typeof payload.agentPreset !== 'string' || payload.agentPreset.length > 256))) {
+          || (payload.agentPreset !== undefined && (typeof payload.agentPreset !== 'string' || payload.agentPreset.length > 256))
+          || (payload.sshTarget !== undefined && !safeInteger(payload.sshTarget, 1))) {
           throw new Error('invalid draft reservation request')
         }
         const claims = assertionFor(req, deps.principals, subject, true)!
@@ -960,9 +1004,10 @@ export function createRuntimeApiHandler(
           if (userId === undefined) throw new CollaborationDeniedError('forbidden')
           projectId = subject.projectInternalId
         }
+        const sshTarget = payload.sshTarget as number | undefined
         const reservation: ConversationDraftReservation = await deps.conversations.reserveDraft({
           organizationId: subject.organizationId,
-          scopeKey: draftScopeKey(subject, claims, payload.cwd, visibility, payload.agentPreset as string | undefined),
+          scopeKey: draftScopeKey(subject, claims, payload.cwd, visibility, payload.agentPreset as string | undefined, sshTarget),
           draftId: payload.draftId,
           sessionId: payload.sessionId,
           ...(userId === undefined ? {} : { userId }),
@@ -970,6 +1015,7 @@ export function createRuntimeApiHandler(
           cwd: payload.cwd,
           visibility,
           ...(payload.agentPreset === undefined ? {} : { agentPreset: payload.agentPreset }),
+          ...(sshTarget === undefined ? {} : { sshTarget }),
         })
         send(res, 200, {
           draftId: reservation.draftId,
@@ -1553,46 +1599,43 @@ export function createRuntimeApiHandler(
           send(res, 503, { error: 'desktop-coordination-unavailable' })
           return true
         }
-        const claims = assertionFor(req, deps.principals, subject, true)!
         const payload = record(JSON.parse(body))
         const action = pathname.slice('/internal/runtime/desktop/'.length)
-        if (action === 'acquire' || action === 'status' || action === 'cancel') {
-          if (typeof payload?.node !== 'string' || payload.node.length === 0 || payload.node.length > 256
-            || typeof payload.desktop !== 'string' || payload.desktop.length === 0 || payload.desktop.length > 256
-            || typeof payload.requestId !== 'string' || payload.requestId.length === 0 || payload.requestId.length > 256
-            || (payload.runId !== undefined && (typeof payload.runId !== 'string' || payload.runId.length > 256))) {
-            throw new Error('invalid desktop request')
-          }
-          const resource = { node: payload.node, desktop: payload.desktop }
-          if (action === 'acquire') {
-            send(res, 200, await deps.desktops.acquire(claims, {
-              ...resource,
-              requestId: payload.requestId,
-              ...(payload.runId === undefined ? {} : { runId: payload.runId }),
-            }))
-          } else if (action === 'status') {
-            send(res, 200, await deps.desktops.status(claims, { ...resource, requestId: payload.requestId }))
-          } else {
-            send(res, 200, { cancelled: await deps.desktops.cancel(claims, { ...resource, requestId: payload.requestId }) })
-          }
-          return true
+        const queued = action === 'acquire' || action === 'status' || action === 'cancel'
+        const granted = action === 'heartbeat' || action === 'release' || action === 'confirm-stopped' || action === 'stop'
+        if (!queued && !granted) return false
+        const address = queued ? 'requestId' : 'grantId'
+        const allowed = ['sessionId', 'desktop', 'ownerSessionIds', address]
+        if (payload === undefined || Object.keys(payload).some(key => !allowed.includes(key))
+          || typeof payload[address] !== 'string' || payload[address].length === 0 || payload[address].length > 256) {
+          throw new ExecutionIdentityError(400, 'invalid desktop coordination request')
         }
-        if (action === 'heartbeat' || action === 'release' || action === 'confirm-stopped') {
-          if (typeof payload?.grantId !== 'string' || payload.grantId.length === 0 || payload.grantId.length > 256) {
-            throw new Error('invalid desktop request')
-          }
-          if (action === 'heartbeat') {
-            send(res, 200, { status: await deps.desktops.heartbeat(claims, payload.grantId) })
+        const identity = { sessionId: payload.sessionId, desktop: payload.desktop, ownerSessionIds: payload.ownerSessionIds }
+        const holder = await execution.desktopHolder(subject, identity)
+        const resource = { node: deps.context.nodeId, desktop: payload.desktop as string }
+        const needsAccess = action === 'acquire' || action === 'status' || action === 'heartbeat'
+        if (needsAccess) await execution.authorizeDesktop(subject, deps.context.nodeId, identity)
+        res.setHeader('cache-control', 'no-store')
+        if (queued) {
+          const input = { ...resource, requestId: payload.requestId as string, runId: holder.runId }
+          if (action === 'acquire') send(res, 200, await deps.desktops.acquire(holder, input))
+          else if (action === 'status') send(res, 200, await deps.desktops.status(holder, input))
+          else send(res, 200, { cancelled: await deps.desktops.cancel(holder, input) })
+        } else {
+          const grantId = payload.grantId as string
+          if (action === 'heartbeat') send(res, 200, { status: await deps.desktops.heartbeat(holder, grantId, holder.runId, resource) })
+          else if (action === 'stop') {
+            await deps.desktops.stop(holder, grantId, holder.runId, resource)
+            send(res, 200, { stopping: true })
           } else if (action === 'release') {
-            await deps.desktops.release(claims, payload.grantId)
+            await deps.desktops.release(holder, grantId, holder.runId, resource)
             send(res, 200, { released: true })
           } else {
-            await deps.desktops.confirmStopped(claims, payload.grantId)
+            await deps.desktops.confirmStopped(holder, grantId, holder.runId, resource)
             send(res, 200, { confirmed: true })
           }
-          return true
         }
-        return false
+        return true
       }
 
       return false
@@ -1627,6 +1670,10 @@ export function createRuntimeApiHandler(
         const status = error.code === 'not-found' ? 404 : error.code === 'forbidden' ? 403
           : error.code === 'queue-full' ? 429 : 409
         send(res, status, { error: `desktop-${error.code}`, code: error.code, message: error.message })
+        return true
+      }
+      if (error instanceof SshTargetError) {
+        send(res, error.status, { error: error.message, message: error.message })
         return true
       }
       if (error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('invalid '))) {

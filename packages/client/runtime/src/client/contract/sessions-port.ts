@@ -8,6 +8,7 @@
  */
 
 import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ISessions } from './sessions.ts'
 import type { SessionCreateOptions } from './session-create.ts'
 import type { ObservableSnapshot } from './store.ts'
 
@@ -35,7 +36,13 @@ export interface SessionsPortList {
 }
 
 /** The sessions-service face injected into sibling domains. */
-export interface SessionsPort {
+export interface SessionsPort extends Pick<ISessions, 'retain'> {
+  /**
+   * Begin an asynchronous navigation intent, superseding any earlier intent.
+   * Selecting, clearing, scope changes, and owner disposal cancel it.
+   * @returns cancellation to check before publishing a late navigation result.
+   */
+  beginNavigation(): AbortSignal
   /** Observable list snapshot (read face only; writes stay inside the sessions domain). */
   readonly list: ObservableSnapshot<SessionsPortList>
   /**

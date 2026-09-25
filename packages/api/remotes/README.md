@@ -10,6 +10,8 @@ The current Client assembly mounts the Goal Remote contribution and the read-onl
 
 This package contains no transport or Host service discovery logic. Its Client face can be reused by Web or a future TUI that provides the same React-free `ctx.remote` contract.
 
+The Client assembly mounts the generated Plugin Manager namespace for profile inspection, installation, activation, cancellation and removal. The owning Host service checks deployment authorization for every call; mounting methods grants no administrator rights. Installation events and logs are not part of the general forwarded-event allowlist.
+
 ## Summary
 
 Two-sided BFF for Host Remote capabilities selected by this application. The Host entry owns the forwarded-event selection and registers its application event source with API Gateway; the Client entry imports generated `/remote` artifacts as runtime values, mounts each contribution through `ctx.remote.$mount()`, and re-exports their declaration merges. Client business packages depend on this facade rather than the Gateway implementation or individual Remote runtime entries.

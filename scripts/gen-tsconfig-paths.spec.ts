@@ -16,7 +16,7 @@ const root = resolve(import.meta.dirname, '..')
 describe('generated tsconfig package aliases', () => {
   it.each([
     ['subprocess/control', 'subprocess/subprocess', 'control'],
-    ['session-format/legacy', 'session/session-format', 'legacy'],
+    ['session-format/surface', 'session/session-format', 'surface'],
     ['compaction-image-offload/projection', 'compaction/compaction-image-offload', 'projection'],
   ])('resolves %s from source without requiring emitted declarations', (specifier, packagePath, entry) => {
     const path = resolve(root, 'tsconfig.base.json')
@@ -25,7 +25,8 @@ describe('generated tsconfig package aliases', () => {
     const source = resolve(root, `packages/${packagePath}/src/${entry}.ts`)
     const host = { ...ts.sys, fileExists: (file: string) => !file.replaceAll('\\', '/').includes('/lib/') && ts.sys.fileExists(file) }
     expect(ts.resolveModuleName(`@deepseek-ai/dsh-${specifier}`,
-      resolve(root, 'packages/subprocess/subprocess-local/src/control-spawn.ts'), options, host).resolvedModule?.resolvedFileName).toBe(source)
+      resolve(root, 'packages/subprocess/subprocess-local/src/control-spawn.ts'), options, host).resolvedModule?.resolvedFileName?.replaceAll('\\', '/'))
+      .toBe(source.replaceAll('\\', '/'))
   })
 
   it('maps each package to its own source directory', () => {

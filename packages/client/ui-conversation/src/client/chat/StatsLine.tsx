@@ -218,7 +218,7 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
             </button>
           )
           : (
-            <div ref={attachRoot} className={css.root} data-stats-line aria-label={line} title={line}>
+            <div ref={attachRoot} className={css.root} data-stats-line role="group" aria-label={t('stats.details')} title={line}>
               {content}
             </div>
           )}
@@ -230,7 +230,7 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
           title={t('stats.details')}
           closeLabel={t('close')}
         >
-          <div className={css.detailList}>
+          <div className={css.detailList} role="group" aria-label={t('stats.details')}>
             {groups.map(group => <p key={group}>{group}</p>)}
           </div>
         </Modal>

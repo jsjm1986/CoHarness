@@ -6,6 +6,8 @@ Shared subprocess harness for tests that boot an app and `cordis.yml` through th
 
 `runLoaderSmoke` accepts bin and config paths, optional complete bin arguments, environment overrides, stdin, pre-run setup, and pre-cleanup inspection. It owns the isolated cwd, DSH homes, diagnostics, deadline, termination, EOF, and cleanup; it returns both streams after a zero exit and rejects with both streams on failure.
 
+`extendEnv: false` makes the supplied environment complete: omitted parent credentials stay absent. Shipped `dsh` source launches select `sourceImport: 'tsx/esm'`; built launches use the declared JavaScript artifact.
+
 `runFixtureTurn` drives one task through exactly one configured root agent, forwards canonical events after that task reaches the durable inbox, flushes the session, and returns the final assistant text plus accumulated usage. Example-local drivers retain configuration, rendering, and assertion ownership.
 
 This is support-tier test infrastructure, not product API.

@@ -140,7 +140,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionStore)
     await ctx.plugin(DeepSeekLlmApiExtensionRegistry)
-    await ctx.plugin(SessionLogDeepSeek, enabled ? {} : { enabled: false })
+    await ctx.plugin(SessionLogDeepSeek, { enabled })
     ctx.baseUrl = import.meta.url
     // Select the source module while Loader owns its active package entry.
     ctx.loader.internal = {
@@ -169,7 +169,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
       } })
       if (enabled) {
         expect(body).toMatchObject({ dsh_session_log: {
-          version: 1, sessionFormatVersion: session.header.version, session: { id: session.id },
+          version: 1, session: { id: session.id, version: session.header.version },
           afterSeq, throughSeq,
           events: Array.from({ length: throughSeq - afterSeq }, (_, index) => ({ seq: afterSeq + index + 1 })),
         } })

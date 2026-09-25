@@ -284,6 +284,47 @@ export function serviceForAgent<K extends string & keyof Context>(
 }
 
 /**
+ * The environment implementation a realm hook installed on the agent's
+ * standing scope — what the preset composition resolves that service name to.
+ *
+ * Realm providers live on the standing scope's own fiber, ONE level above the
+ * mounted subtree, so the membership scan in {@link serviceForAgent} cannot
+ * reach them; the scope fiber is the environment's registration boundary.
+ *
+ * Absent means the realm overrode nothing for `name` and the composition
+ * resolves the host's. A caller routing through this for isolation — an
+ * SSH-bound session's `fs` — must treat undefined as missing, never fall back
+ * to the host implementation: that fallback is the cross-host read this
+ * lookup exists to prevent.
+ * @param ctx - any context of the runtime whose service store is inspected.
+ * @param agent - the agent whose standing scope environment to inspect.
+ * @param name - the service name the realm hook provided.
+ * @returns the realm's implementation, or undefined when the scope owns none.
+ */
+export function environmentForAgent<K extends string & keyof Context>(
+  ctx: Context,
+  agent: { ctx: Context },
+  name: K,
+): Context[K] | undefined {
+  const mount = standingMountFor(agent.ctx)
+  if (mount === undefined) return undefined
+  // The realm hook registers on the standing scope — the mounted tree's
+  // parent context. A mount sitting directly on the root context has no
+  // scope environment at all, so root-owned services must never match.
+  const environment = mount.fiber.parent.fiber
+  if (environment === ctx.root.fiber) return undefined
+  const store = ctx.reflect.store
+  for (const key of Object.getOwnPropertySymbols(store)) {
+    const impl = store[key]
+    /* v8 ignore next -- cordis deletes a store slot on disposal rather than clearing it */
+    if (impl === undefined) continue
+    if (impl.name !== name) continue
+    if (impl.fiber === environment) return impl.value as Context[K]
+  }
+  return undefined
+}
+
+/**
  * Rows that did not reach a usable state, each rendered as one diagnostic line.
  *
  * A row whose module failed to import never gains a fiber; a row whose config

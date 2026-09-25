@@ -51,6 +51,8 @@ describe('SessionRuntimePool', () => {
 
     await expect(pool.ensureSession({ kind: 'project', projectId: 7, projectName: 'Demo' }, 'project-session' as SessionId)).resolves.toBe(true)
     expect(pool.runtimeTargetFor('project-session' as SessionId)).toEqual({ kind: 'project', projectId: 7, projectName: 'Demo' })
+    expect(pool.binding('project-session' as SessionId)).toBeUndefined()
+    pool.open('project-session' as SessionId)
     expect(pool.binding('project-session' as SessionId)?.hostDescription).toBe(targetConnection.hostDescription)
     expect(pool.binding('project-session' as SessionId)?.hostDescription).not.toBe(baseConnection.hostDescription)
     expect(pool.list.getSnapshot().byId['project-session' as SessionId]).toMatchObject({
@@ -68,6 +70,46 @@ describe('SessionRuntimePool', () => {
     expect(pool.list.getSnapshot().byId['project-session' as SessionId]).toBeUndefined()
     pool.clear()
     expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
+  })
+
+  it('keeps an independent reference after the workbench releases its target and closes it after the final release', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const baseApi = new FakeApiClient()
+    const projectApi = new FakeApiClient()
+    const id = 'project-owned' as SessionId
+    projectApi.onList = () => Promise.resolve(ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: true }] }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const stop = vi.fn()
+    const targetConnection: ConnectionHandle = {
+      ...connection(projectApi),
+      start: (sinks) => {
+        queueMicrotask(() => sinks.onConnected?.({ version: 'test', cwd: '/project', attachedSessions: 0, home: '/home/test', canOpenPath: true }))
+        return { stop }
+      },
+    }
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => targetConnection }, fakeRemote())
+    try {
+      const source = pool.retainInfo(id)
+      const changed = vi.fn()
+      const off = source.subscribe(changed)
+      await pool.ensureSession({ kind: 'project', projectId: 7 }, id)
+      const reference = pool.retain(id, { source: 'controllerOperation' })
+      await reference.ready
+      pool.setAdditionalStaged([])
+      expect(stop).not.toHaveBeenCalled()
+      expect(pool.binding(id)).toBe(reference.binding)
+      expect(source.getSnapshot().referenceCount).toBe(1)
+      reference.release()
+      expect(stop).toHaveBeenCalledOnce()
+      expect(source.getSnapshot().referenceCount).toBe(0)
+      expect(pool.binding(id)).toBeUndefined()
+      expect(pool.retainInfo(id)).toBe(source)
+      expect(changed).toHaveBeenCalled()
+      off()
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('keeps the pending target entry across a transient reconnect', async () => {
@@ -170,6 +212,27 @@ describe('SessionRuntimePool', () => {
     const baseConnection = connection(baseApi)
     const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
     expect(pool.runtimeTargetFor('base-session' as SessionId)).toBeUndefined()
+    expect(pool.runtimeIdentityFor('base-session' as SessionId)).toEqual({ kind: 'personal' })
+    pool.setBaseRuntimeTarget({ kind: 'project', projectId: 17 })
+    expect(pool.runtimeTargetFor('base-session' as SessionId)).toBeUndefined()
+    expect(pool.runtimeIdentityFor('base-session' as SessionId)).toEqual({ kind: 'project', projectId: 17 })
+    expect(pool.runtimeIdentityFor('unknown' as SessionId)).toBeUndefined()
+  })
+
+  it("keeps an archived base session's summary reachable through archivedById", async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const id = 'archived-session' as SessionId
+    baseApi.onList = () => Promise.resolve(ok({ items: [{
+      sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+    }] }))
+    baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [id] }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    await vi.waitFor(() => { expect(pool.list.getSnapshot().archivedById[id]?.id).toBe(id) })
+    expect(pool.list.getSnapshot().byId[id]).toBeUndefined()
+    expect(pool.list.getSnapshot().ids).not.toContain(id)
   })
 })
 

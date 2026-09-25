@@ -10,9 +10,10 @@
  */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { createSnapshotStore, ProjectUiPolicyRuntime, SlotRegistry, type SessionId, type AccountPermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, PermissionCatalogDirectory, ProjectUiPolicyRuntime, SlotRegistry, type SessionId, type AccountPermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { CommandDecoration } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { PermissionCatalog, PermissionSelection } from '@deepseek-ai/dsh-permission-presets/client'
@@ -21,6 +22,7 @@ import {
 } from '../src/client/PermissionRow.tsx'
 import { apply, inject } from '../src/client/index.ts'
 import { accessEn } from '../src/client/locales.ts'
+import { DesktopConfirmationAction, type DesktopConfirmationInjected } from '../src/client/DesktopConfirmationAction.tsx'
 
 const sid = (k: string): SessionId => k as SessionId
 
@@ -53,20 +55,20 @@ async function bench() {
   const remote = new TestRemote(ctx)
   let catalog: PermissionCatalog = CATALOG
   let catalogError: { code: string; message: string } | undefined
+  const readCatalog = () => Promise.resolve(catalogError === undefined
+    ? { ok: true as const, value: catalog }
+    : { ok: false as const, error: catalogError })
   Object.assign(remote, {
-    permissionPresets: {
-      catalog: () => Promise.resolve(catalogError === undefined
-        ? { ok: true as const, value: catalog }
-        : { ok: false as const, error: catalogError }),
-    },
+    permissionPresets: { catalog: readCatalog },
   })
   ctx.slots.register({
     name: 'root',
     children: {
       'settings.general.item': { kind: 'list', scope: 'root' },
+      'conversation.input.left': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
-  ctx.provide('connection', {
+  const connection = {
     api: {
       settings: {
         describe: () => Promise.resolve({
@@ -76,7 +78,23 @@ async function bench() {
         mutate: () => Promise.reject(new Error('settings mutation is not exercised')),
       },
     },
-  } as never)
+    hostDescription: {
+      getSnapshot: () => undefined,
+      subscribe: () => () => {},
+    },
+    rpc: {
+      call: (_channel: string, endpoint: string) => endpoint === 'permissionPresets/catalog'
+        ? readCatalog()
+        : Promise.reject(new Error('unexpected generic RPC call')),
+    },
+  }
+  ctx.provide('connection', connection as never)
+  // The runtime-owned directory wired exactly as runtime apply wires it: the
+  // per-connection catalog transport, ownership-driven faces, and the host's
+  // catalog-changed forward attributed to the delivering connection.
+  const catalogDirectory = new PermissionCatalogDirectory(connection as never, createSnapshotStore({}))
+  ctx.provide('permissionCatalog', catalogDirectory)
+  remote.$on('permission-presets/catalog-changed', () => { catalogDirectory.invalidateFor(connection as never) })
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   let decoration: CommandDecoration | undefined
   ctx.provide('commandUi', {
@@ -121,13 +139,33 @@ async function bench() {
       catalogError = error
       remote.$dispatch('permission-presets/catalog-changed', [])
     },
-    decoration: () => decoration,
+    decoration: () => {
+      if (decoration === undefined) return undefined
+      if (decoration.ui.kind !== 'popupSelect') throw new Error('permission command must select an option')
+      return { ...decoration, ui: decoration.ui }
+    },
     permissionRow: () => ctx.slots.entries('settings.general.item')
       .find(entry => entry.component === PermissionRow),
   }
 }
 
 describe('ui-permission browser plugin', () => {
+  it('binds desktop confirmation to the exact pane and removes the action on disposal', async () => {
+    const b = await bench()
+    const entry = b.ctx.slots.entries('conversation.input.left').find(item => item.options.id === 'desktop-confirmation')
+    expect(entry?.component).toBe(DesktopConfirmationAction)
+    const inject = entry?.inject as unknown as (sessionId: SessionId) => DesktopConfirmationInjected
+    const connection = b.ctx.get('connection') as ConnectionHandle
+    expect(inject(sid('local')).connection).toBe(connection)
+    const scoped = { ...connection }
+    const forSession = vi.fn((): ConnectionHandle => scoped)
+    Object.assign(connection, { forSession })
+    expect(inject(sid('managed')).connection).toBe(scoped)
+    expect(forSession).toHaveBeenCalledWith(sid('managed'))
+    await b.fiber.dispose()
+    expect(b.ctx.slots.entries('conversation.input.left')).toHaveLength(0)
+  })
+
   it('keeps the Host catalog intact and refuses unavailable account selections', async () => {
     const b = await bench()
     const c = b.decoration()!

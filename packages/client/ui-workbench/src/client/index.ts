@@ -5,5 +5,11 @@ export type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 export type { WorkbenchKey } from './locales.ts'
 export type { WorkbenchCatalog, WorkbenchConversation } from './catalog.ts'
-export { readWorkbenchRegistry, writeWorkbenchRegistry } from './registry.ts'
-export type { WorkbenchLayout, WorkbenchRegistrySnapshot } from './registry.ts'
+
+
+declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
+  interface SidebarRightResourceParamsMap {
+    /** Text line navigation for the existing authorized file resource. */
+    file: { readonly line?: number }
+  }
+}

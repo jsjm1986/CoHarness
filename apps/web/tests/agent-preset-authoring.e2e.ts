@@ -88,7 +88,9 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Agent 预设' }).click()
     await dialog.getByRole('heading', { name: 'Agent 预设' }).waitFor({ timeout: 10_000 })
-    await dialog.getByText('标准模式').first().waitFor({ timeout: 10_000 })
+    // The picker-policy copy also names 标准模式, so the roster's readiness
+    // signal is a card control that only exists once the list has loaded.
+    await dialog.getByRole('button', { name: '查看: 标准模式' }).waitFor({ timeout: 10_000 })
 
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
 

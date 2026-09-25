@@ -162,6 +162,8 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-dockkit': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
+  // Workbench loads its PDF renderer on demand, including licensed Worker assets.
+  '@deepseek-ai/dsh-client-ui-workbench': ['lib/client.pdf.js'],
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],

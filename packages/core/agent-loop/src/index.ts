@@ -86,7 +86,7 @@ export const turnBoundaryProjectionDefinition = {
 class FactoryOwnership {
   private accepting = true
   private readonly teardown = new AbortController()
-  private readonly inactive = Promise.withResolvers<void>()
+  private readonly inactive = Promise.withResolvers<undefined>()
   private readonly liveAgents = new Set<() => Promise<void>>()
   private startupTasks = new Set<Promise<void>>()
 
@@ -127,7 +127,7 @@ class FactoryOwnership {
   async dispose(): Promise<void> {
     this.accepting = false
     this.teardown.abort(new Error('agent loop is not active'))
-    this.inactive.resolve()
+    this.inactive.resolve(undefined)
     await Promise.all([
       ...[...this.liveAgents].map(dispose => dispose()),
       ...this.startupTasks,
@@ -519,10 +519,10 @@ export class AgentLoop extends Service implements AgentFactory {
     // occupant is a collision the create/resume below will surface itself.
     if (ownerCtx.agents.get(sessionId) === undefined && ownerCtx.sessions.get(sessionId) === undefined) return
 
-    const released = Promise.withResolvers<void>()
+    const released = Promise.withResolvers<undefined>()
     const checkReleased = (): void => {
       if (ownerCtx.agents.get(sessionId) === undefined && ownerCtx.sessions.get(sessionId) === undefined) {
-        released.resolve()
+        released.resolve(undefined)
       }
     }
     const disposeAgentListener = ownerCtx.on('agent/disposed', () => { checkReleased() })
@@ -584,8 +584,8 @@ export class AgentLoop extends Service implements AgentFactory {
     let detachSession: (() => void) | undefined
     let detachAgent: (() => void) | undefined
     let disposing: Promise<void> | undefined
-    let publication: ReturnType<typeof Promise.withResolvers<void>> | undefined
-    const machineReady = Promise.withResolvers<void>()
+    let publication: ReturnType<typeof Promise.withResolvers<undefined>> | undefined
+    const machineReady = Promise.withResolvers<undefined>()
     // Reverse teardown, memoized so every racing owner awaits one quiescence:
     // stop the machine, drain and close the session's write path, leave the
     // registries, unwind the scope, release bookkeeping.
@@ -641,7 +641,7 @@ export class AgentLoop extends Service implements AgentFactory {
     try {
       unfollowOwner = ownerCtx.effect(function* () {
         machine = new ReactLoopAgent(loopCtx, id, options, session, inbox)
-        machineReady.resolve()
+        machineReady.resolve(undefined)
         yield machine.scope.rawDispose
         yield () => {
           // Owner disposal owns the same quiescence boundary. Its teardown skips
@@ -653,7 +653,7 @@ export class AgentLoop extends Service implements AgentFactory {
       }, `agentLoop.lifecycle(${id})`)
       /* v8 ignore start -- ctx.effect throws only on an inactive fiber, which assertActive() above already rejected */
     } catch (error: unknown) {
-      machineReady.resolve()
+      machineReady.resolve(undefined)
       untrack()
       callerSignal?.removeEventListener('abort', onCallerAbort)
       this.ownership.signal.removeEventListener('abort', onFactoryTeardown)
@@ -679,7 +679,7 @@ export class AgentLoop extends Service implements AgentFactory {
         agent,
         signal: abort.signal,
         publish: async (source) => {
-          publication = Promise.withResolvers<void>()
+          publication = Promise.withResolvers<undefined>()
           try {
             assertLive()
             detachSession = agent.ctx.sessions.enter(session)
@@ -692,14 +692,14 @@ export class AgentLoop extends Service implements AgentFactory {
             assertLive()
             return { agent, dispose }
           } finally {
-            publication.resolve()
+            publication.resolve(undefined)
             publication = undefined
           }
         },
         dispose,
       }
     } catch (error: unknown) {
-      machineReady.resolve()
+      machineReady.resolve(undefined)
       // Rollback swallows a disposal rejection: the setup failure is primary.
       void dispose().catch(() => {})
       throw error
@@ -744,10 +744,9 @@ export class AgentLoop extends Service implements AgentFactory {
    * @returns the owned handle and stored cursor, or `undefined` without a backend.
    */
   /**
-   * Start one fresh-or-restored configured agent. Persistence is resolved
-   * through the service graph — a sibling entry mounted later in the tree
-   * cannot race the startup-time service read into an unpersisted session or
-   * a false create.
+   * Start one fresh-or-restored configured agent. Persistence is resolved after
+   * pending mounts settle, so an entry listed later in the tree cannot race the
+   * startup-time service read into an unpersisted session or a false create.
    */
   private async startConfigured(
     ownerCtx: Context,
@@ -756,7 +755,7 @@ export class AgentLoop extends Service implements AgentFactory {
     options: AgentOptions,
     meta: Pick<SessionHeader, 'cwd'>,
   ): Promise<void> {
-    const persistence = sessionId === undefined ? undefined : await this.awaitStartupPersistence()
+    const persistence = sessionId === undefined ? undefined : await this.resolveSessionPersistence()
     if (persistence === undefined) {
       await this.create(configuredId, options, meta)
       return
@@ -765,52 +764,24 @@ export class AgentLoop extends Service implements AgentFactory {
   }
 
   /**
-   * Read the optional persistence backend. A `create()` issued while a sibling
-   * entry is still mounting sees the composition as it stands: waiting here
-   * would have to observe Loader settle state, which includes the caller's own
-   * in-flight entry and deadlocks plugin-time callers. Configured agents take
-   * the service-scoped wait in {@link awaitStartupPersistence} instead.
-   * @returns the registered backend, or `undefined` when none is mounted.
-   */
-  private resolveSessionPersistence(): SessionPersistence | undefined {
-    return this.runtime.ctx.get('sessionPersistence')
-  }
-
-  /**
-   * Resolve the startup persistence backend for a configured agent. Two
-   * service-graph waits race: a `sessionPersistence` inject fires when a
-   * sibling mounts one, and a `loader` inject with `await` fires once pending
-   * mounts drain without one — whichever comes first. The configured-agent
-   * entry has already completed `apply`, so no part of the wait includes this
-   * fiber's own Loader task.
+   * Read the optional persistence backend, waiting out in-flight Loader mounts
+   * once when absent. Sibling entries mount concurrently, so a backend whose
+   * module resolves after this fiber's injected dependencies would otherwise be
+   * invisible to a startup-time `ctx.get`.
    * @returns the registered backend, or `undefined` when the settled
    *   composition has none.
    */
-  private awaitStartupPersistence(): Promise<SessionPersistence | undefined> {
-    const ctx = this.runtime.ctx
-    const existing = ctx.get('sessionPersistence')
-    if (existing !== undefined) return Promise.resolve(existing)
-    if (ctx.get('loader') === undefined) return Promise.resolve(undefined)
-    return new Promise<SessionPersistence | undefined>((resolve) => {
-      const fibers: { dispose(): Promise<void> }[] = []
-      let settled = false
-      const finish = (value: SessionPersistence | undefined): void => {
-        if (settled) return
-        settled = true
-        resolve(value)
-        for (const fiber of fibers) void fiber.dispose()
-      }
-      fibers.push(ctx.inject(['sessionPersistence'], (childCtx: Context) => {
-        finish(childCtx.get('sessionPersistence'))
-      }))
-      fibers.push(ctx.inject({ loader: { await: true } }, () => {
-        finish(ctx.get('sessionPersistence'))
-      }))
-    })
+  private async resolveSessionPersistence(): Promise<SessionPersistence | undefined> {
+    const existing = this.runtime.ctx.get('sessionPersistence')
+    if (existing !== undefined) return existing
+    const loader = this.runtime.ctx.get('loader') as { await(): Promise<void> } | undefined
+    if (loader === undefined) return undefined
+    await loader.await()
+    return this.runtime.ctx.get('sessionPersistence')
   }
 
   private async createStoredSession(session: Session, signal?: AbortSignal): Promise<StoredSession | undefined> {
-    const persistence = this.resolveSessionPersistence()
+    const persistence = await this.resolveSessionPersistence()
     if (persistence === undefined) return undefined
     const handle = await persistence.create(session.header, {
       inheritedEventCount: session.inheritedEventCount,

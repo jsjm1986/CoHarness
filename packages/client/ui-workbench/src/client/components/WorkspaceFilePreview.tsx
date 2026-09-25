@@ -1,6 +1,6 @@
 /** Bounded read-only Workspace text preview, retaining content only in its view. */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceFileTextPage } from '@deepseek-ai/dsh-api-remotes/client'
 import { WorkspaceResourceError, isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceRegistry, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
@@ -27,9 +27,13 @@ function imageMime(path: string): string | undefined {
   return extension === undefined ? undefined : IMAGE_MIME_BY_EXTENSION[extension]
 }
 
-/** Render one paginated file. @param props - bound resource, reader, lifecycle, and labels. @returns a read-only preview dialog. */
-export function WorkspaceFilePreview({ request, read, readBytes, resources, close, labels }: {
+/** Render one paginated file.
+ * @param props - bound resource, reader, lifecycle, and labels.
+ * @returns a read-only region inside its resource tab.
+ */
+export function WorkspaceFilePreview({ request, read, readBytes, resources, close, labels, initialLine }: {
   request: WorkspaceResourceOpenRequest
+  initialLine?: number | undefined
   read: ReadWorkspacePreview
   readBytes?: ReadWorkspaceBytesPreview | undefined
   resources: WorkspaceResourceRegistry
@@ -38,7 +42,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
 }) {
   const source = useMemo(() => resources.source(request), [resources, request])
   const state = useSyncExternalStore(source.subscribe, source.get, source.get)
-  const [offset, setOffset] = useState(1)
+  const [offset, setOffset] = useState(initialLine ?? 1)
   const [revision, setRevision] = useState(0)
   const [page, setPage] = useState<WorkspaceFileTextPage>()
   const [pending, setPending] = useState(false)
@@ -96,26 +100,24 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
   const message = error?.message ?? state.error?.message
   const imageType = imageMime(request.path)
   return (
-    <Modal open title={request.path} closeLabel={labels.close} onClose={close}
-      className={previewClass}
-      footer={(
-        <>
-          <Button size="sm" disabled={pending || state.status === 'loading' || denied}
-            onClick={() => { void reload() }}>{labels.reload}</Button>
-          {page !== undefined && (
-            <>
-              <Button size="sm" disabled={pending || changed || denied || offset <= 1}
-                onClick={() => { setOffset(value => Math.max(1, value - page.limit)) }}>
-                {labels.previous}
-              </Button>
-              <Button size="sm" disabled={pending || changed || denied || page.eof}
-                onClick={() => { setOffset(value => value + page.limit) }}>
-                {labels.next}
-              </Button>
-            </>
-          )}
-        </>
-      )}>
+    <section aria-label={request.path} className={previewClass}>
+      <div className={css.filePreviewActions}>
+        <Button size="sm" onClick={close}>{labels.close}</Button>
+        <Button size="sm" disabled={pending || state.status === 'loading' || denied}
+          onClick={() => { void reload() }}>{labels.reload}</Button>
+        {page !== undefined && (
+          <>
+            <Button size="sm" disabled={pending || changed || denied || offset <= 1}
+              onClick={() => { setOffset(value => Math.max(1, value - page.limit)) }}>
+              {labels.previous}
+            </Button>
+            <Button size="sm" disabled={pending || changed || denied || page.eof}
+              onClick={() => { setOffset(value => value + page.limit) }}>
+              {labels.next}
+            </Button>
+          </>
+        )}
+      </div>
       {message !== undefined && <p role="alert">{message}</p>}
       {changed && !denied && <p role="status" data-workspace-file-changed>{labels.changed}</p>}
       {(pending || state.status === 'loading') && page === undefined && <p role="status">{labels.loading}</p>}
@@ -131,6 +133,6 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
       {!denied && state.value !== undefined && page !== undefined && rawBytes === undefined && (
         <pre className={css.filePreviewText} data-workspace-file-preview>{page.text}</pre>
       )}
-    </Modal>
+    </section>
   )
 }

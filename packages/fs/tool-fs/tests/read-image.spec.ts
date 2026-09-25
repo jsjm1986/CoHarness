@@ -302,6 +302,32 @@ describe('read_image happy path', () => {
       attachment: { mediaType: 'image/png', width: 1, height: 1 },
     })
   })
+
+  it('persists the path only, leaving the reference to the result content', async () => {
+    // The settled content already carries the image block with the complete
+    // reference, so copying it into meta would keep two records of one fact and a
+    // post-execute content replacement would strand the stale copy.
+    const ctx = await setup()
+    const value = { path: '/w/app/shots/card.png', image: {
+      attachmentId: 'sha256:fe6d588c8d5a8e93c743d80524b9376634ca1cc262db9e1d21c9e4c18fc856cc',
+      mediaType: 'image/png' as const, bytes: 24_588, width: 1496, height: 260, name: 'card.png',
+    } }
+    const meta = ctx.tools.get('read_image')?.output.presentationMeta?.({ file_path: 'shots/card.png' }, value)
+    expect(meta).toEqual({ path: value.path })
+  })
+
+  it('carries the committed reference in the result content, not in meta', async () => {
+    // Proves the single source of truth on the path a live call actually takes.
+    await writeFile(join(dir, 'red.png'), PNG_1X1)
+    const ctx = await setup()
+    const result = await readImage(ctx, { file_path: 'red.png' }, agentOn('vision-model'))
+    expect(result.isError).toBe(false)
+    expect(result.meta).toEqual({ path: join(dir, 'red.png') })
+    const image = result.content.find(block => block.type === 'image')
+    expect(image?.attachment.width).toBe(1)
+    expect(image?.attachment.height).toBe(1)
+    expect(image?.attachment.attachmentId).toMatch(/^sha256:/u)
+  })
 })
 
 describe('strict image-modality gate', () => {

@@ -94,6 +94,18 @@ describe('client build environment', () => {
     }).toThrow(/DSH_CLIENT_UNDECLARED/)
   })
 
+  it('isolates CoHarness public values from inherited official branding and runtime profile names', () => {
+    const environment = {
+      DSH_CLIENT_BUILD_PROFILE: 'official', DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3', DSH_CLIENT_EXTRA: 'inherited',
+    }
+    expect(resolveClientBuildEnvironment(environment, 'coharness')).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'coharness', DSH_CLIENT_TITLE: 'CoHarness',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3',
+    })
+    expect(() => { resolveClientBuildEnvironment(environment, 'sdk') }).toThrow('unknown client build profile')
+  })
+
   it('inherits public values by default and isolates an explicit official profile', () => {
     const parent = {
       PATH: '/bin',

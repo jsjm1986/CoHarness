@@ -9,7 +9,7 @@ export type ExecutionInputId = Branded<'ExecutionInputId'>
 export type ExecutionQuestionId = Branded<'rpc-id'>
 
 /** Privilege checked against every current execution participant. */
-export type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review'
+export type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop'
 
 /** Gateway-confirmed participant set, with bounded identity witnesses. */
 export interface ExecutionState {

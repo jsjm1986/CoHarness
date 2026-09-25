@@ -8,22 +8,12 @@
 name: Release (dsh)
 
 on:
-  pull_request:
-    paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'plugins/**'
-      - 'vendor/**'
-      - 'native/system/**'
-      - 'python/**'
-      - 'scripts/build-*.ts'
-      - 'scripts/release/**'
-      - 'scripts/publication-payload*'
-      - '.github/workflows/release.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig*.json'
+  workflow_call:
+    inputs:
+      required_proof:
+        description: Verify packed installation only; this interface cannot publish.
+        type: boolean
+        default: false
   push:
     branches: [master]
     paths:
@@ -60,7 +50,7 @@ permissions:
 concurrency:
   # A newer commit supersedes an in-flight pull-request pack. Pushes and manual
   # publication runs remain serialized and are never cancelled.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: release-dsh-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -97,6 +87,7 @@ jobs:
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache/restore@v4
+        id: pnpm-cache
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -105,6 +96,13 @@ jobs:
 
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
+
+      - name: Populate the PR dependency cache from master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.pnpm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
       - name: Assemble and verify source readiness
         if: inputs.publish
@@ -128,7 +126,7 @@ jobs:
         run: pnpm run verify-npm-install-layout
 
       - name: Build
-        run: pnpm run build:official
+        run: pnpm run build:coharness
 
       - name: Pack release tarballs
         run: pnpm run release:pack --family dsh --out dist/npm
@@ -158,7 +156,7 @@ jobs:
           DSH_GATE_REPORT_DIR: .artifacts/gates
           DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-dsh-pack-${{ github.run_attempt }}
           DSH_EVIDENCE_JOB_NAME: Pack npm tarballs
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
           DSH_GATE_ARTIFACT_GLOBS: '["dist/npm/*.tgz"]'
         with:
           external: npm-pack
@@ -174,7 +172,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    if: inputs.publish
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && !inputs.required_proof
     needs: pack
     runs-on: ubuntu-24.04
     # Required reviewers and the allowed tags live on the environment; this is

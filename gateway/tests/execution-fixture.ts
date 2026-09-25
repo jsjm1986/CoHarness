@@ -9,9 +9,12 @@ import { PostgresAccessMonitor } from '../src/access-invalidation.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
 import { ConversationRepository } from '../src/postgres/conversation-repository.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
+import { PostgresSshTargetService } from '../src/postgres/ssh-target-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
+import { DesktopCoordinator } from '../src/desktop-coordinator.ts'
+import { PostgresDesktopCoordinatorRepository } from '../src/postgres/desktop-coordinator-repository.ts'
 import type { ExecutionIdentityState } from '../src/execution-identity.ts'
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')
@@ -76,8 +79,11 @@ export async function createExecutionFixture(pool: Pool, options: { executionWat
   const conversations = new ConversationRepository(pool)
   const accessMonitor = new PostgresAccessMonitor(context, 60_000)
   await accessMonitor.synchronize()
-  const handler = createRuntimeApiHandler({ context, instances, conversations, principals, accessMonitor,
+  const desktops = new DesktopCoordinator(new PostgresDesktopCoordinatorRepository(context), instances)
+  await desktops.initialize()
+  const handler = createRuntimeApiHandler({ context, instances, conversations, principals, accessMonitor, desktops,
     executionWatchHeartbeatMs: options.executionWatchHeartbeatMs ?? 60_000,
+    sshTargets: new PostgresSshTargetService(context),
     collaboration: new PostgresCollaborationService(context), governance: { resolveOrganizationCredential: async () => null } })
   const server = createServer((req, res) => {
     void (async () => {
@@ -136,5 +142,5 @@ export async function createExecutionFixture(pool: Pool, options: { executionWat
   }
   return { base, context, project, other, personal, peerPersonal, admin, member, peer, principals, headers, dispose,
     publicKey: key.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
-    conversations, accessMonitor, call, session, admit, enter, organizationId }
+    conversations, accessMonitor, desktops, call, session, admit, enter, organizationId }
 }

@@ -36,7 +36,7 @@ changes:
     decision: version-bump
   - root: "event:agent/inbox/spliced"
     previous: "2026-09-21-v4"
-    after: "989d6d8ca9c21c4c5c0e7bbf88ca575e4165221454524cdeb7dc824fdc6b5b0c"
+    after: "6a12ecfb066aafd62c6a857c7898e2f8b2237aba3b5856f391d9aa7d521b1fb6"
     decision: version-bump
   - root: "event:gateway/execution"
     previous: null
@@ -44,7 +44,7 @@ changes:
     decision: version-bump
   - root: "event:session/title-llm-request"
     previous: "2026-09-21-v4"
-    after: "4b7fbf29e0ae1e0d95b75903193114fce97ad18351c41a2e06bc287d86e86333"
+    after: "0735bc4fb1d335aad0b9b8289d5638fa8f7f1f3dc5bd79b501fe5c567f92b867"
     decision: version-bump
   - root: "event:team/message/queued"
     previous: "2026-09-21-v4"
@@ -52,14 +52,14 @@ changes:
     decision: version-bump
   - root: "event:user/message"
     previous: "2026-09-21-v4"
-    after: "0620d01028827bca4cac6c6ae7894fd34681f70b41402e0c48ac6aaf301f2b75"
+    after: "19cb7b6061859227ee6f7f46deb1775629d78ad9d730b69b262e36380227196e"
     decision: version-bump
 ```
 
 <a id="compatibility"></a>
 ## 兼容性
 
-V4 的物理标头校验会拒绝其编码器已输出的 draft 字段。V5 接受这一可选布尔值，并把必需的标头版本从 4 改为 5。相邻的 V4 到 V5 迁移保留事件、序号、继承截点和 draft 值，只有显式写入时才发布新的 V5 代次；原 V4 字节不变。旧消息可以没有可选的 gatewayExecutionScope；新的 gateway/execution 事件是受管授权的必读事件，但旧 V5 日志可以没有它，此时不能获得特权身份。V4 读取器拒绝 V5 标头，因此这些新增项不声称 V4 可以向前读取。
+V4 的物理标头校验会拒绝其编码器已输出的 draft 字段。V5 接受这一可选布尔值，并把必需的标头版本从 4 改为 5。相邻的 V4 到 V5 迁移保留事件、序号、继承截点和 draft 值，只有显式写入时才发布新的 V5 代次；原 V4 字节不变。旧消息可以没有可选的 gatewayExecutionScope；新的 gateway/execution 事件是受管授权的必读事件，但旧 V5 日志可以没有它，此时不能获得特权身份。V4 读取器拒绝 V5 标头，因此这些新增项不声称 V4 可以向前读取。消息 `source` 联合接受 `webhook` 变体；没有该成员的更早 V5 读取器会拒绝携带 webhook 来源消息的日志。
 
 <a id="verification"></a>
 ## 验证

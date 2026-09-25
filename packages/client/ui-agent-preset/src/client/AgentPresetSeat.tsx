@@ -76,6 +76,14 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
     void load()
   }, [load])
 
+  // The component stays registered while hidden, so clear local disclosure
+  // state explicitly; otherwise an external off/on edit can revive an open
+  // menu from before the policy moved.
+  useEffect(() => {
+    if (state.showPicker) return
+    setOpen(false)
+  }, [state.showPicker])
+
   const chosen = state.options.find(option => option.id === state.current)
   const chosenText = chosen === undefined ? undefined : presetDisplayText(chosen, t)
   const label = chosenText?.name ?? state.current
@@ -101,9 +109,9 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
     return () => { window.clearTimeout(done) }
   }, [state.introduce, ready, label, introduced])
 
-  // Nothing to choose between: the deployment composes no presets and every
-  // session shares the host composition.
-  if (!ready) return null
+  // Hidden by policy, or nothing to choose between: the deployment composes
+  // no presets and every session shares the host composition.
+  if (!state.showPicker || !ready) return null
 
   // One wrapper span: the chip is a flex row with a gap, so loose character
   // spans would each pick up the gap between them.

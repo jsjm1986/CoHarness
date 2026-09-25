@@ -424,9 +424,12 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
       const dialog = await browseTo(staged)
       await expect.poll(() => dialog.getByText('alpha', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
       const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
-      await compareOrRefreshGolden(BROWSER_EXPECTED, snapshot, MODE)
-      await dialog.getByRole('button', { name: 'Cancel' }).click()
-      await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+      try {
+        await compareOrRefreshGolden(BROWSER_EXPECTED, snapshot, MODE)
+      } finally {
+        await dialog.getByRole('button', { name: 'Cancel' }).click()
+        await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+      }
     } finally {
       if (realHome === undefined) delete process.env.HOME
       else process.env.HOME = realHome
@@ -602,21 +605,24 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await expect.poll(() => sessionRows.count(), { timeout: 10_000 }).toBe(1)
     const sessionRow = sessionRows.first()
     const rowTitle = await sessionRow.locator('[class*="title"]').innerText()
+    const sessionTitles = () => ungroupedSection.locator('[role="treeitem"][aria-selected] [class*="title"]').allTextContents()
+    const titlesBefore = await sessionTitles()
+    expect(titlesBefore).toContain(rowTitle)
+    const retainedTitles = titlesBefore.filter(title => title !== rowTitle)
     // Row menu: hover reveals the actions button; Archive session commits
     // without a confirmation dialog (non-destructive: log + accounting stay).
+    const durableIds = (await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id).sort()
     await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
     await page.getByRole('menuitem', { name: 'Archive session' }).click()
-    // The row disappears on the archive-set echo; the bucket itself may
-    // keep the provisional New Session a prior adoption left selected, so
-    // what must vanish is the archived row, not the group.
-    await expect.poll(async () => {
-      const bucket = page.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
-      return await bucket.locator('[role="treeitem"]').filter({ hasText: rowTitle }).count()
-    }, { timeout: 10_000 }).toBe(0)
+    // Archiving the active history selects a client-local blank draft. The
+    // draft keeps its group visible without creating a persistent Session.
+    await expect.poll(() => page.getByText(rowTitle, { exact: true }).count(), { timeout: 10_000 }).toBe(0)
+    await expect.poll(() => page.locator('[role="treeitem"][aria-selected="true"]').innerText(), { timeout: 10_000 }).toBe('New Session')
+    expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id).sort()).toEqual(durableIds)
+    for (const title of retainedTitles) await expect.poll(() => page.getByText(title, { exact: true }).count()).toBeGreaterThan(0)
     // Durable on the host: the registry-global set carries the id while the
     // session log itself stays in persistence untouched.
-    await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds], { timeout: 10_000 })
-      .toEqual([SessionId(SEED_ID)])
+    expect([...scaffold.ctx.workspaceRegistry.archivedSessionIds]).toEqual([SessionId(SEED_ID)])
     expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id)).toContain(SessionId(SEED_ID))
     // Reload: the hidden state is rebuilt from the workspace.list baseline.
     const warningStart = tripwire.warnings.length
@@ -624,10 +630,38 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await expect.poll(() => page.getByText('Workspaces', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
-    // The archived row must not resurface (the Ungrouped bucket itself may
-    // reappear if selection restore lands on another stray — not this test's
-    // concern).
+    // The archive set and unrelated selection both survive the fresh baseline.
     expect(await page.getByText(rowTitle, { exact: true }).count()).toBe(0)
+    await expect.poll(sessionTitles, { timeout: 10_000 }).toEqual(retainedTitles)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 90_000)
+
+  it('restores an archived session through the Settings Archived sessions page', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-ws-unarchive'))
+    // Precondition through the host: archive is idempotent, so the scenario
+    // holds whether or not the row-menu archive test ran first. The dialog
+    // polls below carry the client-side frame propagation wait.
+    await scaffold.ctx.workspaceRegistry.archiveSession(SessionId(SEED_ID))
+    // The real composition: Settings dialog → Archived sessions section →
+    // workspace.unarchiveSession RPC → durable set → sidebar row returns.
+    await page.getByRole('button', { name: 'Settings' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    await dialog.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: 'Archived sessions' }).click()
+    const rows = dialog.getByRole('list').locator('li')
+    await expect.poll(() => rows.count(), { timeout: 10_000 }).toBe(1)
+    const rowTitle = await rows.first().locator('[class*="title"]').innerText()
+    expect(await rows.first().innerText()).toContain('Ungrouped')
+    await rows.first().getByRole('button', { name: `Unarchive ${rowTitle}` }).click()
+    // Durable on the host: the id leaves the registry-global set and the
+    // session log is untouched.
+    await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds], { timeout: 10_000 }).toEqual([])
+    expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id)).toContain(SessionId(SEED_ID))
+    await expect.poll(() => dialog.getByText('No archived sessions.', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    await page.keyboard.press('Escape')
+    // The restored row is visible again in the sidebar's Ungrouped bucket.
+    const restored = await seededSessionRow()
+    expect(await restored.locator('[class*="title"]').innerText()).toBe(rowTitle)
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 

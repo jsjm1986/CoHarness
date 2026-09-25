@@ -25,6 +25,12 @@
     },
     {
       "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../host/webserver"
+    },
+    {
+      "path": "../ui-dockkit"
     }
   ],
   "exclude": [

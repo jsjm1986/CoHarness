@@ -1,7 +1,8 @@
 # Complete unattended minimal-agent composition for the Python SDK. The model
 # sees one deployment-selected system prompt and only the owner-scoped
-# persistent Bash and string-replace editor tools. Runtime-context injection and
-# context compaction are absent.
+# persistent shell and string-replace editor tools. Runtime-context injection and
+# context compaction are absent. Windows mounts the `pwsh` dialect/tool pair;
+# every other platform mounts `bash`.
 
 - id: sdk-jsonrpc-server
   name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
@@ -35,6 +36,7 @@
 - id: terminal-bash
   name: '@deepseek-ai/dsh-terminal-bash'
   config:
+    shellDialect: !!js "process.platform === 'win32' ? 'pwsh' : 'bash'"
     timeoutMs: 300000
 
 # The editor uses the bare local filesystem; persistent Bash still consumes the
@@ -43,6 +45,15 @@
   name: '@deepseek-ai/dsh-fs-local'
   config:
     cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+# The session-persistence backend must mount before agent-spine: configured
+# agents resolve `ctx.sessionPersistence` synchronously while the spine mounts
+# the loop, so a later backend would leave them ephemeral.
+- id: sessions
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
+    compression: none
 
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
@@ -58,6 +69,7 @@
 
 - id: persistent-bash
   name: '@deepseek-ai/dsh-tool-bash-persistent'
+  disabled: !!js "process.platform === 'win32'"
   config:
     timeoutMs: 300000
     description: |-
@@ -70,13 +82,21 @@
       * Please avoid commands that may produce a very large amount of output.
       * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
 
+- id: persistent-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh-persistent'
+  disabled: !!js "process.platform !== 'win32'"
+  config:
+    timeoutMs: 300000
+    description: |-
+      Run commands in a PowerShell shell
+      * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+      * You don't have access to the internet via this tool.
+      * State is persistent across command calls and discussions with the user.
+      * Use native Windows paths (C:\...) and $env:NAME variables; this is PowerShell, not bash.
+      * Please avoid commands that may produce a very large amount of output.
+      * Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.
+
 - id: str-replace-editor
   name: '@deepseek-ai/dsh-tool-str-replace-editor'
   config:
     maxOutputChars: 16000
-
-- id: sessions
-  name: '@deepseek-ai/dsh-session-persistence-jsonl'
-  config:
-    root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
-    compression: none

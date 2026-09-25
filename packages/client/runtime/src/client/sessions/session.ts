@@ -1,6 +1,7 @@
 // Sessions remain resident after creation so they continue consuming mux frames
 // off-screen; their browser history window is staged and released separately.
 
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -209,6 +210,8 @@ export class Session implements SessionFace {
    */
   readonly projections: ProjectionValueStore
 
+  private readonly lifetime = new AbortController()
+
   private snapshotCache: ConversationSnapshot
   private readonly notifier: Notifier
   /**
@@ -259,6 +262,22 @@ export class Session implements SessionFace {
       this.queueMirror.replace(inbox)
       this.snapshotCache = this.buildSnapshot()
     }
+  }
+
+  async readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot> {
+    const readSignal = signal === undefined ? this.lifetime.signal : AbortSignal.any([this.lifetime.signal, signal])
+    readSignal.throwIfAborted()
+    const response = this.address === undefined
+      ? await this.api.sessions.history({ sessionId: this.sessionId, toolCallId: callId, detail: 'full' }, readSignal)
+      : await this.api.subagents.history({ ...this.address, toolCallId: callId, detail: 'full' }, readSignal)
+    readSignal.throwIfAborted()
+    if (!response.result.ok) throw new Error(response.result.error.message)
+    const definitions = this.options.conversation
+    if (definitions === undefined) throw new Error('Tool history requires Conversation definitions')
+    const reader = new ConversationNodeAssembler(definitions.events, definitions.views)
+    reader.replaceWindow(response.result.value.events.map(conversationInput), false)
+    reader.flush()
+    return (reader.snapshot('chat') as ChatSnapshot | undefined) ?? EMPTY_CHAT_SNAPSHOT
   }
 
   /**
@@ -713,7 +732,10 @@ export class Session implements SessionFace {
       case 'session/queue': {
         this.queueMirror.replace(frame.items)
         this.observeSubmissionQueue(frame.items)
-        this.notifier.markDirty()
+        // Queue baselines ride the stream's per-turn cadence; publish on the
+        // frame channel like other hot producers instead of per-envelope
+        // microtask flushes.
+        this.notifier.markFrameDirty()
         return
       }
       case 'session/subscribed': {
@@ -837,6 +859,7 @@ export class Session implements SessionFace {
 
   /** Stop in-flight history work and release submission observers for this scope. */
   dispose(): void {
+    this.lifetime.abort(new Error('session disposed'))
     this.disposeInboxProjection()
     this.openGeneration++
     this.historyAbortController?.abort(new Error('session disposed'))

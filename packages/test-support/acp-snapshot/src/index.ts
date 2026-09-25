@@ -35,6 +35,7 @@ export {
   extractSnapshotSpillPaths,
   normalizeSessionLog,
   normalizeSessionSnapshot,
+  normalizeSessionSnapshots,
   normalizeStdout,
   scrubRequestHeaders,
   scrubSessionSnapshot,

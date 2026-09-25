@@ -129,14 +129,14 @@ export class NodePtcRuntime extends PtcRuntime {
     if (!isAbsolute(spec.cwd) || (spec.timeoutMs !== null && (!Number.isFinite(spec.timeoutMs) || spec.timeoutMs <= 0 || spec.timeoutMs > this.config.maxTimeoutMs))) throw new Error('ptc-runtime-node: run requires resolved cwd and timeout')
     const bindings = validateBindings(spec)
     const controller = new AbortController()
-    const completion = Promise.withResolvers<void>()
+    const completion = Promise.withResolvers<undefined>()
     const live = { controller, finished: completion.promise }
     this.live.add(live)
     try {
       return await this.execute(spec, spec.sandboxPolicy, bindings, controller)
     } finally {
       this.live.delete(live)
-      completion.resolve()
+      completion.resolve(undefined)
     }
   }
 

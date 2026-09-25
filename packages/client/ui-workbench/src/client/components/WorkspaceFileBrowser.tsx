@@ -79,7 +79,11 @@ export function WorkspaceFileBrowser({
       address: workspaceResourceAddress(sessionId, entry.path),
     }
     if (entry.type === 'directory') setPath(entry.path)
-    else open(request)
+    else {
+      try { open(request) }
+      catch (cause) { setError(cause instanceof Error ? cause.message : labels.error); return }
+      close()
+    }
   }
   /* v8 ignore next -- CSS modules always provide this generated class in a built client. */
   const browserClass = css.fileBrowser ?? ''

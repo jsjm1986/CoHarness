@@ -309,3 +309,74 @@ describe('bounded Gateway responses', () => {
     expect(cancelled).toBe(true)
   })
 })
+
+it('confines signed terminal management to metadata and termination HTTP endpoints', async () => {
+  const { credential, issue } = fixture()
+  const root = await mkdtemp(join(tmpdir(), 'terminal-management-'))
+  const personal = { ...credential, runtime: { kind: 'user' as const, id: 41, generation: 7 } }
+  const credentialPath = join(root, 'credential.json')
+  await writeFile(credentialPath, JSON.stringify(personal))
+  process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialPath
+  const ctx = new Context()
+  ctx.provide('connection', {} as never)
+  await ctx.plugin(GatewayRuntime)
+  const headers = { [GATEWAY_PRINCIPAL_HEADER]: issue({
+    user: { id: 9, username: 'admin', displayName: 'Admin', role: 'admin' }, purpose: 'terminal-admin',
+    runtime: personal.runtime, scope: { kind: 'personal' },
+  }) }
+  const called = vi.fn(async () => {})
+  try {
+    for (const method of ['adminList', 'adminClose']) {
+      await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: `/api/terminal/${method}`, headers }, called)
+    }
+    expect(called).toHaveBeenCalledTimes(2)
+    for (const request of [
+      { kind: 'http' as const, method: 'POST', pathname: '/api/terminal/follow' },
+      { kind: 'http' as const, method: 'GET', pathname: '/api/terminal/adminList' },
+      { kind: 'upgrade' as const, pathname: '/api/terminal/adminList' },
+    ]) {
+      await expect(async () => ctx.waterfall('connection/request', { ...request, headers }, called)).rejects.toThrow('only inventory and termination')
+    }
+    expect(called).toHaveBeenCalledTimes(2)
+  } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
+it('limits cross-user plugin administration to declared profile methods', async () => {
+  const { credential, issue } = fixture()
+  const root = await mkdtemp(join(tmpdir(), 'plugin-management-'))
+  const personal = { ...credential, runtime: { kind: 'user' as const, id: 41, generation: 7 } }
+  const credentialPath = join(root, 'credential.json')
+  await writeFile(credentialPath, JSON.stringify(personal))
+  process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialPath
+  const ctx = new Context()
+  ctx.provide('connection', {} as never)
+  await ctx.plugin(GatewayRuntime)
+  const headers = { [GATEWAY_PRINCIPAL_HEADER]: issue({
+    user: { id: 9, username: 'admin', displayName: 'Admin', role: 'admin' }, purpose: 'plugin-admin',
+    runtime: personal.runtime, scope: { kind: 'personal' },
+  }) }
+  const called = vi.fn(async () => {})
+  try {
+    const methods = ['listPlugins', 'listBundles', 'inspect', 'setPluginEnabled', 'setBundleEnabled', 'installBundle', 'cancelInstall', 'removeBundle']
+    for (const method of methods) {
+      await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: `/api/pluginManager/${method}`, headers }, called)
+    }
+    await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: '/api/pluginInventory/list', headers }, called)
+    for (const pathname of ['/api/settings.describe', '/api/settings.mutate']) {
+      await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname, headers }, called)
+    }
+    expect(called).toHaveBeenCalledTimes(11)
+    for (const request of [
+      { kind: 'http' as const, method: 'POST', pathname: '/api/terminal/adminList' },
+      { kind: 'http' as const, method: 'POST', pathname: '/api/settings.replace' },
+      { kind: 'http' as const, method: 'POST', pathname: '/api/settings.openDocument' },
+      { kind: 'http' as const, method: 'POST', pathname: '/api/credentials.set' },
+      { kind: 'http' as const, method: 'POST', pathname: '/api/pluginManager/futureMethod' },
+      { kind: 'http' as const, method: 'GET', pathname: '/api/pluginManager/listPlugins' },
+      { kind: 'upgrade' as const, pathname: '/api/pluginManager/listPlugins' },
+    ]) await expect(async () => ctx.waterfall('connection/request', { ...request, headers }, called)).rejects.toThrow('only profile management')
+    expect(called).toHaveBeenCalledTimes(11)
+    expect(() => verifyGatewayPrincipal(issue({ purpose: 'plugin-admin', runtime: personal.runtime, scope: { kind: 'personal' } }), personal))
+      .toThrow()
+  } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
+})

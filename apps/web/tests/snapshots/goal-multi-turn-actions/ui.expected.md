@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"

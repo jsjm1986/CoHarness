@@ -1,18 +1,28 @@
 import { createHash } from 'node:crypto'
-import { link, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { link, mkdtemp, readFile, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import * as atomicWrite from '@deepseek-ai/dsh-atomic-write'
 import {
   DOCUMENT_UPLOAD_HASH_CODE,
   DOCUMENT_UPLOAD_NOT_FOUND_CODE,
   DOCUMENT_UPLOAD_RANGE_CODE,
   UserDocDirectoryId,
 } from '@deepseek-ai/dsh-userdoc'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import LocalUserDocStore from '../src/index.ts'
 
 const roots: string[] = []
+const contexts: Context[] = []
+
+function context(): Context {
+  const ctx = new Context()
+  contexts.push(ctx)
+  return ctx
+}
 
 function body(data: Uint8Array): ReadableStream<Uint8Array> {
   return new ReadableStream({
@@ -28,7 +38,7 @@ function digest(data: Uint8Array): string {
 }
 
 async function store(root: string, config: Record<string, unknown> = {}): Promise<LocalUserDocStore> {
-  const value = new LocalUserDocStore(new Context(), {
+  const value = new LocalUserDocStore(context(), {
     uploadRoot: root, uploadChunkBytes: 65536, uploadMinFreeBytes: 0, ...config,
   })
   await value.list()
@@ -48,6 +58,8 @@ async function complete(storeValue: LocalUserDocStore, uploadId: string, sha256:
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks()
+  await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
   await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
 
@@ -126,7 +138,7 @@ describe('resumable local document uploads', () => {
   it('recovers a publication committed before a runtime restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-recovery-'))
     roots.push(root)
-    const first = new LocalUserDocStore(new Context(), {
+    const first = new LocalUserDocStore(context(), {
       uploadRoot: root, uploadChunkBytes: 65536, uploadMinFreeBytes: 0, uploadMaxConcurrent: 1,
     })
     await first.list()
@@ -162,11 +174,11 @@ describe('resumable local document uploads', () => {
   it('serializes admission across stores sharing one document root', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-admission-'))
     roots.push(root)
-    const first = new LocalUserDocStore(new Context(), {
+    const first = new LocalUserDocStore(context(), {
       uploadRoot: root, uploadChunkBytes: 65536, uploadMinFreeBytes: 0, uploadMaxConcurrent: 1,
     })
     await first.list()
-    const second = new LocalUserDocStore(new Context(), {
+    const second = new LocalUserDocStore(context(), {
       uploadRoot: root, uploadChunkBytes: 65536, uploadMinFreeBytes: 0, uploadMaxConcurrent: 1,
     })
     await second.list()
@@ -183,12 +195,106 @@ describe('resumable local document uploads', () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-orphan-lock-'))
     roots.push(root)
     await store(root)
-    const lockPath = join(root, '.upload-sessions', 'v1', '.admission')
-    await writeFile(lockPath, '9007199254740991\n', { mode: 0o600 })
+    const lockPath = join(root, '.upload-sessions', 'v1', '.admission.lock')
+    const exited = await promisify(execFile)(process.execPath, ['-p', 'process.pid'])
+    await writeFile(lockPath, exited.stdout, { mode: 0o600 })
 
     const restarted = await store(root)
     await expect(restarted.list()).resolves.toEqual([])
     await expect(readFile(lockPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it.each([String(process.pid), 'not-a-pid', '0', '9007199254740991'])(
+    'preserves an admission lock whose owner cannot be proved dead: %s',
+    async (owner) => {
+      const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-held-lock-'))
+      roots.push(root)
+      await store(root)
+      const admission = join(root, '.upload-sessions', 'v1', '.admission')
+      const lockPath = `${admission}.lock`
+      await writeFile(lockPath, owner + '\n', { mode: 0o600 })
+      const acquisition = Promise.withResolvers<undefined>()
+      const proceed = Promise.withResolvers<undefined>()
+      const withFileLock = atomicWrite.withFileLock
+      vi.spyOn(atomicWrite, 'withFileLock').mockImplementation(async (filename, operation, options) => {
+        if (filename === admission) {
+          acquisition.resolve(undefined)
+          await proceed.promise
+        }
+        return withFileLock(filename, operation, options)
+      })
+      const opening = store(root)
+      try {
+        await Promise.race([acquisition.promise, opening.then(() => {
+          throw new Error('startup bypassed document admission')
+        })])
+        expect(await readFile(lockPath, 'utf8')).toBe(owner + '\n')
+      } finally {
+        await rm(lockPath, { force: true })
+        proceed.resolve(undefined)
+        await opening
+      }
+    },
+  )
+
+  it('rechecks a replacement owner when two startups observed the same orphan', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-recovery-race-'))
+    roots.push(root)
+    await store(root)
+    const admission = join(root, '.upload-sessions', 'v1', '.admission')
+    const lockPath = `${admission}.lock`
+    const exited = await promisify(execFile)(process.execPath, ['-p', 'process.pid'])
+    await writeFile(lockPath, exited.stdout, { mode: 0o600 })
+    const bothRecovering = Promise.withResolvers<undefined>()
+    const firstAdmission = Promise.withResolvers<undefined>()
+    const secondAdmission = Promise.withResolvers<undefined>()
+    const releaseAdmission = Promise.withResolvers<undefined>()
+    let recoveries = 0
+    let admissions = 0
+    let active = 0
+    let maxActive = 0
+    const withFileLock = atomicWrite.withFileLock
+    vi.spyOn(atomicWrite, 'withFileLock').mockImplementation(async (filename, operation, options) => {
+      if (filename === `${lockPath}.recovery`) {
+        if (++recoveries === 1) await bothRecovering.promise
+        else {
+          bothRecovering.resolve(undefined)
+          await firstAdmission.promise
+        }
+      }
+      if (filename !== admission) return withFileLock(filename, operation, options)
+      const ordinal = ++admissions
+      if (ordinal === 2) secondAdmission.resolve(undefined)
+      return withFileLock(filename, async () => {
+        active += 1
+        maxActive = Math.max(maxActive, active)
+        try {
+          if (ordinal === 1) {
+            firstAdmission.resolve(undefined)
+            await releaseAdmission.promise
+          }
+          return await operation()
+        } finally {
+          active -= 1
+        }
+      }, options)
+    })
+    const opening = Promise.all([store(root), store(root)])
+    try {
+      await firstAdmission.promise
+      const original = await stat(lockPath)
+      await secondAdmission.promise
+      const retained = await stat(lockPath)
+      expect([retained.dev, retained.ino]).toEqual([original.dev, original.ino])
+      expect(await readFile(lockPath, 'utf8')).toBe(String(process.pid) + '\n')
+    } finally {
+      bothRecovering.resolve(undefined)
+      firstAdmission.resolve(undefined)
+      releaseAdmission.resolve(undefined)
+      await opening
+    }
+    expect(recoveries).toBe(2)
+    expect(maxActive).toBe(1)
   })
 
   it('rejects and removes an oversized on-disk manifest before parsing it', async () => {

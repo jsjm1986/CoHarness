@@ -146,6 +146,10 @@ export function childSessionMeta(
   return {
     ...parentHeader.cwd !== undefined ? { cwd: parentHeader.cwd } : {},
     ...agentPreset === undefined ? {} : { agentPreset },
+    // The child's seeded history ran on the parent's execution target, and
+    // its scope joins the same realm'd standing mount — the binding must
+    // persist so a cold child resume rebuilds that realm, not a local one.
+    ...parentHeader.sshTarget === undefined ? {} : { sshTarget: parentHeader.sshTarget },
     parentSession: parentHeader.id,
     isSeeded,
     // Navigation classification only; the descriptor remains the authority

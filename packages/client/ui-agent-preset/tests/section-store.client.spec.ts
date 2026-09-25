@@ -8,6 +8,8 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ClientRemote, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'
 import { AgentPresetSectionController, draftBlocker } from '../src/client/section-store.ts'
 import type { CopyDraft, PresetRow } from '../src/client/section-store.ts'
 
@@ -19,6 +21,8 @@ interface FakeOptions {
   calls?: Recorded[]
   /** Reject `list` with this message. */
   failList?: string
+  /** Reject `list` only on this ordinal call. */
+  failListAt?: number
   /** Reject `read` with this message. */
   failRead?: string
   /** Reject `copy` with this message. */
@@ -29,6 +33,8 @@ interface FakeOptions {
   failRemove?: string
   /** Reject `settings.update` with this message. */
   failSettings?: string
+  /** Throw from `settings.update` rather than answering, as a dead transport does. */
+  throwSettings?: unknown
   /** Throw from `list` rather than answering, as a dead transport does. */
   throwList?: boolean
   /** Throw from `read`, as a dead transport does. */
@@ -43,6 +49,16 @@ interface FakeOptions {
   hasDocument?: boolean
   /** Hold `remove` until this resolves, to observe the in-flight state. */
   holdRemove?: Promise<void>
+  /** Initial new-session picker visibility. */
+  showPicker?: boolean
+  /** Mutable Host policy used when a Settings write is reflected by the roster. */
+  pickerPolicy?: { enabled: boolean }
+  /** Simulate a concurrent Host write winning after this client's policy write. */
+  ignorePickerWrite?: boolean
+  /** Whether the shared mirror reports the namespace writable. */
+  writable?: boolean
+  /** The mirror's writable reason when {@link writable} is false. */
+  writableReason?: SettingsWritableReason
 }
 
 const ok = (value: unknown) => Promise.resolve({ rpcId: 'r', result: { ok: true as const, value } })
@@ -66,18 +82,28 @@ function fakeRemote(
   options: FakeOptions = {},
 ): Pick<ClientRemote, 'agentPresets'> {
   const record = (method: string, payload: unknown): void => { options.calls?.push({ method, payload }) }
+  let listCount = 0
   return {
     agentPresets: {
       list: () => {
         record('list', {})
+        listCount += 1
         if (options.throwList === true) return Promise.reject(new Error('socket closed'))
-        if (options.failList !== undefined) return remoteFail(options.failList)
+        if (options.failList !== undefined
+          && (options.failListAt === undefined || options.failListAt === listCount)) {
+          return remoteFail(options.failList)
+        }
+        const selectionEnabled = options.pickerPolicy?.enabled ?? options.showPicker ?? true
+        // The Host resolves the saved default only while selection is shown;
+        // hidden, the effective default is the composition default.
+        const effectiveDefault = selectionEnabled ? defaultId.id : 'standard'
         return remoteOk({
           presets: [...presets].map(([id, preset]) => ({
-            id, trust: preset.trust, isDefault: id === defaultId.id,
+            id, trust: preset.trust, isDefault: id === effectiveDefault,
             ...preset.name === undefined ? {} : { name: preset.name },
           })),
           authorable: options.authorable ?? true,
+          modeSelectionEnabled: selectionEnabled,
         })
       },
       read: (id: string) => {
@@ -133,11 +159,15 @@ function fakeApi(defaultId: { id: string }, options: FakeOptions = {}): Pick<IAp
       },
     },
     settings: {
-      update: (payload: { ns: string; patch: { default?: string } }) => {
+      update: (payload: { ns: string; patch: { default?: unknown; modeSelectionEnabled?: unknown } }) => {
         record('settings.update', payload)
+        if (options.throwSettings !== undefined) throw options.throwSettings
         if (options.failSettings !== undefined) return fail(options.failSettings)
-        /* v8 ignore next -- the controller only ever patches `default` */
-        defaultId.id = payload.patch.default ?? defaultId.id
+        if (typeof payload.patch.default === 'string') defaultId.id = payload.patch.default
+        if (typeof payload.patch.modeSelectionEnabled === 'boolean' && !options.ignorePickerWrite) {
+          const policy = options.pickerPolicy ?? { enabled: options.showPicker ?? true }
+          policy.enabled = payload.patch.modeSelectionEnabled
+        }
         return ok({})
       },
     },
@@ -151,19 +181,58 @@ function seed(): Map<string, FakePreset> {
   ])
 }
 
+/**
+ * The shared describe mirror over one namespace's writability: the section
+ * reads it per load, exactly as the row does.
+ * @param options - the fake's writable flag and reason.
+ * @returns a describe face the controller accepts.
+ */
+function fakeDescribe(options: FakeOptions): SettingsDescribeFace {
+  const writable = options.writable ?? true
+  return {
+    getSnapshot: () => ({
+      status: 'ready',
+      view: {
+        writable,
+        hasDocument: true,
+        namespaces: [{
+          ns: 'agent-presets',
+          schema: {},
+          value: {},
+          applies: 'live',
+          revision: 0,
+          writable,
+          ...writable || options.writableReason === undefined
+            ? {}
+            : { writableReason: options.writableReason },
+        }],
+      },
+      error: null,
+    }),
+    subscribe: () => () => {},
+    ensure: () => Promise.resolve(),
+    acceptView: () => {},
+  } as unknown as SettingsDescribeFace
+}
+
 function harness(options: FakeOptions = {}) {
   const presets = seed()
   const defaultId = { id: 'standard' }
   const calls: Recorded[] = []
   let rosterChanges = 0
-  const shared = { ...options, calls: options.calls ?? calls }
+  const pickerPolicy = options.pickerPolicy ?? { enabled: options.showPicker ?? true }
+  const shared = { ...options, pickerPolicy, calls: options.calls ?? calls }
   const controller = new AgentPresetSectionController(
     fakeRemote(presets, defaultId, shared),
     fakeApi(defaultId, shared),
     () => options.hasDocument ?? true,
+    fakeDescribe(options),
     () => { rosterChanges += 1 },
   )
-  return { controller, presets, defaultId, calls, rosterChanges: () => rosterChanges }
+  return {
+    controller, presets, defaultId, pickerPolicy, calls,
+    rosterChanges: () => rosterChanges,
+  }
 }
 
 function copyOf(controller: AgentPresetSectionController): CopyDraft {
@@ -547,7 +616,7 @@ describe('deleting', () => {
         deletePreset: () => Promise.reject(new Error('socket closed')),
       },
     } as unknown as Pick<ClientRemote, 'agentPresets'>,
-    fakeApi({ id: 'standard' }), () => true)
+    fakeApi({ id: 'standard' }), () => true, fakeDescribe({}))
     broken.store.set({ ...broken.store.getSnapshot(), authorable: true, rows: [{
       id: 'mine', trust: 'user', isDefault: false,
     }] })
@@ -566,6 +635,7 @@ describe('a controller with no roster listener', () => {
     const presets = seed()
     const alone = new AgentPresetSectionController(
       fakeRemote(presets, { id: 'standard' }), fakeApi({ id: 'standard' }), () => true,
+      fakeDescribe({}),
     )
     await alone.load()
     alone.confirmDelete('mine')
@@ -587,6 +657,31 @@ describe('the default preset', () => {
     expect(controller.store.getSnapshot().rows.find(row => row.id === 'mine')?.isDefault).toBe(true)
   })
 
+  it('syncs the still-blank session with the Host-effective default', async () => {
+    const { controller, defaultId } = harness()
+    const synced: string[] = []
+    const sync = (id: string): Promise<undefined> => {
+      synced.push(id)
+      return Promise.resolve(undefined)
+    }
+    await controller.load()
+
+    // A concurrent Host write that lands after this client's write is the
+    // value the roster reports — the sync follows the roster, not the patch.
+    const makingDefault = controller.makeDefault('mine', sync)
+    defaultId.id = 'standard'
+    await makingDefault
+
+    expect(controller.store.getSnapshot().rows.find(row => row.isDefault)?.id).toBe('standard')
+    expect(synced).toEqual(['standard'])
+
+    // A default that resolves to no roster row leaves the session alone.
+    const missingDefault = controller.makeDefault('mine', sync)
+    defaultId.id = 'missing'
+    await missingDefault
+    expect(synced).toEqual(['standard'])
+  })
+
   it('surfaces a settings refusal as the page error', async () => {
     const { controller } = harness({ failSettings: 'read-only settings' })
     await controller.load()
@@ -594,5 +689,156 @@ describe('the default preset', () => {
     await controller.makeDefault('mine')
 
     expect(controller.store.getSnapshot().error).toContain('read-only settings')
+  })
+
+  it('keeps a composition sync failure on the page', async () => {
+    const { controller } = harness()
+    await controller.load()
+
+    await controller.makeDefault(
+      'mine',
+      () => Promise.resolve('blank session rejected the preset'),
+    )
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      error: 'blank session rejected the preset', policySaving: false,
+    })
+  })
+
+  it('restores the policy lock after a thrown default write', async () => {
+    const { controller } = harness({ throwSettings: new Error('settings transport unavailable') })
+    await controller.load()
+
+    await controller.makeDefault('mine')
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      error: 'settings transport unavailable', policySaving: false,
+    })
+  })
+
+  it('ignores default writes while mode selection is disabled', async () => {
+    const { controller, calls } = harness({ showPicker: false })
+    await controller.load()
+
+    await controller.makeDefault('mine')
+
+    expect(calls.some(call => call.method === 'settings.update')).toBe(false)
+  })
+
+  it('ignores default writes while the namespace is read-only', async () => {
+    const { controller, calls } = harness({ writable: false, writableReason: 'project' })
+    await controller.load()
+
+    await controller.makeDefault('mine')
+
+    expect(calls.some(call => call.method === 'settings.update')).toBe(false)
+    expect(controller.store.getSnapshot().policyWritableReason).toBe('project')
+  })
+})
+
+describe('the new-session picker preference', () => {
+  it('ignores policy writes until the section is ready', async () => {
+    const { controller, calls } = harness({ showPicker: true })
+
+    await controller.setPickerVisible(false)
+
+    expect(calls.some(call => call.method === 'settings.update')).toBe(false)
+  })
+
+  it('ignores policy writes while the namespace is read-only', async () => {
+    const { controller, calls } = harness({ showPicker: true, writable: false })
+    await controller.load()
+
+    await controller.setPickerVisible(false)
+
+    expect(calls.some(call => call.method === 'settings.update')).toBe(false)
+  })
+
+  it('uses the composition default while disabled and restores the saved default when re-enabled', async () => {
+    const { controller, calls, defaultId } = harness({
+      showPicker: true, failList: 'connection moved', failListAt: 2,
+    })
+    const synced: string[] = []
+    const sync = (id: string): Promise<undefined> => {
+      synced.push(id)
+      return Promise.resolve(undefined)
+    }
+    defaultId.id = 'mine'
+    await controller.load()
+    expect(controller.store.getSnapshot().rows.find(row => row.isDefault)?.id).toBe('mine')
+
+    await controller.setPickerVisible(false, sync)
+    expect(calls.filter(call => call.method === 'settings.update')[0]?.payload)
+      .toEqual({ ns: 'agent-presets', patch: { modeSelectionEnabled: false } })
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      showPicker: false, policySaving: false,
+    })
+    expect(controller.store.getSnapshot().rows.find(row => row.isDefault)?.id).toBe('standard')
+
+    await controller.setPickerVisible(true, sync)
+    expect(calls.filter(call => call.method === 'settings.update')[1]?.payload)
+      .toEqual({ ns: 'agent-presets', patch: { modeSelectionEnabled: true } })
+    expect(controller.store.getSnapshot()).toMatchObject({
+      showPicker: true, policySaving: false,
+    })
+    expect(controller.store.getSnapshot().rows.find(row => row.isDefault)?.id).toBe('mine')
+    expect(synced).toEqual(['standard', 'mine'])
+  })
+
+  it('reloads Host truth and reports a refused visibility write', async () => {
+    const { controller } = harness({ showPicker: true, failSettings: 'read-only settings' })
+    await controller.load()
+
+    await controller.setPickerVisible(false)
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      showPicker: true, error: 'read-only settings', policySaving: false,
+    })
+  })
+
+  it('reloads Host truth when another policy value wins the write', async () => {
+    const { controller } = harness({ showPicker: true, ignorePickerWrite: true })
+    await controller.load()
+
+    await controller.setPickerVisible(false)
+
+    expect(controller.store.getSnapshot()).toMatchObject({ showPicker: true, policySaving: false })
+  })
+
+  it('reloads a roster that cannot mark an effective default', async () => {
+    const { controller, defaultId } = harness({ showPicker: false })
+    defaultId.id = 'missing'
+    await controller.load()
+
+    await controller.setPickerVisible(true)
+
+    expect(controller.store.getSnapshot()).toMatchObject({ showPicker: true, policySaving: false })
+    expect(controller.store.getSnapshot().rows.every(row => !row.isDefault)).toBe(true)
+  })
+
+  it('keeps a blank-session sync failure on the page', async () => {
+    const { controller } = harness({ showPicker: true })
+    await controller.load()
+
+    await controller.setPickerVisible(
+      false,
+      () => Promise.resolve('blank session rejected the policy'),
+    )
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      error: 'blank session rejected the policy', policySaving: false,
+    })
+  })
+
+  it('reloads Host truth after a thrown visibility write', async () => {
+    const { controller } = harness({ showPicker: true, throwSettings: new Error('connection lost') })
+    await controller.load()
+
+    await controller.setPickerVisible(false)
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      showPicker: true, error: 'connection lost', policySaving: false,
+    })
   })
 })

@@ -1,3 +1,5 @@
+import { DesktopAccess, desktopPolicyOwner } from '../src/desktop-access.ts'
+import { TerminalAccess, terminalPolicyOwner } from '../src/terminal-access.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import type { Pool } from 'pg'
@@ -7,6 +9,8 @@ import { verifyExecutionAttribution, type ExecutionIdentityState } from '../src/
 import type { GatewayAccessMonitor } from '../src/access-invalidation.ts'
 import { barrier } from './barrier.ts'
 import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
+import { PRINCIPAL_HEADER } from '../src/principal.ts'
+import { PostgresWebhookDeliveryService, type WebhookEndpointId } from '../src/postgres/webhook-delivery-service.ts'
 
 const databaseUrl = process.env.HGW_TEST_DATABASE_URL
 const describePg = databaseUrl === undefined ? describe.skip : describe
@@ -27,6 +31,483 @@ describePg('Gateway execution identities', () => {
     await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
   })
   afterAll(async () => { await pool?.end() })
+
+  it('reserves each webhook delivery once across Gateway nodes and never replays an unknown result', async () => {
+    const f = await fixture()
+    const node = await pool.query<{ id: string }>('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2) RETURNING id', [f.organizationId, randomUUID()])
+    const first = new PostgresWebhookDeliveryService(f.context)
+    const second = new PostgresWebhookDeliveryService({ ...f.context, nodeId: node.rows[0]!.id })
+    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'delivery-1', requestHash: hash('body+signed-event'),
+      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const results = await Promise.all([first.reserve(input), second.reserve(input)])
+    expect(results.filter(result => result.dispatch)).toHaveLength(1)
+    expect(results[0]!.receipt.id).toBe(results[1]!.receipt.id)
+    const winner = results[0]!.dispatch ? first : second, loser = results[0]!.dispatch ? second : first
+    await expect(loser.complete(input.endpointId, results[0]!.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 404 })
+    await winner.complete(input.endpointId, results[0]!.receipt.id, { state: 'unknown', errorCode: 'runtime-timeout' })
+    expect(await first.reserve({ ...input, configurationRevision: '2' })).toMatchObject({ dispatch: false, receipt: { state: 'unknown', configurationRevision: '1' } })
+    await expect(first.reserve({ ...input, requestHash: hash('other-body') })).rejects.toMatchObject({ status: 409 })
+    await expect(winner.complete(input.endpointId, results[0]!.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 409 })
+    expect((await winner.complete(input.endpointId, results[0]!.receipt.id, { state: 'unknown', errorCode: 'runtime-timeout' })).state).toBe('unknown')
+  })
+
+  it('deduplicates a signed body across nodes and retains delivery aliases after the window expires', async () => {
+    const f = await fixture()
+    const node = await pool.query<{ id: string }>('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2) RETURNING id', [f.organizationId, randomUUID()])
+    const first = new PostgresWebhookDeliveryService(f.context)
+    const second = new PostgresWebhookDeliveryService({ ...f.context, nodeId: node.rows[0]!.id })
+    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'first', requestHash: hash('same signed body'),
+      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id },
+      limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const results = await Promise.all([first.reserve(input), second.reserve({ ...input, deliveryId: 'second' })])
+    expect(results.filter(result => result.dispatch)).toHaveLength(1)
+    expect(results[0]!.receipt.id).toBe(results[1]!.receipt.id)
+    const owner = results[0]!.dispatch ? first : second
+    await owner.complete(input.endpointId, results[0]!.receipt.id, { state: 'ignored' })
+    await pool.query("UPDATE harness.webhook_delivery_receipts SET received_at=now()-interval '2 minutes' WHERE id=$1", [results[0]!.receipt.id])
+    for (const deliveryId of ['first', 'second']) {
+      expect(await second.reserve({ ...input, deliveryId })).toMatchObject({ dispatch: false, receipt: { state: 'ignored' } })
+      await expect(second.reserve({ ...input, deliveryId, requestHash: hash('changed body') })).rejects.toMatchObject({ status: 409 })
+    }
+    const aliases = await pool.query('SELECT receipt_id FROM harness.webhook_delivery_aliases WHERE organization_id=$1 AND endpoint_id=$2', [f.organizationId, input.endpointId])
+    expect(aliases.rows).toEqual([{ receipt_id: results[0]!.receipt.id }])
+    const budget = await pool.query('SELECT accepted FROM harness.webhook_intake_windows WHERE organization_id=$1 AND endpoint_id=$2', [f.organizationId, input.endpointId])
+    expect(budget.rows).toEqual([{ accepted: 1 }])
+  })
+
+  it('expires body deduplication independently of the intake budget, preserving unresolved reservations', async () => {
+    const f = await fixture(), service = new PostgresWebhookDeliveryService(f.context)
+    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'first', requestHash: hash('same body'),
+      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id },
+      limit: 10, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const first = await service.reserve(input)
+    await pool.query("UPDATE harness.webhook_delivery_receipts SET received_at=now()-interval '2 minutes' WHERE id=$1", [first.receipt.id])
+    expect((await service.reserve({ ...input, deliveryId: 'still-dispatching' })).dispatch).toBe(false)
+    await service.complete(input.endpointId, first.receipt.id, { state: 'unknown', errorCode: 'runtime-timeout' })
+    expect((await service.reserve({ ...input, deliveryId: 'unknown' })).dispatch).toBe(false)
+    const otherBody = { ...input, deliveryId: 'known', requestHash: hash('completed body') }
+    const known = await service.reserve(otherBody)
+    await service.complete(input.endpointId, known.receipt.id, { state: 'submitted', sessionId: 'admitted' })
+    expect((await service.reserve({ ...otherBody, deliveryId: 'inside-window', configurationRevision: '2' })).dispatch).toBe(false)
+    await pool.query("UPDATE harness.webhook_delivery_receipts SET received_at=now()-interval '2 minutes' WHERE id=$1", [known.receipt.id])
+    expect((await service.reserve({ ...otherBody, deliveryId: 'outside-window' })).dispatch).toBe(true)
+    expect((await service.reserve({ ...otherBody, deliveryId: 'inside-window' })).dispatch).toBe(false)
+    expect((await service.reserve({ ...input, endpointId: randomUUID() as WebhookEndpointId })).dispatch).toBe(true)
+    await expect(service.reserve({ ...input, replayWindowMs: 0, event: { name: 'push', payload: {} } })).rejects.toMatchObject({ status: 400 })
+    await expect(service.reserve({ ...input, replayWindowMs: 1.5 })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('enforces a shared webhook delivery budget without charging duplicates or carrying expired windows', async () => {
+    const f = await fixture(), service = new PostgresWebhookDeliveryService(f.context)
+    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'first', requestHash: hash('body'),
+      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'project' as const, id: f.project.id }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const attempts = await Promise.allSettled([service.reserve(input), service.reserve({ ...input, deliveryId: 'second', requestHash: hash('second body') })])
+    expect(attempts.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(attempts.filter(result => result.status === 'rejected')).toEqual([expect.objectContaining({ reason: expect.objectContaining({ status: 429 }) })])
+    const accepted = attempts.find(result => result.status === 'fulfilled')!
+    if (accepted.status !== 'fulfilled') throw new Error('no accepted delivery')
+    expect((await service.reserve({ ...input, deliveryId: accepted.value.receipt.deliveryId,
+      requestHash: accepted.value.receipt.deliveryId === 'first' ? input.requestHash : hash('second body') })).dispatch).toBe(false)
+    await pool.query("UPDATE harness.webhook_intake_windows SET started_at=now()-interval '2 minutes' WHERE organization_id=$1 AND endpoint_id=$2", [f.organizationId, input.endpointId])
+    expect((await service.reserve({ ...input, deliveryId: 'third', requestHash: hash('third body') })).dispatch).toBe(true)
+    const count = await pool.query<{ accepted: number }>('SELECT accepted FROM harness.webhook_intake_windows WHERE organization_id=$1 AND endpoint_id=$2', [f.organizationId, input.endpointId])
+    expect(count.rows[0]!.accepted).toBe(1)
+  })
+
+  it('binds webhook delivery completion to organization and endpoint and records admission separately from success', async () => {
+    const f = await fixture(), other = await fixture()
+    const service = new PostgresWebhookDeliveryService(f.context)
+    const input = { endpointId: randomUUID() as WebhookEndpointId, deliveryId: 'same-id', requestHash: hash('body'),
+      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id }, limit: 1, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const reserved = await service.reserve(input)
+    for (const [organizationId, endpointId] of [[other.organizationId, input.endpointId], [f.organizationId, randomUUID()]]) {
+      await expect(pool.query(`INSERT INTO harness.webhook_delivery_aliases(organization_id,endpoint_id,delivery_id,receipt_id)
+        VALUES($1,$2,'cross-scope',$3)`, [organizationId, endpointId, reserved.receipt.id])).rejects.toMatchObject({ code: '23503' })
+    }
+    await expect(service.complete(randomUUID() as WebhookEndpointId, reserved.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 404 })
+    await expect(new PostgresWebhookDeliveryService(other.context).complete(input.endpointId, reserved.receipt.id, { state: 'submitted', sessionId: 's' })).rejects.toMatchObject({ status: 404 })
+    await expect(service.complete(input.endpointId, reserved.receipt.id, { state: 'submitted' })).rejects.toMatchObject({ status: 400 })
+    await expect(service.complete(input.endpointId, reserved.receipt.id, { state: 'rejected', errorCode: 'raw secret value' })).rejects.toMatchObject({ status: 400 })
+    expect(await service.complete(input.endpointId, reserved.receipt.id, { state: 'submitted', sessionId: 's' })).toMatchObject({ state: 'submitted', sessionId: 's', errorCode: null })
+    expect((await service.reserve(input)).dispatch).toBe(false)
+    await expect(service.complete(input.endpointId, reserved.receipt.id, { state: 'submitted', sessionId: 'another' })).rejects.toMatchObject({ status: 409 })
+    expect((await new PostgresWebhookDeliveryService(other.context).reserve({ ...input, executionUserUuid: other.admin.uuid, target: { kind: 'user', id: other.admin.id } })).dispatch).toBe(true)
+    const ignoredEndpoint = randomUUID() as WebhookEndpointId
+    const ignored = await service.reserve({ ...input, endpointId: ignoredEndpoint })
+    expect(await service.complete(ignoredEndpoint, ignored.receipt.id, { state: 'ignored' })).toMatchObject({ state: 'ignored', sessionId: null, errorCode: null })
+  })
+
+  it('pages webhook delivery receipts without crossing endpoints or exposing execution payloads', async () => {
+    const f = await fixture(), service = new PostgresWebhookDeliveryService(f.context)
+    const endpoint = randomUUID() as WebhookEndpointId
+    const input = { endpointId: endpoint, deliveryId: 'first', requestHash: hash('private body'),
+      configurationRevision: '1', executionUserUuid: f.admin.uuid, target: { kind: 'user' as const, id: f.admin.id }, limit: 10, windowMs: 60_000, replayWindowMs: 60_000, event: { name: 'push', payload: {} } }
+    const first = await service.reserve(input)
+    const second = await service.reserve({ ...input, deliveryId: 'second', requestHash: hash('second body') })
+    const page = await service.list(endpoint, undefined, 1)
+    expect(page).toEqual({ items: [second.receipt], nextCursor: second.receipt.id })
+    expect(await service.list(endpoint, page.nextCursor, 1)).toEqual({ items: [first.receipt], nextCursor: null })
+    expect(await service.list(randomUUID())).toEqual({ items: [], nextCursor: null })
+    await expect(service.list(randomUUID(), first.receipt.id)).rejects.toMatchObject({ status: 400 })
+    await expect(service.list(endpoint, undefined, 101)).rejects.toMatchObject({ status: 400 })
+    await expect(service.reserve({ ...input, requestHash: 'unhashed' })).rejects.toMatchObject({ status: 400 })
+    expect(JSON.stringify(page)).not.toContain(input.requestHash)
+    expect(JSON.stringify(page)).not.toContain(input.executionUserUuid)
+  })
+
+  it('admits execution input and selection under a webhook-dispatch assertion and refuses it elsewhere', async () => {
+    const f = await fixture(), id = await f.session()
+    const dispatch = async (action: string, body: unknown) => {
+      const assertion = f.principals.issueWebhookDispatch({
+        user: f.admin, runtime: { kind: f.project.kind, id: f.project.id, generation: f.project.generation },
+        scope: { kind: 'project', projectId: f.project.id, projectName: 'Project', mode: 'ro' },
+      }, 60_000)
+      const response = await fetch(`${f.base}/internal/runtime/execution/${action}`, { method: 'POST',
+        headers: { authorization: `Bearer ${f.project.token}`, 'content-type': 'application/json', [PRINCIPAL_HEADER]: assertion },
+        body: JSON.stringify(body) })
+      const text = await response.text()
+      let parsed: unknown
+      try { parsed = JSON.parse(text) } catch { parsed = text }
+      return { status: response.status, body: parsed as Record<string, unknown> }
+    }
+    const input = await dispatch('input', { sessionId: id, messageId: randomUUID(), kind: 'message', contentHash: hash('dispatch') })
+    expect(input).toMatchObject({ status: 200, body: { primaryActorUserId: f.admin.id } })
+    expect(await dispatch('selection', { sessionId: id, capability: 'plugin-management' })).toMatchObject({ status: 204 })
+    expect((await dispatch('question', { sessionId: id, questionId: 'q', answer: null })).status).toBe(403)
+    expect((await dispatch('authorize', { sessionId: id, capability: 'execute' })).status).toBe(403)
+    const runtimeApi = await fetch(`${f.base}/internal/runtime/ssh/resolve`, { method: 'POST',
+      headers: { authorization: `Bearer ${f.project.token}`, 'content-type': 'application/json',
+        [PRINCIPAL_HEADER]: f.principals.issueWebhookDispatch({
+          user: f.admin, runtime: { kind: f.project.kind, id: f.project.id, generation: f.project.generation },
+          scope: { kind: 'project', projectId: f.project.id, projectName: 'Project', mode: 'ro' },
+        }, 60_000) },
+      body: JSON.stringify({}) })
+    await runtimeApi.body?.cancel()
+    expect(runtimeApi.status).toBe(403)
+  })
+
+  it.each(['terminal-admin', 'plugin-admin'] as const)('rechecks %s without granting another user execution authority', async kind => {
+    const f = await fixture()
+    const domain = kind === 'terminal-admin' ? 'terminal-management' : 'plugin-management'
+    const request = async (person = f.admin, purpose: 'terminal-admin' | 'plugin-admin' | null = kind, path = domain, runtime = f.peerPersonal) => {
+      const assertion = f.principals.issue({ user: person, runtime: { kind: runtime.kind, id: runtime.id, generation: runtime.generation },
+        scope: runtime.kind === 'user' ? { kind: 'personal' } : { kind: 'project', projectId: runtime.id, projectName: 'project', mode: 'ro' },
+        ...(purpose === null ? {} : { purpose }) })
+      const response = await fetch(`${f.base}/internal/runtime/${path}/authorize`, { method: 'POST',
+        headers: { authorization: `Bearer ${runtime.token}`, 'x-dsh-gateway-principal': assertion } })
+      await response.body?.cancel()
+      return response.status
+    }
+    expect(await request()).toBe(204)
+    expect(await request(f.admin, kind, domain, f.project)).toBe(204)
+    expect(await request(f.member)).toBe(400)
+    expect(await request(f.admin, null)).toBe(403)
+    expect(await request(f.admin, kind, kind === 'terminal-admin' ? 'plugin-management' : 'terminal-management', f.personal)).toBe(403)
+    await pool.query("UPDATE harness.memberships SET role='member' WHERE organization_id=$1 AND user_id=$2", [f.organizationId, f.admin.uuid])
+    expect(await request()).toBe(403)
+  })
+
+  it('requires both terminal grants and writable membership even for administrators', async () => {
+    const f = await fixture(), id = await f.session()
+    const policies = new TerminalAccess(f.context)
+    const user = { kind: 'user' as const, id: f.admin.id }, project = { kind: 'project' as const, id: f.project.id }
+    const authorize = (person = f.admin) => f.call('terminal-authorize', { sessionId: id }, person)
+    expect((await f.call('terminal-authorize', { sessionId: id })).status).toBe(403)
+    expect((await authorize()).status).toBe(403)
+    await policies.set(user, true, '0')
+    expect((await authorize()).status).toBe(403)
+    await policies.set(project, true, '0')
+    expect(await authorize()).toMatchObject({ status: 200, body: { userId: f.admin.id } })
+    expect((await authorize(f.member)).status).toBe(403)
+    await policies.set({ kind: 'user', id: f.member.id }, true, '0')
+    expect((await authorize(f.member)).status).toBe(200)
+    await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.admin.uuid])
+    expect((await authorize()).status).toBe(403)
+    await pool.query("UPDATE harness.project_members SET access_mode='rw' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.admin.uuid])
+    await pool.query("UPDATE harness.conversation_sessions SET visibility='private' WHERE id=$1", [id])
+    expect((await authorize(f.member)).status).toBe(403)
+    expect((await authorize()).status).toBe(200)
+    await policies.set(user, false, '1')
+    expect((await authorize()).status).toBe(403)
+    const personalId = await f.session(f.personal)
+    await policies.set(user, true, '2')
+    await policies.set(project, false, '1')
+    expect((await f.call('terminal-authorize', { sessionId: personalId }, f.admin, f.personal)).status).toBe(200)
+    expect((await f.call('terminal-authorize', { sessionId: personalId }, f.peer, f.personal)).status).toBe(403)
+    expect((await authorize()).status).toBe(403)
+    expect(terminalPolicyOwner('user', f.admin.id)).toEqual(user)
+    expect(() => terminalPolicyOwner('unknown', 0)).toThrow('invalid terminal policy owner')
+    await expect(policies.set(user, true, '0')).rejects.toMatchObject({ status: 409 })
+    expect(await new DesktopAccess(f.context).get(user)).toMatchObject({ enabled: false, revision: '0' })
+  })
+
+  it('keeps terminal creator grants bound to runtime, Session and qualification revisions', async () => {
+    const f = await fixture(), id = await f.session(), otherSession = await f.session()
+    const policies = new TerminalAccess(f.context)
+    const user = { kind: 'user' as const, id: f.admin.id }
+    await policies.set(user, true, '0')
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    const grant = await f.call<{ userId: number; grantId: string }>('terminal-authorize', { sessionId: id }, f.admin)
+    expect(grant.status).toBe(200)
+    const check = () => f.call('terminal-check', { sessionId: id, grantId: grant.body.grantId })
+    expect(await check()).toMatchObject({ status: 200, body: { userId: f.admin.id } })
+    expect((await f.call('terminal-authorize', { sessionId: id }, f.admin)).body).toEqual(grant.body)
+    expect((await f.call('terminal-check', { sessionId: otherSession, grantId: grant.body.grantId })).status).toBe(403)
+    expect((await f.call('terminal-check', { sessionId: id, grantId: grant.body.grantId }, undefined, f.other)).status).toBe(403)
+    expect((await f.call('terminal-check', { sessionId: id, grantId: 'invalid' })).status).toBe(400)
+    expect((await f.call('terminal-authorize', { sessionId: id, userId: f.peer.id }, f.admin)).status).toBe(400)
+    await policies.set(user, false, '1')
+    expect((await check()).status).toBe(403)
+    await policies.set(user, true, '2')
+    expect((await check()).status).toBe(403)
+    const replacement = await f.call<{ grantId: string }>('terminal-authorize', { sessionId: id }, f.admin)
+    expect(replacement.status).toBe(200)
+    expect(replacement.body.grantId).not.toBe(grant.body.grantId)
+    expect((await check()).status).toBe(403)
+    expect((await f.call('terminal-check', { sessionId: id, grantId: replacement.body.grantId })).status).toBe(200)
+    await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [f.admin.uuid])
+    expect((await f.call('terminal-check', { sessionId: id, grantId: replacement.body.grantId })).status).toBe(403)
+  })
+
+  it('requires current user and project desktop grants without an administrator or read-only bypass', async () => {
+    const f = await fixture(), id = await f.session()
+    const policies = new DesktopAccess(f.context)
+    const user = { kind: 'user' as const, id: f.admin.id }
+    const project = { kind: 'project' as const, id: f.project.id }
+    await f.enter(id, await f.admit(id))
+    const authorize = () => f.call('authorize', { sessionId: id, capability: 'desktop' })
+    expect(await policies.get(user)).toEqual({ ...user, enabled: false, revision: '0' })
+    expect((await authorize()).status).toBe(403)
+    expect(await policies.set(user, true, '0')).toEqual({ ...user, enabled: true, revision: '1' })
+    expect((await authorize()).status).toBe(403)
+    await policies.set(project, true, '0')
+    expect((await authorize()).status).toBe(200)
+    await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.admin.uuid])
+    expect((await authorize()).status).toBe(403)
+    await pool.query("UPDATE harness.project_members SET access_mode='rw' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.admin.uuid])
+    expect((await authorize()).status).toBe(200)
+    await policies.set(user, false, '1')
+    expect((await authorize()).status).toBe(403)
+    const personalId = await f.session(f.personal)
+    await f.enter(personalId, await f.admit(personalId, f.admin, f.personal), f.personal)
+    await policies.set(user, true, '2')
+    await policies.set(project, false, '1')
+    expect((await f.call('authorize', { sessionId: personalId, capability: 'desktop' }, undefined, f.personal)).status).toBe(200)
+    expect((await authorize()).status).toBe(403)
+  })
+
+  it('checks every inherited desktop actor and publishes qualification revocation', async () => {
+    const f = await fixture(), id = await f.session()
+    const policies = new DesktopAccess(f.context)
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    await policies.set({ kind: 'user', id: f.admin.id }, true, '0')
+    await f.enter(id, await f.admit(id))
+    await f.enter(id, await f.admit(id, f.member))
+    expect((await f.call('authorize', { sessionId: id, capability: 'desktop' })).status).toBe(403)
+    await policies.set({ kind: 'user', id: f.member.id }, true, '0')
+    expect((await f.call('authorize', { sessionId: id, capability: 'desktop' })).status).toBe(200)
+    await f.accessMonitor.synchronize()
+    const invalidated = vi.fn()
+    cleanup.push(f.accessMonitor.subscribe(invalidated))
+    await policies.set({ kind: 'user', id: f.member.id }, false, '1')
+    await f.accessMonitor.synchronize()
+    expect(invalidated).toHaveBeenCalledWith({ userId: f.member.id })
+    expect((await f.call('authorize', { sessionId: id, capability: 'desktop' })).status).toBe(403)
+  })
+
+  it('rejects stale desktop policy revisions and keeps unknown owners and organizations isolated', async () => {
+    const f = await fixture(), other = await fixture()
+    const policies = new DesktopAccess(f.context)
+    const owner = { kind: 'user' as const, id: f.admin.id }
+    const changed = await Promise.allSettled([policies.set(owner, true, '0'), policies.set(owner, false, '0')])
+    expect(changed.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(changed.filter(result => result.status === 'rejected')).toHaveLength(1)
+    const current = await policies.get(owner)
+    expect(await policies.set(owner, current.enabled, current.revision)).toEqual(current)
+    await expect(policies.set(owner, true, '0')).rejects.toMatchObject({ status: 409 })
+    await expect(policies.set(owner, true, '-1')).rejects.toMatchObject({ status: 400 })
+    await expect(policies.set(owner, 'true', current.revision)).rejects.toMatchObject({ status: 400 })
+    await expect(policies.get({ kind: 'user', id: Number.MAX_SAFE_INTEGER })).rejects.toMatchObject({ status: 404 })
+    await expect(policies.set({ kind: 'project', id: Number.MAX_SAFE_INTEGER }, true, '0')).rejects.toMatchObject({ status: 404 })
+    const separate = new DesktopAccess(other.context)
+    expect(await separate.get({ kind: 'user', id: other.admin.id })).toMatchObject({ enabled: false, revision: '0' })
+    expect(desktopPolicyOwner('project', f.project.id)).toEqual({ kind: 'project', id: f.project.id })
+    for (const [kind, id] of [['unknown', 1], ['user', 0], ['user', '1'], ['project', 0.5]]) {
+      expect(() => desktopPolicyOwner(kind, id)).toThrow('invalid desktop policy owner')
+    }
+  })
+
+  it('shows only the interactive user confirmation and refuses stale node saves', async () => {
+    const f = await fixture(), id = await f.session()
+    const policies = new DesktopAccess(f.context)
+    const request = { sessionId: id, desktop: 'display-0' }
+    const status = (person = f.admin) => f.call('desktop-confirmation', request, person)
+    expect((await f.call('desktop-confirmation', request)).status).toBe(403)
+    expect(await status()).toMatchObject({ status: 200, body: { rootSessionId: id, nodeId: f.context.nodeId, desktop: 'display-0',
+      userId: f.admin.id, eligible: false, confirmed: false } })
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    for (const person of [f.admin, f.member]) await policies.set({ kind: 'user', id: person.id }, true, '0')
+    expect(await status()).toMatchObject({ status: 200, body: { eligible: true, confirmed: false } })
+    expect((await f.call('desktop-confirm', { ...request, confirmed: true, expectedNodeId: 'another-node' }, f.admin)).status).toBe(409)
+    expect(await status()).toMatchObject({ status: 200, body: { confirmed: false } })
+    expect((await f.call('desktop-confirm', { ...request, confirmed: true, expectedNodeId: f.context.nodeId }, f.admin)).status).toBe(200)
+    expect(await status()).toMatchObject({ status: 200, body: { confirmed: true } })
+    expect(await status(f.member)).toMatchObject({ status: 200, body: { userId: f.member.id, confirmed: false } })
+    await policies.set({ kind: 'user', id: f.admin.id }, false, '1')
+    expect(await status()).toMatchObject({ status: 200, body: { eligible: false, confirmed: false } })
+    await policies.set({ kind: 'user', id: f.admin.id }, true, '2')
+    expect(await status()).toMatchObject({ status: 200, body: { eligible: true, confirmed: false } })
+    await pool.query('UPDATE harness.execution_sessions SET unverified_history=true WHERE organization_id=$1 AND session_id=$2', [f.organizationId, id])
+    expect(await status()).toMatchObject({ status: 200, body: { eligible: false, confirmed: false } })
+  })
+
+  it('coordinates a root and its live children without a browser assertion and stops on revoked access', async () => {
+    const f = await fixture(), root = await f.session(), child = await f.session(f.project, root), other = await f.session()
+    const policies = new DesktopAccess(f.context)
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    await policies.set({ kind: 'user', id: f.admin.id }, true, '0')
+    const input = await f.admit(root)
+    await f.enter(root, input)
+    await f.enter(other, await f.admit(other))
+    expect((await f.call('inherit', { sessionId: child, parentSessionId: root, inputs: [input.inputId], primaryActorUserId: f.admin.id })).status).toBe(200)
+    const rootAddress = { sessionId: root, desktop: 'display-0' }
+    const childAddress = { sessionId: child, desktop: 'display-0', ownerSessionIds: [root] }
+    const lease = (action: string, value: unknown) => f.call(`/internal/runtime/desktop/${action}`, value)
+    expect((await lease('acquire', { ...rootAddress, requestId: 'first' })).status).toBe(403)
+    for (const sessionId of [root, other]) expect((await f.call('desktop-confirm', {
+      sessionId, desktop: 'display-0', confirmed: true,
+    }, f.admin)).status).toBe(200)
+    const acquired = await lease('acquire', { ...rootAddress, requestId: 'first' })
+    expect(acquired).toMatchObject({ status: 200, body: { status: 'granted' } })
+    const grantId = acquired.body.grantId
+    expect(await lease('acquire', { ...childAddress, requestId: 'child' }))
+      .toMatchObject({ status: 200, body: { status: 'held', grantId } })
+    expect(await lease('heartbeat', { ...childAddress, grantId }))
+      .toMatchObject({ status: 200, body: { status: 'held' } })
+    expect(await lease('status', { ...rootAddress, requestId: 'first' }))
+      .toMatchObject({ status: 200, body: { status: 'granted', grantId } })
+    expect((await lease('release', { sessionId: other, desktop: 'display-0', grantId })).status).toBe(403)
+    expect((await lease('release', { ...rootAddress, desktop: 'different-display', grantId })).status).toBe(403)
+    expect((await lease('release', { sessionId: child, desktop: 'display-0', grantId })).status).toBe(403)
+    expect((await lease('acquire', { ...rootAddress, requestId: 'forged', node: f.context.nodeId })).status).toBe(400)
+    expect((await lease('acquire', { ...rootAddress, requestId: 'forged', runId: other })).status).toBe(400)
+    await policies.set({ kind: 'user', id: f.admin.id }, false, '1')
+    for (const action of ['acquire', 'status', 'heartbeat']) {
+      expect((await lease(action, { ...childAddress, ...(action === 'heartbeat' ? { grantId } : { requestId: 'first' }) })).status).toBe(403)
+    }
+    expect(await lease('release', { ...childAddress, grantId })).toMatchObject({ status: 200, body: { released: true } })
+    const snapshot = await f.desktops.snapshot({ node: f.context.nodeId, desktop: 'display-0' })
+    expect(snapshot.grants).toHaveLength(1)
+    expect(snapshot.grants[0]).toMatchObject({ state: 'released' })
+  })
+
+  it('keeps stopped input exclusive until its exact workflow confirms drainage after revocation', async () => {
+    const f = await fixture(), first = await f.session(), second = await f.session()
+    const policies = new DesktopAccess(f.context)
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    await policies.set({ kind: 'user', id: f.admin.id }, true, '0')
+    for (const sessionId of [first, second]) {
+      await f.enter(sessionId, await f.admit(sessionId))
+      await f.call('desktop-confirm', { sessionId, desktop: 'display-0', confirmed: true }, f.admin)
+    }
+    const lease = (action: string, sessionId: string, extra: object) =>
+      f.call(`/internal/runtime/desktop/${action}`, { sessionId, desktop: 'display-0', ...extra })
+    const acquired = await lease('acquire', first, { requestId: 'first' })
+    expect(acquired.status).toBe(200)
+    const grantId = acquired.body.grantId as string
+    expect(await lease('acquire', second, { requestId: 'second' })).toMatchObject({ status: 200, body: { status: 'queued' } })
+    expect((await lease('stop', second, { grantId })).status).toBe(403)
+    expect(await lease('stop', first, { grantId })).toMatchObject({ status: 200, body: { stopping: true } })
+    expect(await lease('stop', first, { grantId })).toMatchObject({ status: 200, body: { stopping: true } })
+    expect(await lease('heartbeat', first, { grantId })).toMatchObject({ status: 200, body: { status: 'stopping' } })
+    await policies.set({ kind: 'user', id: f.admin.id }, false, '1')
+    expect((await lease('confirm-stopped', second, { grantId })).status).toBe(403)
+    expect(await lease('cancel', second, { requestId: 'second' })).toMatchObject({ status: 200, body: { cancelled: true } })
+    expect(await lease('confirm-stopped', first, { grantId })).toMatchObject({ status: 200, body: { confirmed: true } })
+    const snapshot = await f.desktops.snapshot({ node: f.context.nodeId, desktop: 'display-0' })
+    expect(snapshot.grants[0]?.state).toBe('released')
+    expect(snapshot.queue[0]?.state).toBe('cancelled')
+  })
+
+  it('binds desktop confirmation to each real actor, Session, desktop, node, and runtime generation', async () => {
+    const f = await fixture(), id = await f.session(), otherSession = await f.session()
+    const policies = new DesktopAccess(f.context)
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    for (const person of [f.admin, f.member]) await policies.set({ kind: 'user', id: person.id }, true, '0')
+    await f.enter(id, await f.admit(id))
+    await f.enter(otherSession, await f.admit(otherSession))
+    const request = { sessionId: id, desktop: 'display-0' }
+    const authorize = () => f.call('desktop-authorize', request)
+    expect((await authorize()).status).toBe(403)
+    expect((await f.call('desktop-confirm', { ...request, confirmed: true })).status).toBe(403)
+    expect((await f.call('desktop-confirm', { ...request, confirmed: true, userId: f.member.id }, f.admin)).status).toBe(400)
+    expect((await f.call('desktop-confirm', { ...request, confirmed: true }, f.admin)).status).toBe(200)
+    expect((await authorize()).status).toBe(200)
+    expect((await f.call('desktop-authorize', { ...request, sessionId: otherSession })).status).toBe(403)
+    expect((await f.call('desktop-authorize', { ...request, desktop: 'display-1' })).status).toBe(403)
+    expect((await f.call('desktop-authorize', { ...request, nodeId: f.context.nodeId })).status).toBe(400)
+    await f.enter(id, await f.admit(id, f.member))
+    expect((await authorize()).status).toBe(403)
+    expect((await f.call('desktop-confirm', { ...request, confirmed: true }, f.member)).status).toBe(200)
+    expect((await authorize()).status).toBe(200)
+    await pool.query('UPDATE harness.desktop_session_confirmations SET generation=generation+1 WHERE organization_id=$1', [f.organizationId])
+    expect((await authorize()).status).toBe(403)
+    for (const person of [f.admin, f.member]) await f.call('desktop-confirm', { ...request, confirmed: true }, person)
+    const node = (await pool.query<{ id: string }>('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2) RETURNING id', [f.organizationId, randomUUID()])).rows[0]!.id
+    await pool.query('UPDATE harness.desktop_session_confirmations SET node_id=$2 WHERE organization_id=$1', [f.organizationId, node])
+    expect((await authorize()).status).toBe(403)
+  })
+
+  it('shares root consent only through the supplied live owner chain and rechecks new child actors', async () => {
+    const f = await fixture(), root = await f.session(), child = await f.session(f.project, root), unrelated = await f.session()
+    const policies = new DesktopAccess(f.context)
+    await policies.set({ kind: 'project', id: f.project.id }, true, '0')
+    for (const person of [f.admin, f.member]) await policies.set({ kind: 'user', id: person.id }, true, '0')
+    const input = await f.admit(root)
+    await f.enter(root, input)
+    await f.call('desktop-confirm', { sessionId: root, desktop: 'display-0', confirmed: true }, f.admin)
+    const request = { sessionId: child, desktop: 'display-0', ownerSessionIds: [root] }
+    expect((await f.call('desktop-authorize', request)).status).toBe(403)
+    expect((await f.call('inherit', { sessionId: child, parentSessionId: root, inputs: [input.inputId], primaryActorUserId: f.admin.id })).status).toBe(200)
+    expect((await f.call('desktop-authorize', request)).status).toBe(200)
+    expect((await f.call('desktop-authorize', { sessionId: child, desktop: 'display-0' })).status).toBe(403)
+    expect((await f.call('desktop-authorize', { ...request, ownerSessionIds: [unrelated] })).status).toBe(403)
+    expect((await f.call('desktop-authorize', { ...request, ownerSessionIds: [root, child] })).status).toBe(400)
+    expect((await f.call('desktop-authorize', { ...request, ownerSessionIds: root })).status).toBe(400)
+    await f.enter(child, await f.admit(child, f.member))
+    expect((await f.call('desktop-authorize', request)).status).toBe(403)
+    expect((await f.call('desktop-confirm', { sessionId: root, desktop: 'display-0', confirmed: true }, f.member)).status).toBe(200)
+    expect((await f.call('desktop-authorize', request)).status).toBe(200)
+    await f.call('desktop-confirm', { sessionId: root, desktop: 'display-0', confirmed: false }, f.admin)
+    expect((await f.call('desktop-authorize', request)).status).toBe(403)
+  })
+
+  it('withdraws desktop confirmation immediately and never revives it after a qualification regrant', async () => {
+    const f = await fixture(), id = await f.session()
+    const policies = new DesktopAccess(f.context)
+    const user = { kind: 'user' as const, id: f.admin.id }, project = { kind: 'project' as const, id: f.project.id }
+    await policies.set(user, true, '0'); await policies.set(project, true, '0')
+    await f.enter(id, await f.admit(id))
+    const request = { sessionId: id, desktop: 'display-0' }
+    const confirm = () => f.call('desktop-confirm', { ...request, confirmed: true }, f.admin)
+    const authorize = () => f.call('desktop-authorize', request)
+    expect((await confirm()).status).toBe(200)
+    await policies.set(user, false, '1'); await policies.set(user, true, '2')
+    expect((await authorize()).status).toBe(403)
+    expect((await confirm()).status).toBe(200)
+    await policies.set(project, false, '1'); await policies.set(project, true, '2')
+    expect((await authorize()).status).toBe(403)
+    expect((await confirm()).status).toBe(200)
+    await f.accessMonitor.synchronize()
+    const invalidated = vi.fn(); cleanup.push(f.accessMonitor.subscribe(invalidated))
+    expect((await f.call('desktop-confirm', { ...request, confirmed: false }, f.admin)).status).toBe(200)
+    await f.accessMonitor.synchronize()
+    expect(invalidated).toHaveBeenCalledWith({ userId: f.admin.id })
+    expect((await authorize()).status).toBe(403)
+    await policies.set(user, false, '3')
+    expect((await confirm()).status).toBe(403)
+    expect((await f.call('desktop-confirm', { ...request, confirmed: false }, f.admin)).status).toBe(200)
+  })
 
   it('materializes an authorized header-only project flush before immutable registration', async () => {
     const f = await fixture(), id = randomUUID()

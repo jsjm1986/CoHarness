@@ -65,6 +65,8 @@ Unloading closes selection and review admission, migrates Gateway-managed Auto S
 
 No runtime invariant companion is published: this single effect owns selection admission, review enrollment, cancellation, and cleanup; it has no independent observation that can diverge from those owned operations.
 
+Each reviewer request carries its Session identity and `purpose: auto-review` for metering. Managed requests also carry the execution authority’s immutable input witnesses and one primary actor; these fields are internal accounting metadata, excluded from Provider request bodies and reviewer text. One request produces one usage record regardless of the number of participants.
+
 </details>
 
 -----
@@ -87,8 +89,6 @@ No runtime invariant companion is published: this single effect owns selection a
 #### What the model sees
 
 The reviewer uses the latest `request/header.config` provider and model with the shipped adapter's default reasoning. Its fixed `REVIEW_POLICY` replaces human approval for exactly one action: allow executes immediately with Full access. The other four sections contain only the retained facts described above. It returns one strict JSON text object with `risk` and `decision`; deny may include a string `reason`. Reasoning blocks may precede that single text block. Only `low + allow`, `medium + allow/deny`, and `high + deny` are valid.
-
-Each reviewer request carries its Session identity and `purpose: auto-review` for metering. Managed requests also carry the execution authority’s immutable input witnesses and one primary actor; these fields are internal accounting metadata, excluded from Provider request bodies and reviewer text. One request produces one usage record regardless of the number of participants.
 
 #### Token effect
 

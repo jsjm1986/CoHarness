@@ -9,7 +9,11 @@ kind: "package-library"
 
 `dsh-session-format` 是 provider 无关的 Session 持久化迁移接缝。它校验脱离原对象的 JSON header 和事件 artifact，编译完整的相邻迁移链，在读取事件体前完成 header 分类，并在 provider 决定发布新代次之前于内存中转换旧代次。它还为能够增量读取旧数据行的提供方提供可选的逐事件迁移流；整体 artifact 方法保留为兼容路径。
 
-`src/catalog-default.ts` 提供静态的 v0 → v1 → v2 → v3 → v4 → v5 链。第一方 provider 通过这条 catalog 提供发布版物理 codec 和事件归一化；provider 代码不得复制这条链或另行发明格式版本。
+发布链在 `@deepseek-ai/dsh-session-format-catalog` 中组装：物理 catalog 服务 JSONL 读取方，`sessionLogicalFormatCatalog` 服务存储已解码 header 和事件行的后端（SQLite、Gateway/PostgreSQL）。第一方 provider 通过该 catalog 提供发布版物理 codec 和事件归一化；provider 代码不得复制这条链或另行发明格式版本。
+
+## 概述
+
+`dsh-session-format` 让持久化代码可以直接还原当前会话，或在只消费一次物理行的同时组合唯一的相邻迁移序列。一次还原会让调用方拥有的已解析值流经有状态 Stage，不复制或冻结中间产物。物理分帧、压缩、不可变 generation 命名、排他发布和 Cordis 生命周期行为不属于本库。
 
 ## 概述
 
@@ -47,4 +51,4 @@ catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原�
 
 ## 已知限制与延期工作
 
-- v3 之前的步骤会归一化历史事件词汇（旧版消息载荷、`start`/`end` replace 键、turn 级 surface 事件），各 provider 仍独立负责物理 codec 和发布规则。
+- v3 之前的边会归一化历史事件词汇（旧版消息载荷、`start`/`end` replace 键），逻辑 catalog 额外把声明的 CoHarness v2 数据库方言（turn 级 surface 事件、header 携带的 prompt）归一化到发布版 v2→v3 stage 上。各 provider 仍独立负责物理 codec 和发布规则。

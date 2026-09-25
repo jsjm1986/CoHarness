@@ -7,6 +7,7 @@
  * @module @deepseek-ai/dsh-acp-snapshot/launcher
  */
 
+import { snapshotChildEnvironment } from '@deepseek-ai/dsh-session-snapshot'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
@@ -104,7 +105,7 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
     launch.args,
     {
       cwd,
-      env: { ...process.env, ...launch.env },
+      env: snapshotChildEnvironment(options.env?.DSH_SNAPSHOT, launch.env),
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   )

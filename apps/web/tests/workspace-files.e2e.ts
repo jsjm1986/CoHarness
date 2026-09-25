@@ -24,6 +24,8 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-files', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const CHANGED_EXPECTED = join(SNAPSHOT_DIR, 'changed.expected.md')
+const LINKED_LINE_EXPECTED = join(SNAPSHOT_DIR, 'linked-line.expected.md')
+const MARKDOWN_EXPECTED = join(SNAPSHOT_DIR, 'markdown.expected.md')
 const MODE = webSnapshotMode()
 const FILE_NAME = 'notes.txt'
 const FIRST_CONTENT = 'alpha line\n'
@@ -68,10 +70,17 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
       workbench: true,
       remoteAuthority: 'app.localhost',
     })
-    const seed = await readFile(SEED, 'utf8')
+    const linkedReply = 'DONE\n\n[Line twenty-four](links.txt#L24)\n\n[Line three](links.txt#L3)'
+    const seed = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', `"text":${JSON.stringify(linkedReply)}`)
     const workspaceDir = join(scaffold.workspaceCwd, 'workspace')
     await mkdir(workspaceDir, { recursive: true })
     await writeFile(join(workspaceDir, FILE_NAME), FIRST_CONTENT)
+    const linkedLines = Array.from({ length: 32 }, (_, index) => `Line ${String(index + 1)}`)
+    await writeFile(join(workspaceDir, 'links.txt'), linkedLines.join('\n'))
+    await writeFile(join(workspaceDir, 'guide.md'), '# Guide\n\nPacked **markdown** preview.\n')
+    await mkdir(join(workspaceDir, 'assets'), { recursive: true })
+    await writeFile(join(workspaceDir, 'assets/app.js'), 'document.body.dataset.packed = "yes"\n')
+    await writeFile(join(workspaceDir, 'page.html'), '<!doctype html><p>HTML body</p><script src="assets/app.js"></script>\n')
     const workspace = await scaffold.ctx.workspaceRegistry.create(workspaceDir)
     const sessionId = await seedSession(scaffold, seed, 'ws-files', undefined, workspaceDir)
     await workspace.attachSession(sessionId)
@@ -104,9 +113,52 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await browserDialog.waitFor({ timeout: 10_000 })
     await browserDialog.getByRole('treeitem', { name: FILE_NAME }).click()
 
-    const previewDialog = page.getByRole('dialog', { name: FILE_NAME })
+    const previewDialog = page.getByRole('region', { name: FILE_NAME, exact: true })
     const preview = previewDialog.locator('[data-workspace-file-preview]')
-    await expect.poll(() => preview.textContent(), { timeout: 15_000 }).toBe(FIRST_CONTENT)
+    await preview.waitFor({ timeout: 15_000 }).catch(async (error: unknown) => {
+      await saveFailureShot(page, 'web-e2e-workspace-files-open')
+      throw error
+    })
+    expect(await preview.textContent()).toBe(FIRST_CONTENT)
+
+    expect(await page.locator('[data-sidebar-right-panel]').count()).toBe(1)
+    expect(await page.getByRole('dialog', { name: FILE_NAME }).count()).toBe(0)
+
+    await page.getByRole('button', { name: 'Line twenty-four', exact: true }).click()
+    const linkedPreview = page.getByRole('region', { name: 'links.txt', exact: true }).locator('[data-workspace-file-preview]')
+    await expect.poll(() => linkedPreview.textContent()).toBe(linkedLines.slice(23).join('\n'))
+    const linkedSnapshot = await captureStableAria(page, 'section[aria-label="links.txt"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(LINKED_LINE_EXPECTED, linkedSnapshot, MODE)
+    const fileTabs = page.locator('[data-sidebar-right-panel]').getByRole('tab')
+    const tabCount = await fileTabs.count()
+    await page.getByRole('button', { name: 'Line three', exact: true }).click()
+    await expect.poll(() => linkedPreview.textContent()).toBe(linkedLines.slice(2).join('\n'))
+    expect(await fileTabs.count()).toBe(tabCount)
+    await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
+    await expect.poll(() => preview.textContent()).toBe(FIRST_CONTENT)
+
+    // Markdown renders through the accumulated authorized read; HTML packs its
+    // declared sibling assets through the same Session-scoped service into an
+    // opaque sandboxed frame.
+    await filesButton.click()
+    await browserDialog.getByRole('treeitem', { name: 'guide.md' }).click()
+    const markdownDialog = page.getByRole('region', { name: 'guide.md', exact: true })
+    await markdownDialog.locator('[data-workspace-markdown] h1').waitFor({ timeout: 15_000 })
+    expect(await markdownDialog.locator('[data-workspace-markdown] h1').textContent()).toBe('Guide')
+    const markdownSnapshot = await captureStableAria(page, 'section[aria-label="guide.md"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(MARKDOWN_EXPECTED, markdownSnapshot, MODE)
+
+    await filesButton.click()
+    await browserDialog.getByRole('treeitem', { name: 'page.html' }).click()
+    const htmlDialog = page.getByRole('region', { name: 'page.html', exact: true })
+    const htmlFrame = htmlDialog.locator('iframe[data-workspace-html-preview]')
+    await htmlFrame.waitFor({ timeout: 15_000 })
+    expect(await htmlFrame.getAttribute('sandbox')).toBe('allow-scripts')
+    const packedFrame = page.frameLocator('iframe[data-workspace-html-preview]')
+    await expect.poll(async () => packedFrame.locator('p').textContent(), { timeout: 15_000 }).toBe('HTML body')
+    await expect.poll(async () => packedFrame.locator('body').getAttribute('data-packed'), { timeout: 15_000 }).toBe('yes')
+    await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
+    await preview.waitFor({ timeout: 15_000 })
 
     // A present observation with a fresh version marks the open resource
     // changed; the page content stays until Reload.
@@ -116,7 +168,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await changedBadge.waitFor({ timeout: 15_000 })
     expect(await changedBadge.textContent()).toBe('This file changed. Reload to see its current content.')
     expect(await preview.textContent()).toBe(FIRST_CONTENT)
-    const changedSnapshot = await captureStableAria(page, `[role="dialog"][aria-label="${FILE_NAME}"]`, scaffold.workspaceCwd)
+    const changedSnapshot = await captureStableAria(page, `section[aria-label="${FILE_NAME}"]`, scaffold.workspaceCwd)
     await compareOrRefreshGolden(CHANGED_EXPECTED, changedSnapshot, MODE)
 
     await previewDialog.getByRole('button', { name: 'Reload' }).click()
@@ -131,8 +183,9 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await previewDialog.getByRole('button', { name: 'Reload' }).click()
     await previewDialog.locator('[role="alert"]').waitFor({ timeout: 15_000 })
 
+    expect(await page.locator('[data-slot-error]').count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['changed.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['changed.expected.md', 'linked-line.expected.md', 'markdown.expected.md'])
   }, 120_000)
 })

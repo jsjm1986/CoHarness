@@ -69,6 +69,40 @@ describe('loadConfig', () => {
       .toThrow(/HGW_GATEWAY_DIR must resolve inside/)
     expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_MODEL_GOVERNANCE_PACKAGE: '/tmp' }))
       .toThrow(/HGW_MODEL_GOVERNANCE_PACKAGE must resolve inside/)
+    expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_DESKTOP_DRIVER_PACKAGE: '/tmp' }))
+      .toThrow(/HGW_DESKTOP_DRIVER_PACKAGE must resolve inside/)
+  })
+
+  it('derives the managed desktop driver package and validates the identifier', () => {
+    const releaseRoot = realpathSync(resolve(import.meta.dirname, '../..'))
+
+    expect(loadConfig({}).desktopId).toBeUndefined()
+    expect(loadConfig({}).desktopDriverPackage)
+      .toMatch(/packages\/experimental\/computer-use-cua-driver-mcp$/)
+    expect(loadConfig({ HGW_RELEASE_ROOT: releaseRoot }).desktopDriverPackage)
+      .toBe(join(releaseRoot, 'packages/experimental/computer-use-cua-driver-mcp'))
+    expect(loadConfig({ HGW_DESKTOP_ID: 'display-0' }).desktopId).toBe('display-0')
+
+    expect(() => loadConfig({ HGW_DESKTOP_ID: '' })).toThrow(/HGW_DESKTOP_ID/)
+    expect(() => loadConfig({ HGW_DESKTOP_ID: ` ${'x'.repeat(257)}` })).toThrow(/HGW_DESKTOP_ID/)
+    expect(() => loadConfig({ HGW_DESKTOP_ID: 'seat\u0001one' })).toThrow(/HGW_DESKTOP_ID/)
+    expect(() => loadConfig({ HGW_DESKTOP_DRIVER_PACKAGE: 'relative/dir' }))
+      .toThrow(/HGW_DESKTOP_DRIVER_PACKAGE must be an absolute path/)
+  })
+
+  it('validates desktop driver process overrides', () => {
+    expect(() => loadConfig({ HGW_DESKTOP_DRIVER_COMMAND: '  ' })).toThrow(/HGW_DESKTOP_DRIVER_COMMAND/)
+    expect(() => loadConfig({ HGW_DESKTOP_DRIVER_ARGS: 'not-json' })).toThrow(/HGW_DESKTOP_DRIVER_ARGS/)
+    expect(() => loadConfig({ HGW_DESKTOP_DRIVER_ARGS: '{"a":1}' })).toThrow(/HGW_DESKTOP_DRIVER_ARGS/)
+    expect(() => loadConfig({ HGW_DESKTOP_DRIVER_ARGS: '["mcp",1]' })).toThrow(/HGW_DESKTOP_DRIVER_ARGS/)
+    expect(() => loadConfig({ HGW_DESKTOP_DRIVER_ARGS: '[""]' })).toThrow(/HGW_DESKTOP_DRIVER_ARGS/)
+
+    const cfg = loadConfig({
+      HGW_DESKTOP_DRIVER_COMMAND: '/opt/cua/bin/cua-driver',
+      HGW_DESKTOP_DRIVER_ARGS: '["mcp","--direct"]',
+    })
+    expect(cfg.desktopDriverCommand).toBe('/opt/cua/bin/cua-driver')
+    expect(cfg.desktopDriverArgs).toEqual(['mcp', '--direct'])
   })
 
   it('rejects a custom runtime command that can open a host-local browser', () => {

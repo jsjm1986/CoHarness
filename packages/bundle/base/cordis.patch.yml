@@ -266,6 +266,9 @@
     - id: skill-filesystem
       name: '@deepseek-ai/dsh-skill-filesystem'
 
+    - id: skill-office
+      name: '@deepseek-ai/dsh-skill-office'
+
     - id: skill-badge
       name: '@deepseek-ai/dsh-skill-badge'
       disabled: true
@@ -455,6 +458,9 @@
       config:
         fetch: true
         searchTimeoutMs: 60000
+
+    - id: present
+      name: '@deepseek-ai/dsh-tool-present'
 
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'

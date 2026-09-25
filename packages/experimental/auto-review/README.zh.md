@@ -65,6 +65,8 @@ Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定
 
 本包不发布 runtime invariant companion：同一个 effect 拥有选择准入、review 登记、取消与清理，不存在能与这些自有操作相互偏离的独立观察。
 
+每次 reviewer 请求携带 Session 身份与 `purpose: auto-review` 用于计量。受管请求还携带执行权威确认的不可变输入见证和一位主要发起人；这些字段是内部账务元数据，不进入 Provider 请求正文或 reviewer 文本。无论参与人数量多少，一次请求只生成一条用量记录。
+
 </details>
 
 -----
@@ -87,8 +89,6 @@ Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定
 #### 模型看到什么
 
 Reviewer 使用最新 `request/header.config` 的 provider 与模型，并沿用 shipped adapter 默认 reasoning。固定 `REVIEW_POLICY` 替代恰好一个动作的人工审批：allow 后立即以 Full access 执行。其余四个分区只包含上文列出的保留事实。响应为一个严格 JSON text 对象，包含 `risk` 与 `decision`；deny 可附字符串 `reason`。Reasoning blocks 可以位于这唯一 text block 之前。只有 `low + allow`、`medium + allow/deny` 和 `high + deny` 合法。
-
-每次 reviewer 请求携带 Session 身份与 `purpose: auto-review` 用于计量。受管请求还携带执行权威确认的不可变输入见证和一位主要发起人；这些字段是内部账务元数据，不进入 Provider 请求正文或 reviewer 文本。无论参与人数量多少，一次请求只生成一条用量记录。
 
 #### Token 影响
 

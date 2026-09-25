@@ -1,9 +1,5 @@
-// Real-host smoke: spawn `dsh web` with a real key, walk the full flow
-// list in a real chromium, screenshot every screen into .artifacts/ for the
-// figma comparison pass. Self-skips without DEEPSEEK_API_KEY (repo e2e
-// convention); vitest.web.config.ts loads the repo-root .env before this file
-// runs (the CLI only auto-loads .env from its cwd — a temp dir here, so
-// sessions never land in the repo's .sessions).
+// Keyless CLI checks always run; the real-provider browser flow requires test:web:live.
+// The explicit live entry loads credentials before this file and fails on missing build inputs.
 //
 // Selector convention: CSS Modules hash as [hash]_[local], so class-substring
 // selectors are unreliable — anchor on data-* attributes (data-variant /
@@ -25,7 +21,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { REPO_ROOT, connectFreshWorkspace, newEnglishPage, probeFreePort, requireDist, saveFailureShot } from './support.ts'
+import { REPO_ROOT, connectFreshWorkspace, newEnglishPage, requireDist, saveFailureShot } from './support.ts'
+import { webLiveRequested } from './web-live.ts'
 
 /** One text-bearing content block of an Anthropic Messages request. */
 interface MessagesContentBlock {
@@ -193,7 +190,8 @@ const notReady = UI_PLUGIN_DIRS.filter((dir) => {
   const bundle = join(REPO_ROOT, 'packages/client', dir, 'lib/client.js')
   return !existsSync(bundle) || !readFileSync(bundle, 'utf8').includes('exports.apply')
 })
-if (notReady.length > 0) console.warn(`[smoke-real] skipped — client bundles not ready: ${notReady.join(', ')}`)
+const live = webLiveRequested()
+if (live && notReady.length > 0) throw new Error(`live Web client bundles not ready: ${notReady.join(', ')}`)
 
 describe('dsh web keyless CLI smoke', () => {
   it('listens on 127.0.0.1 by default', async () => {
@@ -477,7 +475,7 @@ describe('dsh web keyless CLI smoke', () => {
   })
 })
 
-describe.skipIf(!process.env.DEEPSEEK_API_KEY || notReady.length > 0)('web smoke (real host, real key)', () => {
+describe.skipIf(!live)('web smoke (real host, real key)', () => {
   let child: ChildProcess
   let sessionsDir: string
   let baseUrl: string
@@ -488,7 +486,6 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || notReady.length > 0)('web smoke
   beforeAll(async () => {
     requireDist()
     sessionsDir = mkdtempSync(join(tmpdir(), 'dsh-web-w5-'))
-    const port = await probeFreePort()
     // tsx boot mirrors the runtime half of the root dsh script. Isolate
     // the host-level Harness and shared-agent homes inside the temp world; tsx
     // also needs the repo's loader and tsconfig paths pointed at explicitly.
@@ -503,7 +500,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || notReady.length > 0)('web smoke
         // the native OS chooser on this bind, and no page can drive that.
         '--patch', fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
         '--no-open',
-        '--port', String(port),
+        '--port', '0',
       ],
       {
         cwd: sessionsDir,
@@ -529,7 +526,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || notReady.length > 0)('web smoke
       const gone = new Promise<void>(resolveExit => child.once('exit', () => { resolveExit() }))
       child.kill('SIGTERM')
       await Promise.race([gone, new Promise(r => setTimeout(r, 10_000).unref())])
-      if (child.exitCode === null) child.kill('SIGKILL')
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      await gone
     }
     if (sessionsDir !== undefined) rmSync(sessionsDir, { recursive: true, force: true })
   })

@@ -1,5 +1,6 @@
 /** Source-launched PostgreSQL/HTTP fixture for root Loader integration tests. @module */
 import { resolve } from 'node:path'
+import { TerminalAccess } from '../src/terminal-access.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
@@ -24,6 +25,11 @@ process.on('message', (message: unknown) => {
       const parent = 'parentSessionId' in message ? message.parentSessionId : undefined
       if (parent !== undefined && typeof parent !== 'string') throw new Error('invalid fixture parent Session')
       value = await fixture.session(fixture.project, parent)
+    } else if (message.action === 'terminal-enable') {
+      const policies = new TerminalAccess(fixture.context)
+      await policies.set({ kind: 'project', id: fixture.project.id }, true, '0')
+      for (const user of [fixture.admin, fixture.member]) await policies.set({ kind: 'user', id: user.id }, true, '0')
+      await fixture.accessMonitor.synchronize()
     } else if (message.action === 'revoke') {
       await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [fixture.project.uuid, fixture.member.uuid])
       await fixture.accessMonitor.synchronize()
@@ -40,6 +46,8 @@ process.send({ ready: true,
     runtime: { kind: 'project', id: fixture.project.id, generation: fixture.project.generation },
     token: fixture.project.token, principalPublicKey: fixture.publicKey },
   admin: fixture.admin.id, member: fixture.member.id,
-  principals: { admin: fixture.headers(fixture.project, fixture.admin)[PRINCIPAL_HEADER],
+  principals: { terminalAdmin: fixture.principals.issue({ user: fixture.admin, runtime: { kind: 'project', id: fixture.project.id, generation: fixture.project.generation }, purpose: 'terminal-admin',
+      scope: { kind: 'project', projectId: fixture.project.id, projectName: 'fixture', mode: 'ro' } }),
+    admin: fixture.headers(fixture.project, fixture.admin)[PRINCIPAL_HEADER],
     member: fixture.headers(fixture.project, fixture.member)[PRINCIPAL_HEADER] },
 })

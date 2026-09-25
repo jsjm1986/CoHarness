@@ -74,6 +74,7 @@
     "@deepseek-ai/dsh-client-ui-settings-models": "workspace:^",
     "@deepseek-ai/dsh-client-ui-settings-plugin-inventory": "workspace:^",
     "@deepseek-ai/dsh-client-ui-settings-plugins": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-settings-unarchive-sessions": "workspace:^",
     "@deepseek-ai/dsh-client-ui-sidebar": "workspace:^",
     "@deepseek-ai/dsh-client-ui-skill": "workspace:^",
     "@deepseek-ai/dsh-client-ui-reference": "workspace:^",
@@ -117,7 +118,13 @@
     "@deepseek-ai/dsh-workspace": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "commander": "^15.0.0",
-    "open": "^11.0.0"
+    "open": "^11.0.0",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-sidebar-browser": "workspace:^",
+    "@deepseek-ai/dsh-workspace-changes": "workspace:^",
+    "@deepseek-ai/dsh-office-to-pdf": "workspace:^",
+    "@deepseek-ai/dsh-api-terminal-controller": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-sidebar-terminal": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",

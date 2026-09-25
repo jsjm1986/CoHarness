@@ -6,6 +6,8 @@
  * @module @deepseek-ai/dsh-subagent-codex
  */
 
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -13,10 +15,13 @@ import {
   assertPositiveFinite,
   NO_START_CAPABILITIES,
   resolveChildCwd,
+  type ContinuableCreateRequest,
+  type ContinuableCreateSpec,
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
   type SubagentProvider,
 } from '@deepseek-ai/dsh-subagent'
+import { ExternalBindingStore, externalMemberIdentity } from '@deepseek-ai/dsh-subagent/external'
 import {
   CODEX_PERMISSION_MODES,
   DEFAULT_CODEX_PERMISSION_MODE,
@@ -26,6 +31,13 @@ import {
   type CodexPermissionMode,
   type CodexRunSpec,
 } from './run.ts'
+import {
+  CODEX_MEMBER_MODEL,
+  CODEX_MEMBER_ROUTE,
+  CodexMemberAdapter,
+  CodexMemberTransport,
+  type CodexMemberConfig,
+} from './member.ts'
 
 export const name = 'subagent-codex'
 export const inject = ['subagents', 'subprocess']
@@ -47,6 +59,17 @@ export interface Config {
   permissionMode?: CodexPermissionMode
   /** Grace in milliseconds between app-server managed-range termination tiers. */
   disposeGraceMs?: number
+  /**
+   * Directory holding the instance-specific member binding store (default `codex.jsonl`),
+   * which maps each durable child session to its Codex thread id and pending
+   * prompt. Required only for continuable members; defaults under `~/.dsh`.
+   */
+  stateDir?: string
+  /**
+   * Workspace for persistent member sessions. Member turns have no parent
+   * Agent to inherit one from; defaults to the harness launch directory.
+   */
+  memberCwd?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -56,19 +79,36 @@ export const Config: z<Config> = z.object({
   permissionMode: z.union([...CODEX_PERMISSION_MODES])
     .default(DEFAULT_CODEX_PERMISSION_MODE),
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
+  stateDir: z.string().min(1),
+  memberCwd: z.string().min(1),
 })
 
-type ResolvedConfig = Omit<Required<Config>, 'model'> & Pick<Config, 'model'>
+type ResolvedConfig = Omit<Required<Config>, 'model' | 'stateDir' | 'memberCwd'>
+  & Pick<Config, 'model' | 'stateDir' | 'memberCwd'>
 
 class CodexProvider implements SubagentProvider {
   readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
   readonly inheritsParentContext = false
+  readonly agentRouteDefaults?: Readonly<{ provider: string; model: string }>
 
   constructor(
     readonly name: string,
     private readonly ctx: Context,
     private readonly config: ResolvedConfig,
-  ) {}
+    memberRoute: string | undefined,
+  ) {
+    if (memberRoute !== undefined) {
+      this.agentRouteDefaults = {
+        provider: memberRoute,
+        model: config.model ?? CODEX_MEMBER_MODEL,
+      }
+      this.prepareContinuable = (_request: ContinuableCreateRequest) => Promise.resolve({})
+    }
+  }
+
+  declare prepareContinuable?: (
+    request: ContinuableCreateRequest,
+  ) => Promise<ContinuableCreateSpec>
 
   start(request: ResolvedSubagentStartRequest) {
     const parentCwd = request.parent.session.header.cwd
@@ -121,6 +161,8 @@ export function apply(ctx: Context, config: Config): void {
     env: config.env as Record<string, string>,
     permissionMode: config.permissionMode ?? DEFAULT_CODEX_PERMISSION_MODE,
     disposeGraceMs: config.disposeGraceMs as number,
+    ...config.stateDir === undefined ? {} : { stateDir: config.stateDir },
+    ...config.memberCwd === undefined ? {} : { memberCwd: config.memberCwd },
   }
   assertPositiveFinite(
     'subagent-codex',
@@ -132,9 +174,40 @@ export function apply(ctx: Context, config: Config): void {
       `subagent-codex: disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`,
     )
   }
+  // Persistent members need the `llm` service to resolve their model route.
+  // When no LLM capability is mounted the provider stays one-shot only:
+  // without `prepareContinuable` the service rejects continuable starts.
+  const llm = ctx.get('llm')
+  const identity = externalMemberIdentity(resolved.providerName, DEFAULT_PROVIDER_NAME, CODEX_MEMBER_ROUTE)
+  let memberRoute: string | undefined
+  if (llm !== undefined) {
+    const memberConfig: CodexMemberConfig = {
+      cwd: resolved.memberCwd ?? process.cwd(),
+      ...resolved.model === undefined ? {} : { model: resolved.model },
+      permissionMode: resolved.permissionMode,
+      env: resolved.env,
+      disposeGraceMs: resolved.disposeGraceMs,
+    }
+    const store = new ExternalBindingStore(
+      join(resolved.stateDir ?? join(homedir(), '.dsh', 'external-members'), identity.filename),
+    )
+    const transport = new CodexMemberTransport(
+      memberConfig,
+      spec => ctx.subprocess.spawn(spec),
+    )
+    ctx.effect(() => {
+      const registration = llm.registerAdapter(
+        [identity.route],
+        new CodexMemberAdapter(transport, store),
+      )
+      return () => { registration() }
+    })
+    memberRoute = identity.route
+  }
   ctx.subagents.registerProvider(new CodexProvider(
     resolved.providerName,
     ctx,
     resolved,
+    memberRoute,
   ))
 }

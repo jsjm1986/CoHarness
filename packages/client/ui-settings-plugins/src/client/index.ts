@@ -4,7 +4,7 @@
  *
  * The section declares `settings.plugins.tab`; its own `configurable` tab then
  * declares `settings.plugin.item` and renders whatever cards were registered
- * into it. The three cards this package ships are the host-plane sections the
+ * into it. The cards this package ships are the host-plane sections the
  * deployment already exposes; each binds its namespace through the client
  * settings scope, which keeps them unaware of one another and of other tabs.
  */
@@ -26,6 +26,10 @@ import { ConfigurablePluginsTab } from './ConfigurablePluginsTab.tsx'
 import { PluginsSettingsSection } from './PluginsSettingsSection.tsx'
 import type { PluginsSettingsSectionInjected, PluginsSettingsTabEntry } from './PluginsSettingsSection.tsx'
 import { WebSearchCard } from './WebSearchCard.tsx'
+import { SubagentModelSelectionCard } from './SubagentModelSelectionCard.tsx'
+import { SUBAGENT_MODEL_SELECTION_NS, SubagentModelSelectionCardController } from './subagent-model-selection-card-controller.ts'
+import { SubagentLimitsCard } from './SubagentLimitsCard.tsx'
+import { SubagentLimitsCardController } from './subagent-limits-card-controller.ts'
 import { AGENT_LOOP_NS, AgentLoopCardController } from './agent-loop-card-controller.ts'
 import { SHELL_NS, BashCardController } from './bash-card-controller.ts'
 import { ConfigurablePluginsTabController } from './tab-store.ts'
@@ -62,6 +66,9 @@ export function apply(ctx: ClientContext): void {
 
   const bash = new BashCardController(ctx.settingsScope.bind({ namespace: SHELL_NS }))
   const agentLoop = new AgentLoopCardController(ctx.settingsScope.bind({ namespace: AGENT_LOOP_NS }))
+  const subagent = new SubagentLimitsCardController(ctx.settingsScope.bind({ namespace: 'subagent' }))
+  const subagentModels = new SubagentModelSelectionCardController(
+    ctx.settingsScope.bind({ namespace: SUBAGENT_MODEL_SELECTION_NS }), api)
   const webSearch = new WebSearchCardController(ctx.settingsScope.bind({ namespace: WEB_SEARCH_NS }), api)
 
   // The credential a card reports is not part of any settings section, so its
@@ -71,6 +78,14 @@ export function apply(ctx: ClientContext): void {
     () => ctx.remote.$on('credentials/reference-updated', (ref) => { webSearch.refreshCredential(ref) }),
     'ui-settings-plugins: credential invalidations',
   )
+
+  ctx.effect(() => ctx.remote.$on('llm/adapters-updated', () => { subagentModels.refreshCatalog() }),
+    'ui-settings-plugins: subagent model catalog')
+  ctx.effect(() => ctx.remote.$on('settings/document-updated', () => { subagentModels.refreshCatalog() }),
+    'ui-settings-plugins: subagent model settings')
+  ctx.effect(() => ctx.on('connection/reset', () => { subagentModels.resetConnection() }),
+    'ui-settings-plugins: subagent model connection')
+  ctx.effect(() => () => { subagentModels.dispose() }, 'ui-settings-plugins: subagent model form')
 
   // Which namespaces the Host serves comes from the shared describe mirror,
   // whose owning plugin already refreshes it on document commits and
@@ -132,7 +147,7 @@ export function apply(ctx: ClientContext): void {
   }, PluginsSettingsSection))
 
   // The existing configuration page is one ordinary tab. It keeps ownership
-  // of the card slot and the three shipped card contributions below.
+  // of the card slot and the shipped card contributions below.
   ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
     name: 'settings.plugins.tab',
     id: 'configurable',
@@ -156,6 +171,18 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       inject: () => agentLoop.inject(),
     }, AgentLoopCard)
+    yield ctx.slots.register({
+      name: 'settings.plugin.item',
+      key: 'subagent',
+      locale: NS,
+      inject: () => subagent.inject(),
+    }, SubagentLimitsCard)
+    yield ctx.slots.register({
+      name: 'settings.plugin.item',
+      key: SUBAGENT_MODEL_SELECTION_NS,
+      locale: NS,
+      inject: () => subagentModels.inject(),
+    }, SubagentModelSelectionCard)
     yield ctx.slots.register({
       name: 'settings.plugin.item',
       key: WEB_SEARCH_NS,

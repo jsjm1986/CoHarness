@@ -32,7 +32,7 @@ export function gatewayPluginManagementAuthorization(
       signal.throwIfAborted()
       const principal = runtime.current()
       if (principal === undefined || principal.claims.user.role !== 'admin'
-        || principal.claims.purpose !== undefined || principal.claims.expiresAt <= Date.now()) {
+        || (principal.claims.purpose !== undefined && principal.claims.purpose !== 'plugin-admin') || principal.claims.expiresAt <= Date.now()) {
         throw new RemoteError('plugin-management/forbidden', 'Profile management requires an authenticated administrator.', {})
       }
       const response = await runtime.request('/internal/runtime/plugin-management/authorize', {

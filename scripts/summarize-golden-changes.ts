@@ -10,7 +10,7 @@ import { scanGoldenOwners } from './web-test-policy.ts'
  * @returns changed expected outputs and recorded replay inputs.
  */
 export function changedGoldenPaths(paths: readonly string[]): string[] {
-  return paths.filter(path => path.startsWith('snapshots/') || path.includes('/snapshots/') || /\.expected\.(?:md|json|txt|html)$/.test(path))
+  return paths.filter(path => path.startsWith('snapshots/') || path.includes('/snapshots/') || /\.expected\.(?:md|jsonl?|txt|html)$/.test(path))
 }
 
 if (import.meta.main) {

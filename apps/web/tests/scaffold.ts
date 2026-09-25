@@ -13,8 +13,9 @@
 //
 // Composition divergences from `dsh web`, all deliberate, all via include
 // patches after the shipped bundle layers, over the SAME tree (never a
-// second yml): temp persistenceRoot; host-level skill roots confined to the
-// temp workspace while project skill discovery remains real; agent-instructions
+// second yml): private Session/document storage outside the workspace;
+// host-level skill roots confined to the temp workspace while project skill
+// discovery remains real; agent-instructions
 // disabled (recorded fixtures must not embed this repo's AGENTS.md);
 // session-title-llm disabled (its fire-and-forget title call would race the
 // loop for the session's replay cursor); webserver pinned to port 0 with the
@@ -23,9 +24,10 @@
 // (the plugin-row path discards the ReplayHandle; the direct install keeps
 // assertConsumed for the teardown fixture-consumption check).
 import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Page } from 'playwright'
 import { expect } from 'vitest'
@@ -34,6 +36,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
 import { scrubRequestHeaders, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-acp-snapshot'
+import { assertSessionFixtureVersion, parseSessionFixtureName, parseSnapshotManifest, redactSessionSnapshotIds, sessionFixtureFiles, sessionFixtureName } from '@deepseek-ai/dsh-session-snapshot'
 import {
   auditStartupEntries,
   composeEntries,
@@ -63,19 +66,9 @@ import type {} from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { REPO_ROOT, requireDist } from './support.ts'
 
-/** Snapshot mode for the lane, from $DSH_SNAPSHOT (same vocabulary as the other snapshot suites). */
-export type WebSnapshotMode = 'replay' | 'record' | 'refresh'
-
-/**
- * Resolve and validate the lane's snapshot mode.
- * @returns the active mode; unset/empty selects replay.
- */
-export function webSnapshotMode(): WebSnapshotMode {
-  const value = process.env.DSH_SNAPSHOT
-  if (value === undefined || value === '' || value === 'replay') return 'replay'
-  if (value === 'record' || value === 'refresh') return value
-  throw new Error(`DSH_SNAPSHOT must be replay, record, or refresh; got ${JSON.stringify(value)}`)
-}
+import { webSnapshotMode, type WebSnapshotMode } from './golden.ts'
+import { normalizeAria } from './aria-normalize.ts'
+export { webSnapshotMode, compareOrRefreshGolden } from './golden.ts'
 
 /** The shipped composition under test: the dsh-base and dsh-web-app bundle patches over the empty profile root. */
 const BASE_PATCH_PATH = join(REPO_ROOT, 'packages/bundle/base/cordis.patch.yml')
@@ -293,12 +286,12 @@ export interface LaunchOptions {
   harnessHome?: string
 }
 
-/** Dispose the booted tree and remove both owned temp roots, reporting every independent cleanup failure. */
-async function cleanupScaffoldWorld(ctx: Context, workspaceCwd: string, persistenceRoot: string): Promise<unknown[]> {
+/** Dispose the booted tree and remove its workspace and private storage, reporting every cleanup failure. */
+async function cleanupScaffoldWorld(ctx: Context, workspaceCwd: string, storageRoot: string): Promise<unknown[]> {
   const failures: unknown[] = []
   await Promise.resolve(ctx.fiber.dispose()).catch((error: unknown) => failures.push(error))
   await rm(workspaceCwd, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
-  await rm(persistenceRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+  await rm(storageRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
   return failures
 }
 
@@ -366,9 +359,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     }
   }
   Object.assign(process.env, skillRootEnvironment)
-  let persistenceRoot: string
+  let storageRoot: string
   try {
-    persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-sessions-'))
+    storageRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-storage-'))
   } catch (error) {
     const failures: unknown[] = [error]
     await rm(workspaceCwd, { recursive: true, force: true }).catch((cleanupError: unknown) => failures.push(cleanupError))
@@ -376,6 +369,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     if (failures.length > 1) throw new AggregateError(failures, 'web scaffold temp-root setup failed')
     throw error
   }
+  const persistenceRoot = join(storageRoot, 'sessions')
+  const documentRoot = join(storageRoot, 'documents')
   if (maskDeepSeekCredential) Reflect.deleteProperty(process.env, 'DEEPSEEK_API_KEY')
 
   // The include patch set — the same layer stack the profile boot composes
@@ -417,6 +412,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     },
     { id: 'session-persistence-jsonl', config: { root: persistenceRoot } },
+    // An explicit document root also disables implicit ~/uploads migration.
+    // The real store still warms, locks, sweeps and drains inside this world.
+    { id: 'userdoc-local', config: { uploadRoot: documentRoot } },
     // Content search is enabled here although the shipped bundles default it
     // off (`openAt: never`, pinned by apps/cli/tests/lazy-search-startup):
     // the seeded-session scenarios navigate by content search, and these e2e
@@ -652,7 +650,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     }
   } catch (error) {
     if (process.cwd() !== originalCwd) process.chdir(originalCwd)
-    const cleanupFailures = await cleanupScaffoldWorld(ctx, workspaceCwd, persistenceRoot)
+    const cleanupFailures = await cleanupScaffoldWorld(ctx, workspaceCwd, storageRoot)
     restoreCredentialEnvironment()
     restoreSkillRootEnvironment()
     if (cleanupFailures.length > 0) {
@@ -702,7 +700,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         }
       }
       try {
-        failures.push(...await cleanupScaffoldWorld(ctx, workspaceCwd, persistenceRoot))
+        failures.push(...await cleanupScaffoldWorld(ctx, workspaceCwd, storageRoot))
       } finally {
         restoreCredentialEnvironment()
         restoreSkillRootEnvironment()
@@ -757,7 +755,19 @@ export async function recordFixture(scaffold: WebScaffold, sessionId: SessionId,
   const existing = existsSync(fixturePath) ? await readFile(fixturePath, 'utf8') : ''
   const stable = stabilizeFixtureMessageIds([fresh], [existing])[0]
   if (stable === undefined) throw new Error('record harvest: no stabilized fixture')
-  await writeFile(fixturePath, stable)
+  const manifestPath = join(dirname(fixturePath), 'snapshot.yml')
+  if (existsSync(manifestPath)) {
+    const manifest = parseSnapshotManifest(await readFile(manifestPath, 'utf8'), manifestPath)
+    if (manifest.session !== undefined || manifest.sessionFormat !== undefined) {
+      throw new Error(`${fixturePath}: borrowers and historical inputs cannot be recorded`)
+    }
+    const role = parseSessionFixtureName(basename(fixturePath))
+    if (role === undefined) throw new Error(`${fixturePath}: manifest owner requires a canonical Session filename`)
+    const target = join(dirname(fixturePath), sessionFixtureName(role.index, agent.session.header.version))
+    await writeFile(target, redactSessionSnapshotIds([stable])[0] as string)
+  } else {
+    await writeFile(fixturePath, stable)
+  }
 }
 
 /**
@@ -820,14 +830,47 @@ export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
  * @param id - the session id the seed is realized for.
  * @returns the realized fixture text.
  */
-export function realizeSeedFixture(scaffold: WebScaffold, fixtureText: string, id: string): string {
-  const realized = fixtureText
-    .split('{{sessionId}}').join(id)
-    .split('{{cwd}}').join(scaffold.workspaceCwd)
-  const fixtureCwd = (JSON.parse(realized.split('\n', 1)[0]!) as { cwd?: string }).cwd
-  return fixtureCwd === undefined
-    ? realized
-    : realized.split(fixtureCwd).join(scaffold.workspaceCwd)
+export function realizeSeedFixture(scaffold: Pick<WebScaffold, 'workspaceCwd' | 'harnessHome'>, fixtureText: string, id: string): string {
+  const first = fixtureText.split(/\r?\n/).find(line => line.trim().length > 0)
+  const fixtureCwd = first === undefined ? undefined : (JSON.parse(first) as { cwd?: unknown }).cwd
+  const realize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(realize)
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, realize(item)]))
+    }
+    if (typeof value !== 'string') return value
+    const normalized = typeof fixtureCwd === 'string' && fixtureCwd.length > 0
+      ? value.split(fixtureCwd).join(scaffold.workspaceCwd) : value
+    return normalized
+      .split('{{sessionId}}').join(id)
+      .replace(/\{\{session:([1-9]\d*)\}\}/g, (_token, ordinal: string) =>
+        ordinal === '1' ? id : `${id}-child-${ordinal}`)
+      .replace(/\{\{(message|approval|workflow|command|rpc|retry|principal|project|runtime|target|resource|id):([1-9]\d*)\}\}/g,
+        (_token, kind: string, ordinal: string) => {
+          const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
+          hex[12] = '4'
+          hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string
+          return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`
+        })
+      .split('{{harnessHome}}').join(scaffold.harnessHome)
+      .split('{{cwd}}').join(scaffold.workspaceCwd)
+  }
+  return fixtureText.split(/\r?\n/).map(line => line.trim() === '' ? line : JSON.stringify(realize(JSON.parse(line)))).join('\n')
+}
+
+/**
+ * Resolve a recorded role to its highest committed generation without modifying any input.
+ * @param path - Any canonical parent or child generation path.
+ * @returns Validated highest-generation path, or the original noncanonical fixture path.
+ */
+export async function selectedSessionFixture(path: string): Promise<string> {
+  const requested = parseSessionFixtureName(basename(path))
+  if (requested === undefined) return path
+  const selected = sessionFixtureFiles(await readdir(dirname(path))).find(file => file.index === requested.index)
+  if (selected === undefined) throw new Error(`${path}: missing Session fixture role ${requested.index}`)
+  const target = join(dirname(path), selected.name)
+  assertSessionFixtureVersion(selected.name, await readFile(target, 'utf8'))
+  return target
 }
 
 export async function seedSession(
@@ -943,51 +986,6 @@ async function persistSeedSession(
 }
 
 /**
- * Normalize an aria snapshot: uuid, cwd, workspace-basename, duration,
- * decode-throughput, and path-sensitive compaction estimates collapse to
- * stable tokens.
- *
- * Throughput needs a token for the same reason durations do, and no fixture
- * can supply one: the figure divides a replayed step's output tokens by the
- * wall time the local run took to stream them, so it moves between two runs
- * on one machine (measured 69 → 70 tok/s) and swings wildly on a fast replay
- * (26333 tok/s for a 3 ms stream).
- */
-function normalizeAria(snapshot: string, workspaceCwd: string): string {
-  // The session heading renders the workspace's basename, not the full
-  // path, so both spellings must collapse to the token.
-  const base = workspaceCwd.split('/').pop()!
-  return snapshot
-    .split(workspaceCwd).join('{{cwd}}')
-    .split(base).join('{{workspace}}')
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{{uuid}}')
-    // The optional space in `\d+m ?\d+s` covers both minute spellings: the
-    // stats line's compact `2m42s` and the message-chrome template's `2m 42s`.
-    .replace(
-      /~\d+(?:y(?: \d+mo)?|mo(?: \d+d)?)|\b(?:\d+d(?: \d+h(?: \d+m \d+s)?)?|\d+h \d+m \d+s|\d+m ?\d+s|\d+(?:\.\d+)?s|\d+(?:\.\d+)?ms)\b/g,
-      duration => duration.startsWith('~') ? duration : '{{duration}}',
-    )
-    // Trajectory timing tooltips spell milliseconds with a space and digit
-    // grouping (`Total 1,542 ms`); the figure is replay wall time.
-    .replace(/\b\d[\d,]*(?:\.\d+)? ms\b/g, '{{duration}}')
-    .replace(
-      /约\d+(?:年(?:\d+个月)?|个月(?:\d+天)?)|\d+(?:天(?:\d+小时(?:\d+分\d+秒)?)?|小时\d+分\d+秒|分\d+秒|(?:\.\d+)?秒)/g,
-      duration => duration.startsWith('约') ? duration : '{{duration}}',
-    )
-    .replace(/\d+(?:\.\d+)?(?= tok\/s(?!\w))/g, '{{throughput}}')
-    // Seeded compaction prices realized file paths, whose length differs
-    // between local worktrees and CI scratch directories.
-    .replace(/(Compacted \d+ history items \(~)\d+( tokens\))/g, '$1{{tokens}}$2')
-    // Session summaries and Message IconActions clocks cross calendar
-    // boundaries; collapse every shape so goldens stay stable across them.
-    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '{{timestamp}}')
-    .replace(/\d{4}年\d{1,2}月\d{1,2}日 \d{2}:\d{2}/g, '{{clock}}')
-    .replace(/\d{1,2}月\d{1,2}日 \d{2}:\d{2}/g, '{{clock}}')
-    .replace(/(?<!\d)\d{1,2}:\d{2}:\d{2}(?:\.\d+)?(?:\s*[AP]M)?(?!\d)/gi, '{{clock}}')
-    .replace(/(?<!\d)\d{2}:\d{2}(?!\d)/g, '{{clock}}')
-}
-
-/**
  * Capture the region's aria snapshot at a settled milestone: poll until two
  * consecutive normalized captures are equal — a single-shot capture races the
  * last React commits.
@@ -1080,29 +1078,9 @@ async function toggleTurnProcesses(page: Page, expanded: 'true' | 'false', timeo
 }
 
 /**
- * Compare a normalized golden, or rewrite it under refresh. Refresh is the
- * ONLY writer: a missing golden in replay mode fails with the healing command
- * instead of silently self-bootstrapping.
- * @param goldenPath - the committed ui.expected.md path.
- * @param actual - the stable normalized snapshot.
- * @param mode - the active snapshot mode.
- */
-export async function compareOrRefreshGolden(goldenPath: string, actual: string, mode: WebSnapshotMode): Promise<void> {
-  const payload = `${actual}\n`
-  if (mode === 'refresh') {
-    await writeFile(goldenPath, payload)
-    return
-  }
-  if (!existsSync(goldenPath)) {
-    throw new Error(`missing golden ${goldenPath} — run DSH_SNAPSHOT=refresh pnpm run test:web to generate it`)
-  }
-  expect(payload).toBe(await readFile(goldenPath, 'utf8'))
-}
-
-/**
  * Fixture-inventory guard: the scenario directory holds exactly the expected
  * files and every committed JSONL is a scrub fixed-point without a run-local
- * browser RPC id.
+ * browser RPC id. Legacy single-request and indexed identity tokens are valid.
  * @param dir - the scenario snapshot directory.
  * @param expected - the exact expected file inventory.
  */
@@ -1113,7 +1091,7 @@ export async function assertFixtureInventory(dir: string, expected: string[]): P
     const content = await readFile(join(dir, entry), 'utf8')
     expect(scrubRequestHeaders(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
     expect(content, `${dir}/${entry} carries a run-local rpcId`)
-      .not.toMatch(/"rpcId":"(?!\{\{rpcId\}\})[^"]+"/)
+      .not.toMatch(/"rpcId"\s*:\s*"(?!(?:\{\{rpcId\}\}|\{\{rpc:[1-9]\d*\}\})")[^"]*"/)
   }
 }
 

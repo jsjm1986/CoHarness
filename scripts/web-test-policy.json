@@ -23,6 +23,7 @@
     "chat-long-interactions.e2e.ts": "conversation",
     "chat-scroll-contract.e2e.ts": "conversation",
     "chat-sender-attribution.e2e.ts": "conversation",
+    "client-plugin-live.e2e.ts": "lifecycle",
     "cold-blank-session.e2e.ts": "lifecycle",
     "cold-inbox.snapshot.ts": "lifecycle",
     "command-image-envelope.snapshot.ts": "conversation",
@@ -34,6 +35,7 @@
     "cordis-tool-round.e2e.ts": "conversation",
     "declared-reasoning.e2e.ts": "conversation",
     "default-model.e2e.ts": "settings",
+    "default-product-isolation.e2e.ts": "shell",
     "details-session-lifecycle.e2e.ts": "lifecycle",
     "diff-context.e2e.ts": "conversation",
     "document-manager.e2e.ts": "documents",
@@ -85,6 +87,7 @@
     "settings-chrome.e2e.ts": "settings",
     "settings-compact.e2e.ts": "settings",
     "shipped-composition.e2e.ts": "shell",
+    "sidebar-browser.e2e.ts": "documents",
     "sidebar-scrollbar.e2e.ts": "workbench",
     "sidebar-subagent-activity.e2e.ts": "subagent",
     "skill-invocation-policy.e2e.ts": "conversation",
@@ -107,7 +110,15 @@
     "workflow-run.e2e.ts": "workbench",
     "workspace-files.e2e.ts": "workbench",
     "workspace-history-entry.e2e.ts": "documents",
-    "workspace-management.e2e.ts": "documents"
+    "workspace-management.e2e.ts": "documents",
+    "tool-details.e2e.ts": "conversation",
+    "workspace-review.e2e.ts": "conversation",
+    "session-feedback.e2e.ts": "conversation",
+    "workspace-office.e2e.ts": "documents",
+    "desktop-confirmation.e2e.ts": "conversation",
+    "user-terminal.e2e.ts": "conversation",
+    "plugin-administration.e2e.ts": "settings",
+    "webhook.e2e.ts": "conversation"
   },
   "sharedInputs": {
     "examples/acp-agent/tests/snapshots/cancel-tool-calls/session.jsonl": [
@@ -127,6 +138,45 @@
     ],
     "examples/web-schedule/cordis.yml": [
       "schedule-after.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/config-ledger.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/PluginManagerPage.module.css": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/locales.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/manager-store.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/presentation.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/transport.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/plugins/PluginManagerPage.tsx": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/pages/PluginsPage.tsx": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/App.tsx": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/src/api.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/vite.config.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "gateway/admin-ui/scripts/prepare-remotes.ts": [
+      "plugin-administration.e2e.ts"
+    ],
+    "apps/web/tests/webhook.overlay.yml": [
+      "webhook.e2e.ts"
     ]
   },
   "packages": {
@@ -155,6 +205,7 @@
     ],
     "client/ui-directory-picker-browse": "documents",
     "client/ui-directory-picker-native": "documents",
+    "client/ui-dockkit": "all",
     "client/ui-documents": "documents",
     "client/ui-goal": "conversation",
     "client/ui-input-trigger": "conversation",
@@ -181,11 +232,14 @@
     "client/ui-settings-models": "settings",
     "client/ui-settings-plugin-inventory": "settings",
     "client/ui-settings-plugins": "settings",
+    "client/ui-settings-unarchive-sessions": "settings",
     "client/ui-sidebar": [
       "shell",
       "subagent",
       "workbench"
     ],
+    "client/ui-sidebar-browser": "documents",
+    "client/ui-sidebar-right": "all",
     "client/ui-skill": "conversation",
     "client/ui-slots": "all",
     "client/ui-subagent": "subagent",
@@ -200,7 +254,8 @@
     "client/ui-workbench": [
       "shell",
       "workbench",
-      "lifecycle"
+      "lifecycle",
+      "documents"
     ],
     "client/ui-workflow-run": "workbench",
     "client/ui-workspace": [
@@ -210,17 +265,24 @@
     ],
     "client/userdoc-upload": "documents",
     "experimental/agent-team": "subagent",
+    "experimental/client-ui-agent-team": "subagent",
     "goal/goal": "conversation",
     "interaction/permission-presets": "settings",
     "llm/token-meter": "conversation",
     "plan/plan-mode": "conversation",
     "schedule/schedule": "conversation",
+    "session-query/session-log-export": "workbench",
     "session/session-stats": "workbench",
     "session/session-title": "workbench",
     "session/session-turn-outline": "workbench",
-    "session-query/session-log-export": "workbench",
     "subagent/subagent": "subagent",
-    "todo/tool-todo": "conversation"
+    "todo/tool-todo": "conversation",
+    "client/ui-sidebar-terminal": "conversation",
+    "api/terminal-controller": "conversation",
+    "boot/plugin-manager": "settings",
+    "host/plugin-inventory": "settings",
+    "webhook/webhook": "all",
+    "webhook/webhook-github": "conversation"
   },
   "fullPrefixes": [
     "apps/web/public/",

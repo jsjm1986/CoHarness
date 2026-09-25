@@ -103,7 +103,7 @@ export type OptionalSessionSeq = SessionSeq | null
  * recorded in the session-log-version-mechanism Agent Note
  * (`.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md`).
  */
-export const SESSION_FORMAT_VERSION = 5
+export const SESSION_FORMAT_VERSION = 6
 
 /**
  * Immutable validated storage metadata, kept outside the conversation event log.
@@ -147,6 +147,14 @@ export interface SessionHeader {
   readonly agentPreset?: string
   /** True for a browser draft whose persistence is deferred until materialization. */
   readonly draft?: boolean
+  /**
+   * Managed SSH execution target bound at creation, as the Gateway-registered
+   * public target id. Durable because the session's fs/subprocess/sandbox
+   * providers ran on that host: a resume that dropped the binding would replay
+   * history the agent cannot act on and silently relocalize remote paths.
+   * Absent means host-local execution.
+   */
+  readonly sshTarget?: number
 }
 
 /**
@@ -175,6 +183,8 @@ export interface CreateSessionOptions {
     readonly delegationDepth?: number
     readonly agentPreset?: string
     readonly draft?: boolean
+    /** Managed SSH target id to bind at creation; see {@link SessionHeader.sshTarget}. */
+    readonly sshTarget?: number
   }
 }
 

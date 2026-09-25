@@ -12,7 +12,7 @@ import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-commands/types'
 import type { SessionAssistantStreamFrame, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
-import { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
+import { LlmAttemptId, ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import { Session } from '../src/client/sessions/session.ts'
 import type {
   ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
@@ -488,6 +488,39 @@ describe('live event path', () => {
 
     frames.shift()!(0)
     expect(published).toHaveLength(2)
+  })
+
+  it('publishes session/queue frames on the animation-frame channel', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const { session } = await opened()
+    const published: number[] = []
+    session.subscribe(() => {
+      published.push(session.getSnapshot().queue.length)
+    })
+
+    const message = createUserMessage({
+      content: [{ type: 'text', text: '排队消息' }] as never,
+      source: { kind: 'user', rpcId: 'rpc-q' } as never,
+    })
+    session.handleMuxEnvelope('queue-1' as never, {
+      type: 'session/queue', sessionId: SID,
+      items: [{ id: 'q-1' as never, placement: 'queued' as const, message }],
+    })
+    session.handleMuxEnvelope('queue-2' as never, {
+      type: 'session/queue', sessionId: SID,
+      items: [{ id: 'q-1' as never, placement: 'queued' as const, message },
+        { id: 'q-2' as never, placement: 'queued' as const, message }],
+    })
+
+    // The two baselines coalesce into one frame publication — no per-envelope flush.
+    expect(published).toEqual([])
+    expect(frames).toHaveLength(1)
+    frames.shift()!(0)
+    expect(published).toEqual([2])
   })
 
   it('publishes a timeline-only boundary even when no Definition claims the event', async () => {
@@ -1694,5 +1727,54 @@ describe('assistant stream', () => {
       expect(api.callsOf('session.history').length).toBeGreaterThan(1)
     })
     expect(chatSeqs(session.getSnapshot())).toEqual([0, 1, 2, 3, 4, 5])
+  })
+})
+
+
+describe('independent Tool detail reads', () => {
+  it('assembles the addressed turn without opening or replacing the chat window', async () => {
+    const { api, session } = makeSession()
+    const snapshot = session.getSnapshot()
+    api.onHistory = () => histResponse([ev.turnStart(8, 2), ev.user(9, 'older call turn')])
+    const chat = await session.readCallHistory(ToolCallId('older-call'))
+    expect(chat.order.length).toBeGreaterThan(0)
+    expect(api.calls.at(-1)).toMatchObject({ method: 'session.history', payload: { sessionId: SID, toolCallId: 'older-call', detail: 'full' } })
+    expect(session.getSnapshot()).toBe(snapshot)
+    session.dispose()
+  })
+
+  it('uses the parent-addressed transport for a cold child', async () => {
+    const api = new FakeApiClient()
+    api.onSubagentHistory = async () => ok({ events: [], hasMore: false })
+    const session = new Session(SID, api, fakeRemote(api), {
+      address: { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable' }, conversation: TEST_CONVERSATION,
+    })
+    await session.readCallHistory(ToolCallId('child-call'))
+    expect(api.calls.at(-1)).toMatchObject({ method: 'subagent.history', payload: {
+      parentSessionId: PARENT, childSessionId: SID, mode: 'continuable', toolCallId: 'child-call', detail: 'full',
+    } })
+    session.dispose()
+  })
+
+  it.each(['reader', 'session'] as const)('rejects late results after %s cancellation', async (owner) => {
+    const { api, session } = makeSession()
+    const pending = deferred<ReturnType<typeof ok<{ events: never[]; hasMore: boolean }>>>()
+    api.onHistory = () => pending.promise
+    const controller = new AbortController()
+    const read = session.readCallHistory(ToolCallId('cancelled-call'), controller.signal)
+    const rejected = expect(read).rejects.toThrow()
+    if (owner === 'reader') controller.abort()
+    else session.dispose()
+    expect(api.lastHistorySignal?.aborted).toBe(true)
+    pending.resolve(ok({ events: [], hasMore: false }))
+    await rejected
+    session.dispose()
+  })
+
+  it('reports authorization errors without publishing an empty success', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = async () => err({ code: 'collaboration-forbidden', message: 'Access revoked', details: { action: 'read', reason: 'forbidden', sessionId: SID } })
+    await expect(session.readCallHistory(ToolCallId('private-call'))).rejects.toThrow('Access revoked')
+    session.dispose()
   })
 })

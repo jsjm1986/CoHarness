@@ -2,20 +2,24 @@
   "name": "harness-gateway",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx --tsconfig tsconfig.run.json src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "build:check": "tsc -p tsconfig.ci.json",
     "build:admin": "npm run build --prefix admin-ui",
     "test": "vitest run --exclude tests/postgres.spec.ts --exclude tests/access-invalidation.spec.ts --exclude tests/execution.spec.ts",
     "typecheck": "tsc --noEmit",
-    "pg:migrate": "tsx scripts/pg-migrate.ts",
-    "pg:check": "tsx scripts/pg-check.ts",
-    "pg:import-sqlite": "tsx scripts/import-sqlite-to-postgres.ts",
-    "test:postgres": "node -e \"if (!process.env.HGW_TEST_DATABASE_URL) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database')\" && vitest run tests/postgres.spec.ts tests/access-invalidation.spec.ts tests/execution.spec.ts --no-file-parallelism",
+    "pg:migrate": "tsx --tsconfig tsconfig.run.json scripts/pg-migrate.ts",
+    "pg:check": "tsx --tsconfig tsconfig.run.json scripts/pg-check.ts",
+    "pg:import-sqlite": "tsx --tsconfig tsconfig.run.json scripts/import-sqlite-to-postgres.ts",
+    "test:postgres": "node -e \"if (!process.env.HGW_TEST_DATABASE_URL || !/(_test|_accept|_acceptance)(\\?|$)/.test(process.env.HGW_TEST_DATABASE_URL)) throw new Error('HGW_TEST_DATABASE_URL must select a disposable test database ending in _test, _accept, or _acceptance')\" && vitest run tests/postgres.spec.ts tests/access-invalidation.spec.ts tests/execution.spec.ts tests/ssh.spec.ts tests/webhook.spec.ts --no-file-parallelism",
     "pg:backup": "bash deploy/postgres/backup-postgres.sh",
-    "pg:restore-check": "bash deploy/postgres/restore-check.sh"
+    "pg:restore-check": "bash deploy/postgres/restore-check.sh",
+    "pg:deploy": "tsx --tsconfig tsconfig.run.json scripts/deploy-apply.ts",
+    "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json"
   },
   "dependencies": {
     "argon2": "^0.44.0",
@@ -23,7 +27,8 @@
     "google-auth-library": "10.7.0",
     "http-proxy": "^1.18.1",
     "js-yaml": "^4.2.0",
-    "pg": "8.16.3"
+    "pg": "8.16.3",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

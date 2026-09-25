@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-11-web-verification-tiering.md
-2026-09-11-web-verification-tiering.md: 9e0596d1e9d935fd03b49f5183b39ae1f848c6fa
-2026-09-11-web-verification-tiering.zh.md: 7c61c8b72461139937baa1d8dbaf9ded76df0da3
+2026-09-11-web-verification-tiering.md: 653a3634899d3969a40749f367ad353cbfbe2b3d
+2026-09-11-web-verification-tiering.zh.md: fb4436b2a3a8174402c7569a931a5c89416a1676

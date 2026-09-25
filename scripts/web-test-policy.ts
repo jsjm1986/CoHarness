@@ -97,10 +97,14 @@ export function validateWebTestPolicy(raw: unknown, source: string): WebTestPoli
     throw new Error(`web-test-policy: ${source} groups contain duplicates.`)
   }
   const scenarios = requireRecord(policy.scenarios, 'scenarios', source)
+  if (Object.keys(scenarios).length === 0) {
+    throw new Error(`web-test-policy: ${source} scenarios must not be empty.`)
+  }
   for (const [scenario, group] of Object.entries(scenarios)) {
     requireRelativeFile(scenario, 'scenario', source)
-    if (!/\.(?:e2e|snapshot)\.ts$/.test(scenario)) {
-      throw new Error(`web-test-policy: ${source} scenario ${JSON.stringify(scenario)} is not a browser scenario file.`)
+    if (!/\.(?:e2e|snapshot)\.ts$/.test(scenario) || scenario.includes('\\')
+      || scenario.split('/').some(part => part === '' || part === '.' || part === '..')) {
+      throw new Error(`web-test-policy: ${source} scenario ${JSON.stringify(scenario)} must be a relative browser scenario path.`)
     }
     if (!known.has(group)) {
       throw new Error(`web-test-policy: ${source} scenario ${JSON.stringify(scenario)} names unknown group ${JSON.stringify(group)}.`)
@@ -121,6 +125,9 @@ export function validateWebTestPolicy(raw: unknown, source: string): WebTestPoli
     sharedInputs[input] = owners
   }
   const smoke = requireStringArray(policy.smokeScenarios, 'smokeScenarios', source)
+  if (smoke.length === 0 || new Set(smoke).size !== smoke.length) {
+    throw new Error(`web-test-policy: ${source} smokeScenarios must be non-empty and contain no duplicates.`)
+  }
   for (const scenario of smoke) {
     if (!(scenario in scenarios)) {
       throw new Error(`web-test-policy: ${source} smoke scenario ${JSON.stringify(scenario)} is not in scenarios.`)
@@ -198,6 +205,22 @@ export function focusedScenarioFiles(
 }
 
 /**
+ * Resolve exact scenario owners together with every required smoke scenario.
+ * @param policy - Policy owning scenario membership and the smoke set.
+ * @param scenarios - Non-empty scenario keys relative to `WEB_TESTS_ROOT`.
+ * @returns Known scenario keys, including smoke scenarios, deduplicated and sorted.
+ * @throws If the selection is empty or contains an unregistered scenario.
+ */
+export function exactScenarioFiles(policy: WebTestPolicy, scenarios: readonly string[]): readonly string[] {
+  if (scenarios.length === 0) throw new Error('web-test-policy: exact scenario selection must not be empty.')
+  const unknown = scenarios.filter(scenario => !Object.hasOwn(policy.scenarios, scenario))
+  if (unknown.length > 0) {
+    throw new Error(`web-test-policy: unknown scenario(s) ${JSON.stringify(unknown)}.`)
+  }
+  return [...new Set([...scenarios, ...policy.smokeScenarios])].sort()
+}
+
+/**
  * Discover every browser scenario file under {@link WEB_TESTS_ROOT}.
  * @param root - Repository root holding `apps/web/tests/`.
  * @returns Scenario paths relative to `WEB_TESTS_ROOT`, matching the
@@ -207,8 +230,27 @@ export function listWebScenarioFiles(root: string): readonly string[] {
   return readdirSync(resolve(root, WEB_TESTS_ROOT), { encoding: 'utf8', recursive: true })
     .map(entry => entry.replaceAll('\\', '/'))
     .filter(entry => (entry.endsWith('.e2e.ts') || entry.endsWith('.snapshot.ts'))
-      && !entry.split('/').includes('snapshots'))
+      && !entry.split('/').includes('snapshots') && statSync(resolve(root, WEB_TESTS_ROOT, entry)).isFile())
     .sort()
+}
+
+/**
+ * Reject a stale policy before a runner uses it to narrow browser coverage.
+ * @param root - Source checkout owning the browser test inventory.
+ * @param policy - Validated policy whose scenario keys must match that inventory.
+ * @returns Every registered scenario key, sorted in deterministic order.
+ * @throws If a registered scenario is missing or a disk scenario is unregistered.
+ */
+export function verifiedWebScenarioFiles(root: string, policy: WebTestPolicy): readonly string[] {
+  const files = listWebScenarioFiles(root)
+  const registered = Object.keys(policy.scenarios).sort()
+  const onDisk = new Set(files)
+  const missing = registered.filter(file => !onDisk.has(file))
+  const unregistered = files.filter(file => !Object.hasOwn(policy.scenarios, file))
+  if (missing.length > 0 || unregistered.length > 0) {
+    throw new Error(`web-test-policy: scenario inventory differs; missing=${JSON.stringify(missing)}, unregistered=${JSON.stringify(unregistered)}.`)
+  }
+  return registered
 }
 
 /**

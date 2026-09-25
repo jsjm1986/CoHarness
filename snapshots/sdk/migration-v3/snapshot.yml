@@ -1,0 +1,13 @@
+# Historical source: snapshots/sdk/text-turn/session.v3.jsonl
+# Source SHA-256: ac2e89bd8ae9c0c8a7dbbe86e2d715ffa4827a5ee5674fc879d8dd73193b20fc
+# Initial import only redacts typed identities; source generation and event data are retained.
+version: 1
+scenario: migration-v3
+profile: sdk
+composition: sdk-upload
+recording: authored
+sessionFormat:
+  version: 3
+  coverage: [adjacent-migration]
+header:
+  class: sdk-upload

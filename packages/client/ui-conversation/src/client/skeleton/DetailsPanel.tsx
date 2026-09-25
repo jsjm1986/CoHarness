@@ -1,12 +1,5 @@
-// DetailsPanel: close button + the selected call's args and
-// result — args as JSON, the result raw except for a terminal-card call, whose
-// Output section is the command's terminal card. Reads the
-// selection from the shared chat
-// store (conversation writes, this panel reads — the cross-registration
-// share the store seat exists for) and derives the call material from the
-// session snapshot — no data of its own.
-
-import { Fragment } from 'react'
+/** Explicitly addressed Tool details with an independent, cancellable history reader. */
+import { Fragment, useEffect, useState } from 'react'
 import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { shallowEqual } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSnapshot, RunningToolCall, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
@@ -63,27 +56,46 @@ function rawResultText(block: ToolCallBlock): string {
   return parts.join('\n')
 }
 
-export function DetailsPanel({ useSession, useSessions, sessionId, useStore, renderSlot, closeDetails, t }: DetailsPanelProps) {
-  const selection = useStore(s => s.selection)
+export function DetailsPanel({
+  useSession, useSessions, sessionId, callId, toolName, close, readEnabled = true, renderSlot, closeDetails, readCall, loadImage, t,
+}: DetailsPanelProps) {
   // Session workspace root: an omitted or relative terminal cwd resolves
   // against it, which the pure presenter cannot see.
   const sessionCwd = useSessions(list => list.byId[sessionId]?.cwd)
-  const callId = selection?.callId
   // materialFor builds a fresh wrapper; shallowEqual short-circuits on its
   // stable members (result node reference rides the snapshot's structural sharing).
-  const material = useSession(
+  const liveMaterial = useSession(
     s => (callId === undefined ? null : materialFor(s, callId)),
     (a, b) => shallowEqual(a, b))
+
+  const running = useSession(snapshot => snapshot.running)
+  const [read, setRead] = useState<{ callId: string; material?: CallMaterial | null; error?: string }>()
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    if (!readEnabled || callId === undefined || liveMaterial !== null) return
+    const controller = new AbortController()
+    setRead({ callId })
+    void readCall(callId, controller.signal).then((block) => {
+      if (controller.signal.aborted) return
+      const material = block === undefined ? null : 'kind' in block ? settledMaterial(block, callId) : runningMaterial(block)
+      setRead({ callId, material })
+    }, (error: unknown) => {
+      if (!controller.signal.aborted) setRead({ callId, error: error instanceof Error ? error.message : String(error) })
+    })
+    return () => { controller.abort() }
+  }, [callId, liveMaterial, readCall, readEnabled, running, attempt])
+  const currentRead = read?.callId === callId ? read : undefined
+  const material = liveMaterial ?? currentRead?.material
 
   return (
     <div className={css.root}>
       <div className={css.header}>
         <div className={css.title}>
-          {selection === null ? t('details.title') : material?.name ?? selection.toolName ?? t('details.title')}
+          {material?.name ?? toolName ?? t('details.title')}
         </div>
         <button
           type="button" className={css.close} aria-label={t('details.close')}
-          onClick={() => { closeDetails() }}
+          onClick={() => { (close ?? closeDetails)() }}
         >
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -91,10 +103,14 @@ export function DetailsPanel({ useSession, useSessions, sessionId, useStore, ren
         </button>
       </div>
       <div className={css.body}>
-        {selection === null || callId === undefined
+        {callId === undefined
           ? <div className={css.empty}>{t('details.empty')}</div>
-          : material === null
-            ? <div className={css.empty}>{t('details.notInWindow')}</div>
+          : material == null
+            ? <div className={css.empty}>
+              {currentRead?.error !== undefined
+                ? <><div role="alert">{currentRead.error}</div><button type="button" onClick={() => { setAttempt(value => value + 1) }}>{t('details.retry')}</button></>
+                : t(material === null ? 'details.notFound' : 'details.loading')}
+            </div>
             : (
               <>
                 {material.argsRaw !== null && (
@@ -110,7 +126,11 @@ export function DetailsPanel({ useSession, useSessions, sessionId, useStore, ren
                       would otherwise carry into the next selection because the
                       panel does not unmount between calls. */}
                   <Fragment key={callId}>
-                    {renderSlot('conversation.details.tool', { block: material.block, cwd: sessionCwd }, {
+                    {renderSlot('conversation.details.tool', {
+                      block: material.block,
+                      cwd: sessionCwd,
+                      renderMessageImages: owner => renderSlot('conversation.details.images', { ...owner, loadImage }),
+                    }, {
                       fallback: 'kind' in material.block
                         ? (
                           <pre className={css.code} data-error={material.block.isError || undefined}>

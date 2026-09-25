@@ -184,6 +184,23 @@ describe('MessageFeedbackService public contract', () => {
     expect(Object.isFrozen(listed.value.items[0])).toBe(true)
   })
 
+  it('persists category-only edits and clears a category when omitted', async () => {
+    const { ctx, persistence } = await harness()
+    const fixture = messageFixture('category')
+    persistence.persist(fixture.session)
+    const target = { sessionId: fixture.session.id, messageId: fixture.assistantMessageIds[0], rating: 'negative' as const }
+    const created = expectItem(await ctx.messageFeedback.put({ ...target, category: 'task-result', ifVersion: null }))
+    expect(created.category).toBe('task-result')
+    const edited = expectItem(await ctx.messageFeedback.put({ ...target, category: 'service-stability', ifVersion: created.version }))
+    expect(edited.category).toBe('service-stability')
+    expect(edited.version).not.toBe(created.version)
+    const listed = await ctx.messageFeedback.list({ sessionId: target.sessionId })
+    expect(listed).toMatchObject({ ok: true, value: { items: [edited] } })
+    const cleared = expectItem(await ctx.messageFeedback.put({ ...target, ifVersion: edited.version }))
+    expect(cleared).not.toHaveProperty('category')
+    expect(cleared.version).not.toBe(edited.version)
+  })
+
   it('reports non-blank and complete UTF-8 byte limits without touching persistence', async () => {
     const { ctx, persistence } = await harness(4)
     const fixture = messageFixture('note-limits')

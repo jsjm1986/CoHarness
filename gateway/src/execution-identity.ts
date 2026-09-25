@@ -8,6 +8,7 @@ import { transaction, type Queryable } from './postgres/database.ts'
 import type { ConversationHeader } from './postgres/conversation-repository.ts'
 import { publicNumber } from './postgres/runtime-context.ts'
 import type { GatewayPrincipalClaims } from './principal.ts'
+import type { DesktopHolder } from './desktop-coordinator.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 
 /** A refused execution identity request, without database or credential details. */
@@ -56,7 +57,7 @@ interface InputRow {
 }
 
 interface ActorRow { id: string; public_id: string; role: 'admin' | 'member'; auto_review_eligible?: boolean }
-type Capability = 'execute' | 'plugin-management' | 'auto-review'
+type Capability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop' | 'user-terminal' | 'ssh'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const HASH = /^[0-9a-f]{64}$/iu
 
@@ -69,6 +70,15 @@ function object(value: unknown, allowed: readonly string[]): Record<string, unkn
 function identity(value: unknown): string {
   if (typeof value !== 'string' || value === '' || Buffer.byteLength(value) > 256) throw new ExecutionIdentityError(400, 'invalid execution identity')
   return value
+}
+
+function desktopRequest(value: unknown): { sessionId: string; desktop: string; owners: string[] } {
+  const request = object(value, ['sessionId', 'desktop', 'ownerSessionIds'])
+  const sessionId = identity(request.sessionId), desktop = identity(request.desktop)
+  if (request.ownerSessionIds !== undefined && !Array.isArray(request.ownerSessionIds)) throw new ExecutionIdentityError(400, 'invalid desktop runtime owners')
+  const owners = request.ownerSessionIds === undefined ? [] : (request.ownerSessionIds as unknown[]).map(identity)
+  if (new Set([sessionId, ...owners]).size !== owners.length + 1) throw new ExecutionIdentityError(400, 'desktop runtime ownership contains a cycle')
+  return { sessionId, desktop, owners }
 }
 
 function inputId(value: unknown): string {
@@ -348,7 +358,7 @@ export class GatewayExecutionIdentity {
   async authorize(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
     const request = object(value, ['sessionId', 'capability', 'unverifiedHistory'])
     const sessionId = identity(request.sessionId), capability = request.capability
-    if (capability !== 'execute' && capability !== 'plugin-management' && capability !== 'auto-review') throw new ExecutionIdentityError(400, 'invalid execution capability')
+    if (capability !== 'execute' && capability !== 'plugin-management' && capability !== 'auto-review' && capability !== 'desktop') throw new ExecutionIdentityError(400, 'invalid execution capability')
     await this.markUnverified(subject, sessionId, request.unverifiedHistory)
     return transaction(this.pool, async (client) => {
       const state = await this.session(client, subject, sessionId)
@@ -377,6 +387,151 @@ export class GatewayExecutionIdentity {
       const selector = await this.principalActor(client, subject, sessionId, principal)
       await this.eligibleActors(client, subject, sessionId, [...new Set([selector, ...Object.keys(state.actor_witnesses)])], capability)
     })
+  }
+
+  /**
+   * Record or withdraw the authenticated user's confirmation for this Session and desktop.
+   * @param subject - current runtime credential.
+   * @param principal - verified interactive requester; no model-provided actor is accepted.
+   * @param nodeId - current Gateway node, supplied by the server.
+   * @param value - exact Session, desktop, and confirmation decision.
+   */
+  async confirmDesktop(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, nodeId: string, value: unknown): Promise<void> {
+    const request = object(value, ['sessionId', 'desktop', 'confirmed', 'expectedNodeId'])
+    if (request.expectedNodeId !== undefined && request.expectedNodeId !== nodeId) throw new ExecutionIdentityError(409, 'desktop node changed; refresh confirmation')
+    const sessionId = identity(request.sessionId), desktop = identity(request.desktop)
+    if (typeof request.confirmed !== 'boolean') throw new ExecutionIdentityError(400, 'invalid desktop confirmation')
+    await transaction(this.pool, async (client) => {
+      const state = await this.session(client, subject, sessionId)
+      const actor = await this.principalActor(client, subject, sessionId, principal)
+      const coordinates = [...scope(subject, sessionId), nodeId, subject.generation, desktop, actor]
+      if (!request.confirmed) {
+        await client.query(`DELETE FROM harness.desktop_session_confirmations WHERE ${SESSION_SCOPE}
+          AND node_id=$5 AND generation=$6 AND desktop=$7 AND user_id=$8`, coordinates)
+        await client.query('SELECT harness.invalidate_access($1,$2::jsonb)', [subject.organizationId, JSON.stringify({ userId: principal.user.id })])
+        return
+      }
+      if (state.unverified_history) throw new ExecutionIdentityError(403, 'desktop confirmation requires verified history')
+      await this.eligibleActors(client, subject, sessionId, [actor], 'desktop')
+      const policy = await client.query<{ user_revision: string; project_revision: string }>(`SELECT u.revision::text user_revision,
+        COALESCE(p.revision,0)::text project_revision FROM harness.desktop_access_policies u
+        LEFT JOIN harness.desktop_access_policies p ON p.organization_id=u.organization_id AND p.project_id=$3
+        WHERE u.organization_id=$1 AND u.user_id=$2`, [subject.organizationId, actor, subject.projectInternalId ?? null])
+      await client.query(`INSERT INTO harness.desktop_session_confirmations
+        (organization_id,runtime_kind,runtime_public_id,session_id,node_id,generation,desktop,user_id,user_policy_revision,project_policy_revision)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        ON CONFLICT (organization_id,runtime_kind,runtime_public_id,session_id,node_id,generation,desktop,user_id)
+        DO UPDATE SET user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision,confirmed_at=now()`,
+      [...coordinates, policy.rows[0]!.user_revision, policy.rows[0]!.project_revision])
+    })
+  }
+
+  /**
+   * Read only the current interactive user's confirmation for the live root.
+   * @param subject - authenticated runtime.
+   * @param principal - verified interactive requester.
+   * @param nodeId - server-owned current node.
+   * @param value - exact root Session and configured desktop.
+   * @returns current-user eligibility and confirmation, without other participants' records.
+   */
+  async desktopConfirmation(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, nodeId: string, value: unknown) {
+    const request = object(value, ['sessionId', 'desktop'])
+    const sessionId = identity(request.sessionId), desktop = identity(request.desktop)
+    return transaction(this.pool, async client => {
+      const state = await this.session(client, subject, sessionId)
+      const actor = await this.principalActor(client, subject, sessionId, principal)
+      const base = { rootSessionId: sessionId, nodeId, desktop, userId: principal.user.id }
+      try {
+        await this.eligibleActors(client, subject, sessionId, [actor], 'desktop')
+      } catch (error) {
+        if (!(error instanceof ExecutionIdentityError) || error.status !== 403) throw error
+        return { ...base, eligible: false, confirmed: false }
+      }
+      if (state.unverified_history) return { ...base, eligible: false, confirmed: false }
+      const confirmed = await this.confirmedDesktopActors(client, subject, sessionId, nodeId, desktop, [actor])
+      return { ...base, eligible: true, confirmed: confirmed === 1 }
+    })
+  }
+
+  /**
+   * Require current qualification and exact human confirmations for all recorded actors.
+   * @param subject - authenticated runtime, including its current generation.
+   * @param nodeId - current Gateway node; caller-supplied node identities are not accepted.
+   * @param value - Session and desktop selected by the actual driver.
+   * @returns canonical participants only when every confirmation remains current.
+   */
+  async authorizeDesktop(subject: RuntimeCredentialSubject, nodeId: string, value: unknown): Promise<ExecutionIdentityState> {
+    const { sessionId, desktop, owners } = desktopRequest(value)
+    return transaction(this.pool, async (client) => {
+      const state = await this.session(client, subject, sessionId)
+      const actors = Object.keys(state.actor_witnesses)
+      if (actors.length === 0 || state.primary_actor_user_id === null || state.unverified_history) {
+        throw new ExecutionIdentityError(403, 'desktop access requires verified execution actors')
+      }
+      await this.eligibleActors(client, subject, sessionId, actors, 'desktop')
+      const { rootSessionId: confirmationSessionId } = await this.desktopRoot(client, subject, sessionId, state, owners)
+      const confirmed = await this.confirmedDesktopActors(client, subject, confirmationSessionId, nodeId, desktop, actors)
+      if (confirmed !== actors.length) throw new ExecutionIdentityError(403, 'each execution actor must confirm this Session and desktop again')
+      return this.state(client, subject, state)
+    })
+  }
+
+  private async confirmedDesktopActors(client: PoolClient, subject: RuntimeCredentialSubject, sessionId: string,
+    nodeId: string, desktop: string, actors: string[]): Promise<number> {
+    const confirmations = await client.query(`SELECT c.user_id FROM harness.desktop_session_confirmations c
+        JOIN harness.desktop_access_policies u ON u.organization_id=c.organization_id AND u.user_id=c.user_id
+          AND u.enabled AND u.revision=c.user_policy_revision
+        LEFT JOIN harness.desktop_access_policies p ON p.organization_id=c.organization_id AND p.project_id=$9
+        WHERE c.organization_id=$1 AND c.runtime_kind=$2 AND c.runtime_public_id=$3 AND c.session_id=$4
+          AND c.node_id=$5 AND c.generation=$6 AND c.desktop=$7 AND c.user_id=ANY($8::uuid[])
+          AND (CASE WHEN c.runtime_kind='project' THEN p.enabled AND p.revision=c.project_policy_revision ELSE c.project_policy_revision=0 END)
+        FOR SHARE OF c`, [...scope(subject, sessionId), nodeId, subject.generation, desktop, actors, subject.projectInternalId ?? null])
+    return confirmations.rows.length
+  }
+
+  /**
+   * Resolve the registered root workflow without requiring a still-active desktop grant.
+   * Cleanup remains possible after revocation, but cannot change runtime, node or root.
+   * @param subject - authenticated current runtime.
+   * @param value - driver Session, desktop and live owner chain.
+   * @returns server-owned workflow identity and attribution for the coordinator.
+   */
+  async desktopHolder(subject: RuntimeCredentialSubject, value: unknown): Promise<DesktopHolder> {
+    const { sessionId, owners } = desktopRequest(value)
+    return transaction(this.pool, async client => {
+      const state = await this.session(client, subject, sessionId)
+      const { rootSessionId, root } = await this.desktopRoot(client, subject, sessionId, state, owners)
+      const attribution = await client.query<{ public_id: string; username: string; organization: string; project_name: string | null }>(`
+        SELECT u.public_id::text,u.username,o.slug organization,p.name project_name FROM harness.users u
+        JOIN harness.organizations o ON o.id=u.organization_id
+        LEFT JOIN harness.projects p ON p.organization_id=o.id AND p.id=$3
+        WHERE u.organization_id=$1 AND u.id=$2`, [subject.organizationId, root.primary_actor_user_id, subject.projectInternalId ?? null])
+      const actor = attribution.rows[0]
+      if (actor === undefined) throw new ExecutionIdentityError(403, 'desktop workflow has no recorded actor')
+      return {
+        organization: actor.organization,
+        runtime: { ...subject.target, generation: subject.generation },
+        user: { id: publicNumber(actor.public_id, 'desktop actor'), username: actor.username },
+        scope: subject.target.kind === 'user' ? { kind: 'personal' } : {
+          kind: 'project', projectId: subject.target.id, projectName: actor.project_name!, mode: 'rw',
+        },
+        runId: rootSessionId,
+      }
+    })
+  }
+
+  private async desktopRoot(client: PoolClient, subject: RuntimeCredentialSubject, sessionId: string,
+    state: SessionRow, owners: string[]): Promise<{ rootSessionId: string; root: SessionRow }> {
+    let rootSessionId = sessionId, root = state
+    // The trusted runtime supplies live ownership; durable lineage checks each asserted edge.
+    for (const parentId of owners) {
+      if (root.parent_session_id !== parentId || root.inheritance_hash === null) {
+        throw new ExecutionIdentityError(403, 'desktop runtime owner lacks verified execution inheritance')
+      }
+      root = await this.session(client, subject, parentId, false)
+      rootSessionId = parentId
+    }
+    return { rootSessionId, root }
   }
 
   private async markUnverified(subject: RuntimeCredentialSubject, sessionId: string, unverified: unknown): Promise<void> {
@@ -453,8 +608,77 @@ export class GatewayExecutionIdentity {
     return row
   }
 
+  /**
+   * Check the interactive user independently of the Session's model participants.
+   * @param subject - authenticated runtime, including its current generation.
+   * @param principal - signed interactive caller; restricted integration credentials cannot open terminals.
+   * @param value - requested Session identity.
+   * @returns the server-confirmed creator identity; administrator status grants no terminal bypass.
+   */
+  async authorizeTerminal(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, nodeId: string, value: unknown): Promise<{ userId: number; grantId: string }> {
+    const request = object(value, ['sessionId'])
+    const sessionId = identity(request.sessionId)
+    return transaction(this.pool, async (client) => {
+      const actor = await this.principalActor(client, subject, sessionId, principal)
+      await this.eligibleActors(client, subject, sessionId, [actor], 'user-terminal')
+      const revisions = await this.terminalRevisions(client, subject, actor)
+      const granted = await client.query<{ grant_id: string }>(`INSERT INTO harness.terminal_session_grants AS g
+        (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
+          grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
+            AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
+          generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
+        WHERE g.generation<>EXCLUDED.generation OR g.user_policy_revision<>EXCLUDED.user_policy_revision
+          OR g.project_policy_revision<>EXCLUDED.project_policy_revision
+        RETURNING grant_id`, [subject.organizationId,nodeId,subject.target.kind,subject.target.id,subject.generation,sessionId,actor,revisions.user,revisions.project])
+      const existing = granted.rows[0] === undefined ? await client.query<{ grant_id: string }>(`SELECT grant_id FROM harness.terminal_session_grants
+        WHERE organization_id=$1 AND node_id=$2 AND runtime_kind=$3 AND runtime_public_id=$4 AND session_id=$5 AND user_id=$6`,
+      [subject.organizationId,nodeId,subject.target.kind,subject.target.id,sessionId,actor]) : granted
+      return { userId: principal.user.id, grantId: existing.rows[0]!.grant_id }
+    })
+  }
+
+  /**
+   * Recheck an existing terminal creator using a runtime-bound server grant.
+   * @param subject - current authenticated runtime.
+   * @param nodeId - receiving Gateway node.
+   * @param value - Session and opaque grant previously issued to its interactive creator.
+   * @returns current creator identity; a regrant cannot revive an old process.
+   */
+  async checkTerminal(subject: RuntimeCredentialSubject, nodeId: string, value: unknown): Promise<{ userId: number }> {
+    const request = object(value, ['sessionId', 'grantId'])
+    const sessionId = identity(request.sessionId), grantId = inputId(request.grantId)
+    return transaction(this.pool, async (client) => {
+      const rows = await client.query<{ user_id: string; public_id: string; user_policy_revision: string; project_policy_revision: string }>(`SELECT g.user_id,u.public_id::text,
+        g.user_policy_revision::text,g.project_policy_revision::text FROM harness.terminal_session_grants g
+        JOIN harness.users u ON u.organization_id=g.organization_id AND u.id=g.user_id
+        WHERE g.organization_id=$1 AND g.node_id=$2 AND g.runtime_kind=$3 AND g.runtime_public_id=$4
+          AND g.generation=$5 AND g.session_id=$6 AND g.grant_id=$7 FOR SHARE OF g`,
+      [subject.organizationId,nodeId,subject.target.kind,subject.target.id,subject.generation,sessionId,grantId])
+      const grant = rows.rows[0]
+      if (grant === undefined) throw new ExecutionIdentityError(403, 'terminal creator grant is unavailable')
+      await this.eligibleActors(client, subject, sessionId, [grant.user_id], 'user-terminal')
+      const revisions = await this.terminalRevisions(client, subject, grant.user_id)
+      if (grant.user_policy_revision !== revisions.user || grant.project_policy_revision !== revisions.project) {
+        throw new ExecutionIdentityError(403, 'terminal creator qualification changed')
+      }
+      return { userId: publicNumber(grant.public_id, 'terminal creator') }
+    })
+  }
+
+  private async terminalRevisions(client: PoolClient, subject: RuntimeCredentialSubject, actor: string): Promise<{ user: string; project: string }> {
+    const rows = await client.query<{ user_id: string | null; revision: string }>(`SELECT user_id,revision::text FROM harness.terminal_access_policies
+      WHERE organization_id=$1 AND (user_id=$2 OR project_id=$3) AND enabled FOR SHARE`,
+    [subject.organizationId,actor,subject.projectInternalId ?? null])
+    const user = rows.rows.find(row => row.user_id === actor)?.revision
+    const project = subject.target.kind === 'user' ? '0' : rows.rows.find(row => row.user_id === null)?.revision
+    if (user === undefined || project === undefined) throw new ExecutionIdentityError(403, 'terminal qualification is unavailable')
+    return { user, project }
+  }
+
   private async principalActor(client: PoolClient, subject: RuntimeCredentialSubject, sessionId: string, principal: GatewayPrincipalClaims): Promise<string> {
-    if (principal.purpose !== undefined) throw new ExecutionIdentityError(403, 'restricted-purpose principals cannot introduce execution inputs')
+    if (principal.purpose !== undefined && principal.purpose !== 'webhook-dispatch') throw new ExecutionIdentityError(403, 'restricted-purpose principals cannot introduce execution inputs')
     const actor = await client.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [subject.organizationId, principal.user.id])
     const id = actor.rows[0]?.id
     if (id === undefined) throw new ExecutionIdentityError(403, 'execution actor is unavailable')
@@ -483,6 +707,17 @@ export class GatewayExecutionIdentity {
       || (capability === 'auto-review' && actor.auto_review_eligible !== true))) {
       throw new ExecutionIdentityError(403, 'an execution actor is no longer eligible')
     }
+    if (capability === 'desktop' || capability === 'user-terminal' || capability === 'ssh') {
+      const resource = capability === 'desktop' ? 'desktop' : capability === 'ssh' ? 'ssh' : 'terminal'
+      const users = await client.query<{ user_id: string }>(`SELECT user_id FROM harness.${resource}_access_policies
+        WHERE organization_id=$1 AND user_id=ANY($2::uuid[]) AND enabled FOR SHARE`, [subject.organizationId, actorIds])
+      if (users.rows.length !== actorIds.length) throw new ExecutionIdentityError(403, `an execution actor lacks ${resource} qualification`)
+      if (subject.target.kind === 'project') {
+        const project = await client.query(`SELECT 1 FROM harness.${resource}_access_policies
+          WHERE organization_id=$1 AND project_id=$2 AND enabled FOR SHARE`, [subject.organizationId, subject.projectInternalId])
+        if (project.rowCount !== 1) throw new ExecutionIdentityError(403, `${resource} access is not enabled for this project`)
+      }
+    }
     if (subject.target.kind === 'user') {
       if (result.rows.some(actor => publicNumber(actor.public_id, 'execution actor') !== subject.target.id)) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
       return
@@ -498,7 +733,7 @@ export class GatewayExecutionIdentity {
       WHERE organization_id=$1 AND project_id=$2 AND user_id=ANY($3::uuid[]) FOR SHARE`,
     [subject.organizationId, subject.projectInternalId, actorIds])
     const writers = new Set(members.rows.filter(row => row.access_mode === 'rw').map(row => row.user_id))
-    if (result.rows.some(actor => actor.role !== 'admin' && (!writers.has(actor.id)
+    if (result.rows.some(actor => (capability === 'desktop' || capability === 'user-terminal' || actor.role !== 'admin') && (!writers.has(actor.id)
       || (session.visibility === 'private' && session.creator_user_id !== actor.id)))) {
       throw new ExecutionIdentityError(403, 'an execution actor cannot write this Session')
     }

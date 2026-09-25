@@ -8,7 +8,7 @@ This tutorial is the programmatic alternative to the Web UI. It installs the pub
 
 - Python 3.10 or newer
 - Git
-- Linux x64, Linux arm64, or macOS 14 or newer on arm64
+- Linux x64, Linux arm64, macOS 14 or newer on arm64, or Windows x64
 - A DeepSeek-compatible API endpoint and credential
 - An isolated workspace that the agent may modify
 
@@ -86,8 +86,8 @@ print(result.final_response)
 |---|---|
 | System prompt | `DSH_SYSTEM_PROMPT`, falling back to `You are a helpful software engineer assistant.` |
 | Model in `minimal.py` | `--model`, then `DSH_MODEL`, then `deepseek-v4-flash` |
-| Model-facing tools | Persistent `bash` and `str_replace_editor` only |
-| Bash timeout | 300 seconds |
+| Model-facing tools | Persistent `bash` (`pwsh` on Windows) and `str_replace_editor` only |
+| Persistent shell timeout | 300 seconds |
 | Editor output limit | 16,000 characters |
 | Context compaction | Disabled |
 | Filesystem | Bare local backend; absolute editor paths may address any path visible to the runtime process |
@@ -99,6 +99,23 @@ The composition omits harness identity, workspace prompt text, skills, one-shot 
 
 `cwd` selects the workspace available to the agent, while `session_root` stores session logs and state. Use a fresh session id for an independent task; reuse an id only when the next call should continue the same conversation and persistent shell state.
 
-The composition uses `danger-full-access`. Run it only inside a disposable checkout or container: Bash and the editor can modify any path allowed to the runtime process. The persistent PTY backend requires a POSIX terminal substrate, so this composition does not support Windows agents.
+The composition uses `danger-full-access`. Run it only inside a disposable checkout or container: the persistent shell and the editor can modify any path allowed to the runtime process. The composition selects `pwsh` on Windows and `bash` elsewhere.
 
 The [`jsonrpc-agent` example reference](../../../examples/jsonrpc-agent/README.md) owns the exact composition. The [Python SDK reference](../../../python/sdk/README.md) covers lifecycle, results, notifications, runtime selection, and configuration; the [Cordis primer](../../cordis-primer.md) covers composition syntax.
+
+<a id="opt-in-to-str_replace_editor"></a>
+## Opt in to `str_replace_editor`
+
+The bundled runtime includes `str_replace_editor`, but the `sdk-minimal` profile omits it — and its filesystem provider — from the default Cordis tree. To use it there, save this configuration as `editor.patch.yml`; `insert` adds both the editor and the filesystem provider the minimal profile lacks:
+
+```yaml
+- insert:
+    - id: fs-local
+      name: '@deepseek-ai/dsh-fs-local'
+      config:
+        cwd: !!js process.cwd()
+    - id: tool-str-replace-editor
+      name: '@deepseek-ai/dsh-tool-str-replace-editor'
+```
+
+Apply it with `dsh --profile sdk-minimal --patch /absolute/path/to/editor.patch.yml`, or put the patch at `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` for persistent configuration. On the next runtime launch, model requests include `str_replace_editor` beside the persistent shell. The local filesystem provider resolves relative paths against the runtime working directory and, like the minimal shell, does not confine access to that directory. For the standard `sdk` profile, insert only the editor row so it uses the existing filesystem provider and policies.

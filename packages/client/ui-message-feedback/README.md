@@ -8,19 +8,19 @@ One `MessageFeedbackController` per Session backs every message control in that 
 
 Mutations go through `ctx.remote.messageFeedback`; the Host owns per-item compare-and-set. Every `put` and `delete` carries the `version` this controller last observed, and a `version-conflict` reply carries the authoritative item, so a lost race reconciles from the reply itself instead of refetching the Session. Mutations serialize per Session, so a queued operation always compares against the committed version. Re-clicking the recorded rating retracts the feedback; switching sides carries the existing note forward.
 
-The `/client` exports are the plugin body (`apply`/`inject`), the `MessageFeedbackActions` component, the `MessageFeedbackController` class, and the injected face types.
+The `/client` exports are the plugin body (`apply`/`inject`) and public types; components and controllers remain internal.
 
 ## Summary
 
-This package is the Web GUI's feedback surface: the Like/Dislike pair in the finalized assistant message's action strip, the feedback dialog with its acknowledgement and failure toasts in the composer overlay, and a decoration that opens the dialog from a bare `/feedback`. Like and Dislike both open the dialog, which collects a category and an optional description before recording the selected rating. One surface per Session backs every entry, so a single list read seeds the whole transcript and one dialog serves the Session and its messages. Ratings, categories, and notes are log-only Session events that never enter model context.
+Message controls retain editable ratings and notes in the Host-owned sidecar. A bare `/feedback` opens a separate Session dialog with a category and optional description; `/feedback <text>` keeps the command acknowledgement. Submitting the dialog uses `sessionFeedback.record`, appends one log-only `feedback/record`, and may trigger Session-log delivery under the deployment's telemetry policy. Neither path starts a model turn. A rejected submission retains its draft for correction, and success shows an acknowledgement. Drafts are isolated by Session and discarded when that Session scope ends; late replies cannot reopen them.
 
 ## Invariants
 
-**Runtime invariant:** No companion is published. Feedback records live in the Host-owned sidecar domain; the browser half renders the action strip and confirmation dialog without holding feedback state.
+**Runtime invariant:** No companion is published. The Host owns durable feedback; the client controllers own disposable reads, drafts, and submission state.
 
 ## Model Experience
 
-None, as ratings, categories, and notes are log-only events, not model input. Optional Session-log delivery uses request metadata rather than model context.
+None, as message ratings remain in a sidecar and Session remarks remain log-only; neither enters model context.
 
 #### KV Cache effect
 

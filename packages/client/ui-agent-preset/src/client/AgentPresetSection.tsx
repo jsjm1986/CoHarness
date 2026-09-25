@@ -13,7 +13,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Button, IconBrowseOutline16, IconCopyOutline16, IconFolderOpenOutline16, IconPlusOutline16, IconTrashOutline16, Modal, Tooltip,
+  Button, IconBrowseOutline16, IconCopyOutline16, IconFolderOpenOutline16, IconPlusOutline16, IconTrashOutline16,
+  Modal, Switch, Tag, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -57,6 +58,8 @@ export interface AgentPresetSectionInjected {
   remove: () => Promise<void>
   /** Make one preset the default for sessions created later. */
   makeDefault: (id: string) => Promise<void>
+  /** Show or hide new-session preset selection. */
+  setPickerVisible: (showPicker: boolean) => Promise<void>
 }
 
 /** Full component props. */
@@ -171,6 +174,23 @@ function CardDescription({ text }: { text: string }): ReactNode {
 }
 
 /**
+ * The locale key naming why the namespace refuses this browser's writes.
+ * @param reason - the mirror's writable reason, when it reported one.
+ * @returns the matching read-only copy key.
+ */
+function readOnlyReasonKey(
+  reason: AgentPresetSectionState['policyWritableReason'],
+): 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment' {
+  switch (reason) {
+    case 'project': return 'readOnlyProject'
+    case 'account': return 'readOnlyAccount'
+    case 'organization': return 'readOnlyOrganization'
+    case 'deployment': return 'readOnlyDeployment'
+    default: return 'readOnly'
+  }
+}
+
+/**
  * Render the Agent presets section content column.
  * @param props - composed slot props.
  * @returns the section, or null when the deployment composes no presets.
@@ -215,8 +235,10 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
       <button
         type="button"
         className={css.creatorButton}
-        disabled={!state.authorable}
-        title={state.authorable ? undefined : t('duplicateUnavailable')}
+        disabled={!state.authorable || !state.showPicker || state.policySaving}
+        title={!state.showPicker
+          ? t('enablePickerToCreate')
+          : state.authorable ? undefined : t('duplicateUnavailable')}
         onClick={() => {
           props.startCreatorDraft?.()
           props.close()
@@ -233,12 +255,39 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
     <div className={css.section}>
       <h2 className={css.title}>{t('nav')}</h2>
       <p className={css.intro}>{t('sectionIntro')}</p>
+      <div className={css.pickerPreference}>
+        <div className={css.pickerPreferenceCopy}>
+          <span className={css.pickerPreferenceTitleRow}>
+            <span className={css.pickerPreferenceTitle}>{t('showPicker')}</span>
+            <Tag>{t('showPickerBeta')}</Tag>
+          </span>
+          <p className={css.pickerPreferenceDescription}>{t('showPickerDescription')}</p>
+        </div>
+        <Switch
+          checked={state.showPicker}
+          label={t('showPicker')}
+          disabled={state.status !== 'ready' || state.policySaving || !state.policyWritable}
+          title={state.policyWritable ? undefined : t(readOnlyReasonKey(state.policyWritableReason))}
+          onChange={(next) => { void props.setPickerVisible(next) }}
+        />
+      </div>
+      {state.policyWritable ? null : (
+        <p className={css.intro} role="status">{t(readOnlyReasonKey(state.policyWritableReason))}</p>
+      )}
       {projectScope ? <p className={css.intro} role="status">{t('projectFilesystem')}</p> : null}
       {state.error === null ? null : <p className={css.error} role="alert">{state.error}</p>}
       {([['system', t('builtInGroup')], ['user', t('customGroup')]] as const).map(([trust, heading]) => {
         const group = state.rows
           .filter(row => row.trust === trust)
-          .map(row => ({ row, text: presetDisplayText(row, t) }))
+          .map(row => ({
+            row,
+            text: presetDisplayText(row, t),
+            selectionAction: row.broken !== undefined
+              ? t('brokenBadge')
+              : row.isDefault
+                ? t(state.showPicker ? 'inUse' : 'selectionOffDefault')
+                : t(state.showPicker ? 'setDefault' : 'enablePickerToSetDefault'),
+          }))
         // The custom group is where a preset of one's own will appear, so it
         // stays on screen even while empty: heading plus the creator entry.
         const tail = trust === 'user' ? creatorButton : null
@@ -248,29 +297,41 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
             <h3 className={css.groupHead}>{heading}</h3>
             {group.length === 0 ? null : (
               <ul className={css.cards}>
-                {group.map(({ row, text }) => (
+                {group.map(({ row, text, selectionAction }) => (
                   <li
                     key={row.id}
-                    className={row.broken !== undefined
-                      ? `${css.card} ${css.cardBroken}`
-                      : row.isDefault ? `${css.card} ${css.cardActive}` : css.card}
+                    className={[
+                      css.card,
+                      row.broken !== undefined ? css.cardBroken : undefined,
+                      row.isDefault ? css.cardActive : undefined,
+                      !state.showPicker && row.broken === undefined && !row.isDefault
+                        ? css.cardSelectionDisabled
+                        : undefined,
+                    ].filter(Boolean).join(' ')}
                   >
                     {/* The card body IS the control: picking a preset is the
                       common act, so it should not hide behind a small button.
                       The action row sits outside it — nesting buttons is
                       invalid, and these act on the card rather than select it.
-                      A broken preset cannot compose a session, so its body is
-                      disabled and the card says why instead of offering it. */}
+                      A broken preset cannot compose a session, so its body
+                      refuses the pick; the reason rides the card rather than
+                      a disabled control a keyboard cannot reach. */}
                     <button
                       type="button"
                       className={css.cardMain}
                       aria-pressed={row.isDefault}
-                      disabled={!state.authorable || row.isDefault || row.broken !== undefined}
+                      disabled={row.isDefault
+                        || (row.broken === undefined
+                          && (!state.showPicker || state.policySaving || !state.policyWritable))}
+                      aria-disabled={row.broken !== undefined}
                       // Without this the name is the whole card read aloud —
                       // title, badge, description, id.
-                      aria-label={`${row.broken !== undefined ? t('brokenBadge') : row.isDefault ? t('inUse') : t('setDefault')}: ${text.name}`}
-                      title={row.broken ?? (row.isDefault ? t('inUse') : t('setDefault'))}
-                      onClick={() => { void props.makeDefault(row.id) }}
+                      aria-label={`${selectionAction}: ${text.name}`}
+                      title={row.broken ?? selectionAction}
+                      onClick={() => {
+                        if (row.broken !== undefined) return
+                        void props.makeDefault(row.id)
+                      }}
                     >
                       <span className={css.cardHead}>
                         <span className={css.cardName}>{text.name}</span>
@@ -280,7 +341,9 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                         <span className={css.badge}>
                           {row.trust === 'user' ? t('userTrust') : t('builtIn')}
                         </span>
-                        {row.isDefault ? <span className={css.inUse}>{t('inUse')}</span> : null}
+                        {row.isDefault
+                          ? <span className={css.inUse}>{state.showPicker ? t('inUse') : t('selectionOffDefault')}</span>
+                          : null}
                       </span>
                       <CardDescription text={text.description ?? t('noDescription')} />
                       {row.broken === undefined

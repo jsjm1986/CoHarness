@@ -64,7 +64,10 @@ export interface TerminalBlockProps {
   home?: string | undefined
   /** The command's output text; may contain ANSI escape sequences. */
   output?: string | undefined
-  /** Settled exit code; non-zero renders a failure pill, null an explicit no-exit-code pill. */
+  /**
+   * Settled exit code; non-zero renders a failure pill. `null` — or an omitted status on a settled
+   * command — renders the no-exit-code pill: an unknown status is never success.
+   */
   exitCode?: number | null | undefined
   /** Settled terminating signal name; any value renders the status pill, taking precedence over the exit code. */
   signal?: string | undefined
@@ -97,8 +100,10 @@ function promptLabel(cwd: string, home: string | undefined): string {
 /**
  * Status pill text for a settled command, or undefined when the command
  * settled cleanly (exit 0, no signal) and needs no pill — the same
- * distinction the bash tool's own exit-status markers draw.
- * @param exitCode - settled code, `null` for an explicitly unknown code, or absent.
+ * distinction the bash tool's own exit-status markers draw. A settled
+ * command without a status fact — `null` or simply absent — gets the
+ * no-exit-code pill: unknown is never success.
+ * @param exitCode - settled code, `null` or absent for an unknown code.
  * @param signal - settled terminating signal name, when known.
  * @param labels - display copy for the pill text.
  * @returns the pill text, or undefined for a clean exit.
@@ -109,8 +114,8 @@ function statusText(
   labels: TerminalBlockLabels,
 ): string | undefined {
   if (signal !== undefined) return labels.signal(signal)
-  if (exitCode === null) return labels.noExitCode
-  if (exitCode !== undefined && exitCode !== 0) return labels.exitCode(exitCode)
+  if (exitCode === undefined || exitCode === null) return labels.noExitCode
+  if (exitCode !== 0) return labels.exitCode(exitCode)
   return undefined
 }
 
@@ -121,11 +126,11 @@ function statusText(
  * four states are reachable: the running chase (the same
  * indicator a running tool row's leading icon uses, so the row and its card
  * never disagree), green for a clean settle, red for a signal or a non-zero
- * exit — the same status distinction {@link statusText} draws for the pill. An
- * omitted legacy exit status keeps the clean-settle presentation. An explicit
- * null status reports that no exit code was received and never shows success.
+ * exit — the same status distinction {@link statusText} draws for the pill. A
+ * settled command whose exit status never arrived reports the no-exit-code
+ * failure, exactly like an explicit `null`, and never shows success.
  * @param running - the command has not settled.
- * @param exitCode - settled code, `null` for an explicitly unknown code, or absent.
+ * @param exitCode - settled code, `null` or absent for an unknown code.
  * @param signal - settled terminating signal name, when known.
  * @param labels - display copy for the text label.
  * @returns the dot's state and its text label, since the dot is aria-hidden.
@@ -192,7 +197,12 @@ export function TerminalBlock({
 
   const onToggle = useCallback(() => { setExpanded(value => !value) }, [])
 
-  const status = statusText(exitCode, signal, copy)
+  // A running card carries no status fact, so an absent exitCode must not
+  // raise the no-exit-code pill — but a caller that does supply a signal or
+  // code (a settle that outran the running flag) still gets its pill.
+  const status = running && exitCode === undefined && signal === undefined
+    ? undefined
+    : statusText(exitCode, signal, copy)
   const state = runState(running, exitCode, signal, copy)
   // A multi-line command gets one prompt row per line, so a two-command shell
   // snippet reads as the two commands it is instead of collapsing into one

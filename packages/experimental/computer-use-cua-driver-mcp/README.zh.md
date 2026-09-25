@@ -54,6 +54,8 @@ kind: "package-reference"
 
 模型看到的工具使用固定的 `mcp__cua-driver-mcp__` 命名空间。工具名称、描述、输入模式、规范结果和图像准入遵循现有 [MCP 桥接器](../../mcp/mcp-client/README.zh.md)。本包不额外提供 DSH 操作目录或提供者选择工具。
 
+固定桌面命名空间在发送 MCP 请求前经过[桌面执行政策](../../computer-use/computer-use/README.zh.md)。被拒绝的调用不会到达子进程，政策取消会取消已准入请求；其他 MCP 服务命名空间保留各自的政策。
+
 -----
 
 <a id="understand-the-implementation"></a>

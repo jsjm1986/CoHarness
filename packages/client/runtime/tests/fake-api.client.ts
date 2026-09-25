@@ -88,6 +88,10 @@ export function fakeRemote(api?: FakeApiClient): SessionRemotes {
 }
 
 export class FakeApiClient implements IApiClient {
+  readonly desktop: IApiClient['desktop'] = {
+    status: async () => ok(null),
+    confirm: async () => ({ rpcId: RpcId('desktop-unavailable'), result: { ok: false, error: { code: 'internal', message: 'No desktop configured.', details: {} } } }),
+  }
   /** Chronological call record: [method, payload]. */
   readonly calls: { method: string; payload: unknown }[] = []
 
@@ -243,7 +247,7 @@ export class FakeApiClient implements IApiClient {
 
   // The archive-set field defaults at the binding below so list stubs keep
   // the pre-archive `{ items }` shape; a stub carrying the field wins.
-  onWorkspaceList: (payload: unknown) => Promise<RpcResponse<{ items: never[]; archivedSessionIds?: never[] }>> =
+  onWorkspaceList: (payload: unknown) => Promise<RpcResponse<{ items: WorkspaceView[]; archivedSessionIds?: SessionId[] }>> =
     () => Promise.resolve(ok({ items: [] }))
   onWorkspaceCreate: (payload: unknown) => Promise<RpcResponse<{ workspace: WorkspaceView; created: boolean }>> =
     () => Promise.resolve(ok({ workspace: fakeWorkspace('fk-ws'), created: true }))
@@ -263,10 +267,13 @@ export class FakeApiClient implements IApiClient {
   onWorkspaceArchiveSession: (payload: unknown) => Promise<RpcResponse<{ archivedSessionIds: SessionId[] }>> =
     payload => Promise.resolve(ok({ archivedSessionIds: [(payload as { sessionId: SessionId }).sessionId] }))
 
+  onWorkspaceUnarchiveSession: (payload: unknown) => Promise<RpcResponse<{ archivedSessionIds: SessionId[] }>> =
+    () => Promise.resolve(ok({ archivedSessionIds: [] }))
+
   readonly workspace: IApiClient['workspace'] = {
     list: (payload: unknown) => this.record('workspace.list', payload, this.onWorkspaceList(payload).then(response => (
       response.result.ok
-        ? { ...response, result: { ok: true as const, value: { archivedSessionIds: [] as never[], ...response.result.value } } }
+        ? { ...response, result: { ok: true as const, value: { archivedSessionIds: [] as SessionId[], ...response.result.value } } }
         : response
     )) as ReturnType<IApiClient['workspace']['list']>),
     create: (payload: unknown) => this.record('workspace.create', payload, this.onWorkspaceCreate(payload)),
@@ -278,9 +285,17 @@ export class FakeApiClient implements IApiClient {
       this.record('workspace.insertSessionBefore', payload, this.onWorkspaceInsertSessionBefore(payload)),
     archiveSession: (payload: unknown) =>
       this.record('workspace.archiveSession', payload, this.onWorkspaceArchiveSession(payload)),
+    unarchiveSession: (payload: unknown) =>
+      this.record('workspace.unarchiveSession', payload, this.onWorkspaceUnarchiveSession(payload)),
+  }
+
+  readonly workspaceChanges: IApiClient['workspaceChanges'] = {
+    summary: (payload: unknown) => this.record('workspaceChanges.summary', payload, Promise.resolve(ok(null))),
+    diff: (payload: unknown) => this.record('workspaceChanges.diff', payload, Promise.resolve(ok(null))),
   }
 
   readonly workspaceFiles: IApiClient['workspaceFiles'] = {
+    renderOffice: async () => { throw new Error('Office preview is not configured in this fake') },
     list: (payload: unknown) => this.record('workspaceFiles.list', payload, Promise.resolve(ok({ path: '', entries: [], truncated: false }))),
     stat: (payload: unknown) => this.record('workspaceFiles.stat', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, type: 'file' as const, bytes: 0, version: 'fake' }))),
     read: (payload: unknown) => this.record('workspaceFiles.read', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, offset: 1, limit: 1, text: '', eof: true, version: 'fake' }))),

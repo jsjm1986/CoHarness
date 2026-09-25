@@ -121,11 +121,13 @@ describe('search', () => {
 })
 
 describe('scope tree', () => {
-  it('mints lazily on first resolution, tags the ctx, and keeps binding identity stable', async () => {
+  it('borrows only retained generations and keeps their binding identity stable', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1' }])
     expect(b.svc.scope(sid('unknown'))).toBeUndefined()
-    const scoped = b.svc.scope(sid('s1'))
+    expect(b.svc.scope(sid('s1'))).toBeUndefined()
+    const reference = b.svc.retain(sid('s1'), { source: 'controllerOperation' })
+    const scoped = reference.binding.ctx
     expect(scoped).toBeDefined()
     expect(scopeOf(scoped as Context)).toBe('s1')
     expect(scopeOf(b.ctx)).toBeUndefined()
@@ -134,16 +136,19 @@ describe('scope tree', () => {
     expect(binding?.session).toBe(b.svc.currentProvideInfo.getSnapshot().hooks['session'])
     expect(b.svc.binding(sid('s1'))).toBe(binding)
     expect(binding?.ctx).toBe(scoped)
+    reference.release()
   })
 
-  it('tears down an off-stage removed session but defers the staged one until the stage moves', async () => {
+  it('keeps explicit and view references through catalog removal until each owner releases', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1' }, { id: 's2' }])
+    b.svc.open(sid('s1'))
     const ctx1 = b.svc.scope(sid('s1'))
-    b.svc.open(sid('s1')) // s1 staged (current)
-    b.svc.scope(sid('s2')) // s2 scoped but off stage
+    const reference = b.svc.retain(sid('s2'), { source: 'controllerOperation' })
 
-    await feedList(b, [{ id: 's1' }]) // s2 removed, off stage: torn down
+    await feedList(b, [{ id: 's1' }])
+    expect(b.svc.scope(sid('s2'))).toBe(reference.binding.ctx)
+    reference.release()
     expect(b.svc.scope(sid('s2'))).toBeUndefined()
 
     await feedList(b, []) // s1 removed while staged (current masks): deferred, scope survives
@@ -154,9 +159,43 @@ describe('scope tree', () => {
     expect(b.svc.scope(sid('s1'))).toBeUndefined()
   })
 
+  it('rejects a retired context while its replacement with the same Session id is live', async () => {
+    const b = bench()
+    await b.ctx.plugin(() => {}).await()
+    const teardownStarted = deferred<undefined>()
+    const finishTeardown = deferred<undefined>()
+    try {
+      await feedList(b, [{ id: 's1' }])
+      const oldReference = b.svc.retain(sid('s1'), { source: 'controllerOperation' })
+      const old = oldReference.binding
+      old.ctx.effect(() => async () => {
+        teardownStarted.resolve(undefined)
+        await finishTeardown.promise
+      }, 'test: delayed scope teardown')
+      expect(b.svc.sessionOf(old.ctx.extend())).toBe(old.session)
+      oldReference.release()
+      await teardownStarted.promise
+      await feedList(b, [{ id: 's1' }])
+      const replacementReference = b.svc.retain(sid('s1'), { source: 'controllerOperation' })
+      const replacement = replacementReference.binding
+      expect(replacement.session).not.toBe(old.session)
+      expect(b.svc.sessionOf(old.ctx)).toBeUndefined()
+      expect(b.svc.sessionOf(old.ctx.extend())).toBeUndefined()
+      expect(b.svc.sessionOf(replacement.ctx.extend())).toBe(replacement.session)
+      expect(b.svc.sessionOf(b.ctx)).toBeUndefined()
+      finishTeardown.resolve(undefined)
+      await Promise.resolve()
+      expect(b.svc.sessionOf(replacement.ctx)).toBe(replacement.session)
+    } finally {
+      finishTeardown.resolve(undefined)
+      await b.ctx.fiber.dispose()
+    }
+  })
+
   it('keeps the scope when the session merely stops running (frozen ≠ removed)', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', running: true }])
+    b.svc.open(sid('s1'))
     const scoped = b.svc.scope(sid('s1'))
     await feedList(b, [{ id: 's1', running: false }])
     expect(b.svc.scope(sid('s1'))).toBe(scoped)
@@ -165,12 +204,15 @@ describe('scope tree', () => {
   it('cancels a deferred teardown when the id reappears in the list', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1' }])
-    const scoped = b.svc.scope(sid('s1'))
+    const reference = b.svc.retain(sid('s1'), { source: 'controllerOperation' })
+    const scoped = reference.binding.ctx
     b.svc.open(sid('s1'))
     await feedList(b, []) // removed while staged → deferred
     await feedList(b, [{ id: 's1' }, { id: 's2' }]) // reappears (current resurfaces, stage unchanged)
     b.svc.open(sid('s2')) // stage moves; sweep must NOT tear down the re-listed s1
     expect(b.svc.scope(sid('s1'))).toBe(scoped)
+    reference.release()
+    expect(b.svc.scope(sid('s1'))).toBeUndefined()
   })
 })
 
@@ -365,8 +407,8 @@ describe('cell (render-layer session kit)', () => {
     }
     b.svc.open(ids[1]!)
     b.svc.setAdditionalStaged(ids.slice(1))
-    expect(b.svc.binding(ids[0]!)!.session.getSnapshot().openState).toBe('cold')
-    expect(b.svc.binding(ids[0]!)!.session.getSnapshot().running).toBe(true)
+    expect(b.svc.binding(ids[0]!)).toBeUndefined()
+    expect(b.svc.list.getSnapshot().byId[ids[0]!]?.running).toBe(true)
     expect(b.api.calls.some(call => call.method === 'session.cancel')).toBe(false)
     b.svc.clear()
     expect(historyIds()).toEqual(ids)
@@ -402,10 +444,10 @@ describe('slot-store scope prune hook', () => {
     const pruneStoreScope = vi.fn()
     b.ctx.reflect.provide('slots', { pruneStoreScope })
     await feedList(b, [{ id: 's1' }, { id: 's2' }])
-    b.svc.scope(sid('s1'))
-    b.svc.scope(sid('s2'))
+    const reference = b.svc.retain(sid('s1'), { source: 'controllerOperation' })
     b.svc.open(sid('s2')) // s2 staged
-    await feedList(b, []) // s1 off stage → immediate drop; s2 staged → deferred
+    await feedList(b, [])
+    reference.release()
     expect(pruneStoreScope).toHaveBeenCalledWith('s1')
     expect(pruneStoreScope).not.toHaveBeenCalledWith('s2')
     await feedList(b, [{ id: 's3' }])
@@ -416,8 +458,9 @@ describe('slot-store scope prune hook', () => {
   it('tolerates a slots-less boot (object-layer benches carry no slot service)', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1' }])
-    b.svc.scope(sid('s1'))
-    await feedList(b, []) // teardown without ctx.slots must not throw
+    const reference = b.svc.retain(sid('s1'), { source: 'controllerOperation' })
+    await feedList(b, [])
+    reference.release()
     expect(b.svc.scope(sid('s1'))).toBeUndefined()
   })
 })
@@ -538,7 +581,7 @@ describe('create', () => {
     })
   })
 
-  it('resolves with the session already listed and binding-resolvable (no flush wait)', async () => {
+  it('resolves with a listed Session that can be retained without a notifier flush', async () => {
     const b = bench()
     b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('born') }))
     const born = await b.svc.create({ workspaceId: 'ws' as never })
@@ -546,8 +589,11 @@ describe('create', () => {
     // create echo IS the entity entering the client's view (blank row +
     // resolvable scope/binding), no notifier flush in between.
     expect(b.svc.list.getSnapshot().byId[born]).toMatchObject({ id: 'born', blank: true })
-    expect(b.svc.binding(born)).toBeDefined()
+    expect(b.svc.binding(born)).toBeUndefined()
+    const reference = b.svc.retain(born, { source: 'controllerOperation' })
+    expect(reference.binding.sessionId).toBe(born)
     expect(b.svc.scope(born)).toBeDefined()
+    reference.release()
   })
 
   it('keeps a workspace hint for a blank draft across list refreshes', async () => {
@@ -691,12 +737,13 @@ describe('fork', () => {
 
     await expect(b.svc.fork({ sessionId: sid('source'), increaseTitle: true }))
       .rejects.toThrow('fork child rename failed: title-invalid: rejected')
-    expect(b.svc.binding(sid('child'))).toBeDefined()
+    expect(b.svc.list.getSnapshot().ids).toContain('child')
+    expect(b.svc.binding(sid('child'))).toBeUndefined()
   })
 })
 
 describe('scope lifecycle rides the list mirror (entity parity: no client-side pre-birth)', () => {
-  it('a session-added frame births the row (blank) and makes the scope resolvable; removal prunes it', async () => {
+  it('catalog arrival enables retention without creating a scope and catalog removal preserves its owner', async () => {
     const b = bench()
     await feedList(b, [])
     expect(b.svc.scope(sid('s-new'))).toBeUndefined() // not in view: no scope, no exceptions
@@ -705,7 +752,9 @@ describe('scope lifecycle rides the list mirror (entity parity: no client-side p
       payload: { type: 'host/session-added', sessionId: sid('s-new'), blank: true, cwd: '/w/a' } as never,
     })
     await Promise.resolve()
-    const scoped = b.svc.scope(sid('s-new'))
+    expect(b.svc.scope(sid('s-new'))).toBeUndefined()
+    const reference = b.svc.retain(sid('s-new'), { source: 'controllerOperation' })
+    const scoped = reference.binding.ctx
     expect(scoped).toBeDefined()
     expect(scopeOf(scoped as Context)).toBe('s-new')
     b.svc.handleHostEnvelope({
@@ -713,6 +762,8 @@ describe('scope lifecycle rides the list mirror (entity parity: no client-side p
       payload: { type: 'host/session-removed', sessionId: sid('s-new') },
     })
     await Promise.resolve()
+    expect(b.svc.scope(sid('s-new'))).toBe(scoped)
+    reference.release()
     expect(b.svc.scope(sid('s-new'))).toBeUndefined()
   })
 })
@@ -728,6 +779,7 @@ describe('blank mirror', () => {
     })
     await Promise.resolve()
     expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: true, running: true })
+    b.svc.open(sid('s1'))
     expect(b.svc.binding(sid('s1'))?.session.getSnapshot().blank).toBe(true)
 
     b.svc.handleMuxEnvelope({
@@ -750,6 +802,7 @@ describe('blank mirror', () => {
   it('waits for a visible event after prompt acceptance', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', blank: true, cwd: '/w/a' }])
+    b.svc.open(sid('s1'))
     const session = b.svc.binding(sid('s1'))!.session
     expect(session.getSnapshot().blank).toBe(true)
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onPrompt']>>>()
@@ -782,6 +835,7 @@ describe('blank mirror', () => {
   it('keeps a rejected first prompt blank: hidden and still reusable', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', blank: true, cwd: '/w/a' }])
+    b.svc.open(sid('s1'))
     const session = b.svc.binding(sid('s1'))!.session
     b.api.onPrompt = () => Promise.resolve({
       rpcId: 'busy' as never,
@@ -813,6 +867,7 @@ describe('blank mirror', () => {
   it('keeps an accepted empty turn hidden across a stale list refresh', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', blank: true }])
+    b.svc.open(sid('s1'))
     const session = b.svc.binding(sid('s1'))!.session
     await session.prompt([{ type: 'text', text: 'hi' }], 'queue')
     await Promise.resolve()

@@ -68,6 +68,42 @@ describe('durable V3 admission failures', () => {
     expect(() =>{  sessionFormatV2ToV3.migrateHeader({ ...header, draft: true }) }).toThrow(/unexpected field/)
   })
 
+  it('carries the CoHarness sshTarget binding through header decode/encode while v2 stays strict', () => {
+    const physical = { type: 'session', ...header, version: 3, sshTarget: 41 }
+    expect(releasedV3SessionFormatCodec.decodeHeader(physical)).toEqual({ ...header, version: 3, sshTarget: 41 })
+    const decoder = releasedV3SessionFormatCodec.createDecoder(physical, 'strict')
+    expect(decoder.header).toEqual({ ...header, version: 3, sshTarget: 41 })
+    const encoded = releasedV3SessionFormatCodec.encodeHeader({ ...header, version: 3, sshTarget: 41 }, 0)
+    expect(encoded).toMatchObject({ version: 3, sshTarget: 41 })
+    expect(releasedV3SessionFormatCodec.decodeHeader({ type: 'session', ...encoded })).toEqual({ ...header, version: 3, sshTarget: 41 })
+    const absent = releasedV3SessionFormatCodec.encodeHeader({ ...header, version: 3 }, 0)
+    expect('sshTarget' in absent).toBe(false)
+    for (const bad of ['41', 0, -1, 1.5, null]) {
+      expect(() =>{  assertReleasedV3Header({ ...header, version: 3, sshTarget: bad }) }).toThrow(/sshTarget/)
+      expect(() =>{  releasedV3SessionFormatCodec.decodeHeader({ ...physical, sshTarget: bad as number }) }).toThrow(/sshTarget/)
+    }
+    // The released-v2 codec predates `sshTarget`; it must still refuse the field.
+    expect(() =>{  sessionFormatV2ToV3.migrateHeader({ ...header, sshTarget: 41 }) }).toThrow(/unexpected field/)
+  })
+
+  it.each([undefined, 41])('restores sshTarget=%j without exposing it to V2 relationship validation', (sshTarget) => {
+    const artifact = {
+      header: { ...header, version: 3, ...(sshTarget === undefined ? {} : { sshTarget }) },
+      events: [],
+      inheritedEventCount: 0,
+    }
+    expect(restoreReleasedV3Artifact(artifact, new Set())).toBe(artifact)
+    expect(() => restoreReleasedV3Artifact({ ...artifact, header: { ...artifact.header, sshTarget: '41' } }, new Set()))
+      .toThrow('sshTarget must be a positive safe integer')
+  })
+
+  it.each([undefined, false, true])('restores draft=%j without exposing it to V2 relationship validation', (draft) => {
+    const artifact = { header: { ...header, version: 3, ...(draft === undefined ? {} : { draft }) }, events: [], inheritedEventCount: 0 }
+    expect(restoreReleasedV3Artifact(artifact, new Set())).toBe(artifact)
+    expect(() => restoreReleasedV3Artifact({ ...artifact, header: { ...artifact.header, draft: 'yes' } }, new Set()))
+      .toThrow('draft must be boolean')
+  })
+
   it('retains native source extensions through payload validation without classifying their references', () => {
     const extension = event('user/message', { ...user, source: { kind: 'custom-source', localRef: 77 } }, { surfaceOp: 'append' })
     expect(() =>{  assertEvent(extension, 3) }).not.toThrow()

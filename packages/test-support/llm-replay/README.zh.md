@@ -12,13 +12,13 @@
 
 ## fixture 的工作方式
 
-fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `assistant/chunk` 事件包含每个 `StreamChunk`，因此按 `(turn, step)` 分组即可重建每次 agent loop（智能体循环）的 `stream()` 调用的分片序列。压缩（compaction）摘要器成功时，日志记录方式有所不同：当 `compaction/summary` 携带 `llmStreamCall: true` 和完整的 `rawOutput` 时，回放会在该事件的位置重建一条规范成功流，其中每个块各使用一对 `block-start`/`block-end`，带上已记录的用量（如有），并以 `stop` 终止。提供方增量的精确切分不属于持久压缩结果。不带该标记的 `rawOutput` 并不意味着发生了本地 LLM 调用，因为模板摘要器和远程摘要器即使未使用此上下文的适配器，也可能保留完整输出。
+fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `assistant/message` 与 `assistant/attempt` 事件包含每次模型调用的已录制流；展开该流即可重建 `StreamChunk` 序列。历史分片行先经过声明的格式目录，再派生回放脚本。压缩（compaction）摘要器成功时，日志记录方式有所不同：当 `compaction/summary` 携带 `llmStreamCall: true` 和完整的 `rawOutput` 时，回放会在该事件的位置重建一条规范成功流，其中每个块各使用一对 `block-start`/`block-end`，带上已记录的用量（如有），并以 `stop` 终止。提供方增量的精确切分不属于持久压缩结果。不带该标记的 `rawOutput` 并不意味着发生了本地 LLM 调用，因为模板摘要器和远程摘要器即使未使用此上下文的适配器，也可能保留完整输出。
 
-因此，录制就是「运行一次真实 agent 并收集 `.jsonl`」，由快照 harness 完成；该插件本身不录制。fixture 的 `request/header` 内容可能被标记化为 `{{system}}`/`{{tools}}`（harness 会在一个场景中固定该内容，并清除其余场景中的内容）；回放不受影响，因为派生过程只读取 `assistant/chunk` 和 `compaction/summary` 事件以及第 0 行的会话 header。
+因此，录制就是「运行一次真实 agent 并收集 `.jsonl`」，由快照 harness 完成；该插件本身不录制。fixture 的 `request/header` 内容可能被标记化为 `{{system}}`/`{{tools}}`（harness 会在一个场景中固定该内容，并清除其余场景中的内容）；回放不受影响，因为派生过程读取恢复后的 Assistant 流、带标记的 `compaction/summary` 事件以及 Session header。
 
-`parseSessionLog` 还会展开 JSONL 的范围编码 `sourceEventSeqs`，因此物理持久化行与投影 fixture 会向回放消费者提供相同的逻辑事件元数据。
+`parseSessionLog` 还会展开 JSONL 的范围编码 `sourceEventSeqs`，因此物理持久化行与投影 fixture 会向回放消费者提供相同的逻辑事件元数据。同一份构建期格式目录校验物理行、相邻迁移和当前事件载荷。fixture 必须全部保留完整信封，或全部同时省略序号与时间；部分省略或混用均失败。比较编码保留受支持的投影标记和当前 header 字段，包括显式为 false 或 true 的 `draft`。
 
-有两种失败模式无法仅根据 `assistant/chunk` 重建：在产生任何分片前直接抛出异常（例如 HTTP 401，此时日志只有 `turn/end {error}` 而没有分片），以及取消或挂起（差异在时序，而非分片内容）。需要这些行为的场景可提供伴随文件（`<scenario>/replay.override.json`）：它可以替换派生脚本（裸 `ReplayEntry[]`），也可以增补派生脚本（`{ patches: [{ at, entry }] }`：保留所有从 JSONL 派生的调用，只替换指定的从 0 开始计数的调用索引；当 `at` 等于派生长度时，则在注入瞬态异常后的重试位置追加一次调用）。补丁索引不得重复。文件加载时会校验覆写文档、每个补丁和条目，以及每个分片的判别标签。`hang` 条目可以指定 `readyFile`；当前缀分片到达循环后、开始等待取消前，回放会写入这个空标记，使外部驱动程序无需观察展示层更新即可确定性地取消。
+有两种失败模式无法仅根据持久化的结算事件重建：在产生任何分片前直接抛出异常（例如 HTTP 401，此时日志只有 `turn/end {error}` 而没有分片），以及取消或挂起（差异在时序，而非分片内容）。需要这些行为的场景可提供伴随文件（`<scenario>/replay.override.json`）：它可以替换派生脚本（裸 `ReplayEntry[]`），也可以增补派生脚本（`{ patches: [{ at, entry }] }`：保留所有从 JSONL 派生的调用，只替换指定的从 0 开始计数的调用索引；当 `at` 等于派生长度时，则在注入瞬态异常后的重试位置追加一次调用）。补丁索引不得重复。文件加载时会校验覆写文档、每个补丁和条目，以及每个分片的判别标签。`hang` 条目可以指定 `readyFile`；当前缀分片到达循环后、开始等待取消前，回放会写入这个空标记，使外部驱动程序无需观察展示层更新即可确定性地取消。
 
 脚本字符串可以内嵌 `{{fromRequest:<regex>}}`，用来填入静态伴随文件不可能预知的值——例如模型必须原样回填到 `update_goal` 的随机生成 goal id。回放时每个占位符针对实时请求解析：语料是请求消息的所有字符串叶子按换行拼接的结果，取该模式在语料中的最后一次匹配，用其第一个捕获组（无捕获组时用整个匹配）原位替换。模式匹配不到内容、模式非法、占位符未闭合都会明确报错。连续右花括号串的最后两个花括号才是占位符结束符，因此模式可以以花括号量词收尾（如 `[0-9a-f]{4}`），但不能在 `}}` 之后还有后续模式内容。解析作用于所有脚本条目，包括从已记录 JSONL 派生的条目——若录制文本本身合法地含有该字面量标记，需改用不含标记的伴随文件表达。
 
@@ -28,6 +28,8 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 
 回放根据发起调用的会话 id 为每次调用建立键（`GenerateOptions.sessionId` 由 agent loop 写入）。实时会话 id 每次运行时都会重新随机生成，绝不会等于记录中的 id，因此实时会话按**首次调用顺序**绑定到已记录脚本：脚本按 header 中的 `createdAt` 排序（父会话在前，因为它必须先开始流式输出才能委托）；第一个发起调用的实时会话取得第一个脚本，下一个新会话取得下一个脚本，以此类推。此后每个会话分别推进自己的游标。没有 `sessionId` 的调用视为一个绑定主脚本的匿名会话。不同实时会话的数量超过已记录脚本数时会明确报错。
 
+官方 DeepSeek 回放只在脚本请求已受理后提交注册的请求扩展。无 chunk 的抛错默认为未受理，除非 sidecar 显式设置 `accepted: true`；部分流默认为已受理。类型化的 `{{session:N}}` 引用解析为对应的实时会话。尚未绑定的子会话会失败，除非成功的 `subagent` 工具结果已公布其身份；用户正文、其他工具及失败结果不能建立该身份。后续子会话调用必须与公布的身份一致。
+
 ## 配置
 
 | 键 | 类型 | 默认值 | 说明 |
@@ -35,7 +37,7 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 | `file` | string | `$DSH_SNAPSHOT_FILE` | 主（父）`session.jsonl` fixture 的路径。必需（配置或 env）。 |
 | `overrideFile` | string | `$DSH_SNAPSHOT_OVERRIDE` | 主会话的可选 `ReplayOverrideDoc` 伴随文件：裸 `ReplayEntry[]` 替换其派生脚本，`{ patches }` 则按调用索引增补该脚本。 |
 | `childFiles` | string[] | `$DSH_SNAPSHOT_CHILD_FILES`（以路径分隔符分隔） | 嵌套场景中已记录的 subagent 子会话日志；单会话场景为空。 |
-| `providers` | `ReplayProviderConfig[]` | 无 | 可选的仅回放提供方和模型目录。每个提供方可以设置 `retryPolicy`，每个模型可以发布 `contextWindow` 和仅包含 `text`、`image` 的 `inputModalities` 数组；模态配置无效时，插件加载会失败。已配置路由通过回放适配器分派，绝不执行提供方 I/O。 |
+| `providers` | `ReplayProviderConfig[]` | 无 | 可选的仅回放提供方和模型目录。每个提供方可以设置 `retryPolicy`，每个模型可以发布 `contextWindow` 和仅包含 `text`、`image` 的 `inputModalities` 数组；模态配置无效时，插件加载会失败。支持图片的模型可用正整数 `imageRequestTokens` 设置每张保留图片的视觉 token 数；已卸载图片只计省略说明文本。`systemPromptUpdate: in-history` 启用请求历史中的提示词替换；其他显式值会使加载失败。已配置路由通过回放适配器分派，绝不执行提供方 I/O。 |
 | `paceMs` | number | 无（突发） | 可选的每分片延迟（单位为毫秒），使下游传输（例如真实浏览器观察到的 Web SSE（Server-Sent Events）多路复用器）看到真正的增量传递。它只是用于提高真实性的调节项，测试不得依赖它保证正确性。值必须是非负整数；pace 等待期间中止会迅速取消流。 |
 
 ```yaml

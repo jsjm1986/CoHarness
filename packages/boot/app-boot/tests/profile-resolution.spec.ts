@@ -288,21 +288,15 @@ describe('profile resolution generation', { concurrent: false }, () => {
 
   it('prefers ambient TypeScript-source results over routed artifact entries', async () => {
     const f = fixture()
-    // The workspace topology this repair serves: the ambient lookup and the
-    // generation entry reach the same real package through different links
-    // (a source-plane loader maps it to a TypeScript artifact).
-    const routed = pkg(join(f.root, 'install', 'node_modules', 'ambient-lib'), 'ambient-lib', 1)
-    file(join(dirname(routed), 'package.json'), JSON.stringify({
-      name: 'ambient-lib',
-      version: '1.0.0',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(dirname(routed), 'index.ts'), 'export const marker = 1\n')
-    file(join(dirname(routed), 'index.cjs'), 'module.exports = { marker: 1 }\n')
     const ambient = join(f.root, 'node_modules', 'ambient-lib')
-    mkdirSync(dirname(ambient), { recursive: true })
-    symlinkSync(dirname(routed), ambient, process.platform === 'win32' ? 'junction' : 'dir')
+    file(join(ambient, 'package.json'), JSON.stringify({
+      name: 'ambient-lib',
+      version: '2.0.0',
+      type: 'module',
+      exports: { import: './index.ts' },
+    }))
+    file(join(ambient, 'index.ts'), 'export const marker = 2\n')
+    const routed = pkg(join(f.root, 'install', 'node_modules', 'ambient-lib'), 'ambient-lib', 1)
     const generation: ProfileResolutionGeneration = {
       profilesDir: join(f.root, 'profiles'),
       profileDir: f.profile.dir,
@@ -318,10 +312,9 @@ describe('profile resolution generation', { concurrent: false }, () => {
     const registration = installProfileResolution(generation)
     registrations.push(registration)
     const parent = pathToFileURL(join(generation.profilesDir, 'entry.mjs')).href
-    expect(resolveFrom('ambient-lib', parent))
-      .toBe(pathToFileURL(join(dirname(routed), 'index.ts')).href)
+    expect(resolveFrom('ambient-lib', parent)).toBe(pathToFileURL(join(ambient, 'index.ts')).href)
     expect(resolveFrom('ambient-lib', parent, { type: 'javascript' }))
-      .toBe(pathToFileURL(join(dirname(routed), 'index.ts')).href)
+      .toBe(pathToFileURL(join(ambient, 'index.ts')).href)
   })
 
   it('routes a scoped CommonJS package through its containing node_modules directory', async () => {
@@ -659,180 +652,6 @@ describe('profile resolution generation', { concurrent: false }, () => {
     expect(() => resolveFrom(
       '#resolution-lib', pathToFileURL(join(f.profile.dir, 'dual-stale.mjs')).href,
     )).toThrow(/profile resolution mismatch/u)
-  })
-
-  it('keeps an ambient source-plane result inside the generation package', async () => {
-    const f = fixture()
-    file(join(f.installed, 'package.json'), JSON.stringify({
-      name: 'resolution-lib',
-      version: '1.0.0',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(f.installed, 'index.ts'), 'export const marker = 1\n')
-    const generation = await healProfilesModuleFallback({
-      installAnchor: f.installAnchor,
-      profile: f.profile,
-      home: f.root,
-    })
-    const parent = pathToFileURL(join(f.profile.dir, 'entry.mjs')).href
-
-    const enforce = installProfileResolution(generation)
-    expect(resolveFrom('resolution-lib', parent))
-      .toBe(pathToFileURL(join(f.installed, 'index.ts')).href)
-    enforce.dispose()
-
-    const verify = installProfileResolution(generation, 'verify')
-    registrations.push(verify)
-    expect(resolveFrom('resolution-lib', parent))
-      .toBe(pathToFileURL(join(f.installed, 'index.ts')).href)
-  })
-
-  it('detects an ambient source-plane result outside the generation package in verify mode', async () => {
-    const f = fixture()
-    const generation = await healProfilesModuleFallback({
-      installAnchor: f.installAnchor,
-      profile: f.profile,
-      home: f.root,
-    })
-    // A stale projection: the managed link still resolves ambient lookups, but
-    // into a package the generation did not select. A TypeScript export keeps
-    // the probe's result on the source plane.
-    const projection = join(generation.profilesDir, 'node_modules', 'resolution-lib')
-    unlinkSync(projection)
-    const stale = join(f.root, 'stale', 'resolution-lib')
-    file(join(stale, 'package.json'), JSON.stringify({
-      name: 'resolution-lib',
-      version: '9.9.9',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(stale, 'index.ts'), 'export const marker = 9\n')
-    file(join(stale, 'index.cjs'), 'module.exports = { marker: 9 }\n')
-    symlinkSync(stale, projection, process.platform === 'win32' ? 'junction' : 'dir')
-    const registration = installProfileResolution(generation, 'verify')
-    registrations.push(registration)
-    expect(() => resolveFrom(
-      'resolution-lib', pathToFileURL(join(f.profile.dir, 'entry.mjs')).href,
-    )).toThrow(/profile resolution mismatch/u)
-  })
-
-  it('routes over an ambient source-plane result outside the generation package in enforce mode', async () => {
-    const f = fixture()
-    const generation = await healProfilesModuleFallback({
-      installAnchor: f.installAnchor,
-      profile: f.profile,
-      home: f.root,
-    })
-    const projection = join(generation.profilesDir, 'node_modules', 'resolution-lib')
-    unlinkSync(projection)
-    const stale = join(f.root, 'stale', 'resolution-lib')
-    file(join(stale, 'package.json'), JSON.stringify({
-      name: 'resolution-lib',
-      version: '9.9.9',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(stale, 'index.ts'), 'export const marker = 9\n')
-    file(join(stale, 'index.cjs'), 'module.exports = { marker: 9 }\n')
-    symlinkSync(stale, projection, process.platform === 'win32' ? 'junction' : 'dir')
-    const registration = installProfileResolution(generation)
-    registrations.push(registration)
-    expect(resolveFrom(
-      'resolution-lib', pathToFileURL(join(f.profile.dir, 'entry.mjs')).href,
-    )).toBe(pathToFileURL(realpathSync(join(f.installed, 'index.js'))).href)
-  })
-
-  it('keeps an ambient source-plane result the after-fallback anchor also selects', async () => {
-    const f = fixture()
-    // A package above the shared fallback position is not generation-managed:
-    // its route is after-fallback, and the ambient source result stays only
-    // when the routed lookup above the profiles directory selects it too.
-    const unmanaged = join(f.root, 'node_modules', 'ambient-after-lib')
-    file(join(unmanaged, 'package.json'), JSON.stringify({
-      name: 'ambient-after-lib',
-      version: '1.0.0',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(unmanaged, 'index.ts'), 'export const marker = 1\n')
-    file(join(unmanaged, 'index.cjs'), 'module.exports = { marker: 1 }\n')
-    const registration = installProfileResolution(await generationOf(f))
-    registrations.push(registration)
-
-    expect(resolveFrom(
-      'ambient-after-lib', pathToFileURL(join(f.profile.dir, 'entry.mjs')).href,
-    )).toBe(pathToFileURL(join(unmanaged, 'index.ts')).href)
-  })
-
-  it('routes over an ambient source-plane result outside the after-fallback package', async () => {
-    const f = fixture()
-    const generation = await generationOf(f)
-    // A stray copy at the shared fallback position wins the ambient lookup —
-    // it sits closer to the importing profile — while the after-fallback
-    // anchor above the profiles directory selects a different copy.
-    const stale = join(generation.profilesDir, 'node_modules', 'stray-source-lib')
-    file(join(stale, 'package.json'), JSON.stringify({
-      name: 'stray-source-lib',
-      version: '9.9.9',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(stale, 'index.ts'), 'export const marker = 9\n')
-    file(join(stale, 'index.cjs'), 'module.exports = { marker: 9 }\n')
-    const selected = join(f.root, 'node_modules', 'stray-source-lib')
-    pkg(selected, 'stray-source-lib', 1)
-    const parent = pathToFileURL(join(f.profile.dir, 'entry.mjs')).href
-
-    const enforce = installProfileResolution(generation)
-    expect(resolveFrom('stray-source-lib', parent))
-      .toBe(pathToFileURL(join(selected, 'index.js')).href)
-    enforce.dispose()
-
-    const verify = installProfileResolution(generation, 'verify')
-    registrations.push(verify)
-    expect(() => resolveFrom('stray-source-lib', parent))
-      .toThrow(/profile resolution mismatch/u)
-  })
-
-  it('detects an ambient source-plane result the after-fallback lookup misses in verify mode', async () => {
-    const f = fixture()
-    const generation = await generationOf(f)
-    const stale = join(generation.profilesDir, 'node_modules', 'stray-only-lib')
-    file(join(stale, 'package.json'), JSON.stringify({
-      name: 'stray-only-lib',
-      version: '9.9.9',
-      type: 'module',
-      exports: { import: './index.ts', require: './index.cjs' },
-    }))
-    file(join(stale, 'index.ts'), 'export const marker = 9\n')
-    file(join(stale, 'index.cjs'), 'module.exports = { marker: 9 }\n')
-    const registration = installProfileResolution(generation, 'verify')
-    registrations.push(registration)
-
-    expect(() => resolveFrom(
-      'stray-only-lib', pathToFileURL(join(f.profile.dir, 'entry.mjs')).href,
-    )).toThrow(/generation resolved nothing/u)
-  })
-
-  it('treats an ambient source result without an owning package as outside the route', async () => {
-    const f = fixture()
-    const generation = await generationOf(f)
-    // No package.json anywhere above the resolved module: the source-plane
-    // probe cannot prove the ambient file is inside the selected package.
-    const unmanaged = join(f.root, 'node_modules', 'manifestless-source')
-    file(join(unmanaged, 'index.ts'), 'export const marker = 1\n')
-    const parent = pathToFileURL(join(f.profile.dir, 'entry.mjs')).href
-
-    const enforce = installProfileResolution(generation)
-    expect(resolveFrom('manifestless-source/index.ts', parent))
-      .toBe(pathToFileURL(join(unmanaged, 'index.ts')).href)
-    enforce.dispose()
-
-    const verify = installProfileResolution(generation, 'verify')
-    registrations.push(verify)
-    expect(() => resolveFrom('manifestless-source/index.ts', parent))
-      .toThrow(/generation resolved nothing/u)
   })
 
   it('leaves relative package imports targets and their diagnostics to Node', async () => {

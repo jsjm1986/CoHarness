@@ -1,25 +1,27 @@
-# Agent Note: 生产环境客户端 HMR 采用显式启用
+# Agent Note：生产环境客户端产物轮询需显式启用
 
 Status: implemented
 
 [English](2026-08-23-production-client-hmr-opt-in.md) | 中文
 
-## Problem
+## 问题
 
-Web 组合在每次启动时都挂载 `dsh-client-hmr`。即使没有开发构建 watcher 改写 bundle，Host 半边仍会轮询每个客户端 bundle 并暴露 SSE 路由，使普通生产会话承担周期性的文件系统工作。
+没有开发构建器改写文件时，轮询全部客户端 bundle 会产生周期性文件系统开销。禁用整个 HMR 插件还会移除实时图通道，而已打开页面需要通过该通道获知 Host 插件的启停。
 
-## Decision
+## 决策
 
-Web Bundle 只有在启动环境包含精确值 `DSH_CLIENT_HMR=1` 时才启用 `client-hmr` Loader 行。开发启动在运行 `pnpm run dev:web` 重建客户端产物的同时设置该变量。现有 profile patch watcher 独立保持启用，因此普通配置编辑仍然支持实时重载。HMR 包保留现有生命周期和轮询实现，由组合决定其 Fiber 是否存在。
+Web Bundle 始终挂载图传输。其 `watchArtifacts` 配置只在启动环境包含精确值 `DSH_CLIENT_HMR=1` 时启用 stat 轮询。开发启动在运行 `pnpm run dev:web` 的同时设置该变量。普通启动中的图变化与重连快照保持事件驱动，不读取产物基线，也不创建轮询计时器。
 
-## Alternatives considered
+包默认值保留自定义组装中的产物监视。发行 Web 组装拥有生产配置，静态组装检查同时拒绝禁用图传输和无条件产物轮询。页面协调由[共享 ClientEntries 控制器](2026-09-23-page-owned-client-entries.zh.md)负责。
 
-**始终挂载该行。** 否决：空闲的开发功能仍会在每个生产进程中周期性执行 stat 轮询并占用一个路由。
+## 考虑过的替代方案
 
-**增加运行时 heartbeat 或构建器到 Host 的通知通道。** 否决：这会为仅开发期功能增加第二套协调协议和常驻控制面。
+**禁用整个插件。** 这会阻止已打开页面观察插件成员变化，使页面的 Loader 清单陈旧。
 
-**完全关闭 HMR。** 否决：本地客户端开发仍需要源码编辑后的重载，现有浏览器验收测试也覆盖这一行为。
+**在生产环境轮询产物。** 没有开发构建器时，这仍会增加周期性文件系统开销。
 
-## Consequences
+**增加构建器通知协议。** 现有显式启用的轮询已经支持包括网络挂载在内的源码开发，无需另一套协调协议。
 
-普通 Web 启动不会创建客户端 bundle 轮询器、HMR SSE 路由或浏览器 HMR entry。开发者必须显式设置 `DSH_CLIENT_HMR=1` 并运行 `pnpm run dev:web`。Web 表层提示词以及 CLI、Bundle 参考文档都会说明这一更新约定。未设置开关时，客户端源码编辑必须走正常构建和刷新页面路径。
+## 结果
+
+普通启动拥有 SSE 通道和浏览器传输条目，但不创建产物轮询器。客户端源码变更需要显式开发开关和构建器，或走常规构建与刷新流程。Host 配置重载和页面级图协调不依赖产物轮询。测试证明关闭轮询时的图传输和清理，源码编辑验收覆盖启用路径。

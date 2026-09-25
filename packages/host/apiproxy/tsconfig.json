@@ -12,10 +12,16 @@
       "path": "../../api/remotes/tsconfig.host.json"
     },
     {
+      "path": "../../api/terminal-controller/tsconfig.host.json"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
       "path": "../../attachment/userdoc"
+    },
+    {
+      "path": "../../computer-use/computer-use"
     },
     {
       "path": "../../context/collaboration"
@@ -40,6 +46,12 @@
     },
     {
       "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../../deliverables/workspace-changes"
+    },
+    {
+      "path": "../../document/office-to-pdf"
     },
     {
       "path": "../../extensions/cordis-host-runner"
@@ -100,6 +112,18 @@
     },
     {
       "path": "../../skill/skill"
+    },
+    {
+      "path": "../../ssh/ssh"
+    },
+    {
+      "path": "../../ssh/fs-ssh"
+    },
+    {
+      "path": "../../ssh/subprocess-ssh"
+    },
+    {
+      "path": "../../ssh/sandbox-ssh"
     },
     {
       "path": "../../subagent/subagent"

@@ -243,7 +243,7 @@ export class LocalPtySession implements TerminalBackendSession {
   private readonly emulatorData: IDisposable
   private readonly sanitizer: TerminalSanitizer
   private readonly scrollback: BoundedTextBuffer
-  private readonly outputEnded = Promise.withResolvers<void>()
+  private readonly outputEnded = Promise.withResolvers<undefined>()
   private readonly completion: Promise<void>
   private statusValue: TerminalSessionStatus = { kind: 'running' }
   // TODO(pty-send-state-consolidation): Fold the per-send fields below
@@ -484,13 +484,13 @@ export class LocalPtySession implements TerminalBackendSession {
     this.onData(this.decoder.decode())
     this.appendOutput(this.sanitizer.flush())
     this.closeEmulator()
-    this.outputEnded.resolve()
+    this.outputEnded.resolve(undefined)
   }
 
   private readonly onTerminalError = (error: Error): void => {
     this.closeEmulator()
     this.onTransportFailure(error)
-    this.outputEnded.resolve()
+    this.outputEnded.resolve(undefined)
   }
 
   private onData(data: string): void {

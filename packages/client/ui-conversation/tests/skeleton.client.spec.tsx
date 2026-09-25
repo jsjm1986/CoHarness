@@ -29,6 +29,7 @@ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps,
 } from '../src/client/contract/slots.ts'
+import type { QueuedMessage } from '../src/client/input/contract.ts'
 import type { ComposerBlock } from '../src/client/input/blocks.ts'
 import type { ConversationDisplaySettingsSnapshot } from '../src/client/display-settings.ts'
 import type { ViewTab } from '../src/client/contract/views.ts'
@@ -119,6 +120,7 @@ function mount(
   const sessions = createSnapshotStore<SessionListState>({
     ids: listed ? [root, SID] : [root],
     byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
+    archivedById: {},
     current: SID,
     phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   })
@@ -648,5 +650,48 @@ describe('ConversationRoot resident composer', () => {
     }))
     expect(b.view.getByRole('alert').textContent).toContain('Message send failed (offline)')
     expect(b.view.queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
+})
+
+// The InputState store republishes only on member movement: session/queue
+// notifies that leave input state untouched must not re-render subscribers.
+describe('SessionInputShell publication stability', () => {
+  function shellWithQueue() {
+    let listener: (() => void) | undefined
+    const items: QueuedMessage[] = []
+    const queue = {
+      getSnapshot: () => items,
+      subscribe: (fn: () => void) => { listener = fn; return () => {} },
+    }
+    const sink = vi.fn(() => Promise.resolve({ kind: 'success' as const }))
+    const shell = new SessionInputShell({
+      actx: {} as ClientContext,
+      queue,
+      defaultSink: sink,
+      commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
+    })
+    return { shell, sink, notify: () => listener?.() }
+  }
+
+  it('skips the store write when a queue notify leaves input state unchanged', () => {
+    const { shell, notify } = shellWithQueue()
+    const seen: string[] = []
+    shell.state.subscribe(() => { seen.push(JSON.stringify(shell.state.getSnapshot().draft)) })
+    notify()
+    notify()
+    expect(seen).toHaveLength(0)
+    shell.setDraft('next')
+    expect(seen).toHaveLength(1)
+    shell.dispose()
+  })
+
+  it('publishes again when a member actually moves', () => {
+    const { shell } = shellWithQueue()
+    const seen: number[] = []
+    shell.state.subscribe(() => { seen.push(shell.state.getSnapshot().draftRev) })
+    shell.setDraft('a')
+    shell.setDraft('ab')
+    expect(seen).toHaveLength(2)
+    shell.dispose()
   })
 })

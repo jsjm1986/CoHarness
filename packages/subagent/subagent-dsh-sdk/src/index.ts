@@ -10,6 +10,8 @@
  * @module @deepseek-ai/dsh-subagent-dsh-sdk
  */
 
+import { statSync } from 'node:fs'
+import { isAbsolute, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -31,10 +33,14 @@ export const inject = ['subagents']
 export interface Config {
   /** Provider name on `ctx.subagents` (default `dsh-sdk`). */
   providerName: string
-  /** The executable to spawn for each run (the child runtime bin or packaged exe). */
-  command: string
-  /** Arguments passed to {@link command} (typically the child's `cordis.yml` path). */
-  args: string[]
+  /** Explicit dsh CLI module, resolved and checked at plugin load; omission uses the SDK dependency. */
+  dshBin?: string
+  /** Named child profile (default `sdk`). */
+  profile: string
+  /** Ordered per-launch profile patch files, resolved and checked at plugin load. */
+  patches: string[]
+  /** Absolute isolated Harness home for every nested child process. */
+  dshHome: string
   /**
    * Working directory override for the child process and its SDK session
    * workspace. Must be non-empty; a relative path resolves against the
@@ -74,8 +80,10 @@ export interface Config {
 
 export const Config: z<Config> = z.object({
   providerName: z.string().default('dsh-sdk'),
-  command: z.string().required(),
-  args: z.array(z.string()).default([]),
+  dshBin: z.string(),
+  profile: z.string().default('sdk'),
+  patches: z.array(z.string()).default([]),
+  dshHome: z.string().required(),
   cwd: z.string(),
   provider: z.string().default('deepseek-official'),
   model: z.string().default('deepseek-v4-flash'),
@@ -88,7 +96,18 @@ export const Config: z<Config> = z.object({
 })
 
 /** The shape after schemastery applied the defaults (`cwd` and `maxTokens` have none). */
-type ResolvedConfig = Required<Omit<Config, 'cwd' | 'maxTokens'>> & Pick<Config, 'cwd' | 'maxTokens'>
+type ResolvedConfig = Required<Omit<Config, 'cwd' | 'maxTokens' | 'dshBin' | 'reasoningEffort'>> & Pick<Config, 'cwd' | 'maxTokens' | 'dshBin' | 'reasoningEffort'>
+
+/** Resolve one configured runtime file against the harness launch directory and require a regular file. */
+function resolveConfiguredFile(field: string, value: string): string {
+  const path = resolve(value)
+  try {
+    if (statSync(path).isFile()) return path
+  } catch {
+    // The diagnostic below owns missing, inaccessible, and non-file paths uniformly.
+  }
+  throw new TypeError(`subagent-dsh-sdk ${field} must name an existing file: ${path}`)
+}
 
 /**
  * The SDK provider. Advertises NO start-time capabilities: an out-of-process
@@ -126,8 +145,10 @@ class SdkSubagentProvider implements SubagentProvider {
       ...maxTokens === undefined ? {} : { maxTokens },
     }
     const spec: SdkRunSpec = {
-      command: this.config.command,
-      args: this.config.args,
+      ...this.config.dshBin === undefined ? {} : { dshBin: this.config.dshBin },
+      profile: this.config.profile,
+      patches: this.config.patches,
+      dshHome: this.config.dshHome,
       cwd,
       ...route,
       env: this.config.env,
@@ -153,11 +174,17 @@ export function apply(ctx: Context, config: Config): void {
   if (resolved.maxTokens !== undefined && (!Number.isSafeInteger(resolved.maxTokens) || resolved.maxTokens <= 0)) {
     throw new TypeError('subagent-dsh-sdk maxTokens must be a positive safe integer')
   }
+  if (!isAbsolute(resolved.dshHome)) throw new TypeError('subagent-dsh-sdk dshHome must be an absolute path')
+  const launchPaths: ResolvedConfig = {
+    ...resolved,
+    patches: resolved.patches.map((path, index) => resolveConfiguredFile(`patches[${String(index)}]`, path)),
+    ...resolved.dshBin === undefined ? {} : { dshBin: resolveConfiguredFile('dshBin', resolved.dshBin) },
+  }
   // Interpret a relative configured cwd against the harness launch directory
   // ONCE, at load, and fail a misconfigured directory here — not per start.
   const configuredCwd = validateConfiguredCwd('subagent-dsh-sdk', resolved.cwd)
   const validated: ResolvedConfig = configuredCwd === undefined
-    ? resolved
-    : { ...resolved, cwd: configuredCwd }
+    ? launchPaths
+    : { ...launchPaths, cwd: configuredCwd }
   ctx.subagents.registerProvider(new SdkSubagentProvider(validated.providerName, ctx, validated))
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority';
 import { ReloadableModelAccess } from "./access.js";
 import { UsageOutbox } from "./outbox.js";
 import { OrganizationCredentialLayer } from "./organization-credentials.js";
@@ -42,6 +43,23 @@ function participantIdentity(messages) {
         }
     }
     return undefined;
+}
+/** Resolve billing witnesses without borrowing the current browser connection's identity. */
+async function billingExecution(ctx, options, initiator) {
+    const authority = executionAuthorityOf(ctx);
+    if (options.executionIdentity !== undefined)
+        return { managed: authority !== undefined, identity: options.executionIdentity };
+    if (authority === undefined)
+        return { managed: false, identity: undefined };
+    const agent = initiator ?? (options.sessionId === undefined ? undefined : ctx.get('agents')?.get(options.sessionId));
+    if (agent === undefined) {
+        if (options.purpose === 'auto-review')
+            throw new Error('Auto review has no executing Agent for attribution');
+        // Configuration probes and cold auxiliary requests have no live Agent; retain explicit unattributed usage.
+        return { managed: true, identity: undefined };
+    }
+    const state = await authority.authorize(options.purpose === 'auto-review' ? 'auto-review' : 'execute', agent, options.signal);
+    return { managed: true, identity: { inputs: state.inputs, ...state.primaryActorUserId === undefined ? {} : { primaryActorUserId: state.primaryActorUserId } } };
 }
 /** Mount policy provider plus final llm/stream enforcement and metering. */
 export function apply(ctx) {
@@ -164,14 +182,13 @@ export function apply(ctx) {
         });
     });
     ctx.on('llm/stream', (options, next) => {
-        const initiatorId = ctx.get('agents')?.currentInitiator()?.session.id;
+        const initiator = ctx.get('agents')?.currentInitiator();
+        const initiatorId = initiator?.session.id;
         const explicitId = options.sessionId;
         const attributedId = explicitId ?? initiatorId;
-        const actor = personalRuntime ? undefined : participantIdentity(options.messages);
         const base = {
             eventId: randomUUID(), occurredAt: Date.now(), provider: options.provider, model: options.model,
             purpose: options.purpose ?? 'assistant', ...attributedId === undefined ? {} : { sessionId: String(attributedId) },
-            ...actor === undefined ? {} : { actorUserId: actor.userId, actorProjectId: actor.projectId },
         };
         if (initiatorId !== undefined && explicitId !== undefined && initiatorId !== explicitId) {
             return (async function* () {
@@ -181,13 +198,43 @@ export function apply(ctx) {
                         } } };
             })();
         }
-        const decision = access.decide({ provider: options.provider, model: options.model });
-        if (!decision.allowed)
-            return (async function* () {
+        return (async function* () {
+            let execution;
+            try {
+                execution = await billingExecution(ctx, options, initiator);
+            }
+            catch {
+                // A missing managed provider or refused attribution must not dispatch the model request.
+                enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'failed' });
+                yield { type: 'finish', reason: { kind: 'error', failure: {
+                            message: 'model-governance: execution identity could not be verified', code: 'MODEL_EXECUTION_IDENTITY_FAILED',
+                        } } };
+                return;
+            }
+            if (execution.identity !== undefined) {
+                if (execution.identity.primaryActorUserId === undefined || attributedId === undefined) {
+                    enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'failed' });
+                    yield { type: 'finish', reason: { kind: 'error', failure: {
+                                message: 'model-governance: verified billing inputs require a Session and primary actor', code: 'MODEL_EXECUTION_IDENTITY_FAILED',
+                            } } };
+                    return;
+                }
+                base.executionInputIds = [...execution.identity.inputs];
+                base.actorUserId = execution.identity.primaryActorUserId;
+            }
+            else if (!execution.managed && !personalRuntime) {
+                const actor = participantIdentity(options.messages);
+                if (actor !== undefined) {
+                    base.actorUserId = actor.userId;
+                    base.actorProjectId = actor.projectId;
+                }
+            }
+            const decision = access.decide({ provider: options.provider, model: options.model });
+            if (!decision.allowed) {
                 enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'denied' });
                 yield { type: 'finish', reason: { kind: 'error', failure: { message: decision.reason, code: 'MODEL_FORBIDDEN' } } };
-            })();
-        return (async function* () {
+                return;
+            }
             let usage;
             let source = 'unknown';
             let status = 'cancelled';

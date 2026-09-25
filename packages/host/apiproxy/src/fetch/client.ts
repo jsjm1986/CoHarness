@@ -1,3 +1,5 @@
+import { desktopStatusValueSchema, desktopConfirmationSchema } from '../api/desktop.schema.ts'
+import { workspaceFilesRenderOfficeValueSchema } from '../api/workspace-files.schema.ts'
 /**
  * Client side of the fetch carrier. AbstractApiClient holds every protocol invariant: rpcId minting,
  * four-quadrant envelope wrap/unwrap, zod parsing, in-process SSE frame decoding, and the payload-direct
@@ -5,6 +7,7 @@
  * abstract doFetch (transport) + overridable onEnvelope (tap). ApiProxy (the impl face) is untouched.
  */
 
+import { workspaceChangesSummaryValueSchema, workspaceChangesDiffValueSchema } from '../api/workspace-changes.schema.ts'
 import type { z } from 'zod'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { ApiProxy, HostFrame, MuxFrame } from '../api/index.ts'
@@ -34,6 +37,7 @@ import {
 } from '../api/sessions.schema.ts'
 import {
   workspaceArchiveSessionValueSchema,
+  workspaceUnarchiveSessionValueSchema,
   workspaceCreateValueSchema,
   workspaceDeleteValueSchema,
   workspaceInsertBeforeValueSchema,
@@ -109,8 +113,18 @@ export interface IApiClient {
     insertBefore(payload: RequestPayload<'workspace.insertBefore'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.insertBefore'>>>
     insertSessionBefore(payload: RequestPayload<'workspace.insertSessionBefore'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.insertSessionBefore'>>>
     archiveSession(payload: RequestPayload<'workspace.archiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.archiveSession'>>>
+    unarchiveSession(payload: RequestPayload<'workspace.unarchiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.unarchiveSession'>>>
+  }
+  desktop: {
+    status(payload: RequestPayload<'desktop.status'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.status'>>>
+    confirm(payload: RequestPayload<'desktop.confirm'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.confirm'>>>
+  }
+  workspaceChanges: {
+    summary(payload: RequestPayload<'workspaceChanges.summary'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceChanges.summary'>>>
+    diff(payload: RequestPayload<'workspaceChanges.diff'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceChanges.diff'>>>
   }
   workspaceFiles: {
+    renderOffice(payload: RequestPayload<'workspaceFiles.renderOffice'>, signal: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.renderOffice'>>>
     list(payload: RequestPayload<'workspaceFiles.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.list'>>>
     stat(payload: RequestPayload<'workspaceFiles.stat'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.stat'>>>
     read(payload: RequestPayload<'workspaceFiles.read'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.read'>>>
@@ -167,6 +181,8 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
   'subagent.history': historyWireValueSchema,
+  'desktop.status': desktopStatusValueSchema,
+  'desktop.confirm': desktopConfirmationSchema,
   'host.describe': hostDescribeValueSchema,
   'host.pickDirectory': hostPickDirectoryValueSchema,
   'host.listDirectory': hostListDirectoryValueSchema,
@@ -179,7 +195,11 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'workspace.insertBefore': workspaceInsertBeforeValueSchema,
   'workspace.insertSessionBefore': workspaceInsertSessionBeforeValueSchema,
   'workspace.archiveSession': workspaceArchiveSessionValueSchema,
+  'workspace.unarchiveSession': workspaceUnarchiveSessionValueSchema,
+  'workspaceChanges.summary': workspaceChangesSummaryValueSchema,
+  'workspaceChanges.diff': workspaceChangesDiffValueSchema,
   'workspaceFiles.list': workspaceFilesListValueSchema,
+  'workspaceFiles.renderOffice': workspaceFilesRenderOfficeValueSchema,
   'workspaceFiles.stat': workspaceFilesStatValueSchema,
   'workspaceFiles.read': workspaceFilesReadValueSchema,
   'workspaceFiles.readBytes': workspaceFilesReadBytesValueSchema,
@@ -764,9 +784,21 @@ export abstract class AbstractApiClient implements IApiClient {
     insertBefore: (payload, signal) => this.callUnary('workspace.insertBefore', payload, signal),
     insertSessionBefore: (payload, signal) => this.callUnary('workspace.insertSessionBefore', payload, signal),
     archiveSession: (payload, signal) => this.callUnary('workspace.archiveSession', payload, signal),
+    unarchiveSession: (payload, signal) => this.callUnary('workspace.unarchiveSession', payload, signal),
+  }
+
+  readonly desktop: IApiClient['desktop'] = {
+    status: (payload, signal) => this.callUnary('desktop.status', payload, signal),
+    confirm: (payload, signal) => this.callUnary('desktop.confirm', payload, signal),
+  }
+
+  readonly workspaceChanges: IApiClient['workspaceChanges'] = {
+    summary: (payload, signal) => this.callUnary('workspaceChanges.summary', payload, signal),
+    diff: (payload, signal) => this.callUnary('workspaceChanges.diff', payload, signal),
   }
 
   readonly workspaceFiles: IApiClient['workspaceFiles'] = {
+    renderOffice: (payload, signal) => this.callUnary('workspaceFiles.renderOffice', payload, signal),
     list: (payload, signal) => this.callUnary('workspaceFiles.list', payload, signal),
     stat: (payload, signal) => this.callUnary('workspaceFiles.stat', payload, signal),
     read: (payload, signal) => this.callUnary('workspaceFiles.read', payload, signal),

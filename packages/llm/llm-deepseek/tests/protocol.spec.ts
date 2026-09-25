@@ -41,6 +41,17 @@ it.each([false, true])('uses Messages when protocol is omitted, schema=%s', asyn
   })
 })
 
+it.each(['https://api.deepseek.com', 'https://api.deepseek.com/', 'https://api.deepseek.com/v1'])(
+  'maps the bare official root %s to the Messages base', (baseURL) => {
+    expect(resolveAdapterOptions({ protocol: 'messages', baseURL }).baseURL)
+      .toBe('https://api.deepseek.com/anthropic')
+  })
+
+it('keeps a custom Messages gateway root literal', () => {
+  expect(resolveAdapterOptions({ protocol: 'messages', baseURL: 'https://gateway.example.com/anthropic/' }).baseURL)
+    .toBe('https://gateway.example.com/anthropic/')
+})
+
 it('keeps the prepared Messages protocol, credential reference and endpoint after switching to Chat', async () => {
   const first = await endpoint(), second = await endpoint(response => response.end(chat))
   let connection = resolveAdapterOptions({ protocol: 'messages', baseURL: first.url, apiKeyEnv: 'MESSAGES_KEY', maxTokens: 12 })

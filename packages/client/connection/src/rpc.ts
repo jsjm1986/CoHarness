@@ -67,6 +67,16 @@ export interface HostConnectionRpc {
 /** Client caller for logical RPC channels carried by the current transport. */
 export interface ClientConnectionRpc {
   /**
+   * Open a read stream through an authenticated logical channel.
+   * @param channel - registered logical channel.
+   * @param endpoint - channel-relative endpoint.
+   * @param payload - channel-owned arguments.
+   * @param signal - caller lifetime.
+   * @returns correlated values or a terminal refusal; absent in unary-only embedded carriers.
+   */
+  stream?(channel: string, endpoint: string, payload: unknown, signal: AbortSignal): AsyncIterable<ConnectionRpcResult<unknown>>
+
+  /**
    * Call one endpoint through an already registered logical channel.
    * @param channel - absolute logical channel such as `/api`.
    * @param endpoint - channel-relative endpoint such as `goals/create`.

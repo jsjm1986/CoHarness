@@ -1,8 +1,10 @@
 import { Context } from '@deepseek-ai/cordis'
+import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { GatewayRequestPrincipal, GatewayRuntimeRequestInit } from '@deepseek-ai/dsh-gateway-runtime'
 import type { ExecutionInputId, ExecutionQuestionId, ExecutionState } from '@deepseek-ai/dsh-execution-authority'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
+import { WebhookDeliveryId, WebhookRuleId, WebhookSourceId } from '@deepseek-ai/dsh-webhook'
 import { TeamId, TeamMessageId } from '@deepseek-ai/dsh-experimental-agent-team'
 import SessionStore, { SessionId, SessionLogOffset, SessionSeq, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -25,10 +27,13 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config } =
   const sessions = ctx.plugin(SessionStore)
   const projections = ctx.plugin(SessionProjectionRegistry)
   const agents = new Map<SessionId, Agent>()
+  const owners = new Map<SessionId, Agent>()
   let initiator: Agent | undefined
   let preset = 'workspace-write'
   let sandboxMode = 'workspace-write'
-  ctx.provide('agents', { get: (id: SessionId) => agents.get(id), list: () => [...agents.values()], currentInitiator: () => initiator } as never)
+  ctx.provide('agents', { get: (id: SessionId) => agents.get(id), list: () => [...agents.values()],
+    roots: () => [...agents.values()].filter(agent => !owners.has(agent.id)),
+    isOwnedBy: (id: SessionId, owner: Agent) => owners.get(id) === owner, currentInitiator: () => initiator } as never)
   const observeSession = vi.fn<SessionQueryEngine['observeSession']>()
   ctx.provide('sessionQuery', { observeSession } as never)
   ctx.provide('permissionPresets', { current: () => preset } as never)
@@ -36,6 +41,7 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config } =
   let stream!: ReadableStreamDefaultController<Uint8Array>
   let current = state()
   let principal: GatewayRequestPrincipal | undefined
+  let requestPrincipal: GatewayRequestPrincipal | undefined
   let authorize: (() => Promise<ExecutionState>) | undefined
   const requests: { path: string; body: Record<string, unknown> }[] = []
   const responses = new Map<string, (body: Record<string, unknown>, init?: GatewayRuntimeRequestInit) => Promise<Response>>()
@@ -58,7 +64,8 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config } =
     if (path.endsWith('/authorize') && authorize !== undefined) return Response.json(await authorize())
     return Response.json(current)
   })
-  ctx.provide('gatewayRuntime', { identity: { kind: options.kind ?? 'user', id: 1 }, interactive: () => principal, request } as never)
+  ctx.provide('gatewayRuntime', { identity: { kind: options.kind ?? 'user', id: 1 },
+    interactive: () => principal, current: () => principal ?? requestPrincipal, request } as never)
   const fiber = ctx.plugin(GatewayExecution, options.config)
   cleanups.push(async () => { agents.clear(); await fiber.dispose(); await projections.dispose(); await sessions.dispose() })
   await fiber.await()
@@ -67,8 +74,9 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config } =
   const agent = { id: session.id, session, ctx, status: 'running', cancel, whenIdle: () => Promise.resolve() } as unknown as Agent
   agents.set(agent.id, agent)
   await vi.waitFor(async () => { expect(await ctx.executionAuthority.authorize('execute', agent)).toEqual(current) })
-  return { ctx, agent, agents, requests, request, stream, responses, observeSession, fiber, cancel,
+  return { ctx, agent, agents, owners, requests, request, stream, responses, observeSession, fiber, cancel,
     setPrincipal(value: GatewayRequestPrincipal | undefined) { principal = value },
+    setRequestPrincipal(value: GatewayRequestPrincipal | undefined) { requestPrincipal = value },
     setState(value: ExecutionState) { current = value },
     setAuthorize(value: () => Promise<ExecutionState>) { authorize = value },
     setInitiator(value: Agent | undefined) { initiator = value },
@@ -87,6 +95,22 @@ function principal(): GatewayRequestPrincipal {
   }
 }
 
+function dispatch(): GatewayRequestPrincipal {
+  const caller = principal()
+  return {
+    assertion: 'verified-dispatch',
+    claims: { ...caller.claims, purpose: 'webhook-dispatch', nonce: 'dispatch-test' },
+  }
+}
+
+function webhookSource() {
+  return {
+    kind: 'webhook' as const, provider: 'github', source: WebhookSourceId('owner/repo'),
+    deliveryId: WebhookDeliveryId('delivery-1'), ruleId: WebhookRuleId('rule-1'),
+    form: 'notice' as const, summary: 'github webhook handled by rule-1',
+  }
+}
+
 function observation(header: SessionHeader, events: readonly SessionEvent[] = []): SessionObservation {
   const result: SessionObservation = {
     source: 'prepared', header, events, inheritedEventCount: SessionLogOffset(0),
@@ -97,6 +121,119 @@ function observation(header: SessionHeader, events: readonly SessionEvent[] = []
 }
 
 describe('managed execution identity', () => {
+  it('mounts desktop policy with live root routing and keeps a child lease until the whole root is idle', async () => {
+    const f = await fixture({ config: { desktop: 'display-0', desktopPollMs: 60_000 } })
+    const session = f.ctx.sessions.create(SessionId('desktop-child'))
+    const child = { ...f.agent, id: session.id, session } as Agent
+    const unrelatedSession = f.ctx.sessions.create(SessionId('unrelated'))
+    f.agents.set(unrelatedSession.id, { ...f.agent, id: unrelatedSession.id, session: unrelatedSession })
+    f.agents.set(child.id, child)
+    f.owners.set(child.id, f.agent)
+    f.responses.set('/acquire', async () => Response.json({ status: 'granted', grantId: 'grant', fencing: 1, grantTtlMs: 300_000 }))
+    f.responses.set('/heartbeat', async () => Response.json({ status: 'held' }))
+    f.responses.set('/release', async () => Response.json({ released: true }))
+    await expect(f.ctx.computerUseAuthorization.run({ agent: child, signal: new AbortController().signal } as ToolExecution,
+      async () => 'effect')).resolves.toBe('effect')
+    expect(f.requests.find(row => row.path.endsWith('/desktop/acquire'))?.body)
+      .toMatchObject({ sessionId: child.id, ownerSessionIds: [f.agent.id], desktop: 'display-0' })
+    Object.assign(f.agent, { status: 'idle' })
+    await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
+    expect(f.requests.some(row => row.path.endsWith('/desktop/release'))).toBe(false)
+    Object.assign(child, { status: 'idle' })
+    await f.ctx.serial('agent/status', { agent: child, status: 'idle' } as never)
+    await vi.waitFor(() => {
+      expect(f.requests.find(row => row.path.endsWith('/desktop/release'))?.body)
+        .toEqual({ sessionId: f.agent.id, ownerSessionIds: [], desktop: 'display-0', grantId: 'grant' })
+    })
+    f.agents.delete(child.id)
+    f.owners.delete(child.id)
+    await f.ctx.serial('agent/disposed', { agent: child } as never)
+  })
+
+  it.each([null, 'denied'])('refuses a rejected desktop coordinator response and cancels its admission (%s)', async (body) => {
+    const f = await fixture({ config: { desktop: 'display-0' } })
+    f.responses.set('/acquire', async () => new Response(body, { status: 403 }))
+    f.responses.set('/cancel', async () => Response.json({ cancelled: true }))
+    const effect = vi.fn()
+    await expect(f.ctx.computerUseAuthorization.run({ agent: f.agent, signal: new AbortController().signal } as ToolExecution,
+      effect)).rejects.toThrow('Desktop coordination failed (403)')
+    expect(effect).not.toHaveBeenCalled()
+    expect(f.requests.at(-1)?.path).toBe('/internal/runtime/desktop/cancel')
+  })
+
+  it('keeps desktop ownership while an idle root has a running job and reports cleanup failure', async () => {
+    const f = await fixture({ config: { desktop: 'display-0', desktopPollMs: 60_000 } })
+    const callbacks: Array<(agent?: Agent) => void> = []
+    const job = { ownerSession: f.agent.id, status: 'running' }
+    f.ctx.provide('jobs', { list: () => [job], onJobsChanged: (callback: (agent?: Agent) => void) => {
+      callbacks.push(callback); return () => {}
+    } } as never)
+    await vi.waitFor(() => { expect(callbacks).toHaveLength(2) })
+    f.responses.set('/acquire', async () => Response.json({ status: 'granted', grantId: 'grant', fencing: 1, grantTtlMs: 300_000 }))
+    f.responses.set('/heartbeat', async () => Response.json({ status: 'held' }))
+    f.responses.set('/release', async () => new Response(null, { status: 503 }))
+    await f.ctx.computerUseAuthorization.run({ agent: f.agent, signal: new AbortController().signal } as ToolExecution, async () => 'result')
+    Object.assign(f.agent, { status: 'idle' })
+    await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
+    expect(f.requests.some(row => row.path.endsWith('/release'))).toBe(false)
+    for (const callback of callbacks) callback(f.agent)
+    await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
+    job.status = 'completed'
+    for (const callback of callbacks) callback(f.agent)
+    await vi.waitFor(() => { expect(f.requests.some(row => row.path.endsWith('/release'))).toBe(true) })
+  })
+
+  it('handles qualification invalidation before a desktop confirmation has been requested', async () => {
+    const f = await fixture()
+    await f.ctx.executionAuthority.authorize('desktop', f.agent)
+    f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
+    await vi.waitFor(() => { expect(f.requests.filter(row => row.path.endsWith('/authorize') && row.body.capability === 'desktop')).toHaveLength(2) })
+    expect(f.cancel).not.toHaveBeenCalled()
+  })
+
+  it('rechecks desktop confirmation on access invalidation even while qualification remains valid', async () => {
+    const f = await fixture(), authority = f.ctx.executionAuthority as GatewayExecution
+    await authority.authorizeDesktop(f.agent, 'display-0', new AbortController().signal)
+    f.responses.set('/desktop-authorize', async () => new Response(null, { status: 403 }))
+    f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
+    await vi.waitFor(() => { expect(f.cancel).toHaveBeenCalledOnce() })
+  })
+
+  it('uses live owners for root-shared desktop confirmation and ignores historical parentage', async () => {
+    const f = await fixture()
+    const session = f.ctx.sessions.create(SessionId('desktop-child'), { meta: { parentSession: f.agent.id } })
+    const child = { ...f.agent, id: session.id, session } as Agent
+    f.agents.set(child.id, child)
+    const authority = f.ctx.executionAuthority as GatewayExecution
+    const signal = new AbortController().signal
+    await authority.authorizeDesktop(child, 'display-0', signal)
+    expect(f.requests.at(-1)?.body).toEqual({ sessionId: child.id, desktop: 'display-0', ownerSessionIds: [] })
+    f.owners.set(child.id, f.agent)
+    await authority.authorizeDesktop(child, 'display-0', signal)
+    expect(f.requests.at(-1)?.body).toEqual({ sessionId: child.id, desktop: 'display-0', ownerSessionIds: [f.agent.id] })
+    f.responses.set('/desktop-authorize', async () => { f.owners.delete(child.id); return Response.json(state()) })
+    await expect(authority.authorizeDesktop(child, 'display-0', signal)).rejects.toThrow(/ownership changed/)
+  })
+
+  it('refuses incomplete or cyclic live desktop ownership instead of consulting stored lineage', async () => {
+    const f = await fixture(), authority = f.ctx.executionAuthority as GatewayExecution
+    const missing = { ...f.agent, id: SessionId('missing') } as Agent
+    f.owners.set(f.agent.id, missing)
+    await expect(authority.authorizeDesktop(f.agent, 'display-0', new AbortController().signal)).rejects.toThrow(/ownership chain/)
+    f.agents.set(missing.id, missing)
+    f.owners.set(missing.id, f.agent)
+    await expect(authority.authorizeDesktop(f.agent, 'display-0', new AbortController().signal)).rejects.toThrow(/ownership chain/)
+  })
+
+  it('rejects a desktop confirmation response after the caller cancels or detaches', async () => {
+    const f = await fixture(), authority = f.ctx.executionAuthority as GatewayExecution
+    const controller = new AbortController()
+    f.responses.set('/desktop-authorize', async () => { controller.abort(new Error('cancelled')); return Response.json(state()) })
+    await expect(authority.authorizeDesktop(f.agent, 'display-0', controller.signal)).rejects.toThrow()
+    f.responses.set('/desktop-authorize', async () => { f.agents.delete(f.agent.id); return Response.json(state()) })
+    await expect(authority.authorizeDesktop(f.agent, 'display-0', new AbortController().signal)).rejects.toThrow(/ownership changed/)
+  })
+
   it('offers Full access only to a live administrator and removes the policy on unload', async () => {
     const f = await fixture()
     const policy = f.ctx.get('permissionPresetAuthorization')!
@@ -194,6 +331,47 @@ describe('managed execution identity', () => {
     })
     expect(call[1]).toMatchObject({ principal })
     expect(Object.isFrozen(edited)).toBe(true)
+  })
+
+  it('stamps a managed webhook dispatch admission through its purpose-bound assertion', async () => {
+    const f = await fixture()
+    const caller = dispatch()
+    f.setRequestPrincipal(caller)
+    f.responses.set('/input', async () => Response.json({ inputId: B }))
+    const message = createUserMessage({ content: [{ type: 'text', text: 'dispatch' }], source: webhookSource() })
+    const stamped = await f.ctx.executionAuthority.stamp(f.agent.session, message)
+    expect(stamped.source).toMatchObject({ gatewayExecutionInput: B })
+    const call = f.request.mock.calls.at(-1)!
+    expect(call[0]).toBe('/internal/runtime/execution/input')
+    expect(call[1]).toMatchObject({ principal: caller })
+    expect(JSON.parse(call[1]?.body as string)).toMatchObject({ messageId: message.id, kind: 'message' })
+  })
+
+  it('selects a privileged preset under the managed dispatch assertion', async () => {
+    const f = await fixture()
+    const caller = dispatch()
+    f.setRequestPrincipal(caller)
+    await f.ctx.executionAuthority.authorizeSelection(f.agent, 'auto')
+    expect(f.request).toHaveBeenLastCalledWith('/internal/runtime/execution/selection',
+      expect.objectContaining({ principal: caller }))
+  })
+
+  it.each([undefined, 'terminal-admin', 'plugin-admin'] as const)(
+    'refuses input stamping without an interactive caller or dispatch assertion (%s)', async (purpose) => {
+      const f = await fixture()
+      if (purpose !== undefined) {
+        const caller = dispatch()
+        f.setRequestPrincipal({ ...caller, claims: { ...caller.claims, purpose } })
+      }
+      const message = createUserMessage({ content: [{ type: 'text', text: 'dispatch' }], source: webhookSource() })
+      await expect(f.ctx.executionAuthority.stamp(f.agent.session, message)).rejects.toThrow(/interactive caller/)
+    })
+
+  it('refuses input stamping under a purpose-bound interactive caller', async () => {
+    const f = await fixture()
+    f.setPrincipal(dispatch())
+    const message = createUserMessage({ content: [{ type: 'text', text: 'dispatch' }], source: webhookSource() })
+    await expect(f.ctx.executionAuthority.stamp(f.agent.session, message)).rejects.toThrow(/interactive caller/)
   })
 
   it('carries the exact sender and stable message identity into relay verification', async () => {

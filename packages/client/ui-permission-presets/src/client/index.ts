@@ -13,7 +13,9 @@
  * The General-settings row separately writes the default preset for sessions
  * created later through the host Settings API.
  */
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import { DesktopConfirmationAction, type DesktopConfirmationInjected } from './DesktopConfirmationAction.tsx'
+import { desktopEn, desktopZh } from './desktop-locales.ts'
+import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the settings slot types (this package registers a General row).
@@ -133,22 +135,23 @@ export function apply(ctx: ClientContext): void {
     ctx.get('projectUiPolicy'), sessions.binding(session.sessionId)?.hostDescription,
   )
 
-  // The option table is process-wide: fetch it once and drop the cache only
-  // on the host's catalog-changed signal, which the allowlist forwards.
-  let catalogCache: PermissionCatalog | undefined
-  const catalog = async (): Promise<PermissionCatalog> => {
-    if (catalogCache === undefined) {
-      const result = await ctx.remote.permissionPresets.catalog()
-      if (!result.ok) throw new Error(`permission catalog read failed: ${result.error.code}: ${result.error.message}`)
-      catalogCache = result.value
-    }
-    return catalogCache
+  // The runtime-owned directory is the one catalog owner: each Session reads
+  // the mirror of its own runtime's connection, so a stale or foreign host's
+  // table can never publish here.
+  const catalog = async (session: ClientSessionContext): Promise<PermissionCatalog> => {
+    const directory = ctx.get('permissionCatalog')
+    if (directory === undefined) throw new Error('permission catalog read failed: the connected host serves no permission presets')
+    return directory.forSession(session.sessionId).read()
   }
-  ctx.remote.$on('permission-presets/catalog-changed', () => { catalogCache = undefined })
 
   ctx.effect(() => ctx.locale.register('settings.permission', { zh, en }), 'ui-permission: settings row dictionaries')
 
   const connection = ctx.get('connection') as ConnectionHandle
+  ctx.effect(() => ctx.locale.register('permission.desktop', { zh: desktopZh, en: desktopEn }), 'permission: desktop confirmation copy')
+  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
+    name: 'conversation.input.left', id: 'desktop-confirmation', locale: 'permission.desktop',
+    inject: (sessionId: SessionId): DesktopConfirmationInjected => ({ connection: connection.forSession?.(sessionId) ?? connection }),
+  }, DesktopConfirmationAction))
   const defaultAvailability = permissionAvailabilitySource(ctx.get('projectUiPolicy'), connection.hostDescription)
   // The row follows the shared describe mirror, whose owning plugin already
   // refreshes it on document commits and reconnects.
@@ -186,10 +189,18 @@ export function apply(ctx: ClientContext): void {
       options: async (session) => {
         const value = selectOf(sessionFor(session))
         if (value === undefined) throw new Error('permission presets are not available on this host')
-        const options = await catalog()
+        const options = await catalog(session)
         return optionsOf(value, options, availabilityFor(session).getSnapshot(), t)
       },
-      subscribeInvalidation: (session, listener) => availabilityFor(session).subscribe(listener),
+      // Eligibility changes and the owning runtime's catalog invalidations
+      // both withdraw the displayed options.
+      subscribeInvalidation: (session, listener) => {
+        const stopAvailability = availabilityFor(session).subscribe(listener)
+        const stopCatalog = ctx.get('permissionCatalog')
+          ?.forSession(session.sessionId)
+          .subscribeInvalidations(listener)
+        return () => { stopAvailability(); stopCatalog?.() }
+      },
       onSelect: async (option, session) => {
         const reason = permissionUnavailableReason(option.id, availabilityFor(session).getSnapshot())
         if (reason !== undefined) throw new Error(t(`unavailable.${reason}`))

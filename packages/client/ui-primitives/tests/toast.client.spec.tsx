@@ -24,6 +24,20 @@ describe('Toast', () => {
     }
   })
 
+  it('uses the selected hold for both the fade delay and unmount timer', () => {
+    vi.useFakeTimers()
+    try {
+      const onDone = vi.fn()
+      const view = render(<Toast text="failure" holdMs={6000} onDone={onDone} />)
+      expect(view.getByRole('alert').style.getPropertyValue('--dsh-toast-hold')).toBe('6000ms')
+      vi.advanceTimersByTime(6999)
+      expect(onDone).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(onDone).toHaveBeenCalledOnce()
+      view.unmount()
+    } finally { vi.useRealTimers() }
+  })
+
   it('centers over its anchor and re-measures on window resize', () => {
     vi.useFakeTimers()
     try {

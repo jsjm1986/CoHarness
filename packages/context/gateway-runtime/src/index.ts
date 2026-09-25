@@ -18,6 +18,9 @@ export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
 /** Private runtime HTTP path used by the Gateway's authenticated readiness probe. */
 export const GATEWAY_READINESS_PATH = '/api/internal/gateway/readiness'
+
+/** Managed webhook dispatch route; `webhook-dispatch` assertions are confined to it. */
+export const GATEWAY_WEBHOOK_DISPATCH_PATH = '/api/internal/gateway/webhook-dispatch'
 /** One-time nonce header for the Gateway readiness challenge. */
 export const GATEWAY_READINESS_NONCE_HEADER = 'x-dsh-gateway-readiness-nonce'
 /** HMAC challenge proof header. */
@@ -55,7 +58,7 @@ export interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
 }
 
 /** Private launch credential delivered through an inherited FD or systemd credential file. */
@@ -301,10 +304,10 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || claims.expiresAt <= claims.issuedAt || !nonEmptyString(claims.nonce)) {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin' && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch') {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && user.role !== 'admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && user.role !== 'admin') {
     throw new Error('invalid Gateway principal assertion')
   }
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
@@ -357,7 +360,7 @@ export function verifyGatewayPrincipal(
   }
   if (claims.scope.kind === 'personal') {
     if (claims.runtime.kind !== 'user'
-      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin')) {
+      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin' && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch')) {
       throw new Error('invalid Gateway principal assertion scope')
     }
   } else if (claims.runtime.kind !== 'project' || claims.scope.projectId !== claims.runtime.id) {
@@ -395,6 +398,15 @@ export function readGatewayRuntimeCredential(env: NodeJS.ProcessEnv = process.en
   }
   return parseGatewayRuntimeCredential(value)
 }
+
+const PLUGIN_MANAGEMENT_PATHS = new Set([
+  'listPlugins', 'listBundles', 'inspect', 'setPluginEnabled', 'setBundleEnabled',
+  'installBundle', 'cancelInstall', 'removeBundle',
+].map(method => `/api/pluginManager/${method}`))
+PLUGIN_MANAGEMENT_PATHS.add('/api/pluginInventory/list')
+PLUGIN_MANAGEMENT_PATHS.add('/api/settings.describe')
+PLUGIN_MANAGEMENT_PATHS.add('/api/settings.mutate')
+PLUGIN_MANAGEMENT_PATHS.add('/api/_stream/pluginManager/installBundleStream')
 
 /** Authenticated Gateway context for one launched Harness runtime. */
 export class GatewayRuntime extends Service {
@@ -440,6 +452,18 @@ export class GatewayRuntime extends Service {
       const principal = {
         assertion: header,
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
+      }
+      if (principal.claims.purpose === 'terminal-admin' && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || (requestMeta.pathname !== '/api/terminal/adminList' && requestMeta.pathname !== '/api/terminal/adminClose'))) {
+        throw new Error('Terminal management assertions permit only inventory and termination.')
+      }
+      if (principal.claims.purpose === 'plugin-admin' && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || !PLUGIN_MANAGEMENT_PATHS.has(requestMeta.pathname ?? ''))) {
+        throw new Error('Plugin management assertions permit only profile management HTTP endpoints.')
+      }
+      if (principal.claims.purpose === 'webhook-dispatch' && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || requestMeta.pathname !== GATEWAY_WEBHOOK_DISPATCH_PATH)) {
+        throw new Error('Webhook dispatch assertions permit only the managed dispatch endpoint.')
       }
       const requestScope = { principal, interactive: request.kind === 'http' }
       return this.requests.run(requestScope, async () => {

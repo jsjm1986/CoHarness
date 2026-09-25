@@ -19,6 +19,8 @@
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
 - 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。
 
+`plugin-admin` 用途仅允许已声明的 Profile 管理 HTTP 方法以及 `settings.describe`、`settings.mutate`。设置方法会重新核验当前管理员权限；写入必须携带已读版本，且不能修改账户偏好。此用途不授予原生文档打开器、凭据 API、终端或会话执行权限。
+
 ### 执行授权
 
 本插件为所属应用标记 `executionAuthorityRequired`。该要求一直保留到应用销毁，授权提供者卸载也不会移除。[Gateway Execution](../gateway-execution/README.zh.md) 拥有执行、权限预设和 profile 管理策略。它使用本包已验证的交互调用者与私有传输；对于委派和恢复工作，则使用真正 Agent 的持久参与者引用。

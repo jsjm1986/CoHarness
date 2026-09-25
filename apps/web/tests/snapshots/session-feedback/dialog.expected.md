@@ -1,0 +1,16 @@
+- dialog "Submit feedback":
+  - heading "Submit feedback" [level=2]
+  - button "Close":
+    - img
+  - group "Feedback category":
+    - button "Task result"
+    - button "Instruction understanding and following"
+    - button "Product features and interaction" [pressed]
+    - button "Stability and speed"
+    - button "Resource usage and cost"
+    - button "Security, privacy, and permissions"
+    - button "Other"
+  - textbox "Feedback details":
+    - /placeholder: Add details to help us improve. Submitting may share this conversation log under the administrator’s sharing policy.
+    - text: The sidebar needs a clearer label.
+  - button "Submit"

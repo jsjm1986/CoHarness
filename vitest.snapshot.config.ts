@@ -39,6 +39,10 @@ export default defineConfig({
     setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
     include: [
       'scripts/**/*.snapshot.ts',
+      'scripts/session-snapshot-corpus.corpus.ts',
+      'snapshots/sdk/**/*.snapshot.ts',
+      'snapshots/acp/**/*.snapshot.ts',
+      'snapshots/session/**/*.snapshot.ts',
       'gateway/tests/**/*.snapshot.ts',
       // The assembled Web snapshot executes generated client bundles; source
       // mode remains the zero-build path, while lib mode requires a prior build.

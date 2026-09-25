@@ -327,6 +327,11 @@
   cursor: pointer;
 }
 
+.fileLink {
+  max-width: 100%;
+  text-align: inherit;
+}
+
 .fileMention:hover,
 .fileMention:focus {
   outline: none;
@@ -382,7 +387,12 @@
 
 .compact a:hover,
 .compact a:focus,
-.compact .fileMention:hover,
+.compact .fileLink {
+  max-width: 100%;
+  text-align: inherit;
+}
+
+.fileMention:hover,
 .compact .fileMention:focus {
   text-decoration-color: currentColor;
 }

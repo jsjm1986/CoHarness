@@ -1813,8 +1813,23 @@
     },
     {
       "doc": "docs/subsystems/client-modules.md",
+      "symbol": "WebBootBatchPhase",
+      "source": "packages/client/modules/src/client/manifest.ts"
+    },
+    {
+      "doc": "docs/subsystems/client-modules.md",
+      "symbol": "WebBootBatch",
+      "source": "packages/client/modules/src/client/manifest.ts"
+    },
+    {
+      "doc": "docs/subsystems/client-modules.md",
       "symbol": "WebBootGraph",
       "source": "packages/client/modules/src/client/manifest.ts"
+    },
+    {
+      "doc": "docs/subsystems/client-modules.md",
+      "symbol": "ClientArtifactBaseline",
+      "source": "packages/client/modules/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-telemetry.md",
@@ -2285,6 +2300,47 @@
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "ExecutionQuestionId",
       "source": "packages/context/execution-authority/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/deliverables.md",
+      "symbol": "PresentedFile",
+      "source": "packages/deliverables/tool-present/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/deliverables.md",
+      "symbol": "WorkspaceChangedFile",
+      "source": "packages/deliverables/workspace-changes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/deliverables.md",
+      "symbol": "WorkspaceChangesSummary",
+      "source": "packages/deliverables/workspace-changes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/deliverables.md",
+      "symbol": "WorkspaceDiffHunk",
+      "source": "packages/deliverables/workspace-changes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/deliverables.md",
+      "symbol": "WorkspaceFileDiff",
+      "source": "packages/deliverables/workspace-changes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/deliverables.md",
+      "symbol": "WorkspaceChanges",
+      "source": "packages/deliverables/workspace-changes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ssh.md",
+      "symbol": "Config",
+      "source": "packages/ssh/ssh/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/ssh.md",
+      "symbol": "SshConnection",
+      "source": "packages/ssh/ssh/src/index.ts",
+      "projection": "public-api"
     }
   ]
 }

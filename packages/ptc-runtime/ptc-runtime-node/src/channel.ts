@@ -97,14 +97,14 @@ export class JsonChannel {
     const header = Buffer.alloc(4)
     header.writeUInt32BE(body.length)
     this.queuedBytes += body.length
-    const completion = Promise.withResolvers<void>()
+    const completion = Promise.withResolvers<undefined>()
     const write: PendingWrite = {
       promise: completion.promise,
       finish: (error) => {
         if (!this.writes.delete(write)) return
         this.queuedBytes -= body.length
         if (error) completion.reject(error)
-        else completion.resolve()
+        else completion.resolve(undefined)
       },
     }
     this.writes.add(write)

@@ -173,6 +173,35 @@ async function expectTypertCollaborationFailure(
   throw new Error('expected Typert collaboration refusal')
 }
 
+describe('user terminal Remote admission', () => {
+  it('checks the creator before any Session lookup and reuses the revocable grant for retained output', async () => {
+    const { ctx } = await harness(readOnlyAuthority())
+    const authorizeSession = vi.fn(async () => {})
+    ctx.provide('terminalController', { authorizeSession } as never)
+    const sessionId = SessionId('unloaded-private-terminal')
+    const signal = new AbortController().signal
+    for (const method of ['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close']) {
+      await authorizeTypertRemote(ctx, { ...typertRequest(`terminal/${method}`, { agentId: sessionId }), signal })
+    }
+    expect(authorizeSession.mock.calls).toEqual(Array.from({ length: 10 }, () => [sessionId, signal]))
+    await authorizeTypertRemote(ctx, { ...typertRequest('terminal/follow', { agentId: sessionId }), phase: 'stream-item' })
+    expect(authorizeSession).toHaveBeenCalledTimes(10)
+    authorizeSession.mockRejectedValueOnce(new Error('Terminal qualification revoked'))
+    await expect(authorizeTypertRemote(ctx, typertRequest('terminal/create', { sessionId }))).rejects.toThrow('Terminal qualification revoked')
+    expect(ctx.agents.get(sessionId)).toBeUndefined()
+  })
+
+  it('refuses missing admission and unknown terminal endpoints', async () => {
+    const { ctx } = await harness(readOnlyAuthority())
+    await expect(authorizeTypertRemote(ctx, typertRequest('terminal/create', { agentId: 'private' }))).rejects.toThrow('authorization is unavailable')
+    const authorizeSession = vi.fn(async () => {})
+    ctx.provide('terminalController', { authorizeSession } as never)
+    await expect(authorizeTypertRemote(ctx, typertRequest('terminal/create', {}))).rejects.toThrow('authorization is unavailable')
+    await expectTypertCollaborationFailure(authorizeTypertRemote(ctx, { ...typertRequest('terminal/unknown', { agentId: 'private' }), phase: 'stream-item' }))
+    expect(authorizeSession).not.toHaveBeenCalled()
+  })
+})
+
 describe('project collaboration Typert Remote ACL', () => {
   it('authorizes every current session-scoped Remote with its declared action', async () => {
     const authority = controlledAuthority().authority
@@ -1089,6 +1118,7 @@ describe('read-only project scope', () => {
       ['session.cancel', () => api.sessions.cancel(request({ sessionId }))],
       ['workspace.insertSessionBefore', () => api.workspace.insertSessionBefore(request({ workspaceId: 'workspace' as never, sessionId }))],
       ['workspace.archiveSession', () => api.workspace.archiveSession(request({ sessionId }))],
+      ['workspace.unarchiveSession', () => api.workspace.unarchiveSession(request({ sessionId }))],
     ]
 
     for (const [name, call] of calls) {

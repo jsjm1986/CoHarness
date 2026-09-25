@@ -269,6 +269,7 @@ const listState = (overrides: Partial<SessionListState> = {}): SessionListState 
       running: true, blank: false, updatedAt: 0,
     },
   },
+  archivedById: {},
   current: PARENT_ID,
   phase: 'ready',
   subagentsByParent: {},

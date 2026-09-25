@@ -17,7 +17,11 @@ import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-api-remotes/
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { terminalBlockLabels, terminalCardModel, terminalFailed } from '../src/client/tool/models/terminal-card-model.ts'
+import { SpillLocator } from '@deepseek-ai/dsh-spill'
+import { formatSpillNotice } from '@deepseek-ai/dsh-spill-policy/notice'
+import {
+  isSettledPersistentShellCall, isSpilledShellCall, terminalBlockLabels, terminalCardModel, terminalFailed,
+} from '../src/client/tool/models/terminal-card-model.ts'
 import { createChatStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
@@ -246,6 +250,51 @@ describe('terminalCardModel', () => {
       callView: future, resultView: { card: 'chart' } as unknown as ToolResultView,
     }))).toBeNull()
   })
+
+  it('keeps a spilled shell result generic: the persisted notice is not an exit status', () => {
+    // presentBashResult parses a trailing [exit code: N] marker for the status
+    // pill; a spill footer is not one, so the terminal card would report a
+    // fabricated clean exit over a bounded preview.
+    const notice = formatSpillNotice({ kind: 'exact', count: 50000 }, {
+      locator: SpillLocator('/spill/output.txt'), retrievalHint: 'Read the file.',
+    })
+    const preview = `HEAD\n\n${notice}`
+    const block = settled({
+      content: [{ type: 'text', text: preview }],
+      resultView: resultTerminal({ output: preview, exitCode: 0 }),
+    })
+    expect(isSpilledShellCall(block)).toBe(true)
+    expect(terminalCardModel(block)).toBeNull()
+    // A notice-only result (the preview could not fit) stays generic as well.
+    const noticeOnly = settled({
+      content: [{ type: 'text', text: notice }],
+      resultView: resultTerminal({ output: notice, exitCode: 0 }),
+    })
+    expect(isSpilledShellCall(noticeOnly)).toBe(true)
+    expect(terminalCardModel(noticeOnly)).toBeNull()
+  })
+
+  it('keeps ordinary and background shell results off the spill guard', () => {
+    expect(isSpilledShellCall(settled())).toBe(false)
+    const background = settled({
+      call: { name: 'bash', argsRaw: '{"command":"ls","description":"List","run_in_background":true}' },
+    })
+    expect(isSpilledShellCall(background)).toBe(false)
+    const foreign = settled({ call: { name: 'fs_read', argsRaw: '{"path":"a"}' } })
+    expect(isSpilledShellCall(foreign)).toBe(false)
+    expect(isSpilledShellCall(running())).toBe(false)
+  })
+
+  it('identifies persistent-shell calls by their descriptionless schema', () => {
+    const persistent = settled({
+      call: { name: 'pwsh', argsRaw: '{"command":"Get-ChildItem"}' },
+    })
+    expect(isSettledPersistentShellCall(persistent)).toBe(true)
+    expect(isSettledPersistentShellCall(settled())).toBe(false)
+    expect(isSettledPersistentShellCall(running())).toBe(false)
+    const foreign = settled({ call: { name: 'fs_read', argsRaw: '{"path":"a"}' } })
+    expect(isSettledPersistentShellCall(foreign)).toBe(false)
+  })
 })
 
 describe('chat row terminal body', () => {
@@ -354,6 +403,7 @@ describe('BashRow terminal card', () => {
   const list = () => createSnapshotStore<SessionListState>({
     ids: [SID],
     byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0 } },
+    archivedById: {},
     current: undefined,
     phase: 'ready',
     subagentsByParent: {}, jobsBySession: {},
@@ -473,10 +523,11 @@ describe('DetailsPanel Output section', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
+        archivedById: {},
         current: SID,
         phase: 'ready',
         subagentsByParent: {}, jobsBySession: {},
@@ -500,9 +551,10 @@ describe('DetailsPanel Output section', () => {
           addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {}, submit: () => {},
         }}
         useProjection={(() => undefined)}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
+        {...(chat.getSnapshot().selection ?? {})}
+        readCall={async () => undefined}
         closeDetails={vi.fn()}
+        loadImage={vi.fn(() => Promise.reject(new Error('not used')))}
         t={t}
       />,
     )
@@ -641,7 +693,7 @@ describe('DetailsPanel Output section', () => {
     expect(view.getByText('输出')).toBeTruthy()
   })
 
-  it('scans past other nodes and other calls before reporting the call out of window', () => {
+  it('reports a missing call after the independent read completes', async () => {
     const view = mount(snapshot({
       nodes: [
         { kind: 'assistant', seq: 1, time: 1_000, turn: 1, step: 1, blocks: [] },
@@ -649,7 +701,7 @@ describe('DetailsPanel Output section', () => {
       ],
       runningCalls: [running({ callId: 'also-elsewhere' })],
     }), target)
-    expect(view.getByText('该调用不在当前窗口内')).toBeTruthy()
+    expect(await view.findByText('会话记录中未找到该调用')).toBeTruthy()
   })
 
   it('no selection at all renders the guidance line and the default title', () => {
@@ -676,7 +728,7 @@ describe('DetailsPanel Output section', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
           {
-            ids: [], byId: {}, current: undefined, phase: 'ready',
+            ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
             subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
           }))}
         useWorkspaces={bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
@@ -689,9 +741,10 @@ describe('DetailsPanel Output section', () => {
           addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {}, submit: () => {},
         }}
         useProjection={(() => undefined)}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
+        {...(chat.getSnapshot().selection ?? {})}
+        readCall={async () => undefined}
         closeDetails={closeDetails}
+        loadImage={vi.fn(() => Promise.reject(new Error('not used')))}
         t={t}
       />,
     )

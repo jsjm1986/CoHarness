@@ -64,6 +64,8 @@ npm run pg:check
 
 SQLite 导入接受 schema v7 与 v8，且不修改源文件。v7 源中的所有用户都以未授予 Auto 审查资格导入；v8 源保留显式资格值，字段缺失或无效会被拒绝。PostgreSQL 迁移 [031](migrations/031_auto_review_eligibility.sql) 增加默认 false 的用户授权，并将资格变更纳入既有访问失效触发器。
 
+迁移 [032](migrations/032_desktop_qualification.sql)–[042](migrations/042_webhook_repository_filter.sql) 覆盖受管执行面：桌面资格策略与逐会话确认（032/033）、按用户终端资格策略与可撤销的终端会话授权（034/035）、Webhook 投递回执与受理窗口（036）、把每个已见 Provider 投递 ID 绑定到同一回执的正文防重放别名（037）、SSH 目标登记与按用户资格策略及项目共享（038）、管理员管理的 Webhook 端点——保存结构化 Provider 规则、执行账号与运行时目标、受理限值、防重放窗口和只写 AES-256-GCM 签名密钥（039；同时向 `webhook_delivery_receipts` 增加供管理员重跑的已验证事件载荷）、让恢复的会话停留在已登记主机并阻止草稿预留跨目标落盘的会话级 SSH 目标绑定（040）、保存维护窗口、写者收敛纪元、操作台账与备份登记表的部署控制面（041），以及端点的结构化 `owner/repo` 仓库筛选（042）。资格策略变更经既有访问失效外发通知已连接运行时重新解析，无需重启；Webhook 密钥仅在网关内部解密，不出现在任何管理视图。
+
 ## Gateway 运行时与切换
 
 运行中的进程需要 `HGW_DATABASE_URL_FILE`、`HGW_ORGANIZATION_SLUG` 和 `HGW_COMPUTE_NODE_NAME`。企业和节点必须已经存在并保持活跃。启动会在绑定 HTTP 端口前应用待执行 migration；PostgreSQL 或任一所选记录不可用时，`/healthz` 返回 `503`。

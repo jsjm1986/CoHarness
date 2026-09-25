@@ -22,6 +22,10 @@ const READY: AgentPresetSectionState = {
   error: null,
   authorable: true,
   hasDocument: true,
+  showPicker: true,
+  policySaving: false,
+  policyWritable: true,
+  policyWritableReason: undefined,
   rows: [
     { id: 'standard', trust: 'system', isDefault: true, name: '标准模式', description: '完整的编码 agent。' },
     { id: 'mine', trust: 'user', isDefault: false },
@@ -59,6 +63,7 @@ function renderSection(
     confirmDelete: vi.fn(),
     remove: vi.fn(() => Promise.resolve()),
     makeDefault: vi.fn(() => Promise.resolve()),
+    setPickerVisible: vi.fn(() => Promise.resolve()),
   }
   const props = {
     ...actions,
@@ -186,7 +191,10 @@ describe('the preset list', () => {
     expect(within(ghost).getByText(en.brokenBadge)).toBeTruthy()
     expect(within(ghost).getByRole('alert').textContent).toContain('is missing')
     const body = within(ghost).getByRole('button', { name: `${en.brokenBadge}: 幽灵预设` })
-    expect(body).toHaveProperty('disabled', true)
+    // `aria-disabled` rather than `disabled`: the reason rides the card, and
+    // a truly disabled control would drop it from the tab order entirely.
+    expect(body).toHaveProperty('disabled', false)
+    expect(body.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(body)
     expect(actions.makeDefault).not.toHaveBeenCalled()
     // Copying a broken preset would only mint another broken one; deleting

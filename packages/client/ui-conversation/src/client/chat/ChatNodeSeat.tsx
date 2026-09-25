@@ -17,7 +17,7 @@ type RoutedChatNodeOwner = {
 
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, selectedCallId, cwd, openFile, inspectCall, forkAt,
+  nodeKey, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt,
   renderMessageImages, fileMentions, turnProcess, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
@@ -28,13 +28,14 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       selectedCallId,
       cwd,
       openFile,
+      openCallDetails,
       inspectCall,
       forkAt,
       renderMessageImages,
       fileMentions,
       ...(turnProcess === undefined ? {} : { turnProcess }),
     }, [
-    node, selectedCallId, cwd, openFile, inspectCall, forkAt, renderMessageImages, fileMentions, turnProcess,
+    node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt, renderMessageImages, fileMentions, turnProcess,
   ])
   if (routedNode === undefined || owner === null) return null
   // Runtime dispatch owns the correlation: every Node's discriminant is the

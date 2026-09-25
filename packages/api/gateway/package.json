@@ -36,7 +36,10 @@
         "@deepseek-ai/dsh-client-connection"
       ],
       "platform": "web",
-      "immediately": true
+      "immediately": true,
+      "external": [
+        "@deepseek-ai/dsh-client-connection/client"
+      ]
     }
   },
   "scripts": {
@@ -54,7 +57,8 @@
     "@deepseek-ai/dsh-client-connection": "workspace:^",
     "@deepseek-ai/dsh-typert-registry": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-connection": "workspace:^",
@@ -62,6 +66,7 @@
     "@deepseek-ai/dsh-typert-registry": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "zod": "^4.4.3",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
   }
 }

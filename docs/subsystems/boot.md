@@ -14,7 +14,9 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `InstallBundleOptions.enabled` defaults to true. False installs without selecting the bundle layer. `approvedBuilds` grants persistent script permission to the supplied pending package names before installation.
 
-`ChangeResult.changed` reports a disk edit independently of `application`: `applied`, `restart-required`, `overridden` or `failed`. Optional `error` carries a localizable code and external diagnostic. `packageResult` records the pnpm exit code, bounded output, truncation flag and complete diagnostic log path. `pendingBuilds` lists undecided packages across the profile; `approvedBuilds` records the names granted permission by this operation.
+`ChangeResult.changed` reports a disk edit independently of `application`: `applied`, `restart-required`, `overridden`, `cancelled` or `failed`. Optional `error` carries a localizable code and external diagnostic. `packageResult` records the pnpm exit code, bounded output, truncation flag and complete diagnostic log path. `pendingBuilds` lists undecided packages across the profile; `approvedBuilds` records the names granted permission by this operation.
+
+`PluginInstallFrame` is one private progress, log or final-result frame. `installBundleStream` requires a unique request id, admits only its own diagnostics and cancels the owned installation when its transport closes. Consumers require the final result and a clean stream end; they must not reconnect and replay an installation.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -124,6 +126,14 @@ async authorize(): Promise<void>
  * @returns Package-manager diagnostics and observed activation outcome.
  */
 @Remote async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult>
+
+/** Install with request-scoped progress; disconnect cancels and waits for cleanup.
+ * @param spec - Registry, Git, tarball or absolute path package spec.
+ * @param options - Activation, build-script approval and unique request identity.
+ * @param signal - Transport lifetime; cancellation does not imply cleanup has finished.
+ * @returns Ordered progress, diagnostics and the final installation result.
+ */
+@Remote({ mode: 'stream' }) async * installBundleStream( spec: string, options: InstallBundleOptions & { requestId: PluginInstallRequestId }, signal: AbortSignal, ): AsyncIterable<PluginInstallFrame>
 
 /** Stop an installation this manager owns and wait until its files are back.
  * @param requestId The id the installation was started with.

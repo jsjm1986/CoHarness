@@ -1,0 +1,12 @@
+- button "Choose the file to review":
+  - text: review.txt
+  - img
+- text: +1 -1
+- button "Split view":
+  - img
+- button "Line wrap"
+- button "Open review.txt in sidebar":
+  - img
+- button "Open review.txt in default app":
+  - img
+- text: "@@ -1,1 +1,1 @@ 1 - before the turn 1 + after the turn"

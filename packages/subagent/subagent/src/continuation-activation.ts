@@ -103,7 +103,7 @@ export interface Activation {
    */
   announced: boolean
   /** Renewed whenever a settlement watcher must re-check residency state. */
-  poke: PromiseWithResolvers<void>
+  poke: PromiseWithResolvers<undefined>
 }
 
 /** Inputs shared by fresh and resumed Activation materialization. */
@@ -508,7 +508,7 @@ export class ContinuableActivationRegistry {
       releaseSlot()
       throw error
     }
-    const settled = Promise.withResolvers<void>()
+    const settled = Promise.withResolvers<undefined>()
     const materialization: Materialization = {
       lineage,
       settled: settled.promise,
@@ -520,7 +520,7 @@ export class ContinuableActivationRegistry {
     }).finally(() => {
       this.materializations.delete(materialization)
       quota.release()
-      settled.resolve()
+      settled.resolve(undefined)
     })
   }
 
@@ -738,7 +738,7 @@ export class ContinuableActivationRegistry {
       ownedChildren: new Set(),
       observer,
       announced: false,
-      poke: Promise.withResolvers<void>(),
+      poke: Promise.withResolvers<undefined>(),
     }
     // After transfer, any failure must dispose the created handle, remove the
     // Activation, and roll back parent ownership before rejecting.
@@ -805,8 +805,8 @@ export class ContinuableActivationRegistry {
 
   /** Let a settlement watcher re-check residency after relevant state changes. */
   private wake(activation: Activation): void {
-    activation.poke.resolve()
-    activation.poke = Promise.withResolvers<void>()
+    activation.poke.resolve(undefined)
+    activation.poke = Promise.withResolvers<undefined>()
   }
 
   /** Follow one Activation to natural settlement. */
@@ -850,10 +850,12 @@ export class ContinuableActivationRegistry {
 
         if (attempt === 'closed') return
         if (attempt === 'retry') continue
+        /* v8 ignore start -- the 'wait' return needs a pending inbox inside the lock window; a scheduler that misses it settles directly */
         if (attempt === 'wait') {
           await idleObservation.promise
           continue
         }
+        /* v8 ignore stop */
         try {
           await attempt.done
         } catch (error: unknown) {
@@ -869,7 +871,7 @@ export class ContinuableActivationRegistry {
   /** Classify one Inbox and owned-child observation without reading Agent execution state. */
   private settlementState(
     activation: Activation,
-    observation: PromiseWithResolvers<void>,
+    observation: PromiseWithResolvers<undefined>,
   ): SettlementState {
     if (activation.inbox.closing !== undefined) return 'closed'
     if (activation.poke !== observation) return 'retry'

@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { applyGrantsToUser } from './apply-grants.ts'
 import {
@@ -27,6 +29,16 @@ import {
   type ConversationArchiveState,
 } from './postgres/conversation-archive-service.ts'
 import { DesktopCoordinationError } from './desktop-coordinator.ts'
+import { PluginManagementError } from './plugin-management.ts'
+import { TerminalManagementError } from './terminal-management.ts'
+import { WebhookReceiptError } from './postgres/webhook-delivery-service.ts'
+import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
+import { WebhookIntakeError } from './webhook-intake.ts'
+import { SshTargetError } from './postgres/ssh-target-service.ts'
+import { MaintenanceError } from './postgres/maintenance-service.ts'
+import { BackupError } from './postgres/backup-service.ts'
+import { DeploymentCommandError } from './deployment-commands.ts'
+import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -80,6 +92,16 @@ async function mapInBatches<T, R>(
 }
 
 function mapError(error: unknown): { status: number; error: string } {
+  if (error instanceof WebhookReceiptError) return { status: error.status, error: error.message }
+  if (error instanceof WebhookEndpointError) return { status: error.status, error: error.message }
+  if (error instanceof WebhookIntakeError) return { status: error.status, error: error.message }
+  if (error instanceof SshTargetError) return { status: error.status, error: error.message }
+  if (error instanceof MaintenanceError) return { status: error.status, error: error.message }
+  if (error instanceof BackupError) return { status: error.status, error: error.message }
+  if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
+  if (error instanceof PluginManagementError) return { status: error.status, error: error.message }
+  if (error instanceof TerminalManagementError) return { status: error.status, error: error.message }
+  if (error instanceof ResourceAccessError) return { status: error.status, error: error.message }
   if (error instanceof DocumentCatalogError) return { status: error.status, error: error.code }
   if (error instanceof ConversationArchiveError) return { status: error.status, error: error.code }
   if (error instanceof Error && error.message === 'cannot-remove-last-admin') {
@@ -117,7 +139,10 @@ function mapError(error: unknown): { status: number; error: string } {
   if (isCodedError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
     return { status: 409, error: 'duplicate' }
   }
-  return { status: 400, error: error instanceof Error ? error.message : String(error) }
+  if (error instanceof Error && /^[\w: .,/+-]{1,160}$/u.test(error.message)) {
+    return { status: 400, error: error.message }
+  }
+  return { status: 500, error: 'internal error' }
 }
 
 /**
@@ -138,6 +163,7 @@ export function createAdminApiHandler(
     } catch (error) {
       if (res.writableEnded) throw error
       const mapped = mapError(error)
+      if (mapped.status === 500) console.error('[gateway] admin api failed:', error)
       sendError(res, mapped.status, mapped.error)
     }
     return true
@@ -156,6 +182,154 @@ async function dispatch(
 ): Promise<boolean> {
   const method = req.method ?? 'GET'
   const ip = req.socket.remoteAddress ?? ''
+  if (pathname === '/admin/api/webhook-deliveries' && method === 'GET') {
+    if (deps.webhookDeliveries === undefined) { sendError(res, 503, 'webhook-deliveries-unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+    sendJson(res, 200, await deps.webhookDeliveries.list(query.get('endpointId'), query.get('cursor') ?? undefined,
+      query.has('limit') ? Number(query.get('limit')) : undefined))
+    return true
+  }
+  if (pathname === '/admin/api/webhook-endpoints' && method === 'GET') {
+    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    sendJson(res, 200, { endpoints: await deps.webhookEndpoints.list() })
+    return true
+  }
+  if (pathname === '/admin/api/webhook-endpoints' && method === 'POST') {
+    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    const endpoint = await deps.webhookEndpoints.create(admin.id, parseObject(body))
+    await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.create',
+      detail: JSON.stringify({ targetId: endpoint.publicId, name: endpoint.name }), ip })
+    sendJson(res, 200, endpoint)
+    return true
+  }
+  if (pathname === '/admin/api/webhook-endpoints/update' && method === 'POST') {
+    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    const endpoint = await deps.webhookEndpoints.update(parseObject(body))
+    await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.update',
+      detail: JSON.stringify({ targetId: endpoint.publicId, revision: endpoint.revision }), ip })
+    sendJson(res, 200, endpoint)
+    return true
+  }
+  if (pathname === '/admin/api/webhook-endpoints/mutate' && method === 'POST') {
+    if (deps.webhookEndpoints === undefined) { sendError(res, 503, 'webhook-endpoints-unavailable'); return true }
+    const input = parseObject(body)
+    const endpoint = await deps.webhookEndpoints.mutate(input)
+    await deps.audit.write({ userId: admin.id, action: 'admin.webhook-endpoints.mutate',
+      detail: JSON.stringify({ targetId: input.targetId, action: input.action }), ip })
+    sendJson(res, 200, endpoint === null ? { removed: true } : endpoint)
+    return true
+  }
+  if (pathname === '/admin/api/webhook-deliveries/redispatch' && method === 'POST') {
+    if (deps.webhookIntake === undefined) { sendError(res, 503, 'webhook-dispatch-unavailable'); return true }
+    const input = parseObject(body)
+    const receipt = await deps.webhookIntake.redispatch(input.receiptId)
+    await deps.audit.write({ userId: admin.id, action: 'admin.webhook-deliveries.redispatch',
+      detail: JSON.stringify({ receiptId: input.receiptId, redispatchId: receipt.id }), ip })
+    sendJson(res, 200, receipt)
+    return true
+  }
+
+  if (pathname === '/admin/api/deployment' && method === 'GET') {
+    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const [state, plan, operations] = await Promise.all([
+      deps.maintenance.state(),
+      deps.migrationPlan?.() ?? Promise.resolve(undefined),
+      deps.maintenance.listOperations(20),
+    ])
+    sendJson(res, 200, { ...state, migrations: plan ?? null, operations })
+    return true
+  }
+  if (pathname === '/admin/api/deployment/maintenance' && method === 'POST') {
+    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const input = parseObject(body)
+    const reason = str(input, 'reason')
+    let state
+    if (input.action === 'enter') state = await deps.maintenance.enterMaintenance(admin.id, reason)
+    else if (input.action === 'exit') state = await deps.maintenance.exitMaintenance(admin.id)
+    else throw new MaintenanceError(400, 'invalid-maintenance-action')
+    await deps.audit.write({ userId: admin.id, action: `admin.deployment.maintenance.${String(input.action)}`,
+      detail: JSON.stringify({ reason: reason ?? null }), ip })
+    sendJson(res, 200, state)
+    return true
+  }
+  if (pathname === '/admin/api/deployment/nodes/status' && method === 'POST') {
+    if (deps.maintenance === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const input = parseObject(body)
+    const nodeId = str(input, 'nodeId')
+    const status = str(input, 'status')
+    if (nodeId === undefined) throw new MaintenanceError(400, 'node-id-required')
+    const node = await deps.maintenance.setNodeStatus(admin.id, nodeId,
+      status === 'draining' ? 'draining' : status === 'offline' ? 'offline' : status === 'active' ? 'active'
+        : (() => { throw new MaintenanceError(400, 'invalid-node-status') })())
+    await deps.audit.write({ userId: admin.id, action: 'admin.deployment.nodes.status',
+      detail: JSON.stringify({ nodeId, status: node.status }), ip })
+    sendJson(res, 200, node)
+    return true
+  }
+  if (pathname === '/admin/api/deployment/restore' && method === 'POST') {
+    if (deps.maintenance === undefined || deps.backups === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const input = parseObject(body)
+    const backupId = str(input, 'backupId')
+    if (backupId === undefined) throw new MaintenanceError(400, 'backup-id-required')
+    const backup = await deps.backups.get(backupId)
+    if (backup.status !== 'verified' && backup.status !== 'restored') throw new MaintenanceError(409, 'backup-not-verified')
+    const operation = await deps.maintenance.requestRestore(admin.id, backup.id)
+    await deps.audit.write({ userId: admin.id, action: 'admin.deployment.restore.request',
+      detail: JSON.stringify({ backupId: backup.id, operationId: operation.id }), ip })
+    sendJson(res, 200, operation)
+    return true
+  }
+  if (pathname === '/admin/api/backups' && method === 'GET') {
+    if (deps.backups === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    sendJson(res, 200, { backups: await deps.backups.list() })
+    return true
+  }
+  if (pathname === '/admin/api/backups' && method === 'POST') {
+    if (deps.backups === undefined || deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const work = deps.backupWork
+    try {
+      const dump = await work.commands.backup(work.backupDir, work.databaseUrl, work.managedPaths)
+      const plan = await deps.migrationPlan?.() ?? { current: 0 }
+      const writeEpoch = (await deps.maintenance?.state())?.writeEpoch ?? '1'
+      const record = await deps.backups.record({
+        path: dump.dumpPath,
+        migrationVersion: plan.current,
+        writeEpoch: BigInt(writeEpoch),
+        sizeBytes: dump.sizeBytes,
+        sha256: dump.sha256,
+        managedFiles: dump.managedFiles,
+        actor: admin.id,
+      })
+      await deps.maintenance?.logOperation('backup', 'completed', admin.id, { backupId: record.id, path: record.path })
+      await deps.audit.write({ userId: admin.id, action: 'admin.backups.create',
+        detail: JSON.stringify({ backupId: record.id, path: record.path }), ip })
+      sendJson(res, 200, record)
+    } catch (error) {
+      await deps.maintenance?.logOperation('backup', 'failed', admin.id,
+        { error: error instanceof Error ? error.message : String(error) }).catch(() => {})
+      throw error
+    }
+    return true
+  }
+  if (pathname === '/admin/api/backups/verify' && method === 'POST') {
+    if (deps.backups === undefined || deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const input = parseObject(body)
+    const id = str(input, 'id')
+    if (id === undefined) throw new BackupError(400, 'backup-id-required')
+    const backup = await deps.backups.get(id)
+    let record
+    try {
+      await deps.backupWork.commands.verifyDump(backup.path)
+      record = await deps.backups.setVerified(id, true)
+    } catch (error) {
+      record = await deps.backups.setVerified(id, false, error instanceof Error ? error.message : String(error))
+    }
+    await deps.audit.write({ userId: admin.id, action: 'admin.backups.verify',
+      detail: JSON.stringify({ backupId: id, status: record.status }), ip })
+    sendJson(res, 200, record)
+    return true
+  }
+
   const write = async (action: string, detail: Record<string, unknown>): Promise<void> =>
     deps.audit.write({ userId: admin.id, action, detail: JSON.stringify(detail), ip })
 
@@ -320,6 +494,112 @@ async function dispatch(
     }
     await write(`admin.archives.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
     sendJson(res, 200, { action, results })
+    return true
+  }
+
+  if (pathname === '/admin/api/plugins/target' && method === 'GET') {
+    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+    sendJson(res, 200, await deps.pluginManagement.target(admin, { kind: query.get('kind'), id: Number(query.get('id')) }))
+    return true
+  }
+  if (pathname === '/admin/api/plugins/invoke' && method === 'POST') {
+    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    const input = parseObject(body), lifetime = new AbortController()
+    const closed = (): void => { if (!res.writableFinished) lifetime.abort() }
+    req.once('aborted', closed); res.once('close', closed)
+    const iterator = deps.pluginManagement.invoke(admin, input, lifetime.signal)
+    try {
+      const first = await iterator.next()
+      res.writeHead(200, { 'content-type': input.endpoint === 'pluginManager/installBundleStream' ? 'application/x-ndjson' : 'application/json', 'cache-control': 'no-store' })
+      await pipeline(Readable.from((async function* () {
+        if (!first.done) yield first.value
+        yield* iterator
+      })()), res, { signal: lifetime.signal })
+      await write('admin.plugins.request', { target: input.target, nodeId: input.nodeId, generation: input.generation, endpoint: input.endpoint, rpcId: input.rpcId })
+    } catch (error) {
+      if (!res.headersSent) throw error
+      res.destroy(error instanceof Error ? error : new Error('Plugin management response interrupted'))
+    } finally {
+      lifetime.abort(); req.removeListener('aborted', closed); res.removeListener('close', closed)
+      await iterator.return(undefined)
+    }
+    return true
+  }
+
+  if (pathname === '/admin/api/terminals' && method === 'GET') {
+    if (deps.terminalManagement === undefined) { sendError(res, 503, 'terminal-management-unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+    const target = resourcePolicyOwner(query.get('kind'), Number(query.get('id')), 'terminal')
+    sendJson(res, 200, await deps.terminalManagement.list(admin, target))
+    return true
+  }
+  if (pathname === '/admin/api/terminals/close' && method === 'POST') {
+    if (deps.terminalManagement === undefined) { sendError(res, 503, 'terminal-management-unavailable'); return true }
+    const input = parseObject(body), target = resourcePolicyOwner(input.kind, input.targetId, 'terminal')
+    const entry = { nodeId: input.nodeId, generation: input.generation, ownerId: input.ownerId, id: input.id }
+    await deps.terminalManagement.close(admin, target, entry)
+    await write('admin.terminals.close', { target, ...entry })
+    sendJson(res, 200, { closed: true })
+    return true
+  }
+
+  if ((pathname === '/admin/api/desktops/permissions' || pathname === '/admin/api/terminals/permissions'
+    || pathname === '/admin/api/ssh/permissions') && (method === 'GET' || method === 'POST')) {
+    const resource = pathname.includes('/terminals/') ? 'terminal' : pathname.includes('/ssh/') ? 'ssh' : 'desktop'
+    const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess : deps.desktopAccess
+    if (access === undefined) { sendError(res, 503, `${resource}-access-unavailable`); return true }
+    if (method === 'GET') {
+      const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+      const owner = resourcePolicyOwner(query.get('kind'), Number(query.get('id')), resource)
+      sendJson(res, 200, await access.get(owner))
+    } else {
+      const input = parseObject(body)
+      const owner = resourcePolicyOwner(input.kind, input.id, resource)
+      const result = await access.set(owner, input.enabled, input.revision)
+      await write(`admin.${resource}s.permission`, { ...result })
+      sendJson(res, 200, result)
+    }
+    return true
+  }
+
+  if (pathname === '/admin/api/ssh-targets' && method === 'GET') {
+    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    sendJson(res, 200, { targets: await deps.sshTargets.list() })
+    return true
+  }
+
+  if (pathname === '/admin/api/ssh-targets' && method === 'POST') {
+    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    const target = await deps.sshTargets.create(admin.id, parseObject(body))
+    await write('admin.ssh-targets.create', { targetId: target.publicId, name: target.name })
+    sendJson(res, 200, target)
+    return true
+  }
+
+  if (pathname === '/admin/api/ssh-targets/update' && method === 'POST') {
+    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    const target = await deps.sshTargets.update(parseObject(body))
+    await write('admin.ssh-targets.update', { targetId: target.publicId, name: target.name, revision: target.revision })
+    sendJson(res, 200, target)
+    return true
+  }
+
+  if (pathname === '/admin/api/ssh-targets/mutate' && method === 'POST') {
+    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    const input = parseObject(body)
+    const target = await deps.sshTargets.mutate(input)
+    await write('admin.ssh-targets.mutate', { targetId: input.targetId, action: input.action })
+    sendJson(res, 200, target === null ? { removed: true } : target)
+    return true
+  }
+
+  if (pathname === '/admin/api/ssh-targets/share' && method === 'POST') {
+    if (deps.sshTargets === undefined) { sendError(res, 503, 'ssh-targets-unavailable'); return true }
+    const input = parseObject(body)
+    const target = await deps.sshTargets.share(admin.id, input)
+    await write('admin.ssh-targets.share', { targetId: input.targetId, projectId: input.projectId, shared: input.shared === true })
+    sendJson(res, 200, target)
     return true
   }
 

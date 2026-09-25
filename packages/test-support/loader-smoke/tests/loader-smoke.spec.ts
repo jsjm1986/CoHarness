@@ -13,6 +13,30 @@ const fixture = (name: string): string => fileURLToPath(new URL(`./fixtures/${na
 const canonicalTempPath = (path: string): string => path.replace(/^\/private(?=\/(?:var|tmp)\/)/, '')
 
 describe('runLoaderSmoke', () => {
+  it('does not reintroduce credentials omitted from a caller-owned environment', async () => {
+    const previous = process.env.LOADER_SMOKE_MARKER
+    process.env.LOADER_SMOKE_MARKER = 'ambient-secret-fixture'
+    try {
+      for (const marker of [undefined, 'controlled-fixture']) {
+        const result = await runLoaderSmoke({
+          label: 'explicit environment fixture',
+          tempDirPrefix: 'loader-smoke-env-',
+          binScript: fixture('success'),
+          libBinScript: fixture('success'),
+          configPath,
+          tsconfigPath,
+          mode: 'lib',
+          extendEnv: false,
+          env: marker === undefined ? {} : { LOADER_SMOKE_MARKER: marker },
+        })
+        expect((JSON.parse(result.stdout) as { marker?: string }).marker).toBe(marker)
+      }
+    } finally {
+      if (previous === undefined) delete process.env.LOADER_SMOKE_MARKER
+      else process.env.LOADER_SMOKE_MARKER = previous
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('isolates the process, closes stdin, captures output, and removes the cwd', async () => {
     const result = await runLoaderSmoke({
       label: 'success fixture',

@@ -10,7 +10,7 @@ The accepted V4 persistence record omits `draft` from the physical JSONL header 
 
 ## Decision
 
-The writer advances to V5 with a [V4-to-V5 adjacent migration](../../../../packages/session/session-format-v4-to-v5/README.md). This edge changes only the header version. It retains omitted, false, and true draft states and forwards every event and inherited-cut marker unchanged. V5 header validation checks `draft` before borrowing historical event validation; that internal validation view omits `draft` because the oldest reused header validator does not know it. The caller receives the original V5 header.
+The writer advances to V5 with a [V4-to-V5 adjacent migration](../../../../packages/session/session-format-v4-to-v5/README.md). This edge changes only the header version. It retains omitted, false, and true draft states and forwards every event and inherited-cut marker unchanged. V5 delegates to the V4/V3 validators, which own optional `draft` validation and compatibility with older events. The caller receives the original V5 header.
 
 The [V4 historical reference](../../../../docs/persistence-changes/historical-formats/v4.md) captures the complete declared inventory from accepted PR #218. The existing V4 acknowledgement and schema remain unchanged. The V5 successor acknowledges the header correction and the current execution-authority event additions in one ordered history. It does not infer authenticated participants for older messages; managed authorization treats missing historical proof according to its own policy.
 
@@ -27,6 +27,8 @@ JSONL read handles and inspection reconstruct the current artifact without publi
 ## Consequences
 
 The new codec shares V4 event framing and validation instead of duplicating the event vocabulary. Provider and SDK expectations advance only the current version marker; historical fixtures keep their source versions. Upstream V3 builds cannot consume the fork’s V5 format, and the release-status record is not advanced before publication.
+
+Replay fixtures use the same strict build-static catalog as persisted artifacts. Incomplete envelope pairs, mixed complete/projected rows and malformed current event payloads are rejected; fixture support does not substitute the permissive legacy migration stream. Valid historical recordings retain their source versions and model chunks, while comparison encoding preserves both explicit V5 draft values. The fixture preflight runs these checks before browser startup.
 
 ## Testing
 

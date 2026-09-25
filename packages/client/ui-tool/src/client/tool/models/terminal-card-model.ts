@@ -9,9 +9,11 @@
  * @module
  */
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
+import { hasSpillNotice } from '@deepseek-ai/dsh-spill-policy/notice'
 import type { TerminalBlockLabels, TerminalBlockProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallBlock } from './tool-call-model.ts'
+import { parsedToolCall, singleResultText, validEscalationFields } from './raw-tool-call.ts'
 
 /**
  * Build the TerminalBlock display copy from the conversation locale seat —
@@ -66,13 +68,15 @@ export interface TerminalCardModel {
  * or a terminating signal. The bash tool settles a failing command as a
  * completed call (`isError` stays false: the exit status is result data), so
  * this is the collapsed row's only failure signal; without it the red exit
- * pill would be visible only after expanding the card.
+ * pill would be visible only after expanding the card. A settled card whose
+ * status never arrived is not a clean exit either — `exitCode !== 0` covers
+ * `null` and absent alike.
  * @param model - a derived terminal card.
  * @returns whether the card's exit status is a failure.
  */
 export function terminalFailed(model: TerminalCardModel): boolean {
   const { exitCode, signal, running } = model.card
-  return running !== true && ((exitCode !== undefined && exitCode !== 0) || signal !== undefined)
+  return running !== true && (exitCode !== 0 || signal !== undefined)
 }
 
 /**
@@ -154,6 +158,67 @@ function collapse(body: string, rooted: boolean, separator = '/'): string {
   return kept.join(separator)
 }
 
+interface ShellCall {
+  command: string
+  persistent: boolean
+  background: boolean
+}
+
+/**
+ * Read the shell identity of a call's parsed arguments. Standard bash/pwsh
+ * schemas require `description`; persistent shell providers omit it, so an
+ * absent description marks the persistent family whose result carries resets
+ * and partial output without one process exit status.
+ * @param name - tool name from the call head.
+ * @param args - parsed open-root Tool arguments.
+ * @returns the shell-call facts used by the generic-path guards, or null.
+ */
+function shellCall(name: string, args: Record<string, unknown>): ShellCall | null {
+  if (name !== 'bash' && name !== 'pwsh') return null
+  const { command, description, timeoutMs, workdir, run_in_background: background } = args
+  if (typeof command !== 'string' || command.trim() === '') return null
+  if (timeoutMs !== undefined && (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0)) return null
+  if (workdir !== undefined && typeof workdir !== 'string') return null
+  if (background !== undefined && typeof background !== 'boolean') return null
+  if (!validEscalationFields(args)) return null
+  return {
+    command,
+    persistent: description === undefined,
+    background: background === true,
+  }
+}
+
+/**
+ * Identify a settled call from the persistent Bash or PowerShell tool. Its
+ * result stays on the generic input/output path because the persistent shell
+ * can report resets and partial output without one process exit status.
+ * @param block - running or settled Tool block.
+ * @returns whether the block is a settled persistent-shell call.
+ */
+export function isSettledPersistentShellCall(block: ToolCallBlock): boolean {
+  if (!('kind' in block)) return false
+  const parsed = parsedToolCall(block)
+  if (parsed === null) return false
+  return shellCall(parsed.name, parsed.args)?.persistent === true
+}
+
+/**
+ * Identify a settled foreground shell preview whose spill footer can hide the
+ * exit marker; the result presentation cannot tell that footer from an exit
+ * status, so the output must remain generic without an inferred exit code.
+ * @param block - running or settled Tool block.
+ * @returns whether the shell output must remain generic without an inferred exit status.
+ */
+export function isSpilledShellCall(block: ToolCallBlock): boolean {
+  if (!('kind' in block)) return false
+  const parsed = parsedToolCall(block)
+  if (parsed === null) return false
+  const call = shellCall(parsed.name, parsed.args)
+  if (call === null || call.background) return false
+  const output = singleResultText(block)
+  return output !== undefined && hasSpillNotice(output)
+}
+
 /**
  * Derive the terminal-card props for a tool call, or null when this call is
  * not a terminal card and belongs on the generic path.
@@ -196,6 +261,10 @@ export function terminalCardModel(block: ToolCallBlock, sessionCwd?: string): Te
       },
     }
   }
+  // A spilled foreground result ends in the persisted spill notice, which the
+  // result presentation parses as a clean exit; keep it generic so its full
+  // recorded text — not an inferred status pill — is what expands.
+  if (isSpilledShellCall(block)) return null
   const result = block.resultView?.card === 'terminal' ? block.resultView : null
   if (result === null) return null
   return {

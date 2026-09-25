@@ -2,18 +2,17 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import type { Events, Fiber } from '@deepseek-ai/cordis'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import { ConnectionRpcStreamInterrupted, type ConnectionHandle, type SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   InvocationDescriptor,
   RemoteResult,
-  TypertClientRemote,
   TypertContext,
   TypertRemoteScopeApi,
   TypertRemoteNamespace,
 } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import type { ClientRemote } from '../src/client/index.ts'
-import { apply, inject } from '../src/client/index.ts'
+import { apply, inject, isRemoteFailure, RemoteStreamCarrierError } from '../src/client/index.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -86,7 +85,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 type FixtureContext = Omit<Context, 'remote'> & {
-  readonly remote: TypertClientRemote & TypertRemoteScopeApi<'fixture'>
+  readonly remote: import('../src/client/index.ts').ClientRemote & TypertRemoteScopeApi<'fixture'>
 }
 
 // Compile-time contract of `$on`: the key face is the forwarding selection and
@@ -190,6 +189,50 @@ async function benchFiber(
 }
 
 describe('Client Typert API', () => {
+  it('routes typed read streams to their Session transport and refuses results after withdrawal', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>()
+    const stream = vi.fn<NonNullable<ConnectionHandle['rpc']['stream']>>(async function* () {
+      yield { ok: true, value: 1 }
+      yield { ok: true, value: 2 }
+    })
+    const target = { rpc: { call, stream } } as unknown as ConnectionHandle
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    const forSession = vi.fn(() => target)
+    ctx.provide('connection', { rpc: { call }, forSession } as unknown as ConnectionHandle)
+    await ctx.plugin({ inject, apply })
+    try {
+      const base = directDescriptor()
+      const dispose = await ctx.remote.$mount({ package: '@fixture/stream', descriptors: [{ ...base, mode: 'stream',
+        scope: { context: 'agent', wire: 'agentId' }, cancellation: { parameter: 'signal' },
+        parameters: base.parameters.map(parameter => parameter.source === 'lookup' ? { ...parameter, lookup: 'agent' } : parameter),
+      }] })
+      const open = ctx.remote.probe.create as unknown as (id: string, body: object, signal?: AbortSignal) => AsyncIterable<number>
+      expect(await collect(open('target', { objective: 'read' }))).toEqual([1, 2])
+      expect(forSession).toHaveBeenCalledWith('target')
+      expect(call).not.toHaveBeenCalled()
+      const pending = open('target', { objective: 'read' })[Symbol.asyncIterator]()
+      expect((await pending.next()).value).toBe(1)
+      await dispose()
+      await expect(pending.next()).rejects.toMatchObject({ code: 'gateway/cancelled' })
+      expect(stream.mock.calls.at(-1)![3].aborted).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('keeps business stream failures terminal and reports unsupported carriers explicitly', async () => {
+    const ctx = await bench(async () => { throw new Error('unary must not execute') })
+    try {
+      await ctx.remote.$mount({ package: '@fixture/stream-refusal', descriptors: [{ ...maybeDescriptor(), mode: 'stream' }] })
+      const open = ctx.remote.probe.maybe as unknown as () => AsyncIterable<unknown>
+      await expect(collect(open())).rejects.toThrow('does not support Remote streams')
+      const stream: NonNullable<ConnectionHandle['rpc']['stream']> = async function* () {
+        yield { ok: false, error: { code: 'gateway/bad-request', message: 'business refusal', details: {} } }
+      }
+      Object.assign((ctx.get('connection') as ConnectionHandle).rpc, { stream })
+      await expect(collect(open())).rejects.toMatchObject({ code: 'gateway/bad-request', message: 'business refusal' })
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('routes agent-addressed Remote calls through the session target transport', async () => {
     const call = vi.fn<ConnectionHandle['rpc']['call']>()
       .mockResolvedValue({ ok: true, value: { ref: 'target-goal' } })
@@ -212,6 +255,38 @@ describe('Client Typert API', () => {
       .resolves.toEqual({ ok: true, value: { ref: 'target-goal' } })
     expect(forSession).toHaveBeenCalledWith('project-session')
     expect(fallback).not.toHaveBeenCalled()
+  })
+
+  it('uses the owning connection when an agent has no separate target transport', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>()
+      .mockResolvedValue({ ok: true, value: { ref: 'local-goal' } })
+    const ctx = await bench(call)
+    const base = directDescriptor()
+    await ctx.remote.$mount({ package: '@fixture/local-agent', descriptors: [{
+      ...base,
+      scope: { context: 'agent', wire: 'agentId' },
+      parameters: base.parameters.map(parameter => parameter.source === 'lookup'
+        ? { ...parameter, lookup: 'agent' }
+        : parameter),
+    }] })
+    await expect(ctx.remote.probe.create('local-session', { objective: 'ship' }))
+      .resolves.toEqual({ ok: true, value: { ref: 'local-goal' } })
+    expect(call).toHaveBeenCalledWith('/api', 'probe/create', {
+      args: { agentId: 'local-session', request: { objective: 'ship' } },
+    }, expect.any(AbortSignal))
+  })
+
+  it('extends an already published namespace without withdrawing its other methods', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: 'retained' })
+    const ctx = await bench(call)
+    const first = await ctx.remote.$mount({ package: '@fixture/first', descriptors: [directDescriptor()] })
+    const second = await ctx.remote.$mount({ package: '@fixture/second', descriptors: [maybeDescriptor()] })
+    await second()
+    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' }))
+      .resolves.toEqual({ ok: true, value: 'retained' })
+    expect((ctx.remote.probe as unknown as Record<string, unknown>).maybe).toBeUndefined()
+    await first()
+    expect(ctx.get('remote.probe')).toBeUndefined()
   })
 
   it('mounts concrete direct methods, forwards inputs, and withdraws retained handles', async () => {
@@ -306,6 +381,42 @@ describe('Client Typert API', () => {
       expect.any(AbortSignal),
     )
 
+    await dispose()
+  })
+
+  it('accepts omitted trailing optional arguments without shifting the cancellation parameter', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: undefined })
+    const ctx = await bench(call)
+    const descriptor: InvocationDescriptor = { ...maybeDescriptor(), cancellation: { parameter: 'signal' } }
+    const dispose = await ctx.remote.$mount({ package: '@fixture/optional', descriptors: [descriptor] })
+    const maybe = ctx.remote.probe.maybe as unknown as (...args: unknown[]) => Promise<unknown>
+    await expect(maybe()).resolves.toEqual({ ok: true, value: undefined })
+    expect(call).toHaveBeenLastCalledWith('/api', 'probe/maybe', { args: {} }, expect.any(AbortSignal))
+    const abort = new AbortController()
+    await maybe(undefined, abort.signal)
+    const forwarded = call.mock.lastCall![3]!
+    abort.abort(new Error('caller cancelled'))
+    expect(forwarded.aborted).toBe(true)
+    await expect(maybe(undefined, abort.signal, 'extra')).rejects.toThrow('expected 0–1 business argument(s)')
+    await dispose()
+  })
+
+  it('keeps required parameters before optional arguments and preserves scoped lookup projection', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: { ref: 'optional' } })
+    const ctx = await bench(call)
+    const descriptor = directDescriptor()
+    const optional = descriptor.parameters[1]!
+    const dispose = await ctx.remote.$mount({ package: '@fixture/optional-scoped', descriptors: [{ ...descriptor,
+      parameters: [descriptor.parameters[0]!, { ...optional, acceptsUndefined: true }],
+    }] })
+    const create = ctx.remote.probe.create as unknown as (...args: unknown[]) => Promise<unknown>
+    await expect(create()).rejects.toThrow('expected 1–2 business argument(s)')
+    await create('agent-1')
+    expect(call).toHaveBeenLastCalledWith('/api', 'probe/create', { args: { agentId: 'agent-1' } }, expect.any(AbortSignal))
+    ctx.typert.contexts.registerClient('fixture', { identity: () => 'scoped-agent' })
+    const scoped = (ctx as FixtureContext).remote.probe.create as unknown as (...args: unknown[]) => Promise<unknown>
+    await scoped()
+    expect(call).toHaveBeenLastCalledWith('/api', 'probe/create', { args: { agentId: 'scoped-agent' } }, expect.any(AbortSignal))
     await dispose()
   })
 
@@ -759,6 +870,25 @@ describe('Client Typert API', () => {
     expect(outcome.error).toMatchObject(rpcError)
   })
 
+  it('preserves caller cancellation when the carrier rejects before a wire response', async () => {
+    const aborted = new AbortController()
+    const cause = new Error('caller cancelled')
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>().mockImplementation(
+      async (_path, _endpoint, _body, signal) => {
+        aborted.abort(cause)
+        signal?.throwIfAborted()
+        throw new Error('expected the caller signal')
+      },
+    ))
+    await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] })
+    const result = await ctx.remote.probe.create('agent-1', { objective: 'ship' }, aborted.signal)
+    expect(result).toMatchObject({ ok: false, error: { code: 'gateway/cancelled', cause } })
+    if (result.ok) throw new Error('expected cancellation')
+    expect(isRemoteFailure(result.error)).toBe(true)
+    expect(isRemoteFailure(cause)).toBe(false)
+    expect(isRemoteFailure(undefined)).toBe(false)
+  })
+
   it('folds a transport throw into the error branch', async () => {
     const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>()
       .mockRejectedValue(new Error('carrier offline')))
@@ -963,4 +1093,83 @@ describe('Client Typert API', () => {
 
     expect(seen).toEqual([])
   })
+})
+
+async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
+  const values: T[] = []
+  for await (const value of stream) values.push(value)
+  return values
+}
+
+
+it.each(['root', 'session', 'fallback'] as const)('supervises read retries using the %s Connection readiness', async (kind) => {
+  const ctx = await bench(async () => ({ ok: true, value: undefined }))
+  const listeners = new Set<() => void>()
+  let ready = false
+  const subscribed = Promise.withResolvers<undefined>()
+  const state = {
+    getSnapshot: () => ready ? 'connected' as const : 'reconnecting' as const,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      subscribed.resolve(undefined)
+      return () => { listeners.delete(listener) }
+    },
+  }
+  const connection = ctx.get('connection') as ConnectionHandle
+  const target = { state } as unknown as ConnectionHandle
+  const forSession = vi.fn(() => target)
+  Object.assign(connection, { state, ...(kind === 'session' ? { forSession } : {}) })
+  let opened = 0
+  const stream = ctx.remote.$stream({
+    ...(kind === 'root' ? {} : { sessionId: 'read-session' as SessionId }),
+    name: 'target readiness',
+    open: async function* () {
+      opened++
+      if (opened === 1) throw new RemoteStreamCarrierError('disconnected')
+      yield 'ready'
+    },
+    ended: () => new Error('done'),
+  })
+  try {
+    const iterator = stream[Symbol.asyncIterator]()
+    const pending = iterator.next()
+    await subscribed.promise
+    expect(opened).toBe(1)
+    ready = true
+    for (const listener of listeners) listener()
+    expect(((await pending).value as { value?: unknown } | undefined)?.value).toBe('ready')
+    await expect(iterator.next()).rejects.toThrow('done')
+    expect(forSession.mock.calls).toHaveLength(kind === 'session' ? 1 : 0)
+    expect(listeners.size).toBe(0)
+  } finally { await stream.dispose(); await ctx.fiber.dispose() }
+})
+
+it('classifies physical stream loss and refuses a retained opener after unmount', async () => {
+  const ctx = await bench(async () => { throw new Error('unary must not execute') })
+  try {
+    const dispose = await ctx.remote.$mount({ package: '@fixture/lost-stream', descriptors: [{ ...maybeDescriptor(), mode: 'stream' }] })
+    const connection = ctx.get('connection') as ConnectionHandle
+    Object.assign(connection.rpc, { stream: () => ({ [Symbol.asyncIterator]: () => ({ next: async () => { throw new ConnectionRpcStreamInterrupted('carrier closed') } }) }) })
+    const open = ctx.remote.probe.maybe as unknown as () => AsyncIterable<unknown>
+    await expect(collect(open())).rejects.toBeInstanceOf(RemoteStreamCarrierError)
+    await dispose()
+    await expect(collect(open())).rejects.toMatchObject({ code: 'gateway/internal', message: expect.stringContaining('no longer mounted') as string })
+  } finally { await ctx.fiber.dispose() }
+})
+
+it('routes inactive terminal holds by their explicit Session identity without Agent activation', async () => {
+  const call = vi.fn<ConnectionHandle['rpc']['call']>()
+  const stream = vi.fn<NonNullable<ConnectionHandle['rpc']['stream']>>(async function* () { yield { ok: true, value: 'held' } })
+  const ctx = await bench(call)
+  try {
+    const forSession = vi.fn(() => ({ rpc: { call, stream } }) as unknown as ConnectionHandle)
+    Object.assign(ctx.get('connection') as ConnectionHandle, { forSession })
+    await ctx.remote.$mount({ package: '@fixture/retention', descriptors: [{ ...maybeDescriptor(), namespace: 'terminal', method: 'retain', mode: 'stream',
+      parameters: [{ name: 'sessionId', wire: 'sessionId', source: 'json', codec: { mode: 'strict', typeSymbol: '@fixture#Session', create: () => z.string() } }],
+    }] })
+    const terminalRemote = ctx.remote.terminal as unknown as { retain(id: string): AsyncIterable<string> }
+    expect(await collect(terminalRemote.retain('inactive-session'))).toEqual(['held'])
+    expect(forSession).toHaveBeenCalledWith('inactive-session')
+    expect(call).not.toHaveBeenCalled()
+  } finally { await ctx.fiber.dispose() }
 })

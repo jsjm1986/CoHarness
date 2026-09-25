@@ -168,7 +168,8 @@ export interface TerminalResultView {
   output?: string
   /**
    * Process exit code, or null when the run settled without a known code.
-   * Omit when a signal supplies the status or no exit-status fact is available.
+   * Omit when a signal supplies the status or no exit-status fact is
+   * available — an omitted status renders as unknown, never as success.
    */
   exitCode?: number | null
   /** Signal name that killed the process (e.g. `SIGTERM`). Mutually exclusive with `exitCode`. */

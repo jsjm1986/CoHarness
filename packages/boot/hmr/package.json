@@ -44,7 +44,7 @@
   "devDependencies": {
     "@types/babel__code-frame": "^7.27.0",
     "@types/picomatch": "^3.0.2",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "@deepseek-ai/cordis-plugin-timer": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",

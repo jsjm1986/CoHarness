@@ -118,9 +118,10 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp-agent e2e: real prompt over 
     const proof = await readFile(join(workdir, 'proof.txt'), 'utf8')
     expect(proof).toContain('ACP_OK')
 
-    // The transport exposes only committed assistant text; tool execution is
-    // proved by the world effect above and remains session-log data.
-    expect(updates.length).toBeGreaterThan(0)
-    expect(updates.every(update => update.sessionUpdate === 'agent_message_chunk')).toBe(true)
+    // The transport exposes committed semantic facts without UI projections;
+    // the world effect independently proves that the standard tool lifecycle ran.
+    expect(updates.some(update => update.sessionUpdate === 'agent_message_chunk')).toBe(true)
+    expect(updates.some(update => update.sessionUpdate === 'tool_call')).toBe(true)
+    expect(updates.some(update => update.sessionUpdate === 'tool_call_update')).toBe(true)
   }, 180_000)
 })

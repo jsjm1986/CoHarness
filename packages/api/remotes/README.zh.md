@@ -10,6 +10,8 @@
 
 本包不包含传输逻辑或 Host 服务发现逻辑。Web 或未来的 TUI 只要提供同一份不依赖 React 的 `ctx.remote` 约定，均可复用其 Client face。
 
+Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile、安装、启停、取消与移除。拥有该能力的 Host 服务对每次调用检查部署授权；挂载方法不会授予管理员权限。安装事件和日志不在通用转发事件许可清单内。
+
 ## 概述
 
 为本应用选定的 Host Remote 能力提供双侧 BFF。Host 入口拥有转发事件名单并向 API Gateway 注册应用事件 source；Client 入口以运行时值形式导入生成的 `/remote` 产物，通过 `ctx.remote.$mount()` 挂载每项贡献，并重新导出对应的声明合并。Client 业务包依赖该外观，而不依赖 Gateway 实现或单独的 Remote 运行时入口。

@@ -534,6 +534,168 @@ export function desktopHolderOf(row: { holderJson: string }): DesktopHolder | un
   }
 }
 
+/** An administrator decision and its optimistic revision, scoped to one resource owner. */
+export interface AdminResourcePolicy {
+  kind: 'user' | 'project'
+  id: number
+  enabled: boolean
+  revision: string
+}
+
+export type AdminDesktopPolicy = AdminResourcePolicy
+
+export function getDesktopPolicy(kind: AdminDesktopPolicy['kind'], id: number, signal?: AbortSignal): Promise<AdminDesktopPolicy> {
+  return request(`/admin/api/desktops/permissions?kind=${kind}&id=${String(id)}`, { signal })
+}
+
+export function setDesktopPolicy(policy: AdminDesktopPolicy): Promise<AdminDesktopPolicy> {
+  return request('/admin/api/desktops/permissions', { method: 'POST', body: JSON.stringify(policy) })
+}
+
+export function getTerminalPolicy(kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal): Promise<AdminResourcePolicy> {
+  return request(`/admin/api/terminals/permissions?kind=${kind}&id=${String(id)}`, { signal })
+}
+
+export function setTerminalPolicy(policy: AdminResourcePolicy): Promise<AdminResourcePolicy> {
+  return request('/admin/api/terminals/permissions', { method: 'POST', body: JSON.stringify(policy) })
+}
+
+export function getSshPolicy(kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal): Promise<AdminResourcePolicy> {
+  return request(`/admin/api/ssh/permissions?kind=${kind}&id=${String(id)}`, { signal })
+}
+
+export function setSshPolicy(policy: AdminResourcePolicy): Promise<AdminResourcePolicy> {
+  return request('/admin/api/ssh/permissions', { method: 'POST', body: JSON.stringify(policy) })
+}
+
+/** Administrator-registered OpenSSH target with its project shares. */
+export interface AdminSshTarget {
+  publicId: number
+  name: string
+  host: string
+  node: string
+  helper: string
+  helperHash: string
+  workspace: string
+  bootstrapPath: string | null
+  bootstrapHash: string | null
+  requestTimeoutMs: number | null
+  maxFrameBytes: number | null
+  maxPending: number | null
+  leaseMs: number | null
+  enabled: boolean
+  revision: string
+  sharedProjects: number[]
+}
+
+/** Editable connection coordinates; ids and revisions are server-owned. */
+export type AdminSshTargetFields = Pick<AdminSshTarget,
+  'name' | 'host' | 'node' | 'helper' | 'helperHash' | 'workspace'
+  | 'bootstrapPath' | 'bootstrapHash' | 'requestTimeoutMs' | 'maxFrameBytes' | 'maxPending' | 'leaseMs'>
+
+export function listSshTargets(): Promise<{ targets: AdminSshTarget[] }> {
+  return request('/admin/api/ssh-targets')
+}
+
+export function createSshTarget(fields: AdminSshTargetFields): Promise<AdminSshTarget> {
+  return request('/admin/api/ssh-targets', { method: 'POST', body: JSON.stringify(fields) })
+}
+
+export function updateSshTarget(targetId: number, revision: string, fields: AdminSshTargetFields): Promise<AdminSshTarget> {
+  return request('/admin/api/ssh-targets/update', { method: 'POST', body: JSON.stringify({ targetId, revision, fields }) })
+}
+
+export function mutateSshTarget(targetId: number, revision: string, action: 'enable' | 'disable' | 'remove'): Promise<AdminSshTarget | { removed: true }> {
+  return request('/admin/api/ssh-targets/mutate', { method: 'POST', body: JSON.stringify({ targetId, revision, action }) })
+}
+
+export function shareSshTarget(targetId: number, projectId: number, shared: boolean): Promise<AdminSshTarget> {
+  return request('/admin/api/ssh-targets/share', { method: 'POST', body: JSON.stringify({ targetId, projectId, shared }) })
+}
+
+/** Administrator-registered webhook endpoint; the signing secret is write-only. */
+export interface AdminWebhookEndpoint {
+  id: string
+  publicId: number
+  name: string
+  provider: 'github'
+  source: string
+  events: string[]
+  actions: string[]
+  repositories: string[]
+  titleTemplate: string
+  promptTemplate: string
+  workspacePath: string
+  agentPreset: string
+  permissionPreset: string
+  modelProvider: string | null
+  modelId: string | null
+  modelMaxTokens: number | null
+  executionUserId: number
+  runtimeKind: 'user' | 'project'
+  runtimePublicId: number
+  intakeLimit: number
+  intakeWindowMs: number
+  replayWindowMs: number
+  maxBodyBytes: number
+  enabled: boolean
+  revision: string
+}
+
+/** Editable endpoint fields; ids, revisions, and the secret are server-owned channels. */
+export type AdminWebhookEndpointFields = Pick<AdminWebhookEndpoint,
+  'name' | 'provider' | 'source' | 'events' | 'actions' | 'repositories' | 'titleTemplate' | 'promptTemplate' | 'workspacePath'
+  | 'agentPreset' | 'permissionPreset' | 'modelProvider' | 'modelId' | 'modelMaxTokens'
+  | 'executionUserId' | 'runtimeKind' | 'runtimePublicId' | 'intakeLimit' | 'intakeWindowMs'
+  | 'replayWindowMs' | 'maxBodyBytes'>
+
+export function listWebhookEndpoints(): Promise<{ endpoints: AdminWebhookEndpoint[] }> {
+  return request('/admin/api/webhook-endpoints')
+}
+
+export function createWebhookEndpoint(fields: AdminWebhookEndpointFields & { secret: string }): Promise<AdminWebhookEndpoint> {
+  return request('/admin/api/webhook-endpoints', { method: 'POST', body: JSON.stringify(fields) })
+}
+
+export function updateWebhookEndpoint(
+  targetId: number, revision: string, fields: AdminWebhookEndpointFields, secret?: string,
+): Promise<AdminWebhookEndpoint> {
+  return request('/admin/api/webhook-endpoints/update', {
+    method: 'POST', body: JSON.stringify({ targetId, revision, fields, ...(secret === undefined ? {} : { secret }) }),
+  })
+}
+
+export function mutateWebhookEndpoint(
+  targetId: number, revision: string, action: 'enable' | 'disable' | 'remove',
+): Promise<AdminWebhookEndpoint | { removed: true }> {
+  return request('/admin/api/webhook-endpoints/mutate', { method: 'POST', body: JSON.stringify({ targetId, revision, action }) })
+}
+
+/** One durable delivery receipt; payloads and secrets are never exposed. */
+export interface AdminWebhookReceipt {
+  id: string
+  deliveryId: string
+  configurationRevision: string
+  state: 'dispatching' | 'submitted' | 'ignored' | 'rejected' | 'unknown'
+  sessionId: string | null
+  errorCode: string | null
+  receivedAt: string
+}
+
+export function listWebhookDeliveries(
+  endpointId: string, cursor?: string, limit?: number,
+): Promise<{ items: AdminWebhookReceipt[]; nextCursor: string | null }> {
+  const params = new URLSearchParams({ endpointId })
+  if (cursor !== undefined) params.set('cursor', cursor)
+  if (limit !== undefined) params.set('limit', String(limit))
+  return request(`/admin/api/webhook-deliveries?${params.toString()}`)
+}
+
+/** Replay one settled receipt's stored event under the endpoint's current configuration. */
+export function redispatchWebhookDelivery(receiptId: string): Promise<AdminWebhookReceipt> {
+  return request('/admin/api/webhook-deliveries/redispatch', { method: 'POST', body: JSON.stringify({ receiptId }) })
+}
+
 export function listDesktops(): Promise<{ resources: AdminDesktopResource[] }> {
   return request('/admin/api/desktops')
 }
@@ -862,4 +1024,119 @@ export function getProjectUsage(projectId: number, month?: string): Promise<Usag
   const query = new URLSearchParams({ projectId: String(projectId) })
   if (month !== undefined && month !== '') query.set('month', month)
   return request(`/admin/api/usage?${query.toString()}`)
+}
+
+export type AdminTerminal = {
+  ownerId: string
+  sessionId: string
+  id: string
+  creatorUserId?: number
+  state: 'starting' | 'running' | 'exited' | 'failed' | 'stopping'
+}
+export type AdminTerminalInventory = {
+  nodeId: string
+  target: { kind: 'user' | 'project'; id: number }
+  generation: number | null
+  terminals: AdminTerminal[]
+}
+
+export function listTerminals(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<AdminTerminalInventory> {
+  return request(`/admin/api/terminals?kind=${kind}&id=${String(id)}`, { signal })
+}
+
+export function closeTerminal(inventory: AdminTerminalInventory, entry: AdminTerminal): Promise<{ closed: true }> {
+  return request('/admin/api/terminals/close', { method: 'POST', body: JSON.stringify({
+    kind: inventory.target.kind, targetId: inventory.target.id, nodeId: inventory.nodeId,
+    generation: inventory.generation, ownerId: entry.ownerId, id: entry.id,
+  }) })
+}
+
+/** Exact current-node profile binding returned before management actions are enabled. */
+export interface PluginManagementTarget { nodeId: string; target: { kind: 'user' | 'project'; id: number }; generation: number | null }
+export function pluginManagementTarget(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<PluginManagementTarget> {
+  return request(`/admin/api/plugins/target?kind=${kind}&id=${String(id)}`, { signal })
+}
+/** Generated Remote codecs validate the answer in the profile adapter. */
+export function pluginManagementInvoke(input: unknown, signal: AbortSignal): Promise<unknown> {
+  return request('/admin/api/plugins/invoke', { method: 'POST', body: JSON.stringify(input), signal })
+}
+
+export type DeploymentNodeStatus = 'active' | 'draining' | 'offline'
+export type ClusterMode = 'serving' | 'maintenance' | 'restoring'
+
+export interface DeploymentNode {
+  nodeId: string
+  name: string
+  status: DeploymentNodeStatus
+  lastHeartbeatAt: string | null
+  heartbeatAgeMs: number | null
+  maintenanceAppliedEpoch: string
+  /** -1 means the node's build predates inflight reporting; it cannot quiesce. */
+  inflightWrites: number
+  quiesced: boolean
+}
+
+export interface DeploymentOperation {
+  id: string
+  kind: 'enter-maintenance' | 'exit-maintenance' | 'apply' | 'backup' | 'restore' | 'node-status'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'aborted'
+  nodeName: string | null
+  detail: unknown
+  createdBy: number | null
+  createdAt: string
+  startedAt: string | null
+  finishedAt: string | null
+  error: string | null
+}
+
+export interface DeploymentState {
+  mode: ClusterMode
+  maintenanceEpoch: string
+  writeEpoch: string
+  reason: string | null
+  enteredAt: string | null
+  updatedAt: string
+  nodes: DeploymentNode[]
+  writersQuiesced: boolean
+  migrations: { applied: number[]; pending: Array<{ version: number; name: string }>; drifted: number[]; current: number } | null
+  operations: DeploymentOperation[]
+}
+
+export interface DeploymentBackup {
+  id: string
+  path: string
+  format: string
+  migrationVersion: number
+  writeEpoch: string
+  sizeBytes: number | null
+  sha256: string | null
+  managedFiles: Array<{ member: string; sourcePath: string; sizeBytes: number; sha256: string }>
+  status: 'recording' | 'verified' | 'failed' | 'restored'
+  createdBy: number | null
+  createdAt: string
+  verifiedAt: string | null
+  restoredAt: string | null
+  error: string | null
+}
+
+export function getDeployment(): Promise<DeploymentState> {
+  return request('/admin/api/deployment')
+}
+export function setMaintenance(action: 'enter' | 'exit', reason?: string): Promise<DeploymentState> {
+  return request('/admin/api/deployment/maintenance', { method: 'POST', body: JSON.stringify({ action, reason }) })
+}
+export function setDeploymentNodeStatus(nodeId: string, status: DeploymentNodeStatus): Promise<DeploymentNode> {
+  return request('/admin/api/deployment/nodes/status', { method: 'POST', body: JSON.stringify({ nodeId, status }) })
+}
+export function requestDeploymentRestore(backupId: string): Promise<DeploymentOperation> {
+  return request('/admin/api/deployment/restore', { method: 'POST', body: JSON.stringify({ backupId }) })
+}
+export function listBackups(): Promise<{ backups: DeploymentBackup[] }> {
+  return request('/admin/api/backups')
+}
+export function createBackup(): Promise<DeploymentBackup> {
+  return request('/admin/api/backups', { method: 'POST', body: '{}' })
+}
+export function verifyBackup(id: string): Promise<DeploymentBackup> {
+  return request('/admin/api/backups/verify', { method: 'POST', body: JSON.stringify({ id }) })
 }

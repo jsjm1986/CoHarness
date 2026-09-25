@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md
-2026-09-22-gateway-profile-management-authority.md: 772bca93390c9e49ad3fa5a7dacf20a9e3ad8db8
-2026-09-22-gateway-profile-management-authority.zh.md: f260d83fcf33683f42d9a86ebc84f7fab6ee5984
+2026-09-22-gateway-profile-management-authority.md: fac0dc151fa616305b02975e7d00e2674aa24e25
+2026-09-22-gateway-profile-management-authority.zh.md: 3e18217e2f205e06e4c86d84aee08aa3f6a31e60

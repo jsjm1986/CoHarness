@@ -20,8 +20,9 @@ import {
   type InitializeResult,
   type SessionPromptParams,
 } from '@deepseek-ai/dsh-sdk-protocol'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { SdkPromptContentBlock } from '@deepseek-ai/dsh-sdk-protocol'
 import { disposeRuntimeProcess } from './dispose.ts'
+import { resolveDshLaunch, type RuntimeProcessOptions } from './launch.ts'
 import type { HarnessClientOptions, HarnessNotification, NotificationFilter } from './types.ts'
 
 /** Retained stderr lines used to diagnose an unexpected runtime death. */
@@ -245,6 +246,9 @@ class NotificationSubscriptionImpl implements NotificationSubscription {
  * runtime is closed.
  */
 export class HarnessClient {
+  /** Public launch configuration and transport limits. */
+  readonly options: HarnessClientOptions
+  private readonly runtime: RuntimeProcessOptions
   private child: ChildProcess | undefined
   private transport: JsonRpcLineTransport | undefined
   private readonly stderrTail: string[] = []
@@ -257,7 +261,11 @@ export class HarnessClient {
   private closeTask: Promise<void> | undefined
 
   /** @param options - launch spec, complete child environment, and timeouts. */
-  constructor(readonly options: HarnessClientOptions) {
+  constructor(options?: HarnessClientOptions)
+  constructor(options: HarnessClientOptions = {}, runtime?: RuntimeProcessOptions) {
+    this.options = options
+    this.runtime = runtime ?? resolveDshLaunch(options)
+    validateTimerDelay(this.runtime.initializeTimeoutMs, 'initializeTimeoutMs')
     validateTimerDelay(options.requestTimeoutMs, 'requestTimeoutMs')
     validateTimerDelay(options.shutdownTimeoutMs, 'shutdownTimeoutMs')
     validateTimerDelay(options.disposeEofGraceMs, 'disposeEofGraceMs')
@@ -275,9 +283,9 @@ export class HarnessClient {
   start(): void {
     if (this.closeTask !== undefined) throw new TransportClosedError('DeepSeek Harness runtime client is closed')
     if (this.child !== undefined) return
-    const child = spawn(this.options.command, this.options.args ?? [], {
-      cwd: this.options.cwd,
-      env: this.options.env ?? process.env,
+    const child = spawn(this.runtime.command, this.runtime.args, {
+      cwd: this.runtime.cwd,
+      env: this.runtime.environment(),
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     this.child = child
@@ -344,7 +352,7 @@ export class HarnessClient {
    * @returns the runtime's wire identity.
    */
   async initialize(params: InitializeParams): Promise<InitializeResult> {
-    const result = await this.request('initialize', { ...params })
+    const result = await this.request('initialize', { ...params }, this.runtime.initializeTimeoutMs)
     if (!isRecord(result) || !isRecord(result.serverInfo)
       || typeof result.serverInfo.name !== 'string' || typeof result.serverInfo.version !== 'string') {
       throw new SdkProtocolError(`initialize returned no server identity: ${JSON.stringify(result)}`)
@@ -358,7 +366,7 @@ export class HarnessClient {
    * @param contentBlocks - the user message, sent verbatim.
    * @returns the queued message id.
    */
-  async prompt(sessionId: string, contentBlocks: ContentBlock[]): Promise<string> {
+  async prompt(sessionId: string, contentBlocks: SdkPromptContentBlock[]): Promise<string> {
     const params: SessionPromptParams = { sessionId, contentBlocks }
     const result = await this.request('session/prompt', { ...params })
     if (!isRecord(result) || typeof result.messageId !== 'string') {
@@ -590,3 +598,17 @@ function errorMessage(error: unknown): string {
   /* v8 ignore next -- the transport and dispose ladder reject only with Errors */
   return error instanceof Error ? error.message : String(error)
 }
+
+/**
+ * Construct the transport against a generic process for package-local fake-runtime tests.
+ * @param options - resolved process, timers and transport limits.
+ * @returns a client retaining the production protocol and cleanup implementation.
+ */
+export function createProcessHarnessClient(options: RuntimeProcessOptions): HarnessClient {
+  const Constructor = HarnessClient as unknown as new (
+    publicOptions: HarnessClientOptions,
+    runtime: RuntimeProcessOptions,
+  ) => HarnessClient
+  return new Constructor(options, options)
+}
+

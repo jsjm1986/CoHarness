@@ -112,13 +112,13 @@ describe('render branch tails', () => {
     expect(view.container.querySelector('[data-state="running"]')).not.toBeNull()
   })
 
-  it('DetailsPanel title falls to 详情 when the selection has no toolName and no material', () => {
+  it('DetailsPanel title falls to 详情 when the selection has no toolName and no material', async () => {
     localStorage.clear()
     const snap = snapshotBase()
     const chat = createChatStore().create()
     chat.actions.select({ turnSeq: 1, callId: 'ghost' } satisfies SelectionTarget)
     const emptyList = createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
     const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
       items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
@@ -143,14 +143,15 @@ describe('render branch tails', () => {
           pruneDocuments: () => {},
           submit: () => {},
         }}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
+        {...(chat.getSnapshot().selection ?? {})}
+        readCall={async () => undefined}
         closeDetails={vi.fn()}
+        loadImage={vi.fn(() => Promise.reject(new Error('not used')))}
         t={t}
       />,
     )
     expect(view.getByText('详情')).toBeTruthy()
-    expect(view.getByText('该调用不在当前窗口内')).toBeTruthy()
+    expect(await view.findByText('会话记录中未找到该调用')).toBeTruthy()
   })
 
   it('DetailsPanel resolves a nested run_code leaf to its full logged args and output', () => {
@@ -177,7 +178,7 @@ describe('render branch tails', () => {
     const chat = createChatStore().create()
     chat.actions.select({ turnSeq: 9, callId: 'p1:ptc:1:ptc:1', toolName: 'read' } satisfies SelectionTarget)
     const emptyList = createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
     const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
       items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
@@ -203,9 +204,10 @@ describe('render branch tails', () => {
           pruneDocuments: () => {},
           submit: () => {},
         }}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
+        {...(chat.getSnapshot().selection ?? {})}
+        readCall={async () => undefined}
         closeDetails={vi.fn()}
+        loadImage={vi.fn(() => Promise.reject(new Error('not used')))}
         t={t}
       />,
     )

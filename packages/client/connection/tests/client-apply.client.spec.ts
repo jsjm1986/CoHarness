@@ -5,7 +5,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, type ConnectionHandle } from '../src/client/index.ts'
-import type { RpcMessage } from '../src/client/api.ts'
+import type { RpcMessage, SessionId } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 import { FixtureApiClient } from '../src/client/fixture.ts'
 import { WebApiClient } from '../src/client/web-api-client.ts'
@@ -462,5 +462,55 @@ describe('connection client apply', () => {
     await expect(handle.rpc.call('/other', 'goals/create', {})).rejects.toThrow(/channel.*unavailable/)
     await expect(handle.rpc.call('/api', 'unknown/read', { args: { agentId: 'fx-alpha' } }))
       .rejects.toThrow(/endpoint.*unavailable/)
+  })
+
+  it('forSession reuses the pool-started target connection and evicts it on stop', async () => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '?fixture' }
+    ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const handle = await mount()
+    const release = handle.registerSessionTargetResolver!(id => id === 's1'
+      ? { kind: 'project', projectId: 7 }
+      : undefined)
+    try {
+      const pooled = handle.forTarget!({ kind: 'project', projectId: 7 })
+      expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
+      expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
+      // Unowned sessions and the personal target resolve to the base connection.
+      expect(handle.forSession!('other' as SessionId)).toBe(handle)
+      expect(handle.forTarget!({ kind: 'personal' })).toBe(handle)
+      // A derived handle resolves sessions through the shared resolver.
+      expect(pooled.forSession!('s1' as SessionId)).toBe(pooled)
+      expect(pooled.forSession!('other' as SessionId)).toBe(handle)
+
+      const original = globalThis.fetch
+      globalThis.fetch = (input: URL | RequestInfo, init?: RequestInit) => {
+        void input
+        const request = JSON.parse(init?.body as string) as { rpcId: string }
+        return Promise.resolve(Response.json({
+          type: 'server-response',
+          rpcId: request.rpcId,
+          result: { ok: true, value: {
+            version: '0.0.0-test', cwd: '/tmp', attachedSessions: 0, home: '/tmp', canOpenPath: false,
+          } },
+        }))
+      }
+      try {
+        const loop = pooled.start({})
+        await vi.waitFor(() => { expect(pooled.state.getSnapshot()).toBe('connected') })
+        expect(pooled.hostDescription.getSnapshot()?.version).toBe('0.0.0-test')
+        // The session-addressed lookup keeps returning the live started handle.
+        expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
+        loop.stop()
+        expect(pooled.state.getSnapshot()).toBeUndefined()
+        expect(pooled.hostDescription.getSnapshot()).toBeUndefined()
+        // A stopped target is evicted: the next resolution mints a fresh handle.
+        expect(handle.forSession!('s1' as SessionId)).not.toBe(pooled)
+        expect(handle.forSession!('s1' as SessionId).state.getSnapshot()).toBeUndefined()
+      } finally {
+        globalThis.fetch = original
+      }
+    } finally {
+      release()
+    }
   })
 })

@@ -84,7 +84,7 @@ export function MessageIconActions({
   // readings only on screen: without the flanking spaces a reader hears one
   // run-on string ("Ran for 13sTTFT 0.2s12 tok/s") instead of three facts.
   const clockEl = time === undefined ? null : (
-    <span className={clock === 'start' ? css.timeStart : css.timeEnd}>
+    <span className={clock === 'start' ? css.timeStart : css.timeEnd} role="group" aria-label={t('message.timing')}>
       {formatMessageClock(time, t, day)}
       {runMs !== undefined && (
         <>

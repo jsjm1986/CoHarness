@@ -28,6 +28,14 @@
  *                        assistant text.
  * - `MOCK_SESSION_ID`  — a fixed `sessionId` to return from `session/new`
  *                        (default: a fresh randomUUID).
+ * - `MOCK_LOAD_SESSION` — if `1`, advertise `loadSession` and serve
+ *                        `session/load`: replay the durable transcript for the
+ *                        requested sessionId as `user_message_chunk` /
+ *                        `agent_message_chunk` updates before resolving.
+ * - `MOCK_TRANSCRIPT_FILE` — a JSONL file standing in for the agent's durable
+ *                        session store: `{sessionId, role, text}` per line.
+ *                        `prompt` appends the user text and its answer;
+ *                        `session/load` replays the session's entries.
  * - `MOCK_NEWSESSION_READY` + `MOCK_NEWSESSION_GO` — `session/new` touches READY
  *                        then polls for GO before answering (a deterministic
  *                        cancel-during-new-session window).
@@ -73,7 +81,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { existsSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Readable, Writable } from 'node:stream'
 import {
   agent as createAgent,
@@ -86,6 +94,8 @@ import {
   type AuthenticateRequest,
   type InitializeRequest,
   type InitializeResponse,
+  type LoadSessionRequest,
+  type LoadSessionResponse,
   type NewSessionRequest,
   type NewSessionResponse,
   type PromptRequest,
@@ -118,6 +128,29 @@ const CRASH_AFTER_CHUNK = process.env.MOCK_CRASH_AFTER_CHUNK === '1'
 const IGNORE_CANCEL = process.env.MOCK_IGNORE_CANCEL === '1'
 const READY_FILE = process.env.MOCK_READY_FILE
 const FLUSH_ON_EOF = process.env.MOCK_FLUSH_ON_EOF
+const LOAD_SESSION = process.env.MOCK_LOAD_SESSION === '1'
+const TRANSCRIPT_FILE = process.env.MOCK_TRANSCRIPT_FILE
+
+/** One durable-transcript line in MOCK_TRANSCRIPT_FILE. */
+interface TranscriptEntry {
+  sessionId: string
+  role: 'user' | 'agent'
+  text: string
+}
+
+function transcriptAppend(entry: TranscriptEntry): void {
+  if (TRANSCRIPT_FILE === undefined) return
+  appendFileSync(TRANSCRIPT_FILE, JSON.stringify(entry) + '\n')
+}
+
+function transcriptRead(sessionId: string): TranscriptEntry[] {
+  if (TRANSCRIPT_FILE === undefined || !existsSync(TRANSCRIPT_FILE)) return []
+  return readFileSync(TRANSCRIPT_FILE, 'utf8')
+    .split('\n')
+    .filter(line => line !== '')
+    .map(line => JSON.parse(line) as TranscriptEntry)
+    .filter(entry => entry.sessionId === sessionId)
+}
 // When MOCK_NEWSESSION_READY/GO are set, newSession touches READY then blocks
 // until GO appears — letting a test cancel mid-newSession deterministically.
 const NEWSESSION_GATE = process.env.MOCK_NEWSESSION_READY !== undefined && process.env.MOCK_NEWSESSION_GO !== undefined
@@ -143,9 +176,24 @@ function makeAgent(conn: AgentClient): Agent {
       if (CRASH_ON_INITIALIZE) process.exit(11)
       return Promise.resolve({
         protocolVersion: PROTOCOL_VERSION,
-        agentCapabilities: { loadSession: false, promptCapabilities: { image: false, audio: false, embeddedContext: false } },
+        agentCapabilities: { loadSession: LOAD_SESSION, promptCapabilities: { image: false, audio: false, embeddedContext: false } },
         authMethods: [],
       })
+    },
+    async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
+      // Replay the durable transcript as session/update notifications before
+      // resolving — the real agents' load replays the session's history the
+      // same way, and the member recovery reads exactly this transcript.
+      for (const entry of transcriptRead(params.sessionId)) {
+        await conn.sessionUpdate({
+          sessionId: params.sessionId,
+          update: {
+            sessionUpdate: entry.role === 'user' ? 'user_message_chunk' : 'agent_message_chunk',
+            content: { type: 'text', text: entry.text },
+          },
+        })
+      }
+      return {}
     },
     async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
       sessionCwd = params.cwd
@@ -165,6 +213,11 @@ function makeAgent(conn: AgentClient): Agent {
     },
     async prompt(params: PromptRequest): Promise<PromptResponse> {
       if (CRASH_ON_PROMPT) process.exit(1)
+      const promptText = params.prompt
+        .filter(block => block.type === 'text')
+        .map(block => (block as { text: string }).text)
+        .join('')
+      transcriptAppend({ sessionId: params.sessionId, role: 'user', text: promptText })
       if (WANT_PERMISSION) {
         // Ask the client to approve before answering; honor its decision. Under
         // MOCK_NO_ALLOW the only options are reject-shaped, so an `allow`-policy
@@ -200,13 +253,15 @@ function makeAgent(conn: AgentClient): Agent {
       }
       // Stream the canned assistant text as one chunk (or, under MOCK_ECHO_CWD,
       // the observable process cwd + announced session cwd).
+      const answerText = ECHO_CWD ? `${process.cwd()}\n${sessionCwd ?? ''}` : TEXT
       await conn.sessionUpdate({
         sessionId: params.sessionId,
         update: {
           sessionUpdate: 'agent_message_chunk',
-          content: { type: 'text', text: ECHO_CWD ? `${process.cwd()}\n${sessionCwd ?? ''}` : TEXT },
+          content: { type: 'text', text: answerText },
         },
       })
+      transcriptAppend({ sessionId: params.sessionId, role: 'agent', text: answerText })
       // Signal "prompt is in flight" by touching the readiness file, so a test
       // can wait on a CONDITION (file exists) rather than an arbitrary timeout
       // before cancelling — deterministic regardless of subprocess cold-start.
@@ -264,8 +319,9 @@ createAgent({ name: 'dsh-subagent-acp-mock' })
   .onConnect(({ client }) => { clientRef.current = client })
   .onRequest(methods.agent.initialize, ({ params }) => implementation.initialize(params))
   .onRequest(methods.agent.session.new, ({ params }) => implementation.newSession(params))
+  .onRequest(methods.agent.session.load, ({ params }) => implementation.loadSession?.(params))
   .onRequest(methods.agent.session.prompt, ({ params }) => implementation.prompt(params))
-  .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel(params))
+  .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel?.(params))
   .connect(
     ndJsonStream(
       Writable.toWeb(process.stdout) as WritableStream<Uint8Array>,

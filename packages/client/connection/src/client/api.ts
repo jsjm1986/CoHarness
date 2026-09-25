@@ -10,7 +10,7 @@ export type {
   ApprovalResponsePayload, QuestionResponsePayload, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
-  DirectoryEntry, DirectoryListing,
+  DirectoryEntry, DirectoryListing, DesktopConfirmation,
   ResponseValue, WorkspaceApi, WorkspaceId, WorkspaceView,
   SkillsApi, SkillEntry,
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
@@ -20,7 +20,7 @@ export type {
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptContentPart, SubagentPromptReceipt,
   JobView,
-  WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
+  WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 /** Authenticated Gateway runtime selected by a workbench pane. */

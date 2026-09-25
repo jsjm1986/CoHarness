@@ -75,6 +75,7 @@ export class WebSearchCardController {
   private readonly form: CardForm<WebSearchSettings>
   private readonly store: SnapshotStore<WebSearchCardState>
   private credential: CredentialState = { ref: '', configured: false, writable: true }
+  private credentialRead = 0
 
   /**
    * @param scope - the bound settings scope for the `web-search-deepseek` namespace.
@@ -114,6 +115,7 @@ export class WebSearchCardController {
    * reference in force.
    */
   private async readCredential(): Promise<void> {
+    const generation = ++this.credentialRead
     const ref = refOf(this.scope.getSnapshot())
     if (ref !== this.credential.ref) {
       // A new reference knows nothing yet; keeping the old answer would claim
@@ -129,7 +131,7 @@ export class WebSearchCardController {
       // last state it knew, and a write still reaches the Host.
       return
     }
-    if (!response.result.ok || ref !== refOf(this.scope.getSnapshot())) return
+    if (generation !== this.credentialRead || !response.result.ok || ref !== refOf(this.scope.getSnapshot())) return
     const view = response.result.value.credentials[ref]
     const next: CredentialState = {
       ref,
@@ -167,17 +169,19 @@ export class WebSearchCardController {
   /**
    * Write the staged key, then re-read whether the Host now holds one.
    * @param value - the staged credential literal.
-   * @returns whether the Host reports a configured credential afterwards.
+   * @returns whether this write was accepted for the unchanged reference and a credential is configured.
    */
   private async writeKey(value: string): Promise<boolean> {
+    const ref = refOf(this.scope.getSnapshot())
+    let accepted = false
     try {
-      await this.api.credentials.set({ ref: refOf(this.scope.getSnapshot()), value })
+      const response = await this.api.credentials.set({ ref, value })
+      accepted = response.result.ok
     } catch (_credentialWriteFailure) {
-      // Refusals surface through the re-read below: the Host is the only
-      // authority on whether the key now exists.
+      // A failed transport cannot acknowledge replacement of an existing credential.
     }
     await this.readCredential()
-    return this.credential.configured
+    return accepted && ref === refOf(this.scope.getSnapshot()) && this.credential.configured
   }
 }
 

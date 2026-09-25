@@ -14,6 +14,7 @@ async function bench() {
     children: {
       'conversation.input.attachments': { kind: 'single', scope: 'session-maybe' },
       'conversation.message.images': { kind: 'single', scope: 'session' },
+      'conversation.details.images': { kind: 'single', scope: 'session' },
     },
   } as never, () => null)
   const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -37,10 +38,15 @@ describe('attachment plugin', () => {
       locale: 'conversation',
       component: MessageImages,
     }])
+    expect(ctx.slots.entries('conversation.details.images')).toMatchObject([{
+      locale: 'conversation',
+      component: MessageImages,
+    }])
 
     await fiber.dispose()
 
     expect(ctx.slots.entries('conversation.input.attachments')).toHaveLength(0)
     expect(ctx.slots.entries('conversation.message.images')).toHaveLength(0)
+    expect(ctx.slots.entries('conversation.details.images')).toHaveLength(0)
   })
 })

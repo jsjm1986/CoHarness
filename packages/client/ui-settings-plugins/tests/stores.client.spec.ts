@@ -1,3 +1,4 @@
+import { SubagentLimitsCardController, type SubagentLimitsSettings } from '../src/client/subagent-limits-card-controller.ts'
 /**
  * The staged card form: what a draft shows before it is written, which wire
  * call a save reaches, and what happens to drafts the Host did not accept.
@@ -238,6 +239,66 @@ describe('CardForm', () => {
     expect(host.set).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a newer draft when an earlier save finishes', async () => {
+    const { host, subject } = form()
+    const pending = Promise.withResolvers<undefined>()
+    const set = vi.fn(async (_field: string, value: unknown) => {
+      await pending.promise
+      host.publish({ value: { timeoutMs: value }, user: { timeoutMs: value } })
+    })
+    host.scope.set = set
+    subject.actions().edit('timeoutMs', '9000')
+    const saving = subject.save()
+    subject.actions().edit('timeoutMs', '12000')
+    pending.resolve(undefined)
+    await saving
+
+    expect(set).toHaveBeenCalledExactlyOnceWith('timeoutMs', 9000)
+    expect(subject.field('timeoutMs').text).toBe('12000')
+    expect(subject.shell()).toMatchObject({ dirty: true, saving: false, failed: false })
+  })
+
+  it('settles a failed transport without losing drafts or submitting later fields', async () => {
+    const { host, subject } = form()
+    host.set.mockRejectedValueOnce(new Error('connection replaced'))
+    subject.actions().edit('timeoutMs', '9000')
+    subject.actions().edit('baseURL', 'https://other.test/v1')
+
+    await expect(subject.save()).resolves.toBeUndefined()
+    expect(host.set).toHaveBeenCalledExactlyOnceWith('timeoutMs', 9000)
+    expect(subject.shell()).toMatchObject({ dirty: true, failed: true, saving: false })
+    acceptWrites(host)
+    await subject.save()
+    expect(subject.shell()).toMatchObject({ dirty: false, failed: false, saving: false })
+  })
+
+  it('stops a queued save after the namespace loses write access', async () => {
+    const { host, subject } = form()
+    const pending = Promise.withResolvers<undefined>()
+    const set = vi.fn(async (_field: string, value: unknown) => {
+      await pending.promise
+      host.publish({ value: { timeoutMs: value }, user: { timeoutMs: value }, writable: false })
+    })
+    host.scope.set = set
+    subject.actions().edit('timeoutMs', '9000')
+    subject.actions().edit('baseURL', 'https://other.test/v1')
+    const saving = subject.save()
+    pending.resolve(undefined)
+    await saving
+
+    expect(set).toHaveBeenCalledExactlyOnceWith('timeoutMs', 9000)
+    expect(subject.shell()).toMatchObject({ dirty: true, failed: true, saving: false })
+  })
+
+  it('retains the owner explanation and does not submit a read-only draft', async () => {
+    const { host, subject } = form()
+    subject.actions().edit('timeoutMs', '9000')
+    host.publish({ writable: false, writableReason: 'project' })
+    await subject.save()
+    expect(host.set).not.toHaveBeenCalled()
+    expect(subject.shell()).toMatchObject({ writable: false, writableReason: 'project', dirty: true })
+  })
+
   it('publishes a projection whenever the scope or a draft changes', () => {
     const { host, subject } = form()
     const store = subject.bind(() => subject.field('timeoutMs').text)
@@ -438,6 +499,41 @@ describe('WebSearchCardController', () => {
     face.save()
 
     expect(credentials.set).not.toHaveBeenCalled()
+  })
+
+  it.each(['refused', 'disconnected'] as const)('retains a rejected replacement when an old key remains configured: %s', async (failure) => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const credentials = credentialsApi(true)
+    const set = vi.fn(async () => {
+      if (failure === 'disconnected') throw new Error('offline')
+      return { rpcId: 'c-2', result: { ok: false, error: { code: 'credentials-rejected', message: 'read only' } } }
+    })
+    const controller = new WebSearchCardController(host.scope, { credentials: { describe: credentials.describe, set } } as never)
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    const face = controller.inject()
+    await vi.waitFor(() => { expect(face.hooks.webSearchCard.getSnapshot().apiKeyConfigured).toBe(true) })
+    face.edit('apiKey', 'replacement-key')
+    face.save()
+
+    await vi.waitFor(() => {
+      expect(face.hooks.webSearchCard.getSnapshot()).toMatchObject({
+        dirty: true, failed: true, saving: false, apiKey: { text: 'replacement-key' }, apiKeyConfigured: true,
+      })
+    })
+  })
+
+  it('ignores an older credential read for the same reference', async () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const credentials = credentialsApi(true)
+    const older = Promise.withResolvers<Awaited<ReturnType<typeof credentials.describe>>>()
+    credentials.describe.mockReturnValueOnce(older.promise)
+    const controller = new WebSearchCardController(host.scope, credentials.api)
+    controller.refreshCredential('DEEPSEEK_API_KEY')
+    const snapshot = () => controller.inject().hooks.webSearchCard.getSnapshot()
+    await vi.waitFor(() => { expect(snapshot().apiKeyConfigured).toBe(true) })
+    older.resolve({ rpcId: 'c-1' as never, result: { ok: true, value: { credentials: { DEEPSEEK_API_KEY: { configured: false, writable: true } } } } })
+    await older.promise
+    expect(snapshot().apiKeyConfigured).toBe(true)
   })
 
   it('re-reads when the Host reports the watched reference changed', async () => {
@@ -683,5 +779,33 @@ describe('ConfigurablePluginsTabController', () => {
 
     expect(controller.inject().hooks.configurablePlugins.getSnapshot())
       .toEqual({ loaded: true, namespaces: [] })
+  })
+})
+describe('SubagentLimitsCardController', () => {
+  it('validates staged limits, saves them, and restores composed defaults', async () => {
+    const host = stubSettingsScope<SubagentLimitsSettings>()
+    const face = new SubagentLimitsCardController(host.scope).inject()
+    const state = () => face.hooks.subagentLimitsCard.getSnapshot()
+    host.publish({ status: 'ready', writable: true, value: { maxDepth: 3, maxActiveSubagents: 8 }, base: { maxDepth: 3, maxActiveSubagents: 8 }, user: {} })
+    acceptWrites(host)
+    expect(state().maxActiveSubagents.text).toBe('8')
+    for (const draft of ['-1', '1.5', '9007199254740992', 'wat', '-0']) {
+      face.edit('maxDepth', draft)
+      expect(state().invalid).toBe(true)
+    }
+    face.edit('maxDepth', '0')
+    face.edit('maxActiveSubagents', '0')
+    expect(state().invalid).toBe(true)
+    face.edit('maxActiveSubagents', '12')
+    expect(host.set).not.toHaveBeenCalled()
+    face.save()
+    await vi.waitFor(() => { expect(state().saving).toBe(false) })
+    expect(host.scope.getSnapshot().value).toEqual({ maxDepth: 0, maxActiveSubagents: 12 })
+    face.resetField('maxDepth')
+    face.edit('maxActiveSubagents', '')
+    expect(state().invalid).toBe(false)
+    face.save()
+    await vi.waitFor(() => { expect(state().saving).toBe(false) })
+    expect(host.scope.getSnapshot().value).toEqual({ maxDepth: 3, maxActiveSubagents: 8 })
   })
 })

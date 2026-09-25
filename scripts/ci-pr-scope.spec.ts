@@ -1,7 +1,14 @@
-import { describe, expect, it } from 'vitest'
-import { classifyCiPrScope, classifyWebVerification, clientSurfacePackages } from './ci-pr-scope.ts'
+import * as childProcess from 'node:child_process'
+import { resolve } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { classifyCiPrScope, classifyWebVerification, clientSurfacePackages, resolveCiPrScopePlans } from './ci-pr-scope.ts'
 import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
-import { focusedScenarioFiles, loadWebTestPolicy } from './web-test-policy.ts'
+import { exactScenarioFiles, focusedScenarioFiles, loadWebTestPolicy, scanGoldenOwners } from './web-test-policy.ts'
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) }
+})
 
 describe('classifyCiPrScope', () => {
   it('uses a versioned declarative policy for shared and model-input paths', () => {
@@ -46,6 +53,43 @@ describe('classifyCiPrScope', () => {
       coverageMode: 'skip',
       snapshotMode: 'skip',
     })
+  })
+
+  it('keeps ordinary accompanying prose out of a scoped package decision', () => {
+    const source = 'packages/util/timeout/src/index.ts'
+    const original = classifyCiPrScope([source], '')
+    expect(classifyCiPrScope([
+      source,
+      'packages/util/timeout/README.md',
+      'packages/util/timeout/README.zh.md',
+      'packages/util/timeout/README.i18n.yaml',
+      '.agents/notes/implemented/process/change.md',
+      'docs/testing.md',
+      'gateway/README.md',
+    ], '')).toEqual(original)
+    expect(original.coverageMode).toBe('scoped')
+  })
+
+  it('retains model inputs, goldens, and configurations beside ordinary source changes', () => {
+    for (const companion of [
+      'packages/util/timeout/cordis.yml',
+      'packages/util/timeout/package.json',
+      'docs/examples/cordis.yml',
+      'packages/skill/skill-badge/assets/dsh-badge.md',
+      '.agents/skills/example/SKILL.md',
+      'examples/acp-agent/tests/snapshots/text-turn/system-prompt.expected.md',
+      'scripts/snapshots/python-sdk-single-exe/model.expected.md',
+      'packages/util/timeout/tests/fixtures/output.expected.md',
+    ]) {
+      expect(classifyCiPrScope(['packages/util/timeout/src/index.ts', companion], '').coverageMode, companion).toBe('full')
+    }
+  })
+
+  it('keeps the scoped package limit and unknown-package fallback with accompanying prose', () => {
+    const paths = ['one', 'two', 'three', 'four'].map(name => `packages/util/${name}/src/index.ts`)
+    expect(classifyCiPrScope([...paths, 'docs/testing.md'], '').coverageMode).toBe('scoped')
+    expect(classifyCiPrScope([...paths, 'packages/util/five/src/index.ts', 'docs/testing.md'], '').coverageMode).toBe('full')
+    expect(classifyCiPrScope(['packages/future/new/src/index.ts', 'docs/testing.md'], '').coverageMode).toBe('full')
   })
 
   it('skips expensive lanes for upgrade and engineering records, including JSON', () => {
@@ -95,7 +139,7 @@ describe('classifyCiPrScope', () => {
 
   it('falls back to full when a scoped candidate touches metadata or infra', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/session/session-format/src/chain.ts',
       'packages/session/session-format/package.json',
     ], '')).toMatchObject({ reason: 'full', coverageMode: 'full', snapshotMode: 'full' })
   })
@@ -114,7 +158,7 @@ describe('classifyCiPrScope', () => {
 
   it('keeps the browser inventory when the lockfile or a manifest moves', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/session/session-format/src/chain.ts',
       'pnpm-lock.yaml',
     ], '')).toMatchObject({ coverageMode: 'full', snapshotMode: 'full' })
   })
@@ -189,7 +233,7 @@ describe('classifyCiPrScope', () => {
       'packages/client/ui-workbench/src/pane.ts',
     ], '', new Set(['client/ui-workbench']))).toMatchObject({
       snapshotMode: 'focused',
-      webGroups: ['lifecycle', 'shell', 'workbench'],
+      webGroups: ['documents', 'lifecycle', 'shell', 'workbench'],
     })
   })
 
@@ -204,10 +248,10 @@ describe('classifyCiPrScope', () => {
     })
   })
 
-  it('keeps the scoped snapshot when the browser surface is not supplied', () => {
+  it('honors an explicit browser consumer even without the discovered package set', () => {
     expect(classifyCiPrScope([
       'packages/client/ui-conversation/src/message-row.ts',
-    ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'scoped' })
+    ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'focused', webGroups: ['conversation', 'mobile', 'subagent', 'workbench'] })
   })
 
   it('forces full runtime coverage for Session and Cordis seams', () => {
@@ -274,6 +318,8 @@ describe('classifyCiPrScope', () => {
 
 describe('web verification tier selection', () => {
   const packages = clientSurfacePackages(process.cwd())
+  const policy = loadWebTestPolicy(process.cwd())
+  const goldenOwners = scanGoldenOwners(process.cwd())
 
   function web(paths: readonly string[], supplied = packages) {
     return classifyCiPrScope(paths, '', supplied)
@@ -326,7 +372,7 @@ describe('web verification tier selection', () => {
       'vitest.snapshot.config.ts',
       'knip.config.ts',
       '.oxlintrc.json',
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/session/session-format/src/chain.ts',
       'packages/interaction/commands/src/router.ts',
       'apps/cli/tests/source-launch.compat.spec.ts',
       'python/sdk/src/deepseek_harness/session.py',
@@ -341,14 +387,16 @@ describe('web verification tier selection', () => {
     expect(web(['vitest.shared.ts'])).toMatchObject({ snapshotMode: 'full' })
   })
 
-  it('routes a scenario file to its owning business group', () => {
+  it('routes scenario-only changes to their exact entries plus every smoke', () => {
     expect(web(['apps/web/tests/goal-bar.e2e.ts'])).toMatchObject({
       snapshotMode: 'focused',
-      webGroups: ['conversation'],
+      webGroups: [],
+      webScenarios: exactScenarioFiles(policy, ['goal-bar.e2e.ts']),
     })
     expect(web(['apps/web/tests/workbench.e2e.ts'])).toMatchObject({
       snapshotMode: 'focused',
-      webGroups: ['workbench'],
+      webGroups: [],
+      webScenarios: exactScenarioFiles(policy, ['workbench.e2e.ts']),
     })
   })
 
@@ -356,7 +404,7 @@ describe('web verification tier selection', () => {
     expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'])).toMatchObject({
       runExpensive: true,
       snapshotMode: 'focused',
-      webGroups: ['conversation'],
+      webGroups: [], webScenarios: expect.arrayContaining(['diff-context.e2e.ts']) as string[],
     })
   })
 
@@ -368,8 +416,8 @@ describe('web verification tier selection', () => {
       sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts', 'workbench.e2e.ts'] },
     }
     const plan = classifyWebVerification([input], packages, combined, new Map())
-    expect(plan).toEqual({ mode: 'focused', groups: ['conversation', 'workbench'] })
-    const selected = focusedScenarioFiles(combined, plan.groups)
+    expect(plan).toEqual({ mode: 'focused', groups: [], scenarios: exactScenarioFiles(combined, ['diff-context.e2e.ts', 'workbench.e2e.ts']) })
+    const selected = plan.scenarios
     expect(selected).toEqual(expect.arrayContaining(['diff-context.e2e.ts', 'workbench.e2e.ts', ...policy.smokeScenarios]))
     expect(selected).not.toContain('subagent-conversation.e2e.ts')
   })
@@ -379,7 +427,7 @@ describe('web verification tier selection', () => {
     const input = 'examples/shared-prose.md'
     const supplied = { ...policy, sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts'] } }
     expect(classifyCiPrScope([input], '', packages, supplied)).toMatchObject({
-      runExpensive: true, changedDocsOnly: false, snapshotMode: 'focused', webGroups: ['conversation'],
+      runExpensive: true, changedDocsOnly: false, snapshotMode: 'focused', webGroups: [], webScenarios: exactScenarioFiles(supplied, ['diff-context.e2e.ts']),
     })
     expect(web(['examples/acp-agent/tests/snapshots/unrelated/session.jsonl'])).toMatchObject({
       snapshotMode: 'scoped', webGroups: [],
@@ -403,19 +451,33 @@ describe('web verification tier selection', () => {
     for (const input of ['pnpm-lock.yaml', 'packages/client/runtime/src/index.ts', 'scripts/web-test-policy.json']) {
       expect(classifyWebVerification([input], packages, {
         ...policy, sharedInputs: { [input]: ['diff-context.e2e.ts'] },
-      }, new Map())).toEqual({ mode: 'full', groups: [] })
+      }, new Map())).toEqual({ mode: 'full', groups: [], scenarios: [] })
     }
   })
 
-  it('routes a committed golden to the groups of the scenarios that reference it', () => {
+  it('routes a committed golden to every referencing scenario without the rest of their groups', () => {
     expect(web(['apps/web/tests/snapshots/goal-bar/active.expected.md'])).toMatchObject({
       snapshotMode: 'focused',
-      webGroups: ['conversation'],
+      webGroups: [],
+      webScenarios: exactScenarioFiles(policy, ['goal-bar.e2e.ts']),
     })
     expect(web(['apps/web/tests/snapshots/seeded-history/seed.jsonl'])).toMatchObject({
       snapshotMode: 'focused',
-      webGroups: ['conversation', 'documents', 'lifecycle', 'workbench'],
+      webGroups: [],
+      webScenarios: exactScenarioFiles(policy, goldenOwners.get('seeded-history') ?? []),
     })
+  })
+
+  it('unions shared golden owners and source scenarios while ignoring accompanying prose', () => {
+    const paths = [
+      'apps/web/tests/snapshots/seeded-history/seed.jsonl',
+      'apps/web/tests/goal-bar.e2e.ts',
+      'apps/web/tests/README.md',
+      '.agents/notes/implemented/testing/web.md',
+    ]
+    const expected = exactScenarioFiles(policy, [...goldenOwners.get('seeded-history') ?? [], 'goal-bar.e2e.ts'])
+    expect(web(paths)).toMatchObject({ snapshotMode: 'focused', webGroups: [], webScenarios: expected })
+    expect(expected).not.toContain('queue-actions.e2e.ts')
   })
 
   it('runs the full inventory for unowned goldens and shared test fixtures', () => {
@@ -435,7 +497,7 @@ describe('web verification tier selection', () => {
     expect(web([
       'packages/client/ui-goal/src/row.ts',
       'apps/web/tests/README.md',
-    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'] })
+    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'], webScenarios: [] })
   })
 
   it('keeps a UI change focused when it carries its own scenario and golden', () => {
@@ -443,7 +505,7 @@ describe('web verification tier selection', () => {
       'packages/client/ui-goal/src/row.ts',
       'apps/web/tests/goal-bar.e2e.ts',
       'apps/web/tests/snapshots/goal-bar/active.expected.md',
-    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'] })
+    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'], webScenarios: [] })
   })
 
   it('focuses every group a multi-group package mapping reaches', () => {
@@ -462,7 +524,14 @@ describe('web verification tier selection', () => {
       packages,
       loadWebTestPolicy(process.cwd()),
       owners,
-    )).toEqual({ mode: 'full', groups: [] })
+    )).toEqual({ mode: 'full', groups: [], scenarios: [] })
+  })
+
+  it('never narrows shared inputs or model-visible test documents to exact scenarios', () => {
+    for (const companion of ['apps/web/tests/scaffold.ts', 'pnpm-lock.yaml', 'apps/web/tests/AGENTS.md']) {
+      expect(web(['apps/web/tests/goal-bar.e2e.ts', companion]), companion)
+        .toMatchObject({ snapshotMode: 'full', webGroups: [], webScenarios: [] })
+    }
   })
 
   it('focuses a mixed UI-and-inert change but upgrades to full with a dependency', () => {
@@ -477,6 +546,83 @@ describe('web verification tier selection', () => {
   })
 })
 
+describe('complete scope shadow comparison', () => {
+  const root = process.cwd()
+  const policy = loadWebTestPolicy(root)
+
+  it('retains the frozen full coverage decision while reporting the narrower candidate', () => {
+    const plan = resolveCiPrScopePlans(['packages/util/timeout/src/index.ts', 'docs/testing.md'], '', root, {})
+    expect(plan).toMatchObject({ baselineStatus: 'available', policy: 'shadow', executionSource: 'shadow-union' })
+    expect(plan.previous.coverageMode).toBe('full')
+    expect(plan.candidate.coverageMode).toBe('scoped')
+    expect(plan.execution.coverageMode).toBe('full')
+    expect(plan.changes.removed).toContainEqual({
+      lane: 'coverage', from: 'full', to: 'scoped', reason: 'accompanying-inert-prose',
+    })
+  })
+
+  it('executes every previous Web-group member while comparing exact owner selection', () => {
+    const plan = resolveCiPrScopePlans(['apps/web/tests/goal-bar.e2e.ts'], '', root, {})
+    expect(plan.previous).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'], webScenarios: [] })
+    expect(plan.candidate.webScenarios).toEqual(exactScenarioFiles(policy, ['goal-bar.e2e.ts']))
+    expect(plan.execution.webScenarios).toEqual(focusedScenarioFiles(policy, ['conversation']))
+    expect(plan.execution.webScenarios).toContain('queue-actions.e2e.ts')
+    const webReduction = plan.changes.removed.find(change => change.lane === 'web')
+    expect(webReduction?.from).toContain('queue-actions.e2e.ts')
+    expect(webReduction?.reason).toBe('exact-scenario-owners-and-smokes')
+  })
+
+  it('records additional validation for a golden the previous policy classified as prose', () => {
+    const plan = resolveCiPrScopePlans(['scripts/snapshots/python-sdk-single-exe/model.expected.md'], '', root, {})
+    expect(plan.previous).toMatchObject({ reason: 'docs-only', coverageMode: 'skip', pythonMode: 'skip' })
+    expect(plan.candidate).toMatchObject({ coverageMode: 'full', pythonMode: 'full' })
+    expect(plan.execution).toMatchObject({ coverageMode: 'full', pythonMode: 'full' })
+    expect(plan.changes.added).toContainEqual(expect.objectContaining({ lane: 'pythonMode', from: 'skip', to: 'full' }))
+  })
+
+  it('explains the old shared-prefix README expansion without narrowing actual shared runtime inputs', () => {
+    const source = 'packages/client/ui-conversation/src/client/chat/ChatView.tsx'
+    const plan = resolveCiPrScopePlans([source, 'packages/client/runtime/README.md'], '', root, {})
+    expect(plan.previous.snapshotMode).toBe('full')
+    expect(plan.candidate).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation', 'mobile', 'subagent', 'workbench'] })
+    expect(plan.changes.removed.find(change => change.lane === 'web')?.reason).toBe('accompanying-inert-prose')
+    expect(plan.execution.snapshotMode).toBe('full')
+    const shared = resolveCiPrScopePlans([source, 'packages/client/runtime/src/index.ts'], '', root, {})
+    expect(shared.candidate.snapshotMode).toBe('full')
+    expect(shared.changes.removed).toEqual([])
+  })
+
+  it('uses candidate selection only for an explicit experiment', () => {
+    const plan = resolveCiPrScopePlans(['apps/web/tests/goal-bar.e2e.ts'], '', root, { DSH_CI_SCOPE_POLICY: 'candidate' })
+    expect(plan.executionSource).toBe('candidate-experiment')
+    expect(plan.execution).toBe(plan.candidate)
+    expect(plan.execution.webScenarios).not.toContain('queue-actions.e2e.ts')
+  })
+
+  it.each(['', 'auto', 'Candidate', ' candidate'])('rejects the unknown decision policy %j', (value) => {
+    expect(() => resolveCiPrScopePlans(['README.md'], '', root, { DSH_CI_SCOPE_POLICY: value }))
+      .toThrow(/must be exactly shadow or candidate/)
+  })
+
+  it('keeps full validation when historical Git evidence is unavailable', () => {
+    const git = vi.mocked(childProcess.execFileSync)
+    git.mockImplementationOnce(() => { throw new Error('historical object unavailable') })
+    try {
+      const plan = resolveCiPrScopePlans(['README.md'], '', root, {})
+      expect(plan).toMatchObject({ baselineStatus: 'unavailable', baselineError: 'historical object unavailable' })
+      expect(plan.candidate.coverageMode).toBe('skip')
+      expect(plan.execution).toMatchObject({
+        coverageMode: 'full', snapshotMode: 'full', compatMode: 'full', windowsMode: 'full',
+        pythonMode: 'full', gatewayMode: 'full', adminUiMode: 'full',
+      })
+    } finally { git.mockReset() }
+  })
+
+  it('does not turn invalid current configuration into historical fallback', () => {
+    expect(() => resolveCiPrScopePlans(['README.md'], '', resolve(root, 'missing-scope-fixture'), {})).toThrow(/ENOENT/)
+  })
+})
+
 describe('clientSurfacePackages', () => {
   it('covers the browser-rendered packages that live outside packages/client', () => {
     const packages = clientSurfacePackages(process.cwd())
@@ -486,4 +632,18 @@ describe('clientSurfacePackages', () => {
     expect(packages.has('extensions/ui-cordis')).toBe(true)
     expect(packages.has('session/session-format')).toBe(false)
   })
+})
+
+it('selects assembled Admin plugin verification without unrelated runtime matrices', () => {
+  for (const path of ['gateway/admin-ui/src/plugins/transport.ts', 'gateway/admin-ui/src/pages/PluginsPage.tsx', 'gateway/admin-ui/src/App.tsx']) {
+    expect(classifyCiPrScope([path], '')).toMatchObject({
+      runExpensive: false, coverageMode: 'skip', compatMode: 'skip', windowsMode: 'skip',
+      adminUiMode: 'full', snapshotMode: 'focused', webGroups: [], webScenarios: expect.arrayContaining(['plugin-administration.e2e.ts']) as string[],
+    })
+  }
+  for (const path of ['packages/boot/plugin-manager/src/index.ts', 'packages/host/plugin-inventory/src/index.ts']) {
+    expect(classifyCiPrScope([path], '', new Set())).toMatchObject({
+      adminUiMode: 'full', snapshotMode: 'focused', webGroups: ['settings'], webScenarios: [],
+    })
+  }
 })

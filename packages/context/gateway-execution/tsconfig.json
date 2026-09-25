@@ -58,6 +58,18 @@
     },
     {
       "path": "../../util/values"
+    },
+    {
+      "path": "../../computer-use/computer-use"
+    },
+    {
+      "path": "../../api/terminal-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../../ssh/ssh"
+    },
+    {
+      "path": "../../webhook/webhook"
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { NavigationController, SlotRegistry, type AddPaneResult, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -19,21 +19,33 @@ async function bench() {
   const startSession = vi.fn()
   const rename = vi.fn(async () => ({}))
   const insertSessionBefore = vi.fn(async () => ({}))
-  const open = vi.fn()
+  const navigation = new NavigationController()
+  ctx.effect(() => () => { navigation.dispose() })
+  const beginNavigation = () => navigation.begin()
+  const open = vi.fn(() => { beginNavigation() })
   const clear = vi.fn()
   const search = vi.fn(async () => ({
     ok: true as const,
     value: { items: [{ sessionId: 'session' as never, snippet: 'match' }], hasMore: false },
   }))
   const renameSession = vi.fn(async (title: string) => ({ ok: true, value: { title, seq: 1 } }))
-  const binding = vi.fn(() => ({ session: { rename: renameSession } }))
+  const binding = vi.fn((_id: string) => ({ session: { rename: renameSession } }))
   const fork = vi.fn(async () => 'forked' as never)
   ctx.provide('workspaces', {
     create, startSession, rename, insertSessionBefore,
+    list: { getSnapshot: () => ({ archivedSessionIds: [] }) },
   } as never)
-  ctx.provide('sessions', { open, clear, search, searchResultLimit: 20, binding, fork } as never)
+  const retain = vi.fn(() => ({
+    ready: Promise.resolve({ session: { getSnapshot: () => ({ openState: 'open', openError: null }) } }),
+    release: vi.fn(),
+  }))
+  const using = vi.fn(async (
+    id: string, _options: unknown,
+    operation: (reference: { binding: ReturnType<typeof binding> }) => Promise<void>,
+  ) => operation({ binding: binding(id) }))
+  ctx.provide('sessions', { open, clear, beginNavigation, search, searchResultLimit: 20, binding, using, retain, fork } as never)
   const viewportState = { mode: 'single' as 'single' | 'workbench' }
-  const replaceActive = vi.fn()
+  const replaceActive = vi.fn<(_id: SessionId) => AddPaneResult>(() => ({ ok: true }))
   ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: viewportState.mode, paneIds: [], paneRatios: [] }), subscribe: () => () => {} }, replaceActive, setMode: vi.fn() } as never)
   ctx.provide('connection', {
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
@@ -82,6 +94,20 @@ describe('ui-workspace apply', () => {
     // expect(after.slots.entries('conversation.empty.workspace')[0]!.component).toBe(WorkspacePicker)
   })
 
+  it('keeps the current selection when the workbench refuses the prepared Session', async () => {
+    const b = await bench()
+    try {
+      declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace')
+      await b.ctx.plugin({ inject: [...inject], apply }).await()
+      b.viewportState.mode = 'workbench'
+      b.replaceActive.mockReturnValue({ ok: false, reason: 'unknown' })
+      const browser = (b.slots.entries('sidebar.workspaces')[0]!.inject as () => WorkspaceBrowserInjected)()
+      await expect(browser.open('refused' as SessionId)).rejects.toThrow()
+      expect(b.open).not.toHaveBeenCalled()
+      expect(b.clear).not.toHaveBeenCalled()
+    } finally { await b.ctx.fiber.dispose() }
+  })
+
   it('routes browser actions and picker creation to the services', async () => {
     const b = await bench()
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace')
@@ -93,12 +119,12 @@ describe('ui-workspace apply', () => {
     expect(b.startSession).toHaveBeenCalledWith('ws')
     browser.startSession()
     expect(b.startSession).toHaveBeenLastCalledWith(undefined)
-    browser.open('session' as never)
+    await browser.open('session' as never)
     expect(b.open).toHaveBeenCalledWith('session')
     // Single-mode opens must not materialize a workbench pane.
     expect(b.replaceActive).not.toHaveBeenCalled()
     b.viewportState.mode = 'workbench'
-    browser.open('session-2' as never)
+    await browser.open('session-2' as never)
     expect(b.replaceActive).toHaveBeenCalledWith('session-2')
     b.viewportState.mode = 'single'
     const signal = new AbortController().signal

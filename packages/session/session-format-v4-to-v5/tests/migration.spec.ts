@@ -4,6 +4,21 @@ import { assertReleasedV5Header, releasedV4SessionFormatCodec, releasedV5Session
 
 const header: SessionFormatHeader = { version: 4, id: 'draft-upgrade', createdAt: 1, isSeeded: false, delegationDepth: 0 }
 
+it.each([undefined, 41])('preserves an already-written sshTarget=%j binding while promoting only the version', (sshTarget) => {
+  const source = { ...header, ...sshTarget === undefined ? {} : { sshTarget } }
+  const physical = releasedV4SessionFormatCodec.encodeHeader(source, 0)
+  expect(physical).toEqual({ type: 'session', ...source })
+  const target = sessionFormatV4ToV5.migrateHeader(releasedV4SessionFormatCodec.decodeHeader(physical))
+  expect(target).toEqual({ ...source, version: 5 })
+  expect(releasedV5SessionFormatCodec.decodeHeader(releasedV5SessionFormatCodec.encodeHeader(target, 0))).toEqual(target)
+  for (const bad of ['41', 0, -1, 1.5]) {
+    expect(() => releasedV5SessionFormatCodec.decodeHeader({ type: 'session', ...header, version: 5, sshTarget: bad as number }))
+      .toThrow('sshTarget must be a positive safe integer')
+    expect(() => { assertReleasedV5Header({ ...header, version: 5, sshTarget: bad }) })
+      .toThrow('sshTarget must be a positive safe integer')
+  }
+})
+
 it.each([undefined, false, true])('preserves already-written draft=%j while promoting only the version', (draft) => {
   const source = { ...header, ...draft === undefined ? {} : { draft } }
   const physical = releasedV4SessionFormatCodec.encodeHeader(source, 0)
@@ -24,6 +39,11 @@ it.each([undefined, false, true])('preserves already-written draft=%j while prom
 })
 
 describe('V4 identity body migration', () => {
+  it('finishes an unseeded artifact without inherited metadata at zero', () => {
+    const stage = sessionFormatV4ToV5.createStage({ sourceHeader: header, targetHeader: { ...header, version: 5 }, sourceInheritedEventCount: undefined, sourceKind: 'decoded' })
+    expect(stage.finish(new SessionFormatEventCollector())).toBe(0)
+  })
+
   it.each([undefined, 0, 2])('preserves events and inherited cut %j without copying message payloads', (knownCut) => {
     const sourceHeader = { ...header, isSeeded: knownCut !== 0 }
     const stage = sessionFormatV4ToV5.createStage({ sourceHeader, targetHeader: { ...sourceHeader, version: 5 }, sourceInheritedEventCount: knownCut, sourceKind: 'decoded' })

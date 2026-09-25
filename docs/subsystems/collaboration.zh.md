@@ -45,7 +45,7 @@ interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
 }
 ```
 
@@ -243,7 +243,7 @@ type ExecutionQuestionId = Branded<'rpc-id'>
 
 ```ts type-equiv
 /** Privilege checked against every current execution participant. */
-type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review'
+type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop'
 ```
 
 ```ts type-equiv
@@ -327,7 +327,7 @@ abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>
  * @param answer - parser-validated answer.
  * @returns whether the caller owns this answer, including an identical retry.
  */
-abstract answer(session: Session, questionId: string, answer: unknown): Promise<boolean>
+abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown): Promise<boolean>
 
 /**
  * Capture the current participants before awaiting delegated work.
@@ -433,6 +433,43 @@ request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response
 Types: [SessionId](core.zh.md)
 
 Source: [`packages/context/gateway-runtime/src/index.ts`](../../packages/context/gateway-runtime/src/index.ts)
+
+<a id="ctxuserterminaladministration--userterminaladministration"></a>
+
+### `ctx.userTerminalAdministration` — `UserTerminalAdministration`
+
+Administrator access grants metadata and termination, never screen or input access.
+
+```ts cordis-catalog
+/**
+ * Verify inventory and termination authority independently of terminal creation.
+ * @param signal - current request cancellation.
+ * @returns after current administrator role validation.
+ */
+administrator(signal: AbortSignal): Promise<void>
+```
+
+Source: [`packages/api/terminal-controller/src/authorization.ts`](../../packages/api/terminal-controller/src/authorization.ts)
+
+<a id="ctxuserterminalauthorization--userterminalauthorization"></a>
+
+### `ctx.userTerminalAuthorization` — `UserTerminalAuthorization`
+
+Managed deployments verify the interactive user and current writable scope.
+
+```ts cordis-catalog
+/**
+ * Authorize a real user gesture without inheriting model, Auto, or approval authority.
+ * @param sessionId - exact target Session, including inactive history.
+ * @param signal - request cancellation, distinct from the returned authority lifetime.
+ * @returns creator identity and a grant cancelled on revocation.
+ */
+authorize(sessionId: SessionId, signal: AbortSignal): Promise<TerminalAuthority>
+```
+
+Types: [SessionId](core.zh.md)
+
+Source: [`packages/api/terminal-controller/src/authorization.ts`](../../packages/api/terminal-controller/src/authorization.ts)
 
 <a id="typert-gateway-events"></a>
 

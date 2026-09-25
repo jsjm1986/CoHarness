@@ -89,3 +89,14 @@ describe('GatewayPrincipalSigner', () => {
     expect(existsSync(join(directory, 'principal-public.pem'))).toBe(false)
   })
 })
+
+it('limits profile assertions to the configured operation deadline without extending ordinary browser authority', () => {
+  const { privateKey } = generateKeyPairSync('ed25519')
+  const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)
+  const input = { user: { ...USER, role: 'admin' as const }, scope: { kind: 'personal' as const }, runtime: { kind: 'user' as const, id: USER.id, generation: 1 }, now: 1000 }
+  const managed = signer.issuePluginManagement(input, 60_000)
+  expect(signer.verify(managed, 60_999)).toMatchObject({ purpose: 'plugin-admin', expiresAt: 61_000 })
+  expect(() => signer.verify(managed, 61_000)).toThrow('expired')
+  expect(() => signer.verify(signer.issue(input), 2000)).toThrow('expired')
+  expect(() => signer.issuePluginManagement(input, 0)).toThrow('positive safe integer')
+})

@@ -10,7 +10,8 @@ import {
   boot, composeEntries, initProfile, readProfilePatches, readProfileManifest, reconcileProfilePatches, OPTIONAL_BUNDLES,
   type ProfileContext,
 } from '@deepseek-ai/dsh-app-boot'
-import PluginManager, { type Config, type PluginChange, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import PluginManager, { type Config, type PluginInstallFrame, type PluginChange, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -598,6 +599,7 @@ it('stops a run on request, restores the files, and answers not-running or too-l
   const before = readFileSync(join(dir, 'package.json'), 'utf8')
   const run = manager.installBundle('slow', { requestId })
   await started.promise
+  await expect(manager.installBundle('replacement', { requestId })).rejects.toThrow('already running')
   expect(await manager.cancelInstall('00000000-0000-4000-8000-000000000000' as PluginInstallRequestId)).toEqual({ status: 'not-running' })
   expect(await manager.cancelInstall(requestId)).toEqual({ status: 'cancelled' })
   expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
@@ -884,4 +886,73 @@ it('restores an installation when its administrator loses permission before acti
   expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
   const remaining: unknown = ctx.get('revokedActivation', false)
   expect(remaining).toBeUndefined()
+})
+
+it('streams one installation through the owning manager and removes its listeners', async () => {
+  const { ctx, dir, manager, bundle } = await fixture()
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, args, options) => {
+    options.onOutput?.('installing package\n', 'stdout')
+    const name = String(args[1])
+    bundle(name, [])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, [name]: '1.0.0' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  const frames: PluginInstallFrame[] = []
+  for await (const frame of manager.installBundleStream('streamed-admin', {
+    requestId: '00000000-0000-4000-8000-000000000077' as PluginInstallRequestId, enabled: false,
+  }, new AbortController().signal)) frames.push(frame)
+  expect(frames[0]).toMatchObject({ type: 'progress', progress: { phase: 'installing' } })
+  expect(frames).toContainEqual(expect.objectContaining({ type: 'log', chunk: expect.objectContaining({ text: 'installing package\n' }) as unknown }))
+  expect(frames.at(-1)).toMatchObject({ type: 'result', value: { application: 'applied', bundle: 'streamed-admin' } })
+  expect(ctx.events._hooks['plugin-manager/install-log']).toHaveLength(0)
+})
+
+it.each([1, 2])('stops activation when cancellation arrives at post-install authorization %s', async (checkpoint) => {
+  const abort = new AbortController()
+  let installed = false, checks = 0
+  const { manager, dir, bundle } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { protectedModules: new Set<string>(), authorize: async () => {
+      if (installed && ++checks === checkpoint) abort.abort()
+    } })
+  }, { authorization: 'required' })
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async () => {
+    bundle('cancelled-before-activation', [])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, 'cancelled-before-activation': '1.0.0' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    installed = true
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  await expect(manager.installBundle('cancelled-before-activation', {}, abort.signal)).resolves.toMatchObject({ application: 'cancelled', changed: checkpoint === 2 })
+  expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core', 'extra'])
+  if (checkpoint === 1) expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  else expect(readProfileManifest('test', dir).dependencies).toHaveProperty('cancelled-before-activation')
+})
+
+it('acknowledges a queued install before the writer lock and cancels without spawning pnpm', async () => {
+  const { manager, dir } = await fixture('startup')
+  const ready = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+  const owner = withFileLock(join(dir, 'package.json'), async () => { ready.resolve(undefined); await release.promise })
+  await ready.promise
+  const install = vi.spyOn(operations, 'runProfilePnpm')
+  onTestFinished(() => { install.mockRestore() })
+  const requestId = 'queued-admin-install' as PluginInstallRequestId
+  const stream = manager.installBundleStream('never-started', { requestId }, new AbortController().signal)
+  const iterator = stream[Symbol.asyncIterator]()
+  try {
+    expect(await iterator.next()).toMatchObject({ value: { type: 'progress', progress: { requestId, phase: 'installing' } } })
+    const cancelled = manager.cancelInstall(requestId)
+    release.resolve(undefined)
+    await owner
+    expect(await cancelled).toEqual({ status: 'cancelled' })
+    const frames: PluginInstallFrame[] = []
+    for (let item = await iterator.next(); !item.done; item = await iterator.next()) frames.push(item.value)
+    expect(frames.at(-1)).toMatchObject({ type: 'result', value: { changed: false, application: 'cancelled' } })
+    expect(install).not.toHaveBeenCalled()
+  } finally { release.resolve(undefined); await owner; await iterator.return?.() }
 })

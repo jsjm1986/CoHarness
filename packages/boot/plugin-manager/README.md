@@ -49,6 +49,8 @@ When pnpm 11 blocks dependency scripts, the failed installation reports every pe
 
 Gateway-managed runtimes recheck administrator authority before every service operation; tool approval and Full access do not grant this authority. `authorization: required` rejects operations while the authorization provider is unavailable; independent local profiles default to `local`. The Gateway policy is rechecked inside the persistent writer lock and configuration queue, so revoked authority cannot use queued writes. Bundle patches cannot replace or disable protected deployment plugins or their owning entries.
 
+Administrative installation uses a request-scoped stream, with a bounded progress buffer and fresh authority checks. Duplicate active request ids are rejected. Disconnect cancels the installation and waits for its cleanup; clients must not automatically replay it. Ordinary Host event subscriptions never receive these logs.
+
 ### Configuration
 
 | Field | Default | Meaning |
@@ -57,6 +59,7 @@ Gateway-managed runtimes recheck administrator authority before every service op
 | `pnpmCommand` | `pnpm` | The pnpm executable name or path, resolved through `PATH` like the `dsh plugin` command. |
 | `inspectTimeoutMs` | `20000` | Bound on one registry lookup an inspection runs, in milliseconds. |
 | `outputBytes` | `16384` | Maximum pnpm diagnostic bytes returned per operation; the full output remains in the returned log path. |
+| `progressBufferBytes` | `1048576` | Maximum queued UTF-8 bytes for one installation stream, including event wrappers. |
 | `lockWaitMs` | `120000` | Maximum time in milliseconds to acquire the profile write lock. |
 
 -----

@@ -22,6 +22,9 @@
     },
     {
       "path": "../../util/http-proxy"
+    },
+    {
+      "path": "../session-snapshot"
     }
   ]
 }

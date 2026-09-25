@@ -36,7 +36,7 @@ const SEARCH_TITLE_KEYS = {
  * settled call with no search card surfaces its model-facing text through
  * ToolRow's Output section, since the keyed SearchRow owns this render slot.
  */
-export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
+export function SearchRow({ toolName, block, inspect, openDetails, t }: SearchRowProps) {
   const model = toolRowModel(toolName, block)
   const search = searchCardModel(block)
   return (
@@ -62,6 +62,7 @@ export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
       errorSummary={model.errorSummary}
       search={search}
       state={model.state}
+      openDetails={openDetails}
       inspect={inspect}
     />
   )

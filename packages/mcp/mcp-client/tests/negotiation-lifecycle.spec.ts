@@ -98,10 +98,10 @@ describe('SDK negotiation lifecycle', () => {
     })
     onTestFinished(async () => {
       server.closeAllConnections()
-      const closed: PromiseWithResolvers<void> = Promise.withResolvers()
+      const closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
       server.close((error) => {
         if (error) closed.reject(error)
-        else closed.resolve()
+        else closed.resolve(undefined)
       })
       await closed.promise
     })

@@ -23,6 +23,10 @@ import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import Approval from '@deepseek-ai/dsh-user-approval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import GatewayExecution from '../src/index.ts'
+import TerminalController, { type WebTerminalId, type TerminalAttachmentId, type TerminalFrame } from '@deepseek-ai/dsh-api-terminal-controller'
+import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+import type { SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const cleanup: Array<() => Promise<void>> = []
@@ -32,6 +36,7 @@ afterEach(async () => {
     try { await dispose() } catch (error) { errors.push(error) }
   }
   vi.unstubAllEnvs()
+  vi.restoreAllMocks()
   if (errors.length > 0) throw new AggregateError(errors, 'PostgreSQL Loader cleanup failed')
 })
 
@@ -40,7 +45,7 @@ interface Ready {
   credential: GatewayRuntimeCredential
   admin: number
   member: number
-  principals: { admin: string; member: string }
+  principals: { admin: string; member: string; terminalAdmin: string }
 }
 
 async function gateway() {
@@ -184,12 +189,81 @@ async function composition(credential: GatewayRuntimeCredential) {
       agent.followup(message)
     })
   }
-  return { ctx, model, writes, attempts, send }
+  return { ctx, model, writes, attempts, send, directory }
 }
 
 // The dedicated keyless command rejects a missing database before Vitest; the
 // general provider inventory can discover this suite without provisioning one.
 describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execution through Loader and PostgreSQL', () => {
+  it('keeps a real user PTY private and waits for termination after PostgreSQL revocation', async () => {
+    const server = await gateway(), world = await composition(server.credential)
+    const { ctx } = world
+    await ctx.plugin(TypertRegistry)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(TerminalController, TerminalController.Config({ shell: { path: process.execPath, name: 'Node REPL', args: ['--interactive'] } } as Parameters<typeof TerminalController.Config>[0]))
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, meta: { cwd: world.directory }, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    const asHuman = async <T>(assertion: string, action: () => Promise<T>, method = 'test'): Promise<T> => {
+      let result!: T
+      await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: `/api/terminal/${method}`,
+        headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion } }, async () => { result = await action() })
+      return result
+    }
+    const terminal = 'creator-private-pty' as WebTerminalId, attachment = 'human-view' as TerminalAttachmentId
+    const create = () => ctx.terminalController.create(agent, { id: terminal, cols: 80, rows: 24 }, new AbortController().signal)
+    await expect(asHuman(server.principals.member, create)).rejects.toMatchObject({ code: 'terminal/forbidden' })
+    await server.command('terminal-enable')
+    let handle: SubprocessTerminalHandle | undefined
+    const spawn = Reflect.get(LocalSubprocessRuntime.prototype, 'spawnTerminal')
+    vi.spyOn(LocalSubprocessRuntime.prototype, 'spawnTerminal').mockImplementation(async function (this: LocalSubprocessRuntime, spec) {
+      handle = await spawn.call(this, spec)
+      return handle
+    })
+    await vi.waitFor(async () => {
+      await asHuman(server.principals.member, () => ctx.terminalController.authorizeSession(sessionId, new AbortController().signal))
+    })
+    const created = await asHuman(server.principals.member, create)
+    expect(created.id).toBe(terminal)
+    const signal = new AbortController().signal
+    await expect(asHuman(server.principals.admin, () => ctx.terminalController.adminList(signal))).rejects.toMatchObject({ code: 'terminal/forbidden' })
+    const inventory = await asHuman(server.principals.terminalAdmin, () => ctx.terminalController.adminList(signal), 'adminList')
+    expect(inventory).toEqual([{ ownerId: expect.any(String) as string, sessionId, id: terminal, creatorUserId: server.member, state: 'running' }])
+    await expect(asHuman(server.principals.terminalAdmin, () => ctx.terminalController.list(sessionId), 'adminList')).rejects.toMatchObject({ code: 'terminal/forbidden' })
+    const originalHandle = handle
+    const extra = 'admin-closed-pty' as WebTerminalId
+    await asHuman(server.principals.member, () => ctx.terminalController.create(agent, { id: extra, cols: 80, rows: 24 }, signal))
+    const extraHandle = handle
+    const owned = inventory[0]
+    if (owned === undefined) throw new Error('expected the terminal inventory entry')
+    await asHuman(server.principals.terminalAdmin, () => ctx.terminalController.adminClose(owned.ownerId, extra, signal), 'adminClose')
+    await extraHandle!.done
+    handle = originalHandle
+    expect((await asHuman(server.principals.member, () => ctx.terminalController.list(sessionId))).map(item => item.id)).toEqual([terminal])
+
+    expect(handle).toBeDefined()
+    expect(await asHuman(server.principals.admin, () => ctx.terminalController.list(sessionId))).toEqual([])
+    await expect(asHuman(server.principals.admin, () => ctx.terminalController.write(agent, terminal, attachment, 'forbidden'))).rejects.toMatchObject({ code: 'terminal/unavailable' })
+    const stream = ctx.terminalController.follow(agent, terminal, attachment, new AbortController().signal)[Symbol.asyncIterator]()
+    try {
+      const opening = await asHuman(server.principals.member, () => stream.next())
+      expect((opening.value as TerminalFrame | undefined)?.type).toBe('snapshot')
+      const target = join(world.directory, 'terminal-created.txt')
+      await asHuman(server.principals.member, () => ctx.terminalController.write(agent, terminal, attachment,
+        `require('node:fs').writeFileSync(${JSON.stringify(target)}, 'terminal-owner')\r`))
+      await vi.waitFor(async () => { expect(await readFile(target, 'utf8')).toBe('terminal-owner') })
+      expect(world.model.script).toEqual([])
+      expect(agent.session.snapshotEvents().some(event => event.type === 'assistant/message')).toBe(false)
+      await server.command('revoke')
+      await handle!.done
+      await ctx.terminalController.drainRevoked()
+      await expect(asHuman(server.principals.member, create)).rejects.toMatchObject({ code: 'terminal/forbidden' })
+      expect(await readFile(target, 'utf8')).toBe('terminal-owner')
+    } finally { await stream.return?.() }
+  }, 30_000)
+
   it('rejects mixed-actor tools, retains child restrictions, and cancels active work on revocation', async () => {
     const server = await gateway(), world = await composition(server.credential)
     const { ctx, model } = world

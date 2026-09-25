@@ -230,9 +230,10 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
-  'useSessions' | 'startSession' | 'open' | 'forkSession'
+  'useSessions' | 'startSession' | 'forkSession'
   | 'insertWorkspaceBefore' | 'insertSessionBefore' | 't'
 > & {
+  open: (sessionId: SessionId) => void
   /** Host account home for POSIX hover-path abbreviation. */
   home?: string | undefined
   workspaces: readonly WorkspaceView[]
@@ -815,6 +816,19 @@ export function WorkspaceBrowser({
   t,
   listDirectory,
 }: WorkspaceBrowserProps) {
+  const [navigationError, setNavigationError] = useState<string | null>(null)
+  const navigationAttempt = useRef(0)
+  useEffect(() => () => { navigationAttempt.current++ }, [])
+  const openSession = (sessionId: SessionId): void => {
+    const attempt = ++navigationAttempt.current
+    setNavigationError(null)
+    const report = (error: unknown): void => {
+      if (attempt !== navigationAttempt.current) return
+      setNavigationError(error instanceof Error ? error.message : String(error))
+    }
+    try { void Promise.resolve(open(sessionId)).catch(report) }
+    catch (error) { report(error) }
+  }
   const home = useHostDescription(description => description?.home)
   const viewportMode = useViewport(state => state.mode)
   const workbenchMode = viewportMode === 'workbench'
@@ -1203,12 +1217,13 @@ export function WorkspaceBrowser({
 
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
+      {navigationError !== null && <div className={css.renameError} role="alert">{navigationError}</div>}
       <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)}>
         {wide && (normalizedQuery !== ''
           ? (
             <SearchResults
               useSessions={useCurrentSessions}
-              open={open}
+              open={openSession}
               workspaces={workspaces}
               archivedSessionIds={archivedSessionIds}
               query={normalizedQuery}
@@ -1220,7 +1235,7 @@ export function WorkspaceBrowser({
           : groupBy === 'flat'
             ? (
               <FlatList
-                useSessions={useCurrentSessions} open={open} forkSession={forkSession}
+                useSessions={useCurrentSessions} open={openSession} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
                 archivedSessionIds={archivedSessionIds}
                 orderBy={orderBy}
@@ -1246,7 +1261,7 @@ export function WorkspaceBrowser({
                 setSessionOrder={actions.setSessionOrder}
                 archivedSessionIds={archivedSessionIds}
                 startSession={startSession}
-                open={open}
+                open={openSession}
                 insertWorkspaceBefore={insertWorkspaceBefore}
                 insertSessionBefore={insertSessionBefore}
                 orderBy={orderBy}

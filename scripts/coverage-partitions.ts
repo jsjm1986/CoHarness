@@ -1,7 +1,9 @@
 /** Coordinate single-worker Vitest coverage partitions and one merged report. */
 import { spawn } from 'node:child_process'
-import { globSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, globSync, readFileSync, writeFileSync } from 'node:fs'
 import { lstat, mkdir, readdir, rm, unlink, writeFile } from 'node:fs/promises'
+import { availableParallelism } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { coverageExemptHeavySuites } from './coverage-exempt.ts'
 import { pnpmInvocation } from './pnpm-invocation.ts'
@@ -121,7 +123,51 @@ const UNKNOWN_FILE_WEIGHT = 1
  * gitignored file at the repository root carries recorded durations across
  * runs on a persistent checkout (self-hosted runners).
  */
-const FILE_TIMES_NAME = '.coverage-times.json'
+export const COVERAGE_TIMINGS_FILE = '.coverage-times.json'
+
+/** Stable runner resource class supplied by CI when recording scheduling weights. */
+export const COVERAGE_TIMING_PROFILE_ENV = 'DSH_COVERAGE_TIMING_PROFILE'
+
+const TIMING_CACHE_VERSION = 1
+const TIMING_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
+const TIMING_POLICY_INPUTS = [
+  'package.json', 'pnpm-lock.yaml', 'vitest.config.ts', 'vitest.shared.ts',
+  'scripts/coverage-policy.ts', 'scripts/coverage-exempt.ts', 'scripts/coverage-partitions.ts',
+] as const
+
+/** Identity of the toolchain and resource class that produced scheduling weights. */
+function timingIdentity(root: string): string {
+  const inputs = createHash('sha256')
+  for (const file of TIMING_POLICY_INPUTS) {
+    const path = join(root, file)
+    const contents = existsSync(path) ? readFileSync(path) : Buffer.alloc(0)
+    inputs.update(`${file.length}:${file}:${contents.length}:`).update(contents)
+  }
+  return JSON.stringify({
+    platform: process.platform,
+    arch: process.arch,
+    node: process.version,
+    runnerOS: process.env.RUNNER_OS ?? process.platform,
+    profile: process.env[COVERAGE_TIMING_PROFILE_ENV] ?? `cpu-${availableParallelism()}`,
+    partitions: process.env[COVERAGE_PARTITIONS_ENV] ?? 'unspecified',
+    policy: inputs.digest('hex'),
+  })
+}
+
+/** Resolve the cache namespace without making cached durations an acceptance result.
+ * @param root - repository whose toolchain and coverage policy own the timings.
+ * @returns environment-specific key prefix; callers may append the run identity for immutable caches.
+ */
+export function coverageTimingCacheKey(root: string): string {
+  return `coverage-times-v${TIMING_CACHE_VERSION}-${createHash('sha256').update(timingIdentity(root)).digest('hex')}`
+}
+
+/** A duration key may schedule only a repository-relative test path. */
+function validTimingPath(path: string): boolean {
+  return !path.startsWith('/') && !path.includes('\\') && !path.includes(':')
+    && path.split('/').every(part => part !== '' && part !== '.' && part !== '..')
+    && /\.spec\.(?:ts|tsx)$/.test(path)
+}
 
 /**
  * The instrumented inventory: every file plus the Vitest project it belongs
@@ -147,6 +193,10 @@ export function parseListOutput(output: string, root: string): InstrumentedInven
   for (const line of output.split(/\r?\n/)) {
     const match = /^\[([^\]]+)\]\s+(\S+\.spec\.(?:ts|tsx))$/.exec(line)
     if (match !== null && match[1] !== undefined && match[2] !== undefined) {
+      const previous = projectOf.get(match[2])
+      if (previous !== undefined && previous !== match[1]) {
+        throw new Error(`coverage partitions: ${match[2]} belongs to both ${previous} and ${match[1]}`)
+      }
       files.add(match[2])
       projectOf.set(match[2], match[1])
     }
@@ -199,50 +249,32 @@ function runListCommand(command: string, args: string[], root: string): Promise<
 }
 
 /**
- * Read recorded per-file durations: the coordinator's persisted file first
- * (survives CI checkouts), falling back to the Vitest results cache for local
- * development. Cache entries are `[projectName:relativePath, {duration}]`;
- * a file appearing several times keeps the average duration.
+ * Read successful instrumented-run durations when their environment and policy
+ * still apply. Vitest's ordinary result cache has neither this identity nor a
+ * complete coverage verdict, so its failed or uninstrumented timings are not used.
  */
 export function readFileDurations(root: string): Map<string, number> {
-  const persisted = readPersistedDurations(root)
-  if (persisted.size > 0) return persisted
-  const totals = new Map<string, { sum: number; count: number }>()
-  for (const file of globSync('node_modules/.vite/vitest/*/results.json', { cwd: root })) {
-    let cache: { results?: Array<[string, { duration?: number }]> }
-    try {
-      cache = JSON.parse(readFileSync(join(root, file), 'utf8')) as { results?: Array<[string, { duration?: number }]> }
-    } catch {
-      continue
-    }
-    for (const [key, entry] of cache.results ?? []) {
-      const separator = key.indexOf(':')
-      if (separator < 0) continue
-      const path = key.slice(separator + 1)
-      const duration = entry.duration
-      if (typeof duration !== 'number') continue
-      const total = totals.get(path)
-      if (total === undefined) totals.set(path, { sum: duration, count: 1 })
-      else {
-        total.sum += duration
-        total.count++
-      }
-    }
-  }
-  return new Map([...totals].map(([path, { sum, count }]) => [path, sum / count]))
+  return readPersistedDurations(root)
 }
 
 /** Read the coordinator's persisted duration map; empty when absent or corrupt. */
 function readPersistedDurations(root: string): Map<string, number> {
-  let raw: Record<string, unknown>
+  let raw: unknown
   try {
-    raw = JSON.parse(readFileSync(join(root, FILE_TIMES_NAME), 'utf8')) as Record<string, unknown>
+    raw = JSON.parse(readFileSync(join(root, COVERAGE_TIMINGS_FILE), 'utf8')) as unknown
   } catch {
     return new Map()
   }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Map()
+  const record = raw as Record<string, unknown>
+  if (record.version !== TIMING_CACHE_VERSION || record.identity !== timingIdentity(root)
+    || typeof record.recordedAt !== 'number' || !Number.isFinite(record.recordedAt)
+    || record.recordedAt > Date.now() || Date.now() - record.recordedAt > TIMING_CACHE_MAX_AGE_MS
+    || record.durations === null || typeof record.durations !== 'object' || Array.isArray(record.durations)) return new Map()
   const durations = new Map<string, number>()
-  for (const [file, duration] of Object.entries(raw)) {
-    if (typeof duration === 'number' && Number.isFinite(duration)) durations.set(file, duration)
+  for (const [file, duration] of Object.entries(record.durations)) {
+    if (!validTimingPath(file) || typeof duration !== 'number' || !Number.isFinite(duration) || duration < 0) return new Map()
+    durations.set(file, duration)
   }
   return durations
 }
@@ -261,14 +293,21 @@ export function writeFileDurations(
 ): void {
   if (durations.size === 0) return
   const merged = new Map(readPersistedDurations(root))
-  for (const [file, duration] of durations) merged.set(file, duration)
+  for (const [file, duration] of durations) {
+    if (validTimingPath(file) && Number.isFinite(duration) && duration >= 0) merged.set(file, duration)
+  }
   if (currentFiles !== undefined) {
     const present = new Set(currentFiles)
     for (const file of [...merged.keys()]) {
       if (!present.has(file)) merged.delete(file)
     }
   }
-  writeFileSync(join(root, FILE_TIMES_NAME), `${JSON.stringify(Object.fromEntries(merged), null, 1)}\n`, 'utf8')
+  writeFileSync(join(root, COVERAGE_TIMINGS_FILE), `${JSON.stringify({
+    version: TIMING_CACHE_VERSION,
+    identity: timingIdentity(root),
+    recordedAt: Date.now(),
+    durations: Object.fromEntries([...merged].sort(([left], [right]) => left.localeCompare(right))),
+  }, null, 1)}\n`, 'utf8')
 }
 
 /**
@@ -472,15 +511,17 @@ export class CoveragePartitionCoordinator {
         }
         return result
       }))
-      // Persist durations before blob validation: a missing blob aborts the
-      // run, but the completed partitions' timings are still worth keeping.
-      this.persistDurations(this.partitions)
       await this.assertCompleteBlobSet(commands)
 
       const mergeCommand = this.mergeCommand()
       console.log(`coverage-partitions: start ${mergeCommand.label}`)
       const mergeResult = await this.runCommand(mergeCommand)
-      return results.some(commandFailed) || commandFailed(mergeResult) ? 1 : 0
+      const failed = results.some(commandFailed) || commandFailed(mergeResult)
+      // Partial or failed executions are not comparable timing samples.
+      const completeInventory = this.vitestArgs.every(argument =>
+        /^--(?:testTimeout|expect\.poll\.timeout|hookTimeout)=\d+$/.test(argument))
+      if (!failed && completeInventory) this.persistDurations(this.partitions)
+      return failed ? 1 : 0
     } finally {
       await removeOwnedTree(this.temporaryRoot)
     }

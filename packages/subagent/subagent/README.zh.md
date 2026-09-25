@@ -45,6 +45,8 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 
 插件以同一 `Config` schema 注册 `subagent` 设置段，并将其 `cordis.yml` 条目作为组合 `base`；user 层中出现的字段覆盖该条目，重置则清除覆盖。`maxDepth` 默认 `1`，在委派工具自身配置省略深度时为其提供深度。显式工具深度（包括 `provider-managed`）优先。深度 `0` 禁止经继承此设置的工具委派；深度 `1` 只允许直接 child。变更在下一次委派尝试时生效。直接调用服务的调用方仍自行提供可选的请求深度。
 
+项目管理者只能通过 Gateway 设置编辑 `maxDepth` 和 `maxActiveSubagents`。其他成员不能写入；持续激活预算继续由部署管理。Web 插件设置卡片提供这两个限制的独立重置和帮助。
+
 物化会在创建或恢复 Agent 前预留两个驻留配额。超过任一上限都会以 `ACTIVATION_CAPACITY_EXCEEDED` 拒绝；回滚或 Activation 最终 dispose 会释放配额，持久化但不活跃的 child 会话不占用配额。
 
 `maxActiveSubagents` 限制经由不间断可继续 parent 链共享的存活可继续 child——与上述驻留配额是独立的轴。不可继续的 parent 开启独立配额池且不占用槽位；可继续后代继承该池。新建与冷恢复在重建 Agent 前预留槽位，清理在句柄 dispose 后归还槽位。等待中的 parent、待处理 inbox 工作和正在停止的 Activation 仍占用槽位。发往驻留 child 的消息复用其槽位。一次性和外部提供方运行不受此限。池继承不跨越一次性 parent：其可继续 child 共享另一个独立池。深度仍是委派工具的独立策略。
@@ -97,6 +99,12 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 管理器根据 Agent 的完全停稳状态和所拥有的子级集合推导三种内部驻留状态，而不维护第二套状态机：running 表示存在正在进行的准入、尚未结束的轮次，或会唤醒 Agent 的 inbox 工作；waiting 表示 Agent 已完全停稳，但仍拥有至少一个尚未 dispose 的子级；settled 表示 Agent 已完全停稳且所有拥有的子级均已 dispose，此时管理器会 dispose `AgentHandle` 并移除 Activation。模型撰写的 `sendMessage()` 经 Steer 跨越一条父/子边：运行中的目标在最近的 step 边界准入，空闲目标开启新轮次，不驻留的直接子级 Activation 则冷恢复出一个新的。宿主协议 prompt 通过内部适配器保留 Queue 路径（`Agent.followup()`，一个后续 FIFO 轮次）。
 
 管理器预留子 agent 身份、解析持久化描述符，通过私有的 activation-owner 作用域调用 `ctx.agents.create()`（冷恢复时为 `ctx.agents.resume()`），把返回的 `AgentHandle` 安装到 Activation 中，建立任何可继续父级所有权，然后提交提示词。冷恢复绝不通过提供方分发，因为持久化会话已持有初始前缀，折叠后的描述符即是全部重建输入。
+
+### 外部运行时成员
+
+运行时位于 harness 之外的提供方（Claude Agent SDK、Codex app-server、具备续接能力的 ACP agent）也可以承载可继续子级：`prepareContinuable` 标记该能力且只提供 detached 数据，continuation 管理器仍然拥有进程内子 Agent。提供方再注册一条 `LlmAdapter` 路由并声明 `agentRouteDefaults`，使成员的每次模型调用都成为外部耐用会话上的一个轮次，按子级的 Session id 经 `GenerateOptions.sessionId` 寻址。
+
+`@deepseek-ai/dsh-subagent/external` 承载共享成员机制：仅追加的 JSONL 绑定存储（子会话 ↔ 外部会话，含待决提示词与已消费游标）、尾随用户提示词窗口，以及恢复规则——已完结的外部答案直接重放不重发，可证未送达的提示词重发一次，不可证的结果以 `EXTERNAL_TURN_OUTCOME_UNKNOWN` 丢弃而不冒重复投递的风险。
 
 ### 结算投递
 

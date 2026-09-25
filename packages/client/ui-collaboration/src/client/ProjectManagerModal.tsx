@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type SyntheticEvent } from 'react'
 import { Button, Input, Modal, IconFolderOpenOutline16, IconPlusOutline16, IconShareOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ProjectInvitation, UserSummary } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
@@ -88,7 +88,7 @@ export function ProjectManagerModal({
     return () => { active = false }
   }, [open, mode, projectId, listInvitations, listUsers, t])
 
-  const submitCreate = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+  const submitCreate = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     if (busy || createProject === undefined || name.trim() === '') return
     setBusy(true)
@@ -102,7 +102,7 @@ export function ProjectManagerModal({
     }
   }
 
-  const submitInvite = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+  const submitInvite = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     if (busy || projectId === undefined || inviteMember === undefined || username.trim() === '') return
     setBusy(true)

@@ -38,6 +38,14 @@
   margin: 0;
 }
 
+/* The image card's in-card label (the shortened read path), styled like the
+   terminal card's description line above its body. */
+.imageLabel {
+  margin: 0 0 6px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
 .empty {
   padding: var(--dsw-space-2) 0;
   font-size: 13px;

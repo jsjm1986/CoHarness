@@ -45,7 +45,7 @@ interface ComposerChainProps {
 
 Think 行默认保持折叠。流式摘要通过节流后的横向滚动跟随最新非空行；结算后恢复左对齐的首个可见行。摘要省略双星号强调标记。展开后以紧凑 Markdown 呈现完整推理，长流式输出也不截断正文，并通过粘性折叠按钮保持操作可达。增量 Markdown 解析器复用已完成块，原始文本继续保存在 Session 日志中（[渲染决策](../../../.agents/notes/implemented/feature/2026-09-22-complete-reasoning-markdown.zh.md)）。
 
-聊天视图保留工具的消息流位置，但委托其展示。每个已排序的 `tool-call` Conversation Node 都通过 `conversation.chat.node` 的同名 key 分发；详情壳层则通过 `conversation.details.tool` 传递当前选中的调用。组装后的 Web bundle 为该 Chat Node key 注册 [`ui-tool`](../ui-tool/README.zh.md)，由后者渲染运行时已投影的递归 root/child 树，并负责按名称分发、通用展示和 render-intent 卡片；只有详情席位会在该 renderer 缺席时保留 raw-result fallback。经注入的 `openFile` 点击路径会请 Host 打开该路径（相对路径按会话 cwd 解析）。Host 或操作系统拒绝时，页面内对话框展示抛出的原因，并提供对同一路径的重试；取消、Escape、关闭控件和点击遮罩会关掉对话框（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.zh.md)）。
+聊天视图保留工具的消息流位置，但委托其展示。每个已排序的 `tool-call` Conversation Node 都通过 `conversation.chat.node` 的同名 key 分发；详情壳层则通过 `conversation.details.tool` 传递当前选中的调用。组装后的 Web bundle 为该 Chat Node key 注册 [`ui-tool`](../ui-tool/README.zh.md)，由后者渲染运行时已投影的递归 root/child 树，并负责按名称分发、通用展示和 render-intent 卡片；只有详情席位会在该 renderer 缺席时保留 raw-result fallback。路径点击通过已有鉴权预览打开工作区文件，并定位请求的行。明确声明为独立本机的 loopback Host 可以回退到桌面应用；Gateway Host 不打开服务器桌面路径。拒绝时显示原因，并保留同一请求供重试。展开的工具行提供独立侧栏详情标签；“查看”保留轨迹导航。恢复的详情标签通过 `readCallHistory` 读取确切 Session 和调用，不分页或替换可见聊天窗口。读取失败保持错误状态，关闭或替换标签会取消请求。
 
 聊天流会将跨重试轮次连续出现的模型重试节点投影为一个稳定的弱化状态行，并用最新一次尝试更新该行；每个重试事件仍保留在运行时快照与会话日志中。前端倒计时以客户端收到事件的时刻为计划延迟的起点，避免 Host 与浏览器的时钟偏差；剩余时间向上取整到秒，且下限为 1 秒。最近一次尚未完成的重试会显示从左到右的文字渐变动画。后续轮次事实用于区分已开始的尝试与在退避期间取消的尝试，Host 的 running 位只控制实时动画；随后该行会显示静态的已完成或已取消标签。normal 策略行显示有限重试上限；always 策略行显示 `∞`。激活该行会显示最近一次重试的精确延迟和失败消息。客户端运行时会在相应重试节点到达前移除每个失败步骤的流式输出尾部；后续某次尝试成功后，该状态仍保持可见。未进入重试的终态失败会在其轮次边界渲染为持久的内联状态，展示安全文案和可选的可操作错误码，但不会提供 Host 无法兑现的操作；AUTH 文案绝不会回显提供方给出的凭据片段，Gateway 会话持久化或授权内部细节会改为本地化重试提示。
 
@@ -63,7 +63,7 @@ Composer 消息提交会根据所寻址会话的运行状态和 steering 能力�
 
 普通会话运行期间，草稿为空或 owner block 使输入不可用时，主指针操作保持为 Stop。可提交的文字、图片或文档会把同一位置切换为已配置投递方式的 Send；清空或成功提交草稿后恢复 Stop。可继续 subagent 则保留相互独立的 Send 与 Stop 操作。[运行中 Send 决策](../../../.agents/notes/implemented/bug-fix/2026-09-22-busy-send-follows-enter-setting.zh.md)将按钮标签和投递方式绑定到同一个实时偏好。
 
-逐会话 UI 状态中的选择与活跃视图位于已声明的聊天 store（`stores.ts` `createChatStore`）中；InputHub 拥有输入区状态机，并将草稿镜像到该 store 以便持久化。apply 将同一个 store handle 传给严格限定于会话的子树、聊天视图和详情注册，因此每个会话内共享一个实例，框架拥有其生命周期。组件保持纯粹：框架标准工具包提供 `useSession`／`sessionId`、全局 `useSessions`／`useWorkspaces`，以及输入状态机的 `useInput`／`inputActions`；store 表层与 inject factory 提供其余状态和回调。
+逐会话 UI 状态中的选择与活跃视图位于已声明的聊天 store（`stores.ts` `createChatStore`）中；InputHub 拥有输入区状态机，并将草稿镜像到该 store 以便持久化。apply 将同一个 store handle 传给严格限定于会话的子树和聊天视图注册，因此每个会话内共享一个实例，框架拥有其生命周期。工具详情从辅助标签所有者接收明确的调用地址。组件保持纯粹：框架标准工具包提供 `useSession`／`sessionId`、全局 `useSessions`／`useWorkspaces`，以及输入状态机的 `useInput`／`inputActions`；store 表层与 inject factory 提供其余状态和回调。
 
 图片经粘贴与整页拖放进入：输入栏绑定 document 级拖拽监听（composer-bar slot 为 `kind: 'single'`，同一时刻至多一个 bar 绑定），文件拖拽悬停窗口时显示 `DropOverlay` 原子组件——纯文本拖拽不受影响，锁定或忙碌的 composer 显示禁用遮罩并拒绝 drop。两种手势共用一条对宿主 `imageLimits` 投影的加入预检（数量、单图字节、总字节）：会突破上限的加入整批拒收，立刻弹出点名上限的横幅，完全不进入附件栏。仍然到达的宿主侧拒绝按 `attachment-error` 原因映射为产品文案（`image-labels.ts` 的 `attachmentErrorText`）；用户无法解决的原因折叠为一条带原因码的发送失败文案，非附件错误码保留开发者可读的原文加错误码。已附加的图片在每条发送路径上都是提交信封的一部分：斜杠命令提交要么消费它们（声明 `images` 的 claim 经 hub 的 `commandImages` 管道序列化图片，尝试信号会取消已放弃的编码，再传给 `claim.submit`，仅在成功 outcome 后清除并释放），要么以 `command.imagesUnsupported` 通知拒绝整个提交，草稿与图片原样保留——命令不可能消费了文字却把图片留在原地。
 
@@ -80,6 +80,8 @@ composer 统计 pill 的 token 账目来自经标准套件 `useProjection` 读�
 完成的一轮会物化一个有序的 `turn-tail` Conversation Node。它由引擎维护的 `TurnLocation` 提供收尾 Assistant 和 Turn data；renderer 在该 Node 的 IconActions 之前渲染 `conversation.chat.turnTail` chain，并派发包含 Turn、收尾 seq 和 `openFile` 的 `TurnTailOwnerProps`。本包只拥有空位；`@deepseek-ai/dsh-client-ui-deliverables` 把改写工具的 `locations` 累积到 Turn data，并拥有产物行、chip 上限和文案，因此把该插件从 cordis.yml 中组合掉即可关闭该交互面，空位以零成本渲染为空。收尾正文经由同一个开关参与其中：chat 视图向可选的 `chatFileMentions` service（ctx.get；由同一插件提供）索取收尾消息的行内代码词表，并把结果接进 MarkdownText 的 `fileMentions` seam——service 缺席时正文保持死文本。
 
 Access 控件还会根据会话所属连接应用[当前账户资格规则](../ui-permission-presets/README.zh.md)。不可用的 Full 和 Auto 选项说明限制原因；已选 Auto 模式会保持可见，直到用户显式修改。
+
+未发送的文本、附件和正在提交的操作独立于可见面板持有确切的 Client Session 代次。切换视图保留输入；清空或明确丢弃输入后释放该引用。运行时销毁时，无论草稿状态如何都清除引用。
 
 ## 概述
 

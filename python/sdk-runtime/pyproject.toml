@@ -17,11 +17,12 @@ Documentation = "https://github.com/deepseek-ai/deepseek-harness/blob/master/pyt
 Issues = "https://github.com/deepseek-ai/deepseek-harness/issues"
 Source = "https://github.com/deepseek-ai/deepseek-harness"
 
-# Include the injected executable and default config; exclude the dev-only node
-# closure from wheels and sdists. Legacy carrier names remain lookup aliases and
-# are intentionally not emitted into new wheels.
+[project.scripts]
+dsh = "deepseek_harness_runtime:main"
+
+# Include the executable and its sidecars; exclude the development Node carrier.
 [tool.hatch.build]
-artifacts = ["src/deepseek_harness_runtime/runtime/deepseek-harness-sdk-runtime-*"]
+artifacts = ["src/deepseek_harness_runtime/runtime/deepseek-harness-sdk-runtime-*", "src/deepseek_harness_runtime/runtime/deepseek-harness-sdk-runtime-*/**"]
 exclude = ["src/deepseek_harness_runtime/runtime/node"]
 
 [tool.hatch.build.targets.wheel]

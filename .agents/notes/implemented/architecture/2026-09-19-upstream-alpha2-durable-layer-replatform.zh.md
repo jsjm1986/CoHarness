@@ -42,7 +42,7 @@ Status: implemented
 
 ## 落地形态补充
 
-- 旧批量 API 并未随替换删除：仍依赖 `migrate`/`createStream` 的消费方经由 `legacy-*` 簇（`legacy-types`、`legacy-json`、`legacy-chain`、`legacy-catalog`、`catalog-default`）和公开子路径 `@deepseek-ai/dsh-session-format/legacy` 继续工作，直到逐个迁移到 codec/restore 读取。
+- 旧批量 API 现已随替换删除：`legacy-*` 簇（`legacy-types`、`legacy-json`、`legacy-chain`、`legacy-catalog`、`catalog-default`）与公开子路径 `@deepseek-ai/dsh-session-format/legacy` 均已移除。协调器、Gateway 与 SQLite 经由 `session-format-catalog` 的 `sessionLogicalFormatCatalog` 读取已解码存储行——它把逻辑 header 投影到发布版要求上，并把 v2 边经声明的 CoHarness 方言 stage 路由到同一套发布版原语。
 - `SessionPersistence` 在保留协调器方法的同时获得上游句柄契约（`create`/`open`/`flush`/`stat`/`list`、`SessionHandle`、`SessionAccess`、上游错误词汇与 `storage-contract` 助手）。旧服务方法 `create`/`list` 与新签名冲突，改名 `createStored`/`listHeaders`；后端 SPI 钩子 `list` 现为 `listStored`。`ContractSessionHandle` 把新句柄适配到协调器原语上——延迟创建、所有权、首次 append 实体化、关闭撤销已与上游语义同构——因此 jsonl、sqlite、gateway 三个后端不做存储重写即通过上游契约套件（各 20 个测试）。`materializeDetached`/`discardDetached`/`listPending`/`isPending` 是适配所需的协调器新动词。
 - 上游 live-write 契约（"无写句柄=不落盘"）假定实时写入经句柄路由；本地协调器目前经 `session/event` 自动持久化所有实时会话。该语义随 generation/storage/worker 重平台一并落地，不在适配层内。
 - `session-persistence-gateway` 增加 `materializeHeader`（仅 header 的 append）以满足空创建上的句柄 `flush`；测试 transport 将空批次视为实体化写入放行。

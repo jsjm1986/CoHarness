@@ -1,18 +1,4 @@
-/**
- * SessionRuntime: root sessions service — list snapshot store (manager
- * projection; carries `current`, the persisted selection every
- * session-scoped surface keys off), Agent scope tree (mintScope pattern: no-op plugin
- * Fiber + ctx.extend scope tag; one scope per session, agent id === session
- * id), stable SessionBinding cache, breadcrumb-route projection.
- *
- * Scope lifecycle is stage-driven: a scope is minted lazily on first
- * resolution (pure — resolution has no side effects and is render-safe);
- * the event window and deferred teardown key off the STAGED session, which
- * follows `list.current` plus an optional multi-pane set. Staging is the open
- * signal: the window opens iff the session is on stage. A session leaving the stage
- * releases its browser history window; its scope and durable interaction
- * mirrors remain resident until the ordinary eligibility prune tears them down.
- */
+/** Session catalog, view references, local scope generations, and renderer bindings. */
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
 import type {
@@ -26,11 +12,15 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { SessionCreateOptions } from '../contract/session-create.ts'
+import type { SessionReferenceSource } from '../index.ts'
+import type { ObservableSnapshot } from '../contract/store.ts'
+import type { SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo } from '../contract/sessions.ts'
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionFace } from '../contract/session.ts'
 import type { AgentContext, ISessions } from '../contract/sessions.ts'
-import { createScope, scopeOf as scopeTagOf } from '../scope.ts'
+import { NavigationController } from '../navigation.ts'
+import { createScope, scopeIdentityOf, scopeOf as scopeTagOf } from '../scope.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import { SessionManager } from './manager.ts'
 import type { SessionRemotes } from './remotes.ts'
@@ -98,6 +88,12 @@ export interface SessionListState {
   ids: SessionId[]
   /** Host rows plus the current addressed subagent route used by navigation. */
   byId: Record<SessionId, SessionSummary>
+  /**
+   * Summaries the Workspace-domain archive filter keeps out of `ids`/`byId`.
+   * A runtime with no archive view leaves this empty and keeps every Host row
+   * inside `byId`, so a restore surface reads `byId[id] ?? archivedById[id]`.
+   */
+  archivedById: Record<SessionId, SessionSummary>
   current: SessionId | undefined
   /** Arrival lifecycle projected 1:1 from the manager snapshot (see SessionListPhase): empty-with-ready means "truly no sessions". */
   phase: SessionListPhase
@@ -211,7 +207,20 @@ function increasedForkTitle(title: string): string {
   return `${title} (1)`
 }
 
+/** Source labels are dictionary keys, including names also present on Object.prototype. */
+function freezeRetainedBy(counts: Partial<Record<SessionReferenceSource, number>>): SessionRetainInfo['retainedBy'] {
+  Object.setPrototypeOf(counts, null)
+  return Object.freeze(counts)
+}
+
+const EMPTY_RETAIN_INFO: SessionRetainInfo = Object.freeze({ referenceCount: 0, retainedBy: freezeRetainedBy({}) })
+
+/** Shared empty `archivedById` for runtimes with no Workspace-domain archive filter. */
+const NO_ARCHIVED_SUMMARIES: Record<SessionId, SessionSummary> = {}
+
 interface ScopeRecord {
+  retention: SessionRetainInfo
+  ended: AbortController
   fiber: Fiber
   ctx: AgentContext
   binding: SessionBinding
@@ -219,6 +228,77 @@ interface ScopeRecord {
   session: Session
   /** Render-layer standard-props bundle (identity-stable per scope; the renderer's per-info caches key off it). */
   provideInfo: SessionProvideInfo
+}
+
+interface RetentionObserver {
+  readonly source: ObservableSnapshot<SessionRetainInfo>
+  readonly listeners: Set<() => void>
+  published: SessionRetainInfo
+}
+
+/** A cancelled waiter releases only its own reference, not the shared opening. */
+async function waitForOpen(opening: Promise<void>, signal?: AbortSignal): Promise<void> {
+  if (signal === undefined) return opening
+  const aborted = Promise.withResolvers<never>()
+  const onAbort = (): void => { aborted.reject(signal.reason) }
+  signal.addEventListener('abort', onAbort, { once: true })
+  try {
+    if (signal.aborted) onAbort()
+    await Promise.race([opening, aborted.promise])
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+  }
+}
+
+class ClientSessionReference implements SessionReference {
+  private readonly released = new AbortController()
+  private readonly readiness = Promise.withResolvers<SessionBinding>()
+  readonly ready = this.readiness.promise
+
+  constructor(
+    readonly sessionId: SessionId,
+    private record: ScopeRecord | undefined,
+    private releaseReference: (() => void) | undefined,
+  ) {
+    void this.ready.catch(() => {})
+  }
+
+  get binding(): SessionBinding {
+    if (this.record === undefined || this.record.ended.signal.aborted) throw new Error(`Session reference "${this.sessionId}" is released`)
+    return this.record.binding
+  }
+
+  attachOpening(opening: Promise<void>, signal?: AbortSignal): void {
+    const signals = [this.released.signal]
+    if (this.record !== undefined) signals.push(this.record.ended.signal)
+    if (signal !== undefined) signals.push(signal)
+    const waitSignal = AbortSignal.any(signals)
+    void waitForOpen(opening, waitSignal).then(
+      () => {
+        try {
+          waitSignal.throwIfAborted()
+          this.readiness.resolve(this.binding)
+        } catch (error: unknown) {
+          this.readiness.reject(error)
+        }
+      },
+      (error: unknown) => { this.readiness.reject(error) },
+    )
+  }
+
+  release(): void {
+    const reason = new Error(`Session reference "${this.sessionId}" is released`)
+    const release = this.releaseReference
+    this.released.abort(reason)
+    this.readiness.reject(reason)
+    this.record = undefined
+    this.releaseReference = undefined
+    release?.()
+  }
+
+  [Symbol.dispose](): void {
+    this.release()
+  }
 }
 
 /** One plugin's per-session standard-props contribution (see {@link SessionRuntime.provide}). */
@@ -280,11 +360,14 @@ export class SessionRuntime implements ISessions {
   private readonly provideChannel: SessionProvideChannel
   /** Extra windows requested by a multi-pane surface and their active stage set. */
   private readonly additionalStaged = new Set<SessionId>()
-  private readonly staged = new Set<SessionId>()
+  private readonly staged = new Map<SessionId, SessionReference>()
+  private reconcilingStage = false
+  private pendingStage: { current: SessionId | undefined; preserveMaskedCurrent: boolean } | undefined
+  private readonly retainObservers = new Map<SessionId, RetentionObserver>()
+  private closed = false
+  private readonly navigation = new NavigationController()
   /** Last selected id retained across a transient list mask on reconnect. */
   private watched: SessionId | undefined
-  /** Removed-while-staged sessions whose teardown waits for the stage to move away. */
-  private readonly deferredRemovals = new Set<SessionId>()
   /** Scope-fiber teardowns in progress; root disposal waits for every one. */
   private readonly pendingScopeDisposals = new Set<Promise<void>>()
   private readonly hostDescription: HostDescriptionSource | undefined
@@ -304,6 +387,7 @@ export class SessionRuntime implements ISessions {
     options: { persistSelection?: boolean; provideService?: boolean; hostDescription?: HostDescriptionSource } = {},
   ) {
     this.hostDescription = options.hostDescription
+    rootCtx.effect(() => () => { this.navigation.dispose() }, 'sessions: navigation lifetime')
     this.selection = createSnapshotStore<SessionSelection>(
       {},
       options.persistSelection === false ? undefined : { persist: { name: 'dsh.sessions.current' } })
@@ -323,19 +407,14 @@ export class SessionRuntime implements ISessions {
       conversation,
     )
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, current: undefined, phase: 'pending',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })
     // The manager owns wire truth; the store is its projection. Manager
     // notifications are already microtask-batched.
     const disposeManagerSubscription = this.manager.subscribe(() => { this.projectList() })
-    // Stage follower: every current write (open() and projection alike)
-    // re-evaluates staging, so startup restore (persisted selection validated
-    // by the projection) and reconnect resurfacing enter their window with no
-    // dedicated code path. Safe to run synchronously inside the store notify:
-    // the follower writes no list state — Session.enterStage()'s synchronous prefix
-    // touches only session-side state and its own microtask-batched notifier.
-    // The current-provide projection follows the same current writes.
+    // Selection and Workbench windows acquire ordinary references. Reentrant
+    // retention observers queue another reconciliation after ownership is published.
     const disposeListSubscription = this.list.subscribe(() => {
       this.followCurrent()
       this.provideChannel.publishCurrent()
@@ -373,16 +452,16 @@ export class SessionRuntime implements ISessions {
         }
       }, 'sessions: conversation registry rebuild')
     }
-    // Scope records are created lazily, so their fibers are not children of a
-    // single static plugin row. Own a final root teardown that closes every
-    // remaining scope and waits for any prune already in progress.
+    // Root shutdown invalidates references before draining generation teardown.
     rootCtx.effect(() => async () => {
+      this.closed = true
       this.additionalStaged.clear()
       this.watched = undefined
       this.staged.clear()
       for (const [id, record] of this.scopes) {
+        record.ended.abort(new Error(`Session generation "${id}" is disposed`))
         this.scopes.delete(id)
-        this.deferredRemovals.delete(id)
+        this.publishRetention(id)
         this.scheduleDrop(id, record)
       }
       while (this.pendingScopeDisposals.size > 0) {
@@ -394,8 +473,63 @@ export class SessionRuntime implements ISessions {
           throw new AggregateError(failures, 'client session scope disposal failed')
         }
       }
+      for (const observer of this.retainObservers.values()) observer.listeners.clear()
     }, 'sessions: scope disposal')
     if (options.provideService !== false) rootCtx.reflect.provide('sessions', this, undefined)
+  }
+
+  beginNavigation(): AbortSignal {
+    return this.navigation.begin()
+  }
+
+  retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {
+    const { source, signal } = options
+    signal?.throwIfAborted()
+    if (this.closed) throw new Error('Session Controller is disposed')
+    const id = typeof target === 'string' && this.scopes.has(target) ? target : this.manager.resolveTarget(target)
+    const reference = this.retainScope(id, source)
+    try {
+      this.manager.get(id).enterStage()
+      reference.attachOpening(this.manager.get(id).open(), signal)
+      return reference
+    } catch (error) {
+      reference.release()
+      throw error
+    }
+  }
+
+  async using<T>(
+    target: SessionTarget,
+    options: SessionRetainOptions,
+    operation: (reference: SessionReference) => T | Promise<T>,
+  ): Promise<T> {
+    const reference = this.retain(target, options)
+    try {
+      await reference.ready
+      return await operation(reference)
+    } finally {
+      reference.release()
+    }
+  }
+
+  retainInfo(id: SessionId): ObservableSnapshot<SessionRetainInfo> {
+    let observer = this.retainObservers.get(id)
+    if (observer === undefined) {
+      const listeners = new Set<() => void>()
+      observer = {
+        listeners,
+        published: this.retentionSnapshot(id),
+        source: {
+          getSnapshot: () => this.retentionSnapshot(id),
+          subscribe: (listener) => {
+            listeners.add(listener)
+            return () => { listeners.delete(listener) }
+          },
+        },
+      }
+      this.retainObservers.set(id, observer)
+    }
+    return observer.source
   }
 
   /**
@@ -420,6 +554,7 @@ export class SessionRuntime implements ISessions {
    * @param id - listed or addressed session id.
    */
   open(id: SessionId): void {
+    this.beginNavigation()
     this.manager.select(id)
   }
 
@@ -428,6 +563,7 @@ export class SessionRuntime implements ISessions {
    * @param address - catalog-derived parent and child ids.
    */
   openSubagent(address: SubagentAddress): void {
+    this.beginNavigation()
     this.manager.selectSubagent(address)
   }
 
@@ -470,8 +606,8 @@ export class SessionRuntime implements ISessions {
    * staged browser history window; a transient list mask does not.
    */
   clear(): void {
+    this.beginNavigation()
     this.watched = undefined
-    this.reconcileStage(undefined)
     this.manager.clearSelection()
   }
 
@@ -482,7 +618,7 @@ export class SessionRuntime implements ISessions {
       if (this.eligible(id)) this.additionalStaged.add(id)
     }
     this.reconcileStage(this.list.getSnapshot().current, true)
-    this.pruneScopes()
+
   }
 
   /**
@@ -534,12 +670,8 @@ export class SessionRuntime implements ISessions {
   }
 
   /**
-   * Create a session on the host. Resolution guarantee: by the time the
-   * promise resolves, the created session is in the list store and
-   * {@link SessionRuntime.binding} resolves it — callers (New Session
-   * draft hand-off) may address the scope synchronously, without waiting a
-   * notifier flush. The synchronous projection below makes this structural
-   * rather than an accident of microtask ordering.
+   * Create a Host Session and publish its catalog row before resolving.
+   * Callers retain the returned identity before borrowing its binding.
    * @param opts - target workspace or directory and an optional preallocated id.
    * @returns the new session id.
    * @throws {SessionCreateError} with the requested id.
@@ -631,21 +763,21 @@ export class SessionRuntime implements ISessions {
     this.projectList()
     const childId = result.value.sessionId
     if (sourceTitle !== undefined) {
-      const child = this.binding(childId)?.session
-      if (child === undefined) throw new Error(`fork child "${childId}" is not locally addressable`)
-      const renamed = await child.rename(increasedForkTitle(sourceTitle))
-      if (!renamed.ok) throw new Error(`fork child rename failed: ${renamed.error.code}: ${renamed.error.message}`)
+      await this.using(childId, { source: 'controllerOperation' }, async (reference) => {
+        const renamed = await reference.binding.session.rename(increasedForkTitle(sourceTitle))
+        if (!renamed.ok) throw new Error(`fork child rename failed: ${renamed.error.code}: ${renamed.error.message}`)
+      })
     }
     return childId
   }
 
   /**
-   * Resolve an Agent-scoped context view (use-and-discard).
-   * @param id - session id (the agent identity — 1:1 same axis).
-   * @returns scoped ctx, or undefined for a session neither listed nor already scoped.
+   * Borrow an already-retained Agent-scoped context.
+   * @param id - Session identity.
+   * @returns the live context, or undefined without a retained generation.
    */
   scope(id: SessionId): AgentContext | undefined {
-    return this.resolve(id)?.ctx
+    return this.scopes.get(id)?.ctx
   }
 
   /**
@@ -672,17 +804,19 @@ export class SessionRuntime implements ISessions {
   sessionOf(ctx: Context): SessionFace | undefined {
     const id = scopeTagOf(ctx)
     if (id === undefined) return undefined
-    return this.scopes.get(id)?.binding.session
+    const record = this.scopes.get(id)
+    return record !== undefined && scopeIdentityOf(record.ctx) === scopeIdentityOf(ctx)
+      ? record.binding.session
+      : undefined
   }
 
   /**
-   * Resolve the stable session binding (scope-addressed assembly feed). Pure
-   * resolution — no staging, no window side effects.
-   * @param id - session id.
-   * @returns binding, or undefined for a session neither listed nor already scoped.
+   * Borrow an already-retained binding without extending its lifetime.
+   * @param id - Session identity.
+   * @returns the live binding, or undefined without a retained generation.
    */
   binding(id: SessionId): SessionBinding | undefined {
-    return this.resolve(id)?.binding
+    return this.scopes.get(id)?.binding
   }
 
   /**
@@ -693,7 +827,7 @@ export class SessionRuntime implements ISessions {
    * concurrent discarded passes must stay free).
    */
   provideInfoFor(id: SessionId): SessionProvideInfo | undefined {
-    return this.resolve(id)?.provideInfo
+    return this.scopes.get(id)?.provideInfo
   }
 
   /**
@@ -713,35 +847,85 @@ export class SessionRuntime implements ISessions {
 
   /** Reconcile Session stage membership without touching current selection. */
   private reconcileStage(current: SessionId | undefined, preserveMaskedCurrent = false): void {
-    const desired = new Set<SessionId>(this.additionalStaged)
-    if (current !== undefined && this.eligible(current)) desired.add(current)
-    if (preserveMaskedCurrent && current === undefined && this.watched !== undefined) desired.add(this.watched)
-    for (const id of [...this.staged]) {
-      if (desired.has(id)) continue
-      this.scopes.get(id)?.session.leaveStage()
-      this.staged.delete(id)
-    }
-    this.sweepDeferred()
-    for (const id of desired) {
-      if (this.staged.has(id)) continue
-      const record = this.resolve(id)
-      if (record === undefined) continue
-      this.staged.add(id)
-      record.session.enterStage()
-      void this.manager.refreshSubagents(id)
+    this.pendingStage = { current, preserveMaskedCurrent }
+    if (this.reconcilingStage) return
+    this.reconcilingStage = true
+    try {
+      while (this.pendingStage !== undefined) {
+        const request = this.pendingStage
+        this.pendingStage = undefined
+        this.applyStage(request.current, request.preserveMaskedCurrent)
+      }
+    } finally {
+      this.reconcilingStage = false
     }
   }
 
-  /**
-   * Lazily mint the scope + binding for an eligible session. Eligibility and
-   * prune share one predicate: listed on the host or selected
-   * through a retained subagent address. Breadcrumb-only ancestors remain
-   * summary data and do not keep scopes alive.
-   */
-  private resolve(id: SessionId): ScopeRecord | undefined {
-    const existing = this.scopes.get(id)
-    if (existing !== undefined) return existing
-    if (!this.eligible(id)) return undefined
+  private applyStage(current: SessionId | undefined, preserveMaskedCurrent: boolean): void {
+    const desired = new Set<SessionId>(this.additionalStaged)
+    if (current !== undefined && this.eligible(current)) desired.add(current)
+    if (preserveMaskedCurrent && current === undefined && this.watched !== undefined) desired.add(this.watched)
+    for (const id of desired) {
+      if (this.staged.has(id)) continue
+      const reference = this.retain(id, { source: this.additionalStaged.has(id) ? 'workbench' : 'conversation' })
+      this.staged.set(id, reference)
+      void this.manager.refreshSubagents(id)
+    }
+    for (const [id, reference] of this.staged) {
+      if (desired.has(id)) continue
+      this.staged.delete(id)
+      reference.release()
+    }
+  }
+
+  private retainScope(id: SessionId, source: SessionReferenceSource): ClientSessionReference {
+    const record = this.scopes.get(id) ?? this.materializeScope(id)
+    const previous = record.retention
+    record.retention = Object.freeze({
+      referenceCount: previous.referenceCount + 1,
+      retainedBy: freezeRetainedBy({ ...previous.retainedBy, [source]: (previous.retainedBy[source] ?? 0) + 1 }),
+    })
+    const reference = new ClientSessionReference(id, record, () => {
+      if (record.ended.signal.aborted) return
+      const count = record.retention.referenceCount - 1
+      const { [source]: sourceCount = 0, ...otherSources } = record.retention.retainedBy
+      const retainedBy = sourceCount > 1 ? { ...otherSources, [source]: sourceCount - 1 } : otherSources
+      record.retention = count === 0
+        ? EMPTY_RETAIN_INFO
+        : Object.freeze({ referenceCount: count, retainedBy: freezeRetainedBy(retainedBy) })
+      if (count === 0) this.retireScope(id, record)
+      else this.publishRetention(id)
+    })
+    this.publishRetention(id)
+    return reference
+  }
+
+  private retentionSnapshot(id: SessionId): SessionRetainInfo {
+    return this.scopes.get(id)?.retention ?? EMPTY_RETAIN_INFO
+  }
+
+  private publishRetention(id: SessionId): void {
+    const observer = this.retainObservers.get(id)
+    const snapshot = this.retentionSnapshot(id)
+    if (observer === undefined || observer.published === snapshot) return
+    observer.published = snapshot
+    for (const listener of [...observer.listeners]) {
+      try { listener() } catch (error) { this.rootCtx.logger.error(error) }
+    }
+  }
+
+  private retireScope(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
+    if (record.ended.signal.aborted) return
+    record.ended.abort(new Error(`Session generation "${id}" is disposed`))
+    if (this.scopes.get(id) === record) this.scopes.delete(id)
+    record.session.unbindScope()
+    this.scheduleDrop(id, record, disposeFiber)
+    if (!this.closed) this.projectList()
+    this.publishRetention(id)
+  }
+
+  /** Materialize one validated local generation for its first reference. */
+  private materializeScope(id: SessionId): ScopeRecord {
     const { fiber, ctx } = createScope(this.rootCtx, id)
     const session = this.manager.get(id)
     // The Session owns its scoped dispatch point (host Agent.loopCtx mirror);
@@ -752,6 +936,8 @@ export class SessionRuntime implements ISessions {
       ...this.hostDescription === undefined ? {} : { hostDescription: this.hostDescription },
     }
     const record: ScopeRecord = {
+      retention: EMPTY_RETAIN_INFO,
+      ended: new AbortController(),
       fiber,
       ctx,
       binding,
@@ -760,10 +946,11 @@ export class SessionRuntime implements ISessions {
       provideInfo: this.provideChannel.materializeInfo(binding),
     }
     this.scopes.set(id, record)
+    ctx.effect(() => () => { this.retireScope(id, record, false) }, 'sessions: exact generation')
     return record
   }
 
-  /** The one aliveness predicate shared by scope mint and prune: host-listed or currently addressed. */
+  /** View admission follows the Host list or the selected catalog address. */
   private eligible(id: SessionId): boolean {
     const { ids, current } = this.list.getSnapshot()
     return current === id || ids.includes(id)
@@ -828,6 +1015,12 @@ export class SessionRuntime implements ISessions {
         address = this.manager.navigationAddress(address.parentSessionId)
       }
     }
+    for (const [id, record] of this.scopes) {
+      if (byId[id] !== undefined) continue
+      const previous = this.list.getSnapshot().byId[id]
+      const snapshot = record.session.getSnapshot()
+      byId[id] = { ...(previous ?? { id, displayTitle: id, updatedAt: 0 }), running: snapshot.running, blank: snapshot.blank }
+    }
     const persisted = this.selection.getSnapshot().sessionId
     // No current (cleared, or masked gap) wipes the persisted cell — a reload
     // stays on empty; the in-memory selection still resurfaces a masked id.
@@ -843,22 +1036,8 @@ export class SessionRuntime implements ISessions {
         ...(currentAddress === undefined ? {} : { subagentAddress: currentAddress }),
       })
     }
-    this.list.set({ ids, byId, current, phase, subagentsByParent, jobsBySession, currentAddress })
-    this.pruneScopes()
-  }
+    this.list.set({ ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, subagentsByParent, jobsBySession, currentAddress })
 
-  /** Tear down scope + instance for no-longer-eligible sessions off stage; the staged one defers until the stage moves. */
-  private pruneScopes(): void {
-    for (const [id, record] of this.scopes) {
-      if (this.eligible(id)) continue
-      if (this.staged.has(id)) {
-        this.deferredRemovals.add(id)
-        continue
-      }
-      this.scopes.delete(id)
-      this.deferredRemovals.delete(id)
-      this.scheduleDrop(id, record)
-    }
   }
 
   /**
@@ -868,8 +1047,8 @@ export class SessionRuntime implements ISessions {
    * stores, and the Session instance itself — the host session log is the
    * durable truth, a reopen lazily rebuilds and backfills via open().
    */
-  private scheduleDrop(id: SessionId, record: ScopeRecord): void {
-    const disposal = this.dropScope(id, record)
+  private scheduleDrop(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
+    const disposal = this.dropScope(id, record, disposeFiber)
     this.pendingScopeDisposals.add(disposal)
     // Prunes are triggered from synchronous projection notifications and have
     // no caller to await. Observe failures here; root teardown still awaits
@@ -883,7 +1062,7 @@ export class SessionRuntime implements ISessions {
   }
 
   /** Dispose one scope and only then release its session-owned dispatch point. */
-  private async dropScope(id: SessionId, record: ScopeRecord): Promise<void> {
+  private async dropScope(id: SessionId, record: ScopeRecord, disposeFiber: boolean): Promise<void> {
     record.session.dispose()
     record.session.leaveStage()
     // Remove the manager instance before awaiting the fiber so a session that
@@ -894,7 +1073,7 @@ export class SessionRuntime implements ISessions {
     // declared dependency; a slots-less boot (object-layer tests) skips.
     this.rootCtx.get('slots')?.pruneStoreScope(id)
     try {
-      await record.fiber.dispose()
+      if (disposeFiber) await record.fiber.dispose()
     } finally {
       // Release the Session's dispatch point with the scope it belongs to (a
       // surviving instance — the live Intent — rebinds when resolve re-mints).
@@ -902,27 +1081,4 @@ export class SessionRuntime implements ISessions {
     }
   }
 
-  /** Run deferred teardowns whose session is no longer staged (called when the stage moves). */
-  private sweepDeferred(): void {
-    for (const id of [...this.deferredRemovals]) {
-      /* v8 ignore next -- defensive: only the staged id ever defers, and every
-       * stage move sweeps first, so the set cannot contain the id the stage just
-       * moved to; kept as a guard against future extra sweep call sites. */
-      if (this.staged.has(id)) continue
-      // Eligible again? (A re-added id cancels the deferred teardown.)
-      if (this.eligible(id)) {
-        this.deferredRemovals.delete(id)
-        continue
-      }
-      const record = this.scopes.get(id)
-      this.deferredRemovals.delete(id)
-      /* v8 ignore next -- defensive: prune deletes a scope and its deferral
-       * together, so a deferred id always still owns its record; kept so a
-       * future teardown path cannot double-dispose. */
-      if (record !== undefined) {
-        this.scopes.delete(id)
-        this.scheduleDrop(id, record)
-      }
-    }
-  }
 }

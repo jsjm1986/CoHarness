@@ -10,11 +10,12 @@ import { releasedV0SessionFormatCodec, releasedV1SessionFormatCodec, sessionForm
 import { releasedV2SessionFormatCodec, sessionFormatV1ToV2 } from '@deepseek-ai/dsh-session-format-v1-to-v2'
 import { releasedV3SessionFormatCodec, sessionFormatV2ToV3 } from '@deepseek-ai/dsh-session-format-v2-to-v3'
 import { releasedV4SessionFormatCodec, sessionFormatV3ToV4 } from '@deepseek-ai/dsh-session-format-v3-to-v4'
-import { assertReleasedV5Header, releasedV5SessionFormatCodec, restoreReleasedV5Artifact, sessionFormatV4ToV5 } from '@deepseek-ai/dsh-session-format-v4-to-v5'
+import { releasedV5SessionFormatCodec, sessionFormatV4ToV5 } from '@deepseek-ai/dsh-session-format-v4-to-v5'
+import { assertReleasedV6Header, releasedV6SessionFormatCodec, restoreReleasedV6Artifact, sessionFormatV5ToV6 } from '@deepseek-ai/dsh-session-format-v5-to-v6'
 
 /** Physical codec dispatch and complete adjacent chain, independent of mounted plugins. */
 export const sessionFormatCatalog = createSessionFormatCatalog({
-  currentVersion: 5,
+  currentVersion: 6,
   codecs: [
     releasedV0SessionFormatCodec,
     releasedV1SessionFormatCodec,
@@ -22,19 +23,27 @@ export const sessionFormatCatalog = createSessionFormatCatalog({
     releasedV3SessionFormatCodec,
     releasedV4SessionFormatCodec,
     releasedV5SessionFormatCodec,
+    releasedV6SessionFormatCodec,
   ],
-  currentEncoder: releasedV5SessionFormatCodec,
-  migrations: [sessionFormatV0ToV1, sessionFormatV1ToV2, sessionFormatV2ToV3, sessionFormatV3ToV4, sessionFormatV4ToV5],
+  currentEncoder: releasedV6SessionFormatCodec,
+  migrations: [
+    sessionFormatV0ToV1,
+    sessionFormatV1ToV2,
+    sessionFormatV2ToV3,
+    sessionFormatV3ToV4,
+    sessionFormatV4ToV5,
+    sessionFormatV5ToV6,
+  ],
   restoreCurrent(artifact) {
-    const restored = restoreReleasedV5Artifact(artifact, KNOWN_SESSION_EVENT_TYPES)
+    const restored = restoreReleasedV6Artifact(artifact, KNOWN_SESSION_EVENT_TYPES)
     validateInstalledCurrentSessionArtifact(restored)
     return restored
   },
   restoreTransformedCurrent(artifact) {
-    return restoreReleasedV5Artifact(artifact, KNOWN_SESSION_EVENT_TYPES)
+    return restoreReleasedV6Artifact(artifact, KNOWN_SESSION_EVENT_TYPES)
   },
   restoreCurrentHeader(header) {
-    assertReleasedV5Header(header)
+    assertReleasedV6Header(header)
     validateInstalledCurrentSessionHeader(header)
     return header
   },

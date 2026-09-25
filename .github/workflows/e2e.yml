@@ -6,7 +6,7 @@ name: E2E (real DeepSeek API)
 # https://api.deepseek.com (DEEPSEEK_BASE_URL is pinned to it explicitly so a
 # stray repo-root .env can't redirect the run).
 #
-# pull_request IS a trigger, but GitHub withholds repo secrets from BOTH forked
+# PR verification calls this workflow through CI; GitHub withholds repo secrets from BOTH forked
 # PRs and Dependabot PRs (the latter are same-repo, fork==false, but still
 # keyless). The job-level `if:` below also restricts credentialed execution to
 # the canonical repository and requires the DSH_REAL_API_E2E_ENABLED repository
@@ -29,12 +29,20 @@ name: E2E (real DeepSeek API)
 # .agents/notes/implemented/testing/2026-06-19-real-api-e2e-ci.md.
 #
 # Note: scheduled triggers are auto-disabled after 60 days of repo inactivity;
-# push/pull_request/workflow_dispatch act as backstops.
+# push, CI's required calls and workflow_dispatch act as backstops.
 on:
+  workflow_call:
+    inputs:
+      required_proof:
+        description: Run the selected provider proof independently of the scheduled-run opt-in.
+        type: boolean
+        default: false
+    secrets:
+      DEEPSEEK_API_KEY_EXTERNAL:
+        required: false
   workflow_dispatch:
   push:
     branches: [main, master]
-  pull_request:
   schedule:
     # 00:17 UTC nightly = 08:17 Asia/Shanghai — off the top-of-hour cron stampede.
     - cron: '17 0 * * *'
@@ -42,7 +50,7 @@ on:
 # Cancel a superseded PR run (it is on a stale commit); never cancel a
 # push/schedule run — it is already producing the post-merge/nightly signal.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: deepseek-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege: this job only reads the repo to run tests.
@@ -62,7 +70,7 @@ jobs:
     # opt-in. Fork and Dependabot PRs remain skipped because secrets are withheld.
     if: >-
       github.repository == 'jsjm1986/CoHarness'
-      && (github.event_name == 'workflow_dispatch' || vars.DSH_REAL_API_E2E_ENABLED == 'true')
+      && (inputs.required_proof || github.event_name == 'workflow_dispatch' || vars.DSH_REAL_API_E2E_ENABLED == 'true')
       && (github.event_name != 'pull_request'
       || !(github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]'))
     # Bounded file parallelism (DSH_E2E_MAX_WORKERS), 120s/test, retry 2. 45m
@@ -109,7 +117,7 @@ jobs:
       # the built artifact under plain Node, resolving plugins through real package
       # exports — the shape a real consumer runs. That requires a prior build.
       - name: Build (lib for the e2e example bins)
-        run: pnpm run build:official
+        run: pnpm run build:coharness
 
       # Real-API end-to-end tests only. The keyless gates (lint/typecheck/
       # coverage/snapshot/etc.) already run in ci.yml on every push/PR.
@@ -135,3 +143,16 @@ jobs:
           external: real-provider
           status: ${{ job.status }}
           command: pnpm run test:e2e (external DeepSeek API)
+
+  proof-status:
+    name: Required DeepSeek proof
+    needs: e2e
+    if: always() && inputs.required_proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Reject unavailable or unsuccessful provider proof
+        if: needs.e2e.result != 'success'
+        run: |
+          echo '::error::The required real-provider proof did not succeed. Missing credentials or an untrusted event cannot satisfy it.'
+          exit 1

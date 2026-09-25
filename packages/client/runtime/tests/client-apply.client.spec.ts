@@ -7,6 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionSinks } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ClientConnectionRpc, HostDescription } from '@deepseek-ai/dsh-client-connection/client'
 import { SESSION_SEARCH_RESULT_LIMIT } from '@deepseek-ai/dsh-host-apiproxy/api'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import * as RuntimeClient from '../src/client/index.ts'
@@ -21,26 +22,60 @@ interface Bench {
   api: FakeApiClient
   sinks: ConnectionSinks | undefined
   stopped: number
+  remote: Record<string, unknown>
+  /** Spec-owned `/api` channel endpoint stub; unset calls reject. */
+  onRpcCall: ((channel: string, endpoint: string) => ReturnType<ClientConnectionRpc['call']>) | undefined
+  /** Publish the base connection's description the way the controller does per generation. */
+  publishDescription: (next: HostDescription | undefined) => void
+  /** Drive the forwarded-event bridge the same way the connection sink does. */
+  dispatchForwarded: (event: string, args?: readonly unknown[]) => void
 }
 
 async function mount(): Promise<Bench> {
   const ctx = new Context()
   await ctx.plugin(TypertRegistry)
   const api = new FakeApiClient()
-  const bench: Bench = { ctx, api, sinks: undefined, stopped: 0 }
+  const forwarded = new Map<string, Set<(...args: never[]) => void>>()
+  const remote: Record<string, unknown> = {
+    $on: (event: string, listener: (...args: never[]) => void) => {
+      let set = forwarded.get(event)
+      if (set === undefined) forwarded.set(event, set = new Set())
+      set.add(listener)
+      return () => { set.delete(listener) }
+    },
+    $dispatch: (event: string, args: readonly unknown[] = []) => {
+      for (const listener of forwarded.get(event) ?? []) listener(...args as never[])
+    },
+  }
+  let description: HostDescription | undefined
+  const descriptionListeners = new Set<() => void>()
+  const bench: Bench = {
+    ctx, api, sinks: undefined, stopped: 0, remote, onRpcCall: undefined,
+    publishDescription: (next) => {
+      description = next
+      for (const listener of [...descriptionListeners]) listener()
+    },
+    dispatchForwarded: (event, args = []) => {
+      for (const listener of forwarded.get(event) ?? []) listener(...args as never[])
+    },
+  }
   const handle: ConnectionHandle = {
     api,
     isLoopback: true,
     hostDescription: {
-      getSnapshot: () => undefined,
-      subscribe: () => () => {},
+      getSnapshot: () => description,
+      subscribe: (listener) => {
+        descriptionListeners.add(listener)
+        return () => { descriptionListeners.delete(listener) }
+      },
     },
     state: {
       getSnapshot: () => undefined,
       subscribe: () => () => {},
     },
     rpc: {
-      call: () => Promise.reject(new Error('unexpected generic RPC call')),
+      call: (channel, endpoint) => bench.onRpcCall?.(channel, endpoint)
+        ?? Promise.reject(new Error('unexpected generic RPC call')),
     },
     reconnect: () => {},
     start: (sinks) => {
@@ -49,7 +84,7 @@ async function mount(): Promise<Bench> {
     },
   }
   ctx.reflect.provide('connection', handle)
-  ctx.reflect.provide('remote', {})
+  ctx.reflect.provide('remote', remote)
   ctx.reflect.provide('remote.commands', fakeRemote().commands)
   ctx.reflect.provide('remote.subagents', fakeRemote().subagents)
   await ctx.plugin(RuntimeClient).await()
@@ -142,6 +177,7 @@ describe('runtime client apply', () => {
       payload: { type: 'host/session-added', blank: true, sessionId: 's-registry' } as never,
     })
     await flushMicrotasks()
+    sessions.open('s-registry' as never)
     expect(sessions.binding('s-registry' as never)).toBeDefined()
     const rebuild = vi.spyOn(Session.prototype, 'rebuildConversationRegistry')
     const definition: ConversationNodeDefinition<null> = {
@@ -158,6 +194,38 @@ describe('runtime client apply', () => {
 
     expect(rebuild).toHaveBeenCalledOnce()
     rebuild.mockRestore()
+  })
+
+  it('owns the permission catalog: attributed changes republish and generation boundaries clear', async () => {
+    const bench = await mount()
+    let catalog = { options: [{ value: 'one', name: 'One' }] }
+    bench.onRpcCall = (_channel, endpoint) => Promise.resolve(
+      endpoint === 'permissionPresets/catalog' ? { ok: true as const, value: catalog } : { ok: false as const, error: { code: 'unknown', message: 'no endpoint', details: {} } },
+    )
+    const directory = bench.ctx.get('permissionCatalog')
+    if (directory === undefined) throw new Error('permissionCatalog missing after runtime apply')
+    const face = directory.forSession(undefined)
+    const seen: unknown[] = []
+    face.subscribe(() => { seen.push(face.getSnapshot()) })
+    await flushMicrotasks()
+    expect(face.getSnapshot()).toBe(catalog)
+
+    // The host's catalog-changed frame republishes the fresh option table on
+    // the delivering connection's mirror only.
+    catalog = { options: [{ value: 'two', name: 'Two' }] }
+    bench.sinks?.onHostEnvelope?.({
+      rpcId: 'r-catalog' as never,
+      payload: { type: 'host/remote-event', event: 'permission-presets/catalog-changed', args: [] } as never,
+    })
+    await flushMicrotasks()
+    expect(face.getSnapshot()).toBe(catalog)
+    expect(seen).toHaveLength(2)
+
+    // A new connection generation clears before repulling the next host's table.
+    bench.publishDescription({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
+    expect(seen).toHaveLength(3)
+    await flushMicrotasks()
+    expect(face.getSnapshot()).toBe(catalog)
   })
 
   it('stops the stream loop when the plugin fiber unloads', async () => {

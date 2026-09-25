@@ -90,6 +90,14 @@ class GoalService extends Service {
     throw this.businessError ?? new Error('fixture business failure')
   }
 
+  @Remote({ mode: 'stream' })
+  async *watch(value: unknown, signal: AbortSignal): AsyncGenerator {
+    this.calls.push('watch')
+    this.lastSignal = signal
+    yield value
+    yield this.nextResult
+  }
+
   strictOnly(request: { readonly title: string }): unknown {
     this.calls.push('strictOnly')
     return this.nextResult === undefined ? request : this.nextResult
@@ -110,6 +118,10 @@ class FakeConnectionService extends Service {
 
   constructor(ctx: Context) {
     super(ctx, 'connection')
+  }
+
+  get http() {
+    return { handlePrefix: () => this.ctx.effect(() => () => {}, 'fixture: stream route') }
   }
 
   get rpc() {
@@ -1256,6 +1268,41 @@ describe('TypertGatewayService', () => {
       await connectionFiber.dispose()
     }
     expect(routes).toHaveLength(0)
+  })
+})
+
+describe('Remote stream dispatch', () => {
+  it('requires stream mode before invoking a stream and rejects streaming unary endpoints', async () => {
+    const { ctx, service } = await setup()
+    try {
+      await expect(ctx.typertGateway.invoke({ namespace: 'goals', method: 'watch', args: { value: 1 } })).rejects.toThrow('mode')
+      await expect(ctx.typertGateway.invoke({ namespace: 'goals', method: 'passthrough', args: { value: 1 }, mode: 'stream' })).rejects.toThrow('mode')
+      expect(service.calls).toEqual([])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('validates every strict item and closes after cancellation or revoked admission', async () => {
+    const { ctx, service } = await setup()
+    try {
+      const base = passthroughDescriptor()
+      registerStrict(ctx, [{ ...base, id: 'stream', method: 'watch', mode: 'stream', cancellation: { parameter: 'signal' },
+        result: strictCodec('stream-number', z.number()) }])
+      const request = { namespace: 'goals', method: 'watch', args: { value: 1 }, mode: 'stream' as const }
+      service.nextResult = 'bad item'
+      const stream = await ctx.typertGateway.invoke(request) as AsyncIterable<unknown>
+      const iterator = stream[Symbol.asyncIterator]()
+      expect(await iterator.next()).toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).rejects.toThrow('result')
+      const abort = new AbortController()
+      const revoked = await ctx.typertGateway.invoke({ ...request, signal: abort.signal }) as AsyncIterable<unknown>
+      const cancelled = revoked[Symbol.asyncIterator]()
+      expect((await cancelled.next()).value).toBe(1)
+      abort.abort(new Error('request revoked'))
+      await expect(cancelled.next()).rejects.toThrow('request revoked')
+      const denied = (await ctx.typertGateway.invoke(request) as AsyncIterable<unknown>)[Symbol.asyncIterator]()
+      ctx.on('typert-gateway/authorize', () => { throw new Error('ACL revoked') })
+      await expect(denied.next()).rejects.toThrow('ACL revoked')
+    } finally { await ctx.fiber.dispose() }
   })
 })
 

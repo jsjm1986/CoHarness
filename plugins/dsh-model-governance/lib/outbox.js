@@ -111,6 +111,8 @@ function actorlessUsageBody(body) {
     if (value === null || typeof value !== 'object' || Array.isArray(value))
         return undefined;
     const record = value;
+    if (Object.hasOwn(record, 'executionInputIds'))
+        return undefined;
     if (record.kind === 'model-registration'
         || (!Object.hasOwn(record, 'actorUserId') && !Object.hasOwn(record, 'actorProjectId')))
         return undefined;

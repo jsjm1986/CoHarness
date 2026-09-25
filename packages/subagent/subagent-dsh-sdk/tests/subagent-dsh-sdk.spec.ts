@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,8 +35,15 @@ function request(text = 'p', signal = new AbortController().signal) {
 
 /** Every setup() Context, disposed after each test (dispose is idempotent). */
 const contexts: Context[] = []
+const homes: string[] = []
+function isolatedHome(): string {
+  const home = mkdtempSync(join(tmpdir(), 'sdk-test-home-'))
+  homes.push(home)
+  return home
+}
 afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
+  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
 })
 
 /** Mount the SDK backend pointed at the fake runtime, scripted by `fakeEnv`. */
@@ -48,8 +55,8 @@ async function setup(fakeEnv: Record<string, string> = {}, config: Partial<sdk.C
   // exercises the schemastery default end to end.
   await ctx.plugin(sdk, {
     providerName: 'dsh-sdk',
-    command: process.execPath,
-    args: [fakeRuntime],
+    dshBin: fakeRuntime,
+    profile: 'sdk', patches: [], dshHome: isolatedHome(),
     provider: 'fake-provider',
     model: 'fake-model',
     env: fakeEnv,
@@ -295,8 +302,8 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     try {
       const controller = new AbortController()
       const spec: SdkRunSpec = {
-        command: process.execPath,
-        args: [fakeRuntime],
+        dshBin: fakeRuntime,
+        profile: 'sdk', patches: [], dshHome: isolatedHome(),
         cwd: process.cwd(),
         provider: 'p',
         model: 'm',
@@ -340,15 +347,16 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   it('rejects WITHOUT spawning when the signal is already aborted', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'subagent-dsh-sdk-preabort-'))
     const sentinel = join(tmp, 'spawned')
+    const sentinelBin = join(tmp, 'sentinel.mjs')
+    writeFileSync(sentinelBin, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(sentinel)}, 'spawned')\n`)
     try {
       const controller = new AbortController()
       controller.abort()
       await expect(startSdkRun(
         request('p', controller.signal),
-        // `touch <sentinel>` — runs only if the process is actually spawned.
+        // The private executable writes the sentinel immediately if spawned.
         {
-          command: 'touch',
-          args: [sentinel],
+          dshBin: sentinelBin, profile: 'sdk', patches: [], dshHome: isolatedHome(),
           cwd: tmp,
           provider: 'p',
           model: 'm',
@@ -380,8 +388,8 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   it('cancelling mid-handshake rejects start after reaping the child', async () => {
     const controller = new AbortController()
     const spec: SdkRunSpec = {
-      command: process.execPath,
-      args: [fakeRuntime],
+      dshBin: fakeRuntime,
+      profile: 'sdk', patches: [], dshHome: isolatedHome(),
       cwd: process.cwd(),
       provider: 'p',
       model: 'm',
@@ -398,8 +406,8 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   it('routes a post-publication child failure through onError and settles error', async () => {
     const seen: string[] = []
     const spec: SdkRunSpec = {
-      command: process.execPath,
-      args: [fakeRuntime],
+      dshBin: fakeRuntime,
+      profile: 'sdk', patches: [], dshHome: isolatedHome(),
       cwd: process.cwd(),
       provider: 'p',
       model: 'm',
@@ -439,8 +447,8 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     await ctx.plugin(SubagentRuntime)
     const fiber = await ctx.plugin(sdk, {
       providerName: 'sdk-hmr',
-      command: process.execPath,
-      args: [fakeRuntime],
+      dshBin: fakeRuntime,
+      profile: 'sdk', patches: [], dshHome: isolatedHome(),
       provider: 'p',
       model: 'm',
       env: {},
@@ -462,7 +470,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
   it('rejects non-positive timing bounds at load', async () => {
     const ctx = new Context()
     await ctx.plugin(SubagentRuntime)
-    const base = { providerName: 'sdk', command: 'true', args: [], provider: 'p', model: 'm', env: {} }
+    const base = { providerName: 'sdk', dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(), provider: 'p', model: 'm', env: {} }
     await expect(ctx.plugin(sdk, { ...base, shutdownTimeoutMs: 0 })).rejects.toThrow('shutdownTimeoutMs must be a positive finite number')
     await expect(ctx.plugin(sdk, { ...base, disposeEofGraceMs: -1 })).rejects.toThrow('disposeEofGraceMs must be a positive finite number')
     await expect(ctx.plugin(sdk, { ...base, disposeGraceMs: Number.NaN })).rejects.toThrow('disposeGraceMs must be a positive finite number')
@@ -476,8 +484,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
       await ctx.plugin(SubagentRuntime)
       await expect(ctx.plugin(sdk, {
         providerName: 'sdk',
-        command: 'true',
-        args: [],
+        dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(),
         provider: 'p',
         model: 'm',
         maxTokens,
@@ -494,8 +501,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
       await ctx.plugin(SubagentRuntime)
       expect(() => { sdk.apply(ctx, {
         providerName: 'sdk',
-        command: 'true',
-        args: [],
+        dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(),
         provider: 'p',
         model: 'm',
         maxTokens,
@@ -513,8 +519,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     await ctx.plugin(SubagentRuntime)
     await expect(ctx.plugin(sdk, {
       providerName: 'sdk',
-      command: 'true',
-      args: [],
+      dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(),
       cwd: '',
       provider: 'p',
       model: 'm',

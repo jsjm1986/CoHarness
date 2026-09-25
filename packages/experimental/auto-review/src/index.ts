@@ -696,7 +696,7 @@ export function apply(ctx: Context): void {
         return { kind: 'cancel' }
       }
 
-      const completed = Promise.withResolvers<void>()
+      const completed = Promise.withResolvers<undefined>()
       active.add(completed.promise)
       try {
         const signal = AbortSignal.any([exec.signal, lifecycle.signal])
@@ -738,7 +738,7 @@ export function apply(ctx: Context): void {
         return downstream
       } finally {
         active.delete(completed.promise)
-        completed.resolve()
+        completed.resolve(undefined)
       }
     }, { prepend: true })
     yield stopListener
