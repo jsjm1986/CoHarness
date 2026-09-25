@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -9,22 +9,25 @@ import { homedir } from 'node:os'
 import { expect, it } from 'vitest'
 import {
   defineAcpSnapshotSuite,
+  parseSnapshotManifest,
   runScenario,
+  sessionFixtureNames,
   type InputScript,
   type Scenario,
   type SnapshotSuiteOptions,
-} from '@deepseek-ai/dsh-acp-snapshot'
+} from '@deepseek-ai/dsh-session-snapshot'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 
 /**
  * The acp-agent example's snapshot suite: the scenario table for
- * `dsh-acp-snapshot`'s suite factory, which owns every compare/guard mechanic
+ * `dsh-session-snapshot`'s suite factory, which owns every compare/guard mechanic
  * (expected-output + re-persisted-log diffs, record/refresh write-back, the pinned-header
- * uniformity guard, the fixture guards). Fixtures live under `snapshots/<name>/`;
+ * uniformity guard, the fixture guards). Fixtures live under `snapshots/<name>/`,
+ * each carrying a `snapshot.yml` manifest the table derives from;
  * `pnpm run test:snapshot:record` re-records model transcripts against the real
  * API; `pnpm run test:snapshot:refresh` rewrites current replay expected outputs keyless.
- * See the package README (packages/test-support/acp-snapshot) and the snapshot Agent Note,
+ * See the package README (packages/test-support/session-snapshot) and the snapshot Agent Note,
  * .agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md.
  */
 
@@ -134,7 +137,10 @@ async function prepareFsSearchWorkspace(cwd: string): Promise<void> {
 // retaining ACP protocol contracts here.
 
 function fixtureText(name: string): string {
-  return readFileSync(join(SNAPSHOTS_DIR, name, 'session.jsonl'), 'utf8')
+  const dir = join(SNAPSHOTS_DIR, name)
+  const [parentFixture] = sessionFixtureNames(readdirSync(dir))
+  if (parentFixture === undefined) throw new Error(`${name}: missing selected session fixture`)
+  return readFileSync(join(dir, parentFixture), 'utf8')
 }
 
 function fixtureRecords(name: string): unknown[] {
@@ -159,12 +165,69 @@ function snapshotModeFromEnv(value: string | undefined): SnapshotSuiteOptions['m
   }
 }
 
-const SCENARIOS: Scenario[] = [
-  { name: 'handshake', hasModelTurn: false, recorded: false },
-  { name: 'reject-extra-dirs', hasModelTurn: false, recorded: false },
+/**
+ * One scenario's table entry: every durable metadata fact lives in the
+ * scenario's own `snapshot.yml` (authoritative, also read by the suite's
+ * fixture guard), while this table carries only the facts that cannot be
+ * serialized there — the config overlay path and the workspace seeders.
+ */
+interface ScenarioCase {
+  name: string
+  hasModelTurn: boolean
+  /** Compare the replayed log against a historical-generation fixture; current fixtures default to {@link Scenario.hasModelTurn}. */
+  comparesLog?: boolean
+  configPath?: string
+  workspaceParent?: string
+  prepareWorkspace?: Scenario['prepareWorkspace']
+}
+
+/**
+ * Rehydrate one table entry into the full {@link Scenario} the suite expects:
+ * recording mode, replay overrides, header-class pin metadata, platform gates,
+ * and the historical-generation declaration all come from `snapshot.yml`.
+ *
+ * @param entry The code-bearing residue of the scenario table.
+ * @returns The scenario with manifest-owned metadata folded in.
+ */
+function scenarioFromManifest(entry: ScenarioCase): Scenario {
+  const manifestPath = join(SNAPSHOTS_DIR, entry.name, 'snapshot.yml')
+  const manifest = parseSnapshotManifest(readFileSync(manifestPath, 'utf8'), manifestPath)
+  const env: Record<string, string> = { ...manifest.environment }
+  if (manifest.permission !== undefined) env.DSH_PERMISSION_MODE = manifest.permission
+  return {
+    name: entry.name,
+    hasModelTurn: entry.hasModelTurn,
+    recorded: manifest.recording === 'live',
+    ...entry.comparesLog !== undefined ? { comparesLog: entry.comparesLog } : {},
+    ...manifest.sessionFormat !== undefined ? { sessionFormat: manifest.sessionFormat } : {},
+    ...manifest.replay?.override === true ? { overridden: true } : {},
+    ...manifest.header?.pin === true ? { pinsHeader: true } : {},
+    ...manifest.header?.systemPromptSource !== undefined
+      ? { systemPromptSource: manifest.header.systemPromptSource } : {},
+    ...manifest.header?.toolSchemasSource !== undefined
+      ? { toolSchemasSource: manifest.header.toolSchemasSource } : {},
+    ...manifest.header?.childToolSchemas !== undefined
+      ? { pinsChildToolSchemas: manifest.header.childToolSchemas } : {},
+    ...manifest.header?.childSystemPrompts !== undefined
+      ? { pinsChildSystemPrompts: manifest.header.childSystemPrompts } : {},
+    ...manifest.header?.changes !== undefined ? { expectedHeaderChanges: manifest.header.changes } : {},
+    ...manifest.header?.promptChanges !== undefined ? { expectedPromptChanges: manifest.header.promptChanges } : {},
+    ...manifest.header?.class !== undefined ? { headerClass: manifest.header.class } : {},
+    ...entry.configPath !== undefined ? { configPath: entry.configPath } : {},
+    ...entry.workspaceParent !== undefined ? { workspaceParent: entry.workspaceParent } : {},
+    ...entry.prepareWorkspace !== undefined ? { prepareWorkspace: entry.prepareWorkspace } : {},
+    ...Object.keys(env).length > 0 ? { env } : {},
+    ...manifest.platform === 'posix' ? { posixOnly: true } : {},
+    ...manifest.platform === 'pwsh' ? { pwshOnly: true } : {},
+  }
+}
+
+const SCENARIO_CASES: ScenarioCase[] = [
+  { name: 'handshake', hasModelTurn: false },
+  { name: 'reject-extra-dirs', hasModelTurn: false },
   // text-turn is the default header pin and owns the prompt and tool-schema
   // sidecars reused by alternate classes with identical component sequences.
-  { name: 'text-turn', hasModelTurn: true, recorded: true, pinsHeader: true },
+  { name: 'text-turn', hasModelTurn: true },
   // Product-subagent scenarios are authored schema-isolation fixtures: they
   // reuse the stable text-turn transcript so only Loader-composed headers and
   // tool sidecars vary. Model output and usage are not evidence here, so record
@@ -172,60 +235,40 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'product-subagent-codex',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'product-subagent-codex',
     configPath: PRODUCT_SUBAGENT_CODEX_CONFIG,
   },
   {
     name: 'product-subagent-both',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'product-subagent-both',
-    systemPromptSource: 'product-subagent-codex',
     configPath: PRODUCT_SUBAGENT_BOTH_CONFIG,
   },
   {
     name: 'product-subagent-result-diagnostic',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
-    pinsHeader: true,
-    headerClass: 'product-subagent-result-diagnostic',
-    systemPromptSource: 'product-subagent-codex',
     configPath: PRODUCT_SUBAGENT_RESULT_DIAGNOSTIC_CONFIG,
   },
   {
     name: 'session-title-after-turn',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
     configPath: SESSION_TITLE_CONFIG,
   },
-  { name: 'tool-call-turn', hasModelTurn: true, recorded: true },
+  { name: 'tool-call-turn', hasModelTurn: true },
   // Authored from the real PACKED_CHUNKS_SOURCE recording under the ordinary
   // app composition. The contract below pins decoded equality and all three
   // row kinds; replay additionally proves the assembled app re-packs identically.
-  { name: 'packed-chunks', hasModelTurn: true, recorded: false },
+  { name: 'packed-chunks', hasModelTurn: true, comparesLog: true },
   // The fs overlay only adds the spill stack (the sandboxed filesystem tools
   // live in the base tree), so these scenarios share the default header class.
   {
     name: 'parallel-tool-calls',
     hasModelTurn: true,
-    recorded: false,
     configPath: FS_CONFIG,
   },
-  { name: 'bash-spill', hasModelTurn: true, recorded: false, configPath: FS_CONFIG },
+  { name: 'bash-spill', hasModelTurn: true, configPath: FS_CONFIG },
   {
     name: 'session-query-spill',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
-    pinsHeader: true,
-    headerClass: 'session-query',
     configPath: SESSION_QUERY_CONFIG,
-    posixOnly: true,
   },
   // Authored keyless replays through the assembled app: the replay catalog
   // declares the vision model image-capable and Flash text-only, and the
@@ -235,19 +278,11 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'read-image',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'image',
     configPath: IMAGE_CONFIG,
   },
   {
     name: 'read-image-text-route',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'image-text-route',
-    systemPromptSource: 'text-turn',
-    toolSchemasSource: 'read-image',
     configPath: IMAGE_TEXT_ROUTE_CONFIG,
   },
   // Authored keyless replay of the normalization path: the 2001x1 fixture is
@@ -257,33 +292,23 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'read-image-dimension',
     hasModelTurn: true,
-    recorded: false,
-    headerClass: 'image',
     configPath: IMAGE_CONFIG,
   },
   {
     name: 'inline-image-prompt',
     hasModelTurn: true,
-    recorded: false,
-    headerClass: 'image',
     configPath: IMAGE_CONFIG,
   },
   {
     name: 'pty-tools',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'pty',
     configPath: PTY_CONFIG,
   },
-  { name: 'bash-tool-turn', hasModelTurn: true, recorded: true },
+  { name: 'bash-tool-turn', hasModelTurn: true },
   {
     name: 'background-job-admission',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
     configPath: BACKGROUND_TASK_ADMISSION_CONFIG,
-    posixOnly: true,
   },
   // The pwsh overlay (pwsh.cordis.yml / pwsh.cordis.snapshot.yml) swaps the
   // bundle's bash tool for the PowerShell twin, so its header class pins its
@@ -291,24 +316,16 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'pwsh-tool-turn',
     hasModelTurn: true,
-    recorded: true,
-    pinsHeader: true,
-    headerClass: 'pwsh',
     configPath: PWSH_CONFIG,
     // The composition boots the real pwsh executor; hosts without a `pwsh`
     // binary skip the run (fixtures stay guarded). The recorded turn writes
     // PWSH_OK via [Console]::Out.Write so the fixture carries no platform
     // newline and one recording replays on every host.
-    pwshOnly: true,
   },
   {
     name: 'persistent-pwsh-tool-turn',
     hasModelTurn: true,
-    recorded: true,
-    pinsHeader: true,
-    headerClass: 'persistent-pwsh',
     configPath: PERSISTENT_PWSH_CONFIG,
-    pwshOnly: true,
   },
   // Authored keyless replay through a test-only partial-Landlock provider:
   // the exact compatibility notice must stay ordinary stderr when the wrapped
@@ -316,48 +333,31 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'partial-landlock-child-failure',
     hasModelTurn: true,
-    recorded: false,
-    headerClass: 'sandbox',
     configPath: PARTIAL_LANDLOCK_CONFIG,
-    env: { DSH_PERMISSION_MODE: 'read-only' },
-    posixOnly: true,
   },
   // A valid cwd plus a missing provider executable exercises the assembled
   // foreground error and background job marker without a platform runner.
   {
     name: 'missing-sandbox-runner',
     hasModelTurn: true,
-    recorded: false,
-    headerClass: 'sandbox',
     configPath: PARTIAL_LANDLOCK_CONFIG,
-    env: {
-      DSH_PERMISSION_MODE: 'read-only',
-      DSH_SNAPSHOT_MISSING_SANDBOX_RUNNER: '1',
-    },
-    posixOnly: true,
   },
-  { name: 'todo-write', hasModelTurn: true, recorded: true },
+  { name: 'todo-write', hasModelTurn: true },
   {
     name: 'skill-load',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'skill',
-    systemPromptSource: 'text-turn',
-    toolSchemasSource: 'text-turn',
     prepareWorkspace: prepareEditingCordisSkillWorkspace,
   },
-  { name: 'lsp-definition', hasModelTurn: true, recorded: false, pinsHeader: true, headerClass: 'lsp', configPath: LSP_CONFIG },
+  { name: 'lsp-definition', hasModelTurn: true, configPath: LSP_CONFIG },
   // web_fetch markdown rendering end to end: the overlay's loopback fixture
   // server supplies deterministic HTML (entities, a GFM table, nesting), the
   // REAL local fetch provider retrieves it, and the tool result pins the
   // turndown conversion. The fetched URL (fixed port) is part of the recorded
   // transcript; replay re-executes the real fetch against the same fixture.
-  { name: 'web-fetch', hasModelTurn: true, recorded: true, pinsHeader: true, headerClass: 'web', configPath: WEB_CONFIG },
+  { name: 'web-fetch', hasModelTurn: true, configPath: WEB_CONFIG },
   {
     name: 'workspace-edit',
     hasModelTurn: true,
-    recorded: true,
   },
   // The real Loader/app/subprocess path executes the PACKAGED ripgrep binary
   // against a prepared workspace whose fixed mtimes pin the
@@ -375,17 +375,13 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'fs-glob-sampling',
     hasModelTurn: true,
-    recorded: true,
-    posixOnly: true,
-    pinsHeader: true,
-    headerClass: 'fs-search',
     configPath: FS_SEARCH_CONFIG,
     prepareWorkspace: prepareFsSearchWorkspace,
   },
-  { name: 'fs-read', hasModelTurn: true, recorded: true },
-  { name: 'fs-write', hasModelTurn: true, recorded: true },
-  { name: 'fs-edit', hasModelTurn: true, recorded: true },
-  { name: 'fs-write-overwrite', hasModelTurn: true, recorded: true },
+  { name: 'fs-read', hasModelTurn: true },
+  { name: 'fs-write', hasModelTurn: true },
+  { name: 'fs-edit', hasModelTurn: true },
+  { name: 'fs-write-overwrite', hasModelTurn: true },
   // An overwrite whose replacement is at/above the configured diff-basis bound:
   // the persisted result meta carries no contextual hunks and presentation
   // falls back to the whole-file diff. The overlay leaves the prompt and tool
@@ -394,18 +390,13 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'fs-write-overwrite-bounded',
     hasModelTurn: true,
-    recorded: true,
-    pinsHeader: true,
-    headerClass: 'fs-diff-bound',
-    systemPromptSource: 'text-turn',
-    toolSchemasSource: 'text-turn',
     configPath: FS_DIFF_BOUND_CONFIG,
   },
-  { name: 'fs-read-window', hasModelTurn: true, recorded: true },
-  { name: 'fs-policy-reject', hasModelTurn: true, recorded: true },
-  { name: 'fs-delete-recreate', hasModelTurn: true, recorded: true },
-  { name: 'multi-turn', hasModelTurn: true, recorded: true },
-  { name: 'error-finish', hasModelTurn: true, recorded: false, overridden: true },
+  { name: 'fs-read-window', hasModelTurn: true },
+  { name: 'fs-policy-reject', hasModelTurn: true },
+  { name: 'fs-delete-recreate', hasModelTurn: true },
+  { name: 'multi-turn', hasModelTurn: true },
+  { name: 'error-finish', hasModelTurn: true },
   // Keyless, authored (like error-finish): a live provider cannot be coaxed
   // into a degenerate empty completion, so the fixture scripts the adapters'
   // EMPTY_RESPONSE error finish in turn 1 followed by the recovered reply
@@ -413,19 +404,19 @@ const SCENARIOS: Scenario[] = [
   // llm/retry event, no ACP output for the discarded attempt, the recovered
   // reply, and a clean completed retry turn. Its overlay only pins a deterministic
   // 1 ms zero-jitter delay, so it shares the default header class.
-  { name: 'empty-response-retry', hasModelTurn: true, recorded: false, configPath: RETRY_CONFIG },
+  { name: 'empty-response-retry', hasModelTurn: true, configPath: RETRY_CONFIG },
   // Keyless, authored (like error-finish): a live model cannot be coaxed into
   // a deterministic mid-tool-call output-limit truncation. Turn 1's script ends
   // at `max-tokens` with an unfinished tool call and adapter replay metadata for
   // both blocks; the durable assistant/message pins assembly dropping the tool
   // call AND pruning its per-block replay entry in the same decision, and turn 2
   // proves the session continues past the truncated step.
-  { name: 'max-tokens-continue', hasModelTurn: true, recorded: false },
+  { name: 'max-tokens-continue', hasModelTurn: true },
   // Keyless, authored (like error-finish/cancel): deterministically forcing a
   // LIVE model to repeat one call three times is not a stable recording, so
   // the fixture scripts five identical todo_write calls and pins BOTH reminder
   // tiers (gentle at 3, detailed at 5) as injected user/message in transcript and log.
-  { name: 'repeat-tool-reminder', hasModelTurn: true, recorded: false },
+  { name: 'repeat-tool-reminder', hasModelTurn: true },
   // Authored replay: a root AGENTS.md pins the session prefix, then a read in
   // nested/ discovers its narrower AGENTS.md as a raw, metadata-bearing
   // injected user/message. Both portable AGENTS.md fixtures are symlinks to a sibling
@@ -440,44 +431,33 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'agent-instructions',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
-    pinsHeader: true,
-    headerClass: 'agent-instructions',
-    toolSchemasSource: 'text-turn',
+    comparesLog: true,
     configPath: WORKSPACE_CONTEXT_CONFIG,
     prepareWorkspace: prepareDelimiterPathWorkspace,
-    posixOnly: true,
   },
-  { name: 'cancel', hasModelTurn: true, recorded: false, overridden: true },
+  { name: 'cancel', hasModelTurn: true },
   // Cancelling a live bash call relies on POSIX process-group termination;
   // Windows bash process-tree kill is deferred with the Bash execution domain.
-  { name: 'cancel-tool-calls', hasModelTurn: true, recorded: false, overridden: true, posixOnly: true },
-  { name: 'subagent-spawn-in-process', hasModelTurn: true, recorded: true },
+  { name: 'cancel-tool-calls', hasModelTurn: true },
+  { name: 'subagent-spawn-in-process', hasModelTurn: true },
   {
     name: 'subagent-current-model',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'subagent-current-model',
-    systemPromptSource: 'text-turn',
-    toolSchemasSource: 'text-turn',
-    pinsChildSystemPrompts: [1],
     configPath: SUBAGENT_CURRENT_MODEL_CONFIG,
   },
   // Keyless authored scenario: the child ends at max-tokens with an empty
   // usage-only assistant/message after earlier text and a tool call. The
   // parent's tool result must retain that assistant output and stop reason.
-  { name: 'subagent-max-tokens-partial', hasModelTurn: true, recorded: false },
-  { name: 'subagent-multi', hasModelTurn: true, recorded: true },
+  { name: 'subagent-max-tokens-partial', hasModelTurn: true },
+  { name: 'subagent-multi', hasModelTurn: true },
   // Authored keyless replay: one assistant message carries two subagent calls
   // and the parent log pins call/call/result/result instead of the serial
   // interleaving. The twin delegations must stay identical: replay binds child
   // scripts and harvest order nondeterministically across concurrent children
   // (XXX(concurrent-subagents) in dsh-llm-replay).
-  { name: 'subagent-parallel', hasModelTurn: true, recorded: false },
-  { name: 'subagent-fork-in-process', hasModelTurn: true, recorded: true },
-  { name: 'subagent-mixed', hasModelTurn: true, recorded: true },
+  { name: 'subagent-parallel', hasModelTurn: true },
+  { name: 'subagent-fork-in-process', hasModelTurn: true },
+  { name: 'subagent-mixed', hasModelTurn: true },
   // Authored continuable-subagent transcript: a background delegation returns
   // only the durable subagent id, two send_message calls steer that same child
   // (the first reaches an idle child and opens its second turn; the second
@@ -495,7 +475,6 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'subagent-continuable',
     hasModelTurn: true,
-    recorded: false,
     configPath: SUBAGENT_DURABILITY_FAILURE_CONFIG,
   },
   // Authored policy-inheritance transcript: the root session is switched to
@@ -508,7 +487,6 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'subagent-continuable-inheritance',
     hasModelTurn: true,
-    recorded: false,
     configPath: SUBAGENT_CONTINUABLE_INHERITANCE_CONFIG,
   },
   // The in-process child is published before its first follow-up fails. The
@@ -516,10 +494,7 @@ const SCENARIOS: Scenario[] = [
   // published-handle disposal failure.
   {
     name: 'subagent-published-run-failure',
-    env: { DSH_SUBAGENT_PUBLISHED_FAILURE: '1' },
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
     configPath: SUBAGENT_DURABILITY_FAILURE_CONFIG,
   },
   // Authored durable-catalog transcript: the snapshot-only lifecycle marker
@@ -531,13 +506,10 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'subagent-list-agents',
     hasModelTurn: true,
-    recorded: false,
   },
   {
     name: 'subagent-depth-two-rejection',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
     configPath: DEPTH_TWO_CONFIG,
   },
   // Authored keyless replay: one live continuable child fills the configured
@@ -546,8 +518,6 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'subagent-activation-limit',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
     configPath: ACTIVATION_LIMIT_CONFIG,
   },
   // Authored keyless replay through the assembled app: a one-shot child calls
@@ -557,16 +527,12 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'subagent-child-question-rejection',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'child-question',
-    systemPromptSource: 'text-turn',
     configPath: CHILD_QUESTION_CONFIG,
   },
   // The workflow tool: the model writes a one-child orchestration script; the
   // child runs as a spawn subagent under the worker-thread engine (its session is the
   // child fixture), and the tool result carries the script's return value.
-  { name: 'workflow-run', hasModelTurn: true, recorded: true },
+  { name: 'workflow-run', hasModelTurn: true },
   // Authored counterpart to the packaged Python SDK snapshot: define a host-half marker package and
   // run it, inspect this session's dynamic packages through PTC, run direct and workflow
   // children, then undefine it. The extra PTC and
@@ -574,57 +540,48 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'advanced-toolchain',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'advanced',
+    comparesLog: true,
     configPath: ADVANCED_CONFIG,
   },
   {
     name: 'cordis-inspect-jsdoc',
     hasModelTurn: true,
-    recorded: false,
-    headerClass: 'advanced',
     configPath: ADVANCED_CONFIG,
   },
   // Prompt-submit blocks are authored keylessly with malformed matcher fields,
   // which these matcherless events must ignore. Admission rejects before a turn
   // opens, so only the ACP stop reason is observable and no log is harvested.
-  { name: 'hook-cc-promptsubmit-block', hasModelTurn: false, recorded: false },
-  { name: 'hook-codex-promptsubmit-block', hasModelTurn: false, recorded: false },
+  { name: 'hook-cc-promptsubmit-block', hasModelTurn: false },
+  { name: 'hook-codex-promptsubmit-block', hasModelTurn: false },
   // Each invalid matcher follows a runnable prompt blocker. Reaching the replay
   // model without any hook audit rows proves config loading is atomic through
   // the real Loader/app path, rather than retaining the earlier valid group.
-  { name: 'hook-cc-invalid-matcher', hasModelTurn: true, recorded: false },
-  { name: 'hook-codex-invalid-matcher', hasModelTurn: true, recorded: false },
+  { name: 'hook-cc-invalid-matcher', hasModelTurn: true },
+  { name: 'hook-codex-invalid-matcher', hasModelTurn: true },
   // The mid-turn interception points fire during a real model turn, so each is recorded with its hook active
   // (the model's reaction to a deny/block/force-continue is part of the captured transcript).
   // SessionStart/SubagentStart are excluded because detached injection races log
   // order; SubagentStop writes no transcript, so an expected output could not prove it ran.
   // Unit tests cover those points; the hook-snapshot-matrix Agent Note owns the rationale.
-  { name: 'hook-cc-promptsubmit-context', hasModelTurn: true, recorded: true },
-  { name: 'hook-cc-pretool-deny', hasModelTurn: true, recorded: true },
-  { name: 'hook-cc-pretool-ask', hasModelTurn: true, recorded: true },
-  { name: 'hook-cc-posttool-block', hasModelTurn: true, recorded: true },
-  { name: 'hook-cc-posttool-context', hasModelTurn: true, recorded: true },
-  { name: 'hook-cc-stop-continue', hasModelTurn: true, recorded: true },
-  { name: 'hook-codex-promptsubmit-context', hasModelTurn: true, recorded: true },
-  { name: 'hook-codex-pretool-block', hasModelTurn: true, recorded: true },
-  { name: 'hook-codex-posttool-block', hasModelTurn: true, recorded: true },
-  { name: 'hook-codex-posttool-context', hasModelTurn: true, recorded: true },
-  { name: 'hook-codex-stop-continue', hasModelTurn: true, recorded: true },
+  { name: 'hook-cc-promptsubmit-context', hasModelTurn: true },
+  { name: 'hook-cc-pretool-deny', hasModelTurn: true },
+  { name: 'hook-cc-pretool-ask', hasModelTurn: true },
+  { name: 'hook-cc-posttool-block', hasModelTurn: true },
+  { name: 'hook-cc-posttool-context', hasModelTurn: true },
+  { name: 'hook-cc-stop-continue', hasModelTurn: true },
+  { name: 'hook-codex-promptsubmit-context', hasModelTurn: true },
+  { name: 'hook-codex-pretool-block', hasModelTurn: true },
+  { name: 'hook-codex-posttool-block', hasModelTurn: true },
+  { name: 'hook-codex-posttool-context', hasModelTurn: true },
+  { name: 'hook-codex-stop-continue', hasModelTurn: true },
   // PTC: the registry in `mode: ptc` — the wire tool list collapses to [run_code], the
   // tools:sdk section rides in the prompt, and the program's tool calls land as
   // tool/ptc-dispatch events. Each overlay composes and pins its own header class.
-  { name: 'ptc-turn', hasModelTurn: true, recorded: true, pinsHeader: true, headerClass: 'ptc', configPath: PTC_CONFIG },
+  { name: 'ptc-turn', hasModelTurn: true, configPath: PTC_CONFIG },
   {
     name: 'ptc-read-image',
     hasModelTurn: true,
-    recorded: false,
-    pinsHeader: true,
-    headerClass: 'ptc-image',
-    toolSchemasSource: 'ptc-turn',
     configPath: PTC_IMAGE_CONFIG,
-    posixOnly: true,
   },
   // A nested fs dispatch inside run_code discovers workspace instructions. The
   // projection enters the inbox after the outer result and becomes model-visible
@@ -632,12 +589,6 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'ptc-workspace-context',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
-    pinsHeader: true,
-    headerClass: 'ptc-workspace-context',
-    systemPromptSource: 'ptc-turn',
-    toolSchemasSource: 'ptc-turn',
     configPath: PTC_WORKSPACE_CONTEXT_CONFIG,
   },
   // `both` owns its own expected prompt rather than sharing ptc-turn's:
@@ -646,9 +597,6 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'both-mode-turn',
     hasModelTurn: true,
-    recorded: true,
-    pinsHeader: true,
-    headerClass: 'both',
     configPath: BOTH_MODE_CONFIG,
   },
   // Machine permission scenarios use an explicit deployment policy; there is
@@ -656,31 +604,18 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'escalation-approved',
     hasModelTurn: true,
-    recorded: true,
-    pinsHeader: true,
-    headerClass: 'sandbox',
-    systemPromptSource: 'text-turn',
-    toolSchemasSource: 'text-turn',
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
   },
   {
     name: 'escalation-rejected',
     hasModelTurn: true,
-    recorded: true,
-    headerClass: 'sandbox',
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
   },
   {
     name: 'fs-escalation-approved',
     hasModelTurn: true,
-    recorded: true,
-    headerClass: 'sandbox',
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
   },
   {
     name: 'fs-same-mode',
     hasModelTurn: true,
-    recorded: false,
   },
   // Unlike ordinary snapshots, this session cwd is outside the platform temp
   // roots that workspace-write always grants. The overlay points the
@@ -689,11 +624,7 @@ const SCENARIOS: Scenario[] = [
   {
     name: 'session-sandbox-root',
     hasModelTurn: true,
-    recorded: false,
-    overridden: true,
-    headerClass: 'sandbox',
     configPath: SESSION_SANDBOX_ROOT_CONFIG,
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
     workspaceParent: homedir(),
   },
 ]
@@ -706,7 +637,7 @@ const hasPwsh = spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInte
 defineAcpSnapshotSuite({
   agent: AGENT,
   snapshotsDir: SNAPSHOTS_DIR,
-  scenarios: SCENARIOS,
+  scenarios: SCENARIO_CASES.map(scenarioFromManifest),
   mode: snapshotModeFromEnv(process.env.DSH_SNAPSHOT),
   hasPwsh,
 })
@@ -830,7 +761,7 @@ it.each(['chat-completions', 'messages'] as const)('pins %s Files offload and in
       agent: AGENT,
       mode: 'record',
       configPath: IMAGE_OFFLOAD_CONFIG,
-      fixtureFile: join(SNAPSHOTS_DIR, 'image-offload-request', 'session.jsonl'),
+      fixtureFile: join(SNAPSHOTS_DIR, 'image-offload-request', 'session.v6.jsonl'),
       workspaceDir: join(SNAPSHOTS_DIR, 'read-image', 'workspace'),
       env: {
         DSH_SNAPSHOT_PROTOCOL: protocol,
@@ -955,7 +886,7 @@ it.each(['chat-completions', 'messages'] as const)('pins %s Files offload and in
       agent: AGENT,
       mode: 'record',
       configPath: IMAGE_OFFLOAD_CONFIG,
-      fixtureFile: join(SNAPSHOTS_DIR, 'image-offload-request', 'session.jsonl'),
+      fixtureFile: join(SNAPSHOTS_DIR, 'image-offload-request', 'session.v6.jsonl'),
       workspaceDir: join(SNAPSHOTS_DIR, 'read-image', 'workspace'),
       env: {
         DSH_SNAPSHOT_PROTOCOL: protocol,

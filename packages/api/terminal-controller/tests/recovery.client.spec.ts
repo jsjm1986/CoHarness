@@ -720,6 +720,7 @@ it('keeps other holds usable when releasing one transport fails', async () => {
   service.retainTabs([{ sessionId, tabId: 'a', contentId: 'a' }])
   await expect.poll(() => h.remote.retain).toHaveBeenCalledOnce()
   const { TerminalWindowHold } = await import('../src/client/retention.ts')
+  // oxlint-disable-next-line typescript/unbound-method -- the spy restores the captured prototype reference through call().
   const original = TerminalWindowHold.prototype.dispose
   const failure = vi.spyOn(TerminalWindowHold.prototype, 'dispose')
   failure.mockImplementationOnce(async function (this: InstanceType<typeof TerminalWindowHold>) {

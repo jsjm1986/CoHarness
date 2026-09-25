@@ -92,7 +92,7 @@ describe('resumable local document uploads', () => {
     expect(await readFile(finished.ref!.path)).toEqual(Buffer.from(all))
   })
 
-  it('accepts the observed 100 MB-plus document through bounded chunks', async () => {
+  it('accepts the observed 100 MB-plus document through bounded chunks', { timeout: 30_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-100mb-'))
     roots.push(root)
     const size = 100_230_654

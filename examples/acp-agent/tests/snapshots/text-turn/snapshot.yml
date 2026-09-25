@@ -1,0 +1,8 @@
+version: 1
+scenario: text-turn
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: default
+  pin: true

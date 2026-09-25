@@ -28,6 +28,8 @@ const DIALECT_PRESET_ORIGINS: ReadonlySet<string> = new Set(['default', 'selecti
  * events bypass released admission entirely — the current schema records the
  * type, and the restore gate validates the migrated artifact. Malformed
  * payloads throw rather than widen the tunnel.
+ * @param event Stored event the edge is about to admit.
+ * @returns Whether the event is a well-formed dialect-only type.
  */
 export function isDialectOnlyEvent(event: SessionFormatEvent): boolean {
   if (event.type !== 'userdoc/attached') return false
@@ -128,6 +130,8 @@ function restoreSource(
  * Normalize one stored event onto the released vocabulary: the descriptor
  * stamp is rewritten permanently (v2 data satisfies the identical v3 schema),
  * while dialect members are hidden and recorded for post-emission restore.
+ * @param raw Stored event exactly as the database returned it.
+ * @returns The released-vocabulary event plus its hidden-member ledger.
  */
 export function hideDialectMembers(raw: SessionFormatEvent): DialectEvent {
   const data = isRecord(raw.data) ? raw.data : undefined
@@ -195,6 +199,9 @@ export function hideDialectMembers(raw: SessionFormatEvent): DialectEvent {
  * Re-attach one event's hidden members to the event the edge emitted. The
  * emitted `data` payload is copied, never mutated, and members are only
  * restored into positions that do not already carry a value.
+ * @param emitted Event the released edge produced for `dialect.event`.
+ * @param dialect Hidden-member ledger recorded by {@link hideDialectMembers}.
+ * @returns The emitted event with its hidden dialect members re-attached.
  */
 export function restoreDialectMembers(emitted: SessionFormatEvent, dialect: DialectEvent): SessionFormatEvent {
   if (dialect.presetOrigin === undefined && dialect.sourceMembers.length === 0) return emitted

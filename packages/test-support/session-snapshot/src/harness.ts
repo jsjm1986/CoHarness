@@ -44,7 +44,9 @@ import { captureWorkspaceSnapshot, type WorkspaceSnapshotEntry } from './workspa
 
 export type { AgentUnderTest } from './launcher.ts'
 
-const DEFAULT_WAIT_TIMEOUT_MS = 10_000
+// Replayed turns queue behind subagent activation and LLM-replay latency on a
+// loaded gate host; this ceiling bounds failure reporting, never speed.
+const DEFAULT_WAIT_TIMEOUT_MS = 30_000
 const WAIT_POLL_INTERVAL_MS = 10
 
 /**
@@ -798,18 +800,47 @@ async function harvestSessionLogs(root: string): Promise<HarvestedLog[]> {
       content,
     })
   }
-  // Primary (no parentSession) first, then children by ascending createdAt. A
-  // scenario has exactly one top-level session. Subagent children are created
-  // synchronously and strictly sequentially, so their createdAt values are
-  // strictly ordered; the recordedId tiebreak only keeps a degenerate
-  // same-millisecond collision (unreachable here) deterministic. This harvest
-  // order must match the replay load order in dsh-llm-replay's loadSessionScripts
-  // so session.<n>.jsonl maps to the same child on record and replay — replay
-  // re-sorts childFiles by the same key, so the two stay consistent.
-  logs.sort((a, b) => {
-    const ap = Number(a.parentSession !== undefined)
-    const bp = Number(b.parentSession !== undefined)
-    return ap - bp || a.createdAt - b.createdAt || a.id.localeCompare(b.id)
-  })
-  return logs
+  return orderHarvestedLogs(logs)
+}
+
+/**
+ * Order harvested logs by the position each child id is first referenced in
+ * its own parent's content — the `subagent/catalog` emit order. Parallel
+ * subagent spawns race on `createdAt`, so timestamps do not define sibling
+ * order; the parent log does. Replay binds live children to scripts in the
+ * same announcement order (`inferStartedSubagents` walks "started subagent"
+ * tool results in request order), and `loadSessionScripts` falls back to
+ * recordedId when committed headers carry normalized `createdAt: 0` — the
+ * recordedId token order is this same catalog order. A child never referenced
+ * by its parent keeps the `createdAt`/id order as a deterministic fallback.
+ * Traversal is depth-first so a subtree stays beneath its parent log.
+ * @param logs - the harvested logs in filesystem enumeration order.
+ * @returns the primary log first, then descendants in catalog order.
+ */
+function orderHarvestedLogs(logs: HarvestedLog[]): HarvestedLog[] {
+  const childrenOf = new Map<string | undefined, HarvestedLog[]>()
+  for (const log of logs) {
+    const siblings = childrenOf.get(log.parentSession) ?? []
+    siblings.push(log)
+    childrenOf.set(log.parentSession, siblings)
+  }
+  const sortSiblings = (parentContent: string | undefined) => (a: HarvestedLog, b: HarvestedLog) => {
+    const rank = (log: HarvestedLog): number => {
+      if (parentContent === undefined) return Number.MAX_SAFE_INTEGER
+      const at = parentContent.indexOf(log.id)
+      return at < 0 ? Number.MAX_SAFE_INTEGER : at
+    }
+    return rank(a) - rank(b) || a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+  }
+  const ordered: HarvestedLog[] = []
+  const visit = (log: HarvestedLog) => {
+    ordered.push(log)
+    const children = childrenOf.get(log.id) ?? []
+    children.sort(sortSiblings(log.content))
+    for (const child of children) visit(child)
+  }
+  const primaries = childrenOf.get(undefined) ?? []
+  primaries.sort(sortSiblings(undefined))
+  for (const primary of primaries) visit(primary)
+  return ordered
 }

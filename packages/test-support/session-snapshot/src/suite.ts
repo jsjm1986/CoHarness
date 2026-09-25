@@ -32,7 +32,7 @@ import {
   type SnapshotSessionFormatManifest,
 } from './manifest.ts'
 import { redactSessionSnapshotIds } from './identity.ts'
-import { captureExpectedWorkspaceSnapshot } from './workspace.ts'
+import { captureExpectedWorkspaceSnapshot, materializeWorkspaceSnapshot } from './workspace.ts'
 import {
   assertSessionFixtureVersion,
   sessionFixtureName,
@@ -681,10 +681,14 @@ function surfaceEventMessage(record: Record<string, unknown>): Record<string, un
 function recordMessages(record: Record<string, unknown>): Record<string, unknown>[] {
   const surfaceMessage = surfaceEventMessage(record)
   if (surfaceMessage !== undefined) return [surfaceMessage]
-  if (record.type !== 'agent/inbox/spliced' || !isRecord(record.data) || !Array.isArray(record.data.inserted)) {
-    return []
-  }
-  return record.data.inserted.flatMap((value) => {
+  if (!isRecord(record.data)) return []
+  const embedded = record.type === 'agent/inbox/spliced'
+    ? record.data.inserted
+    : record.type === 'session/title-llm-request'
+      ? record.data.messages
+      : undefined
+  if (!Array.isArray(embedded)) return []
+  return embedded.flatMap((value) => {
     const message = completeMessage(value)
     return message === undefined ? [] : [message]
   })
@@ -1352,6 +1356,7 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
           ],
           cwd: result.cwd,
           cwdAliases: result.cwdAliases,
+          identityLogs: result.sessionLogs.map(l => l.content),
         }
 
         const childSchemaPins = new Set(scenario.pinsChildToolSchemas ?? [])
@@ -1584,7 +1589,14 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         }
 
         if (manifest.workspace?.final === true) {
-          const expectedWorkspace = await captureExpectedWorkspaceSnapshot(join(dir, 'workspace.expected'))
+          const expectedDir = join(dir, 'workspace.expected')
+          // The final-workspace oracle is authored evidence: record/refresh may
+          // bootstrap an absent tree but never rewrite a committed one, so a
+          // tool regression cannot silently absorb itself into the oracle.
+          if ((REFRESHING || RECORDING) && !existsSync(expectedDir)) {
+            await materializeWorkspaceSnapshot(expectedDir, result.finalWorkspace)
+          }
+          const expectedWorkspace = await captureExpectedWorkspaceSnapshot(expectedDir)
           expect(result.finalWorkspace, `${scenario.name}: complete final workspace`).toEqual(expectedWorkspace)
         } else {
           expect(result.finalWorkspace, `${scenario.name}: a changed workspace requires workspace.final`)

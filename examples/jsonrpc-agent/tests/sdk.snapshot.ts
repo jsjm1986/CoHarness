@@ -17,17 +17,20 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   normalizeSessionLog,
-  normalizeSessionSnapshot,
+  normalizeSessionSnapshots,
   normalizeStdout,
   refreshFixtureReplacements,
-  scrubRequestHeaders,
+  scrubModelRequestBulk,
   scrubSessionSnapshot,
+  sessionFixtureName,
+  sessionFixtureNames,
+  sessionHeaderVersion,
   stabilizeFixtureMessageIds,
   stabilizeRefreshLog,
   tokenizeSessionFixtureCwd,
   type HarvestedLog,
   type NormalizeContext,
-} from '@deepseek-ai/dsh-acp-snapshot'
+} from '@deepseek-ai/dsh-session-snapshot'
 import { resolveExampleLaunch } from '@deepseek-ai/dsh-loader-smoke'
 import { createProcessDeepSeekHarness } from '../../../packages/sdk/client/src/api.ts'
 import { type HarnessNotification, type RunResult } from '@deepseek-ai/dsh-sdk-client'
@@ -224,7 +227,7 @@ function contextOfContents(contents: readonly string[]): NormalizeContext {
 async function hydrateReplayFixtures(scenario: SdkScenario, cwd: string): Promise<string[]> {
   const root = join(cwd, '.replay-fixtures')
   await mkdir(root, { recursive: true })
-  return Promise.all(fixtureFiles(scenario).map(async (source) => {
+  return Promise.all((await fixtureFiles(scenario)).map(async (source) => {
     const destination = join(root, basename(source))
     await writeFile(destination, (await readFile(source, 'utf8')).replaceAll('{{cwd}}', cwd))
     return destination
@@ -251,7 +254,7 @@ function normalizeNotifications(notifications: readonly HarnessNotification[], c
     .map(n => n.params.event as Record<string, unknown>)
   const normalizedEvents = events.length === 0
     ? []
-    : scrubRequestHeaders(normalizeSessionLog(
+    : scrubModelRequestBulk(normalizeSessionLog(
       `${events.map(event => JSON.stringify(event)).join('\n')}\n`,
       ctx,
     )).trimEnd().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
@@ -307,14 +310,14 @@ async function runScenario(scenario: SdkScenario): Promise<{
   }
 
   const harness = createProcessDeepSeekHarness({
-      command: launch.command,
-      args: launch.args,
-      cwd,
-      environment: () => env,
-      description: launch.command,
-      initializeTimeoutMs: 10_000,
-      requestTimeoutMs: 110_000,
-    }, {
+    command: launch.command,
+    args: launch.args,
+    cwd,
+    environment: () => env,
+    description: launch.command,
+    initializeTimeoutMs: 10_000,
+    requestTimeoutMs: 110_000,
+  }, {
     cwd,
     provider: 'deepseek-official',
     model: 'deepseek-v4-flash',
@@ -350,12 +353,18 @@ function orderLogs(logs: PersistedLog[], scenario: SdkScenario): PersistedLog[] 
   return [...parents, ...children]
 }
 
-function fixtureFiles(scenario: SdkScenario): string[] {
+async function fixtureFiles(scenario: SdkScenario): Promise<string[]> {
   const dir = join(snapshotsDir, scenario.name)
-  return [
-    join(dir, 'session.jsonl'),
-    ...Array.from({ length: scenario.children }, (_, index) => join(dir, `session.${index + 1}.jsonl`)),
-  ]
+  return sessionFixtureNames(await readdir(dir)).map(name => join(dir, name))
+}
+
+/** Canonical output fixture paths, generation-named from each harvested log. */
+function outputFixtureFiles(scenario: SdkScenario, logs: readonly PersistedLog[]): string[] {
+  const dir = join(snapshotsDir, scenario.name)
+  return logs.map((log, index) => join(
+    dir,
+    sessionFixtureName(index, sessionHeaderVersion(log.content, `harvested Session ${index}`)),
+  ))
 }
 
 describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
@@ -368,7 +377,7 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
       const { result, notifications, logs, observedFiles, cwd } = await runScenario(scenario)
       const ordered = orderLogs(logs, scenario)
       const actualContext = contextOf(ordered, cwd)
-      const files = fixtureFiles(scenario)
+      const files = await fixtureFiles(scenario)
 
       if (recording) {
         // Fixtures carry tokenized request headers; llm-replay reads only
@@ -380,8 +389,9 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
           ordered.map(log => scrubSessionSnapshot(tokenizeSessionFixtureCwd(log.content))),
           existing,
         )
+        const outputs = outputFixtureFiles(scenario, ordered)
         await Promise.all(fixtures.map(async (fixture, index) => {
-          const file = files[index]
+          const file = outputs[index]
           if (file === undefined) throw new Error(`no fixture path for persisted log ${index}`)
           await writeFile(file, fixture)
         }))
@@ -405,25 +415,29 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
           ))
         })
         expectedContents = stabilizeFixtureMessageIds(refreshed, expectedContents)
+        const outputs = outputFixtureFiles(scenario, ordered)
         await Promise.all(expectedContents.map(async (stable, index) => {
-          const file = files[index]
-          if (file === undefined) throw new Error(`no fixture for persisted log ${index}`)
+          const file = outputs[index]
+          if (file === undefined) throw new Error(`no fixture path for persisted log ${index}`)
           await writeFile(file, stable)
         }))
       }
 
       for (const [index, expected] of expectedContents.entries()) {
-        expect(scrubRequestHeaders(expected), `${scenario.name} session fixture ${index} carries request-header bulk`)
+        expect(scrubModelRequestBulk(expected), `${scenario.name} session fixture ${index} carries request-header bulk`)
           .toBe(expected)
       }
 
-      // Persisted transcripts match the committed fixtures.
+      // Persisted transcripts match the committed fixtures. The batch
+      // normalizer shares identity tokens across the logs and migrates
+      // committed generations forward for comparison.
       const expectedContext = contextOfContents(expectedContents)
-      for (const [index, log] of ordered.entries()) {
-        const expected = expectedContents[index]
+      const actualNormalized = normalizeSessionSnapshots(ordered.map(log => log.content), actualContext)
+      const expectedNormalized = normalizeSessionSnapshots(expectedContents, expectedContext)
+      for (const [index, actual] of actualNormalized.entries()) {
+        const expected = expectedNormalized[index]
         if (expected === undefined) throw new Error(`no fixture for persisted log ${index}`)
-        expect(normalizeSessionSnapshot(log.content, actualContext))
-          .toBe(normalizeSessionSnapshot(expected, expectedContext))
+        expect(actual).toBe(expected)
       }
 
       // The SDK-visible wire stream and turn result match their expected outputs.

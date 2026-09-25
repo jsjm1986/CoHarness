@@ -1,17 +1,20 @@
 /** Relationship-preserving identity redaction for committed session snapshots. */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// `goal-<uuid>` brands a minted uuid; the compound is unambiguous wherever it
+// surfaces (goal/change state, goal_id arguments, result payloads).
+const GOAL_COMPOUND_RE = /goal-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi
 const LEGACY_TOKEN_RE = /^\{\{(?:sessionId|messageId)\}\}$/
 const CANONICAL_TOKEN_RE = new RegExp(
   String.raw`^\{\{(session|message|approval|workflow|command|rpc|retry|compaction|`
-  + String.raw`principal|project|runtime|target|resource|id):([1-9]\d*)\}\}$`,
+  + String.raw`goal|principal|project|runtime|target|resource|id):([1-9]\d*)\}\}$`,
 )
 
 type IdentityKind = 'session' | 'message' | 'approval' | 'workflow' | 'command' | 'rpc' | 'retry'
-  | 'compaction' | 'principal' | 'project' | 'runtime' | 'target' | 'resource' | 'id'
+  | 'compaction' | 'goal' | 'principal' | 'project' | 'runtime' | 'target' | 'resource' | 'id'
 
 const FIELD_KINDS: Readonly<Record<string, IdentityKind>> = {
-  sessionId: 'session', parentSessionId: 'session', rootSessionId: 'session',
+  sessionId: 'session', parentSessionId: 'session', rootSessionId: 'session', childId: 'session',
   messageId: 'message', participantId: 'principal', principalId: 'principal',
   projectId: 'project', runtimeId: 'runtime', executionTargetId: 'target', resourceId: 'resource',
 }
@@ -40,8 +43,7 @@ function messageId(value: unknown): string | undefined {
   if (!isRecord(value)
     || typeof value.id !== 'string'
     || typeof value.role !== 'string'
-    || !Array.isArray(value.content)
-    || !isRecord(value.source)) return undefined
+    || !Array.isArray(value.content)) return undefined
   return value.id
 }
 
@@ -92,23 +94,9 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
     tokenByValue.set(value, `{{${kind}:${next}}}`)
   }
 
-  for (const log of parsed) {
-    const header = log.records[0]
-    if (header?.type === 'session') claim(header.id, 'session', true)
-    const feedbackCommands = new Set(log.records.flatMap(record =>
-      record.type === 'command/run' && isRecord(record.data) && record.data.name === 'feedback'
-        ? [record.data.commandId] : []))
-    for (const record of log.records) {
-      if (record.type !== 'command/done' || !isRecord(record.data)
-        || !feedbackCommands.has(record.data.commandId) || typeof record.data.text !== 'string') continue
-      const anonymous = /^Feedback recorded for session [^\n]+\nAnonymous user: ([0-9a-f-]{36})\./i.exec(record.data.text)
-      if (anonymous !== null) claim(anonymous[1], 'principal')
-    }
-  }
-
-  const collect = (value: unknown, recordType?: unknown): void => {
+  const collect = (value: unknown, recordType?: unknown, inRpcParams = false): void => {
     if (Array.isArray(value)) {
-      for (const item of value) collect(item, recordType)
+      for (const item of value) collect(item, recordType, inRpcParams)
       return
     }
     if (!isRecord(value)) return
@@ -129,12 +117,42 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
         claim(item, 'workflow')
       } else if (FIELD_KINDS[childKey] !== undefined) {
         claim(item, FIELD_KINDS[childKey])
+      } else if (inRpcParams && childKey === 'id') {
+        claim(item, 'id')
       }
-      collect(item, recordType)
+      collect(item, recordType, childKey === 'params')
     }
   }
+  // Branded `goal-<uuid>` compounds sit inside literal payload strings that
+  // collect skips (tool arguments, result text); mine every string directly.
+  const mineGoalIds = (value: unknown): void => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(GOAL_COMPOUND_RE)) {
+        if (match[1] !== undefined) claim(match[1], 'goal')
+      }
+      return
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) mineGoalIds(item)
+      return
+    }
+    if (isRecord(value)) for (const item of Object.values(value)) mineGoalIds(item)
+  }
+  // Claim each log's header before its records so a child catalog id seen in the
+  // parent wins the earlier token — parallel child ids bind in catalog order,
+  // not harvest order.
   for (const log of parsed) {
+    const header = log.records[0]
+    if (header?.type === 'session') claim(header.id, 'session', true)
+    const feedbackCommands = new Set(log.records.flatMap(record =>
+      record.type === 'command/run' && isRecord(record.data) && record.data.name === 'feedback'
+        ? [record.data.commandId] : []))
     for (const record of log.records) {
+      if (record.type === 'command/done' && isRecord(record.data)
+        && feedbackCommands.has(record.data.commandId) && typeof record.data.text === 'string') {
+        const anonymous = /^Feedback recorded for session [^\n]+\nAnonymous user: ([0-9a-f-]{36})\./i.exec(record.data.text)
+        if (anonymous !== null) claim(anonymous[1], 'principal')
+      }
       if (record.type === 'feedback/message-put' && isRecord(record.data) && isRecord(record.data.item)) {
         claim(record.data.item.version, 'id')
       }
@@ -142,21 +160,35 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
         && isRecord(record.data)) {
         claim(record.data.compactionId, 'compaction')
       }
+      mineGoalIds(record)
       collect(record, record.type)
     }
   }
 
   const replacements = [...tokenByValue]
     .sort(([left], [right]) => right.length - left.length)
-  const pattern = replacements.length === 0 ? undefined : new RegExp(
-    `(?<![\\w-])(?:${replacements.map(([source]) => source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\w-])`,
-    'g',
-  )
+  // A uuid stays one identity when carried inside a `prefix-<uuid>` compound
+  // (session-<child id> agent handles, goal-<uuid> branding), so uuid sources
+  // may abut `-`. Short readable ids keep the hyphen guard: `s` must not
+  // rewrite `s-other`.
+  const uuidSources = replacements.filter(([source]) => UUID_RE.test(source))
+  const plainSources = replacements.filter(([source]) => !UUID_RE.test(source))
+  const patternFor = (sources: [string, string][], hyphen: string): RegExp | undefined => sources.length === 0
+    ? undefined
+    : new RegExp(
+      `(?<![\\w${hyphen}])(?:${sources.map(([source]) => source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\w${hyphen}])`,
+      'g',
+    )
+  const uuidPattern = patternFor(uuidSources, '')
+  const plainPattern = patternFor(plainSources, '-')
   const replace = (value: unknown): unknown => {
     if (typeof value === 'string') {
       const exact = tokenByValue.get(value)
       if (exact !== undefined) return exact
-      return pattern === undefined ? value : value.replace(pattern, source => tokenByValue.get(source) as string)
+      let output = value
+      if (uuidPattern !== undefined) output = output.replace(uuidPattern, source => tokenByValue.get(source) as string)
+      if (plainPattern !== undefined) output = output.replace(plainPattern, source => tokenByValue.get(source) as string)
+      return output
     }
     if (Array.isArray(value)) return value.map(replace)
     if (isRecord(value)) {

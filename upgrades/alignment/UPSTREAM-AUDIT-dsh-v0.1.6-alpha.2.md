@@ -444,7 +444,7 @@ B10 验证中运行 `verify-default-product-isolation`、`verify-package-depende
 
 **仍未关闭。** 浏览器真实链路 GIF 验收按仓库 GUI 政策属 PR 随附义务；本批局部绿灯不得据以宣称发布就绪。
 
-## 性能基准套件移植与 CI 门禁（2026-10-06，未提交候选）
+## 性能基准套件移植与 CI 门禁（2026-09-25，未提交候选）
 
 本批在 `codex/alpha2-complete-alignment` 工作树实现，尚未提交、推送或开放发布。上游 `benchmarks/` 六个场景目录此前全部缺失，对应 `node 24 / benchmarks` 必需 CI job 及其 spec 钉住、五个支撑 Agent Note 三件套与 `request-freeze.spec.ts` 均未携带。本批将其完整落地，全部测量为真实运行数据。
 
@@ -461,3 +461,25 @@ B10 验证中运行 `verify-default-product-isolation`、`verify-package-depende
 **验证证据。** `vitest.bench.config.ts` 全套 7 文件 41 测试在 M4/arm64/Node 25.8.1 实测全绿：session-open 首屏历史 ~837–976 ms、reopen agent-resume 中位 34.7 ms、128 MB 受限堆完成；agent-continuation request-history 68.07 ms（预算 297）、tool-continuation 199.45 ms（1125）、catalog 324.7 ms（1125）、profile ~980 ms；terminal-io 五 MiB 中位 104.4 ms（300）；long-session 浏览器 open 177/page 181/trajectory 263/first 242/streamTask 1458/streamWall 2285 ms，三样本 `inputOverlapped` 全真；conversation-fold 500k delta 大窗 fold 19.5 ms（40）；reconnect replace 13.36 ms（63）/驻留 22.27 MiB（30）。测量记录于 `upgrades/alignment/UPSTREAM-ALIGNMENT-PERFORMANCE-dsh-v0.1.6-alpha.2.json`（verify-upgrade-records 16 记录合规）。
 
 **仍未关闭。** 全部数字为 arm64 参考机证据；标准托管 x64（ubuntu-24.04）上的 CI 实测尚不存在——上游 2× CI 时间系数与各终点托管预期已就位，首个真实托管运行后才能确认。浏览器计时含源解析测试 Host 与 Playwright 可动作性，不构成已发布 Host 证据。本批局部绿灯不得据以宣称发布就绪。
+
+## 夹具世代迁移、回放确定性与门禁收口增量（2026-09-26，未提交候选）
+
+本批在 `codex/fixture-replay-alignment` 工作树实现（含已提交基线与未提交收口改动），尚未推送或开放发布。对应 alpha.2 夹具/回放车道的剩余缺口：ACP 与语料 fixture 仍停留在无版本 `session.jsonl` 命名，回放归一化在并行子会话场景下绑定序不确定，写路径可产生非归一化不动点，外加全量门禁在满载并发下暴露的一批负载敏感测试。
+
+**夹具世代迁移。** ACP 例子与 `snapshots/` 语料的当前 fixture 全部迁入版本命名（`session.v2/v4/v6.jsonl`，v0 沿用无后缀名），历史世代原地保留不更名不删除；v6 世代补全并把记录/刷新写路径限定为「每角色写最高当前世代」。`web-test-policy` 的 `sharedInputs`、Web e2e 与其 spec 中对已迁移 ACP fixture 的引用同步改到 `session.v6.jsonl`；Web 车道自有的旧世代 `session.jsonl`（v2–v4）属合法命名，未动。`session-format-catalog` 准入 CoHarness v0/v1 方言经逻辑链解析。
+
+**回放归一化确定性（产品级竞态修复）。** 并行子会话场景的子会话令牌绑定此前依赖 harvest 数组序，与 LLM 回放按父会话 catalog 公告序认领 `liveSessionIds` 槽位的语义不一致，`subagent-parallel` 场景 pass/fail 摆动。修复把整条链路的规范键统一为父日志 catalog 首见序：`FIELD_KINDS` 认领 `childId`；`identity.ts` 改为逐日志交错认领（每日志先认其 header 再扫记录），取代全量 header 预认领；`harvestSessionLogs` 的子会话排序键改为父日志内容中 child id 的首见位置。stdout 逐帧归一化直接使用 context 的 `sessionIds` 顺序（该顺序即 harvest 产出的权威序）。
+
+**写路径不动点。** `session/title-llm-request` 记录内嵌的 `data.messages[]` 此前不在 `recordMessages` 覆盖内：其消息 id 被 `preserveNormalizedVolatiles` 当普通易变字符串借入字面令牌并 `reserve()` 预占序号，写出的 fixture 呈稀疏编号、非归一化不动点。将该记录类型纳入 `recordMessages` 后刷新产出紧凑编号并收敛。`workspace.expected` 独立预言完整性同步钉死：共享 suite 的物化仅在 oracle 缺失时引导新场景，committed oracle 永不被 record/refresh 重写（语料政策要求）。
+
+**scenario 手术。** `session-query-spill`：fixture 残留的 skill-catalog user/message 记录对应已移出组合面的 `skill-office`，删除后按事件前移同步 `seq` 引用、消息令牌编号与 `sourceEventSeqs`。`subagent-inheritance` 期望文件按新令牌方案（`{{session:N}}`/`{{message:N}}`、子头 `id/parent` 语义正确）刷新。两处迁移期残留的双角色 fixture（输入+期望同文件）就地升入 v6 并按名实一致更名 `session.v6.jsonl`。
+
+**主权与依赖台账。** `atomic-write` 由 `tracked` 改 `adapted`（本地 exit 时释放文件锁系有意修复）；`skill-office` 等 fork 独有组合面在台账与审计中维持登记。knip 清零：fixture 入口按迁移后新位置补 entry（examples 旧副本仍被 ACP 车道 `cordis.yml` 使用，两份均保留）、仅经 yml 消费的包入 `ignoreDependencies`、`@yao-pkg/pkg` 按 spawn 二进制豁免、`verify-installed.ts` 补根 entry、`@types/js-yaml` 移除（js-yaml@5 自带类型）并重新生成 `THIRD_PARTY_NOTICES.md`。
+
+**负载敏感测试加固（非放宽语义）。** 失败全部复现为「独立通过、门禁并发下超时/竞态」后逐个加固：`deepseek-defaults` fixture 空闲超时 150 ms→1 s 且 keep-alive 注释 6×200 ms（注释窗口仍大于超时，watchdog 判别力保留）；`built-boot` 单测超时 240 s；pwsh 三个真实 shell describe 统一 15 s；ptc-python 派生 CPU 预算改 `time.process_time()`（燃烧量与调度无关），两个内存/序列化用例抬墙钟预算与测试超时；HMR watch 两个用例与 model-governance 文件监听等待窗加大；session-snapshot `waitForTitleAfterTurnEnd` 补 `isolateDiagnosticTimeout`（与兄弟用例一致）；shell-activity 全文件 `expect.poll` 走 10 s 窗口包装；terminal-bash pwsh 套件两处按 scrollback 权威面改写（`done` 可先于输出 settle，`waitReason` 启发式胜者在负载下不唯一）；llm-pi-ai watchdog 的 socket 关闭竞态窗 1 s→10 s；oxlint-contract 六个真实子进程用例补 90 s 超时；plugin-manager/skill-office checkers/HMR transaction 用例补显式超时；session-snapshot harness `DEFAULT_WAIT_TIMEOUT_MS` 10 s→30 s（进度探测上限，非性能断言）；build-artifacts/client-build-environment/verify-web-fixtures/prepare/userdoc/code-block/tool-pwsh 按各文件既有惯例补显式超时。
+
+**探针-构建竞态根治。** `oxlint-contract.spec.ts` 的契约探针按设计写入真实 tsconfig include 面（`packages/*/src`、`tests/`、`scripts/`）以验证逐类项目发现与生产/测试规则分层——与并发 `tsc -b` 枚举共享文件视图，探针在枚举后被删除即 TS6053（check:all 第六轮实发）。CI 各 job 独占工作区无此问题；本地修复用 run-gates 既有 `after` 原语把 check-all 的 `test` 串行在 `build` settle 之后（不传播失败，与 build↔typecheck 的 writer/reader 先例一致），整类竞态永久消除且不削弱任何契约断言。
+
+**验证证据。** 快照套件 307/307（`subagent-parallel` 连跑 4 次稳定）；`pnpm run test` 全量 1442 文件 / 24493 测试 / 0 失败；`check:all` 收口轮 75/75 门禁通过（前轮历轮暴露的 test/test:snapshot/build 竞态全部按上述修复闭环）。生成物（doc graphs、markdown 链接、翻译配对、THIRD_PARTY_NOTICES）全部重跑通过。
+
+**仍未关闭。** 验收 runbook 的环境依赖项在本机工作树无法关闭：真实双人 LAN/公网验收、release-freeze 移除、CI 平台矩阵、生产形态备份恢复演练、Linux/Windows Python SDK 构件、桌面 computer-use/browser-use 与 Office WASM Linux 环境验收。GUI 可见行为改动的浏览器 GIF 属 PR 随附义务。本批局部绿灯不得据以宣称发布就绪；提交、PR 与合并由用户执行。

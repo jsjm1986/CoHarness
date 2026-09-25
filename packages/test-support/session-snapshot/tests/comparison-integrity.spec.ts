@@ -30,7 +30,8 @@ describe('replay comparison integrity', () => {
     const output = normalizeStdout(JSON.stringify({ jsonrpc: '2.0', result: {
       sessionUpdate: 'usage_update', used: 42, details: { used: 64 },
     } }), context)
-    expect(JSON.parse(output).result).toEqual({ sessionUpdate: 'usage_update', used: 42, details: { used: 64 } })
+    expect((JSON.parse(output) as { result: unknown }).result)
+      .toEqual({ sessionUpdate: 'usage_update', used: 42, details: { used: 64 } })
   })
 
   it('compares parent and child references with one shared identity map', () => {
@@ -53,7 +54,10 @@ describe('replay comparison integrity', () => {
 })
 
 const commonCases = JSON.parse(readFileSync(new URL('./fixtures/comparison-cases.json', import.meta.url), 'utf8')) as {
-  name: string; left: Record<string, unknown>[]; right: Record<string, unknown>[]; equal: boolean
+  name: string
+  left: Record<string, unknown>[]
+  right: Record<string, unknown>[]
+  equal: boolean
 }[]
 
 it.each(commonCases)('shares Python comparison rule: $name', ({ left, right, equal }) => {

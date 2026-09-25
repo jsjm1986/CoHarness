@@ -40,8 +40,10 @@ export function apply(ctx: Context): void {
   const publishedFailure = process.env.DSH_SUBAGENT_PUBLISHED_FAILURE === '1'
   const humanSteer = process.env.DSH_SNAPSHOT_HUMAN_STEER === '1'
   const persistence = ctx.sessionPersistence
+  // oxlint-disable-next-line typescript/unbound-method -- the original is re-bound through call() where it is invoked.
   const stat = persistence.stat
   const agents = ctx.agents
+  // oxlint-disable-next-line typescript/unbound-method -- the original is re-bound through call() where it is invoked.
   const create = agents.create
 
   agents.create = async (options) => {

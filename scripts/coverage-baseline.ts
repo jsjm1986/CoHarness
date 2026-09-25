@@ -166,8 +166,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/preset/agent-presets/src/discovery.ts',
   'packages/preset/agent-presets/src/specifier.ts',
   'packages/settings/settings/src/redact.ts',
-  'packages/test-support/acp-snapshot/src/normalize.ts',
-  'packages/test-support/acp-snapshot/src/suite.ts',
   'packages/test-support/client-runtime/src/sessions.ts',
   'packages/test-support/llm-replay/src/index.ts',
   'packages/web/web/src/response.ts',

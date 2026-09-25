@@ -1,0 +1,9 @@
+version: 1
+scenario: subagent-max-tokens-partial
+profile: acp
+composition: acp-agent
+recording: authored
+header:
+  class: default
+workspace:
+  final: true

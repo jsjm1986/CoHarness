@@ -16,7 +16,7 @@ const EXACT_DIR = fileURLToPath(new URL('./snapshots/diff-context', import.meta.
 const BOUNDED_DIR = fileURLToPath(new URL('./snapshots/diff-bounded', import.meta.url))
 // The ACP owner retains its live recording. The bounded script is authored upstream;
 // both replace only model responses while this browser scenario executes the real tools.
-const EXACT_FIXTURE = fileURLToPath(new URL('../../../examples/acp-agent/tests/snapshots/fs-edit/session.jsonl', import.meta.url))
+const EXACT_FIXTURE = fileURLToPath(new URL('../../../examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl', import.meta.url))
 const BOUNDED_FIXTURE = join(BOUNDED_DIR, 'session.v3.jsonl')
 const UNTOUCHED = Buffer.from('unrelated file\r\nkeep these bytes\n', 'utf8')
 const settings = (prefix: string): string =>

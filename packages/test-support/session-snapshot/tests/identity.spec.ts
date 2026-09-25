@@ -157,6 +157,42 @@ describe('session snapshot identity redaction', () => {
     expect(result).toContain(proseUuid)
   })
 
+  it('collapses branded goal-<uuid> compounds across state and literal payloads', () => {
+    const goalUuid = 'aaaaaaaa-0000-4000-8000-00000000000a'
+    const goalId = `goal-${goalUuid}`
+    const source = [
+      { type: 'session', id: parentId },
+      { type: 'goal/change', data: { kind: 'goal/change', version: 1, operation: 'create',
+        goal: { id: goalId, revision: 1, objective: 'ship it', phase: 'active', maxGoalRounds: 2 },
+        roundsStarted: 0, createdAt: 0, updatedAt: 0 } },
+      { type: 'tool/call', data: { turn: 1, step: 1, callId: 'c1', name: 'update_goal',
+        arguments: `{"goal_id":"${goalId}","action":"complete"}` } },
+      { type: 'goal/change', data: { kind: 'goal/change', version: 1, operation: 'clear',
+        cleared: { id: goalId, revision: 2 }, clearedAt: 1 } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const [output] = redactSessionSnapshotIds([source])
+    expect(output).not.toContain(goalUuid)
+    expect(output?.match(/goal-\{\{goal:1\}\}/g)).toHaveLength(3)
+    expect(redactSessionSnapshotIds([output!])).toEqual([output])
+  })
+
+  it('replaces a claimed uuid inside a hyphenated compound while keeping prose boundaries', () => {
+    const parentLog = [
+      { type: 'session', id: 's' },
+      { type: 'example', data: { sessionId: childId, text: `child agent id is "session-${childId}"`, probe: `x-${childId}` } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const childLog = [
+      { type: 'session', id: childId, parentSessionId: 's' },
+      { type: 'example', data: { text: 'child ran' } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const [parentOut, childOut] = redactSessionSnapshotIds([parentLog, childLog])
+    expect(parentOut).toContain('session-{{session:2}}')
+    expect(parentOut).toContain('x-{{session:2}}')
+    expect(parentOut).not.toContain(childId)
+    expect(childOut).toContain('"id":"{{session:2}}"')
+    expect(redactSessionSnapshotIds([parentOut!, childOut!])).toEqual([parentOut, childOut])
+  })
+
   it('keeps a canonical token first seen through a generic id key', () => {
     const canonical = '{{message:7}}'
     const nextMessage = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'

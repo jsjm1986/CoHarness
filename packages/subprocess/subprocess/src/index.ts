@@ -83,7 +83,7 @@ export function scrubbedParentEnv(): Record<string, string> {
     if (value === undefined) Reflect.deleteProperty(env, name)
     else env[name] = value
   }
-  env.LANG ??= 'C.UTF-8'
+  if (!('LANG' in env)) env.LANG = 'C.UTF-8'
   return env
 }
 

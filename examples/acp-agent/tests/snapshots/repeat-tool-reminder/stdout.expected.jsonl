@@ -10,5 +10,5 @@
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"call_4","status":"completed","content":[{"type":"content","content":{"type":"text","text":"Updated todo list: 0 pending, 1 in progress, 0 completed."}}]}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call","toolCallId":"call_5","title":"todo_write","kind":"other","status":"in_progress","rawInput":{"todos":[{"content":"watch the kettle boil","status":"in_progress"}]}}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"call_5","status":"completed","content":[{"type":"content","content":{"type":"text","text":"Updated todo list: 0 pending, 1 in progress, 0 completed."}}]}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:1}}","content":{"type":"text","text":"DONE."}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:16}}","content":{"type":"text","text":"DONE."}}}}
 {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}

@@ -5223,7 +5223,7 @@
       "kind": "event",
       "event": "feedback/message-put",
       "surface": false,
-      "digest": "3b04fde0dc763cf84fbde7b6611b3194dd56d95d0c0bf0204311640468d586e1",
+      "digest": "b5086d249e8502e9ead1d39156bb8d559bde7951cac0f14ce150345b4e42a2bf",
       "schema": {
         "root": 0,
         "nodes": [
@@ -5237,22 +5237,22 @@
               },
               {
                 "name": "ignorable",
-                "type": 8,
+                "type": 16,
                 "optional": true
               },
               {
                 "name": "seq",
-                "type": 3,
+                "type": 11,
                 "optional": false
               },
               {
                 "name": "time",
-                "type": 3,
+                "type": 11,
                 "optional": false
               },
               {
                 "name": "type",
-                "type": 9,
+                "type": 17,
                 "optional": false
               }
             ],
@@ -5268,7 +5268,7 @@
               },
               {
                 "name": "sessionId",
-                "type": 4,
+                "type": 12,
                 "optional": false
               }
             ],
@@ -5278,37 +5278,82 @@
             "kind": "object",
             "properties": [
               {
-                "name": "createdAt",
+                "name": "category",
                 "type": 3,
+                "optional": true
+              },
+              {
+                "name": "createdAt",
+                "type": 11,
                 "optional": false
               },
               {
                 "name": "messageId",
-                "type": 4,
+                "type": 12,
                 "optional": false
               },
               {
                 "name": "note",
-                "type": 4,
+                "type": 12,
                 "optional": true
               },
               {
                 "name": "rating",
-                "type": 5,
+                "type": 13,
                 "optional": false
               },
               {
                 "name": "updatedAt",
-                "type": 3,
+                "type": 11,
                 "optional": false
               },
               {
                 "name": "version",
-                "type": 4,
+                "type": 12,
                 "optional": false
               }
             ],
             "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "instruction-following"
+          },
+          {
+            "kind": "literal",
+            "value": "other"
+          },
+          {
+            "kind": "literal",
+            "value": "product-interaction"
+          },
+          {
+            "kind": "literal",
+            "value": "resource-cost"
+          },
+          {
+            "kind": "literal",
+            "value": "security-privacy-permission"
+          },
+          {
+            "kind": "literal",
+            "value": "service-stability"
+          },
+          {
+            "kind": "literal",
+            "value": "task-result"
           },
           {
             "kind": "primitive",
@@ -5321,8 +5366,8 @@
           {
             "kind": "union",
             "types": [
-              6,
-              7
+              14,
+              15
             ]
           },
           {
@@ -28305,6 +28350,7 @@
         ]
       },
       "names": [
+        "event:feedback/message-put.data.item.category",
         "event:feedback/record.data.category"
       ],
       "sources": []
@@ -29363,7 +29409,7 @@
         "packages/feedback/message-feedback/src/types.ts#MessageFeedbackRating"
       ],
       "sources": [
-        "packages/feedback/message-feedback/src/types.ts:16"
+        "packages/feedback/message-feedback/src/types.ts:17"
       ]
     },
     {
@@ -29876,132 +29922,6 @@
       "sources": [
         "packages/subagent/subagent/src/catalog.ts:24"
       ]
-    },
-    {
-      "digest": "3b04fde0dc763cf84fbde7b6611b3194dd56d95d0c0bf0204311640468d586e1",
-      "schema": {
-        "root": 0,
-        "nodes": [
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "data",
-                "type": 1,
-                "optional": false
-              },
-              {
-                "name": "ignorable",
-                "type": 8,
-                "optional": true
-              },
-              {
-                "name": "seq",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "time",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "type",
-                "type": 9,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "item",
-                "type": 2,
-                "optional": false
-              },
-              {
-                "name": "sessionId",
-                "type": 4,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "createdAt",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "messageId",
-                "type": 4,
-                "optional": false
-              },
-              {
-                "name": "note",
-                "type": 4,
-                "optional": true
-              },
-              {
-                "name": "rating",
-                "type": 5,
-                "optional": false
-              },
-              {
-                "name": "updatedAt",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "version",
-                "type": 4,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "primitive",
-            "type": "number"
-          },
-          {
-            "kind": "primitive",
-            "type": "string"
-          },
-          {
-            "kind": "union",
-            "types": [
-              6,
-              7
-            ]
-          },
-          {
-            "kind": "literal",
-            "value": "negative"
-          },
-          {
-            "kind": "literal",
-            "value": "positive"
-          },
-          {
-            "kind": "literal",
-            "value": true
-          },
-          {
-            "kind": "literal",
-            "value": "feedback/message-put"
-          }
-        ]
-      },
-      "names": [
-        "event:feedback/message-put"
-      ],
-      "sources": []
     },
     {
       "digest": "3b1be838223869fe0a08210db85bf773796ed3f2373ac16555dff227cade0c48",
@@ -30710,6 +30630,124 @@
       ],
       "sources": [
         "packages/core/tools/src/index.ts:684"
+      ]
+    },
+    {
+      "digest": "3d7d07060a7be77984feb651ea2bf1925d3e0477911d9d3ed86330d1e8ca6182",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "createdAt",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "messageId",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 10,
+                "optional": true
+              },
+              {
+                "name": "rating",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "instruction-following"
+          },
+          {
+            "kind": "literal",
+            "value": "security-privacy-permission"
+          },
+          {
+            "kind": "literal",
+            "value": "service-stability"
+          },
+          {
+            "kind": "literal",
+            "value": "task-result"
+          },
+          {
+            "kind": "literal",
+            "value": "other"
+          },
+          {
+            "kind": "literal",
+            "value": "product-interaction"
+          },
+          {
+            "kind": "literal",
+            "value": "resource-cost"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              12,
+              13
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "negative"
+          },
+          {
+            "kind": "literal",
+            "value": "positive"
+          }
+        ]
+      },
+      "names": [
+        "packages/feedback/message-feedback/src/types.ts#MessageFeedbackItem"
+      ],
+      "sources": [
+        "packages/feedback/message-feedback/src/types.ts:20"
       ]
     },
     {
@@ -31426,7 +31464,7 @@
         "packages/experimental/agent-team/src/types.ts:21",
         "packages/experimental/agent-team/src/types.ts:33",
         "packages/experimental/agent-team/src/types.ts:9",
-        "packages/feedback/message-feedback/src/types.ts:13",
+        "packages/feedback/message-feedback/src/types.ts:14",
         "packages/goal/goal/src/types.ts:16",
         "packages/host/apiproxy/src/api/rpc.ts:18",
         "packages/interaction/commands/src/brand.ts:31",
@@ -52341,6 +52379,140 @@
       "sources": []
     },
     {
+      "digest": "aa7bc2817014ca6c45719b1c193c5c131be718a0921f34345098ff250f444626",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "item",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "sessionId",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "createdAt",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "messageId",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 11,
+                "optional": true
+              },
+              {
+                "name": "rating",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "instruction-following"
+          },
+          {
+            "kind": "literal",
+            "value": "resource-cost"
+          },
+          {
+            "kind": "literal",
+            "value": "security-privacy-permission"
+          },
+          {
+            "kind": "literal",
+            "value": "service-stability"
+          },
+          {
+            "kind": "literal",
+            "value": "task-result"
+          },
+          {
+            "kind": "literal",
+            "value": "other"
+          },
+          {
+            "kind": "literal",
+            "value": "product-interaction"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              13,
+              14
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "negative"
+          },
+          {
+            "kind": "literal",
+            "value": "positive"
+          }
+        ]
+      },
+      "names": [
+        "event:feedback/message-put.data"
+      ],
+      "sources": [
+        "packages/feedback/message-feedback/src/index.ts:59"
+      ]
+    },
+    {
       "digest": "aa93010d0e521ad7c42273f58d5c9b8bf1dfc94edf1b805a3971b364a35c1877",
       "schema": {
         "root": 0,
@@ -55965,6 +56137,177 @@
       "sources": []
     },
     {
+      "digest": "b5086d249e8502e9ead1d39156bb8d559bde7951cac0f14ce150345b4e42a2bf",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 16,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 17,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "item",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "sessionId",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "createdAt",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "messageId",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "rating",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "instruction-following"
+          },
+          {
+            "kind": "literal",
+            "value": "other"
+          },
+          {
+            "kind": "literal",
+            "value": "product-interaction"
+          },
+          {
+            "kind": "literal",
+            "value": "resource-cost"
+          },
+          {
+            "kind": "literal",
+            "value": "security-privacy-permission"
+          },
+          {
+            "kind": "literal",
+            "value": "service-stability"
+          },
+          {
+            "kind": "literal",
+            "value": "task-result"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "negative"
+          },
+          {
+            "kind": "literal",
+            "value": "positive"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "feedback/message-put"
+          }
+        ]
+      },
+      "names": [
+        "event:feedback/message-put"
+      ],
+      "sources": []
+    },
+    {
       "digest": "b54940ff095c17e874c5be03815f4c2145a256cf3a1d34dae4ab2f7769dfffe8",
       "schema": {
         "root": 0,
@@ -59272,95 +59615,6 @@
       ],
       "sources": [
         "packages/schedule/schedule/src/types.ts:72"
-      ]
-    },
-    {
-      "digest": "cb1df23dfd315032b6d34b3c5fe2c4e3d07f7b60334ab9afd9f17da48ad09379",
-      "schema": {
-        "root": 0,
-        "nodes": [
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "item",
-                "type": 1,
-                "optional": false
-              },
-              {
-                "name": "sessionId",
-                "type": 3,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "createdAt",
-                "type": 2,
-                "optional": false
-              },
-              {
-                "name": "messageId",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "note",
-                "type": 3,
-                "optional": true
-              },
-              {
-                "name": "rating",
-                "type": 4,
-                "optional": false
-              },
-              {
-                "name": "updatedAt",
-                "type": 2,
-                "optional": false
-              },
-              {
-                "name": "version",
-                "type": 3,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "primitive",
-            "type": "number"
-          },
-          {
-            "kind": "primitive",
-            "type": "string"
-          },
-          {
-            "kind": "union",
-            "types": [
-              5,
-              6
-            ]
-          },
-          {
-            "kind": "literal",
-            "value": "negative"
-          },
-          {
-            "kind": "literal",
-            "value": "positive"
-          }
-        ]
-      },
-      "names": [
-        "event:feedback/message-put.data"
-      ],
-      "sources": [
-        "packages/feedback/message-feedback/src/index.ts:59"
       ]
     },
     {
@@ -62936,79 +63190,6 @@
       },
       "names": [],
       "sources": []
-    },
-    {
-      "digest": "e68568d70fde1c0701e8d3e7645e5bb796f856ca42f349b5479032c254f27375",
-      "schema": {
-        "root": 0,
-        "nodes": [
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "createdAt",
-                "type": 1,
-                "optional": false
-              },
-              {
-                "name": "messageId",
-                "type": 2,
-                "optional": false
-              },
-              {
-                "name": "note",
-                "type": 2,
-                "optional": true
-              },
-              {
-                "name": "rating",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "updatedAt",
-                "type": 1,
-                "optional": false
-              },
-              {
-                "name": "version",
-                "type": 2,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "primitive",
-            "type": "number"
-          },
-          {
-            "kind": "primitive",
-            "type": "string"
-          },
-          {
-            "kind": "union",
-            "types": [
-              4,
-              5
-            ]
-          },
-          {
-            "kind": "literal",
-            "value": "negative"
-          },
-          {
-            "kind": "literal",
-            "value": "positive"
-          }
-        ]
-      },
-      "names": [
-        "packages/feedback/message-feedback/src/types.ts#MessageFeedbackItem"
-      ],
-      "sources": [
-        "packages/feedback/message-feedback/src/types.ts:19"
-      ]
     },
     {
       "digest": "e72269f931559e901e5e8fe1cfcbd0669fb795f43cc038ff39fba62f60403c33",

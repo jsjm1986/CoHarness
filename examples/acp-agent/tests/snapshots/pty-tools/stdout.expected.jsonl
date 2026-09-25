@@ -12,5 +12,5 @@
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"pty-kill","status":"completed","content":[{"type":"content","content":{"type":"text","text":"closed terminal session pty-1"}}]}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call","toolCallId":"pty-list","title":"terminal_list","kind":"other","status":"in_progress","rawInput":{}}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"pty-list","status":"completed","content":[{"type":"content","content":{"type":"text","text":"(no terminal sessions)"}}]}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:1}}","content":{"type":"text","text":"DONE"}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:16}}","content":{"type":"text","text":"DONE"}}}}
 {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}

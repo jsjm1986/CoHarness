@@ -16,13 +16,16 @@ it('realizes typed parent, child and resource identities without changing litera
       text: 'order 123e4567-e89b-12d3-a456-426614174000 expires 2026-09-25T12:34:56Z; "sleep 45s"' },
   ].map(record => JSON.stringify(record)).join('\n') + '\n'
   const realized = realizeSeedFixture(target, input, 'parent')
-  const [header, event] = realized.trim().split('\n').map(line => JSON.parse(line))
+  const [header, event] = realized.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
+  if (header === undefined || event === undefined) throw new Error('realized seed fixture lacks header or event lines')
   expect(header).toEqual({ type: 'session', id: 'parent', cwd: target.workspaceCwd })
   expect(event).toMatchObject({ parent: 'parent', child: 'parent-child-10', other: 'parent-child-2', home: target.harnessHome })
-  expect(event.message).toBe(event.again)
-  expect(event.message).not.toBe(event.second)
-  expect(event.principal).not.toBe(event.runtime)
-  expect(event.text).toBe(JSON.parse(input.trim().split('\n')[1]!).text)
+  expect(event['message']).toBe(event['again'])
+  expect(event['message']).not.toBe(event['second'])
+  expect(event['principal']).not.toBe(event['runtime'])
+  const sourceLine = input.trim().split('\n').at(1)
+  if (sourceLine === undefined) throw new Error('seed fixture input lacks the event line')
+  expect(event['text']).toBe((JSON.parse(sourceLine) as Record<string, unknown>)['text'])
   expect(realizeSeedFixture(target, realized, 'parent')).toBe(realized)
 })
 

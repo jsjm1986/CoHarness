@@ -2,7 +2,7 @@
 import { copyFile, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
-import { normalizeSessionSnapshot } from '@deepseek-ai/dsh-acp-snapshot'
+import { normalizeSessionSnapshot } from '@deepseek-ai/dsh-session-snapshot'
 import { runLoaderSmoke, LOADER_SMOKE_TEST_TIMEOUT_MS } from '@deepseek-ai/dsh-loader-smoke'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 

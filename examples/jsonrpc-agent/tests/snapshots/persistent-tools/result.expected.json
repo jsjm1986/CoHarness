@@ -1,1 +1,1 @@
-{"sessionId":"{{sessionId}}","finalResponse":"PERSISTENT_TOOLS_OK"}
+{"sessionId":"{{session:1}}","finalResponse":"PERSISTENT_TOOLS_OK"}

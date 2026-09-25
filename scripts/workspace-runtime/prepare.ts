@@ -85,7 +85,10 @@ export type RuntimeTarget = keyof typeof lock.targets
  * @returns Whether this exact payload passed native interpreter and Office round trips.
  */
 export async function preparePrimaryRuntime(options: {
-  target: RuntimeTarget; output: string; cache: string; cross?: boolean;
+  target: RuntimeTarget
+  output: string
+  cache: string
+  cross?: boolean
 }): Promise<{ executionVerified: boolean }> {
   const { target } = options
   const destination = resolve(options.output)

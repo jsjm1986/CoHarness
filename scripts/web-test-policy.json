@@ -121,19 +121,19 @@
     "webhook.e2e.ts": "conversation"
   },
   "sharedInputs": {
-    "examples/acp-agent/tests/snapshots/cancel-tool-calls/session.jsonl": [
+    "examples/acp-agent/tests/snapshots/cancel-tool-calls/session.v6.jsonl": [
       "bash-abort-row.e2e.ts"
     ],
-    "examples/acp-agent/tests/snapshots/fs-edit/session.jsonl": [
+    "examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl": [
       "diff-context.e2e.ts"
     ],
-    "examples/acp-agent/tests/snapshots/skill-load/session.jsonl": [
+    "examples/acp-agent/tests/snapshots/skill-load/session.v6.jsonl": [
       "skill-tool-row.e2e.ts"
     ],
-    "examples/acp-agent/tests/snapshots/workflow-run/session.1.jsonl": [
+    "examples/acp-agent/tests/snapshots/workflow-run/session.1.v6.jsonl": [
       "workflow-run.e2e.ts"
     ],
-    "examples/acp-agent/tests/snapshots/workflow-run/session.jsonl": [
+    "examples/acp-agent/tests/snapshots/workflow-run/session.v6.jsonl": [
       "workflow-run.e2e.ts"
     ],
     "examples/web-schedule/cordis.yml": [

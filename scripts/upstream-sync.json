@@ -995,9 +995,6 @@
     "terminal/tool-terminal": {
       "sovereignty": "adapted"
     },
-    "test-support/acp-snapshot": {
-      "sovereignty": "owned"
-    },
     "test-support/agent-loop-testkit": {
       "sovereignty": "tracked"
     },
@@ -1043,7 +1040,7 @@
       "sovereignty": "adapted"
     },
     "util/atomic-write": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "util/brand": {
       "sovereignty": "tracked"

@@ -1,7 +1,7 @@
 /** Capture readable, path-stable workspace state for recorded-session tests. */
 
-import { readFile, readdir, readlink } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 /** Marker that lets Git retain an expected empty directory without becoming expected workspace state. */
 export const EMPTY_WORKSPACE_MARKER = '.empty'
@@ -110,4 +110,44 @@ export async function captureWorkspaceSnapshot(
  */
 export function captureExpectedWorkspaceSnapshot(root: string): Promise<WorkspaceSnapshotEntry[]> {
   return captureWorkspaceSnapshot(root, { ignoredRootEntries: [EMPTY_WORKSPACE_MARKER] })
+}
+
+/**
+ * Replace one `workspace.expected/` tree with captured entries, marking an
+ * empty expected workspace so Git retains the directory.
+ *
+ * @param root - Expected-workspace directory to rewrite.
+ * @param entries - Captured workspace state.
+ * @returns Resolves after the tree matches `entries`.
+ */
+export async function materializeWorkspaceSnapshot(
+  root: string,
+  entries: readonly WorkspaceSnapshotEntry[],
+): Promise<void> {
+  await rm(root, { recursive: true, force: true })
+  await mkdir(root, { recursive: true })
+  if (entries.length === 0) {
+    await writeFile(join(root, EMPTY_WORKSPACE_MARKER), '')
+    return
+  }
+  for (const entry of entries) {
+    const absolute = join(root, ...entry.path.split('/'))
+    switch (entry.kind) {
+      case 'empty-directory':
+        await mkdir(absolute, { recursive: true })
+        break
+      case 'text':
+        await mkdir(dirname(absolute), { recursive: true })
+        await writeFile(absolute, entry.content)
+        break
+      case 'binary':
+        await mkdir(dirname(absolute), { recursive: true })
+        await writeFile(absolute, Buffer.from(entry.base64, 'base64'))
+        break
+      case 'symlink':
+        await mkdir(dirname(absolute), { recursive: true })
+        await symlink(entry.target, absolute)
+        break
+    }
+  }
 }

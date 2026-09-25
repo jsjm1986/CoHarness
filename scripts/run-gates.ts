@@ -297,7 +297,13 @@ export function gatesForMode(selected: Mode): Gate[] {
         ...staticPolicyGates(),
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
-        pnpmScript('test', 'test'),
+        // Oxlint contract probes write .ts fixtures into tsconfig include
+        // space (package src/, tests/, scripts/) while linting them; the
+        // concurrent build and lint legs enumerate that space with tsc/
+        // tsgolint, then read the probe after the spec has deleted it
+        // (TS6053, tsconfig-error). `after` serializes the suite against both
+        // enumerators without making their failures skip the test leg.
+        pnpmScript('test', 'test', { after: ['build', 'lint'] }),
         ...pluginTestGates(),
         pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
         pnpmScript('duplication', 'duplication'),

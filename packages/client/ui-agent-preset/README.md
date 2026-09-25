@@ -6,7 +6,7 @@ The agent-preset surfaces: a General-settings row choosing which [preset](../../
 
 ## Summary
 
-Use this package to choose the agent preset for a new Web GUI session, see the active preset in the session header, and manage available presets in Settings. The Agent mode picker is shown by default; Settings can hide it without changing running or historical sessions, and while it is hidden new sessions compose from the deployment default with the saved default parked until the picker returns. A preset is fixed when a session is created, so changing the selection or default affects only later sessions. If the deployment provides no presets, these controls stay hidden and every session uses the host composition.
+Use this package to choose the agent preset for a new Web GUI session, see the active preset in the session header, and manage available presets in Settings. The Agent mode picker is shown by default; Settings can hide it without changing running or historical sessions, and while it is hidden new sessions compose from the deployment default with the saved default parked until the picker returns. A preset fixes at session creation, so changing the selection or default affects only later sessions. If the deployment provides no presets, these controls stay hidden and every session uses the host composition.
 
 ## Why it is a new-session preference
 

@@ -52,7 +52,10 @@ describe('ARIA runtime measurements', () => {
   })
 
   const cases = JSON.parse(readFileSync(new URL('../../../packages/test-support/session-snapshot/tests/fixtures/comparison-cases.json', import.meta.url), 'utf8')) as {
-    name: string; left: unknown; right: unknown; equal: boolean
+    name: string
+    left: unknown
+    right: unknown
+    equal: boolean
   }[]
   it.each(cases.filter(item => !item.equal))('preserves shared negative control: $name', ({ left, right }) => {
     const aria = (value: unknown) => `- paragraph: ${JSON.stringify(JSON.stringify(value))}`

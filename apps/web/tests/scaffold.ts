@@ -35,7 +35,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
-import { scrubRequestHeaders, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-acp-snapshot'
+import { scrubModelRequestBulk, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-session-snapshot'
 import { assertSessionFixtureVersion, parseSessionFixtureName, parseSnapshotManifest, redactSessionSnapshotIds, sessionFixtureFiles, sessionFixtureName } from '@deepseek-ai/dsh-session-snapshot'
 import {
   auditStartupEntries,
@@ -748,7 +748,7 @@ function rawSessionLog(session: Session): string {
 export async function recordFixture(scaffold: WebScaffold, sessionId: SessionId, fixturePath: string): Promise<void> {
   const agent = scaffold.ctx.agents.get(sessionId)
   if (agent === undefined) throw new Error(`record harvest: no live agent for ${sessionId}`)
-  const fresh = scrubRequestHeaders(rawSessionLog(agent.session))
+  const fresh = scrubModelRequestBulk(rawSessionLog(agent.session))
     .split(sessionId).join('{{sessionId}}')
     .split(scaffold.workspaceCwd).join('{{cwd}}')
     .replace(/"rpcId":"[^"]+"/g, '"rpcId":"{{rpcId}}"')
@@ -1089,7 +1089,7 @@ export async function assertFixtureInventory(dir: string, expected: string[]): P
   expect(entries).toEqual([...expected].sort())
   for (const entry of entries.filter(name => name.endsWith('.jsonl'))) {
     const content = await readFile(join(dir, entry), 'utf8')
-    expect(scrubRequestHeaders(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
+    expect(scrubModelRequestBulk(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
     expect(content, `${dir}/${entry} carries a run-local rpcId`)
       .not.toMatch(/"rpcId"\s*:\s*"(?!(?:\{\{rpcId\}\}|\{\{rpc:[1-9]\d*\}\})")[^"]*"/)
   }

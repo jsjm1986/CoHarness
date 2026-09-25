@@ -401,7 +401,7 @@ describe('web verification tier selection', () => {
   })
 
   it('routes the shared ACP edit fixture to its real browser consumer', () => {
-    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'])).toMatchObject({
+    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl'])).toMatchObject({
       runExpensive: true,
       snapshotMode: 'focused',
       webGroups: [], webScenarios: expect.arrayContaining(['diff-context.e2e.ts']) as string[],
@@ -410,7 +410,7 @@ describe('web verification tier selection', () => {
 
   it('selects every shared-input owner and the common smoke scenarios', () => {
     const policy = loadWebTestPolicy(process.cwd())
-    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'
+    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl'
     const combined = {
       ...policy,
       sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts', 'workbench.e2e.ts'] },
@@ -432,7 +432,7 @@ describe('web verification tier selection', () => {
     expect(web(['examples/acp-agent/tests/snapshots/unrelated/session.jsonl'])).toMatchObject({
       snapshotMode: 'scoped', webGroups: [],
     })
-    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.jsonl.backup'])).toMatchObject({
+    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl.backup'])).toMatchObject({
       snapshotMode: 'scoped', webGroups: [],
     })
     expect(web(['new-runtime-input.dat'])).toMatchObject({ snapshotMode: 'full' })
@@ -440,7 +440,7 @@ describe('web verification tier selection', () => {
 
   it('fails on a shared relation with no registered consumer instead of falling back', () => {
     const policy = loadWebTestPolicy(process.cwd())
-    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.jsonl'
+    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl'
     expect(() => classifyWebVerification([input], packages, {
       ...policy, sharedInputs: { [input]: ['removed.e2e.ts'] },
     }, new Map())).toThrow(/unknown scenario/)

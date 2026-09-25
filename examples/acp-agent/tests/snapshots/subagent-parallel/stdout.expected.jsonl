@@ -4,5 +4,5 @@
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call","toolCallId":"call_parallel_alpha_2","title":"subagent","kind":"other","status":"in_progress","rawInput":{"description":"Say the word ALPHA","prompt":"Reply with exactly the word ALPHA and nothing else.","run_in_background":false}}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"call_parallel_alpha_1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"ALPHA"}}]}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"tool_call_update","toolCallId":"call_parallel_alpha_2","status":"completed","content":[{"type":"content","content":{"type":"text","text":"ALPHA"}}]}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:1}}","content":{"type":"text","text":"PARENT_DONE"}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:7}}","content":{"type":"text","text":"PARENT_DONE"}}}}
 {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}

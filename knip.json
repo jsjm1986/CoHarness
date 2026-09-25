@@ -16,9 +16,17 @@
     "python/sdk-runtime"
   ],
   "ignoreDependencies": [
+    "@deepseek-ai/cordis",
+    "@deepseek-ai/dsh-computer-use",
+    "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
+    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
+    "@deepseek-ai/dsh-experimental-browser-use-runtime",
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
+    "@deepseek-ai/dsh-skill-office",
+    "@yao-pkg/pkg",
     "@yarnpkg/cli-dist",
-    "lightningcss",
-    "@deepseek-ai/cordis"
+    "lightningcss"
   ],
   "workspaces": {
     "packages/util/package-manifest": {
@@ -33,7 +41,8 @@
         "scripts/types/client-build-environment/index.d.ts",
         "scripts/bundle-input-isolation.ts",
         "scripts/coverage-canonical-locations.ts",
-        "scripts/web-product-bundle-isolation.ts"
+        "scripts/web-product-bundle-isolation.ts",
+        "scripts/workspace-runtime/verify-installed.ts"
       ],
       "ignoreUnresolved": [
         "client-build-environment"
@@ -409,16 +418,6 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/test-support/acp-snapshot": {
-      "entry": [
-        "tests/**/*.spec.ts",
-        "tests/fixtures/fake-acp-agent.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "tests/**/*.ts"
-      ]
-    },
     "packages/test-support/loader-smoke": {
       "entry": [
         "tests/**/*.spec.ts",
@@ -563,7 +562,8 @@
     },
     "packages/context/session-reference": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/fixtures/source-session.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -865,11 +865,19 @@
     "packages/subagent/subagent-dsh-sdk": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/loader/*.ts"
       ],
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-agent-instructions",
+        "@deepseek-ai/dsh-llm-deepseek",
+        "@deepseek-ai/dsh-session-checkpoint-policy",
+        "@deepseek-ai/dsh-session-persistence-jsonl",
+        "@deepseek-ai/dsh-skill-filesystem"
       ]
     },
     "packages/bundle/base": {
@@ -886,7 +894,8 @@
     },
     "packages/bundle/headless": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/fixtures/provider-cwd.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -980,9 +989,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@deepseek-ai/.+"
       ]
     },
     "packages/acp/acp": {
@@ -1304,6 +1310,16 @@
         "src/**/*.ts",
         "src/**/*.tsx",
         "tests/**/*.tsx"
+      ]
+    },
+    "packages/test-support/session-snapshot": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/fixtures/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     }
   }

@@ -15,9 +15,9 @@ This plugin supplies `load_workspace_dependencies`: a tool that installs a deplo
 
 - [Configuration](#configuration)
 - [Installation](#installation)
+- [Dev Note](#dev-note)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 ## Configuration
 
@@ -47,6 +47,10 @@ The [CLI patch](../../../apps/cli/config/workspace-dependencies.cordis.patch.yml
 
 The installer checks manifest versions and platform identity, stages a complete copy, and replaces the installed tree under the shared cross-process writer lock. An interrupted replacement can recover its previous tree. Reusing the same manifest preserves user-added packages; the returned distribution versions describe the bundled payload only. No runtime invariant companion is published: installation checks execute at publication, and the tool registry owns registration disposal.
 
+## Dev Note
+
+The installer derives from the fixed alpha.2 `desktop-host` implementation. CoHarness uses a plugin usable by its CLI and Gateway runtimes, adds cross-process installation serialization, and rejects paths that the current execution target cannot use. [Office skills](../../skill/skill-office/README.md) supply document workflows; [computer-use](../../computer-use/computer-use/README.md) owns desktop access.
+
 ## Model Experience
 
 ### Request context and condition
@@ -55,14 +59,15 @@ The installer checks manifest versions and platform identity, stages a complete 
 
 The `load_workspace_dependencies` tool returns `python`, `node`, `pnpm`, `pythonPackages`, `nodePackages`, and `pythonDistributions`. Use the returned Node executable to invoke the pnpm script. Loading paths does not execute a user script or prove its output.
 
+#### Token effect
+
+Mounting contributes one tool schema. A call returns the installed path map as an ordinary tool result; the payload contents never enter the request.
+
 #### KV Cache effect
 
 Mounting adds one tool schema. Calling adds its ordinary tool result without a separate system-prompt contribution.
 
 ## Known Limitations and Deferred Work
 
-Payload download, platform packaging, and installed interpreter validation belong to the deployment build. The installer does not download missing components or install onto SSH targets. A stale writer lock requires operator investigation; contenders never remove a lock merely because it is old.
-
-## Dev Note
-
-The installer derives from the fixed alpha.2 `desktop-host` implementation. CoHarness uses a plugin usable by its CLI and Gateway runtimes, adds cross-process installation serialization, and rejects paths that the current execution target cannot use. [Office skills](../../skill/skill-office/README.md) supply document workflows; [computer-use](../../computer-use/computer-use/README.md) owns desktop access.
+- **Deployment build owns payload acquisition** — payload download, platform packaging, and installed interpreter validation belong to the deployment build; the installer does not download missing components or install onto SSH targets.
+- **Stale writer locks are operator concerns** — a stale writer lock requires operator investigation; contenders never remove a lock merely because it is old.

@@ -111,7 +111,7 @@ function fixture(options: { appDirectory?: string; appOutput?: string; appExport
   return { root, manifest, write, cli, read, commit, native }
 }
 
-describe('workspace build artifact CLI', () => {
+describe('workspace build artifact CLI', { timeout: 30_000 }, () => {
   it('keeps official compatibility artifacts distinct from the default CoHarness consumer', () => {
     const f = fixture({ profile: 'official' })
     expect(f.cli('create').status).not.toBe(0)

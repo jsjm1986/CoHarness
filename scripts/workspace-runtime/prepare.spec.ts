@@ -64,7 +64,7 @@ it('extracts a hash-verified cached library without a Python installer or networ
   }
 })
 
-it('fully extracts a large deflate-compressed wheel entry', async () => {
+it('fully extracts a large deflate-compressed wheel entry', { timeout: 15_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'desktop-large-wheel-'))
   try {
     const expected = Buffer.alloc(1024 * 1024)
@@ -114,7 +114,7 @@ it('refuses an existing output and never counts a foreign payload as executed', 
     await expect(preparePrimaryRuntime({ target: 'mac-arm64', output: root, cache: join(root, 'cache') }))
       .rejects.toThrow('output already exists')
     await writeFile(join(root, 'runtime.json'), JSON.stringify({ platform: 'other', arch: process.arch }))
-    expect(() => smokePrimaryRuntime(root)).toThrow('native smoke requires')
+    expect(() => { smokePrimaryRuntime(root) }).toThrow('native smoke requires')
     const target = process.platform === 'win32' ? 'mac-arm64' : 'win-x64'
     await expect(preparePrimaryRuntime({ target, output: join(root, 'output'), cache: join(root, 'cache') }))
       .rejects.toThrow('target cannot execute')

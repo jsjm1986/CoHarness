@@ -88,6 +88,12 @@ export interface NormalizeContext {
   cwd: string
   /** Other filesystem spellings of the same cwd (for example Windows short and long paths). */
   cwdAliases?: readonly string[]
+  /**
+   * Raw Session logs of the same run, in primary-first order, whose claimed identities
+   * also apply to the transcript — covers ids reachable only through the logs, such as
+   * a user message id rendered inside a `session_event_read` result.
+   */
+  identityLogs?: readonly string[]
 }
 
 /** How cwd-rooted path separators are represented after the cwd is tokenized. */
@@ -271,9 +277,12 @@ export function tokenizeSessionFixtureCwd(rawLog: string): string {
 
 /** Redact one transcript using the same primary-first Session identity order as its logs. */
 function redactWithContext(raw: string, ctx: NormalizeContext): string {
+  const logs = ctx.identityLogs ?? []
   const headers = ctx.sessionIds.map(id => JSON.stringify({ type: 'session', id }))
-  const normalized = redactSessionSnapshotIds([...headers, raw])
-  return normalized[normalized.length - 1]!
+  const normalized = redactSessionSnapshotIds([...headers, ...logs, raw])
+  const last = normalized.at(-1)
+  if (last === undefined) throw new Error('redaction dropped the appended transcript')
+  return last
 }
 
 /**

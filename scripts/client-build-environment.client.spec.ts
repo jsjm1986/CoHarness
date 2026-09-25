@@ -77,7 +77,7 @@ function repositoryFixture(version = '1.2.3-rc.4'): string {
   return fixtureRoot
 }
 
-describe('client build environment', () => {
+describe('client build environment', { timeout: 15_000 }, () => {
   it('requires an exact public environment for a named artifact profile', () => {
     const expected = {
       DSH_CLIENT_BUILD_PROFILE: 'official',

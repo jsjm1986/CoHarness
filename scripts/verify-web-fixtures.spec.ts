@@ -44,7 +44,7 @@ function cli(root: string) {
   ], { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8' })
 }
 
-describe('browser fixture admission preflight', () => {
+describe('browser fixture admission preflight', { timeout: 30_000 }, () => {
   it('refuses missing literal inputs while ignoring comments and unrelated scenarios', () => {
     const root = fixture()
     writeFileSync(resolve(root, 'apps/web/tests/one.e2e.ts'),

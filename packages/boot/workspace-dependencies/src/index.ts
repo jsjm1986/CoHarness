@@ -68,7 +68,7 @@ export function apply(ctx: Context, config: Config): void {
         installation = undefined
         throw error
       })
-      return installation.then(result => {
+      return installation.then((result) => {
         exec.signal.throwIfAborted()
         return result
       })

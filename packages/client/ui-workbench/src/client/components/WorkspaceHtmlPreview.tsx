@@ -108,7 +108,10 @@ export function WorkspaceHtmlPreview({ request, resources, read, htmlT, renderHt
     {failure !== undefined && <p role="alert">{failure.message}</p>}
     {!denied && state.value?.changed === true && <p role="status">{labels.changed}</p>}
     {!denied && result !== undefined && (
-      <HtmlFrame key={request.address} data={result.data} read={read} request={request} lifetime={lifetime.signal} renderHtml={renderHtml} t={htmlT} />
+      <HtmlFrame
+        key={request.address} data={result.data} read={read} request={request}
+        lifetime={lifetime.signal} renderHtml={renderHtml} t={htmlT}
+      />
     )}
     {!denied && result === undefined && (pending || state.status === 'loading') && <p role="status">{htmlT('loading')}</p>}
   </section>

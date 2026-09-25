@@ -1,0 +1,7 @@
+version: 1
+scenario: hook-codex-invalid-matcher
+profile: acp
+composition: acp-agent
+recording: authored
+header:
+  class: default

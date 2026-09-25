@@ -19,7 +19,7 @@
 
 Markdown 文件链接在现有鉴权文件标签中打开，并从请求的首行开始显示。再次打开同一文件的不同行号只更新导航，不创建第二个资源。链接目标不会改变文件系统权限。
 
-文件标签按扩展名选择预览正文。Markdown 文件（`md`、`markdown`）累计同样的带版本保护分页，经 `MarkdownText` 渲染且不自动换行。HTML 文件（`html`、`htm`）通过带版本保护的 `workspaceFiles.readBytes` 窗口读取完整源，然后打包通过同一授权 Session 和 runtime 目标读取的直接声明相对 `.js` classic 脚本与 `.css` 样式表。依赖读取限定在 Session 工作区内解析，单资源 4 MiB、总量 32 MiB、最多 64 个资源；外部、根相对、module 及 CSS 遍历得到的引用一律不读取。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销 Blob URL。非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。PDF 与 Office 文件保留各自的文档正文，其余文件继续使用文本或有界 Base64 窗口。
+文件标签按扩展名选择预览正文。Markdown 文件（`md`、`markdown`）累计同样的带版本保护分页，经 `MarkdownText` 渲染且不自动换行。HTML 文件（`html`、`htm`）通过带版本保护的 `workspaceFiles.readBytes` 窗口读取完整源，然后打包通过同一授权 Session 和 runtime 目标读取的直接声明相对 `.js` classic 脚本、`.css` 样式表与可识别图片文件。依赖读取限定在 Session 工作区内解析，单资源 4 MiB、总量 32 MiB、最多 64 个资源；外部、根相对、module 及 CSS 遍历得到的引用一律不读取。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销 Blob URL。非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。PDF 与 Office 文件保留各自的文档正文，其余文件继续使用文本或有界 Base64 窗口。
 
 Office 文件通过同一文件标签请求授权转换；PDF.js 在独立 Worker 中按可见页面渲染，提供可选择文本及缺失字体提示。隐藏正文释放内容与 Worker，标签保留页码偏好。源变化要求重新加载，撤权立即清空内容。普通 PDF 读取仍受 Workspace 单窗口字节限制；Office 输入和输出由转换器限制。引擎及适配规则见[文档转换](../../../docs/subsystems/office-to-pdf.zh.md)。
 
@@ -48,6 +48,6 @@ Office 文件通过同一文件标签请求授权转换；PDF.js 在独立 Worke
 - 最多支持四个根 Session，暂不提供嵌套分割树或跨会话上下文共享。
 - 目录只返回元数据，面板选中后才按需加载历史并启动项目运行时，不会预加载所有项目。
 - 浏览器本地视图状态不跨设备或浏览器配置同步。
-- 文件标签提供有界文本、Markdown、HTML 和图片预览，其他二进制文件回退为 Base64。HTML 打包仅覆盖直接声明的相对 classic 脚本与样式表；module 导入、CSS `url()`/`@import` 与运行时 `fetch` 不会读取 Workspace 文件。Office 转换、编辑器和标签内上传尚未实现。
+- 文件标签提供有界文本、Markdown、HTML 和图片预览，其他二进制文件回退为 Base64。HTML 打包仅覆盖直接声明的相对 classic 脚本、样式表与图片 `src` 引用；`srcset`、module 导入、CSS `url()`/`@import` 与运行时 `fetch` 不会读取 Workspace 文件。Office 转换、编辑器和标签内上传尚未实现。
 
 **运行时不变式：** 不发布伴生入口。所有权与生命周期由 Cordis 槽位与视口能力执行。

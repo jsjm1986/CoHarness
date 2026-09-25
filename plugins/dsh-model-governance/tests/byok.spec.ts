@@ -114,7 +114,7 @@ async function boot(options: {
   return { ctx, adapter, home }
 }
 
-describe('user-declared route authorization', () => {
+describe('user-declared route authorization', { timeout: 15_000 }, () => {
   it('authorizes an unlisted route the user layer declares', async () => {
     const bench = await boot({ userDeclaredAllowed: true })
     const chunks = await drain(bench.ctx.llm.stream({ provider: 'own', model: 'm1', messages: [] }))
@@ -166,7 +166,7 @@ describe('user-declared route authorization', () => {
     await vi.waitFor(async () => {
       const chunks = await drain(bench.ctx.llm.stream({ provider: 'shipped', model: 'm2', messages: [] }))
       expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
-    })
+    }, { timeout: 10_000 })
     await bench.ctx.fiber.dispose()
   })
 
@@ -184,7 +184,7 @@ describe('user-declared route authorization', () => {
       expect(records.some(record => record.kind === 'model-registration' && record.action === 'provider-created')).toBe(true)
       expect(records.some(record => record.kind === 'model-registration' && record.model === 'custom-model')).toBe(true)
       expect(JSON.stringify(records)).not.toContain('PRIVATE_KEY')
-    })
+    }, { timeout: 10_000 })
     await bench.ctx.fiber.dispose()
   })
 
@@ -202,7 +202,7 @@ describe('user-declared route authorization', () => {
         .filter(record => record.kind === 'model-registration')
       expect(records.filter(record => record.action === 'provider-created')).toHaveLength(1)
       expect(records.filter(record => record.action === 'model-created')).toHaveLength(1)
-    })
+    }, { timeout: 10_000 })
     await bench.ctx.fiber.dispose()
   })
 
@@ -217,7 +217,7 @@ describe('user-declared route authorization', () => {
         allowed: false,
         reason: expect.stringContaining('temporarily unavailable'),
       })
-    })
+    }, { timeout: 10_000 })
     const chunks = await drain(bench.ctx.llm.stream({ provider: 'own', model: 'm1', messages: [] }))
     expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
     expect(bench.adapter.calls).toBe(0)

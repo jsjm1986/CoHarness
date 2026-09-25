@@ -340,7 +340,6 @@
     { "path": "./packages/examples/jsonrpc-demo" },
     { "path": "./packages/test-support/llm-replay" },
     { "path": "./packages/typert/generator" },
-    { "path": "./packages/test-support/acp-snapshot" },
     { "path": "./packages/test-support/session-snapshot" },
     { "path": "./packages/test-support/loader-smoke" },
     { "path": "./packages/test-support/llm-mock-server" },
