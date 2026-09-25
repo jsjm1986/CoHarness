@@ -514,6 +514,7 @@
     },
     "experimental/agent-team": {
       "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-09-26-one-shot-subagent-descriptor-at-publish.md",
       "removedUpstreamPaths": [
         "packages/experimental/agent-team/src/persisted.ts",
         "packages/experimental/agent-team/src/projection.ts"

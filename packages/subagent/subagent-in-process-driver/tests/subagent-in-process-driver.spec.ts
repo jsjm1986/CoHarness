@@ -67,6 +67,23 @@ describe('startInProcessRun', () => {
     expect(ctx.agents.get(run.id)).toBeUndefined()
   })
 
+  it('marks the child as provider-owned before publication announces it', async () => {
+    // Agent Teams and other `agent/created` observers classify children through
+    // session meta before the descriptor lands at first-step admission, so the
+    // `origin` marker must already be durable when that announcement fires.
+    const { ctx, parent } = await setup([textResponse('driver answer')])
+    const atCreated = new Map<SessionId, string | undefined>()
+    ctx.on('agent/created', ({ agent }) => {
+      if (agent.session.header.parentSession === parent.id) {
+        atCreated.set(agent.id, agent.session.header.origin)
+      }
+    })
+    const run = await startInProcessRun(request(parent), {})
+    expect(atCreated.get(run.id)).toBe('subagent')
+    await run.result
+    await run.dispose()
+  })
+
   it('uses explicit child model selectors when the parent has none and preserves its cwd', async () => {
     const { ctx } = await setup([textResponse('driver answer')])
     const parent = await ctx.agentLoop.create(SessionId('bare-parent'), {}, { cwd: '/workspace' })

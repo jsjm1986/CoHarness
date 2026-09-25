@@ -479,8 +479,15 @@ export class TeamRoster {
     })
   }
 
-  /** Whether a Session's own suffix identifies a provider-owned subagent child. */
+  /**
+   * Whether an Agent is a provider-owned subagent child. The session header's
+   * `origin: "subagent"` meta is durable at creation, so it already classifies
+   * at `agent/created`; the descriptor event is only appended at first-step
+   * admission and remains the authority for legacy sessions created before the
+   * origin field existed.
+   */
   private subagentDescriptor(agent: Agent): boolean {
+    if (agent.session.header.origin === 'subagent') return true
     // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return foldSubagentDescriptor(agent.session.ownEvents()) !== undefined
   }
