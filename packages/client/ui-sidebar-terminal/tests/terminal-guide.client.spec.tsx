@@ -3,7 +3,8 @@
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import type { TerminalLaunchShells } from '@deepseek-ai/dsh-api-terminal-controller/client'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import { terminalIssueOf, type TerminalLaunchShells } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import { TerminalGuide, type TerminalGuideProps } from '../src/client/TerminalGuide.tsx'
 import { en } from '../src/client/locales.ts'
 
@@ -20,7 +21,7 @@ function mount(description: string | undefined = en.description) {
   // The fixture supplies only the guide's consumed owner and framework shares.
   const props = {
     entryId: 'new', kind: 'terminal', title: en.new, description, t: makeTranslate(en),
-    useTabInfo: () => ({ tab: { actions: { openTab } } }), loadShells, selectShell,
+    useTabInfo: () => ({ tab: { actions: { openTab } } }), loadShells, issueOf: terminalIssueOf, selectShell,
   } as unknown as TerminalGuideProps
   const view = render(<TerminalGuide {...props} />)
   const open = () => fireEvent.click(view.getByRole('button', { name: en.shell }))
@@ -61,6 +62,15 @@ it.each([new Error('offline'), 'offline'])('offers an in-place retry after disco
   await h.view.findByRole('menuitem', { name: 'bash' })
   expect(h.loadShells).toHaveBeenCalledTimes(2)
   expect(h.openTab).not.toHaveBeenCalled()
+})
+
+it('reports a permission denial in translated copy without an unchanged-retry item', async () => {
+  const h = mount()
+  h.loadShells.mockRejectedValueOnce(new RemoteError('terminal/forbidden', 'User terminal access requires current user qualification and writable project authorization.', {}))
+  h.open()
+  await h.view.findByText(en.forbidden)
+  expect(h.view.queryByText(/User terminal access requires/u)).toBeNull()
+  expect(h.view.queryByRole('menuitem', { name: en.retry })).toBeNull()
 })
 
 it('shows empty discovery without opening a terminal and supports title-only cards', async () => {

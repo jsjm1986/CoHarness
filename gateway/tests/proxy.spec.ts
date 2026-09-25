@@ -41,6 +41,13 @@ const server = http.createServer((req, res) => {
     return
   }
   if (req.url === '/api/hold') { res.writeHead(200); res.write('authorized-prefix'); return }
+  if (req.url === '/api/sse') {
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    res.write('data: open\\n\\n')
+    const timer = setTimeout(() => { res.write('data: tick\\n\\n'); res.end() }, 250)
+    req.on('close', () => clearTimeout(timer))
+    return
+  }
   if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
   if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
   res.setHeader('content-type', 'application/json')
@@ -99,14 +106,14 @@ async function runtimeRelay(portFile: string): Promise<number> {
   return (relay.address() as AddressInfo).port
 }
 
-async function setup(withPrincipal = false) {
+async function setup(withPrincipal = false, env: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   cleanup.push(() => rmSync(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'g.sqlite'))
   cleanup.push(() => db.close())
   const portFile = join(root, 'child-port')
   const port = await runtimeRelay(portFile)
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: String(port) })
+  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: String(port), ...env })
   cfg.dshCommand = [process.execPath, '-e', ECHO_DSH, '{port}', portFile]
   const deps: GatewayDeps = {
     cfg,
@@ -302,6 +309,15 @@ describe('proxy handlers', () => {
     handlers.invalidateAccess({ userId: alice.id })
     await Promise.all([closed, ended])
     reader.releaseLock()
+  })
+
+  it('does not abort an event stream that idles past the upstream timeout', async () => {
+    const { deps, base, cookie } = await setup(false, { HGW_UPSTREAM_TIMEOUT_MS: '100' })
+    await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
+    const response = await fetch(`${base}/api/sse`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    const body = await response.text()
+    expect(body).toBe('data: open\n\ndata: tick\n\n')
   })
 
   it('proxies websocket upgrades with rewritten host', async () => {

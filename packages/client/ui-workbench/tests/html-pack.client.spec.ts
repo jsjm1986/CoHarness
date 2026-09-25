@@ -18,6 +18,35 @@ describe('packHtml', () => {
     expect(document.querySelector('script,link')).toBeNull()
   })
 
+  it('collects same-directory relative images as binary assets with their MIME type', async () => {
+    const png = new Uint8Array([137, 80, 78, 71])
+    const read = vi.fn<ReadHtmlRelative>().mockResolvedValue(png)
+    const signal = new AbortController().signal
+    const html = '<img src="logo.png"><img src="shots/cover.JPEG"><img src="logo.png"><img src="icon.svg?v=2">'
+    const bundle = await packHtml(utf8(html), read, signal)
+    expect(read.mock.calls).toEqual([['logo.png', signal], ['shots/cover.JPEG', signal], ['icon.svg?v=2', signal]])
+    expect(bundle.assets.map(asset => [asset.kind, asset.reference, asset.type])).toEqual([
+      ['image', 'logo.png', 'image/png'],
+      ['image', 'shots/cover.JPEG', 'image/jpeg'],
+      ['image', 'icon.svg?v=2', 'image/svg+xml'],
+    ])
+    expect(bundle.assets[0]!.data).toBe(png)
+  })
+
+  it('leaves remote, data-URI, root-relative and extensionless images to browser rules', async () => {
+    const read = vi.fn<ReadHtmlRelative>()
+    const html = '<img src="https://example.invalid/a.png"><img src="//example.invalid/a.png"><img src="data:image/png;base64,AA=="><img src="/a.png"><img src="photo"><img src="clip.mp4">'
+    expect((await packHtml(utf8(html), read, new AbortController().signal)).assets).toEqual([])
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it('accepts image bytes that are not valid UTF-8', async () => {
+    const read = vi.fn<ReadHtmlRelative>().mockResolvedValue(new Uint8Array([255, 0, 255]))
+    const bundle = await packHtml(utf8('<img src="a.bmp">'), read, new AbortController().signal)
+    expect(bundle.assets).toHaveLength(1)
+    expect([...bundle.assets[0]!.data]).toEqual([255, 0, 255])
+  })
+
   it('leaves HTTPS, module, file, root-relative, data and runtime dependencies to browser rules', async () => {
     const read = vi.fn<ReadHtmlRelative>()
     const html = '<script src="https://example.invalid/a.js"></script><script src="//example.invalid/a.js"></script><script type="module" src="./module.js"></script><script type="application/ld+json" src="./data.js"></script><script src="file:///a.js"></script><script src="/a.js"></script><script src="data:text/javascript,1"></script><script>fetch("./data.json")</script><link rel="icon" href="./icon.css"><!-- <script src="./comment.js"></script> -->'

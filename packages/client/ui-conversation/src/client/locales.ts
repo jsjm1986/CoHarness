@@ -124,6 +124,7 @@ export const zh = {
   'hero.preview': '预览版',
   'hero.chooseWorkspace': '选择工作区',
 
+  'workspace.selectFailed': '无法打开该工作区：{message}（{code}）',
   'workspace.discard.title': '切换工作区并放弃未发送内容？',
   'workspace.discard.description': '当前有未发送的文字或附件。继续后将清除这些内容并进入「{name}」工作区。',
   'workspace.discard.close': '关闭',
@@ -461,6 +462,7 @@ export const en = {
   'hero.preview': 'Preview',
   'hero.chooseWorkspace': 'Choose workspace',
 
+  'workspace.selectFailed': 'Could not open the workspace: {message} ({code})',
   'workspace.discard.title': 'Discard unsent content and switch?',
   'workspace.discard.description': 'You have unsent text or attachments. Continuing clears them and opens “{name}”.',
   'workspace.discard.close': 'Close',

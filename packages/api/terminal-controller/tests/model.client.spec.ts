@@ -567,3 +567,15 @@ it('exposes a localized quota error and clears it after a successful retry', asy
   await connected(model)
   expect(model.state.getSnapshot()).toMatchObject({ phase: 'connected', issue: undefined, error: undefined })
 })
+
+it('exposes a localized permission denial and clears the retained view', async () => {
+  const { model, remote } = fixture()
+  await connected(model)
+  vi.mocked(remote.write).mockResolvedValueOnce({ ok: false, error: new RemoteError('terminal/forbidden', 'User terminal access requires current user qualification and writable project authorization.', {}) })
+  model.write('denied input')
+  await expect.poll(() => model.state.getSnapshot().issue).toBe('forbidden')
+  expect(model.state.getSnapshot()).toMatchObject({
+    phase: 'failed', writable: false, error: 'User terminal access requires current user qualification and writable project authorization.',
+    render: undefined, info: undefined, title: undefined, environment: undefined,
+  })
+})

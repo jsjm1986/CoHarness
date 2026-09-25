@@ -15,7 +15,7 @@ import type {
 export type TerminalRemote = Pick<ClientRemote['terminal'], 'environment' | 'shells' | 'list' | 'create' | 'retain' | 'follow' | 'write' | 'resize' | 'rename' | 'close'>
 
 /** Product error identifiers translated by the terminal UI. */
-export type TerminalViewIssue = 'missingTerminal' | 'inputFull' | 'attachmentEnded' | 'invalidOutput' | 'terminalLimit'
+export type TerminalViewIssue = 'missingTerminal' | 'inputFull' | 'attachmentEnded' | 'invalidOutput' | 'terminalLimit' | 'forbidden'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
@@ -26,6 +26,22 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 
 class TerminalViewError extends RemoteError<'terminal/view'> {
   constructor(issue: TerminalViewIssue, message: string = issue) { super('terminal/view', message, { issue }) }
+}
+
+/**
+ * Classify a terminal failure into the product issue the UI translates.
+ * `terminal/forbidden` is a permission denial the caller cannot fix by
+ * retrying, so its surfaces must not offer an unchanged-retry action.
+ * @param error - rejection from a terminal Remote call or stream.
+ * @returns the translatable issue, or undefined for unclassified failures.
+ */
+export function terminalIssueOf(error: unknown): TerminalViewIssue | undefined {
+  const failure = remoteErrorOf(error)
+  if (failure?.code === 'terminal/view') return failure.details.issue
+  if (failure?.code === 'terminal/limit-reached') return 'terminalLimit'
+  if (failure?.code === 'terminal/forbidden') return 'forbidden'
+  if (failure?.code === 'terminal/unavailable') return 'missingTerminal'
+  return undefined
 }
 
 /** One screen write awaiting the DOM emulator's callback. */
@@ -333,7 +349,7 @@ export class TerminalView {
       return
     }
     if (failure?.code === 'terminal/forbidden') this.patch({ render: undefined, info: undefined, title: undefined, environment: undefined })
-    const issue = failure?.code === 'terminal/view' ? failure.details.issue : failure?.code === 'terminal/limit-reached' ? 'terminalLimit' : failure?.code === 'terminal/unavailable' ? 'missingTerminal' : undefined
+    const issue = terminalIssueOf(error)
     this.patch({ phase: error instanceof RemoteStreamCarrierError ? 'disconnected' : 'failed', writable: false, issue, error: error instanceof Error ? error.message : String(error) })
   }
 }

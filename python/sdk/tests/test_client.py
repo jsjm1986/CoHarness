@@ -791,7 +791,7 @@ time.sleep(60)
 
     with HarnessClient(
         HarnessConfig(
-            
+
             initialize_timeout_seconds=0.1,
             request_timeout_seconds=0.1,
         )
@@ -828,7 +828,7 @@ for line in sys.stdin:
 
     client = HarnessClient(
         HarnessConfig(
-            
+
             shutdown_timeout_seconds=0.1,
         )
     , _launch_args=(sys.executable, str(script)))
@@ -926,7 +926,7 @@ sys.exit(42)
 
     with HarnessClient(
         HarnessConfig(
-            
+
             request_timeout_seconds=2,
         )
     , _launch_args=(sys.executable, str(script))) as client:
@@ -958,7 +958,7 @@ with open(os.environ["SEEN"], "w") as seen:
 
     with HarnessClient(
         HarnessConfig(
-            
+
             env={"SEEN": str(output)},
         )
     , _launch_args=(sys.executable, str(script))) as client:

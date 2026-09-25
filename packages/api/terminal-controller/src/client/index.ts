@@ -5,7 +5,7 @@ import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { TerminalView, type TerminalRemote } from './model.ts'
+import { TerminalView, terminalIssueOf, type TerminalRemote, type TerminalViewIssue } from './model.ts'
 import { createSnapshotStore, sessionPersistenceKey, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { TerminalShell, WebTerminalId, WebTerminalInfo } from '../types.ts'
@@ -14,6 +14,7 @@ import { TerminalCloseRequests, type TerminalCloseRequest } from './close-reques
 import { TerminalWindowHold } from './retention.ts'
 import { TerminalBindings } from './bindings.ts'
 
+export { terminalIssueOf } from './model.ts'
 export type { TerminalView, TerminalViewState, TerminalViewIssue, TerminalRenderFrame, TerminalRemote } from './model.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -119,10 +120,17 @@ export class ClientTerminals extends Service {
     const identity = this.requireIdentity(sessionId)
     const result = await this.remote.shells(sessionId, signal)
     if (this.disposed || this.identity.key(sessionId) !== identity) throw new Error('Terminal ownership changed')
-    if (!result.ok) throw new Error(result.error.message)
+    if (!result.ok) throw result.error
     const previous = preferredShell(identity)
     return { shells: result.value, selectedShell: result.value.find(shell => shell.path === previous)?.path ?? result.value[0]?.path }
   }
+
+  /**
+   * Classify a terminal failure for surfaces that cannot hold a model view.
+   * @param error - rejection from a terminal Remote call or service operation.
+   * @returns the translatable issue, or undefined for unclassified failures.
+   */
+  issueOf(error: unknown): TerminalViewIssue | undefined { return terminalIssueOf(error) }
 
   /**
    * Remember the guide selection before allocating its terminal tab.
@@ -167,7 +175,26 @@ export class ClientTerminals extends Service {
       this.identities.set(tab.sessionId, key)
       return true
     })
+    this.reconcileViews()
     this.reconcileHolds()
+  }
+
+  /** Dispose views whose tab occurrence left the sidebar without a close handler. */
+  private reconcileViews(): void {
+    if (this.disposed) return
+    for (const [sessionId, views] of this.views) {
+      for (const [key, view] of views) {
+        // A scope teardown drops tabs without running their close handlers;
+        // keeping the model would mark its Host terminal held and suppress
+        // recovery, and a re-minted key would inherit the stale model.
+        if (this.openTabs.some(tab => tab.sessionId === sessionId && tab.tabId === key)) continue
+        views.delete(key)
+        const task = view.dispose().finally(() => { this.releasing.delete(task) })
+        this.releasing.add(task)
+        void task.catch((error: unknown) => { this.ctx.logger.warn('Terminal view disposal failed', error) })
+      }
+      if (views.size === 0) this.views.delete(sessionId)
+    }
   }
 
   private hold(sessionId: SessionId, id: WebTerminalId): TerminalWindowHold {

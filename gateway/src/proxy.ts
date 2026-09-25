@@ -61,6 +61,9 @@ function scrubRuntimeHeaders(req: IncomingMessage): void {
   ]) delete req.headers[name]
 }
 
+/** Response media types whose streams may legitimately idle past the upstream timeout. */
+const STREAMING_MEDIA_TYPES = new Set(['text/event-stream', 'application/x-ndjson'])
+
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
@@ -68,8 +71,11 @@ export function createProxyHandlers(
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
     xfwd: true,
+    // Bounds upstream connect and time to first byte only: STREAMING_MEDIA_TYPES
+    // disarm it once headers arrive. The http-proxy `timeout` option is not set;
+    // it would put the same idle bound on the client-facing socket, where it
+    // persists on keep-alive connections and kills any stream that pauses.
     proxyTimeout: cfg.upstreamTimeoutMs,
-    timeout: cfg.upstreamTimeoutMs,
   })
   const active = new Set<{ context: GatewayRequestContext; cancel(): void }>()
   const invalidateAccess: GatewayAccessInvalidation = (subject) => {
@@ -113,6 +119,10 @@ export function createProxyHandlers(
     if (typeof location === 'string') {
       const rewritten = publicLocation(location)
       if (rewritten !== location) proxyResponse.headers.location = rewritten
+    }
+    const mediaType = proxyResponse.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase()
+    if (mediaType !== undefined && STREAMING_MEDIA_TYPES.has(mediaType)) {
+      proxyResponse.socket.setTimeout(0)
     }
   })
 

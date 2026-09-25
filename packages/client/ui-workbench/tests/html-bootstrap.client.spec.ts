@@ -37,11 +37,11 @@ describe('HTML bootstrap', () => {
   it('creates local resources in the frame and preserves base, inline code and script order attributes', () => {
     const source = '<!doctype html><html lang="en"><head><base href="https://example.invalid/assets/"><link rel="stylesheet" href="./main.css"></head><body><script src="./one.js"></script><script>window.next=1</script><script defer src="./one.js"></script><script async src="https://example.invalid/remote.js"></script></body></html>'
     const result = run(createHtmlDocument({ data: utf8(source), assets: [
-      { kind: 'script', reference: './one.js', data: utf8('window.first=1') },
-      { kind: 'stylesheet', reference: './main.css', data: utf8('body{color:red}') },
+      { kind: 'script', reference: './one.js', type: 'text/javascript', data: utf8('window.first=1') },
+      { kind: 'stylesheet', reference: './main.css', type: 'text/css', data: utf8('body{color:red}') },
     ] }))
     expect(result.createObjectURL).toHaveBeenCalledTimes(2)
-    expect(result.createObjectURL.mock.calls.map(([blob]) => blob.type)).toEqual(['application/javascript', 'text/css'])
+    expect(result.createObjectURL.mock.calls.map(([blob]) => blob.type)).toEqual(['text/javascript', 'text/css'])
     const scripts = [...result.document.querySelectorAll('script')]
     expect(scripts.map(script => script.getAttribute('src'))).toEqual(['blob:null/resource-1', null, 'blob:null/resource-1', 'https://example.invalid/remote.js'])
     expect(scripts[1]?.textContent).toBe('window.next=1')
@@ -52,8 +52,12 @@ describe('HTML bootstrap', () => {
     expect(result.document.documentElement.lang).toBe('en')
   })
 
-  it('rejects non-UTF-8 root and asset bytes before creating an iframe document', () => {
-    expect(() => createHtmlDocument({ data: utf8('<p>root</p>'), assets: [{ kind: 'script', reference: 'bad.js', data: new Uint8Array([255]) }] })).toThrow()
+  it('rejects non-UTF-8 root bytes and passes asset bytes through as binary', () => {
+    const binary = new Uint8Array([255, 0, 255])
+    const result = run(createHtmlDocument({ data: utf8('<img src="a.png">'), assets: [{ kind: 'image', reference: 'a.png', type: 'image/png', data: binary }] }))
+    expect(result.createObjectURL).toHaveBeenCalledOnce()
+    const [blob] = result.createObjectURL.mock.calls[0]!
+    expect(blob.type).toBe('image/png')
     expect(() => createHtmlDocument({ data: new Uint8Array([255]), assets: [] })).toThrow()
     expect(decodeText(utf8('雪\u2028\u2029'))).toBe('雪\u2028\u2029')
   })

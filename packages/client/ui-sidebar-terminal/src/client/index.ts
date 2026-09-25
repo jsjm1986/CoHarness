@@ -70,6 +70,7 @@ export function apply(ctx: Context): void {
     name: 'sidebar.right.tab.guide.entry', key: id, locale: namespace,
     inject: (sessionId): TerminalGuideInjected => ({
       loadShells: signal => ctx.webTerminals.launchShells(sessionId, signal),
+      issueOf: error => ctx.webTerminals.issueOf(error),
       selectShell: (path) => { ctx.webTerminals.selectShell(sessionId, path) },
     }),
   }, TerminalGuide)), 'ui-sidebar-terminal.guide')

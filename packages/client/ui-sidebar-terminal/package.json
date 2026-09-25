@@ -74,7 +74,8 @@
     "@xterm/addon-fit": "^0.11.0",
     "@deepseek-ai/dsh-client-ui-layout": "workspace:^",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-theme": "workspace:^"
+    "@deepseek-ai/dsh-client-ui-theme": "workspace:^",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
   },
   "files": [
     "lib/index.js",

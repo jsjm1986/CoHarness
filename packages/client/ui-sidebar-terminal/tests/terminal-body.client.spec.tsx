@@ -368,13 +368,22 @@ it('starts a recovered screen with no local history when environment discovery i
 
 it.each([en, zh])('translates known terminal failures while retaining unknown Host diagnostics', (dictionary) => {
   const h = mount(idle, dictionary)
-  for (const issue of ['missingTerminal', 'inputFull', 'attachmentEnded', 'invalidOutput', 'terminalLimit'] as const) {
+  for (const issue of ['missingTerminal', 'inputFull', 'attachmentEnded', 'invalidOutput', 'terminalLimit', 'forbidden'] as const) {
     h.update({ ...idle, phase: 'failed', issue, error: 'raw diagnostic' })
     expect(h.view.getByRole('alert').textContent).toContain(dictionary[issue])
     expect(h.view.getByRole('alert').textContent).not.toContain('raw diagnostic')
   }
   h.update({ ...idle, phase: 'failed', error: 'Host permission denied' })
   expect(h.view.getByRole('alert').textContent).toContain('Host permission denied')
+})
+
+it.each([en, zh])('shows a localized permission denial without an unchanged-retry control', (dictionary) => {
+  const h = mount({ ...idle, phase: 'failed', issue: 'forbidden', error: 'raw Host diagnostic' }, dictionary)
+  expect(h.view.getByRole('alert').textContent).toContain(dictionary.forbidden)
+  expect(h.view.getByRole('alert').textContent).not.toContain('raw Host diagnostic')
+  expect(h.view.queryByRole('button')).toBeNull()
+  h.update({ ...idle, phase: 'failed', error: 'offline' })
+  expect(h.view.getByRole('button', { name: dictionary.retry })).toBeDefined()
 })
 
 it.each([en, zh])('offers an explicit new terminal for missing instances without retrying the lost process', (dictionary) => {

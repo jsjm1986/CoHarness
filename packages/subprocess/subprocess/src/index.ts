@@ -59,6 +59,13 @@ export const SENSITIVE_ENV_PATTERN = /KEY|PASSWORD|SECRET|TOKEN/i
  * that cannot route through the service (node-pty backends, SDK-managed
  * transports) share the one scrub definition.
  *
+ * A parent chain launched without a locale (launchd, systemd, a stripped
+ * service environment) leaves children in the POSIX `C` locale, where
+ * non-ASCII text — CJK filenames are the visible case — renders as `?`.
+ * The scrub therefore defaults `LANG` to a UTF-8 locale when the parent
+ * exported none; per POSIX precedence an ambient `LC_ALL`/`LC_CTYPE` still
+ * wins, and a spec `env` entry or `undefined` tombstone can still override.
+ *
  * When a proxy is active the result also carries the resolved proxy names and the flag a child Node
  * needs to honor them, so a child inherits the same routing as its parent.
  * @returns a fresh environment object safe to hand to a child spawn.
@@ -76,6 +83,7 @@ export function scrubbedParentEnv(): Record<string, string> {
     if (value === undefined) Reflect.deleteProperty(env, name)
     else env[name] = value
   }
+  env.LANG ??= 'C.UTF-8'
   return env
 }
 

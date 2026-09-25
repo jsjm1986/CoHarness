@@ -255,6 +255,22 @@ it('recovers Host terminals by Session while excluding held, pending-close, and 
   expect(await service.recover(sessionId)).toEqual([unheld])
 })
 
+it('resurfaces a retained process after its tab leaves the sidebar without closing', async () => {
+  storage()
+  const h = fixture()
+  const { service } = await h.service()
+  const model = service.view(sessionId, 'tab', 'tab')
+  service.retainTabs([{ sessionId, tabId: 'tab', contentId: 'tab' }])
+  vi.mocked(h.remote.list).mockResolvedValue(success([{ ...info, id: model.id }]))
+  expect(await service.recover(sessionId)).toEqual([])
+  // Session scope teardown clears the occurrence without a close handler.
+  service.retainTabs([])
+  expect(await service.recover(sessionId)).toEqual([{ ...info, id: model.id }])
+  // A re-minted occurrence key starts a fresh model rather than the stale one.
+  expect(service.view(sessionId, 'tab', 'tab')).not.toBe(model)
+  expect(await service.recover(sessionId)).toEqual([])
+})
+
 it('queries current held views after a slow recovery response and reports discovery errors', async () => {
   const h = fixture()
   const { service } = await h.service()
@@ -567,6 +583,22 @@ it('discovers menu choices without creating a process and remembers a choice bef
   expect(vi.mocked(h.remote.create).mock.calls.at(-1)?.[1]).not.toHaveProperty('shellPath')
 })
 
+it('preserves the Remote failure code through shell discovery for issue classification', async () => {
+  const h = fixture()
+  const { service } = await h.service()
+  vi.mocked(h.remote.shells).mockResolvedValueOnce({ ok: false, error: new RemoteError('terminal/forbidden', 'Terminal qualification required', {}) })
+  const error = await service.launchShells(sessionId, new AbortController().signal).then(
+    () => { throw new Error('unexpected success') },
+    (rejection: unknown) => rejection,
+  )
+  expect(error).toMatchObject({ code: 'terminal/forbidden' })
+  expect(service.issueOf(error)).toBe('forbidden')
+  expect(service.issueOf(new RemoteError('terminal/limit-reached', 'limit', { limit: 8 }))).toBe('terminalLimit')
+  expect(service.issueOf(new RemoteError('terminal/unavailable', 'gone', {}))).toBe('missingTerminal')
+  expect(service.issueOf(new RemoteError('terminal/view', 'view', { issue: 'invalidOutput' }))).toBe('invalidOutput')
+  expect(service.issueOf(new Error('transport'))).toBeUndefined()
+})
+
 it('retains the last selection across a failed automatic launch', async () => {
   const data = storage()
   const h = fixture()
@@ -688,7 +720,6 @@ it('keeps other holds usable when releasing one transport fails', async () => {
   service.retainTabs([{ sessionId, tabId: 'a', contentId: 'a' }])
   await expect.poll(() => h.remote.retain).toHaveBeenCalledOnce()
   const { TerminalWindowHold } = await import('../src/client/retention.ts')
-  // oxlint-disable-next-line typescript/unbound-method -- Preserve the real disposer while injecting one failure after it settles.
   const original = TerminalWindowHold.prototype.dispose
   const failure = vi.spyOn(TerminalWindowHold.prototype, 'dispose')
   failure.mockImplementationOnce(async function (this: InstanceType<typeof TerminalWindowHold>) {

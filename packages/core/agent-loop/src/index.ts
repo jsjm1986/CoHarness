@@ -167,7 +167,6 @@ async function raceAbortCall<T>(
   try {
     return await raceAbort(pending, signal, id)
   } catch (error: unknown) {
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the signal can abort while the operation is awaited.
     if (signal.aborted && releaseAbandoned !== undefined) {
       void pending.then(releaseAbandoned, () => undefined)
     }
@@ -744,9 +743,10 @@ export class AgentLoop extends Service implements AgentFactory {
    * @returns the owned handle and stored cursor, or `undefined` without a backend.
    */
   /**
-   * Start one fresh-or-restored configured agent. Persistence is resolved after
-   * pending mounts settle, so an entry listed later in the tree cannot race the
-   * startup-time service read into an unpersisted session or a false create.
+   * Start one fresh-or-restored configured agent. Persistence is resolved
+   * through the service graph — a sibling entry mounted later in the tree
+   * cannot race the startup-time service read into an unpersisted session or
+   * a false create.
    */
   private async startConfigured(
     ownerCtx: Context,
@@ -755,7 +755,7 @@ export class AgentLoop extends Service implements AgentFactory {
     options: AgentOptions,
     meta: Pick<SessionHeader, 'cwd'>,
   ): Promise<void> {
-    const persistence = sessionId === undefined ? undefined : await this.resolveSessionPersistence()
+    const persistence = sessionId === undefined ? undefined : await this.awaitStartupPersistence()
     if (persistence === undefined) {
       await this.create(configuredId, options, meta)
       return
@@ -764,24 +764,52 @@ export class AgentLoop extends Service implements AgentFactory {
   }
 
   /**
-   * Read the optional persistence backend, waiting out in-flight Loader mounts
-   * once when absent. Sibling entries mount concurrently, so a backend whose
-   * module resolves after this fiber's injected dependencies would otherwise be
-   * invisible to a startup-time `ctx.get`.
-   * @returns the registered backend, or `undefined` when the settled
-   *   composition has none.
+   * Read the optional persistence backend. A `create()` issued while a sibling
+   * entry is still mounting sees the composition as it stands: waiting here
+   * would have to observe Loader settle state, which includes the caller's own
+   * in-flight entry and deadlocks plugin-time callers. Configured agents take
+   * the service-scoped wait in {@link awaitStartupPersistence} instead.
+   * @returns the registered backend, or `undefined` when none is mounted.
    */
-  private async resolveSessionPersistence(): Promise<SessionPersistence | undefined> {
-    const existing = this.runtime.ctx.get('sessionPersistence')
-    if (existing !== undefined) return existing
-    const loader = this.runtime.ctx.get('loader') as { await(): Promise<void> } | undefined
-    if (loader === undefined) return undefined
-    await loader.await()
+  private resolveSessionPersistence(): SessionPersistence | undefined {
     return this.runtime.ctx.get('sessionPersistence')
   }
 
+  /**
+   * Resolve the startup persistence backend for a configured agent. Two
+   * service-graph waits race: a `sessionPersistence` inject fires when a
+   * sibling mounts one, and a `loader` inject with `await` fires once pending
+   * mounts drain without one — whichever comes first. The configured-agent
+   * entry has already completed `apply`, so no part of the wait includes this
+   * fiber's own Loader task.
+   * @returns the registered backend, or `undefined` when the settled
+   *   composition has none.
+   */
+  private awaitStartupPersistence(): Promise<SessionPersistence | undefined> {
+    const ctx = this.runtime.ctx
+    const existing = ctx.get('sessionPersistence')
+    if (existing !== undefined) return Promise.resolve(existing)
+    if (ctx.get('loader') === undefined) return Promise.resolve(undefined)
+    return new Promise<SessionPersistence | undefined>((resolve) => {
+      const fibers: { dispose(): Promise<void> }[] = []
+      let settled = false
+      const finish = (value: SessionPersistence | undefined): void => {
+        if (settled) return
+        settled = true
+        resolve(value)
+        for (const fiber of fibers) void fiber.dispose()
+      }
+      fibers.push(ctx.inject(['sessionPersistence'], (childCtx: Context) => {
+        finish(childCtx.get('sessionPersistence'))
+      }))
+      fibers.push(ctx.inject({ loader: { await: true } }, () => {
+        finish(ctx.get('sessionPersistence'))
+      }))
+    })
+  }
+
   private async createStoredSession(session: Session, signal?: AbortSignal): Promise<StoredSession | undefined> {
-    const persistence = await this.resolveSessionPersistence()
+    const persistence = this.resolveSessionPersistence()
     if (persistence === undefined) return undefined
     const handle = await persistence.create(session.header, {
       inheritedEventCount: session.inheritedEventCount,
@@ -801,7 +829,6 @@ export class AgentLoop extends Service implements AgentFactory {
    */
   private async appendUnstoredSuffix(stored: StoredSession | undefined, session: Session): Promise<void> {
     if (stored === undefined) return
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const suffix = session.snapshotEvents(SessionLogOffset(stored.storedCount))
     if (suffix.length > 0) await stored.handle.append(suffix)
     // Advance by what was stored, not to `session.seq`: an event appended

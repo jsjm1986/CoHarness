@@ -51,7 +51,8 @@ export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t }: Ter
   else if (state.info?.state === 'failed') status = t('unavailable')
   else if (state.phase === 'closed') status = t('closed')
   const ended = state.info?.state === 'exited' || state.phase === 'closed'
-  const retry = !ended && (state.phase === 'failed' || state.phase === 'disconnected')
+  // A permission denial cannot succeed on an unchanged retry, so it gets no retry control.
+  const retry = !ended && state.issue !== 'forbidden' && (state.phase === 'failed' || state.phase === 'disconnected')
   const readOnly = state.phase === 'connected' && state.info?.state === 'running' && !state.writable
   return (
     <section className={css.root} data-sidebar-terminal>

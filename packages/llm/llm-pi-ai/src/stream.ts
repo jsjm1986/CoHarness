@@ -136,16 +136,19 @@ function* preserveEmptyNativeText(state: TextBlockState): Generator<StreamChunk>
 /**
  * Map pi-ai usage (reasoning folded into output by pi-ai).
  * @param usage - cumulative usage from the terminal pi-ai event.
- * @returns harness counts with pi-ai's exact total; cache fields appear only
- *   when non-zero (pi-ai reports zeros, not absence).
+ * @returns harness counts with pi-ai's exact total; cache buckets are always
+ *   emitted because pi-ai reports a numeric zero — a measured bucket, not
+ *   absence — and turn-level aggregation treats an omitted bucket as
+ *   unreported, which would hide a whole turn's cache totals when one
+ *   zero-cache step sits beside cache-using steps.
  */
 export function mapUsage(usage: PiUsage): TokenUsage {
   return {
     inputTokens: usage.input,
     outputTokens: usage.output,
     totalTokens: usage.totalTokens,
-    ...usage.cacheRead > 0 ? { cacheReadTokens: usage.cacheRead } : {},
-    ...usage.cacheWrite > 0 ? { cacheWriteTokens: usage.cacheWrite } : {},
+    cacheReadTokens: usage.cacheRead,
+    cacheWriteTokens: usage.cacheWrite,
   }
 }
 
