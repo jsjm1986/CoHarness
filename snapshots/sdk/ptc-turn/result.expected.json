@@ -1,1 +1,1 @@
-{"sessionId":"{{sessionId}}","finalResponse":"CODE_ONE+CODE_TWO"}
+{"sessionId":"{{session:1}}","finalResponse":"CODE_ONE+CODE_TWO"}

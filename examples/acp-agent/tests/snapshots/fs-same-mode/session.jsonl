@@ -1,4 +1,4 @@
-{"type":"session","version":4,"id":"{{sessionId}}","createdAt":1784045702340,"cwd":"{{cwd}}","isSeeded":false,"delegationDepth":0}
+{"type":"session","version":6,"id":"{{sessionId}}","createdAt":1784045702340,"cwd":"{{cwd}}","isSeeded":false,"delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Use the write tool to create escalated.md containing exactly the single line: escalated. Set sandbox_permissions to danger-full-access and justification to 'use the current permissions'. The session already uses danger-full-access. After the result, reply with exactly DONE."}],"source":{"kind":"user"},"role":"user","id":"00000000-0000-0000-0000-000000000014"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

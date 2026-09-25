@@ -617,6 +617,7 @@ describe('Node 24 lane ownership', () => {
       'built-package-invariants',
       'lint-and-duplication',
       'snapshot',
+      'expected-output',
       'admin-build',
       'web-snapshot',
       'doc-typecheck',
@@ -636,6 +637,7 @@ describe('Node 24 lane ownership', () => {
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])
     for (const id of [
       'snapshot',
+      'expected-output',
       'doc-typecheck',
       'node-next-types',
       'built-bin-smoke',
@@ -644,6 +646,7 @@ describe('Node 24 lane ownership', () => {
     }
     expect(subject.find(item => item.id === 'web-snapshot')?.needs).toEqual(['built-package-invariants', 'web-fixtures', 'admin-build'])
     expect(subject.find(item => item.id === 'snapshot')?.env).toEqual({ DSH_EXAMPLE_MODE: 'lib' })
+    expect(subject.find(item => item.id === 'expected-output')?.env).toEqual({ DSH_EXAMPLE_MODE: 'lib' })
     expect(subject.find(item => item.id === 'doc-typecheck')?.env).toEqual({
       DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1',
     })
@@ -663,6 +666,7 @@ describe('Node 24 lane ownership', () => {
         'publint',
         'lint-and-duplication',
         'snapshot',
+        'expected-output',
         'doc-typecheck',
         'node-next-types',
         'built-bin-smoke',

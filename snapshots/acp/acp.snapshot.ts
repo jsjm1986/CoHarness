@@ -26,9 +26,12 @@ function snapshotMode(value: string | undefined): SnapshotSuiteOptions['mode'] {
 const controllerCases: readonly {
   readonly name: string
   readonly hasModelTurn: boolean
+  readonly comparesLog?: boolean
   readonly configPath?: string
 }[] = [
-  { name: 'handshake', hasModelTurn: false },
+  { name: 'handshake', hasModelTurn: false, comparesLog: true },
+  // Rejected `session/new` persists no Session under the current writer; the
+  // authored header generations stay replay-inert and never compare a live log.
   { name: 'reject-extra-dirs', hasModelTurn: false },
   { name: 'cancel', hasModelTurn: true },
   { name: 'cancel-tool-calls', hasModelTurn: true },

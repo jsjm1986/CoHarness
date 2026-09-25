@@ -1,1 +1,1 @@
-{"sessionId":"{{sessionId}}","finalResponse":"child answer 42."}
+{"sessionId":"{{session:1}}","finalResponse":"child answer 42."}

@@ -1006,6 +1006,31 @@ describe('headless recorded-session snapshots', () => {
     }
   })
 
+  it('rejects a native writer oracle that diverges from the persisted run', () => {
+    const header = {
+      type: 'session', version: SESSION_FORMAT_VERSION, id: 'oracle-session', createdAt: 1,
+      cwd: '/tmp/oracle-session', isSeeded: false, delegationDepth: 0,
+    }
+    const persisted = [
+      header,
+      { type: 'turn/start', seq: 0, time: 2, data: { turn: 1 } },
+      { type: 'turn/end', seq: 1, time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const ctx: NormalizeContext = { sessionIds: ['oracle-session'], cwd: '/tmp/oracle-session' }
+    const [actual] = normalizeSessionSnapshots([persisted], ctx)
+    // The scenario loop reads each writer.expected.jsonl verbatim and compares
+    // normalized records; the retained replay input never enters that equality.
+    const [matching] = normalizeSessionSnapshots([persisted], contextOf([persisted]))
+    expect(records(actual as string)).toEqual(records(matching as string))
+    const divergent = [
+      header,
+      { type: 'turn/start', seq: 0, time: 2, data: { turn: 1 } },
+      { type: 'turn/end', seq: 1, time: 3, data: { turn: 1, reason: { kind: 'failed' } } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const [mutated] = normalizeSessionSnapshots([divergent], contextOf([divergent]))
+    expect(records(actual as string)).not.toEqual(records(mutated as string))
+  })
+
   for (const scenario of scenarios) {
     const skipped = scenario.manifest.platform === 'posix' && process.platform === 'win32'
       || scenario.manifest.platform === 'pwsh' && !hasPwsh

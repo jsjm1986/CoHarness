@@ -23,7 +23,8 @@ import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
 import { join } from 'node:path'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, realizeSeedFixture, recordFixture, rewriteSeedEvents, seedSession, selectedSessionFixture, systemPromptTexts, watchConsole, webSnapshotMode,
+  launchWebScaffold, realizeSeedFixture, recordFixture, rewriteSeedEvents, seedSession,
+  selectedSessionFixture, systemPromptTexts, watchConsole, webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
@@ -32,7 +33,7 @@ import { normalizeAria } from './aria-normalize.ts'
 const OVERLAY = fileURLToPath(new URL('./seeded-history.overlay.yml', import.meta.url))
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/seeded-history', import.meta.url))
-const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.v3.jsonl', import.meta.url))
+const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.v6.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expected.md', import.meta.url))
 // Command-row goldens over the same conversation after direct host commands.
 const COMMAND_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/command-row.expected.md', import.meta.url))

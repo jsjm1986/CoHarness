@@ -1,1 +1,1 @@
-{"sessionId":"{{sessionId}}","finalResponse":"ERROR_DETAILS_OK"}
+{"sessionId":"{{session:1}}","finalResponse":"ERROR_DETAILS_OK"}

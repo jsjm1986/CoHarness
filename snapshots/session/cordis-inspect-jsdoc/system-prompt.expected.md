@@ -29,7 +29,13 @@ Use goal tools for one long-running completion objective in the current session.
 
 Use cordis_inspect_list to discover Host and Client providers, then cordis_inspect_query to read exact Service, Event, Tool, Theme or Slot APIs. These tools are read-only; queries do not invoke business methods.
 
+Use cordis_inspect_self to inspect existing session-owned Plugin summaries, version pointers, or an exact Package's source and diagnostics. An explicit @pluginId reference identifies an inspection target; it does not authorize execution or modification. Dynamic definitions remain process-local and may be unavailable after restart.
+
+For a requested persistent Plugin or MCP change, load the cordis-plugin-development Skill and use Plugin Manager's authorized installation workflow. Inspect results describe APIs; they are not business data or an alternative execution path.
+
 Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.
+
+Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflows for bounded delegation and fan-out.
 
 Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.
 
@@ -71,7 +77,7 @@ interface ToolArgsMap {
   } & Record<string, JsonValue>;
   /** List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call. */
   cordis_inspect_list: Record<string, JsonValue>;
-  /** Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query an exact Slot root for its complete registration contract and props; an exact Factory root returns its identity, scope, and registrant. */
+  /** Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props. */
   cordis_inspect_query: {
     /** Runtime platform that owns the Provider. */
     platform: "host" | "client";
@@ -81,6 +87,13 @@ interface ToolArgsMap {
     method: string;
     /** Optional query input; it must satisfy the method input schema. */
     input?: JsonValue;
+  } & Record<string, JsonValue>;
+  /** Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers. */
+  cordis_inspect_self: {
+    /** Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin. */
+    pluginId?: string;
+    /** Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned. */
+    packageId?: string;
   } & Record<string, JsonValue>;
   /** Create one persisted same-session completion goal when the current direct human request is a long-running objective that should continue across autonomous goal rounds. You may infer that intent without requiring the user to say "create a goal". Do not use this for trivial single-turn work. Execution rejects non-human and subagent authority. */
   create_goal: {
@@ -154,6 +167,22 @@ interface ToolArgsMap {
   list_agents: {
     /** children (default) lists direct children only; descendants walks the complete tree below you. */
     scope?: "children" | "descendants";
+  } & Record<string, JsonValue>;
+  /** Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved. */
+  present: {
+    files: {
+      /** Path of an existing regular file. Relative paths use the Session working directory. */
+      path: string;
+      /** Brief description for the user. */
+      description?: string;
+    }[];
+  } & Record<string, JsonValue>;
+  /** Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only when the direct human explicitly asks for Ralph or fresh-agent iteration. Each round opens a new child with no parent conversation or prior child session; the shared workspace is long-term memory, and only a bounded structured report crosses rounds. The call returns when a worker reports completion or a concrete blocker, or at the round limit. Ordinary long-running same-session work belongs to goal tools. */
+  ralph: {
+    /** The immutable completion objective for every fresh Ralph round. */
+    objective: string;
+    /** Optional positive safe-integer round cap, bounded by the deployment ceiling. */
+    maxRounds?: number;
   } & Record<string, JsonValue>;
   /** Read a UTF-8 text file and return line-numbered content. */
   read: {
@@ -302,6 +331,7 @@ interface ToolOutputMap {
   };
   cordis_inspect_list: JsonValue;
   cordis_inspect_query: JsonValue;
+  cordis_inspect_self: JsonValue;
   create_goal: {
     goal: null;
   } | {
@@ -405,6 +435,18 @@ interface ToolOutputMap {
     parent?: string;
     depth?: number;
   })[];
+  present: {
+    turn: number;
+    files: {
+      path: string;
+      description?: string;
+    }[];
+  };
+  ralph: {
+    runId: string;
+    agentsStarted: number;
+    result: JsonValue;
+  };
   read: {
     path: string;
     offset: number;

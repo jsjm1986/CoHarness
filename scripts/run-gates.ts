@@ -302,6 +302,7 @@ export function gatesForMode(selected: Mode): Gate[] {
         pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
         pnpmScript('duplication', 'duplication'),
         snapshotGate(),
+        expectedOutputGate(),
         pnpmScript('build', 'build'),
         ...hygieneLeafGates({ artifactNeeds: ['build'] }),
         ...docSyncLeafGates({
@@ -516,6 +517,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     'publint',
     'lint-and-duplication',
     'snapshot',
+    'expected-output',
     'doc-typecheck',
     'node-next-types',
     'built-bin-smoke',
@@ -544,6 +546,7 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
       needs: validatedBuild,
     }),
     snapshotGate(validatedBuild),
+    expectedOutputGate(validatedBuild),
     ...options.includeWebSnapshot === false
       ? []
       : [adminBuildGate(validatedBuild), webSnapshotGate([...validatedBuild, 'web-fixtures', 'admin-build'], buildArtifactReaders)],
@@ -758,6 +761,15 @@ function coverageGates(): Gate[] {
 // either on `build` or on a validation gate that transitively owns that build.
 function snapshotGate(needs: string[] = ['build']): Gate {
   return pnpmScript('snapshot', 'test:snapshot', {
+    env: { DSH_EXAMPLE_MODE: 'lib' },
+    needs,
+  })
+}
+
+// Owner-local process expectations consume built package exports without entering
+// the recorded-session corpus or the credentialed provider lane.
+function expectedOutputGate(needs: string[] = ['build']): Gate {
+  return pnpmScript('expected-output', 'test:expected', {
     env: { DSH_EXAMPLE_MODE: 'lib' },
     needs,
   })
