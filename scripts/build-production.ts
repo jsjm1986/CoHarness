@@ -52,6 +52,7 @@ function requireAsset(directory: string, suffix: string, failures: string[]): vo
 const GATEWAY_RUNTIME_PACKAGES: readonly { directory: string; entry: string }[] = [
   { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
   { directory: 'packages/session/session-format', entry: 'lib/index.js' },
+  { directory: 'packages/session/session-format-catalog', entry: 'lib/index.js' },
 ]
 
 /**
