@@ -110,7 +110,7 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   cleanup.push(() => rmSync(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'g.sqlite'))
-  cleanup.push(() => db.close())
+  cleanup.push(() => { db.close() })
   const portFile = join(root, 'child-port')
   const port = await runtimeRelay(portFile)
   const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: String(port), ...env })
