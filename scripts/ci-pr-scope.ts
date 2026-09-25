@@ -685,6 +685,16 @@ function main(): void {
   const scopedPackages = result.coverageMode === 'scoped'
     ? [...new Set(runtimeInputPaths(paths).map(scopedPackage).filter((value): value is string => value !== undefined))]
     : []
+  // Job outputs are capped at 1 MiB, so outputs and the plan carry only the
+  // routing fields downstream jobs read; per-path reasons stay in the
+  // uploaded selection artifact.
+  const { reasons: _reasons, providerAcceptance: _acceptance, unsupportedProofs, ...proofFlags } = proofs
+  const cappedUnsupportedProofs = unsupportedProofs.map(proof => ({
+    ...proof,
+    reasons: proof.reasons.length > 25
+      ? [...proof.reasons.slice(0, 25), `…${proof.reasons.length - 25} more in the selection artifact`]
+      : proof.reasons,
+  }))
   process.stdout.write(`${[
     `run_expensive=${String(result.runExpensive)}`,
     `reason=${result.reason}`,
@@ -709,11 +719,10 @@ function main(): void {
     `proof_provider=${String(proofs.provider)}`,
     `proof_pi_ai=${String(proofs.piAi)}`,
     `proof_native_windows=${String(proofs.nativeWindows)}`,
-    `proofs=${JSON.stringify(proofs)}`,
-    // Job outputs are capped at 1 MiB, so the plan carries only the fields
-    // verify-pr-results reads; the full scope stays in the selection artifact.
+    `proofs=${JSON.stringify(proofFlags)}`,
     `validation_plan=${JSON.stringify({
-      version: 1, commit, proofs,
+      version: 1, commit,
+      proofs: { ...proofFlags, unsupportedProofs: cappedUnsupportedProofs },
       scope: {
         runExpensive: result.runExpensive,
         coverageMode: result.coverageMode,
