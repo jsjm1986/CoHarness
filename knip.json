@@ -70,6 +70,7 @@
         "acp-agent/tests/fixtures/child-question-tripwire.ts",
         "acp-agent/tests/fixtures/parent-sandbox-override.ts",
         "acp-agent/tests/fixtures/partial-landlock-sandbox.ts",
+        "acp-agent/tests/fixtures/missing-runner-completion-waiter.ts",
         "acp-agent/tests/fixtures/subagent-durability-failure.ts",
         "acp-agent/tests/fixtures/subagent-current-model.ts",
         "acp-agent/tests/fixtures/subagent-result-diagnostic.ts",
