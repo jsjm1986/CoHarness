@@ -48,8 +48,10 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       value = replacePath(value, base, '{{workspace}}')
       // Minted session/agent ids reach prose (a child's parent-agent
       // instructions quote the parent id verbatim), so collapse them like
-      // paths rather than leaving them to a scope.
-      value = value.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{{uuid}}')
+      // paths rather than leaving them to a scope. Bare uuids stay literal:
+      // business identifiers are content, covered by seeded-history's
+      // normalize-preserves-identifiers case.
+      value = value.replace(/session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'session-{{uuid}}')
       value = normalizeMeasurement(value, scope)
       if (value !== node.value) {
         if (node.range == null) throw new Error('ARIA scalar has no source range')

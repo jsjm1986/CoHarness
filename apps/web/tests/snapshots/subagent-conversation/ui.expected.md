@@ -25,7 +25,7 @@
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: "Explain event sourcing in one sentence.Your parent agent id is \"session-dd64b8ec-a766-4470-bf40-fd4ba4ab6194\". Before you finish, send your result to that agent with send_message({ agent_id: \"session-dd64b8ec-a766-4470-bf40-fd4ba4ab6194\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
+- text: "Explain event sourcing in one sentence.Your parent agent id is \"session-{{uuid}}\". Before you finish, send your result to that agent with send_message({ agent_id: \"session-{{uuid}}\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
 - group "Message timing": "{{clock}}"
 - button "Copy":
   - img
