@@ -91,7 +91,11 @@ describe('web e2e: delivered files and historical review', () => {
     await expect.poll(() => review.textContent()).toContain('before the turn')
     expect(await review.textContent()).toContain('after the turn')
     expect(await review.textContent()).not.toContain('current file changed later')
-    await compareOrRefreshGolden(join(DIRECTORY, 'review.expected.md'), await captureStableAria(page, '[data-changes-review]', scaffold.workspaceCwd), webSnapshotMode())
+    // The host reports an open-in-app handler only on desktops that probe
+    // one, so the default-app row is environment-dependent chrome.
+    const reviewSnapshot = (await captureStableAria(page, '[data-changes-review]', scaffold.workspaceCwd))
+      .replace(/\n *- button "Open [^\n]* in default app":\n *- img/g, '')
+    await compareOrRefreshGolden(join(DIRECTORY, 'review.expected.md'), reviewSnapshot, webSnapshotMode())
     await review.locator('[data-review-tool="split"]').click()
     await review.locator('[data-review-tool="wrap"]').click()
     expect(await review.locator('[data-review-tool="split"]').getAttribute('aria-pressed')).toBe('true')

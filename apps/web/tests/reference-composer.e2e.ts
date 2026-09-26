@@ -211,6 +211,9 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await target.waitFor({ timeout: 15_000 })
     await target.click()
     await page.getByRole('button', { name: /^Session recall\s*Research notes$/ }).waitFor({ timeout: 15_000 })
+    // The model trigger announces its current selection once the models RPC
+    // resolves; two stable captures can still precede it.
+    await page.getByRole('button', { name: /Select model, current / }).waitFor({ timeout: 15_000 })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(TARGET_SESSION_ID).join('{{targetId}}')

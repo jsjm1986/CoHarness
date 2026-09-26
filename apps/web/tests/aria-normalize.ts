@@ -57,6 +57,9 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       // even outside a timing group, while bare HH:MM deadlines in message
       // text stay literal.
       value = value.replace(/\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\s*[AP]M/gi, '{{clock}}')
+      // The compaction badge's ~N tokens is priced from seeded content that
+      // embeds the workspace path, whose length varies by platform tmpdir.
+      value = value.replace(/~\d[\d,]* tokens/g, '~{{tokens}} tokens')
       value = normalizeMeasurement(value, scope)
       if (value !== node.value) {
         if (node.range == null) throw new Error('ARIA scalar has no source range')

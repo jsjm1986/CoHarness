@@ -6,6 +6,8 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspaceFileTab } from '../src/client/components/WorkspaceFileTab.tsx'
 import { FontNotice } from '../src/client/office/FontNotice.tsx'
 
+vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
+
 afterEach(cleanup)
 const sessionId = 'files-owner' as SessionId
 
@@ -19,7 +21,7 @@ function harness(path = 'a.txt') {
   const readPreview = vi.fn(async () => ({ path, offset: 1, limit: 20, text: 'project content', version: 'v1', eof: true }))
   const readBytesPreview = vi.fn()
   const readFileBytes = vi.fn(async () => ({ data: new Uint8Array(), version: 'v1' }))
-  const readDocument = vi.fn()
+  const readDocument = vi.fn(async () => ({ bytes: btoa('PDF v1'), version: 'v1', missingFonts: [] as string[] }))
   const props = (visible: boolean, line?: number, revision = 0) => ({
     sessionId, resources, runtimeTarget, readPreview, readBytesPreview, readFileBytes, readDocument,
     renderHtml: vi.fn(async () => '<html></html>'), fontNotice: FontNotice,
@@ -72,13 +74,28 @@ describe('workspace file tab', () => {
     await waitFor(() => { expect(markdown.readPreview).toHaveBeenCalled() })
     expect(markdownView.container.querySelector('[data-workspace-markdown]')).not.toBeNull()
     expect(markdown.readFileBytes).not.toHaveBeenCalled()
+    fireEvent.click(markdownView.getByRole('button', { name: 'previewClose' }))
+    expect(markdown.close).toHaveBeenCalledOnce()
     markdownView.unmount()
 
     const html = harness('page.html')
     const htmlView = render(<WorkspaceFileTab {...html.props(true)} />)
     await waitFor(() => { expect(html.readFileBytes).toHaveBeenCalled() })
     expect(html.readPreview).not.toHaveBeenCalled()
+    fireEvent.click(htmlView.getByRole('button', { name: 'previewClose' }))
+    expect(html.close).toHaveBeenCalledOnce()
     htmlView.unmount()
+  })
+
+  it('routes a document suffix to the document preview and closes from its toolbar', async () => {
+    const h = harness('report.pdf')
+    const view = render(<WorkspaceFileTab {...h.props(true)} />)
+    await waitFor(() => { expect(view.getByTestId('pdf')).toBeTruthy() })
+    expect(h.readDocument).toHaveBeenCalled()
+    expect(h.readPreview).not.toHaveBeenCalled()
+    expect(h.readFileBytes).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: 'previewClose' }))
+    expect(h.close).toHaveBeenCalledOnce()
   })
 
   it('rejects a tab address belonging to another Session before reading', () => {

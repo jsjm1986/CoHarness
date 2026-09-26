@@ -55,7 +55,7 @@
     - img
     - text: "Ran for {{duration}}"
 - group "Message timing": "{{clock}}"
-- button "compact Compacted 5 history items (~253 tokens)"
+- "button \"compact Compacted 5 history items (~{{tokens}} tokens)\""
 - button "Context injection AGENTS.md":
   - img
   - img

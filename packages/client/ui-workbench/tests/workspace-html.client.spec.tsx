@@ -120,6 +120,16 @@ describe('WorkspaceHtmlPreview', () => {
     expect(view.container.childElementCount).toBe(0)
   })
 
+  it('ignores a read rejection after unmount', async () => {
+    const pending = Promise.withResolvers<Awaited<ReturnType<ReadWorkspaceFileData>>>()
+    const read = vi.fn<ReadWorkspaceFileData>().mockReturnValue(pending.promise)
+    const view = harness(read)
+    await waitFor(() => { expect(read).toHaveBeenCalledOnce() })
+    view.unmount()
+    await act(async () => { pending.reject(new Error('late failure')) })
+    expect(view.container.childElementCount).toBe(0)
+  })
+
   it('reports a read rejection and permits retry', async () => {
     const read = vi.fn<ReadWorkspaceFileData>()
       .mockRejectedValueOnce('read interrupted')
