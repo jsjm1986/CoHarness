@@ -1,7 +1,8 @@
+// @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry, NavigationController, createSnapshotStore, workspaceResourceAddress, WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationViewportSnapshot, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '../src/client/apply.ts'
 import type { WorkbenchCatalog, WorkbenchConversation } from '../src/client/catalog.ts'
@@ -46,8 +47,9 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
   }
   const sidebarRight = { openSessionResource: vi.fn() }
   const layout = { focusRightbar: vi.fn() }
+  const tabTypes: { canOpen(address: string): boolean; title(address: string): string }[] = []
   ctx.provide('sidebarRight', sidebarRight as never)
-  ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
+  ctx.provide('sidebarRightTabs', { register: (spec: never) => { tabTypes.push(spec); return () => {} } } as never)
   ctx.provide('layout', layout as never)
   ctx.provide('conversationViewport', viewport as never)
   ctx.provide('sessions', sessions as never)
@@ -60,6 +62,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     'conversation.workbench.empty': { kind: 'single', scope: 'root' },
     'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
     'sidebar.workspaces.workbench': { kind: 'single', scope: 'root' },
+    'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
   } } as never, () => null)
   const fiber = await ctx.plugin({ inject, apply }).await()
   const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
@@ -84,7 +87,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     openFiles(): void
   })()
   return {
-    ctx, slots, fiber, sessions, viewport, snapshot, sidebarRight, layout,
+    ctx, slots, fiber, sessions, viewport, snapshot, sidebarRight, layout, tabTypes,
     actions: { ...actions, ...createWorkspacePreviewReaders(services.connection as ConnectionHandle | undefined) },
   }
 }
@@ -345,6 +348,56 @@ describe('workspace file serving', () => {
       h.snapshot.set({ mode: 'single', paneIds: [], paneRatios: [] })
       expect(h.actions.filesAvailable()).toBe(true)
       h.actions.openFiles()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('refuses a resource open when the session runtime moved to another project and forwards a target line', async () => {
+    const conn = connection()
+    const h = await harness({ connection: conn })
+    try {
+      h.sessions.runtimeTargetFor.mockReturnValue({ kind: 'project', projectId: 7 })
+      expect(() => { h.actions.openWorkspaceResource({ ...openRequest, runtimeTarget: { kind: 'project', projectId: 9 } }) })
+        .toThrow('runtime no longer owns')
+      h.actions.openWorkspaceResource({ ...openRequest, runtimeTarget: { kind: 'project', projectId: 7 }, line: 4 })
+      expect(h.sidebarRight.openSessionResource).toHaveBeenCalledWith(A, openRequest.address, { kind: 'workspace-file', params: { line: 4 } })
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('declares the workspace-file tab type over the resource address grammar', async () => {
+    const h = await harness({ connection: connection() })
+    try {
+      const tab = h.tabTypes[0]!
+      expect(tab.canOpen(openRequest.address)).toBe(true)
+      expect(tab.canOpen('https://example.com/a.txt')).toBe(false)
+      expect(tab.title(openRequest.address)).toBe('a.txt')
+      expect(tab.title('dsh-resource://elsewhere')).toBe('dsh-resource://elsewhere')
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('exposes the pane tab inject face with per-session runtime and html packing', async () => {
+    const h = await harness({ connection: connection() })
+    try {
+      const entry = h.slots.entries('sidebar.right.pane.tab')[0]!
+      const face = (entry.inject as unknown as (id: SessionId) => {
+        runtimeTarget(): SessionRuntimeTarget
+        renderHtml(
+          data: Uint8Array,
+          read: (request: unknown, signal: AbortSignal) => Promise<{ data: Uint8Array; version: string }>,
+          request: unknown, lifetime: AbortSignal, signal: AbortSignal,
+        ): Promise<string>
+      })(A)
+      expect(face.runtimeTarget()).toEqual({ kind: 'base' })
+      h.sessions.runtimeTargetFor.mockReturnValue({ kind: 'project', projectId: 7 })
+      expect(face.runtimeTarget()).toEqual({ kind: 'project', projectId: 7 })
+      Object.assign(h.sessions, { runtimeTargetFor: undefined })
+      expect(face.runtimeTarget()).toEqual({ kind: 'base' })
+      const read = vi.fn(async () => ({ data: new Uint8Array([1, 2, 3]), version: 'v1' }))
+      const html = await face.renderHtml(
+        new TextEncoder().encode('<p><img src="icon.png"></p>'), read,
+        openRequest, new AbortController().signal, new AbortController().signal,
+      )
+      expect(read).toHaveBeenCalledOnce()
+      expect(html).toContain('<!doctype html>')
     } finally { await h.ctx.fiber.dispose() }
   })
 

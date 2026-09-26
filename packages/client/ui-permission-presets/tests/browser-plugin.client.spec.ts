@@ -16,6 +16,7 @@ import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { CommandDecoration } from '@deepseek-ai/dsh-client-ui-commands/client'
+import type { SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { PermissionCatalog, PermissionSelection } from '@deepseek-ai/dsh-permission-presets/client'
 import {
   PermissionRow, type PermissionRowInjected,
@@ -36,6 +37,28 @@ const CATALOG: PermissionCatalog = {
 
 const SELECT: PermissionSelection = {
   currentValue: 'workspace-write',
+}
+
+/** One permission namespace view whose schema advertises all three catalog presets. */
+function permissionNs(defaultPreset: string, revision = 0): SettingsNamespaceView {
+  return {
+    ns: 'permission',
+    schema: {
+      uid: 7,
+      refs: {
+        1: { type: 'const', value: 'read-only' },
+        2: { type: 'const', value: 'workspace-write' },
+        3: { type: 'const', value: 'danger-full-access' },
+        4: { type: 'union', list: [1, 2, 3] },
+        7: { type: 'object', dict: { defaultPreset: 4 } },
+      },
+    },
+    value: { defaultPreset },
+    base: { defaultPreset: 'read-only' },
+    applies: 'live',
+    secrets: [],
+    revision,
+  }
 }
 
 async function bench() {
@@ -68,14 +91,16 @@ async function bench() {
       'conversation.input.left': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
+  const settingsNamespaces: SettingsNamespaceView[] = []
+  const settingsMutate = vi.fn((): Promise<unknown> => Promise.reject(new Error('settings mutation is not exercised')))
   const connection = {
     api: {
       settings: {
         describe: () => Promise.resolve({
           rpcId: 'describe',
-          result: { ok: true as const, value: { writable: true, hasDocument: false, namespaces: [] } },
+          result: { ok: true as const, value: { writable: true, hasDocument: false, namespaces: [...settingsNamespaces] } },
         }),
-        mutate: () => Promise.reject(new Error('settings mutation is not exercised')),
+        mutate: settingsMutate,
       },
     },
     hostDescription: {
@@ -93,7 +118,7 @@ async function bench() {
   // per-connection catalog transport, ownership-driven faces, and the host's
   // catalog-changed forward attributed to the delivering connection.
   const catalogDirectory = new PermissionCatalogDirectory(connection as never, createSnapshotStore({}))
-  ctx.provide('permissionCatalog', catalogDirectory)
+  const releaseCatalog = ctx.provide('permissionCatalog', catalogDirectory)
   remote.$on('permission-presets/catalog-changed', () => { catalogDirectory.invalidateFor(connection as never) })
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   let decoration: CommandDecoration | undefined
@@ -129,6 +154,8 @@ async function bench() {
   await fiber.await()
   return {
     ctx, fiber, values, commands, managed, localHost, managedHost,
+    settingsNamespaces, settingsMutate,
+    dropCatalog: () => { releaseCatalog() },
     qualify: (value: AccountPermissionAvailability) => { policy.setAccountPermissions(value) },
     setResult: (r: { ok: boolean; matched?: boolean }) => { commandResult = r },
     setCatalog: (next: PermissionCatalog) => {
@@ -258,6 +285,51 @@ describe('ui-permission browser plugin', () => {
     b.failCatalog({ code: 'unavailable', message: 'host offline' })
     await expect(c.ui.options(proj, new AbortController().signal))
       .rejects.toThrow(/permission catalog read failed: unavailable: host offline/)
+  })
+
+  it('rejects options when the connected host serves no permission catalog', async () => {
+    const b = await bench()
+    try {
+      const c = b.decoration()!
+      const proj = { sessionId: sid('s1') }
+      b.values.set(sid('s1'), SELECT)
+      b.dropCatalog()
+      await expect(c.ui.options(proj, new AbortController().signal))
+        .rejects.toThrow(/serves no permission presets/)
+    } finally { await b.fiber.dispose() }
+  })
+
+  it('checks the default preset against current account eligibility before writing', async () => {
+    const b = await bench()
+    try {
+      b.settingsNamespaces.push(permissionNs('read-only', 3))
+      b.ctx.remote.$dispatch('settings/document-updated', ['permission', 1])
+      const injected = b.permissionRow()!.inject?.() as PermissionRowInjected | undefined
+      if (injected === undefined) throw new Error('expected the injected preset row')
+      await injected.load()
+      await vi.waitFor(() => {
+        expect(injected.hooks.permission.getSnapshot()).toMatchObject({ status: 'ready', currentValue: 'read-only' })
+      })
+      // The unverified account cannot write the gated Full access preset.
+      await injected.select('danger-full-access')
+      expect(injected.hooks.permission.getSnapshot()).toMatchObject({
+        status: 'error', error: accessEn['unavailable.unverified'],
+      })
+      expect(b.settingsMutate).not.toHaveBeenCalled()
+      b.settingsMutate.mockResolvedValue({
+        rpcId: 'mutate',
+        result: { ok: true as const, value: permissionNs('workspace-write', 4) },
+      })
+      await injected.select('workspace-write')
+      expect(b.settingsMutate).toHaveBeenCalledWith({
+        ns: 'permission',
+        ops: [{ op: 'set', path: ['defaultPreset'], value: 'workspace-write' }],
+        expectedRevision: 3,
+      })
+      expect(injected.hooks.permission.getSnapshot()).toMatchObject({
+        status: 'ready', currentValue: 'workspace-write', revision: 4,
+      })
+    } finally { await b.fiber.dispose() }
   })
 
   it('a pick submits the /permission line; rejection and unmatched throw', async () => {

@@ -155,6 +155,7 @@ describe('open and options load', () => {
   })
 
   it('an options failure keeps the shell open with search retained, surfaces the error, and retry reloads', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     let attempts = 0
     const { popup } = await readyPopup({
       options: () => {
@@ -171,6 +172,8 @@ describe('open and options load', () => {
     await Promise.resolve()
     expect(popup.state.getSnapshot()).toMatchObject({ status: 'ready', options: OPTIONS, search: 'da' })
     expect(attempts).toBe(2)
+    expect(errors).toHaveBeenCalledTimes(1)
+    errors.mockRestore()
   })
 
   it('retry is a no-op unless the options load failed', async () => {
@@ -316,6 +319,7 @@ describe('select', () => {
   })
 
   it('an onSelect failure keeps the shell open with search/highlight/token intact, no consumption, and select re-arms', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     let attempts = 0
     const deps = makeDeps()
     const { popup } = await readyPopup({
@@ -335,9 +339,12 @@ describe('select', () => {
     await popup.select(1) // retry = selecting again
     expect(deps.consume).toHaveBeenCalledExactlyOnceWith(SEGMENT)
     expect(popup.state.getSnapshot().open).toBe(false)
+    expect(errors).toHaveBeenCalledTimes(1)
+    errors.mockRestore()
   })
 
   it('ignores selects while closed, pending, failed, or out of filtered range', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const closed = new PopupSelectController<Ctx>(makeDeps())
     await closed.select(0)
     expect(closed.state.getSnapshot().open).toBe(false)
@@ -351,6 +358,7 @@ describe('select', () => {
     await popup.select(1) // only one filtered row
     expect(deps.consume).not.toHaveBeenCalled()
     expect(popup.state.getSnapshot().open).toBe(true)
+    errors.mockRestore()
   })
 
   it('a dismiss racing a succeeding onSelect revokes it: no consume, no focus, state stays closed', async () => {
@@ -369,6 +377,7 @@ describe('select', () => {
   })
 
   it('a dispose racing a failing onSelect revokes its error write', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     let reject!: (error: Error) => void
     const deps = makeDeps()
     const { popup } = await readyPopup({
@@ -380,6 +389,7 @@ describe('select', () => {
     await selecting
     expect(popup.state.getSnapshot()).toMatchObject({ open: false, error: null })
     expect(deps.consume).not.toHaveBeenCalled()
+    errors.mockRestore()
   })
 
   it('a reopen racing a succeeding onSelect keeps the new shell: no consume of the old segment', async () => {
