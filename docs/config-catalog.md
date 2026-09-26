@@ -641,6 +641,8 @@ export interface Config {
   dshHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
+  /** Whether Chokidar polls instead of using native filesystem events. */
+  watchUsePolling?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
   debounceMs?: number
 }
