@@ -520,10 +520,11 @@ jobs:
           exit "$sandbox_status"
 
       # Gateway is an independent npm project outside the root pnpm workspace.
-      # Root snapshot tests import its runtime modules, so install its locked
-      # production dependency graph before the consumer gate starts.
-      - name: Install Gateway runtime dependencies
-        run: npm ci --prefix gateway --omit=dev
+      # Root snapshot tests import its runtime modules and the typed lint face
+      # reads its dev-time @types (pg, better-sqlite3), so install the full
+      # locked dependency graph before the consumer gate starts.
+      - name: Install Gateway dependencies
+        run: npm ci --prefix gateway
 
       - name: Test Gateway execution through Loader and PostgreSQL
         id: gateway-execution

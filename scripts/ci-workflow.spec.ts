@@ -76,7 +76,7 @@ describe('CI workflow', () => {
       },
     })
     const steps = (consumer.steps as unknown[]).filter(isRecord)
-    const install = steps.findIndex(step => step.run === 'npm ci --prefix gateway --omit=dev')
+    const install = steps.findIndex(step => step.run === 'npm ci --prefix gateway')
     const execution = steps.findIndex(step => step.id === 'gateway-execution')
     const record = steps.findIndex(step => step.name === 'Record Gateway execution evidence')
     const upload = steps.findIndex(step => step.uses === './.github/actions/gate-evidence')
@@ -99,7 +99,7 @@ describe('CI workflow', () => {
       },
     })
     expect(steps.filter(step => step.uses === './.github/actions/gate-evidence')).toHaveLength(1)
-    expect(steps.filter(step => step.run === 'npm ci --prefix gateway --omit=dev')).toHaveLength(1)
+    expect(steps.filter(step => step.run === 'npm ci --prefix gateway')).toHaveLength(1)
     expect(isRecord(consumer.env) && consumer.env.HGW_TEST_DATABASE_URL).toBeUndefined()
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
     expect(manifest.scripts['test:gateway:execution']).toBe(
@@ -228,11 +228,11 @@ describe('CI workflow', () => {
     expectExternalCapacityExpression(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY, '32', '1')
     expect(String(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY)).toContain("&& '12'")
     const consumerSteps = node24Consumers.steps.filter(isRecord)
-    const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway runtime dependencies')
+    const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway dependencies')
     const consumerGateIndex = consumerSteps.findIndex(step => step.name === 'Run keyless compatibility, snapshot, and artifact gates')
     expect(gatewayInstallIndex).toBeGreaterThanOrEqual(0)
     expect(consumerSteps[gatewayInstallIndex]).toMatchObject({
-      run: 'npm ci --prefix gateway --omit=dev',
+      run: 'npm ci --prefix gateway',
     })
     expect(consumerGateIndex).toBeGreaterThan(gatewayInstallIndex)
     expect(consumerSteps[consumerGateIndex]).toMatchObject({ run: 'pnpm run check:ci:consumers:scoped' })
