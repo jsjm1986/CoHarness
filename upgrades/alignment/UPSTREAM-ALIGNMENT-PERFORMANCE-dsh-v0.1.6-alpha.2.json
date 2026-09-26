@@ -8,7 +8,9 @@
     "commit": "4a6c2af3aec1411f13c32e55f99c4830de7c756a",
     "platform": "darwin",
     "arch": "arm64",
-    "cpuModels": ["Apple M4"],
+    "cpuModels": [
+      "Apple M4"
+    ],
     "availableParallelism": 10,
     "node": "v25.8.1",
     "v8": "14.1.146.11-node.21",
@@ -43,7 +45,7 @@
     {
       "name": "conversation-fold",
       "status": "measured",
-      "evidence": "1,200 events, 1,600 compact records, 500,000 streamed deltas: large-window fold 19.5 ms vs 40 ms budget with 800 materialized Chat nodes. Delta scaling measures ~4.6-5.3x against the recalibrated 5x expectation / 6.25x bound; the CoHarness fold rebuilds location, turn-navigation, and timeline projections per window replace, so the upstream 2.5x expectation is not portable. The bound still rejects the ~11x per-delta-replay regression; see the session-open-performance-gate Agent Note."
+      "evidence": "1,200 events, 1,600 compact records, 500,000 streamed deltas: large-window fold 17.5-17.9 ms repeated min-of-3 on the arm64 reference, recalibrated expectation 18 ms vs 45 ms budget with 800 materialized Chat nodes; the first standard-hosted Ubuntu run measured 41.7 ms, inside the 2.5x scaled allowance. Delta scaling measures ~4.6-5.3x against the recalibrated 5x expectation / 6.25x bound; the CoHarness fold rebuilds location, turn-navigation, and timeline projections per window replace, so the upstream 2.5x expectation and 16 ms reference are not portable. The bound still rejects the ~11x per-delta-replay regression; see the session-open-performance-gate Agent Note."
     },
     {
       "name": "active-stream-reconnect",

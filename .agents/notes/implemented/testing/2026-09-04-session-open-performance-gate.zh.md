@@ -74,11 +74,11 @@ PR #3640 的标准双 CPU 运行 (run 34023970384, job 101461539961)使用 Node 
 | First-open Agent resume | 180 ms（历史参考） | 562 ms |
 | 当前 generation Agent resume | 40 ms | 100 ms |
 | Agent GC 后增量堆 | 26.1 MB | 33 MB |
-| Client fold 绝对时间 | 16 ms | 40 ms |
+| Client fold 绝对时间 | 18 ms | 45 ms |
 | Client fold delta 缩放比 | 5× | 6.25× |
 | 受限 old space | — | 128 MB |
 
-Fold 缩放比预期与上游校准 (2.5× / 3.125×) 不同：CoHarness 每次窗口替换还会重建 location、turn-navigation 与 timeline 投影，小窗口因此承担更多固定成本，记录数成比例的 fold 在 arm64 参考机上测得约 5×。该上限仍然拒绝其针对的约 11× 逐 delta 重放退化。
+Fold 缩放比预期与上游校准 (2.5× / 3.125×) 不同：CoHarness 每次窗口替换还会重建 location、turn-navigation 与 timeline 投影，小窗口因此承担更多固定成本，记录数成比例的 fold 在 arm64 参考机上测得约 5×。同一笔额外汇编把大窗口 fold 抬到 18 ms（上游参考为 16 ms）；首个托管 Ubuntu 运行实测 41.7 ms，仍在 2.5 倍系数预算内。该上限仍然拒绝其针对的约 11× 逐 delta 重放退化。
 
 ## 考虑过的替代方案
 

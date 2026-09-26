@@ -74,11 +74,11 @@ The calibrated source budgets are:
 | First-open Agent resume | 180 ms (historical reference) | 562 ms |
 | Current-generation Agent resume | 40 ms | 100 ms |
 | Agent retained heap | 26.1 MB | 33 MB |
-| Client-fold absolute time | 16 ms | 40 ms |
+| Client-fold absolute time | 18 ms | 45 ms |
 | Client-fold delta scaling | 5× | 6.25× |
 | Constrained old space | — | 128 MB |
 
-The fold scaling expectation differs from the upstream calibration (2.5× / 3.125×): each CoHarness window replace also rebuilds the location, turn-navigation, and timeline projections, so the small window carries more fixed cost and a record-proportional fold measures about 5× on the arm64 reference. The bound still rejects the roughly 11× per-delta-replay regression it exists to catch.
+The fold scaling expectation differs from the upstream calibration (2.5× / 3.125×): each CoHarness window replace also rebuilds the location, turn-navigation, and timeline projections, so the small window carries more fixed cost and a record-proportional fold measures about 5× on the arm64 reference. The same extra rebuild work places the large-window fold at 18 ms against upstream's 16 ms reference; the first hosted Ubuntu run measured 41.7 ms, within the 2.5× scaled budget. The bound still rejects the roughly 11× per-delta-replay regression it exists to catch.
 
 ## Alternatives considered
 

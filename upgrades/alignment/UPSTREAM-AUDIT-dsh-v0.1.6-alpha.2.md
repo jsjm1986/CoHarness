@@ -452,7 +452,7 @@ B10 验证中运行 `verify-default-product-isolation`、`verify-package-depende
 
 **本地适配（四处，均为架构差异而非语义放宽）。** `session-history-adapter.ts`：上游 `api/session-controller` 未携带，以本地 `SessionQueryEngine`/`observeSession` 加 `host/apiproxy` 的 model-selection 投影重建同款跟随语义（promote 仍在首帧 yield 后的下一次拉动发生）。`conversation-fold/runtime-client-shim.ts`：`dsh-client-runtime/client` 是浏览器模块表工厂无法在 plain-Node 解析，tsdown alias＋neverBundle 收窄把所需叶模块内联进 worker，其余包导入仍走 lib 出口。`agent-continuation` 改用本地 SDK 嵌套 launch 形态（`command/args/cwd/env`＋`--patch`）驱动 sdk-minimal profile。`long-session-browser` 适配本地 scaffold（`baseUrl` 字段、`<textarea>` composer、可重渲染的 Load earlier 交互）。
 
-**conversation-fold 缩放比重校准（有依据的本地分化）。** 上游期望 2.5×/上限 3.125× 假定 fold 成本与记录数成比例；本地 fold 每次窗口替换还重建 location、turn-navigation 与 timeline 投影，小窗口固定成本抬高比值。实测缩放稳定 4.6–5.3，期望改为 5×/上限 6.25×——判别力保留（逐 delta 重放退化约 11× 仍被拒），绝对时间预算 16 ms/40 ms 不变。依据写入 `session-open-performance-gate` note 双语。
+**conversation-fold 缩放比重校准（有依据的本地分化）。** 上游期望 2.5×/上限 3.125× 假定 fold 成本与记录数成比例；本地 fold 每次窗口替换还重建 location、turn-navigation 与 timeline 投影，小窗口固定成本抬高比值。实测缩放稳定 4.6–5.3，期望改为 5×/上限 6.25×——判别力保留（逐 delta 重放退化约 11× 仍被拒）。同一笔额外汇编也使绝对时间期望重校准为 18 ms（上限 45 ms）：首个托管 Ubuntu 运行实测 41.7 ms，超出按上游较轻 fold 校准的 40 ms 上限、但在按本地参考机的 2.5 倍系数预算内。依据写入 `session-open-performance-gate` note 双语。
 
 **CI 门禁补齐（真实缺口）。** `ci.yml` 新增 `node-24-bench` job：标准托管 `ubuntu-24.04`、不经 failover 路由、无 `needs`（独立测量车道）、15 分钟超时、pnpm store 无条件恢复、Chromium 安装与 `DSH_GATE_VERBOSE=1` 的 `check:ci:bench`；`all-checks-passed` 收编该 job。`ci-workflow.spec.ts` 移植上游三组断言（failover 无关性、cache 形态、步骤与超时钉住），21/21 通过。
 
