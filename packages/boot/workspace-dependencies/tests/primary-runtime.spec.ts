@@ -282,8 +282,8 @@ it('requires absolute deployment paths before registering its tool', async () =>
   const ctx = new Context()
   const harness = toolHarness(ctx)
   try {
-    expect(() => workspaceDependencies.apply(ctx, { source: 'relative', root })).toThrow('must be absolute')
-    expect(() => workspaceDependencies.apply(ctx, { source, root: 'relative' })).toThrow('must be absolute')
+    expect(() => { workspaceDependencies.apply(ctx, { source: 'relative', root }) }).toThrow('must be absolute')
+    expect(() => { workspaceDependencies.apply(ctx, { source, root: 'relative' }) }).toThrow('must be absolute')
     expect(harness.tool).toBeUndefined()
     workspaceDependencies.apply(ctx, { source, root })
     expect(harness.tool?.presentCall({})).toEqual({ card: 'generic', title: 'Load workspace dependencies', kind: 'read' })

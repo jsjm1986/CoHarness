@@ -73,7 +73,9 @@ async function boot() {
   ctx.provide('workspaceResources', resources as never)
   const sessions = {
     retain: vi.fn(() => ({ release: vi.fn() })),
-    list: createSnapshotStore({ current: SESSION as SessionId | undefined, byId: { [SESSION]: { id: SESSION } } }),
+    list: createSnapshotStore<{ current: SessionId | undefined; byId: Record<string, { id: SessionId }> }>({
+      current: SESSION, byId: { [SESSION]: { id: SESSION } },
+    }),
   }
   ctx.provide('sessions', sessions as never)
   const policy = new ProjectUiPolicyRuntime()
@@ -327,9 +329,9 @@ describe('ui-sidebar-right apply', () => {
 
     // No explicit Session falls back to the mounted current Session.
     binding.openDetails(undefined, { callId: 'call-2' })
-    expect(() => binding.openDetails(SESSION, undefined)).toThrow('require an explicit Session and call')
+    expect(() => { binding.openDetails(SESSION, undefined) }).toThrow('require an explicit Session and call')
     sessions.list.set({ current: undefined, byId: {} })
-    expect(() => binding.openDetails(undefined, { callId: 'call-3' })).toThrow('require an explicit Session and call')
+    expect(() => { binding.openDetails(undefined, { callId: 'call-3' }) }).toThrow('require an explicit Session and call')
 
     binding.close(SESSION)
     expect(instance.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(false)
@@ -345,7 +347,7 @@ describe('ui-sidebar-right apply', () => {
     const instance = handle.create(SESSION)
     instance.actions.open(SESSION)
     const reference = { release: vi.fn() }
-    sessions.retain.mockReturnValueOnce(reference as never)
+    sessions.retain.mockReturnValueOnce(reference)
     resources.pin.mockImplementationOnce(() => { throw new Error('pin failed') })
     expect(() => {
       ctx.sidebarRight.openResourceIn(SESSION, `dsh-resource://file/session/${SESSION}/a.txt`)
@@ -400,8 +402,8 @@ describe('ui-sidebar-right apply', () => {
     const { seat, fiber } = await boot()
     const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
     // 's-anon' has no owned persistence key, so clearing skips storage removal.
-    const instance = handle.create('s-anon' as SessionId)
-    expect(() => instance.clearPersisted()).not.toThrow()
+    const instance = handle.create('s-anon')
+    expect(() => { instance.clearPersisted() }).not.toThrow()
     await fiber.dispose()
   })
 
