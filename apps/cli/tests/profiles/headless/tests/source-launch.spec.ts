@@ -24,7 +24,9 @@ const keylessPatch = fileURLToPath(new URL(
 const SOURCE_LAUNCH_TIMEOUT_MS = 60_000
 
 describe('headless profile under the tsx source launcher', () => {
-  it('runs a tool round trip without splitting the module plane', async () => {
+  // The headless example wires only the bash executor; Windows hosts compose
+  // no shell tool for it, so the round trip has no POSIX-tool carrier there.
+  it.skipIf(process.platform === 'win32')('runs a tool round trip without splitting the module plane', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-source-launch-headless-'))
     try {
       const result = await execa(

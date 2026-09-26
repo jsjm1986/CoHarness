@@ -442,7 +442,7 @@ describe('cross-process write lock', () => {
     await b.close()
   })
 
-  it('arbitrates legacy create-and-probe lock files by their recorded pid', async () => {
+  it.skipIf(process.platform === 'win32')('arbitrates legacy create-and-probe lock files by their recorded pid', async () => {
     const dir = join(await freshRoot(), 'legacy')
     await mkdir(dir, { recursive: true })
     const lock = join(dir, LOCK)

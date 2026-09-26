@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { checkInventoryCoverage, checkManifest, checkMatrix } from './verify-upgrade-records.ts'
 
 const SHA = 'a'.repeat(40)
@@ -181,7 +182,7 @@ it('the record CLI verifies identities and the exact raw cumulative and incremen
     write('scripts/upstream-sync.json', { syncedTag: 'fixture', syncedCommit: commit, gateReplayRecord: matrixPath })
     write('scripts/verify-upgrade-records.ts', readFileSync(new URL('./verify-upgrade-records.ts', import.meta.url), 'utf8'))
     const run = () => {
-      const result = spawnSync(process.execPath, ['--import', createRequire(import.meta.url).resolve('tsx/esm'), join(root, 'scripts/verify-upgrade-records.ts')], {
+      const result = spawnSync(process.execPath, ['--import', pathToFileURL(createRequire(import.meta.url).resolve('tsx/esm')).href, join(root, 'scripts/verify-upgrade-records.ts')], {
         cwd: root, encoding: 'utf8', timeout: 30_000,
       })
       expect(result.error).toBeUndefined()

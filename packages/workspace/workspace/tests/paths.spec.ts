@@ -64,7 +64,10 @@ describe('execution-target paths', () => {
     const target = { targetKey: FsTargetKey('remote:opaque:42'), displayPath: '/remote/link' }
     const info = { type: 'directory' as const, version: FsVersion('remote-v1') }
     const filesystem = { resolve: vi.fn(async () => target), stat: vi.fn(async () => info), processPath: vi.fn(() => '/remote/canonical') }
-    expect(await resolveWorkspacePath('/remote/link', filesystem as unknown as FileSystem)).toEqual({ path: '/remote/canonical', info })
+    // The request spelling must be fully qualified on the Host; the opaque
+    // target key and the provider's process path stay remote-shaped either way.
+    const requested = process.platform === 'win32' ? 'C:\\remote\\link' : '/remote/link'
+    expect(await resolveWorkspacePath(requested, filesystem as unknown as FileSystem)).toEqual({ path: '/remote/canonical', info })
     expect(filesystem.stat).toHaveBeenCalledWith(target)
     expect(filesystem.processPath).toHaveBeenCalledWith(target)
   })
