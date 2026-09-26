@@ -386,6 +386,10 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     expectReminderFraming(reminderRequest)
     const session = page.getByRole('treeitem', { name: /Scheduled After follow-up/ })
     await session.click()
+    // turn:step keys repeat across sessions: wait for this session's own reply
+    // before locating the keyed row so the locator cannot resolve inside the
+    // previously open conversation.
+    await page.getByText(AFTER_REPLY, { exact: true }).waitFor({ timeout: 15_000 })
     if (afterAssistantReply === undefined) throw new Error('After assistant reply was not captured')
     const selector = `[data-chat-anchor-key="${assistantKey(afterAssistantReply)}"]`
     const row = page.locator(selector)
@@ -447,6 +451,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
 
     const session = page.getByRole('treeitem', { name: /Fixed-rate reminder batch/ })
     await session.click()
+    await page.getByText('Check primary metrics', { exact: false }).waitFor({ timeout: 15_000 })
     if (everyAssistantReply === undefined) throw new Error('Every assistant reply was not captured')
     const selector = `[data-chat-anchor-key="${assistantKey(everyAssistantReply)}"]`
     const row = page.locator(selector)
@@ -519,6 +524,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
 
     const session = page.getByRole('treeitem', { name: /Explicit local-time reminder/ })
     await session.click()
+    await page.getByText(AT_REPLY, { exact: true }).waitFor({ timeout: 15_000 })
     if (atAssistantReply === undefined) throw new Error('At assistant reply was not captured')
     const selector = `[data-chat-anchor-key="${assistantKey(atAssistantReply)}"]`
     const row = page.locator(selector)

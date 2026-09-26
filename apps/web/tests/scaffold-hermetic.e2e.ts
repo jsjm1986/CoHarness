@@ -140,7 +140,10 @@ it('isolates replay skill discovery from every ambient host root', async () => {
       expect(names).not.toContain('ambient-dsh')
       expect(names).not.toContain('ambient-agents')
       expect(names).not.toContain('ambient-bundled')
-      expect(names.toSorted()).toEqual(['office-docx', 'office-pptx', 'office-xlsx'])
+      // The shipped Web composition mounts no preset skills for the standard
+      // agent; with every host root pinned inside the empty temp world the
+      // merged catalog is empty rather than merely ambient-free.
+      expect(names).toEqual([])
     } finally {
       await handle.dispose()
     }

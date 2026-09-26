@@ -14,7 +14,7 @@ import { chromium } from 'playwright'
 import { strFromU8, unzipSync } from 'fflate'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, type SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses, fixtureUserPrompts,
   launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
@@ -294,13 +294,17 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const exportButton = page.getByRole('button', { name: 'Session log' })
     expect(await exportButton.isDisabled()).toBe(false)
     const header = exportButton.locator('xpath=ancestor::header[1]')
-    const [buttonBox, headerBox] = await Promise.all([
-      exportButton.boundingBox(), header.boundingBox(),
+    // The right Sidebar's expand button holds the header's corner; the export
+    // control sits immediately to its left.
+    const sidebarButton = page.getByRole('button', { name: 'Open right sidebar' })
+    const [buttonBox, sidebarBox, headerBox] = await Promise.all([
+      exportButton.boundingBox(), sidebarButton.boundingBox(), header.boundingBox(),
     ])
-    if (buttonBox === null || headerBox === null) {
+    if (buttonBox === null || sidebarBox === null || headerBox === null) {
       throw new Error('Session Header export geometry is unavailable')
     }
-    expect(headerBox.x + headerBox.width - (buttonBox.x + buttonBox.width)).toBeLessThanOrEqual(32)
+    expect(headerBox.x + headerBox.width - (sidebarBox.x + sidebarBox.width)).toBeLessThanOrEqual(32)
+    expect(sidebarBox.x - (buttonBox.x + buttonBox.width)).toBeLessThanOrEqual(32)
     const responsePromise = page.waitForResponse(response =>
       response.request().method() === 'HEAD'
       && new URL(response.url()).pathname === '/api/session.export', { timeout: 30_000 })
@@ -316,9 +320,10 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     // text verbatim (the assembled seam: real route, real persistence read).
     const files = unzipSync(await readFile(await download.path()))
     // The root entry keeps the persisted artifact's base filename — the
-    // current-generation session log is `session.v5`.
-    expect(Object.keys(files)).toEqual(['session.v5'])
-    const content = strFromU8(files['session.v5'] as Uint8Array)
+    // current-generation session log follows SESSION_FORMAT_VERSION.
+    const exportedLog = `session.v${SESSION_FORMAT_VERSION}`
+    expect(Object.keys(files)).toEqual([exportedLog])
+    const content = strFromU8(files[exportedLog] as Uint8Array)
     expect(content.split('\n')[0]).toContain(SEED_ID)
     expect(content).toContain('FIRST_DONE')
     await dialog.getByText('Close', { exact: true }).click()
@@ -356,8 +361,8 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
       const slashDownload = await slashDownloadPromise
       expect(slashDownload.suggestedFilename()).toBe(download.suggestedFilename())
       const slashFiles = unzipSync(await readFile(await slashDownload.path()))
-      expect(Object.keys(slashFiles)).toEqual(['session.v5'])
-      const slashContent = strFromU8(slashFiles['session.v5'] as Uint8Array)
+      expect(Object.keys(slashFiles)).toEqual([exportedLog])
+      const slashContent = strFromU8(slashFiles[exportedLog] as Uint8Array)
       const slashEvents = parseSessionLog(slashContent)
       const exportRun = slashEvents.findLast(event => event.type === 'command/run' && event.data.name === 'export')
       if (exportRun?.type !== 'command/run') throw new Error('slash ZIP has no export command/run')

@@ -131,16 +131,10 @@ describe('web e2e: assistant IconActions wait for the turn to end', () => {
     await expect.poll(() => copyButtons.count(), { timeout: 10_000 }).toBe(1)
     expect(await page.getByRole('button', { name: 'Branch into a new conversation' }).count()).toBe(0)
     await copyButtons.first().focus()
-    const catalogSources = sessionEvents.flatMap(event => event.type === 'user/message'
-      && event.data.source.kind === 'skill-catalog' ? [event.data.source] : [])
-    expect(catalogSources).toEqual([expect.objectContaining({
-      kind: 'skill-catalog',
-      entries: expect.arrayContaining([
-        expect.objectContaining({ name: 'office-docx' }),
-        expect.objectContaining({ name: 'office-pptx' }),
-        expect.objectContaining({ name: 'office-xlsx' }),
-      ]) as unknown[],
-    })])
+    // The shipped composition mounts no preset skills, so the request carries
+    // no skill-catalog source at all — an ambient host root must not leak in.
+    expect(sessionEvents.filter(event => event.type === 'user/message'
+      && event.data.source.kind === 'skill-catalog')).toEqual([])
     const running = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
     await compareOrRefreshGolden(RUNNING_EXPECTED, running, MODE)
 

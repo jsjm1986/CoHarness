@@ -18,7 +18,8 @@
   - img
   - img
   - text: System prompt
-- text: Begin your reply with the plain sentence "Reading the workspace now." as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop. {{clock}}
+- text: Begin your reply with the plain sentence "Reading the workspace now." as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - tooltip "Copy"
@@ -26,10 +27,6 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "Context injection skill-catalog":
-  - img
-  - img
-  - text: Context injection skill-catalog
 - button "Think The user wants me to begin with \"Reading the workspace now.\" and call bash with \"echo alpha\" in the same message. Then after the tool result, reply with the single word DONE and stop.":
   - img
   - img
@@ -54,10 +51,11 @@
   - img
 - button "6% of context used"
 - button "Stop generating"
-- button "1 turns · 1 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 1 steps{{throughput}} tok/s
-- button "7.9K tok · Cache hit 0%":
-  - img
-  - text: 7.9K tokCache hit 0%
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "7.9K tok · Cache hit 0%":
+    - img
+    - text: 7.9K tokCache hit 0%
 - separator "Adjust transcript content width"
