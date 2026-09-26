@@ -333,6 +333,49 @@ describe('the preset list', () => {
 
     expect(actions.load).toHaveBeenCalledTimes(2)
   })
+  it('gates selection controls on the picker preference when it is off', () => {
+    renderSection({
+      showPicker: false,
+      rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
+    })
+
+    // The creator entry explains the preference gate instead of opening a draft.
+    expect(screen.getByTitle(en.enablePickerToCreate)).toBeTruthy()
+    // The in-use row keeps a non-interactive Default label; other rows name
+    // the preference that must be turned on first.
+    expect(within(rowFor('standard')).getByTitle(en.selectionOffDefault)).toBeTruthy()
+    const mine = rowFor('mine')
+    const minePick = within(mine).getByTitle(en.enablePickerToSetDefault)
+    expect(minePick).toHaveProperty('disabled', true)
+    expect(mine.className).toContain('cardSelectionDisabled')
+  })
+
+  it('flips the picker preference through the switch', () => {
+    const actions = renderSection({ showPicker: false })
+
+    fireEvent.click(screen.getByRole('switch', { name: en.showPicker }))
+
+    expect(actions.setPickerVisible).toHaveBeenCalledWith(true)
+  })
+
+  it.each([
+    ['project', 'readOnlyProject'],
+    ['account', 'readOnlyAccount'],
+    ['organization', 'readOnlyOrganization'],
+    ['deployment', 'readOnlyDeployment'],
+    [undefined, 'readOnly'],
+  ] satisfies [AgentPresetSectionState['policyWritableReason'], keyof typeof en][])(
+    'explains a %s-owned policy as read-only',
+    (reason, key) => {
+      renderSection({ policyWritable: false, policyWritableReason: reason })
+
+      // The status line and the disabled switch carry the same owner copy.
+      expect(screen.getByRole('status').textContent).toBe(en[key])
+      const pickerSwitch = screen.getByRole('switch', { name: en.showPicker })
+      expect(pickerSwitch).toHaveProperty('disabled', true)
+      expect(pickerSwitch).toHaveProperty('title', en[key])
+    },
+  )
 })
 
 describe('the copy dialog', () => {

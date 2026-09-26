@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -6,6 +6,8 @@ import {
   captureExpectedWorkspaceSnapshot,
   captureWorkspaceSnapshot,
   EMPTY_WORKSPACE_MARKER,
+  materializeWorkspaceSnapshot,
+  type WorkspaceSnapshotEntry,
 } from '../src/workspace.ts'
 
 describe('workspace snapshots', () => {
@@ -59,5 +61,28 @@ describe('workspace snapshots', () => {
     expect(await captureWorkspaceSnapshot(directory)).toEqual([
       { path: 'nul.bin', kind: 'binary', base64: 'YQBi' },
     ])
+  })
+
+  it('materializes an empty expected workspace as a marker-only tree', async () => {
+    const expected = join(await root(), 'workspace.expected')
+    await materializeWorkspaceSnapshot(expected, [])
+    expect(await readFile(join(expected, EMPTY_WORKSPACE_MARKER), 'utf8')).toBe('')
+    expect(await captureExpectedWorkspaceSnapshot(expected)).toEqual([])
+  })
+
+  it('materializes every entry kind and round-trips through capture', async () => {
+    const expected = join(await root(), 'workspace.expected')
+    const entries: WorkspaceSnapshotEntry[] = [
+      { path: 'bin.dat', kind: 'binary', base64: '/wE=' },
+      { path: 'deep/nested/note.txt', kind: 'text', content: 'hello\n' },
+      { path: 'empty/dir', kind: 'empty-directory' },
+      { path: 'link', kind: 'symlink', target: 'deep/nested/note.txt' },
+    ]
+
+    await materializeWorkspaceSnapshot(expected, entries)
+    expect(await captureExpectedWorkspaceSnapshot(expected)).toEqual(entries)
+    // Rewriting replaces the tree instead of merging into it.
+    await materializeWorkspaceSnapshot(expected, [])
+    expect(await captureExpectedWorkspaceSnapshot(expected)).toEqual([])
   })
 })

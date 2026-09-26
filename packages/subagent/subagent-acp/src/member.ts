@@ -287,6 +287,9 @@ export class AcpMemberTransport implements ExternalMemberTransport {
     const sessionBox: { current: AcpMemberSession | undefined } = { current: undefined }
     const client = createClient({ name: 'dsh-subagent-acp-member' })
       .onNotification(methods.client.session.update, ({ params }) => {
+        /* v8 ignore next -- sessionBox.current is assigned synchronously right
+           below, before the handshake completes; an agent cannot send
+           session/update first. */
         if (sessionBox.current === undefined) {
           throw new Error('subagent-acp member: session update arrived before session creation')
         }
@@ -313,6 +316,9 @@ export class AcpMemberTransport implements ExternalMemberTransport {
 
     let disposed = false
     const dispose = async (): Promise<void> => {
+      /* v8 ignore next -- each MemberConnection is disposed at most once:
+         probe/open-catch call it exactly once; a returned session owns its own
+         teardown. */
       if (disposed) return
       disposed = true
       await disposeAcpChild(child, this.config.disposeEofGraceMs)

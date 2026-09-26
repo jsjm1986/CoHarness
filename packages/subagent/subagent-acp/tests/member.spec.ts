@@ -14,16 +14,22 @@ import {
   ExternalBindingStore,
   EXTERNAL_TURN_OUTCOME_UNKNOWN,
   externalMemberTurn,
+  type ExternalTurnBound,
+  type ExternalTurnOutcome,
 } from '@deepseek-ai/dsh-subagent/external'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { spawnSubprocess } from '@deepseek-ai/dsh-subprocess-local/src/spawn.ts'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import * as acp from '../src/index.ts'
 import {
+  ACP_MEMBER_MODEL,
   ACP_MEMBER_ROUTE,
+  AcpMemberAdapter,
   AcpMemberTransport,
   type AcpMemberConfig,
 } from '../src/member.ts'
+import type { PermissionPolicy } from '../src/run.ts'
 
 /**
  * Keyless member tests for persistent ACP children: the scripted mock agent
@@ -50,12 +56,16 @@ function root(): string {
   return dir
 }
 
-function memberConfig(dir: string, env: Record<string, string>): AcpMemberConfig {
+function memberConfig(
+  dir: string,
+  env: Record<string, string>,
+  permission: PermissionPolicy = 'reject',
+): AcpMemberConfig {
   return {
     command: process.execPath,
     args: [mockServer],
     cwd: dir,
-    permission: 'reject',
+    permission,
     env,
     disposeEofGraceMs: 500,
     disposeGraceMs: 1_000,
@@ -73,6 +83,15 @@ async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[
   const chunks: StreamChunk[] = []
   for await (const chunk of stream) chunks.push(chunk)
   return chunks
+}
+
+/** Collect one member session turn's pieces (prompt-bound, bound, or outcome). */
+async function collectTurn(
+  turn: AsyncIterable<string | ExternalTurnBound | ExternalTurnOutcome>,
+): Promise<(string | ExternalTurnBound | ExternalTurnOutcome)[]> {
+  const pieces: (string | ExternalTurnBound | ExternalTurnOutcome)[] = []
+  for await (const piece of turn) pieces.push(piece)
+  return pieces
 }
 
 function outcomeText(chunks: StreamChunk[]): string {
@@ -390,5 +409,250 @@ describe('ACP member plugin composition', () => {
     // the task text plus its runtime-context and delegation preamble.
     expect(entries[0]!.text).toContain('member task')
     expect(entries[1]).toMatchObject({ sessionId: 'acp-member-session', role: 'agent', text: 'member answer' })
+  })
+})
+
+describe('AcpMemberSession surface', () => {
+  it('rejects a turn on a session whose session/new carried no id, and disposes without cancel', async () => {
+    const dir = root()
+    const transport = new AcpMemberTransport(
+      memberConfig(dir, { MOCK_MISSING_SESSION_ID: '1' }),
+      spawnSubprocess,
+    )
+    const session = await transport.open(undefined, signal)
+    expect(session.externalId).toBeUndefined()
+    await expect(collectTurn(session.turn('task', signal)))
+      .rejects.toThrow('prompt issued before the ACP session opened')
+    // An unbound session has nothing to cancel remotely: dispose still tears
+    // the child down and stays idempotent.
+    await session.dispose()
+    await session.dispose()
+  })
+
+  it('rejects a turn on an aborted signal before the prompt issues', async () => {
+    const dir = root()
+    const transport = new AcpMemberTransport(memberConfig(dir, {}), spawnSubprocess)
+    const session = await transport.open(undefined, signal)
+    const controller = new AbortController()
+    controller.abort()
+    await expect(collectTurn(session.turn('task', controller.signal)))
+      .rejects.toThrow('turn aborted before the prompt was issued')
+    await session.dispose()
+    // The idempotent guard makes a second dispose a no-op.
+    await session.dispose()
+  })
+
+  it('folds session updates only for the bound id and only for text message chunks', async () => {
+    const dir = root()
+    const transport = new AcpMemberTransport(memberConfig(dir, {}), spawnSubprocess)
+    const session = await transport.open(undefined, signal)
+    const sessionId = session.externalId as string
+    expect(sessionId).toBeDefined()
+
+    // A notification for a foreign session id is dropped.
+    session.pushUpdate('foreign-id', {
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text: 'stray' },
+    })
+    // A non-message update is consumed but never accumulated.
+    session.pushUpdate(sessionId, {
+      sessionUpdate: 'agent_thought_chunk',
+      content: { type: 'text', text: 'thinking' },
+    })
+    // A message chunk with non-text content carries no text.
+    session.pushUpdate(sessionId, {
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'resource', resource: { uri: 'file:///x' } },
+    })
+    // A user chunk outside the load window is folded into neither the
+    // transcript nor the turn text.
+    session.pushUpdate(sessionId, {
+      sessionUpdate: 'user_message_chunk',
+      content: { type: 'text', text: 'user echo' },
+    })
+
+    // The prompt now answering proves none of the above text leaked into it.
+    const pieces = await collectTurn(session.turn('task', signal))
+    expect(pieces).toEqual([{ text: 'mock child answer' }])
+    await session.dispose()
+  })
+
+  it('streams past a thought chunk without letting it into the turn text', async () => {
+    const dir = root()
+    const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
+    const transport = new AcpMemberTransport(
+      memberConfig(dir, { MOCK_THOUGHT: '1', MOCK_TEXT: 'settled' }),
+      spawnSubprocess,
+    )
+    const chunks = await collect(externalMemberTurn(
+      { sessionId: SessionId('child-thought'), messages: userMessages(['task']), signal },
+      store, transport,
+    ))
+    expect(outcomeText(chunks)).toBe('settled')
+  })
+
+  it('cancels the remote turn on dispose, best-effort when the child is already dead', async () => {
+    const dir = root()
+    const handles: SubprocessHandle[] = []
+    const transport = new AcpMemberTransport(
+      memberConfig(dir, {}),
+      (spec: SubprocessSpawnSpec) => {
+        const handle = spawnSubprocess(spec)
+        handles.push(handle)
+        return handle
+      },
+    )
+    const session = await transport.open(undefined, signal)
+    const child = handles[0]!
+    child.stdin!.destroy()
+    child.terminate()
+    await child.waitForExit()
+    // The cancel notify cannot reach a dead child; the failure stays swallowed.
+    await session.dispose()
+  })
+})
+
+describe('AcpMemberTransport startup failures', () => {
+  it('rejects resuming a bound session when the agent cannot load sessions', async () => {
+    const dir = root()
+    const transport = new AcpMemberTransport(memberConfig(dir, {}), spawnSubprocess)
+    await expect(transport.open('acp-session-1', signal))
+      .rejects.toThrow('does not advertise `loadSession`')
+  })
+
+  it('rejects open and probe on an already-aborted signal', async () => {
+    const dir = root()
+    const transport = new AcpMemberTransport(memberConfig(dir, {}), spawnSubprocess)
+    const controller = new AbortController()
+    controller.abort()
+    await expect(transport.probe(controller.signal))
+      .rejects.toThrow('open aborted before the child spawned')
+    await expect(transport.open(undefined, controller.signal))
+      .rejects.toThrow('open aborted before the child spawned')
+  })
+
+  it('rejects a child handle that dropped a piped protocol stream', async () => {
+    const dir = root()
+    const stubHandle: SubprocessHandle = {
+      control: undefined,
+      stdin: undefined,
+      stdout: undefined,
+      stderr: undefined,
+      collected: {},
+      done: new Promise(() => {}),
+      terminate: () => {},
+      waitForExit: async () => true,
+    }
+    const transport = new AcpMemberTransport(memberConfig(dir, {}), () => stubHandle)
+    await expect(transport.open(undefined, signal))
+      .rejects.toThrow('dropped a piped protocol stream')
+  })
+
+  it('disposes the child and rethrows when initialize fails', async () => {
+    const dir = root()
+    const transport = new AcpMemberTransport(
+      memberConfig(dir, { MOCK_CRASH_ON_INITIALIZE: '1' }),
+      spawnSubprocess,
+    )
+    await expect(transport.open(undefined, signal)).rejects.toThrow()
+  })
+})
+
+describe('AcpMemberTransport permission policy', () => {
+  function memberTurnChunks(
+    dir: string,
+    env: Record<string, string>,
+    permission: PermissionPolicy,
+  ): Promise<StreamChunk[]> {
+    const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
+    const transport = new AcpMemberTransport(
+      memberConfig(dir, env, permission),
+      spawnSubprocess,
+    )
+    return collect(externalMemberTurn(
+      { sessionId: SessionId('child-permission'), messages: userMessages(['task']), signal },
+      store, transport,
+    ))
+  }
+
+  it('selects an allow option under the allow policy', async () => {
+    const chunks = await memberTurnChunks(root(), { MOCK_PERMISSION: '1' }, 'allow')
+    expect(outcomeText(chunks)).toBe('mock child answer')
+  })
+
+  it('cancels the prompt under the allow policy when no allow option exists', async () => {
+    const chunks = await memberTurnChunks(
+      root(),
+      { MOCK_PERMISSION: '1', MOCK_NO_ALLOW: '1' },
+      'allow',
+    )
+    expect(outcomeText(chunks)).toBe('')
+  })
+
+  it('cancels every permission prompt under the reject policy', async () => {
+    const chunks = await memberTurnChunks(root(), { MOCK_PERMISSION: '1' }, 'reject')
+    expect(outcomeText(chunks)).toBe('')
+  })
+})
+
+describe('AcpMemberAdapter', () => {
+  it('reports the fixed member model and rejects auxiliary calls', async () => {
+    const dir = root()
+    const adapter = new AcpMemberAdapter(
+      new AcpMemberTransport(memberConfig(dir, {}), spawnSubprocess),
+      new ExternalBindingStore(join(dir, 'bindings.jsonl')),
+    )
+    expect(adapter.providerInfo('route-x')).toEqual({ id: 'route-x', name: 'ACP member' })
+    await expect(adapter.listModels('route-x')).resolves.toEqual([
+      { provider: 'route-x', id: ACP_MEMBER_MODEL, name: 'ACP member' },
+    ])
+    expect(() => adapter.stream({
+      provider: ACP_MEMBER_ROUTE,
+      model: ACP_MEMBER_MODEL,
+      messages: userMessages(['x']),
+      purpose: 'compaction',
+      sessionId: SessionId('child-1'),
+    })).toThrow('auxiliary model calls')
+  })
+})
+
+describe('ACP member plugin defaults', () => {
+  it('derives member workspace from the configured cwd when memberCwd is omitted', async () => {
+    const dir = root()
+    const ctx = new Context()
+    contexts.push(ctx)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const { LlmRuntime } = await import('@deepseek-ai/dsh-llm')
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(acp, {
+      providerName: 'acp-member-cwd',
+      command: process.execPath,
+      args: [mockServer],
+      resume: true,
+      cwd: dir,
+      permission: 'reject',
+      stateDir: join(dir, 'state'),
+      env: {},
+    })
+    expect(ctx.subagents.getProvider('acp-member-cwd')).toBeDefined()
+  })
+
+  it('falls back to the launch cwd and the default state dir when both are omitted', async () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const { LlmRuntime } = await import('@deepseek-ai/dsh-llm')
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(acp, {
+      providerName: 'acp-member-defaults',
+      command: process.execPath,
+      args: [mockServer],
+      resume: true,
+      permission: 'reject',
+      env: {},
+    })
+    expect(ctx.subagents.getProvider('acp-member-defaults')).toBeDefined()
   })
 })

@@ -148,6 +148,7 @@ export function recoverCodexThread(
   const texts: string[] = []
   for (let i = promptIndex + 1; i < entries.length; i++) {
     const entry = entries[i]
+    /* v8 ignore next -- entries is a dense push-built array; indexing never yields undefined. */
     if (entry === undefined) continue
     const text = rolloutAgentText(entry)
     if (text !== undefined && text !== '') texts.push(text)
@@ -197,6 +198,8 @@ class CodexMemberSession implements ExternalMemberSession {
       // persists the binding and marks the prompt pending while this
       // generator is suspended here, so a crash during runTurn leaves the
       // issued prompt recoverable rather than resent to a fresh thread.
+      /* v8 ignore else -- wire.startThread throws when the response carries no
+         thread id, so collectThreadId cannot return undefined here. */
       if (this.externalId !== undefined) yield { bound: this.externalId }
     } else {
       await wire.resumeThread(this.externalId, signal)

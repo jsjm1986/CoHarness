@@ -212,6 +212,7 @@ export function apply(ctx: ClientContext): void {
         presetSelected()
         rosterReaders.delete(readRoster)
         creatorDraft = undefined
+        /* v8 ignore else -- a scope unload runs before the same fiber's next mount, so this cleanup never meets a newer seat */
         if (seatRef === seat) seatRef = undefined
         chip()
         label()

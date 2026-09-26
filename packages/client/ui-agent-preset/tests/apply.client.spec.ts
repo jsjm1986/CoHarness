@@ -75,7 +75,7 @@ const ROSTER_HIDDEN = {
 
 async function bench(
   hostSnapshot: unknown = { canOpenPath: true },
-  options: { failSettingsUpdate?: boolean } = {},
+  options: { failSettingsUpdate?: boolean; deferSettingsUpdate?: Promise<void> } = {},
 ) {
   const ctx = new Context()
   // The host's answer, mutable so a spec can move the default the way the
@@ -136,8 +136,9 @@ async function bench(
           rpcId: 'r',
           result: { ok: true as const, value: { writable: true, hasDocument: true, namespaces: [] } },
         }),
-        update: (payload: { patch: { default?: unknown; modeSelectionEnabled?: unknown } }) => {
+        update: async (payload: { patch: { default?: unknown; modeSelectionEnabled?: unknown } }) => {
           calls.push(`settings:${JSON.stringify(payload.patch)}`)
+          await options.deferSettingsUpdate
           if (options.failSettingsUpdate === true) {
             return Promise.resolve({
               rpcId: 'r',
@@ -684,6 +685,81 @@ describe('ui-agent-preset apply', () => {
     expect(calls.filter(call => call.startsWith('select:'))).toEqual([
       'select:minimal', 'select:standard', 'select:minimal',
     ])
+    conversation()
+  })
+
+  it('drops a blank-session sync captured by a superseded seat', async () => {
+    const gate = Promise.withResolvers<undefined>()
+    const { ctx, slots, calls } = await bench({ canOpenPath: true }, { deferSettingsUpdate: gate.promise })
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state = {
+      current: 's1',
+      byId: { s1: { id: 's1', blank: true, agentPreset: 'standard' } },
+    }
+    const sessions = sessionsDouble(state)
+    ctx.provide('sessions', sessions as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    const fiber = ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply })
+    await fiber.await()
+    const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+    await section.load()
+
+    const pending = section.makeDefault('minimal')
+    // The Settings write is in flight: the blank-session sync has already
+    // captured this mount's seat but runs only after the write settles.
+    await vi.waitFor(() => {
+      expect(calls.some(call => call.startsWith('settings:'))).toBe(true)
+    })
+
+    // Disposing the mount drops the seat before the write lands, so the
+    // captured sync runs against a seat no longer current and refuses.
+    await fiber.dispose()
+    gate.resolve(undefined)
+    await pending
+
+    // The superseded seat's sync is a no-op — no selection reaches the session.
+    expect(calls.filter(call => call.startsWith('select:'))).toEqual([])
+    conversation()
+  })
+
+  it('ignores a roster reply superseded by a newer load', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const seat = (slots.entries('conversation.hero.agentPreset')[0]!
+      .inject as unknown as () => AgentPresetSeatInjected)()
+    const remote = ctx.get('remote') as unknown as {
+      agentPresets: { list: () => Promise<typeof ROSTER_ONE | typeof ROSTER_MOVED> }
+    }
+
+    // First load stalls inside the host call; a second load supersedes it and
+    // lands the moved roster before the stale reply arrives.
+    const stale = Promise.withResolvers<typeof ROSTER_ONE | typeof ROSTER_MOVED>()
+    let listCalls = 0
+    remote.agentPresets.list = () => listCalls++ === 0 ? stale.promise : Promise.resolve(ROSTER_MOVED)
+    const staleLoad = seat.load()
+    await seat.load()
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('minimal')
+    stale.resolve(ROSTER_ONE)
+    await staleLoad
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('minimal')
+
+    // A stale rejection is swallowed the same way: it must not overwrite the
+    // newer load's clean state.
+    const failed = Promise.withResolvers<typeof ROSTER_ONE | typeof ROSTER_MOVED>()
+    remote.agentPresets.list = () => listCalls++ === 2 ? failed.promise : Promise.resolve(ROSTER_MOVED)
+    const failedLoad = seat.load()
+    await seat.load()
+    failed.reject(new Error('stale list died'))
+    await failedLoad
+    expect(seat.hooks.agentPresetSeat.getSnapshot().error).toBeNull()
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('minimal')
     conversation()
   })
 
