@@ -7,6 +7,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -17,7 +19,8 @@
   - img
   - img
   - text: System prompt
-- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. 7/25 {{clock}}"
+- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
@@ -47,21 +50,22 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
-- button "compact Compacted 5 history items (~{{tokens}} tokens)"
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
+- button "compact Compacted 5 history items (~253 tokens)"
 - button "Context injection AGENTS.md":
   - img
   - img
   - text: Context injection AGENTS.md
 - img
 - text: permission preset read-only
-- 'button "feedback Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured." [expanded]':
+- 'button "feedback Feedback recorded for session {{seededId}} Anonymous user: {{userId}}. Session sharing is not configured." [expanded]':
   - img
-  - text: "feedback Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured."
-- text: "Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured."
+  - text: "feedback Feedback recorded for session {{seededId}} Anonymous user: {{userId}}. Session sharing is not configured."
+- text: "Feedback recorded for session {{seededId}} Anonymous user: {{userId}}. Session sharing is not configured."
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -74,10 +78,11 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 2 steps{{throughput}} tok/s
-- button "16K tok · Cache hit 98%":
-  - img
-  - text: 16K tokCache hit 98%
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "16K tok · Cache hit 98%":
+    - img
+    - text: 16K tokCache hit 98%
 - separator "Adjust transcript content width"

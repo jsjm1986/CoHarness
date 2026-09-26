@@ -5,4 +5,5 @@
   - text: +1 -1
 - button "Copy"
 - text: config.txt - mode=DEBUG + mode=RELEASE level=info └ +1 -1 · 1 file
+- button "Open details in sidebar"
 - button "Inspect"

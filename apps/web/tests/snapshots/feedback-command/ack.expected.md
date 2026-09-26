@@ -1,4 +1,4 @@
-- 'button "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."':
+- 'button "feedback Feedback recorded for session session-faa2cfc2-d38c-48b9-9d35-9208a974eaac Anonymous user: ab190a4f-45cd-4249-8615-4e80d79883f7. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."':
   - img
   - img
-  - text: "feedback Feedback recorded for session session-{{uuid}} Anonymous user: {{uuid}}. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."
+  - text: "feedback Feedback recorded for session session-faa2cfc2-d38c-48b9-9d35-9208a974eaac Anonymous user: ab190a4f-45cd-4249-8615-4e80d79883f7. Session sharing is feedback-gated; recording feedback releases the session prefix for sharing."

@@ -17,13 +17,16 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: "Explain event sourcing in one sentence.Your parent agent id is \"session-{{uuid}}\". Before you finish, send your result to that agent with send_message({ agent_id: \"session-{{uuid}}\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn. {{clock}}"
+- text: "Explain event sourcing in one sentence.Your parent agent id is \"session-dd64b8ec-a766-4470-bf40-fd4ba4ab6194\". Before you finish, send your result to that agent with send_message({ agent_id: \"session-dd64b8ec-a766-4470-bf40-fd4ba4ab6194\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":
@@ -39,14 +42,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Now give the same explanation to a human reader. {{clock}}
+- text: Now give the same explanation to a human reader.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":
@@ -62,10 +67,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -76,10 +82,11 @@
 - 'button "Access mode, current: Custom"': Custom
 - button "6% of context used"
 - button "Send message" [disabled]
-- button "2 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 2 turns · 2 steps{{throughput}} tok/s
-- button "15.7K tok · Cache hit 99%":
-  - img
-  - text: 15.7K tokCache hit 99%
+- group "Session statistics":
+  - "button \"2 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "2 turns · 2 steps{{throughput}} tok/s"
+  - button "15.7K tok · Cache hit 99%":
+    - img
+    - text: 15.7K tokCache hit 99%
 - separator "Adjust transcript content width"

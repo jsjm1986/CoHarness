@@ -2,5 +2,5 @@
   - text: Files & folders
   - option "File · reference.txt reference.txt" [selected]
   - text: Session conversations
-  - option "Session · reference-order-target-session {{cwd}} · {{timestamp}}"
-  - option "Session · reference-source-session {{cwd}} · {{timestamp}}"
+  - "option \"Session · reference-order-target-session {{cwd}} · 2026-09-26T13:34:24.364Z\""
+  - "option \"Session · reference-source-session {{cwd}} · 2026-09-26T13:34:24.341Z\""

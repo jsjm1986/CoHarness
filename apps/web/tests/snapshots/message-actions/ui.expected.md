@@ -7,17 +7,16 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "2 tool calls · 2 intermediate messages" [expanded]:
-  - text: 2 tool calls · 2 intermediate messages
+- button "2 tool calls · 1 intermediate message":
+  - text: 2 tool calls · 1 intermediate message
   - img
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
-- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. 7/25 {{clock}}"
+- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - tooltip "Copy"
@@ -26,6 +25,20 @@
   - img
   - text: Think The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
 - paragraph: I will read both files before answering.
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation" [disabled]:
+  - img
+- text: Available only on the last message of a completed turn
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "Read a.txt":
   - img
   - img
@@ -36,32 +49,11 @@
   - img
   - text: Read
   - button "b.txt"
-- button "Think Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
-  - img
-  - img
-  - text: Think Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
-- paragraph: DONE
-- text: Stopped
-- button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
-  - img
-- button "Branch into a new conversation" [disabled]:
-  - img
-- text: Available only on the last message of a completed turn
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
-- status:
-  - text: This turn failedprovider stream reset
-  - code: SERVER_ERROR
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Now give the final answer. 7/25 {{clock}}
+- text: Now give the final answer.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: DONE
@@ -73,10 +65,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -85,14 +78,15 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model, current DeepSeek-V4-Flash":
-  - text: DeepSeek-V4-Flash
+- button "Select model":
+  - text: Select model
   - img
 - button "Send message" [disabled]
-- button "2 turns · 3 steps · {{throughput}} tok/s":
-  - img
-  - text: 2 turns · 3 steps{{throughput}} tok/s
-- button "16K tok · Cache hit 98%":
-  - img
-  - text: 16K tokCache hit 98%
+- group "Session statistics":
+  - "button \"2 turns · 3 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "2 turns · 3 steps{{throughput}} tok/s"
+  - button "7.9K tok · Cache hit 98%":
+    - img
+    - text: 7.9K tokCache hit 98%
 - separator "Adjust transcript content width"

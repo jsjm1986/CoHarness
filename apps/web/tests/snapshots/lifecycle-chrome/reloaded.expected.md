@@ -9,10 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Reply with the single word LIGHTHOUSE and stop. {{clock}}
+- text: Reply with the single word LIGHTHOUSE and stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The user wants me to reply with a single word. Let me comply.":
@@ -28,10 +31,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -45,10 +49,11 @@
   - img
 - button "6% of context used"
 - button "Send message" [disabled]
-- button "1 turns · 1 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 1 steps{{throughput}} tok/s
-- button "7.8K tok · Cache hit 99%":
-  - img
-  - text: 7.8K tokCache hit 99%
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "7.8K tok · Cache hit 99%":
+    - img
+    - text: 7.8K tokCache hit 99%
 - separator "Adjust transcript content width"
