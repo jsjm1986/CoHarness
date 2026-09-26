@@ -1,0 +1,100 @@
+/** Browser history never crosses verified ownership or restores executable addresses. */
+import { afterEach, expect, it, vi } from 'vitest'
+import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import { createScopedBrowserStore } from '../src/client/browser/persistence.ts'
+import { BrowserNavigation } from '../src/client/browser/BrowserNavigation.ts'
+
+const tab = 'tab1' as TabId
+afterEach(() => { vi.unstubAllGlobals() })
+
+function setup() {
+  const values = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+  })
+  let key: string | undefined = 'account:1/runtime:personal/session:one'
+  const listeners = new Set<() => void>()
+  const disposers: Array<() => void> = []
+  const handle = createScopedBrowserStore({
+    key: () => key, origin: () => 'https://app.test',
+    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    onDispose: (dispose) => { disposers.push(dispose) },
+  })
+  return { values, handle, listeners,
+    setKey(next: string | undefined) { key = next; for (const listener of listeners) listener() },
+    dispose() { for (const dispose of disposers) dispose() },
+  }
+}
+
+it('restores canonical history only for its verified owner and omits transient sandbox state', () => {
+  const setupState = setup()
+  const store = setupState.handle.create('one')
+  const navigation = new BrowserNavigation()
+  navigation.navigate({ kind: 'https', url: 'https://example.test/', title: 'example.test' })
+  store.actions.replace(tab, navigation.snapshot)
+  expect(setupState.values.size).toBe(1)
+  expect([...setupState.values.values()][0]).not.toContain('sandbox')
+  setupState.setKey(undefined)
+  expect(store.getSnapshot().byTab).toEqual({})
+  setupState.setKey('account:2/runtime:personal/session:one')
+  expect(store.getSnapshot().byTab).toEqual({})
+  setupState.setKey('account:1/runtime:personal/session:one')
+  expect(BrowserNavigation.current(store.getSnapshot().byTab[tab])?.url).toBe('https://example.test/')
+  expect(store.getSnapshot().byTab[tab]?.navigation.status).toBe('empty')
+  setupState.dispose()
+  expect(setupState.listeners.size).toBe(0)
+})
+
+it('rejects damaged storage, foreign-origin policy violations and invalid history pointers', () => {
+  const setupState = setup()
+  const key = 'dsh.sidebar-browser.scoped.v1.account:1/runtime:personal/session:one'
+  for (const raw of ['{', JSON.stringify({ version: 2, tabs: {} }), ...['javascript:alert(1)', 'https://app.test/private', 'https://user:secret@example.test/'].map(url => JSON.stringify({ version: 1, tabs: { tab1: { entries: [url], index: 0 } } })), JSON.stringify({ version: 1, tabs: { tab1: { entries: ['https://example.test'], index: 2 } } })]) {
+    setupState.values.set(key, raw)
+    expect(setupState.handle.create('one').getSnapshot().byTab).toEqual({})
+  }
+  setupState.dispose()
+})
+
+it('restores an empty history without a pending request', () => {
+  const setupState = setup()
+  setupState.values.set(
+    'dsh.sidebar-browser.scoped.v1.account:1/runtime:personal/session:one',
+    JSON.stringify({ version: 1, tabs: { tab9: { entries: [], index: -1 } } }))
+  const store = setupState.handle.create('one')
+  expect(store.getSnapshot().byTab['tab9' as TabId]?.entries).toEqual([])
+  expect(store.getSnapshot().byTab['tab9' as TabId]?.request).toBeUndefined()
+  setupState.dispose()
+})
+
+it('serves bare stores off-scope and skips writes with no live owner key', () => {
+  const setupState = setup()
+  // A scopeless create returns an unwired instance: no restore, no writes.
+  const bare = setupState.handle.create(undefined)
+  expect(bare.getSnapshot().byTab).toEqual({})
+
+  const store = setupState.handle.create('one')
+  const navigation = new BrowserNavigation()
+  navigation.navigate({ kind: 'https', url: 'https://example.test/', title: 'example.test' })
+  store.actions.replace(tab, navigation.snapshot)
+  const size = setupState.values.size
+  // A same-key notification is a no-op: no restore, no extra write.
+  setupState.setKey('account:1/runtime:personal/session:one')
+  expect(setupState.values.size).toBe(size)
+  // Losing the owner key stops persistence: mutations no longer reach storage.
+  setupState.setKey(undefined)
+  store.actions.replace(tab, navigation.snapshot)
+  expect(setupState.values.size).toBe(size)
+  setupState.dispose()
+})
+
+it('keeps closed-tab removal and unavailable storage local to its owner', () => {
+  const setupState = setup()
+  const store = setupState.handle.create('one')
+  store.actions.replace(tab, BrowserNavigation.empty())
+  store.actions.forget(tab)
+  expect(setupState.handle.create('one').getSnapshot().byTab).toEqual({})
+  vi.stubGlobal('localStorage', { getItem() { throw new Error('denied') }, setItem() { throw new Error('quota') } })
+  expect(() => { setupState.handle.create('one').actions.replace(tab, BrowserNavigation.empty()) }).not.toThrow()
+  setupState.dispose()
+})

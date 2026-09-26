@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-21-preset-remote-contract-boundaries.md
-2026-09-21-preset-remote-contract-boundaries.md: fe9b11f9be676ca248af9314e75f078fa1fd03ad
-2026-09-21-preset-remote-contract-boundaries.zh.md: 3486060b2a36279935b5b62970ad3b0e3064bd96
+2026-09-21-preset-remote-contract-boundaries.md: a3e946f51b31a0e0c3cd8f35241c28fb8a49d2a2
+2026-09-21-preset-remote-contract-boundaries.zh.md: 94d31cd7538e8c7233ac8d38a94b77139d291bf0

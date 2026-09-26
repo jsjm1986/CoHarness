@@ -23,6 +23,16 @@ describe('parseExitStatus', () => {
     expect(parseExitStatus('[exit code: 5]')).toEqual({ body: '[exit code: 5]', exitCode: 0 })
   })
 
+  it('retains an explicitly unknown exit instead of turning it into success', () => {
+    expect(parseExitStatus('partial\n[exit code: null]')).toEqual({ body: 'partial', exitCode: null })
+    expect(parseExitStatus('[exit code: null]')).toEqual({ body: '[exit code: null]', exitCode: 0 })
+  })
+
+  it.each(['undefined', 'NaN', '1.5', 'failed'])('does not interpret %s as a valid exit-code marker', (value) => {
+    const text = `output\n[exit code: ${value}]`
+    expect(parseExitStatus(text)).toEqual({ body: text, exitCode: 0 })
+  })
+
   it('recovers a signal kill ahead of any non-zero exit marker', () => {
     expect(parseExitStatus('gone\n[killed by signal: SIGKILL]')).toEqual({ body: 'gone', signal: 'SIGKILL' })
     // A fake signal marker with no leading newline is output, not a kill.

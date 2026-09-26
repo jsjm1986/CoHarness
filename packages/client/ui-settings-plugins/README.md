@@ -12,9 +12,11 @@ Use the **Built-in plugins** settings section to inspect the plugins this deploy
 
 The configurable tab reads which settings namespaces the Host serves and dispatches one slot key per namespace, so what renders is the intersection of two ledgers: the namespaces a live Host plugin registered, and the cards registered under those keys. A served namespace no card claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and a card whose namespace this deployment does not serve is never dispatched, so an uncomposed plugin leaves no trace and does not hold the tab back from its empty line. The empty line waits for the Host's first answer, so an unanswered read never reads as "this deployment configures no plugin". Cards appear in the order they registered, which is stable for the cards one package installs together and not stable across plugins: apply order between packages is unconstrained.
 
-The cards this package ships cover the shell executor (`bash`), the agent loop's tool-call parallelism (`agent-loop`), and the DeepSeek search provider (`web-search-deepseek`).
+The cards cover the shell executor (`shell`), tool-call parallelism (`agent-loop`), delegation depth and capacity (`subagent`), exact model routes (`subagent-model-selection`), and the DeepSeek search provider (`web-search-deepseek`). Delegation controls retain the upstream integer validation, reset and explanatory help. Depth zero disables tools that inherit this setting; explicit tool depth takes precedence. Capacity counts live descendants of the same root Agent across all depths, excluding the root itself.
 
 In a project scope these cards expose only namespaces whose Host registration declares `owner: project` and `projectWrite: manager`. The project owner and organization administrators can save those shared runtime values; other members see the card and an inline owner explanation but no write request is sent. Account, organization, deployment, and model-provider settings stay on their owning surfaces.
+
+The model-selection card starts disabled, joins live routes with removable saved routes, and saves its switch and allowlist atomically at the draft revision. A changed revision requires discarding the stale draft. Catalog failures preserve choices; reconnects clear target-specific drafts. Settings affect newly composed Sessions and never grant access beyond runtime model governance.
 
 ## Extension point
 
@@ -24,11 +26,11 @@ The section declares `settings.plugins.tab`, a root list slot whose labels becom
 
 A card stages what the user types and writes it only when they save. Each control renders staged text, so what is on screen is exactly what a save would store; **Discard** drops the drafts, and a card holding unsaved edits says so on its header even while collapsed. A reset stages the composed default rather than writing immediately, and a draft the field does not accept blocks the save instead of being dropped.
 
-Saving writes each staged field through the client settings scope, which fences every write with the namespace revision it read, so a form that has drifted from the document is refused rather than overwriting a concurrent change. The Host is the only authority on whether a value was accepted — its validators own the constraints no schema can express — so the card reads the section back afterwards and reports a save that did not land, keeping those drafts for the user to correct.
+Saving writes each staged field through the client settings scope, which fences every write with the namespace revision it read. A refusal, lost write access or transport failure stops the remaining writes and retains unacknowledged drafts. Accepted fields clear only the draft submitted by that save; edits made while it was in flight remain unsaved. A multi-field save can partly succeed and does not claim transactional rollback.
 
 A key can also be written from another surface — the Models page addresses the same reference — which changes no settings section, so the card re-reads on the forwarded `credentials/reference-updated` event for the reference it watches.
 
-A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key.
+A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key. A replacement requires its own successful write response: the presence of an older key cannot acknowledge it. Credential reads reject superseded responses even when the reference is unchanged.
 
 ## Invariants
 

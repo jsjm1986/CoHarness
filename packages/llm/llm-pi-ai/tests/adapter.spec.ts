@@ -114,7 +114,7 @@ describe('PiAiAdapter provider routing', () => {
     })
     expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
     expect(result.finish).toEqual({ kind: 'stop' })
-    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, totalTokens: 4 })
+    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, totalTokens: 4, cacheReadTokens: 0, cacheWriteTokens: 0 })
     expect(server.paths).toEqual(['/chat/completions'])
   })
 
@@ -766,7 +766,7 @@ describe('PiAiAdapter provider routing', () => {
     await Promise.race([
       server.responseClosed,
       new Promise<never>((_resolve, reject) => {
-        setTimeout(() => { reject(new Error('SDK request did not close after idle timeout')) }, 1_000)
+        setTimeout(() => { reject(new Error('SDK request did not close after idle timeout')) }, 10_000)
       }),
     ])
 

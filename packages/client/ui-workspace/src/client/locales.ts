@@ -6,6 +6,7 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'navigation.unavailable': '此会话当前无法在工作台中打开，请刷新会话列表后重试。',
   'group.ungrouped': '独立会话',
   'session.new': '新会话',
   'session.private': '私密',
@@ -77,6 +78,7 @@ export type WorkspaceKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'navigation.unavailable': 'This session cannot be opened in the workbench. Refresh the session list and try again.',
   'group.ungrouped': 'Independent sessions',
   'session.new': 'New Session',
   'session.private': 'Private',

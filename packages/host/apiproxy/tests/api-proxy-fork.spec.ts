@@ -255,6 +255,47 @@ describe('sessions.fork', () => {
     await ctx.fiber.dispose()
   })
 
+  it('re-mounts the source session\'s SSH realm and binds the child to the same target', async () => {
+    const ctx = await composed()
+    const mountedRealms: Array<string | undefined> = []
+    ctx.provide('agentPresets', {
+      resolve: () => Promise.resolve({ id: 'standard', trust: 'system', path: '/presets/standard/agent.cordis.yml' }),
+      mount: (_ctx: Context, _id: string | undefined, realm?: string) => {
+        mountedRealms.push(realm)
+        return Promise.resolve({ id: 'standard', trust: 'system', path: '/presets/standard/agent.cordis.yml' })
+      },
+      registerRealm: () => () => {},
+    } as never)
+    const resolved: number[] = []
+    ctx.provide('sshAuthorization', {
+      resolve: (targetId: number) => {
+        resolved.push(targetId)
+        return Promise.resolve({ userId: 7, config: {}, signal: new AbortController().signal })
+      },
+    } as never)
+    const session = ctx.sessions.create(sid('session-ssh-source'), {
+      meta: { cwd: '/proj', agentPreset: 'standard', sshTarget: 41 },
+    })
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'work' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+
+    const response = await api(ctx).sessions.fork(request({ sessionId: session.id }))
+
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) return
+    // The seeded history ran on that host; the fork composes the same
+    // subject-scoped realm instead of silently dropping to host tools.
+    expect(resolved).toEqual([41])
+    expect(mountedRealms).toEqual(['ssh-target/41/u7'])
+    expect(ctx.sessions.get(response.result.value.sessionId)?.header.sshTarget).toBe(41)
+    await ctx.fiber.dispose()
+  })
+
   it('installs the latest logged model selection before the child can run', async () => {
     const ctx = await composed()
     const source = await liveAgent(ctx, 'session-routed', 1)

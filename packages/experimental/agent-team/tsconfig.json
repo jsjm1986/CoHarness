@@ -40,6 +40,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/execution-authority"
     }
   ]
 }

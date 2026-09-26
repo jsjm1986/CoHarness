@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import Storage from '@deepseek-ai/dsh-storage'
@@ -11,16 +11,29 @@ import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import { createWorkspaceFilesApi, subscribeWorkspaceFileChanges } from '../src/workspace-files.ts'
+import { createWorkspaceChangesApi } from '../src/workspace-changes.ts'
 import { createApiProxy } from '../src/api-proxy.ts'
-import type { RpcRequest } from '../src/api/rpc.ts'
+import type { RpcError, RpcRequest } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import { FsError, FsVersion } from '@deepseek-ai/dsh-fs'
+import type { FileSystem, FsTarget } from '@deepseek-ai/dsh-fs'
 import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
+import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+
+const realmEnvironment = vi.hoisted(() => ({ real: undefined as unknown }))
+vi.mock('@deepseek-ai/dsh-agent-presets', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@deepseek-ai/dsh-agent-presets')>()
+  realmEnvironment.real = original.environmentForAgent
+  return { ...original, environmentForAgent: vi.fn(original.environmentForAgent) }
+})
+const realmFsFor = vi.mocked(environmentForAgent)
 
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => { for (const dispose of cleanups.splice(0).reverse()) await dispose() })
+afterEach(() => { realmFsFor.mockImplementation(realmEnvironment.real as never) })
 
 const request = <P>(payload: P): RpcRequest<P> => ({ rpcId: RpcId('workspace-files-test'), payload })
 
@@ -35,6 +48,7 @@ async function harness(options: {
   maxBytes?: number
   maxLines?: number
   maxEntries?: number
+  workspace?: string
 } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-files-')))
   cleanups.push(() => { rmSync(root, { recursive: true, force: true }) })
@@ -53,16 +67,17 @@ async function harness(options: {
   ctx.provide('sessionPersistence', { list: () => Promise.resolve([]), readHeader,
     listHeaders: () => Promise.resolve([]),
   } as never)
+  const filesystem = ctx.plugin(LocalFileSystem, { cwd: root })
+  await filesystem
   await ctx.plugin(WorkspaceRegistry)
-  await ctx.plugin(LocalFileSystem, { cwd: root })
   if (options.authority !== undefined) ctx.provide('collaboration', { capture: () => options.authority } as never)
-  const api = createApiProxy(ctx, { cwd: root, defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
+  const api = createApiProxy(ctx, { cwd: options.workspace ?? root, defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
     ...(options.maxBytes === undefined ? {} : { workspaceFileMaxBytes: options.maxBytes }),
     ...(options.maxLines === undefined ? {} : { workspaceFileMaxLines: options.maxLines }),
     ...(options.maxEntries === undefined ? {} : { workspaceFileMaxEntries: options.maxEntries }),
   })
-  const session = ctx.sessions.create(SessionId('workspace-files-session'), { meta: { cwd: root } })
-  return { api, ctx, root, session, headers, readHeader }
+  const session = ctx.sessions.create(SessionId('workspace-files-session'), { meta: { cwd: options.workspace ?? root } })
+  return { api, ctx, root, session, headers, readHeader, filesystem }
 }
 
 function authority(mode: 'ro' | 'rw'): CollaborationAuthority {
@@ -95,6 +110,34 @@ describe('workspaceFiles RPC', () => {
     const limited = expectOk(await api.workspaceFiles.list(request({ sessionId: session.id, maxEntries: 1 })))
     expect(limited.entries).toHaveLength(1)
     expect(limited.truncated).toBe(true)
+  })
+
+  it('authorizes and reads a project in provider coordinates without resolving its path on the Host', async () => {
+    const workspace = '/execution-only/project'
+    const { api, ctx, root, session } = await harness({ authority: authority('ro'), workspace })
+    writeFileSync(join(root, 'remote.txt'), 'provider content')
+    const fs = ctx.fs
+    vi.spyOn(fs, 'processPathFromHostPath').mockReturnValue(undefined)
+    const resolve = fs.resolve.bind(fs)
+    const processPath = fs.processPath.bind(fs)
+    const lstat = fs.lstat.bind(fs)
+    const local = (path: string) => path === workspace || path.startsWith(`${workspace}/`)
+      ? join(root, path.slice(workspace.length)) : path
+    vi.spyOn(fs, 'resolve').mockImplementation((path, options) => resolve(local(path), {
+      ...options, ...(options?.cwd === undefined ? {} : { cwd: local(options.cwd) }),
+    }))
+    vi.spyOn(fs, 'processPath').mockImplementation(target => `${workspace}/${relative(root, processPath(target))}`.replace(/\/$/, ''))
+    vi.spyOn(fs, 'lstat').mockImplementation((path, options, signal) => lstat(local(path), {
+      ...options, ...(options?.cwd === undefined ? {} : { cwd: local(options.cwd) }),
+    }, signal))
+    const response = expectOk(await api.workspaceFiles.read(request({ sessionId: session.id, path: 'remote.txt' }), new AbortController().signal))
+    expect(response.text).toBe('provider content')
+    expect(JSON.stringify(response)).not.toContain(root)
+    expect(JSON.stringify(response)).not.toContain(workspace)
+    expect(ctx.agents.get(session.id)).toBeUndefined()
+    vi.spyOn(fs, 'contains').mockReturnValueOnce(false)
+    expect((await api.workspaceFiles.read(request({ sessionId: session.id, path: 'remote.txt' }), new AbortController().signal)).result)
+      .toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
   })
 
   it('rejects traversal, absolute paths, and symlinks', async () => {
@@ -645,9 +688,9 @@ describe('workspaceFiles RPC', () => {
     expect(second.entries.map(entry => entry.path)).toEqual(['b.txt'])
   })
 
-  it('exposes only bounded read methods on the browser surface', async () => {
+  it('exposes bounded reads and authorized conversion without file mutations', async () => {
     const { api } = await harness()
-    expect(Object.keys(api.workspaceFiles).sort()).toEqual(['list', 'read', 'readBytes', 'stat'])
+    expect(Object.keys(api.workspaceFiles).sort()).toEqual(['list', 'read', 'readBytes', 'renderOffice', 'stat'])
   })
 
   it('skips observations for a session detached before its batch drains', async () => {
@@ -716,4 +759,342 @@ describe('workspaceFiles RPC', () => {
     stopB()
   })
 
+})
+
+describe('workspaceChanges RPC', () => {
+  function recorder(root: string) {
+    const summary = { turn: 1, cwd: root, files: [{ path: 'removed.txt', display: 'removed.txt', added: 0, deleted: 1 }],
+      total: 1, added: 0, deleted: 1, snapshot: { before: 'private-before', after: 'private-after' } }
+    const diff = { kind: 'text' as const, path: 'removed.txt', display: 'removed.txt', before: true, after: false,
+      coarse: false, hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 0, lines: ['-historical content'] }] }
+    return { summary, diff, service: { summary: vi.fn(() => summary), diff: vi.fn(async () => diff) } }
+  }
+
+  it('serves deleted-file snapshots without reading current contents or creating an Agent', async () => {
+    const { api, ctx, root, session } = await harness()
+    const recorded = recorder(root)
+    ctx.provide('workspaceChanges', recorded.service)
+    const read = vi.spyOn(ctx.fs, 'readText')
+    const payload = { sessionId: session.id, seq: 3 }
+    const summary = expectOk(await api.workspaceChanges.summary(request(payload)))
+    expect(summary).toEqual({ turn: 1, files: recorded.summary.files, total: 1, added: 0, deleted: 1 })
+    expect(JSON.stringify(summary)).not.toContain(root)
+    expect(JSON.stringify(summary)).not.toContain('private-before')
+    expect(expectOk(await api.workspaceChanges.diff(request({ ...payload, index: 0 })))).toEqual(recorded.diff)
+    expect(read).not.toHaveBeenCalled()
+    expect(ctx.agents.get(session.id)).toBeUndefined()
+  })
+
+  it('reads a cold Session snapshot and rejects a mismatched workspace without activating an Agent', async () => {
+    const { api, ctx, root, session, headers, readHeader } = await harness()
+    const coldId = SessionId('cold-review')
+    headers.set(coldId, { ...session.header, id: coldId })
+    const recorded = recorder(root)
+    ctx.provide('workspaceChanges', recorded.service)
+    const payload = { sessionId: coldId, seq: 3 }
+    expect(expectOk(await api.workspaceChanges.summary(request(payload)))).toMatchObject({ total: 1 })
+    expect(readHeader).toHaveBeenCalledWith(coldId, expect.any(AbortSignal))
+    expect(ctx.sessions.get(coldId)).toBeUndefined()
+    expect(ctx.agents.get(coldId)).toBeUndefined()
+    recorded.summary.cwd = join(root, 'different-workspace')
+    expect((await api.workspaceChanges.diff(request({ ...payload, index: 0 }))).result)
+      .toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+    expect(recorded.service.diff).not.toHaveBeenCalled()
+  })
+
+  it('reports a missing comparison and refuses snapshot access when the filesystem provider is removed', async () => {
+    const { api, ctx, root, session, filesystem } = await harness()
+    const recorded = recorder(root)
+    const diff = vi.fn(async () => undefined)
+    ctx.provide('workspaceChanges', { summary: recorded.service.summary, diff })
+    const payload = { sessionId: session.id, seq: 3, index: 0 }
+    expect(expectOk(await api.workspaceChanges.diff(request(payload)))).toBeNull()
+    await filesystem.dispose()
+    expect((await api.workspaceChanges.diff(request(payload))).result).toMatchObject({ ok: false, error: { code: 'internal' } })
+    expect(diff).toHaveBeenCalledOnce()
+  })
+
+  it('authorizes before probing a snapshot and denies a project snapshot outside its allowed root', async () => {
+    const actor = authority('ro')
+    const { api, ctx, root, session } = await harness({ authority: actor })
+    const recorded = recorder(root)
+    ctx.provide('workspaceChanges', recorded.service)
+    const payload = { sessionId: session.id, seq: 3 }
+    vi.spyOn(actor, 'authorize').mockRejectedValueOnce(new CollaborationError('not-member'))
+    expect((await api.workspaceChanges.summary(request(payload))).result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+    expect(recorded.service.summary).not.toHaveBeenCalled()
+    recorded.summary.files[0]!.path = '../private.txt'
+    expect((await api.workspaceChanges.diff(request({ ...payload, index: 0 }))).result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+    expect(recorded.service.diff).not.toHaveBeenCalled()
+  })
+
+  it('rechecks principal and file authorization before returning historical bytes', async () => {
+    const actor = authority('ro')
+    const { api, ctx, root, session } = await harness({ authority: actor })
+    const recorded = recorder(root)
+    ctx.provide('workspaceChanges', recorded.service)
+    const authorize = vi.spyOn(actor, 'authorize')
+    recorded.service.diff.mockImplementationOnce(async () => {
+      authorize.mockRejectedValueOnce(new CollaborationError('not-member'))
+      return recorded.diff
+    })
+    const payload = { sessionId: session.id, seq: 3, index: 0 }
+    expect((await api.workspaceChanges.diff(request(payload))).result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+    let revoked = false
+    ctx.on('workspace-files/authorize', () => { if (revoked) throw new CollaborationError('forbidden') })
+    recorded.service.diff.mockImplementationOnce(async () => { revoked = true; return recorded.diff })
+    expect((await api.workspaceChanges.diff(request(payload))).result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+  })
+
+  it('does not expose disposed snapshots, cancelled reads, or provider diagnostics', async () => {
+    const { api, ctx, root, session } = await harness()
+    const recorded = recorder(root)
+    let available = true
+    ctx.provide('workspaceChanges', { summary: () => available ? recorded.summary : undefined, diff: recorded.service.diff })
+    const payload = { sessionId: session.id, seq: 3, index: 0 }
+    recorded.service.diff.mockImplementationOnce(async () => { available = false; return recorded.diff })
+    expect(expectOk(await api.workspaceChanges.diff(request(payload)))).toBeNull()
+    expect(expectOk(await api.workspaceChanges.summary(request(payload)))).toBeNull()
+    available = true
+    expect((await api.workspaceChanges.diff(request(payload), AbortSignal.abort())).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    recorded.service.diff.mockRejectedValueOnce(new Error('private path and credential'))
+    const failed = await api.workspaceChanges.diff(request(payload))
+    expect(failed.result).toMatchObject({ ok: false, error: { code: 'internal' } })
+    expect(JSON.stringify(failed)).not.toContain('credential')
+  })
+})
+
+describe('SSH-bound session file reads', () => {
+  type AgentResolver = (ctx: Context, sessionId: SessionId) => Promise<{ agent: Agent } | { error: RpcError }>
+
+  /** Minimal runtime for the SSH branch: bound session, host fs spy-able, injectable agent lookup. */
+  async function sshHarness(agent?: AgentResolver) {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-ssh-')))
+    cleanups.push(() => { rmSync(root, { recursive: true, force: true }) })
+    const ctx = new Context()
+    cleanups.push(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(LocalFileSystem, { cwd: root })
+    const api = createWorkspaceFilesApi(ctx, {
+      maxBytes: undefined, maxLines: undefined, maxEntries: undefined,
+      authorize: () => Promise.resolve({ authority: undefined }),
+      validateRoot: cwd => Promise.resolve(cwd),
+      principalSignal: signal => signal,
+      ...(agent === undefined ? {} : { agent: (sessionId: SessionId) => agent(ctx, sessionId) }),
+    })
+    const session = ctx.sessions.create(SessionId('ssh-bound'), { meta: { cwd: root, sshTarget: 41 } })
+    writeFileSync(join(root, 'same-name.txt'), 'LOCAL_HOST_BYTES')
+    return { api, ctx, root, session }
+  }
+
+  /** Realm filesystem stand-in: real targets in realm coordinates, `inside` controls the containment verdict. */
+  function realmFs(inside = true): FileSystem {
+    const target = (path: string): FsTarget => ({ targetKey: path, displayPath: path }) as FsTarget
+    return {
+      resolve: async (path: string) => target(path),
+      contains: () => inside,
+      processPath: (file: FsTarget) => file.targetKey === '.' ? '/realm' : `/realm/${file.targetKey}`,
+      lstat: async () => ({ type: 'file', version: FsVersion('realm-v1'), size: 4 }),
+      stat: async () => ({ type: 'file', version: FsVersion('realm-v1'), size: 4 }),
+      readByteRange: async () => new Uint8Array([1, 2, 3, 4]),
+      streamText: async () => (async function* () { yield 'realm content\n' })(),
+      listDir: async () => [],
+    } as unknown as FileSystem
+  }
+
+  /** Minimal runtime for the SSH-bound workspace-changes branch, mirroring `sshHarness`. */
+  async function changesHarness(agent?: (sessionId: SessionId) => Promise<{ agent: Agent } | { error: RpcError }>) {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-ssh-changes-')))
+    cleanups.push(() => { rmSync(root, { recursive: true, force: true }) })
+    const ctx = new Context()
+    cleanups.push(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(LocalFileSystem, { cwd: root })
+    const diff = { kind: 'text' as const, path: 'gone.txt', display: 'gone.txt', before: true, after: false, coarse: false, hunks: [] }
+    ctx.provide('workspaceChanges', {
+      summary: () => ({ turn: 1, cwd: root, files: [{ path: 'gone.txt', display: 'gone.txt', added: 0, deleted: 1 }], total: 1, added: 0, deleted: 1 }),
+      diff: vi.fn(async () => diff),
+    })
+    const api = createWorkspaceChangesApi(ctx, {
+      authorize: () => Promise.resolve({ authority: undefined }),
+      validateRoot: cwd => Promise.resolve(cwd),
+      principalSignal: signal => signal,
+      ...(agent === undefined ? {} : { agent }),
+    })
+    const session = ctx.sessions.create(SessionId('ssh-changes'), { meta: { cwd: root, sshTarget: 41 } })
+    return { api, ctx, root, session }
+  }
+
+  it('reads remote workspace bytes only through the mounted realm filesystem', async () => {
+    realmFsFor.mockReturnValue(realmFs() as never)
+    const agentCtx = new Context()
+    cleanups.push(() => agentCtx.fiber.dispose())
+    const { api, ctx, session } = await sshHarness(() => Promise.resolve({ agent: { ctx: agentCtx } as unknown as Agent }))
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.stat(request({ sessionId: session.id, path: 'same-name.txt' }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: true, value: { path: 'same-name.txt', type: 'file', bytes: 4 } })
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('keeps the wire code when realm admission throws a remote refusal', async () => {
+    const denied = new RemoteError('ssh/forbidden' as never, 'SSH targets require current user qualification and project sharing.', {} as never)
+    const { api, ctx, session } = await sshHarness(() => Promise.reject(denied))
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.read(request({ sessionId: session.id, path: 'same-name.txt' }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({
+      ok: false,
+      error: { code: 'ssh/forbidden', message: 'SSH targets require current user qualification and project sharing.' },
+    })
+    expect(JSON.stringify(result)).not.toContain('LOCAL_HOST_BYTES')
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('publishes SSH-bound observations only after the realm filesystem confirms the path', async () => {
+    realmFsFor.mockReturnValue(realmFs() as never)
+    const { ctx, session } = await sshHarness()
+    const agentCtx = new Context()
+    cleanups.push(() => agentCtx.fiber.dispose())
+    const published: unknown[] = []
+    const stop = subscribeWorkspaceFileChanges(ctx, {
+      authority: undefined, signal: new AbortController().signal,
+      publish: (frame) => { published.push(frame) }, fail: vi.fn(), validateRoot: async cwd => cwd,
+    })
+    cleanups.push(stop)
+
+    // An observation whose subject carries no realm context must be dropped, never resolved on the host fs.
+    ctx.emit('fs/observed', { targetKey: 'remote-file', displayPath: 'remote-file' } as never, { kind: 'absent' }, { agent: { session } })
+    ctx.emit('fs/observed', { targetKey: 'remote-file', displayPath: 'remote-file' } as never,
+      { kind: 'present', version: FsVersion('realm-v2') }, { agent: { session, ctx: agentCtx } })
+
+    await vi.waitFor(() => { expect(published).toHaveLength(1) })
+    expect(published[0]).toMatchObject({
+      type: 'host/workspace-file-changed', sessionId: session.id, path: 'remote-file', present: true,
+    })
+  })
+
+  it('refuses historical changes for an SSH-bound session with no agent resolver wired', async () => {
+    const { api, session } = await changesHarness()
+
+    const result = await api.diff(request({ sessionId: session.id, seq: 3, index: 0 }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+  })
+
+  it('reads remote change snapshots through the bound session realm filesystem', async () => {
+    realmFsFor.mockReturnValue(realmFs() as never)
+    const agentCtx = new Context()
+    cleanups.push(() => agentCtx.fiber.dispose())
+    const resolver = vi.fn(async () => ({ agent: { ctx: agentCtx } as unknown as Agent }))
+    const { api, ctx, session } = await changesHarness(resolver)
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.diff(request({ sessionId: session.id, seq: 3, index: 0 }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: true })
+    // Admission is re-verified after the comparison so a stale binding cannot leak bytes.
+    expect(resolver).toHaveBeenCalledTimes(2)
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the bound session agent exposes no realm filesystem', async () => {
+    const agentCtx = new Context()
+    cleanups.push(() => agentCtx.fiber.dispose())
+    const { api, session } = await changesHarness(async () => ({ agent: { ctx: agentCtx } as unknown as Agent }))
+
+    const result = await api.diff(request({ sessionId: session.id, seq: 3, index: 0 }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'internal' } })
+  })
+
+  it('refuses a recorded file the realm filesystem reports outside its root', async () => {
+    realmFsFor.mockReturnValue(realmFs(false) as never)
+    const { api, session } = await changesHarness(async () => ({ agent: {} as Agent }))
+
+    const result = await api.diff(request({ sessionId: session.id, seq: 3, index: 0 }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+  })
+
+  it('answers with the binding refusal when realm admission is lost during recheck', async () => {
+    realmFsFor.mockReturnValue(realmFs() as never)
+    const resolver = vi.fn<(sessionId: SessionId) => Promise<{ agent: Agent } | { error: RpcError }>>()
+      .mockResolvedValueOnce({ agent: {} as Agent })
+      .mockResolvedValueOnce({
+        error: { code: 'ssh/forbidden', message: 'SSH targets require current user qualification and project sharing.', details: {} },
+      })
+    const { api, session } = await changesHarness(resolver)
+
+    const result = await api.diff(request({ sessionId: session.id, seq: 3, index: 0 }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'ssh/forbidden' } })
+  })
+
+  it('answers the agent resolver refusal instead of reading the host filesystem', async () => {
+    const { api, ctx, session } = await sshHarness(() => Promise.resolve({
+      error: { code: 'ssh/forbidden', message: 'SSH targets require current user qualification and project sharing.', details: {} },
+    }))
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.read(request({ sessionId: session.id, path: 'same-name.txt' }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'ssh/forbidden' } })
+    expect(JSON.stringify(result)).not.toContain('LOCAL_HOST_BYTES')
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the mounted agent exposes no realm filesystem', async () => {
+    const { api, ctx, session } = await sshHarness(agentCtx => Promise.resolve({
+      agent: { ctx: agentCtx.extend({}) } as unknown as Agent,
+    }))
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.read(request({ sessionId: session.id, path: 'same-name.txt' }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'internal' } })
+    expect(JSON.stringify(result)).not.toContain('LOCAL_HOST_BYTES')
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('refuses a bound session when the runtime wires no agent resolver', async () => {
+    const { api, ctx, session } = await sshHarness()
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.read(request({ sessionId: session.id, path: 'same-name.txt' }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'workspace-file/unknown-session' } })
+    expect(JSON.stringify(result)).not.toContain('LOCAL_HOST_BYTES')
+    expect(resolve).not.toHaveBeenCalled()
+  })
+
+  it('routes historical workspace changes through the bound session agent', async () => {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-ssh-changes-')))
+    cleanups.push(() => { rmSync(root, { recursive: true, force: true }) })
+    const ctx = new Context()
+    cleanups.push(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(LocalFileSystem, { cwd: root })
+    ctx.provide('workspaceChanges', {
+      summary: () => ({ turn: 1, cwd: root, files: [{ path: 'gone.txt', display: 'gone.txt', added: 0, deleted: 1 }], total: 1, added: 0, deleted: 1 }),
+      diff: vi.fn(async () => null),
+    })
+    const api = createWorkspaceChangesApi(ctx, {
+      authorize: () => Promise.resolve({ authority: undefined }),
+      validateRoot: cwd => Promise.resolve(cwd),
+      principalSignal: signal => signal,
+      agent: () => Promise.resolve({
+        error: { code: 'ssh/forbidden', message: 'SSH targets require current user qualification and project sharing.', details: {} },
+      }),
+    })
+    const session = ctx.sessions.create(SessionId('ssh-changes'), { meta: { cwd: root, sshTarget: 41 } })
+    const resolve = vi.spyOn(ctx.fs, 'resolve')
+
+    const result = await api.diff(request({ sessionId: session.id, seq: 3, index: 0 }), new AbortController().signal)
+
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'ssh/forbidden' } })
+    expect(resolve).not.toHaveBeenCalled()
+  })
 })

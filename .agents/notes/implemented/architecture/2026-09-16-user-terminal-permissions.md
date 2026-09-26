@@ -16,6 +16,8 @@ Agent permission changes leave user terminals running. Agent-owned shell and ter
 
 This decision supersedes only the shared sandbox policy and mode-switch restriction in the [Web sidebar terminal decision](../feature/2026-09-09-web-sidebar-terminal.md). That note remains active for process ownership, transport, screen recovery and shell selection. OpenCode's `packages/core/src/pty.ts` and `packages/core/src/pty/pty.node.ts` provide adjacent evidence: its interactive terminal creates a PTY directly with the selected shell and working directory.
 
+[Private managed terminals](2026-09-23-private-user-terminals.md) refine Session ownership with creator isolation and Gateway qualification. The Agent sandbox distinction in this note remains unchanged.
+
 ## Alternatives considered
 
 **Inherit Agent permissions.** One Session mode describes both processes, but users must also grant the Agent access needed only for manual commands. Persistent user shells then obstruct changes to Agent permissions.

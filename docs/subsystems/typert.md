@@ -145,6 +145,9 @@ Connection decodes its carrier envelope before calling `ctx.typertGateway`. The 
 ```ts type-equiv
 /** One Remote method request after a carrier has decoded its envelope. */
 interface InvokeRemoteRequest {
+  /** Stream endpoints must be invoked explicitly as streams; unary calls never open a stream. */
+  readonly mode?: 'stream'
+
   /** Remote namespace selected by the generated descriptor. */
   readonly namespace: string
   /** Exported Service method name. */

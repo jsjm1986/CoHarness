@@ -1,11 +1,11 @@
-/** Describe and verify complete official workspace outputs without transferring test verdicts. */
+/** Describe and verify complete named-profile workspace outputs without transferring test verdicts. */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, globSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import ts from 'typescript'
-import { CLIENT_BUILD_RECORD_PATH, officialClientBuildEnvironment, readClientBuildRecord } from './client-build-environment.ts'
+import { CLIENT_BUILD_RECORD_PATH, coharnessClientBuildEnvironment, officialClientBuildEnvironment, readClientBuildRecord, type ClientBuildProfile } from './client-build-environment.ts'
 import { pnpmInvocation } from './pnpm-invocation.ts'
 import { repositoryConfigHost } from './ts-project.ts'
 
@@ -13,8 +13,8 @@ const COMPILER_OUTPUT_ROOT = /^(?:vendor\/[^/]+|packages\/[^/]+\/[^/]+|apps\/[^/
 
 /** Same-commit build identity and the exact generated inventory a consumer must receive. */
 export interface BuildArtifactManifest {
-  readonly version: 1
-  readonly mode: 'official-workspace'
+  readonly version: 2
+  readonly mode: 'workspace'
   readonly identity: {
     readonly commit: string
     readonly tree: string
@@ -25,7 +25,7 @@ export interface BuildArtifactManifest {
     readonly libc: string | null
     readonly lockSha256: string
     readonly buildInputsSha256: string
-    readonly profile: 'official'
+    readonly profile: ClientBuildProfile
     readonly publicClientEnvironment: Readonly<Record<string, string>>
   }
   readonly files: readonly {
@@ -188,10 +188,11 @@ function sameCheckoutRoot(declared: string, given: string): boolean {
 }
 
 /** Capture a complete build's identities and bytes; this does not assert that tests passed.
- * @param root - clean committed checkout with a completed official build.
+ * @param root - clean committed checkout with a completed build of the requested product profile.
+ * @param profile - product profile required by the caller, never selected by a transferred report.
  * @returns manifest suitable for transport beside the generated files.
  */
-export function createBuildArtifactManifest(root: string): BuildArtifactManifest {
+export function createBuildArtifactManifest(root: string, profile: ClientBuildProfile = 'coharness'): BuildArtifactManifest {
   root = realpathSync(root)
   const declaredRoot = realpathSync(git(root, ['rev-parse', '--show-toplevel']))
   if (!sameCheckoutRoot(declaredRoot, root)) throw new Error(`build artifacts: root must be the Git checkout root (declared ${declaredRoot}, got ${root})`)
@@ -204,7 +205,7 @@ export function createBuildArtifactManifest(root: string): BuildArtifactManifest
   const packageManager = json(join(root, 'package.json')).packageManager
   if (typeof packageManager !== 'string' || (packageManager !== `pnpm@${pnpm}` && !packageManager.startsWith(`pnpm@${pnpm}+`))
     || !/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(pnpm)) throw new Error('build artifacts: actual pnpm does not match packageManager')
-  const publicClientEnvironment = officialClientBuildEnvironment(root, { DSH_CLIENT_COMMIT_HASH: commit })
+  const publicClientEnvironment = (profile === 'official' ? officialClientBuildEnvironment : coharnessClientBuildEnvironment)(root, { DSH_CLIENT_COMMIT_HASH: commit })
   readClientBuildRecord(root, publicClientEnvironment)
   const header = (process.report.getReport() as { header: { glibcVersionRuntime?: string } }).header
   const libc = header.glibcVersionRuntime ?? null
@@ -237,21 +238,22 @@ export function createBuildArtifactManifest(root: string): BuildArtifactManifest
     const stat = lstatSync(join(root, path))
     return { path, sha256: digest(readFileSync(join(root, path))), bytes: stat.size, mode: stat.mode & 0o777 }
   })
-  return { version: 1, mode: 'official-workspace', identity: {
+  return { version: 2, mode: 'workspace', identity: {
     commit, tree, platform: process.platform, architecture: process.arch, node: process.version,
-    pnpm, libc, lockSha256, buildInputsSha256, profile: 'official', publicClientEnvironment,
+    pnpm, libc, lockSha256, buildInputsSha256, profile, publicClientEnvironment,
   }, files }
 }
 
 /** Verify restored bytes and local identities; mismatch requires a fresh build, never a cached verdict.
  * @param root - clean consumer checkout with restored generated files.
  * @param manifest - untrusted parsed transfer manifest.
+ * @param expectedProfile - authoritative product profile required by this consumer.
  * @returns verified complete inventory.
  */
-export function verifyBuildArtifactManifest(root: string, manifest: unknown): BuildArtifactManifest {
+export function verifyBuildArtifactManifest(root: string, manifest: unknown, expectedProfile: ClientBuildProfile = 'coharness'): BuildArtifactManifest {
   const raw = record(manifest, 'transfer manifest')
-  const current = createBuildArtifactManifest(root)
-  if (raw.version !== 1 || raw.mode !== 'official-workspace') throw new Error('build artifacts: unsupported manifest version or mode')
+  const current = createBuildArtifactManifest(root, expectedProfile)
+  if (raw.version !== 2 || raw.mode !== 'workspace') throw new Error('build artifacts: unsupported manifest version or mode')
   if (!isDeepStrictEqual(raw.identity, current.identity)) throw new Error('build artifacts: candidate, toolchain, build inputs or client environment mismatch')
   if (!isDeepStrictEqual(raw.files, current.files)) throw new Error('build artifacts: missing, extra, damaged or mode-mismatched generated outputs')
   if (!isDeepStrictEqual(raw, current)) throw new Error('build artifacts: unexpected transfer manifest fields')
@@ -261,15 +263,15 @@ export function verifyBuildArtifactManifest(root: string, manifest: unknown): Bu
 if (import.meta.main) {
   try {
     const { values, positionals } = parseArgs({
-      options: { root: { type: 'string' }, manifest: { type: 'string' }, profile: { type: 'string', default: 'official' } },
+      options: { root: { type: 'string' }, manifest: { type: 'string' }, profile: { type: 'string', default: 'coharness' } },
       allowPositionals: true,
     })
     if (positionals.length !== 1 || !['create', 'verify'].includes(positionals[0] ?? '') || values.manifest === undefined
-      || values.profile !== 'official') throw new Error('usage: build-artifacts.ts <create|verify> --manifest PATH [--root PATH] [--profile official]')
+      || (values.profile !== 'official' && values.profile !== 'coharness')) throw new Error('usage: build-artifacts.ts <create|verify> --manifest PATH [--root PATH] [--profile coharness|official]')
     const root = resolve(values.root ?? process.cwd())
     const path = resolve(values.manifest)
     if (positionals[0] === 'create') {
-      const manifest = createBuildArtifactManifest(root)
+      const manifest = createBuildArtifactManifest(root, values.profile)
       if (manifest.files.some(file => resolve(root, file.path) === path)
         || compilerOutputs(root).roots.some(output => path.startsWith(resolve(root, output) + sep))
         || path.startsWith(resolve(root, 'apps/web/dist') + sep)
@@ -280,7 +282,7 @@ if (import.meta.main) {
       writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n')
       console.log(`build artifacts: recorded ${manifest.files.length} files for ${manifest.identity.commit}`)
     } else {
-      const manifest = verifyBuildArtifactManifest(root, JSON.parse(readFileSync(path, 'utf8')) as unknown)
+      const manifest = verifyBuildArtifactManifest(root, JSON.parse(readFileSync(path, 'utf8')) as unknown, values.profile)
       console.log(`build artifacts: verified ${manifest.files.length} files for ${manifest.identity.commit}`)
     }
   } catch (error) {

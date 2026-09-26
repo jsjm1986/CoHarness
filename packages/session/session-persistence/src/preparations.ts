@@ -89,10 +89,10 @@ export class SessionPreparations<Source extends PreparedSource, CommitState> {
     }
     if (this.entries.get(id) !== entry) return undefined
     const source = entry.source as Source
-    const reservationSettled = Promise.withResolvers<void>()
+    const reservationSettled = Promise.withResolvers<undefined>()
     entry.phase = 'committing'
     entry.reservationSettled = reservationSettled.promise
-    entry.settleReservation = reservationSettled.resolve
+    entry.settleReservation = () => { reservationSettled.resolve(undefined) }
     let committed: { source: Source; state: CommitState } | undefined
     try {
       committed = await commit(source)

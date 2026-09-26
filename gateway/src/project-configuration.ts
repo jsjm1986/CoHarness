@@ -17,6 +17,7 @@ export interface ProjectConfigurationView {
     runtimeSettings: boolean
     projectModels: boolean
     members: boolean
+    sshTargets: boolean
     filesystem: false
   }
 }

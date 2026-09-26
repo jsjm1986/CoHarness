@@ -69,7 +69,14 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     void collaboration.load()
     const syncPolicy = (): void => {
-      const scope = collaboration.getSnapshot().context?.scope
+      const snapshot = collaboration.getSnapshot()
+      const context = snapshot.context
+      projectUiPolicy?.setVerifiedAccountId(snapshot.contextVerified ? context?.user.id : undefined)
+      const scope = context?.scope
+      const full = context?.user.role === 'admin' && context.fullAccess === true
+      const auto = context?.autoReviewEligible === true
+      projectUiPolicy?.setAccountPermissions(!snapshot.contextVerified || snapshot.scopeBusy ? 'unknown'
+        : full ? auto ? 'full-and-auto' : 'full' : auto ? 'auto' : 'standard')
       if (scope?.kind !== 'project') projectUiPolicy?.set('personal')
       else projectUiPolicy?.set('project', scope.uiThemePolicy ?? 'follow-user', {
         projectId: scope.projectId,
@@ -80,10 +87,12 @@ export function apply(ctx: ClientContext): void {
     syncPolicy()
     return () => {
       unsubscribe()
+      projectUiPolicy?.setVerifiedAccountId(undefined)
+      projectUiPolicy?.setAccountPermissions('unknown')
       collaboration.dispose()
     }
   }, 'ui-collaboration: account context')
-  ctx.on('connection/reset', () => { void collaboration.refresh() })
+  ctx.on('connection/reset', () => { collaboration.invalidateContext(); void collaboration.refresh() })
 
   ctx.on('sessions/prepare-create', async (_options, next): Promise<SessionCreateOptions> => {
     const prepared = await next()
@@ -117,6 +126,8 @@ export function apply(ctx: ClientContext): void {
     getInvitationCount: () => collaboration.getInvitationCount(),
     loadProjectConfiguration: projectId => collaboration.loadProjectConfiguration(projectId),
     setProjectThemePolicy: (projectId, policy) => collaboration.setProjectThemePolicy(projectId, policy),
+    listProjectSshTargets: projectId => collaboration.listProjectSshTargets(projectId),
+    shareProjectSshTarget: (projectId, targetId, shared) => collaboration.shareProjectSshTarget(projectId, targetId, shared),
   })
   const conversationInjected = (sessionId: SessionId): ConversationShareInjected => ({
     hooks,

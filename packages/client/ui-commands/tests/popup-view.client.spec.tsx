@@ -211,6 +211,7 @@ describe('PopupSelectView', () => {
   })
 
   it('a failed options load shows the error with a retry button that reloads', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     let attempts = 0
     await mountOpen({
       options: () => {
@@ -225,15 +226,18 @@ describe('PopupSelectView', () => {
     })
     expect(attempts).toBe(2)
     expect(rowLabels()).toEqual(['Dark', 'Light', 'Sepia'])
+    errors.mockRestore()
   })
 
   it('an onSelect failure keeps the shell open with the error strip and no retry button (re-select is the retry)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { search, consume } = await mountOpen({ onSelect: () => Promise.reject(new Error('host rejected')) })
     await act(async () => { fireEvent.keyDown(search, { key: 'Enter' }) })
     expect(screen.getByRole('alert').textContent).toContain('host rejected')
     expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
     expect(consume).not.toHaveBeenCalled()
     expect(screen.getAllByRole('option').length).toBe(3)
+    errors.mockRestore()
   })
 
   it('Escape dismisses and restores composer focus', async () => {

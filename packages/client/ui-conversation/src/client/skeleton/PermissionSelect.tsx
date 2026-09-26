@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
+import { permissionUnavailableReason, type PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PermissionCatalog, PermissionSelection as PermissionSelectValue } from '@deepseek-ai/dsh-permission-presets/client'
 import { IconChevronDownOutline14, Menu, RiskConfirmation, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -73,6 +74,8 @@ export interface PermissionSelectProps {
   value: PermissionSelectValue | undefined
   /** Process-level option table; `undefined` while the remote catalog read is unsettled. */
   catalog: PermissionCatalog | undefined
+  /** Eligibility for the current account and this control's runtime target. */
+  availability: PermissionAvailability
   locked: boolean
   command: (line: string) => Promise<boolean>
   /** The owning bar's locale seat, passed down as a plain prop. */
@@ -81,7 +84,7 @@ export interface PermissionSelectProps {
   onOpenSettings?: (section: 'model' | 'reasoning' | 'permission') => void
 }
 
-export function PermissionSelect({ value, catalog, locked, command, t, presentation = 'trigger', onOpenSettings }: PermissionSelectProps) {
+export function PermissionSelect({ value, catalog, availability, locked, command, t, presentation = 'trigger', onOpenSettings }: PermissionSelectProps) {
   const [pick, setPick] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
@@ -95,6 +98,12 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
     setConfirmation(null)
   }, [locked, value])
 
+  useEffect(() => {
+    setOpen(false)
+    setAcknowledged(false)
+    setConfirmation(null)
+  }, [availability])
+
   if (value === undefined || catalog === undefined) return null
 
   const currentValue = pick ?? value.currentValue
@@ -105,9 +114,14 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
     .filter(o => o.value !== 'custom')
     .map((option) => {
       const icon = permissionGlyph(option.value)
-      return { id: option.value, label: optionLabel(option, t), ...icon === undefined ? {} : { icon } }
+      const reason = permissionUnavailableReason(option.value, availability)
+      return { id: option.value, label: optionLabel(option, t), reason, ...icon === undefined ? {} : { icon } }
     })
-  const items: MenuEntry[] = options
+  const items: MenuEntry[] = options.map(option => ({
+    ...option,
+    disabled: option.reason !== undefined,
+    label: option.reason === undefined ? option.label : <span>{option.label}<small className={css.unavailable}>{t(`access.unavailable.${option.reason}`)}</small></span>,
+  }))
 
   const submit = (id: string): void => {
     setPick(id)
@@ -118,6 +132,7 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
 
   const choose = (id: string): void => {
     setOpen(false)
+    if (permissionUnavailableReason(id, availability) !== undefined) return
     if (id === value.currentValue) return
     if (id === FULL_ACCESS) {
       setAcknowledged(false)
@@ -133,13 +148,20 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
   }
 
   const confirmFullAccess = (): void => {
-    if (locked || !acknowledged || confirmation === null) return
+    if (locked || !acknowledged || confirmation === null || permissionUnavailableReason(confirmation, availability) !== undefined) return
     const id = confirmation
     closeConfirmation()
     submit(id)
   }
 
-  const currentLabel = current === undefined ? displayName(currentValue) : optionLabel(current, t)
+  const currentUnavailable = permissionUnavailableReason(value.currentValue, availability)
+  const modeLabel = current === undefined ? displayName(currentValue) : optionLabel(current, t)
+  const currentLabel = currentUnavailable === undefined ? modeLabel : `${modeLabel} · ${t('access.unavailableLabel')}`
+  const notice = currentUnavailable === undefined ? null : (
+    <span className={css.unavailable} role="status">
+      {t('access.currentUnavailable', { name: modeLabel })} {t(`access.unavailable.${currentUnavailable}`)}
+    </span>
+  )
   const confirmationDialog = (
     <RiskConfirmation
       open={confirmation !== null}
@@ -168,15 +190,18 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
               role="menuitemradio"
               aria-checked={item.id === currentValue}
               className={clsx(css.sectionOption, item.id === currentValue && css.sectionOptionSelected)}
-              disabled={locked || busy}
+              disabled={locked || busy || item.reason !== undefined}
               onClick={() => { choose(item.id) }}
             >
               {item.icon !== undefined && <span className={css.sectionIcon}>{item.icon}</span>}
-              <span className={css.sectionLabel}>{item.label}</span>
+              <span className={css.sectionLabel}>{item.label}
+                {item.reason !== undefined && <small className={css.unavailable}>{t(`access.unavailable.${item.reason}`)}</small>}
+              </span>
               {item.id === currentValue && <span className={css.sectionCheck}>✓</span>}
             </button>
           ))}
         </div>
+        {notice}
         {confirmationDialog}
       </>
     )
@@ -195,8 +220,9 @@ export function PermissionSelect({ value, catalog, locked, command, t, presentat
           <button
             type="button"
             className={css.trigger}
-            aria-label={t('input.accessMode', { name: current === undefined ? displayName(currentValue) : optionLabel(current, t) })}
-            title={current?.description}
+            aria-label={t('input.accessMode', { name: currentLabel })}
+            title={currentUnavailable === undefined ? current?.description
+              : `${t('access.currentUnavailable', { name: modeLabel })} ${t(`access.unavailable.${currentUnavailable}`)}`}
             disabled={locked || busy}
             onClick={() => {
               if (phone && onOpenSettings !== undefined) {

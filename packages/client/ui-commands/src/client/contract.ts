@@ -23,6 +23,8 @@ export interface SelectOption {
   readonly label: string
   readonly detail?: string
   readonly active?: boolean
+  /** Display the option and its explanation without allowing selection. */
+  readonly disabled?: boolean
   /** Optional in-page risk gate owned by the shared popup shell. */
   readonly confirmation?: SelectConfirmation
 }
@@ -33,11 +35,23 @@ export interface SelectOption {
  * The shell component is owned by ui-commands; business never sees it. Both
  * callbacks receive the ClientSessionContext captured at popup open.
  */
-export type CommandUiSpec = {
+export interface PopupSelectSpec {
   readonly kind: 'popupSelect'
   options(session: ClientSessionContext, signal: AbortSignal): Promise<readonly SelectOption[]>
   onSelect(option: SelectOption, session: ClientSessionContext): void | Promise<void>
+  /** Subscribe only while this popup is open; a change invalidates its captured options. */
+  subscribeInvalidation?(session: ClientSessionContext, listener: () => void): () => void
 }
+
+/** Bare command action that leaves attachments intact and submits nothing to the Host. */
+export interface ActionSpec {
+  readonly kind: 'action'
+  /** Run against the Session captured by a successfully consumed trigger token. */
+  run(session: ClientSessionContext): void
+}
+
+/** A command's selection panel or immediate client action. */
+export type CommandUiSpec = PopupSelectSpec | ActionSpec
 
 /**
  * One client-owned command contribution: a slash-menu entry whose behavior
@@ -56,7 +70,7 @@ export interface CommandContribution {
   readonly icon?: ComponentType<IconProps>
   /** Capability filter, called with a fresh projection per candidate pass. */
   available(session: ClientSessionContext): boolean
-  /** The command's UI behavior (this phase: popupSelect only). */
+  /** The command's UI behavior (popup selection or non-submitting action). */
   readonly ui: CommandUiSpec
 }
 
@@ -74,7 +88,7 @@ export interface CommandDecoration {
   readonly name: string
   /** Capability filter, called with a fresh projection per bare invocation. */
   available(session: ClientSessionContext): boolean
-  /** The bare-invocation UI (this phase: popupSelect only). */
+  /** The bare-invocation UI (popup selection or non-submitting action). */
   readonly ui: CommandUiSpec
 }
 

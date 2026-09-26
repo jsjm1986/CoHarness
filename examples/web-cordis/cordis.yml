@@ -1,6 +1,5 @@
-# Opt-in Web composition for inspecting the self-referential Cordis tools.
-# Temporary Plugin code can reach every injected live capability; treat this
-# deployment like shell access, not as a security boundary.
+# Opt-in read-only Host and Client runtime inspection. The Web profile already
+# owns the inspection registry and browser providers.
 # This file is a PATCH OVERLAY over the web profile (dsh-base + dsh-web-app
 # bundle layers), not a tree: `dsh web --patch` applies it as one more sibling
 # patch list at the same include level, so these patches reach every bundle
@@ -13,7 +12,5 @@
     port: 3081
 
 - insert:
-    - id: cordis-host-runner
-      name: '@deepseek-ai/dsh-cordis-host-runner'
     - id: tool-cordis
       name: '@deepseek-ai/dsh-tool-cordis'

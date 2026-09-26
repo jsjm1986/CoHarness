@@ -18,6 +18,7 @@ interface PostgresAuthUser {
   membership_status: 'active' | 'disabled'
   home_path: string
   must_change_password: boolean
+  auto_review_eligible: boolean
   password_hash: string
   deleted_at: Date | null
 }
@@ -50,6 +51,7 @@ function userRow(row: PostgresAuthUser): UserRow {
     status: row.status === 'active' && row.membership_status === 'active' ? 'active' : 'disabled',
     homePath: row.home_path,
     mustChangePassword: row.must_change_password,
+    autoReviewEligible: row.auto_review_eligible,
   }
 }
 
@@ -81,7 +83,7 @@ export class PostgresAuthService {
       const address = sourceIp(ip)
       const result = await this.context.pool.query<PostgresAuthUser>(`SELECT u.public_id::text,u.username::text,
         u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
-        c.must_change_password,c.password_hash
+        c.must_change_password,c.password_hash,u.auto_review_eligible
         FROM harness.users u
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
         JOIN harness.password_credentials c ON c.user_id=u.id
@@ -119,7 +121,7 @@ export class PostgresAuthService {
         // token returned from this login attempt.
         const user = await client.query<PostgresAuthIdentity>(
           `SELECT u.id::text AS id,u.public_id::text,u.username::text,u.display_name,u.status,u.deleted_at,u.home_path,
-            m.role,m.status membership_status,c.must_change_password,c.password_hash
+            m.role,m.status membership_status,c.must_change_password,c.password_hash,u.auto_review_eligible
            FROM harness.users u
            JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
            JOIN harness.password_credentials c ON c.user_id=u.id
@@ -153,7 +155,7 @@ export class PostgresAuthService {
         absolute_expires_at: Date
       }>(`SELECT s.id session_id,s.absolute_expires_at,u.public_id::text,u.username::text,
         u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
-        c.must_change_password,c.password_hash
+        c.must_change_password,c.password_hash,u.auto_review_eligible
         FROM harness.auth_sessions s
         JOIN harness.users u ON u.id=s.user_id AND u.organization_id=s.organization_id
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id

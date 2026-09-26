@@ -1,0 +1,754 @@
+[
+  {
+    "name": "business UUID text",
+    "left": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "11111111-1111-4111-8111-111111111111"
+            }
+          ]
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "22222222-2222-4222-8222-222222222222"
+            }
+          ]
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "command quotes",
+    "left": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "echo “ok”"
+            }
+          ]
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "echo \"ok\""
+            }
+          ]
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "business deadline",
+    "left": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "2026-09-25T13:00:00Z"
+            }
+          ]
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "2026-09-25T14:00:00Z"
+            }
+          ]
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "business duration",
+    "left": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "expire in 30s"
+            }
+          ]
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "expire in 60s"
+            }
+          ]
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "business object identity",
+    "left": [
+      {
+        "type": "example",
+        "data": {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "orderId": "11111111-1111-4111-8111-111111111111"
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "example",
+        "data": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "orderId": "22222222-2222-4222-8222-222222222222"
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "request prompt presence",
+    "left": [
+      {
+        "type": "request/header",
+        "data": {
+          "header": {
+            "system": "required rule"
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "request/header",
+        "data": {
+          "header": {
+            "system": ""
+          }
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "tool parameter schema",
+    "left": [
+      {
+        "type": "request/header",
+        "data": {
+          "header": {
+            "tools": [
+              {
+                "name": "tool",
+                "input_schema": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "request/header",
+        "data": {
+          "header": {
+            "tools": [
+              {
+                "name": "tool",
+                "input_schema": {
+                  "type": "number"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "cross-session feedback",
+    "left": [
+      {
+        "type": "session",
+        "id": "11111111-1111-4111-8111-111111111111",
+        "createdAt": 1
+      },
+      {
+        "type": "subagent/catalog",
+        "data": {
+          "sessionId": "22222222-2222-4222-8222-222222222222",
+          "parentSessionId": "11111111-1111-4111-8111-111111111111"
+        }
+      },
+      {
+        "type": "assistant/message",
+        "data": {
+          "message": {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "role": "assistant",
+            "content": [],
+            "source": {}
+          }
+        }
+      },
+      {
+        "type": "feedback/message-put",
+        "data": {
+          "sessionId": "11111111-1111-4111-8111-111111111111",
+          "item": {
+            "messageId": "33333333-3333-4333-8333-333333333333"
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "session",
+        "id": "11111111-1111-4111-8111-111111111111",
+        "createdAt": 1
+      },
+      {
+        "type": "subagent/catalog",
+        "data": {
+          "sessionId": "22222222-2222-4222-8222-222222222222",
+          "parentSessionId": "11111111-1111-4111-8111-111111111111"
+        }
+      },
+      {
+        "type": "assistant/message",
+        "data": {
+          "message": {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "role": "assistant",
+            "content": [],
+            "source": {}
+          }
+        }
+      },
+      {
+        "type": "feedback/message-put",
+        "data": {
+          "sessionId": "22222222-2222-4222-8222-222222222222",
+          "item": {
+            "messageId": "33333333-3333-4333-8333-333333333333"
+          }
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "legitimate identity renewal",
+    "left": [
+      {
+        "type": "session",
+        "id": "11111111-1111-4111-8111-111111111111",
+        "createdAt": 1
+      },
+      {
+        "type": "subagent/catalog",
+        "data": {
+          "sessionId": "22222222-2222-4222-8222-222222222222",
+          "parentSessionId": "11111111-1111-4111-8111-111111111111"
+        }
+      },
+      {
+        "type": "assistant/message",
+        "data": {
+          "message": {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "role": "assistant",
+            "content": [],
+            "source": {}
+          }
+        }
+      },
+      {
+        "type": "feedback/message-put",
+        "data": {
+          "sessionId": "11111111-1111-4111-8111-111111111111",
+          "item": {
+            "messageId": "33333333-3333-4333-8333-333333333333"
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "session",
+        "id": "22222222-2222-4222-8222-222222222222",
+        "createdAt": 1
+      },
+      {
+        "type": "subagent/catalog",
+        "data": {
+          "sessionId": "33333333-3333-4333-8333-333333333333",
+          "parentSessionId": "22222222-2222-4222-8222-222222222222"
+        }
+      },
+      {
+        "type": "assistant/message",
+        "data": {
+          "message": {
+            "id": "44444444-4444-4444-8444-444444444444",
+            "role": "assistant",
+            "content": [],
+            "source": {}
+          }
+        }
+      },
+      {
+        "type": "feedback/message-put",
+        "data": {
+          "sessionId": "22222222-2222-4222-8222-222222222222",
+          "item": {
+            "messageId": "44444444-4444-4444-8444-444444444444"
+          }
+        }
+      }
+    ],
+    "equal": true
+  },
+  {
+    "name": "prose resembling an identity acknowledgement",
+    "left": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Retain this as message 11111111-1111-4111-8111-111111111111. Anonymous user: 11111111-1111-4111-8111-111111111111."
+            }
+          ]
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "user/message",
+        "data": {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Retain this as message 22222222-2222-4222-8222-222222222222. Anonymous user: 22222222-2222-4222-8222-222222222222."
+            }
+          ]
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "tool arguments with identity-shaped business fields",
+    "left": [
+      {
+        "type": "tool/call",
+        "data": {
+          "args": {
+            "projectId": "11111111-1111-4111-8111-111111111111",
+            "sessionId": "11111111-1111-4111-8111-111111111111"
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "tool/call",
+        "data": {
+          "args": {
+            "projectId": "22222222-2222-4222-8222-222222222222",
+            "sessionId": "22222222-2222-4222-8222-222222222222"
+          }
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "schema business defaults",
+    "left": [
+      {
+        "type": "request/header",
+        "data": {
+          "header": {
+            "tools": [
+              {
+                "name": "example",
+                "parameters": {
+                  "sessionId": "11111111-1111-4111-8111-111111111111"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "request/header",
+        "data": {
+          "header": {
+            "tools": [
+              {
+                "name": "example",
+                "parameters": {
+                  "sessionId": "22222222-2222-4222-8222-222222222222"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "compaction lifecycle identities vary together",
+    "left": [
+      {
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "turn": 2
+        }
+      },
+      {
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "summary": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "user/message",
+        "data": {
+          "source": {
+            "kind": "plugin",
+            "plugin": "compact",
+            "compactionId": "11111111-1111-4111-8111-111111111111"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "turn": 2
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "22222222-2222-4222-8222-222222222222",
+          "turn": 2
+        }
+      },
+      {
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "22222222-2222-4222-8222-222222222222",
+          "summary": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "user/message",
+        "data": {
+          "source": {
+            "kind": "plugin",
+            "plugin": "compact",
+            "compactionId": "22222222-2222-4222-8222-222222222222"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "22222222-2222-4222-8222-222222222222",
+          "turn": 2
+        }
+      }
+    ],
+    "equal": true
+  },
+  {
+    "name": "compaction end belongs to another operation",
+    "left": [
+      {
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "turn": 2
+        }
+      },
+      {
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "summary": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "user/message",
+        "data": {
+          "source": {
+            "kind": "plugin",
+            "plugin": "compact",
+            "compactionId": "11111111-1111-4111-8111-111111111111"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "turn": 2
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "22222222-2222-4222-8222-222222222222",
+          "turn": 2
+        }
+      },
+      {
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "22222222-2222-4222-8222-222222222222",
+          "summary": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "user/message",
+        "data": {
+          "source": {
+            "kind": "plugin",
+            "plugin": "compact",
+            "compactionId": "22222222-2222-4222-8222-222222222222"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "33333333-3333-4333-8333-333333333333",
+          "turn": 2
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "compaction lookalike in tool arguments stays literal",
+    "left": [
+      {
+        "type": "example",
+        "data": {
+          "arguments": {
+            "compactionId": "11111111-1111-4111-8111-111111111111"
+          }
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "example",
+        "data": {
+          "arguments": {
+            "compactionId": "22222222-2222-4222-8222-222222222222"
+          }
+        }
+      }
+    ],
+    "equal": false
+  },
+  {
+    "name": "canonical compaction lifecycle is a comparison fixed point",
+    "left": [
+      {
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "{{compaction:1}}",
+          "turn": 2
+        }
+      },
+      {
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "{{compaction:1}}",
+          "summary": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "user/message",
+        "data": {
+          "source": {
+            "kind": "plugin",
+            "plugin": "compact",
+            "compactionId": "{{compaction:1}}"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "{{compaction:1}}",
+          "turn": 2
+        }
+      }
+    ],
+    "right": [
+      {
+        "type": "compaction/start",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "turn": 2
+        }
+      },
+      {
+        "type": "compaction/summary",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "summary": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "user/message",
+        "data": {
+          "source": {
+            "kind": "plugin",
+            "plugin": "compact",
+            "compactionId": "11111111-1111-4111-8111-111111111111"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "stable summary"
+            }
+          ]
+        }
+      },
+      {
+        "type": "compaction/end",
+        "data": {
+          "compactionId": "11111111-1111-4111-8111-111111111111",
+          "turn": 2
+        }
+      }
+    ],
+    "equal": true
+  }
+]

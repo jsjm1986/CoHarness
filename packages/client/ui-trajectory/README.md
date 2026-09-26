@@ -6,6 +6,8 @@ Trajectory renders a turn-aware event ledger with selectable User, Assistant, To
 
 On compact viewports the ledger keeps its durable selection but projects events as a readable mobile feed with larger body roles and a compact timeline strip. An open event inspector becomes an opaque upper-rounded reading sheet with a shared backdrop, one summary scroll position, safe-area insets, and a small drag affordance, so status/value rows remain visible on short phones without changing the underlying selection state.
 
+A `run_code` Tool record opens a program inspector: the Code tab shows numbered source with its language tag, an Original JSON toggle for the verbatim arguments, and copy controls for the source, JSON, and captured output. The overview keeps the same panels in compact preview form, hiding inspector-only rows such as the timing source. Each open inspector samples the persisted line-wrap preference (`dsh.trajectory.wrap`) when the record is selected or the Code tab activates, so a toggle writes the next default without rewrapping inspectors already open. The actual-duration toggle persists browser-wide the same way (`dsh.trajectory.duration`).
+
 While a staged session is running, the shared Session window expands older pages in the background and the older-page row stays out of the ledger; the row returns when a later stage entry intentionally starts from a bounded tail.
 
 Trajectory assistant streams use the shared incremental block accumulator, joining reasoning and tool-argument parts only when a visible row is published. Long reasoning streams therefore avoid copying their complete prefix for every chunk.

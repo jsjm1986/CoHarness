@@ -89,7 +89,24 @@ Optional policy supplied by a deployment that owns the request identity.
  * @returns whether the request may select the preset.
  */
 canSelect(name: string): boolean
+
+/**
+ * Recheck deployment authority before an explicit command commits its preset.
+ * @param agent - Agent whose current Session receives the selection.
+ * @param name - validated preset name.
+ * @returns completion when selection is authorized; rejection leaves the Session unchanged.
+ */
+authorizeSelection?(agent: Agent, name: string): Promise<void>
+
+/**
+ * Authorize an explicit future-session default using the live account request.
+ * @param name - schema-valid configured preset name; Auto is never a default.
+ * @returns completion when the default may be persisted.
+ */
+authorizeDefault?(name: string): Promise<void>
 ```
+
+Types: [Agent](core.zh.md)
 
 Source: [`packages/interaction/permission-presets/src/index.ts`](../../packages/interaction/permission-presets/src/index.ts)
 

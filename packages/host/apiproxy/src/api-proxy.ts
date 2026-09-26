@@ -3,15 +3,20 @@
  * narrow RpcRequest<P> and echoes request.rpcId on the RpcResponse<T>.
  */
 
+import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { randomUUID } from 'node:crypto'
+import { createDesktopApi } from './desktop.ts'
+import { createWorkspaceChangesApi } from './workspace-changes.ts'
 import { createWorkspaceFilesApi, subscribeWorkspaceFileChanges, DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 import { mkdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-terminal-controller'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentSetup, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -51,6 +56,7 @@ import type {
   SessionPersistencePage,
   SessionPersistencePageRequest,
 } from '@deepseek-ai/dsh-session-persistence'
+import { ensureSshRealm, sshRealmKey } from './ssh-execution.ts'
 // Type-only: resolves the optional permission-default owner notified after
 // the browser confirms and the Host verifies a Workspace blank reuse target.
 import type {} from '@deepseek-ai/dsh-permission-presets'
@@ -97,6 +103,7 @@ import { expandAssistantStream } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
 import { historyIndexFromEvents } from './history-index.ts'
+import { toolHistoryTurn } from './fetch/tool-history.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -121,6 +128,7 @@ import {
   type CollaborationVisibility,
 } from '@deepseek-ai/dsh-collaboration'
 import {
+  remoteErrorOf,
   TypertLookupFailure,
   type TypertGatewayAuthorizationRequest,
 } from '@deepseek-ai/dsh-typert-protocol'
@@ -243,14 +251,26 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
 /**
  * Project-scope Remote methods whose wire arguments carry no Session identity
  * because only the owning service's registry can resolve it. The service
- * enforces the per-Session ACL itself; this table only admits the call after
- * principal capture has verified project membership.
+ * enforces its Session ACL or deployment management policy itself; this table
+ * only admits the call after principal capture has verified project membership.
  */
+const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
+const TERMINAL_REQUEST_SIGNAL = new AbortController().signal
+
 const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',
   'dynamicCordisRunner/syncInspectManifest',
   'agentPresets/list',
+  'pluginManager/listPlugins',
+  'pluginManager/listBundles',
+  'pluginManager/inspect',
+  'pluginManager/setPluginEnabled',
+  'pluginManager/setBundleEnabled',
+  'pluginManager/installBundle',
+  'pluginManager/installBundleStream',
+  'pluginManager/cancelInstall',
+  'pluginManager/removeBundle',
 ])
 
 /**
@@ -293,6 +313,23 @@ function rejectTypertCollaboration(error: unknown, action: CollaborationAction, 
   throw new TypertLookupFailure<RpcError>(collaborationRefusal(error, action, sessionId))
 }
 
+/** Gateway request metadata needed by the proxy, independent of its HTTP transport implementation. */
+interface GatewayRequestReader {
+  /** @returns the verified request purpose, or undefined outside an authenticated operation. */
+  current(): { claims: { purpose?: string } } | undefined
+}
+
+/** The runtime-identity slice of the managed `gatewayRuntime` service. */
+interface GatewayRuntimeIdentityReader {
+  /** Runtime identity bound into the launch credential. */
+  readonly identity: { readonly kind: 'user' | 'project'; readonly id: number }
+}
+
+function pluginAdministration(ctx: Context): boolean {
+  const runtime = ctx.get('gatewayRuntime') as GatewayRequestReader | undefined
+  return runtime?.current()?.claims.purpose === 'plugin-admin'
+}
+
 /**
  * Apply project collaboration ACLs to a validated Typert Remote request.
  * Personal requests and compositions without collaboration retain ordinary behavior.
@@ -304,6 +341,25 @@ export async function authorizeTypertRemote(
   ctx: Context,
   payload: TypertGatewayAuthorizationRequest,
 ): Promise<void> {
+  if (pluginAdministration(ctx)) {
+    if (!payload.endpoint.startsWith('pluginManager/') && payload.endpoint !== 'pluginInventory/list') {
+      throw new Error('Plugin management assertions cannot invoke another service')
+    }
+    const manager = ctx.get('pluginManager')
+    if (manager === undefined) throw new Error('Plugin management is unavailable')
+    await manager.authorize()
+    return
+  }
+  if (payload.endpoint === 'terminal/adminList' || payload.endpoint === 'terminal/adminClose') return
+  if (USER_TERMINAL_ENDPOINTS.has(payload.endpoint)) {
+    // Retained output uses the controller's revocable creator grant, not an expired browser assertion.
+    if (payload.phase === 'stream-item') return
+    const sessionId = typertSessionId(payload.args.agentId ?? payload.args.sessionId)
+    const controller = ctx.get('terminalController')
+    if (sessionId === undefined || controller === undefined) throw new Error('Terminal Session authorization is unavailable')
+    await controller.authorizeSession(sessionId, payload.signal ?? TERMINAL_REQUEST_SIGNAL)
+    return
+  }
   const collaboration = ctx.get('collaboration')
   if (collaboration === undefined) return
   const policy = PROJECT_TYPERT_SESSION_AUTHORIZATION[payload.endpoint]
@@ -729,20 +785,32 @@ class FrameQueue<F extends RpcRequest<{ type: string }>> {
     this.waiter?.()
   }
 
-  async *iterate(signal: AbortSignal, cleanup: () => void): AsyncGenerator<F> {
+  async *iterate(
+    signal: AbortSignal,
+    cleanup: () => void,
+    authorizeBatch?: (items: readonly F[]) => Promise<readonly F[]>,
+  ): AsyncGenerator<F> {
     const onAbort = (): void => { this.end() }
+    const isAborted = (): boolean => signal.aborted
     signal.addEventListener('abort', onAbort, { once: true })
     try {
       while (true) {
-        while (this.head < this.buffer.length) {
-          const next = this.buffer[this.head] as { item: F; bytes: number }
-          this.head++
-          this.bufferedBytes -= next.bytes
-          yield next.item
+        if (isAborted()) return
+        if (this.head < this.buffer.length) {
+          const batch = this.buffer.slice(this.head).map(entry => entry.item)
+          this.buffer = []
+          this.head = 0
+          this.bufferedBytes = 0
+          const allowed = authorizeBatch === undefined ? batch : await authorizeBatch(batch)
+          for (const item of allowed) {
+            if (isAborted()) return
+            yield item
+          }
+          continue
         }
         this.buffer = []
         this.head = 0
-        if (this.done || signal.aborted) return
+        if (this.done || isAborted()) return
         await new Promise<void>((resolve) => { this.waiter = resolve })
         this.waiter = undefined
       }
@@ -816,7 +884,6 @@ function createSessionReadTracker(
   const readable = new Set<SessionId>()
   const pending = new Map<SessionId, Promise<boolean>>()
   const ensureReadable = (sessionId: SessionId): Promise<boolean> => {
-    if (readable.has(sessionId)) return Promise.resolve(true)
     if (authority === undefined) {
       readable.add(sessionId)
       return Promise.resolve(true)
@@ -826,6 +893,7 @@ function createSessionReadTracker(
     const check = authority.readableSessionIds([sessionId]).then((ids) => {
       const allowed = ids.has(sessionId)
       if (allowed) readable.add(sessionId)
+      else readable.delete(sessionId)
       return allowed
     }, (error: unknown) => {
       fail(error)
@@ -837,6 +905,52 @@ function createSessionReadTracker(
     return check
   }
   return { readable, ensureReadable }
+}
+
+/** Recheck the bounded publication batch, including frames queued before a revocation. */
+function authorizeReadBatch<F extends MuxFrame | HostFrame>(
+  authority: CollaborationAuthority | undefined,
+  fail: (error: unknown) => void,
+): ((items: readonly RpcRequest<F>[]) => Promise<readonly RpcRequest<F>[]>) | undefined {
+  if (authority === undefined) return undefined
+  return async (items) => {
+    const sessionIds = new Set<SessionId>()
+    for (const { payload } of items) {
+      if ('sessionId' in payload) sessionIds.add(payload.sessionId)
+      if (payload.type === 'host/workspace-changed') {
+        for (const id of payload.workspace.sessionIds) sessionIds.add(id)
+      }
+      if (payload.type === 'host/archived-sessions-changed') {
+        for (const id of payload.archivedSessionIds) sessionIds.add(id)
+      }
+      if (payload.type === 'host/remote-event' && payload.event === 'agent-preset/selected') {
+        sessionIds.add(payload.args[0] as SessionId)
+      }
+    }
+    if (sessionIds.size === 0) return items
+    let allowed: ReadonlySet<SessionId>
+    try {
+      allowed = await authority.readableSessionIds([...sessionIds])
+    } catch (error: unknown) {
+      fail(error)
+      return []
+    }
+    return items.flatMap((item): RpcRequest<F>[] => {
+      const payload = item.payload
+      if ('sessionId' in payload && !allowed.has(payload.sessionId)) return []
+      if (payload.type === 'host/remote-event' && payload.event === 'agent-preset/selected'
+        && !allowed.has(payload.args[0] as SessionId)) return []
+      if (payload.type === 'host/workspace-changed') {
+        return [{ ...item, payload: { ...payload, workspace: {
+          ...payload.workspace, sessionIds: payload.workspace.sessionIds.filter(id => allowed.has(id)),
+        } } }]
+      }
+      if (payload.type === 'host/archived-sessions-changed') {
+        return [{ ...item, payload: { ...payload, archivedSessionIds: payload.archivedSessionIds.filter(id => allowed.has(id)) } }]
+      }
+      return [item]
+    })
+  }
 }
 
 /**
@@ -957,6 +1071,7 @@ function sessionListFields(header: SessionHeader, events: readonly SessionEvent[
   origin?: 'subagent'
   cwd?: string
   agentPreset?: string
+  sshTarget?: number
 } {
   // The preset comes from the log, not the header: a session that switched
   // while blank ran its turns under the newer composition, and a picker
@@ -967,6 +1082,7 @@ function sessionListFields(header: SessionHeader, events: readonly SessionEvent[
     ...header.origin === undefined ? {} : { origin: header.origin },
     ...header.cwd === undefined ? {} : { cwd: header.cwd },
     ...agentPreset === undefined ? {} : { agentPreset },
+    ...header.sshTarget === undefined ? {} : { sshTarget: header.sshTarget },
   }
 }
 
@@ -1593,6 +1709,20 @@ class SessionCwdConflict extends Error {
   }
 }
 
+/** Requested identity already belongs to a session bound to another SSH target. */
+class SessionSshTargetConflict extends Error {
+  constructor(
+    readonly sessionId: SessionId,
+    readonly requestedTarget: number,
+    readonly existingTarget: number | undefined,
+  ) {
+    super(
+      `session "${sessionId}" already exists bound to SSH target ${String(existingTarget)}; `
+      + `requested ${String(requestedTarget)}. A session's execution target is fixed at creation.`,
+    )
+  }
+}
+
 /** An explicit Host naming operation would duplicate another Workspace title. */
 class WorkspaceNameConflictError extends Error {
   constructor(readonly workspaceName: string) {
@@ -1946,6 +2076,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ): Promise<string> {
     if (authority?.participant.scope.kind !== 'project') return path
     if (!isAbsolute(path)) throw new CollaborationError('forbidden')
+    const fs = ctx.get('fs')
+    if (fs !== undefined && fs.processPathFromHostPath(defaults.cwd) === undefined) {
+      const [root, target] = await Promise.all([fs.resolve(defaults.cwd), fs.resolve(path)])
+      if (!fs.contains(root, target)) throw new CollaborationError('forbidden')
+      return fs.processPath(target)
+    }
     canonicalProjectRoot ??= realpath(resolve(defaults.cwd))
     const [root, target] = await Promise.all([canonicalProjectRoot, canonicalPath(path)])
     if (!containedPath(root, target)) throw new CollaborationError('forbidden')
@@ -2158,6 +2294,44 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /**
+   * The persisted SSH binding wins over anything the request names for the same
+   * reason as the preset: replaying a session on a different host would strand
+   * the filesystem state its history already produced.
+   * @throws when both are present and differ.
+   */
+  function assertSshTargetUnchanged(
+    sessionId: SessionId,
+    requested: number | undefined,
+    existing: number | undefined,
+  ): void {
+    if (requested === undefined || requested === existing) return
+    throw new SessionSshTargetConflict(sessionId, requested, existing)
+  }
+
+  /**
+   * Re-resolve the caller's SSH qualification before a live bound Agent is
+   * handed over. The realm mount was authorized by the FIRST joiner's grant;
+   * adoption, a shared creation awaited by another caller, and every generic
+   * agent lookup must qualify the caller reaching it now — mount-time
+   * admission alone cannot.
+   * @param agent - the live Agent about to be served.
+   * @throws the authorization service's `ssh/forbidden` refusal when the
+   *   caller is not currently qualified for the session's bound target.
+   */
+  async function assertLiveSshAdmission(agent: Agent): Promise<void> {
+    const sshTarget = agent.session.header.sshTarget
+    if (sshTarget === undefined) return
+    const authorization = ctx.get('sshAuthorization')
+    if (authorization === undefined) {
+      throw new Error('session sshTarget requires a managed runtime providing sshAuthorization')
+    }
+    // Check-only resolution: the join keeps riding the mount's own grant, so
+    // the admission grant is released rather than accumulated per call.
+    const admission = await authorization.resolve(sshTarget)
+    admission.release?.()
+  }
+
+  /**
    * Resolve the preset an agent will be composed from, and the setup that
    * installs it.
    *
@@ -2173,16 +2347,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * @returns the id to record on the header (absent without a roster) and the setup callback.
    * @throws when the roster supplies no such preset.
    */
-  async function composeAgent(presetId: string | undefined): Promise<{
+  async function composeAgent(presetId: string | undefined, sshTarget?: number): Promise<{
     agentPreset?: string
-    setup: (agentCtx: Context, agent: Agent) => Promise<void>
+    setup: AgentSetup
   }> {
     const presets = ctx.get('agentPresets')
     if (presets === undefined) {
+      // Rosterless hosts compose tools in the host realm, where a session
+      // cannot shadow the execution providers — SSH binding is only
+      // meaningful through a realm'd standing mount.
+      if (sshTarget !== undefined) {
+        throw new Error('session sshTarget requires an agent-preset roster to mount the remote execution realm')
+      }
       return {
         setup: (agentCtx: Context, agent: Agent) => {
           installSelection(agentCtx, agent)
-          return Promise.resolve()
         },
       }
     }
@@ -2191,7 +2370,26 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       agentPreset: resolvedId,
       setup: async (agentCtx: Context, agent: Agent) => {
         installSelection(agentCtx, agent)
-        await presets.mount(agentCtx, resolvedId)
+        if (sshTarget === undefined) {
+          await presets.mount(agentCtx, resolvedId)
+          return
+        }
+        // The per-join resolve is the caller's own admission check: the
+        // standing mount is cached across calls, so joining it must not
+        // inherit an earlier caller's authorization. The grant's subject also
+        // keys the realm, confining one caller's revocation to its own mounts.
+        const joined = await agentCtx.get('sshAuthorization')?.resolve(sshTarget)
+        if (joined === undefined) {
+          throw new Error('session sshTarget requires a managed runtime providing sshAuthorization')
+        }
+        const runtime = agentCtx.get('gatewayRuntime') as GatewayRuntimeIdentityReader | undefined
+        const projectId = runtime?.identity.kind === 'project' ? runtime.identity.id : undefined
+        const realm = sshRealmKey(sshTarget, joined.userId, projectId)
+        ensureSshRealm(presets, realm, sshTarget)
+        await presets.mount(agentCtx, resolvedId, realm)
+        // Publication gate: a revocation racing the mount aborts this join's
+        // own grant, which commit re-checks after every setup await settles.
+        return { commit: () => { joined.signal.throwIfAborted() } }
       },
     }
   }
@@ -2221,7 +2419,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const { agentFor, pendingResume } = createApiRemoteAgentResolver(ctx, {
     agentOptions,
     setup: async ({ meta, events }) =>
-      (await composeAgent(resolveSessionPreset({ header: meta, events }))).setup,
+      (await composeAgent(resolveSessionPreset({ header: meta, events }), meta.sshTarget)).setup,
+    liveAdmission: async (agent) => {
+      try {
+        await assertLiveSshAdmission(agent)
+        return undefined
+      } catch (error: unknown) {
+        const remote = remoteErrorOf(error)
+        if (remote !== undefined && remote.code === 'ssh/forbidden') {
+          return { code: 'ssh/forbidden', message: remote.message, details: {} }
+        }
+        return {
+          code: 'internal',
+          message: error instanceof Error ? error.message : String(error),
+          details: {},
+        }
+      }
+    },
   })
 
   /** Send one transient frame to every connected mux consumer. */
@@ -2801,6 +3015,28 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
   }
 
+  /** Read an exact call without staging a chat window or activating an Agent. */
+  async function callHistoryFor(
+    sessionId: SessionId, callId: ToolCallId, signal?: AbortSignal, parentSessionId?: SessionId,
+  ): Promise<{ events: HistoryEntry[]; hasMore: boolean }> {
+    const query = ctx.get('sessionQuery')
+    if (query === undefined) throw new Error('Tool history requires the Session query service')
+    const observation = await query.observeSession(sessionId, { projectionMode: 'none', ...(signal === undefined ? {} : { signal }) })
+    try {
+      signal?.throwIfAborted()
+      if (parentSessionId !== undefined && observation.header.parentSession !== parentSessionId) {
+        throw new Error('Subagent parent changed during Tool history read')
+      }
+      const events = toolHistoryTurn(observation.events, callId)
+      if (events.length === 0) return { events: [], hasMore: false }
+      const scope = await presenterScopeFor(sessionId, observation, { lookupLiveAgent: observation.source === 'live' })
+      signal?.throwIfAborted()
+      return { ...historyPage(ctx, events, undefined, Number.MAX_SAFE_INTEGER, scope), hasMore: false }
+    } finally {
+      observation[Symbol.dispose]()
+    }
+  }
+
   /** Rebuild a bounded cold tail's projections through the existing persistence cache owner. */
   async function coldHistoryBaseline(source: HistorySource, signal?: AbortSignal): Promise<SessionProjectionsBlock | undefined> {
     if (source.kind !== 'detached' || !source.bounded) return undefined
@@ -2925,6 +3161,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     checkPersistedIdentity: boolean,
     presetId?: string,
     draft = false,
+    sshTarget?: number,
   ): Promise<Agent> {
     let creation = sessionCreations.get(sessionId)
     if (creation === undefined) {
@@ -2966,23 +3203,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // while blank ran every turn under the newer composition.
           const storedPreset = resolveSessionPreset({ header: inspected.meta, events: inspected.events })
           assertPresetUnchanged(sessionId, presetId, storedPreset)
+          assertSshTargetUnchanged(sessionId, sshTarget, inspected.meta.sshTarget)
           // The stored preset wins over anything the request names: a resumed
           // session's history was produced under that composition, and
           // rebuilding it differently would replay tool calls the model can no
-          // longer make.
+          // longer make. The persisted SSH binding likewise re-mounts from the
+          // header, re-resolved under the resuming caller's authority.
           return (await ctx.agents.resume({
             resumeSessionId: sessionId,
             agentOptions: agentOptions(),
-            setup: (await composeAgent(storedPreset)).setup,
+            setup: (await composeAgent(storedPreset, inspected.meta.sshTarget)).setup,
           })).agent
         }
 
-        try {
-          await mkdir(cwd, { recursive: true })
-        } catch (error: unknown) {
-          throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
+        if (sshTarget === undefined) {
+          try {
+            await mkdir(cwd, { recursive: true })
+          } catch (error: unknown) {
+            throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
+          }
         }
-        const composition = await composeAgent(presetId)
+        const composition = await composeAgent(presetId, sshTarget)
         return (await ctx.agents.create({
           sessionId,
           agentOptions: agentOptions(),
@@ -2990,6 +3231,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             cwd,
             ...(draft ? { draft: true } : {}),
             ...composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset },
+            ...sshTarget === undefined ? {} : { sshTarget },
           },
           setup: composition.setup,
         })).agent
@@ -3017,6 +3259,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     // covers every path that yields a live agent — freshly created, adopted
     // live, resumed from disk, or recovered by the concurrent-creation catch.
     assertPresetUnchanged(sessionId, presetId, resolveSessionPreset(agent.session))
+    assertSshTargetUnchanged(sessionId, sshTarget, agent.session.header.sshTarget)
+    // Live reuse must not inherit the first joiner's SSH grant: a shared
+    // creation also hands the agent to callers that never mounted it, so the
+    // caller reaching it here re-resolves under its own qualification.
+    await assertLiveSshAdmission(agent)
     if (agent.session.header.cwd !== cwd) {
       throw new SessionCwdConflict(sessionId, cwd, agent.session.header.cwd)
     }
@@ -3403,6 +3650,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return `settings namespace "${String(descriptor.ns)}" does not allow project writes to ${rendered}`
   }
 
+  /** Recheck the restricted administrator principal before any profile configuration access. */
+  async function authorizePluginSettings(): Promise<{ administrator: boolean; error?: RpcError }> {
+    if (!pluginAdministration(ctx)) return { administrator: false }
+    const manager = ctx.get('pluginManager')
+    try {
+      if (manager === undefined) throw new Error('Plugin management is unavailable')
+      await manager.authorize()
+      return { administrator: true }
+    } catch (_authorizationFailure) {
+      return { administrator: false, error: {
+        code: 'collaboration-forbidden', message: 'Administrator profile configuration permission is unavailable.',
+        details: { action: 'write', reason: 'forbidden' },
+      } }
+    }
+  }
+
   /**
    * Run one settings write (merge or wholesale replace) and acknowledge with
    * the namespace's new redacted view. Every seam refusal — unknown or invalid
@@ -3419,9 +3682,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     // Capture collaboration before looking up the optional settings service so
     // a project member receives the authorization refusal even in a minimal
     // composition that does not mount settings at all.
-    const preAuthorized = authorizePersonalConfiguration(true)
+    const management = await authorizePluginSettings()
+    if (management.error !== undefined) return err(request, management.error)
+    if (management.administrator && (mode !== 'mutate' || expectedRevision === undefined)) {
+      return err(request, { code: 'bad-request', message: 'Administrator configuration requires a revision-fenced mutation.',
+        details: { issues: [{ code: 'custom', path: [], message: 'Use settings.mutate with expectedRevision.' }] } })
+    }
+    const preAuthorized = management.administrator ? {} : authorizePersonalConfiguration(true)
     if (preAuthorized.error !== undefined) return err(request, preAuthorized.error)
-    const captured = captureCollaboration('write')
+    const captured = management.administrator ? { authority: undefined } : captureCollaboration('write')
     if ('error' in captured) return err(request, captured.error)
     if (captured.authority?.participant.scope.kind === 'project'
       && captured.authority.participant.role !== 'admin'
@@ -3434,7 +3703,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
     const settings = ctx.get('settings')
     if (settings === undefined) return err(request, settingsAbsent())
-    const authorized = authorizeSettingsNamespace(ns, settings)
+    if (management.administrator && settings.describe().find(descriptor => String(descriptor.ns) === ns)?.owner === 'account') {
+      return err(request, { code: 'settings-rejected', message: 'Account preferences belong to the account settings surface.', details: { ns, reason: 'account' } })
+    }
+    const authorized = management.administrator ? {} : authorizeSettingsNamespace(ns, settings)
     if (authorized.error !== undefined) return err(request, authorized.error)
     if (captured.authority?.participant.scope.kind === 'project') {
       const descriptor = settings.describe({ redactSecrets: true }).find(candidate => String(candidate.ns) === ns)
@@ -3505,9 +3777,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     authorize: sessionId => authorizeSession(sessionId, 'read'),
     validateRoot: resolveProjectPath,
     principalSignal,
+    agent: sessionId => agentFor(sessionId),
+  })
+
+  const workspaceChanges = createWorkspaceChangesApi(ctx, {
+    authorize: sessionId => authorizeSession(sessionId, 'read'),
+    validateRoot: resolveProjectPath,
+    principalSignal,
+    agent: sessionId => agentFor(sessionId),
   })
 
   return {
+    desktop: createDesktopApi(ctx, { authorize: (id, authority) => authorizeSession(id, 'write', authority), agent: agentFor, signal: principalSignal }),
+    workspaceChanges,
     workspaceFiles,
     sessions: {
       // Attached sessions summarize from memory; persisted-but-unattached (cold)
@@ -3685,6 +3967,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, collaborationRefusal(error, 'write', sessionId))
         }
         const requestedPreset = request.payload.agentPreset
+        const requestedSshTarget = request.payload.sshTarget
         const visibility = scope.authority?.participant.scope.kind === 'project'
           ? request.payload.visibility ?? 'project'
           : 'personal'
@@ -3701,6 +3984,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 cwd,
                 visibility,
                 ...(requestedPreset === undefined ? {} : { agentPreset: requestedPreset }),
+                ...(requestedSshTarget === undefined ? {} : { sshTarget: requestedSshTarget }),
               }))
             if (reservation !== undefined) {
               sessionId = reservation.sessionId
@@ -3741,6 +4025,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               request.payload.sessionId !== undefined || reservedDraft,
               requestedPreset,
               draftRequested,
+              requestedSshTarget,
             ),
           )
         } catch (error: unknown) {
@@ -3771,6 +4056,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 ...error.existingCwd === undefined ? {} : { existingCwd: error.existingCwd },
               },
             })
+          }
+          if (error instanceof SessionSshTargetConflict) {
+            return err(request, {
+              code: 'ssh-target-conflict',
+              message: error.message,
+              details: {
+                sessionId: error.sessionId,
+                requestedSshTarget: error.requestedTarget,
+                ...error.existingTarget === undefined ? {} : { existingSshTarget: error.existingTarget },
+              },
+            })
+          }
+          // SSH qualification denials surface their declared wire code instead
+          // of folding into `internal`, matching the Typert channel's code.
+          const remote = remoteErrorOf(error)
+          if (remote !== undefined && remote.code === 'ssh/forbidden') {
+            return err(request, { code: 'ssh/forbidden', message: remote.message, details: {} })
           }
           if (error instanceof SubagentSessionOwnership) {
             return err(request, subagentOwnershipError(error.sessionId))
@@ -3837,15 +4139,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // allowed and the row `session.list` serves for the same session.
         const created = ctx.agents.get(sessionId)
         const createdPreset = created === undefined ? undefined : resolveSessionPreset(created.session)
+        const createdSshTarget = created?.session.header.sshTarget
         return ok(request, {
           sessionId,
           ...createdPreset === undefined ? {} : { agentPreset: createdPreset },
+          ...createdSshTarget === undefined ? {} : { sshTarget: createdSshTarget },
           ...(draftRequested ? { draft: true as const } : {}),
         })
       },
 
       async history(request, signal) {
-        const { sessionId, beforeSeq, maxMessages, detail } = request.payload
+        const { sessionId, toolCallId, beforeSeq, maxMessages, detail } = request.payload
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
         }
@@ -3856,6 +4160,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         try {
           signal?.throwIfAborted()
+          if (toolCallId !== undefined) return ok(request, await callHistoryFor(sessionId, toolCallId, signal))
           const tailRequest = beforeSeq === undefined && detail === 'conversation'
           const normalizedMaxMessages = maxMessages ?? DEFAULT_MAX_MESSAGES
           const projectionRevision = projectionRevisionOf(ctx)
@@ -4155,6 +4460,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: {},
           })
         }
+        const authority = executionAuthorityOf(ctx)
+        const executionScope = await authority?.captureSession(sessionId)
         const events = source.events
         // An in-log anchor belongs to the turn containing it and must never
         // clip backward to an earlier completed turn. Omitted and past-end
@@ -4198,7 +4505,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // those tools, and composing anything else would strand the tool calls
         // it already carries. Now that no model-facing row sits in the host
         // plane, composing nothing would leave the child with no tools at all.
-        const forkComposition = await composeAgent(resolveSessionPreset(source))
+        const forkComposition = await composeAgent(resolveSessionPreset(source), source.header.sshTarget)
         try {
           await ctx.agents.create({
             sessionId: childId,
@@ -4210,10 +4517,14 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ...forkComposition.agentPreset === undefined
                 ? {}
                 : { agentPreset: forkComposition.agentPreset },
+              ...source.header.sshTarget === undefined ? {} : { sshTarget: source.header.sshTarget },
             },
             inheritedEventCount: SessionLogOffset(cut),
             agentOptions: agentOptions(),
-            setup: forkComposition.setup,
+            setup: (agentCtx, agent) => {
+              if (executionScope !== undefined && authority !== undefined) authority.inherit(agent.session, executionScope)
+              return forkComposition.setup(agentCtx, agent)
+            },
           })
         } catch (error: unknown) {
           return err(request, {
@@ -4289,7 +4600,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             const messageSource: MessageSource = durable.documents.length === 0
               ? source
               : { ...source, documents: durable.documents }
-            const message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
+            let message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
+            const execution = executionAuthorityOf(ctx)
+            if (execution !== undefined) message = await execution.stamp(agent.session, message)
             if (mode === 'steer') agent.steer(message)
             else agent.followup(message)
           } catch (error: unknown) {
@@ -4436,11 +4749,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { itemId },
           })
         }
+        let replacement = action.kind === 'edit'
+          ? freezeMessage({ ...message, content: action.content }) : message
+        const execution = executionAuthorityOf(ctx)
+        if (action.kind !== 'remove' && execution !== undefined) {
+          replacement = await execution.stamp(agent.session, replacement)
+        }
+        const current = (target === 'next-turn' ? agent.inbox.nextTurn : agent.inbox.nextStep)
+          .find(candidate => candidate.id === itemId)
+        if (current !== message || (action.kind === 'steer' && agent.status !== 'running')) {
+          return err(request, { code: 'queue-item-not-found', message: 'queued item changed before the update completed', details: { itemId } })
+        }
         if (action.kind === 'edit') {
-          agent.inbox.replace(itemId, freezeMessage({ ...message, content: action.content }))
+          agent.inbox.replace(itemId, replacement)
         } else {
           agent.inbox.remove(itemId)
-          if (action.kind === 'steer') agent.steer(message)
+          if (action.kind === 'steer') agent.steer(replacement)
         }
         return ok(request, { accepted: true as const })
       },
@@ -4468,7 +4792,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     subagents: {
       async history(request, signal) {
         const {
-          parentSessionId, childSessionId, mode, beforeSeq, maxMessages, detail,
+          parentSessionId, childSessionId, mode, toolCallId, beforeSeq, maxMessages, detail,
         } = request.payload
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'subagent history read was cancelled', details: {} })
@@ -4489,6 +4813,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         let detachedBaseline: SessionProjectionsBlock | undefined
         let source: HistorySource
         try {
+          if (toolCallId !== undefined) return ok(request, await callHistoryFor(childSessionId, toolCallId, signal, parentSessionId))
           source = await historySourceFor(childSessionId, {
             ...(beforeSeq === undefined ? {} : { beforeSeq }),
             ...(maxMessages === undefined ? {} : { maxMessages }),
@@ -4614,7 +4939,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             return err(request, collaborationRefusal(error, 'write'))
           }
           // The registry rejects a path that does not resolve to an existing
-          // directory (realpath ENOENT / not-a-directory) — the business
+          // directory (provider missing-path / not-a-directory) — the business
           // error of the typed-path flow, surfaced as a validation failure.
           return err(request, {
             code: 'workspace-invalid-path',
@@ -4787,6 +5112,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, collaborationRefusal(error, 'read', sessionId))
         }
       },
+
+      async unarchiveSession(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        // Idempotent like the registry operation: an id that is not archived
+        // (a lost race with another surface) resolves as a no-op returning the
+        // current set, not as an error.
+        await ctx.workspaceRegistry.restoreSession(sessionId)
+        try {
+          return ok(request, {
+            archivedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.archivedSessionIds,
+              authorized.authority,
+            ),
+            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+          })
+        } catch (error: unknown) {
+          return err(request, collaborationRefusal(error, 'read', sessionId))
+        }
+      },
     },
 
     host: {
@@ -4815,6 +5161,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           attachedSessions,
           home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
+          executionAuthorityRequired: ctx.get('executionAuthorityRequired') === true,
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
             maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,
@@ -5008,8 +5355,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     },
 
     settings: {
-      describe(request) {
-        const captured = captureCollaboration('read')
+      async describe(request) {
+        const management = await authorizePluginSettings()
+        if (management.error !== undefined) return err(request, management.error)
+        const captured = management.administrator ? { authority: undefined } : captureCollaboration('read')
         if ('error' in captured) return Promise.resolve(err(request, captured.error))
         const projectScope = captured.authority?.participant.scope.kind === 'project'
         const projectManager = captured.authority?.participant.scope.kind === 'project'
@@ -5030,8 +5379,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         return Promise.resolve(ok(request, {
           writable,
           ...writableReason === undefined ? {} : { writableReason },
-          hasDocument: settings.documentPath !== undefined && !projectScope,
-          namespaces: visible.map(descriptor => namespaceView(descriptor, projectScope, projectManager, settings.writable)),
+          hasDocument: settings.documentPath !== undefined && !projectScope && !management.administrator,
+          namespaces: visible.map(descriptor => ({
+            ...namespaceView(descriptor, projectScope, projectManager, settings.writable),
+            ...(management.administrator && descriptor.owner === 'account' ? { writable: false, writableReason: 'account' as const } : {}),
+          })),
         }))
       },
       async openDocument(request, signal) {
@@ -5259,6 +5611,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const { readable, ensureReadable } = createSessionReadTracker(authority, fail)
 
           const publishFor = (sessionId: SessionId, deliver: () => void): void => {
+            // Materialize observed events before mutable producer state advances.
+            // The publication batch owns the current Session access check.
             if (readable.has(sessionId)) {
               deliver()
               return
@@ -5448,7 +5802,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           yield* queue.iterate(streamSignal, () => {
             cleanup()
-          })
+          }, authorizeReadBatch<MuxFrame>(authority, fail))
         })())
       },
 
@@ -5542,14 +5896,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               publish(() => {
                 if (readable.has(agent.id)) {
                   queue.push(frame({ type: 'host/session-status', sessionId: agent.id, running: status === 'running' }))
+                  return
                 }
+                void ensureReadable(agent.id).then((allowed) => { if (allowed) {
+                  queue.push(frame({ type: 'host/session-status', sessionId: agent.id, running: status === 'running' }))
+                } })
               })
             }),
             ctx.on('agent/error', ({ agent, error }: { agent: Agent; error: unknown }) => {
               publish(() => {
                 if (readable.has(agent.id)) {
                   queue.push(frame({ type: 'host/agent-error', sessionId: agent.id, message: errorChain(error) }))
+                  return
                 }
+                void ensureReadable(agent.id).then((allowed) => { if (allowed) {
+                  queue.push(frame({ type: 'host/agent-error', sessionId: agent.id, message: errorChain(error) }))
+                } })
               })
             }),
             ctx.on('domain/changed', (change) => {
@@ -5610,10 +5972,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                     return
                   }
                   const sessionId = args[0] as SessionId
-                  if (readable.has(sessionId)) {
-                    queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
-                    return
-                  }
                   void ensureReadable(sessionId).then((allowed) => {
                     if (allowed) queue.push(frame({ type: 'host/remote-event', event: name, args: jsonArgs }))
                   })
@@ -5642,7 +6000,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             yield frame({ type: 'stream/error', error: collaborationRefusal(error, 'read') })
             return
           }
-          yield* queue.iterate(streamSignal, cleanup)
+          yield* queue.iterate(streamSignal, cleanup, authorizeReadBatch<HostFrame>(authority, fail))
         })())
       },
     },
@@ -5787,7 +6145,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       if ('error' in authorized) return { accepted: false, reason: 'bad-response' }
       if (pendingQuestions.get(message.rpcId) !== pending) return { accepted: false, reason: 'not-pending' }
       try {
-        if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(
+        const execution = executionAuthorityOf(ctx)
+        const session = ctx.sessions.get(pending.sessionId)
+        if (execution !== undefined) {
+          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer)) {
+            return { accepted: false, reason: 'not-pending' }
+          }
+        } else if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(
           pending.sessionId,
           'question',
           String(pending.rpcId),

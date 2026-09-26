@@ -291,7 +291,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     const name = pick.candidate.name
     const contribution = this.live.contributions.get(name)
     if (contribution !== undefined && contribution.available(pick.session)) {
-      this.openPopup(name, contribution.ui, pick.session, { via: 'menu', span: pick.span })
+      this.invoke(name, contribution.ui, pick.session, { via: 'menu', span: pick.span })
       return 'handled'
     }
     const desc = this.directory.resolve(pick.session.sessionId, name)
@@ -301,7 +301,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     // manufactures one, and never touches the argument claim below.
     const decoration = this.live.decorations.get(name)
     if (decoration !== undefined && decoration.available(pick.session)) {
-      this.openPopup(name, decoration.ui, pick.session, { via: 'menu', span: pick.span })
+      this.invoke(name, decoration.ui, pick.session, { via: 'menu', span: pick.span })
       return 'handled'
     }
     if (desc.input !== undefined) return { claim: this.leadingClaim(desc, pick.session, claimToken(desc, this.t)) }
@@ -332,7 +332,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
    * through a command declaring image acceptance. Every other command route —
    * popup, non-accepting claim, bare detached execute — throws the refusal
    * so the machine surfaces one composer notice and the draft and images
-   * stay in place; nothing executes and nothing is dropped.
+   * stay in place; nothing executes and nothing is dropped. Non-submitting actions retain images.
    */
   private async matchEnter(
     session: ClientSessionContext,
@@ -353,8 +353,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     const contribution = this.live.contributions.get(name)
     if (contribution !== undefined && contribution.available(session)) {
       if (!bare) return undefined
-      if (envelope.images > 0) refuseImages()
-      this.openPopup(name, contribution.ui, session, { via: 'enter', token })
+      if (envelope.images > 0 && contribution.ui.kind !== 'action') refuseImages()
+      this.invoke(name, contribution.ui, session, { via: 'enter', token })
       return 'handled'
     }
     await this.directory.ensureReady(session.sessionId, signal)
@@ -367,8 +367,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     if (bare) {
       const decoration = this.live.decorations.get(canonicalName)
       if (decoration !== undefined && decoration.available(session)) {
-        if (envelope.images > 0) refuseImages()
-        this.openPopup(canonicalName, decoration.ui, session, { via: 'enter', token })
+        if (envelope.images > 0 && decoration.ui.kind !== 'action') refuseImages()
+        this.invoke(canonicalName, decoration.ui, session, { via: 'enter', token })
         return 'handled'
       }
     }
@@ -383,8 +383,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     return 'handled'
   }
 
-  /** Open the session's popup for one contribution or decoration (menu pick / bare enter). */
-  private openPopup(
+  /** Open the Session's selection panel or run its action after consuming the current token. */
+  private invoke(
     name: string,
     ui: CommandContribution['ui'],
     session: ClientSessionContext,
@@ -392,6 +392,10 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   ): void {
     const actx = this.scopeFor(session.sessionId)
     if (actx === undefined) return
+    if (ui.kind === 'action') {
+      if (this.consumeVia(session.sessionId, segment)) ui.run(session)
+      return
+    }
     this.popupFor(actx).open(name, ui, session, segment)
   }
 
@@ -480,14 +484,14 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   }
 
   /** Dispatch a consume-token event to one session (menu-pick / bare-enter execute paths). */
-  private consumeVia(id: SessionId, segment: TokenSegment): void {
+  private consumeVia(id: SessionId, segment: TokenSegment): boolean {
     const actx = this.scopeFor(id)
-    if (actx === undefined) return
-    actx.bail(actx, 'slash/input-consume-token', {
+    if (actx === undefined) return false
+    return actx.bail(actx, 'slash/input-consume-token', {
       guard: segment.via === 'menu'
         ? { kind: 'span', span: segment.span }
         : { kind: 'bare-token', token: segment.token },
-    })
+    }) === true
   }
 
   /** Route an admission/transport failure to the session's composer notice channel (scope gone = attempt died with it). */

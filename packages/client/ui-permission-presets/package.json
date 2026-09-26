@@ -52,7 +52,8 @@
     "@deepseek-ai/dsh-client-ui-commands": "workspace:^",
     "@deepseek-ai/dsh-client-ui-settings": "workspace:^",
     "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
-    "@deepseek-ai/dsh-permission-presets": "workspace:^"
+    "@deepseek-ai/dsh-permission-presets": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -68,7 +69,8 @@
     "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
     "@deepseek-ai/dsh-permission-presets": "workspace:^",
     "@types/react": "~19.2.7",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^"
   },
   "files": [
     "lib/index.js",

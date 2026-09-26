@@ -133,13 +133,17 @@ function standaloneHistory(
   }
 }
 
-function standaloneDuration(): Pick<
-  ComponentProps<typeof TrajectoryView>, 'useDuration' | 'setActualDuration'
+function standalonePreferences(): Pick<
+  ComponentProps<typeof TrajectoryView>,
+  'useDuration' | 'setActualDuration' | 'useWrap' | 'setWrapLines'
 > {
   const duration = createSnapshotStore(false)
+  const wrap = createSnapshotStore(false)
   return {
     useDuration: bindSnapshotSelector(duration),
     setActualDuration: (value) => { duration.set(value) },
+    useWrap: bindSnapshotSelector(wrap),
+    setWrapLines: (value) => { wrap.set(value) },
   }
 }
 
@@ -151,7 +155,7 @@ function fakeSession(nodes: ConversationSnapshot['nodes']) {
 /** Empty sessions-list hook; breadcrumbs therefore fall back to the raw id. */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 
@@ -256,8 +260,10 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         return {
           loadOlder: trajectory.loadOlder,
           setActualDuration: trajectory.setActualDuration,
+          setWrapLines: trajectory.setWrapLines,
           ensureHistoryDetail: trajectory.ensureHistoryDetail,
           useDuration: bindSnapshotSelector(trajectory.hooks.duration),
+          useWrap: bindSnapshotSelector(trajectory.hooks.wrap),
           t: tZh,
         }
       })()
@@ -347,6 +353,24 @@ describe('plugin registration', () => {
     expect(second.hooks.duration.getSnapshot()).toBe(true)
     expect(localStorage.getItem('dsh.trajectory.duration')).toBe('true')
     expect(localStorage.getItem(`dsh.trajectory.duration.${SID}`)).toBeNull()
+  })
+
+  it('shares one browser-wide wrap preference across session injections', async () => {
+    const b = await bench()
+    const entry = b.slots.entries('conversation.view')
+      .find(candidate => candidate.options.id === 'trajectory')
+    expect(entry).toBeDefined()
+    const injectEntry = entry!.inject as unknown as (
+      sessionId: SessionId,
+    ) => TrajectoryViewInjected
+    const first = injectEntry(SID)
+    const second = injectEntry('s2' as SessionId)
+
+    expect(second.hooks.wrap).toBe(first.hooks.wrap)
+    first.setWrapLines(true)
+    expect(second.hooks.wrap.getSnapshot()).toBe(true)
+    expect(localStorage.getItem('dsh.trajectory.wrap')).toBe('true')
+    expect(localStorage.getItem(`dsh.trajectory.wrap.${SID}`)).toBeNull()
   })
 
   it('reports whether loading older history changed the Trajectory snapshot', async () => {
@@ -1153,7 +1177,7 @@ describe('timeline projection', () => {
       {
         ...standaloneProps([]),
         ...standaloneHistory(historySnapshot([])),
-        ...standaloneDuration(),
+        ...standalonePreferences(),
       },
     ))
     expect(screen.getByRole('toolbar', { name: '轨迹工具栏' })).toBeTruthy()
@@ -1167,6 +1191,7 @@ describe('TrajectoryView state', () => {
     const commonProps = {
       ...standaloneProps(NODES),
       ...standaloneHistory(historySnapshot(NODES)),
+      ...standalonePreferences(),
     }
     const first = render(
       <TrajectoryView
@@ -1209,7 +1234,7 @@ describe('TrajectoryView state', () => {
     const view = render(
       <TrajectoryView
         {...standaloneProps([])}
-        {...standaloneDuration()}
+        {...standalonePreferences()}
         useSession={bindSnapshotSelector(store)}
         loadOlder={vi.fn(() => Promise.resolve(false))}
         ensureHistoryDetail={() => Promise.resolve()}

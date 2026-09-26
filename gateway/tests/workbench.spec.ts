@@ -23,7 +23,7 @@ describe('workbench account catalog', () => {
     } as unknown as GatewayCollaborationService
     const user: UserRow = {
       id: 1, username: 'me', displayName: 'Me', role: 'user', status: 'active',
-      homePath: '/home/me', mustChangePassword: false,
+      homePath: '/home/me', mustChangePassword: false, autoReviewEligible: false,
     }
     const fetch = vi.fn(async (url: string) => new Response(JSON.stringify({
       type: 'server-response', result: { ok: true, value: url.endsWith('/workspace.list')
@@ -63,7 +63,7 @@ describe('workbench account catalog', () => {
     } as unknown as GatewayCollaborationService
     const user: UserRow = {
       id: 1, username: 'me', displayName: 'Me', role: 'user', status: 'active',
-      homePath: '/home/me', mustChangePassword: false,
+      homePath: '/home/me', mustChangePassword: false, autoReviewEligible: false,
     }
     vi.stubGlobal('fetch', vi.fn(async () => new Response('legacy session list failed', { status: 500 })))
     const handler = createGatewayWorkbenchCatalogHandler({

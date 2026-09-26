@@ -1,16 +1,18 @@
 /**
  * Composer submission policy. It owns the live busy-Enter
- * preference and resolves keyboard gestures into queue/steer delivery modes;
+ * preference and resolves composer gestures into queue/steer delivery modes;
  * Host and Agent keep the actual delivery-window authority.
  */
 import {
   createSnapshotStore, settingsControlState, type SettingsControlState, type SettingsScope, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  BusyEnterBehavior, ComposerSubmitGesture, InputSubmitMode,
+  BusyEnterBehavior,
 } from '../contract/composer-submission.ts'
 import { BUSY_ENTER_FIELD, DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 import type { ConversationSettings } from '../../submission-settings.ts'
+
+export { resolveSubmitMode } from '../contract/composer-submission.ts'
 
 export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 
@@ -20,7 +22,7 @@ export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
  * submission into the next waking Queue item.
  */
 export class ComposerSubmissionPolicy {
-  /** Reactive preference source for the Settings row. */
+  /** Reactive preference source shared by the composer and Settings row. */
   readonly busyEnter: SnapshotStore<BusyEnterBehavior> = createSnapshotStore(DEFAULT_BUSY_ENTER_BEHAVIOR)
   /** Host writability and write status source for the Settings row. */
   readonly settings: SnapshotStore<SettingsControlState>
@@ -45,24 +47,6 @@ export class ComposerSubmissionPolicy {
       })
       this.adopt(host)
     }
-  }
-
-  /**
-   * Resolve one keyboard gesture without changing state.
-   * @param running - whether the addressed agent currently reports busy.
-   * @param gesture - plain Enter or the Cmd/Ctrl-accelerated chord.
-   * @param steeringAvailable - whether this session transport supports steering.
-   * @returns Queue outside steer-capable busy state; otherwise the preferred mode or its opposite.
-   */
-  resolve(
-    running: boolean,
-    gesture: ComposerSubmitGesture,
-    steeringAvailable: boolean,
-  ): InputSubmitMode {
-    if (!running || !steeringAvailable) return 'queue'
-    const preferred = this.busyEnter.getSnapshot()
-    if (gesture === 'enter') return preferred
-    return preferred === 'queue' ? 'steer' : 'queue'
   }
 
   /**

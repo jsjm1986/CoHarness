@@ -1,13 +1,13 @@
 /**
- * Boot the self-referential Cordis tools under Web or ACP, defaulting to Web. This is a repository demo wrapper, not a product CLI feature.
+ * Boot read-only Cordis inspection under Web or ACP, defaulting to Web. This is a repository demo wrapper, not a product CLI feature.
  */
 import { spawn } from 'node:child_process'
 
 const SURFACES = new Map([
-  // The browser surface with the cordis toolset layered on: `dsh web --config`
+  // The browser surface with read-only inspection layered on: `dsh --profile web --patch`
   // applies this overlay over the shipped web composition; it owns port 3081.
-  ['web', ['--import', 'tsx', 'apps/cli/src/bin.ts', 'web', '--patch', 'examples/web-cordis/cordis.yml']],
-  ['acp', ['--import', 'tsx', 'packages/examples/acp-demo/src/bin.ts', '--config', 'examples/acp-agent/cordis-tools.cordis.yml']],
+  ['web', ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', '--profile', 'web', '--patch', 'examples/web-cordis/cordis.yml']],
+  ['acp', ['--import', 'tsx/esm', 'apps/cli/src/bin.ts', '--profile', 'acp', '--patch', 'examples/acp-agent/cordis-tools.cordis.yml']],
 ])
 
 const surface = process.argv[2] ?? 'web'

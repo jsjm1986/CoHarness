@@ -1376,6 +1376,10 @@ class FaceAnalyzer {
       const resultType = authored.typeArguments?.[0]
       const wrappers = mode === 'stream' ? ['Iterable', 'AsyncIterable'] : ['Promise']
       const declaration = resolved === undefined ? undefined : preferredDeclaration(resolved)
+      if (mode !== 'stream' && resolved !== undefined && ['Iterable', 'AsyncIterable'].includes(resolved.name)
+        && declaration !== undefined && isStandardLibraryFile(declaration.getSourceFile().fileName)) {
+        this.fail(method, 'Iterable Remote results require @Remote({ mode: "stream" })')
+      }
       if (resolved !== undefined
         && wrappers.includes(resolved.name)
         && resultType !== undefined
@@ -2582,8 +2586,15 @@ class FaceAnalyzer {
     const target = packageExportTargets(registration.manifest)
       .find(([subpath]) => subpath === module.subpath)?.[1]
     if (target === undefined) return undefined
-    const sourceFile = this.sourceFiles.get(realPath(sourcePathForExport(registration.root, target))) as ts.SourceFile
-    const moduleSymbol = this.checker.getSymbolAtLocation(sourceFile) as ts.Symbol
+    const exportPath = realPath(sourcePathForExport(registration.root, target))
+    const sourceFile = this.sourceFiles.get(exportPath)
+    if (sourceFile === undefined) {
+      throw new Error(`typert analyzer: ${registration.name} export ${module.subpath} resolves outside the analyzed program: ${exportPath} (requested ${requestedName})`)
+    }
+    const moduleSymbol = this.checker.getSymbolAtLocation(sourceFile)
+    if (moduleSymbol === undefined) {
+      throw new Error(`typert analyzer: no module symbol for ${registration.name} export ${module.subpath} -> ${sourceFile.fileName} (requested ${requestedName})`)
+    }
     const exported = this.checker.getExportsOfModule(moduleSymbol)
       .find(candidate => candidate.name === requestedName && this.resolveSymbol(candidate) === symbol)
     return exported?.name

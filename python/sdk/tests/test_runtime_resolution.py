@@ -9,19 +9,9 @@ import pytest
 
 from deepseek_harness_runtime import (
     RUNTIME_MODE_ENV_VAR,
-    bundled_default_config_path,
     bundled_package_dir,
     resolve_bundled_launch_args,
 )
-
-
-def test_default_config_is_shipped_with_the_package() -> None:
-    path = bundled_default_config_path()
-    assert path == bundled_package_dir() / "runtime" / "cordis.yml"
-    config = path.read_text()
-    assert "@deepseek-ai/dsh-agent-spine-demo" in config
-    assert "@deepseek-ai/dsh-session-persistence-jsonl" in config
-    assert "@deepseek-ai/dsh-session-checkpoint-policy" in config
 
 
 def test_unknown_explicit_mode_fails_loud() -> None:
@@ -70,7 +60,7 @@ def test_current_platform_supports_macos_x64(monkeypatch: pytest.MonkeyPatch) ->
     assert runtime._current_platform_tag() == "macos-x64"
 
 
-def test_legacy_runtime_name_remains_a_lookup_alias(
+def test_legacy_demo_does_not_satisfy_the_dsh_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runtime_dir = tmp_path / "runtime"
@@ -80,8 +70,8 @@ def test_legacy_runtime_name_remains_a_lookup_alias(
     Path(f"{legacy}-rg").touch()
     monkeypatch.setattr(runtime, "bundled_package_dir", lambda: tmp_path)
     monkeypatch.setattr(runtime, "_current_platform_tag", lambda: "linux-x64")
-
-    assert runtime.bundled_runtime_path() == legacy
+    with pytest.raises(FileNotFoundError, match="deepseek-harness-sdk-runtime-linux-x64"):
+        runtime.bundled_runtime_path()
 
 
 def test_canonical_runtime_name_wins_over_legacy_alias(

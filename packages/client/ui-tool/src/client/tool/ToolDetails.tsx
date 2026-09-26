@@ -2,6 +2,7 @@
 import { DiffBlock, ReadBlock, SearchBlock, TerminalBlock, WebBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolDetailsProps } from '../contract/slots.ts'
 import { diffCardModel } from './models/diff-card-model.ts'
+import { imageCardModel } from './models/image-card-model.ts'
 import { readCardModel } from './models/read-card-model.ts'
 import { searchCardModel } from './models/search-card-model.ts'
 import { terminalBlockLabels, terminalCardModel } from './models/terminal-card-model.ts'
@@ -17,8 +18,8 @@ import css from './ToolDetails.module.css'
  * @returns the details output body.
  */
 export function ToolDetails({
-  block, cwd, useHostDescription, t,
-}: Pick<ToolDetailsProps, 'block' | 'cwd' | 'useHostDescription' | 't'>) {
+  block, cwd, renderMessageImages, useHostDescription, t,
+}: Pick<ToolDetailsProps, 'block' | 'cwd' | 'renderMessageImages' | 'useHostDescription' | 't'>) {
   const home = useHostDescription(description => description?.home)
   const terminal = terminalCardModel(block, cwd)
   if (terminal !== null) {
@@ -33,6 +34,18 @@ export function ToolDetails({
   }
   const read = readCardModel(block, cwd, home)
   if (read !== null) return <ReadBlock {...read} labels={readBlockLabels(t)} className={css.read} />
+  // The details owner supplies the same slot-backed renderer the chat row
+  // receives; an image without it still shows its label and envelope text.
+  const image = imageCardModel(block, cwd, home)
+  if (image !== null) {
+    return (
+      <>
+        <div className={css.imageLabel}>{image.label}</div>
+        {renderMessageImages?.({ images: image.images, align: 'start' })}
+        <pre className={css.code}>{image.text}</pre>
+      </>
+    )
+  }
   const diff = diffCardModel(block)
   if (diff !== null) return <DiffBlock {...diff.card} labels={diffBlockLabels(t)} className={css.cardBody} />
   const search = searchCardModel(block)

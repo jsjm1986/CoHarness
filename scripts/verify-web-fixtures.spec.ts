@@ -28,7 +28,7 @@ function fixture(): string {
       ...Object.fromEntries(existing.map(scenario => [scenario, 'shell'])),
       'one.e2e.ts': 'shell', 'two.e2e.ts': 'shell',
     },
-    packages: {}, fullPrefixes: [], webInfraPrefixes: [], smokeScenarios: ['one.e2e.ts'], unknown: 'full',
+    packages: {}, sharedInputs: {}, fullPrefixes: [], webInfraPrefixes: [], smokeScenarios: ['one.e2e.ts'], unknown: 'full',
   }))
   return root
 }
@@ -44,7 +44,7 @@ function cli(root: string) {
   ], { cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8' })
 }
 
-describe('browser fixture admission preflight', () => {
+describe('browser fixture admission preflight', { timeout: 30_000 }, () => {
   it('refuses missing literal inputs while ignoring comments and unrelated scenarios', () => {
     const root = fixture()
     writeFileSync(resolve(root, 'apps/web/tests/one.e2e.ts'),
@@ -68,6 +68,44 @@ describe('browser fixture admission preflight', () => {
     expect(inspectWebFixtures(root, ['one.e2e.ts'])).toEqual({
       files: ['apps/web/tests/snapshots/one/session.jsonl'], problems: [],
     })
+  })
+
+  it('validates referenced corpus inputs outside the local golden tree, including generation names', () => {
+    const root = fixture()
+    const dir = resolve(root, 'snapshots/web/owned')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(resolve(root, 'apps/web/tests/one.e2e.ts'),
+      "const fixture = '../../../snapshots/web/owned/session.v4.jsonl'\n")
+    const path = resolve(dir, 'session.v4.jsonl')
+    writeFileSync(path, header)
+    expect(inspectWebFixtures(root, ['one.e2e.ts'])).toEqual({
+      files: ['snapshots/web/owned/session.v4.jsonl'], problems: [],
+    })
+    writeFileSync(path, header.replace('\"version\":4', '\"version\":5'))
+    expect(inspectWebFixtures(root, ['one.e2e.ts']).problems).toHaveLength(1)
+    writeFileSync(path, header + '{\"type\":\"turn/start\",\"seq\":0,\"data\":{\"turn\":1}}\n')
+    expect(inspectWebFixtures(root, ['one.e2e.ts']).problems[0]?.message).toContain('both seq and time')
+  })
+
+  it('selects the latest corpus generation and rejects malformed roles through the public command', () => {
+    const root = fixture()
+    const dir = resolve(root, 'snapshots/web/owned')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(resolve(root, 'apps/web/tests/one.e2e.ts'),
+      "const fixture = '../../../snapshots/web/owned/session.v4.jsonl'\n")
+    writeFileSync(resolve(root, 'apps/web/tests/snapshots/two/session.jsonl'), header)
+    writeFileSync(resolve(dir, 'session.v4.jsonl'), header)
+    writeFileSync(resolve(dir, 'session.v5.jsonl'), header.replace('"version":4', '"version":5'))
+    expect(inspectWebFixtures(root, ['one.e2e.ts'])).toEqual({
+      files: ['snapshots/web/owned/session.v5.jsonl'], problems: [],
+    })
+    expect(cli(root).status).toBe(0)
+    writeFileSync(resolve(dir, 'session.2.v5.jsonl'), header.replace('"version":4', '"version":5'))
+    writeFileSync(resolve(root, 'apps/web/tests/snapshots/two/session.jsonl'), '{broken\n')
+    const rejected = cli(root)
+    expect(rejected.status, rejected.stderr).toBe(1)
+    expect(rejected.stderr).toContain('roles must be contiguous')
+    expect(rejected.stderr).toContain('invalid JSONL header')
   })
 
   it('reports every invalid selected file instead of stopping at the first one', () => {

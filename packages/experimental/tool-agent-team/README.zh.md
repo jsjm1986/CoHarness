@@ -18,7 +18,7 @@
     forkProvider: fork
 ```
 
-`freshProvider` 与 `forkProvider` 选择已注册的 continuable-subagent provider。固定模型策略仅在用户明确要求 Agent Teams 或 teammate 时创建 teammate。
+`freshProvider` 与 `forkProvider` 选择已注册的 continuable-subagent provider。任何声明 `prepareContinuable` 的提供方都可用，包括外部运行时提供方：`llm` 服务挂载时的 `subagent-claude-code` 与 `subagent-codex`，以及设置 `resume: true` 的 `subagent-acp`——它们把耐用 Team 成员保留为进程内子级，同时把模型调用路由到各自外部运行时的可续接会话。不具备该能力的提供方会以 `UNSUPPORTED_CAPABILITY` 拒绝 spawn。固定模型策略仅在用户明确要求 Agent Teams 或 teammate 时创建 teammate。
 
 ## 工具与权限
 

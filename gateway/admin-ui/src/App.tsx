@@ -5,10 +5,15 @@ import {
   FolderKanban,
   LogOut,
   Monitor,
+  Network,
+  Terminal,
+  Puzzle,
   PanelsTopLeft,
+  Rocket,
   ScrollText,
   Sparkles,
   Users,
+  Webhook,
   type LucideIcon,
 } from 'lucide-react'
 import { NavLink, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
@@ -16,11 +21,17 @@ import { AuditPage } from './pages/AuditPage.tsx'
 import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
 import { ProjectListPage } from './pages/ProjectListPage.tsx'
 import { UsersPage } from './pages/UsersPage.tsx'
+import { lazy, Suspense } from 'react'
+const PluginsPage = lazy(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
 import { ModelsPage } from './pages/ModelsPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 import { DocumentsPage } from './pages/DocumentsPage.tsx'
 import { ArchivesPage } from './pages/ArchivesPage.tsx'
 import { DesktopsPage } from './pages/DesktopsPage.tsx'
+import { SshPage } from './pages/SshPage.tsx'
+import { DeploymentPage } from './pages/DeploymentPage.tsx'
+import { WebhooksPage } from './pages/WebhooksPage.tsx'
+import { TerminalsPage } from './pages/TerminalsPage.tsx'
 
 export function App() {
   return (
@@ -43,10 +54,15 @@ export function App() {
             <Route path="/" element={<UsersPage />} />
             <Route path="/projects" element={<ProjectListPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/plugins" element={<Suspense fallback={<p role="status">正在加载插件管理</p>}><PluginsPage /></Suspense>} />
             <Route path="/models" element={<ModelsPage />} />
             <Route path="/usage" element={<UsagePage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/archives" element={<ArchivesPage />} />
+            <Route path="/terminals" element={<TerminalsPage />} />
+            <Route path="/ssh" element={<SshPage />} />
+            <Route path="/deployment" element={<DeploymentPage />} />
+            <Route path="/webhooks" element={<WebhooksPage />} />
             <Route path="/desktops" element={<DesktopsPage />} />
             <Route path="/audit" element={<AuditPage />} />
           </Routes>
@@ -60,10 +76,15 @@ export function App() {
 const NAV_ITEMS: Array<{ to: string; label: string; icon: LucideIcon; end?: boolean }> = [
   { to: '/', label: '用户', icon: Users, end: true },
   { to: '/projects', label: '项目', icon: FolderKanban },
+  { to: '/plugins', label: '插件', icon: Puzzle },
   { to: '/models', label: '模型', icon: Sparkles },
   { to: '/usage', label: '用量', icon: ChartNoAxesCombined },
   { to: '/documents', label: '文档', icon: FileText },
   { to: '/archives', label: '归档', icon: Archive },
+  { to: '/terminals', label: '终端', icon: Terminal },
+  { to: '/ssh', label: 'SSH', icon: Network },
+  { to: '/deployment', label: '部署', icon: Rocket },
+  { to: '/webhooks', label: 'Webhook', icon: Webhook },
   { to: '/desktops', label: '桌面', icon: Monitor },
   { to: '/audit', label: '审计', icon: ScrollText },
 ]

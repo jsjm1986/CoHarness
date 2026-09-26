@@ -2,7 +2,7 @@
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
 import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -37,8 +37,26 @@ export interface ToolCallOwnerProps {
   cwd?: string | undefined
   /** Host account home; POSIX home-rooted summaries display as `~`. */
   home?: string | undefined
-  /** Open a Tool argument path through the Host. */
-  openFile: (path: string) => void
+  /**
+   * Open a Tool argument path through the Host. A view that knows which line
+   * the call was about passes it, and the opened surface lands there.
+   */
+  openFile: (path: string, options?: { line?: number }) => void
+  /**
+   * Whether this call is a run_code sub-dispatch: nested calls persist no
+   * presentationMeta and no wire views, so card models read that fact from the
+   * owner rather than the node, which carries no parent link.
+   */
+  nested?: boolean | undefined
+  /**
+   * Slot-backed image gallery renderer, supplied by the chat node that owns
+   * this call. The tool layer never imports an attachment implementation nor
+   * handles URL authorization; an absent renderer keeps an image card's
+   * envelope text beside an empty gallery position.
+   */
+  renderMessageImages?: RenderMessageImages | undefined
+  /** Open this exact call in an auxiliary detail tab. */
+  openDetails?: (() => void) | undefined
   /** Inspect this call in the trajectory view when available. */
   inspect?: (() => void) | undefined
 }

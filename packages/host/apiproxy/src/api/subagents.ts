@@ -4,6 +4,7 @@
  * generated `subagents` Remote surface.
  */
 
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 import type { HistoryDetail, HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from './sessions.ts'
@@ -16,10 +17,12 @@ export interface SubagentsApi {
    * message-aligned pagination and render intents, without Agent activation.
    * `detail` is the same download gear as `session.history`: omitted or
    * `'full'` keeps every event; `'conversation'` omits completed historical
-   * chunk runs and reports `omittedSpans`.
+   * chunk runs and reports `omittedSpans`. `toolCallId` uses the same independent
+   * complete-turn lookup as session.history, preserving parent and child access checks.
    */
   history(
     request: RpcRequest<SubagentAddress & {
+      toolCallId?: ToolCallId
       beforeSeq?: number
       maxMessages?: number
       detail?: HistoryDetail

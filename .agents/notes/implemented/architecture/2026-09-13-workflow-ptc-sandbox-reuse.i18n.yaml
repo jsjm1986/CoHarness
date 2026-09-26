@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md
-2026-09-13-workflow-ptc-sandbox-reuse.md: 9454ffef28e1ab5ba7791a30f4bcd67093a34ba3
-2026-09-13-workflow-ptc-sandbox-reuse.zh.md: c51706065703866520bfcad11beffc02eb1f5551
+2026-09-13-workflow-ptc-sandbox-reuse.md: 7588b8235dc7ef515171129fdd5188412d5084fc
+2026-09-13-workflow-ptc-sandbox-reuse.zh.md: 1adea81d1c5a928463313070694236e629d589c2

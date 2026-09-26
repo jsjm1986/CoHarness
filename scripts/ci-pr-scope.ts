@@ -98,7 +98,7 @@ const DEPENDENCY_PATH = /(^|\/)(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.
  * would skip every lane.
  */
 function isInertPath(path: string): boolean {
-  if (/(?:^|\/)snapshots\//.test(path) || /\.expected\.(?:md|json|txt|html)$/.test(path)) return false
+  if (/(?:^|\/)snapshots\//.test(path) || /\.expected\.(?:md|jsonl?|txt|html)$/.test(path)) return false
   return policy.inertPrefixes.some(prefix => path.startsWith(prefix))
     || path.endsWith('.md')
     || path.endsWith('.mdx')
@@ -234,6 +234,21 @@ export function classifyWebVerification(
   const scenarios = new Set<string>()
   let exactOnly = true
   for (const path of paths) {
+    const owners = Object.hasOwn(policy.sharedInputs, path) ? policy.sharedInputs[path] : undefined
+    if (owners === undefined && isInertProsePath(path)) continue
+    if (policy.fullPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
+    if (DEPENDENCY_PATH.test(path)) return FULL_WEB_VERIFICATION
+    if (policy.webInfraPrefixes.some(prefix => path.startsWith(prefix))
+      && !(isAdminUiPath(path) && owners !== undefined)) return FULL_WEB_VERIFICATION
+    if (owners !== undefined) {
+      for (const owner of owners) {
+        const group = policy.scenarios[owner]
+        if (group === undefined) throw new Error(`web-test-policy: shared input ${JSON.stringify(path)} references unknown scenario ${JSON.stringify(owner)}.`)
+        groups.add(group)
+        scenarios.add(owner)
+      }
+      continue
+    }
     if (path.startsWith(WEB_TESTS_ROOT)) {
       const route = routeWebTestPath(path, policy, goldenOwners)
       if (route === 'inert') continue
@@ -248,13 +263,10 @@ export function classifyWebVerification(
     }
     if (isInertProsePath(path)) continue
     exactOnly = false
-    if (policy.fullPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
-    if (DEPENDENCY_PATH.test(path)) return FULL_WEB_VERIFICATION
-    if (policy.webInfraPrefixes.some(prefix => path.startsWith(prefix))) return FULL_WEB_VERIFICATION
     const pkg = scopedPackage(path)
     if (pkg !== undefined) {
-      if (!clientPackages.has(pkg)) continue
       const mapping = policy.packages[pkg]
+      if (!clientPackages.has(pkg) && mapping === undefined) continue
       if (mapping === undefined) return FULL_WEB_VERIFICATION
       for (const group of expandPackageGroups(mapping, policy)) groups.add(group)
       continue
@@ -326,8 +338,9 @@ export function classifyCiPrScope(
 ): CiPrScope {
   const changedSourceFiles = paths.filter(path => /^packages\/[^/]+\/[^/]+\/src\//.test(path))
   const changedPackageFiles = paths.filter(path => path.endsWith('/package.json') || path === 'package.json' || path === 'pnpm-lock.yaml')
+  const sharedWebInput = paths.some(path => Object.hasOwn(policy.sharedInputs, path))
+  const inertOnly = !sharedWebInput && paths.length > 0 && paths.every(isInertPath)
   const runtimePaths = runtimeInputPaths(paths)
-  const inertOnly = paths.length > 0 && paths.every(isInertPath)
   const fullRuntime = runtimePaths.some(isFullRuntimePath)
   const modelInput = paths.some(isModelInputPath)
   const reasons = consumerReasons(paths.filter(path => !isInertPath(path) || isModelInputPath(path)))
@@ -347,7 +360,9 @@ export function classifyCiPrScope(
   // SDK are provably outside their input domain; `scripts/**` is deliberately not
   // exempt, because it holds the gate runner every lane invokes and the fixture
   // generator the snapshot lane consumes.
-  const nodeLanesUnreachable = !modelInput && paths.length > 0
+  const adminBrowserInput = paths.some(path => isAdminUiPath(path) && Object.hasOwn(policy.sharedInputs, path))
+  const onlyAdminSharedInputs = paths.every(path => !Object.hasOwn(policy.sharedInputs, path) || isAdminUiPath(path))
+  const nodeLanesUnreachable = !modelInput && (!sharedWebInput || onlyAdminSharedInputs) && paths.length > 0
     && paths.every(path => isInertPath(path) || path.startsWith('python/') || path.startsWith(scopePolicy.adminUiPrefix))
   // The runtime wheel executes the TypeScript loop and Session protocol too.
   const pythonLanesReachable = reasons.python.length > 0 || paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
@@ -387,7 +402,7 @@ export function classifyCiPrScope(
   const removed = changedLines.filter(line => line.startsWith('-')).map(line => line.slice(1))
   const normalizedAdded = added.map(normalizeRef).sort()
   const normalizedRemoved = removed.map(normalizeRef).sort()
-  const actionOnly = paths.every(path => path.startsWith('.github/workflows/'))
+  const actionOnly = !sharedWebInput && paths.every(path => path.startsWith('.github/workflows/'))
     && added.length > 0
     && added.length === removed.length
     && [...added, ...removed].every(line => SETUP_USES.test(line))
@@ -451,9 +466,9 @@ export function classifyCiPrScope(
     coverageMode: nodeLanesUnreachable ? 'skip' : 'full',
     // A change with no browser-rendered input keeps the keyless ACP/CLI snapshots
     // but not the Playwright inventory, which would have nothing new to render.
-    snapshotMode: nodeLanesUnreachable ? 'skip' : snapshotModeFromWeb[webPlan.mode],
-    webGroups: nodeLanesUnreachable ? [] : webPlan.groups,
-    webScenarios: nodeLanesUnreachable ? [] : webPlan.scenarios,
+    snapshotMode: nodeLanesUnreachable && !adminBrowserInput ? 'skip' : snapshotModeFromWeb[webPlan.mode],
+    webGroups: nodeLanesUnreachable && !adminBrowserInput ? [] : webPlan.groups,
+    webScenarios: nodeLanesUnreachable && !adminBrowserInput ? [] : webPlan.scenarios,
     // The Node compatibility smokes exercise the Node runtime against the
     // TypeScript build; a Python-only change has no Node input to break them.
     compatMode: nodeLanesUnreachable ? 'skip' : 'full',
@@ -523,7 +538,7 @@ function scopeChanges(
   const addedScenarios = [...after].filter(file => !before.has(file)).sort()
   const removedScenarios = [...before].filter(file => !after.has(file)).sort()
   const proseOnlyBrowserExpansion = paths.some(isInertProsePath)
-    && JSON.stringify(browserScenarios(previousRuntime, previousPolicy)) === JSON.stringify([...after].sort())
+    && JSON.stringify(browserScenarios(previousRuntime, policy)) === JSON.stringify([...after].sort())
   if (addedScenarios.length > 0) added.push({ lane: 'web', from: [], to: addedScenarios, reason: 'browser-input-policy' })
   if (removedScenarios.length > 0) removed.push({ lane: 'web', from: removedScenarios, to: [],
     reason: candidate.webScenarios.length > 0 ? 'exact-scenario-owners-and-smokes'
@@ -549,7 +564,11 @@ function executionUnion(previous: CiPrScope, candidate: CiPrScope, policy: WebTe
     : previous.coverageMode === 'scoped' || candidate.coverageMode === 'scoped' ? 'scoped' : 'skip'
   const fullBrowser = previous.snapshotMode === 'full' || candidate.snapshotMode === 'full'
   const previousScenarios = browserScenarios(previous, previousPolicy)
-  const scenarios = [...new Set([...previousScenarios, ...browserScenarios(candidate, policy)])].sort()
+  // A retained group also owns scenarios added since the frozen baseline.
+  // Shadow execution keeps both inventories until the reviewed switch.
+  const scenarios = [...new Set([
+    ...previousScenarios, ...browserScenarios(previous, policy), ...browserScenarios(candidate, policy),
+  ])].sort()
   const changedGroups = JSON.stringify(previousScenarios) !== JSON.stringify(browserScenarios(previous, policy))
   const exact = !fullBrowser && scenarios.length > 0
     && (changedGroups || previous.webScenarios.length > 0 || candidate.webScenarios.length > 0)
@@ -666,6 +685,16 @@ function main(): void {
   const scopedPackages = result.coverageMode === 'scoped'
     ? [...new Set(runtimeInputPaths(paths).map(scopedPackage).filter((value): value is string => value !== undefined))]
     : []
+  // Job outputs are capped at 1 MiB, so outputs and the plan carry only the
+  // routing fields downstream jobs read; per-path reasons stay in the
+  // uploaded selection artifact.
+  const { reasons: _reasons, providerAcceptance: _acceptance, unsupportedProofs, ...proofFlags } = proofs
+  const cappedUnsupportedProofs = unsupportedProofs.map(proof => ({
+    ...proof,
+    reasons: proof.reasons.length > 25
+      ? [...proof.reasons.slice(0, 25), `…${proof.reasons.length - 25} more in the selection artifact`]
+      : proof.reasons,
+  }))
   process.stdout.write(`${[
     `run_expensive=${String(result.runExpensive)}`,
     `reason=${result.reason}`,
@@ -690,8 +719,23 @@ function main(): void {
     `proof_provider=${String(proofs.provider)}`,
     `proof_pi_ai=${String(proofs.piAi)}`,
     `proof_native_windows=${String(proofs.nativeWindows)}`,
-    `proofs=${JSON.stringify(proofs)}`,
-    `validation_plan=${JSON.stringify({ version: 1, commit, scope: result, proofs })}`,
+    `proofs=${JSON.stringify(proofFlags)}`,
+    `validation_plan=${JSON.stringify({
+      version: 1, commit,
+      proofs: { ...proofFlags, unsupportedProofs: cappedUnsupportedProofs },
+      scope: {
+        runExpensive: result.runExpensive,
+        coverageMode: result.coverageMode,
+        snapshotMode: result.snapshotMode,
+        webGroups: result.webGroups,
+        webScenarios: result.webScenarios,
+        compatMode: result.compatMode,
+        pythonMode: result.pythonMode,
+        windowsMode: result.windowsMode,
+        gatewayMode: result.gatewayMode,
+        adminUiMode: result.adminUiMode,
+      },
+    })}`,
   ].join('\n')}\n`)
 }
 

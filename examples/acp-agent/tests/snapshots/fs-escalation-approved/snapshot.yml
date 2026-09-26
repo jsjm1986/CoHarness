@@ -1,0 +1,10 @@
+version: 1
+scenario: fs-escalation-approved
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: sandbox
+permission: workspace-write
+workspace:
+  final: true

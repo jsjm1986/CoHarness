@@ -20,6 +20,7 @@
     "packages/client/*/tests/**/*.ts",
     "packages/client/*/tests/**/*.tsx",
     "packages/*/*/tests/**/*.client.spec.ts",
+    "packages/*/*/tests/**/*.client.e2e.ts",
     "packages/*/*/tests/**/*.client.spec.tsx",
     "packages/*/*/tests/**/*.client.tsx",
     "packages/*/*/tests/**/*.client.ts",
@@ -39,6 +40,7 @@
     "packages/client/*/tests/**/*.host.spec.ts"
   ],
   "references": [
+    { "path": "./packages/api/terminal-controller/tsconfig.client.json" },
     { "path": "./packages/util/crypto" },
     { "path": "./packages/util/values" },
     // Shared leaf: web e2e boots the real host webserver (fixture + real-host
@@ -56,6 +58,10 @@
     { "path": "./packages/client/userdoc-upload" },
     { "path": "./packages/client/ui-attachment" },
     { "path": "./packages/client/ui-primitives" },
+    { "path": "./packages/client/ui-dockkit" },
+    { "path": "./packages/client/ui-sidebar-right" },
+    { "path": "./packages/client/ui-sidebar-browser" },
+    { "path": "./packages/client/ui-sidebar-terminal" },
     { "path": "./packages/client/modules" },
     { "path": "./packages/client/hmr" },
     { "path": "./packages/client/connection/tsconfig.client.json" },
@@ -103,9 +109,11 @@
     { "path": "./packages/client/ui-settings-general" },
     { "path": "./packages/client/ui-settings-models" },
     { "path": "./packages/client/ui-settings-plugin-inventory" },
+    { "path": "./packages/client/ui-settings-unarchive-sessions" },
     { "path": "./packages/client/locale" },
     { "path": "./packages/client/ui-renderer" },
     { "path": "./packages/client/web" },
+    { "path": "./packages/experimental/client-ui-agent-team" },
     { "path": "./apps/web" }
   ]
 }

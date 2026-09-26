@@ -6,6 +6,8 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 业务 UI 包只注册 wire 工具名称和原子视图，不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑。运行时仍对 call/result 配对、生命周期和递归 `subCalls` 投影拥有最终决定权；conversation view 仍对 ChatFlow 位置拥有最终决定权。
 
+会话所有者提供操作时，展开的通用和终端行显示**在侧栏查看详情**，目标为确切的根调用或嵌套调用。**查看**继续导航到轨迹视图。
+
 ## 概述
 
 `dsh-client-ui-tool` 是 dsh Web 客户端的 Client 工具展示插件：它渲染对话中的每一次工具调用。`ui-conversation` 通过 `conversation.chat.node` 的匹配 key 分发每个已排序的 `tool-call` Conversation Node；本包渲染其中的 root 及其 PTC dispatch 子调用，并把每个原子调用通过 keyed slot `tool.call.toolview` 分发。没有注册的工具名称使用通用卡片。业务 UI 包只注册 wire 工具名称和原子视图——它们不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑，因为运行时仍对 call/result 配对、生命周期与递归 `subCalls` 投影拥有最终决定权。
@@ -17,6 +19,12 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 每个 root 和 child 包装层都保留 `data-chat-anchor-key="call:<id>"` 与 `data-chat-call-id` DOM 约定，供分页和 selection 使用。
 
 本包还通过 `ToolDetails` 填充 `conversation.details.tool`。行 renderer 与详情 renderer 共用同一组面向 `terminal`、`read`、`diff`、`search` 和 `web` render intent 的纯 card model。已完成的 ask-user 调用使用经过校验、可读的问题／回答卡片；混合或格式错误的结果块会回退为完整的通用输出。未知的 intent 标签和格式错误的 wire card 数据都会回退为压平的工具结果文本。
+
+terminal model 使用浏览器安全入口 `@deepseek-ai/dsh-spill-policy/notice` 的 `hasSpillNotice`，而非独立的 UI 匹配规则；[spill-policy](../../spill/spill-policy/README.zh.md) 负责通知文本的格式化与识别。该检查保守地选择通用输出——匹配的文本无法证明其来源，回放也不改变已记录的结果字节。已落定的 persistent shell 调用（无 `description` 的 `bash`/`pwsh` schema）同样保持通用输出，因为其结果携带重置与部分输出，没有单一的进程退出状态。
+
+keyed `read_image` 行从已落定调用持久化的 `meta.path` 与原始结果内容推导专属图片卡片：缩短的路径标签、持久图片引用与文本信封——原始附件对象绝不会被 JSON 压平到图片下方。画廊本体经会话所有者的 `renderMessageImages` prop 渲染（chat 中为经会话授权的 `conversation.message.images` 槽位，details 面板中为 `conversation.details.images` 姐妹槽位），因此本包从不自行推导 URL、也不绕过附件授权；畸形或不完整的工具数据回落为通用输出而非隐藏内容。嵌套 `read_image` 调用（不持久化 `meta`）以自身 `file_path` 参数标注卡片。
+
+文件修改行在折叠时保留 `+A -R` 计数。摘要与展开卡片共用 `ui-primitives.diffTotals` 的有界比较，显式摘要后缀或失败信息仍具有优先权。
 
 通用行把已知工具名称归类为 search、read、shell、write、edit、code 或 generic 变体。运行中、成功、失败和中断状态只来自冻结的 call/result slice。只有用户调用 Host 打开文件回调时，文件路径才相对会话 `cwd` 解析；展示代码不读取会话服务。
 

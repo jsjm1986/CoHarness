@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 The TypeScript client SDK for driving a DeepSeek Harness runtime as a subprocess over stdio JSON-RPC — the design twin of the [Python SDK](../../../python/README.md) (`deepseek-harness`), sharing the same runtime peer, protocol, and layering: `DeepSeekHarness` is the high-level owned-run API, `HarnessClient` the lower-level protocol client. The package root enumerates the consumer interface: the two client layers, caller-facing types, and `JsonRpcResponseError`; source modules, normalization helpers, and subscription-delivery machinery are not consumer imports. A pure library: it registers nothing on a Cordis context; the runtime process it spawns is a complete harness whose composition its own `cordis.yml` decides.
 
-Unlike the Python SDK, the launch spec is fully explicit (`command`/`args`): this package is for repo-adjacent TypeScript consumers — including the [`dsh-subagent-dsh-sdk`](../../subagent/subagent-dsh-sdk/README.md) backend and automation — that know which runtime they are launching. Bundled-runtime resolution (finding a packaged executable) remains the Python distribution's concern.
+The public launch options select `dshBin`, a runtime `profile` (default `sdk`), ordered `patches`, and `dshHome`. Without `dshBin`, the client resolves the same-version `@deepseek-ai/dsh` package; an unbuilt checkout uses its declared source launcher. The [`dsh-subagent-dsh-sdk`](../../subagent/subagent-dsh-sdk/README.md) backend uses the same options. Python additionally resolves its platform executable distribution.
 
 ## Summary
 
@@ -16,7 +16,8 @@ Unlike the Python SDK, the launch spec is fully explicit (`command`/`args`): thi
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
 
 await using harness = new DeepSeekHarness({
-  launch: { command: 'node', args: ['lib/bin.js', 'cordis.yml'] },
+  profile: 'sdk',
+  dshHome: './.harness',
   provider: 'deepseek-official',
   model: 'deepseek-v4-flash',
   maxTokens: 49_152,
@@ -53,7 +54,7 @@ None in the client process. Profile, patch, provider, model, and history choices
 
 ## Known Limitations and Deferred Work
 
-- **No bundled-runtime resolution** — callers name the runtime executable explicitly; packaged-executable discovery stays Python-side until a TypeScript distribution consumer exists.
+- **Explicit module versions** — default resolution checks the installed `dsh` and SDK package versions; an explicit `dshBin` requires the caller to supply a compatible runtime.
 - **No mid-turn cancel** — the wire has no prompt-cancel method; abandoning a turn means closing the runtime (see the protocol's [Known Limitations](../protocol/README.md)).
 - **No per-prompt result or cancel** — low-level `prompt()` returns only an enqueue receipt; high-level `run()` owns receipt-to-idle collection, and abandoning it means closing the runtime.
 - **Client→server notifications and server→client requests are unimplemented** on both wire ends; the transport carries them for future approval flows.

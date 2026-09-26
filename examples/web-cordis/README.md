@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Self-referential demonstration of [`@deepseek-ai/dsh-tool-cordis`](../../packages/extensions/tool-cordis/README.md). The agent can inspect its current Cordis process and mount or unmount model-authored plugins in memory. Temporary plugins disappear when they are unmounted or the process exits and may affect other sessions in the same process.
+Read-only [Cordis runtime inspection](../../packages/extensions/tool-cordis/README.md) through the shipped Web or ACP profile. The Agent discovers exact Host APIs; Web also supplies live Client APIs and Slot information. The demo does not expose model tools for executing dynamic Plugin code.
 
 ## Run it
 
@@ -18,4 +18,4 @@ Start the ACP automation server instead:
 pnpm run demo:cordis acp
 ```
 
-Both commands require `DEEPSEEK_API_KEY`. The [Cordis tool reference](../../packages/extensions/tool-cordis/README.md) defines the tool arguments, lifetime, cleanup, and safety contracts.
+Both commands use the normal `dsh` profile launcher with an inspection overlay. Model conversations require `DEEPSEEK_API_KEY`. Ask the Agent to list inspection providers, query the Tool provider, and describe the available read-only APIs. Persistent Plugin changes belong to Creator mode and Plugin Manager's authorized installation workflow.

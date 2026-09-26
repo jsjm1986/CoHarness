@@ -10,6 +10,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
+import { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
 import type { SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolRestriction } from '@deepseek-ai/dsh-tools'
@@ -144,6 +146,10 @@ export function childSessionMeta(
   return {
     ...parentHeader.cwd !== undefined ? { cwd: parentHeader.cwd } : {},
     ...agentPreset === undefined ? {} : { agentPreset },
+    // The child's seeded history ran on the parent's execution target, and
+    // its scope joins the same realm'd standing mount — the binding must
+    // persist so a cold child resume rebuilds that realm, not a local one.
+    ...parentHeader.sshTarget === undefined ? {} : { sshTarget: parentHeader.sshTarget },
     parentSession: parentHeader.id,
     isSeeded,
     // Navigation classification only; the descriptor remains the authority
@@ -226,6 +232,10 @@ export interface DelegatedPolicyOverrides {
    * delegation, so its asks are rejected deterministically.
    */
   readonly approvalPolicy: 'never' | undefined
+  /** Auto remains reviewed rather than becoming an unrestricted child. */
+  readonly autoReview?: true
+  /** Verified participants captured before asynchronous child creation. */
+  readonly executionScope?: ExecutionInheritance
 }
 
 /**
@@ -239,7 +249,11 @@ export interface DelegatedPolicyOverrides {
  * @returns the sandbox override (or `undefined` without one) and the approval pin.
  */
 export function captureDelegatedPolicyOverrides(parent: Agent): DelegatedPolicyOverrides {
+  const executionScope = executionAuthorityOf(parent.ctx)?.capture(parent)
+  const autoReview = parent.ctx.get('permissionPresets')?.current(parent.session) === AUTO_PRESET
   return {
+    ...(executionScope === undefined ? {} : { executionScope }),
+    ...(autoReview ? { autoReview: true as const } : {}),
     sandboxMode: parent.ctx.get('sandboxPolicy')?.overrideOf(parent.session),
     approvalPolicy: parent.ctx.get('approval') === undefined ? undefined : 'never',
   }
@@ -258,12 +272,16 @@ export function appendDelegatedPolicyOverrides(
   childSession: Session,
   overrides: DelegatedPolicyOverrides,
 ): void {
+  if (overrides.executionScope !== undefined) {
+    childSession.append('gateway/execution', { kind: 'inherit', scope: overrides.executionScope })
+  }
   if (overrides.sandboxMode !== undefined) {
     childSession.append('sandbox/mode', { mode: overrides.sandboxMode, source: 'delegation' })
   }
   if (overrides.approvalPolicy !== undefined) {
     childSession.append('approval/policy', { policy: overrides.approvalPolicy, source: 'delegation' })
   }
+  if (overrides.autoReview) childSession.append('permission/preset', { preset: AUTO_PRESET, origin: 'selection' })
 }
 
 /** Identity and lineage inputs shared by every in-process child creation. */

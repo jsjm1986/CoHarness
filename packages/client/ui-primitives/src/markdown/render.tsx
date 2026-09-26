@@ -22,6 +22,8 @@ import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
+import { parseFileLink } from './file-link.ts'
+import { useMarkdownDelegate } from './MarkdownDelegate.tsx'
 import { CodeBlock } from './CodeBlock.tsx'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
@@ -287,7 +289,7 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'table':
       return renderTable(node, key, context)
     case 'link':
-      return renderAnchor(node.url, renderChildren(node.children, { ...context, inLink: true }), key)
+      return renderAnchor(node.url, renderChildren(node.children, { ...context, inLink: true }), key, context.streaming)
     case 'linkReference':
       return renderLinkReference(node, key, context)
     case 'image':
@@ -456,12 +458,22 @@ function renderTableRow(
 function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNode {
   const safeHref = sanitizeUrl(href)
   if (safeHref === '') return <Fragment key={key}>{children}</Fragment>
-  const external = ['http:', 'https:'].includes(new URL(safeHref).protocol)
+  return <MarkdownAnchor key={key} href={safeHref}>{children}</MarkdownAnchor>
+}
+
+function MarkdownAnchor({ href, children }: { readonly href: string; readonly children: ReactNode[] }): ReactNode {
+  const { openExternalLink } = useMarkdownDelegate()
+  const external = ['http:', 'https:'].includes(new URL(href).protocol)
+  const open = external ? openExternalLink : undefined
   return (
     <a
-      key={key}
-      href={safeHref}
+      href={href}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      onClick={open === undefined ? undefined : (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        event.preventDefault()
+        open(href)
+      }}
     >
       {children}
     </a>
@@ -469,8 +481,24 @@ function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNod
 }
 
 /** Anchor over a parsed markdown destination, which hast normalized before the allowlist saw it. */
-function renderAnchor(url: string, children: ReactNode[], key: Key): ReactNode {
+function renderAnchor(url: string, children: ReactNode[], key: Key, streaming = false): ReactNode {
+  const file = streaming ? undefined : parseFileLink(url)
+  if (file !== undefined) return <MarkdownFileLink key={key} file={file}>{children}</MarkdownFileLink>
   return renderSafeLink(normalizeUri(url), children, key)
+}
+
+function MarkdownFileLink({ file, children }: {
+  readonly file: { path: string; line?: number }
+  readonly children: ReactNode[]
+}): ReactNode {
+  const { openFile } = useMarkdownDelegate()
+  if (openFile === undefined) return <>{children}</>
+  return (
+    <button type="button" className={clsx(css.fileMention, css.fileLink)} title={file.path}
+      onClick={() => { openFile(file.path, file.line === undefined ? undefined : { line: file.line }) }}>
+      {children}
+    </button>
+  )
 }
 
 /**
@@ -533,7 +561,7 @@ function renderLinkReference(
     // not an anchor, so mentions inside it stay live.
     return <Fragment key={key}>{'['}{renderChildren(node.children, context)}{referenceSuffix(node)}</Fragment>
   }
-  return renderAnchor(definition.url, renderChildren(node.children, { ...context, inLink: true }), key)
+  return renderAnchor(definition.url, renderChildren(node.children, { ...context, inLink: true }), key, context.streaming)
 }
 
 function renderImageReference(

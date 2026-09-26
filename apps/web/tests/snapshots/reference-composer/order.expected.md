@@ -7,11 +7,14 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "System prompt":
   - img
   - img
   - text: System prompt
-- text: Research notes what changed? Referenced session · Research notes {{clock}}
+- text: Research notes what changed? Referenced session · Research notes
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Session recall Research notes":
@@ -29,6 +32,7 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- img
-- text: 1 turns · 1 steps
+- group "Session statistics":
+  - img
+  - text: 1 turns · 1 steps
 - separator "Adjust transcript content width"

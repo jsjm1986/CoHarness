@@ -12,6 +12,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SessionStore from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
@@ -695,6 +696,36 @@ describe('settings domain', () => {
     }
   })
 
+  it('allows only freshly authorized, revision-fenced administrator configuration without account preferences', async () => {
+    const ctx = await harness({ projectScope: 'ro' })
+    const authorize = vi.fn(async () => {})
+    ctx.provide('gatewayRuntime', { current: () => ({ claims: { purpose: 'plugin-admin' } }) } as never)
+    expect(expectErr(await createApiProxy(ctx, DEFAULTS).settings.describe(request({})))).toMatchObject({ code: 'collaboration-forbidden' })
+    ctx.provide('pluginManager', { authorize } as never)
+    ctx.settings.register(settingsNamespace('runtime-test'), z.object({ capacity: z.number().min(1).default(2) }), { owner: 'deployment' })
+    ctx.settings.register(settingsNamespace('account-test'), z.object({ label: z.string() }), { owner: 'account' })
+    const api = createApiProxy(ctx, DEFAULTS)
+    try {
+      const described = expectOk(await api.settings.describe(request({})))
+      const section = described.namespaces.find(value => value.ns === 'runtime-test')!
+      expect(described.hasDocument).toBe(false)
+      expect(section).toMatchObject({ owner: 'deployment', writable: true })
+      expect(described.namespaces.find(value => value.ns === 'account-test')).toMatchObject({ writable: false, writableReason: 'account' })
+      expect(expectOk(await api.settings.mutate(request({ ns: section.ns, expectedRevision: section.revision,
+        ops: [{ op: 'set', path: ['capacity'], value: 4 }] })))).toMatchObject({ value: { capacity: 4 } })
+      expect(expectErr(await api.settings.mutate(request({ ns: section.ns, expectedRevision: section.revision,
+        ops: [{ op: 'set', path: ['capacity'], value: 5 }] })))).toMatchObject({ code: 'settings-conflict' })
+      expect(expectErr(await api.settings.mutate(request({ ns: section.ns, ops: [] })))).toMatchObject({ code: 'bad-request' })
+      expect(expectErr(await api.settings.update(request({ ns: section.ns, patch: {}, expectedRevision: section.revision })))).toMatchObject({ code: 'bad-request' })
+      expect(expectErr(await api.settings.mutate(request({ ns: 'account-test', expectedRevision: 0,
+        ops: [{ op: 'set', path: ['label'], value: 'changed' }] })))).toMatchObject({ code: 'settings-rejected' })
+      authorize.mockRejectedValue(new Error('revoked'))
+      expect(expectErr(await api.settings.describe(request({})))).toMatchObject({ code: 'collaboration-forbidden' })
+      expect(expectErr(await api.settings.mutate(request({ ns: section.ns, expectedRevision: 1,
+        ops: [{ op: 'set', path: ['capacity'], value: 9 }] })))).toMatchObject({ code: 'collaboration-forbidden' })
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('lets a project manager write only namespaces explicitly owned by the project', async () => {
     const ctx = await harness({
       projectScope: 'rw',
@@ -768,6 +799,29 @@ describe('settings domain', () => {
     expect(cwd).toMatchObject({ code: 'settings-rejected', details: { ns: 'shell', reason: 'project' } })
     const wholesale = expectErr(await api.settings.replace(request({ ns: 'shell', section: {} })))
     expect(wholesale).toMatchObject({ code: 'settings-rejected', details: { ns: 'shell', reason: 'project' } })
+  })
+
+  it.each([false, true])('checks real subagent settings ownership and protected capacity: manager=%s', async (projectManager) => {
+    const ctx = await harness({ projectScope: 'rw', projectManager })
+    try {
+      await ctx.plugin(SubagentRuntime)
+      const api = createApiProxy(ctx, DEFAULTS)
+      const result = await api.settings.mutate(request({
+        ns: 'subagent', ops: [{ op: 'set', path: ['maxDepth'], value: 0 }],
+      }))
+      if (projectManager) {
+        expect(expectOk(result)).toMatchObject({ value: { maxDepth: 0 } })
+        expect(ctx.subagents.resolveMaxDepth()).toBe(0)
+        const protectedWrite = await api.settings.mutate(request({
+          ns: 'subagent', ops: [{ op: 'set', path: ['maxContinuableActivations'], value: 100 }],
+        }))
+        expect(expectErr(protectedWrite)).toMatchObject({ code: 'settings-rejected' })
+        expect(expectErr(await api.settings.replace(request({ ns: 'subagent', section: {} })))).toMatchObject({ code: 'settings-rejected' })
+      } else {
+        expect(expectErr(result)).toMatchObject({ code: 'collaboration-forbidden' })
+        expect(ctx.subagents.resolveMaxDepth()).toBe(1)
+      }
+    } finally { await ctx.fiber.dispose() }
   })
 
   it('discovers newly registered project namespaces from ownership metadata', async () => {

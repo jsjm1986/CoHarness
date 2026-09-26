@@ -18,6 +18,8 @@
 
 `toolFilter` 会改变子 agent 的全局工具层，但不是从父级派生的权限上限。见 [agent 作用域的安全非目标](../../../.agents/notes/implemented/architecture/2026-07-08-agent-scope-contexts.zh.md#security-and-authority-are-non-goals)。
 
+`subagent-model-selection` 设置分区归项目所有。项目管理者仅可修改 `enabled` 与 `allowedModels`；Host 原子校验两者，并拒绝开启但清单为空的设置。该偏好不覆盖运行时模型授权。
+
 ## 配置
 
 | 键 | 含义 |

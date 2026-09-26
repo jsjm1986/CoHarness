@@ -1,0 +1,8 @@
+- region "guide.md":
+  - button "Close preview"
+  - button "Reload"
+  - heading "Guide" [level=1]
+  - paragraph:
+    - text: Packed
+    - strong: markdown
+    - text: preview.

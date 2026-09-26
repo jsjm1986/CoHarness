@@ -16,6 +16,7 @@ import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 // Type-only: pulls this package's LocaleNamespaceMap merge (the 'feedback' seat).
 import type {} from './locales.ts'
+import type { FeedbackDialogState } from './dialog.ts'
 import type { MessageFeedbackActionResult, MessageFeedbackView } from './controller.ts'
 
 /** Injected business face of one assistant-message feedback entry. */
@@ -61,4 +62,33 @@ export interface MessageFeedbackInjected {
 export type MessageFeedbackActionProps =
   PropsRuntime<'conversation.chat.assistant-actions'>
   & InjectFace<MessageFeedbackInjected>
+  & PropsLocale<'feedback'>
+
+/** Injected business face of the Session's feedback dialog entry. */
+export interface FeedbackDialogInjected {
+  hooks: {
+    /** The Session's dialog and toast state. */
+    dialog: HostObservable<FeedbackDialogState>
+  }
+  /**
+   * Replace part of the draft: the category (null clears it) or the text.
+   * @param draft - the members to replace.
+   */
+  edit: (draft: Partial<Pick<FeedbackDialogState, 'category' | 'text'>>) => void
+  /** Submit the draft to the open target. */
+  submit: () => Promise<void>
+  /** Close the dialog and discard the draft. */
+  dismiss: () => void
+  /** Retire the current submission-failure toast without closing its draft. */
+  dismissFailure: () => void
+  /**
+   * Retire the toast the view finished showing.
+   * @param seq - the toast sequence.
+   */
+  dismissToast: (seq: number) => void
+}
+
+/** Full props of the feedback dialog overlay entry. */
+export type FeedbackDialogProps =
+  InjectFace<FeedbackDialogInjected>
   & PropsLocale<'feedback'>

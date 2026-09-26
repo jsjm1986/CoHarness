@@ -16,7 +16,9 @@ Status: implemented
 
 本决策取代[一次录制／确定性回放决策](2026-06-19-acp-snapshot-tests.zh.md)中 ACP 专属的放置位置与控制器所有权；后者继续负责会话日志回放、例外 override、规范化和 ACP transcript 比较。
 
-录制会话仍是主要输入，并在当前代际场景中同时作为预期输出。来自用户的消息驱动所选公开接口，录制的 assistant chunk 驱动确定性模型回放，规范化后的持久化结果必须等于 fixture。父会话和子会话共享同一类型化脱敏映射。提交的 fixture 使用保留关系的身份 token，并将请求 system prompt 和工具 schema 替换为 token；每个不同 header 类仍保留一个显式 sidecar 所有者。
+录制会话仍是主要输入，并在当前代际场景中同时作为预期输出。来自用户的消息驱动所选公开接口，录制的 assistant chunk 驱动确定性模型回放，规范化后的持久化结果必须等于 fixture。父会话和子会话共享同一类型化脱敏映射。提交的 fixture 使用保留关系的身份 token，并将请求 system prompt 和工具 schema 替换为 token；每个不同 header 类仍保留一个显式 sidecar 所有者。会话 token 按父日志公告顺序绑定，由[身份绑定顺序 Agent Note](2026-09-26-snapshot-session-identity-binding-order.zh.md)负责。
+
+空的持久系统消息保持为空；只有非空内容才替换为提示词 token。脱敏不能制造模型输入，也不能把不同请求的身份合并。Web fixture 校验同时接受旧版单请求 token 与编号 RPC token，并拒绝运行时请求 ID。
 
 Fixture 解码与比较只取决于选定 JSONL 内容；文件名标识 inventory role，但不是 parser 输入。replay、seed、record、refresh 与规范化比较路径都使用同一个严格静态 catalog 校验。
 

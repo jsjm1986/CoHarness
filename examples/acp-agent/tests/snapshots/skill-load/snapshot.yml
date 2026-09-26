@@ -1,0 +1,10 @@
+version: 1
+scenario: skill-load
+profile: acp
+composition: acp-agent
+recording: authored
+header:
+  class: skill
+  pin: true
+  systemPromptSource: text-turn
+  toolSchemasSource: text-turn

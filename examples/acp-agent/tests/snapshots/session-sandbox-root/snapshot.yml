@@ -1,0 +1,13 @@
+version: 1
+scenario: session-sandbox-root
+profile: acp
+composition: session-sandbox-root
+recording: authored
+header:
+  class: sandbox
+replay:
+  override: true
+permission: workspace-write
+workspace:
+  final: true
+  parent: outside-temp

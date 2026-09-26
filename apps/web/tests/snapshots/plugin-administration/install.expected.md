@@ -1,0 +1,4 @@
+- listitem:
+  - button "查看 admin-install": admin-install
+  - text: Administrative installation acceptance
+  - switch "启用 admin-install"

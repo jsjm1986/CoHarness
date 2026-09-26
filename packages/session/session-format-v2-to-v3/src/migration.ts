@@ -136,8 +136,11 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
   }
 }
 
-/** Source admission precedes renaming, so these payloads have exact audited fields. */
-function renamePtcEvent(event: SessionFormatEvent): SessionFormatEvent {
+/** Source admission precedes renaming, so these payloads have exact audited fields.
+ * @param event - admitted v2 event to rename.
+ * @returns the event with retired code-era vocabulary renamed to its v3 spelling.
+ */
+export function renamePtcEvent(event: SessionFormatEvent): SessionFormatEvent {
   switch (event.type) {
     case 'agent-preset/selected':
       return (event.data as SessionFormatJsonObject)['agentPreset'] === 'code'

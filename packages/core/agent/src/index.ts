@@ -82,6 +82,8 @@ export interface CreateAgentOptions {
     readonly origin?: 'subagent'
     readonly delegationDepth?: number
     readonly agentPreset?: string
+    /** Managed SSH target bound at creation; see `SessionHeader.sshTarget` in dsh-session. */
+    readonly sshTarget?: number
   }
   /** Exact fork-inherited prefix length when the session metadata sets `isSeeded`. */
   readonly inheritedEventCount?: SessionLogOffset
@@ -249,7 +251,7 @@ export class AgentRegistry extends Service {
   private readonly initiatorRuns = new AsyncLocalStorage<InitiatorRun>()
   private initiatorState: 'active' | 'closing' | 'disposed' = 'active'
   private activeInitiatorRuns = 0
-  private initiatorDrain: PromiseWithResolvers<void> | undefined
+  private initiatorDrain: PromiseWithResolvers<undefined> | undefined
   private initiatorDisposal: Promise<void> | undefined
 
   constructor(ctx: Context) {
@@ -607,7 +609,7 @@ export class AgentRegistry extends Service {
       this.closeInitiators()
       this.releaseReentrantInitiatorRuns()
       if (this.activeInitiatorRuns !== 0) {
-        this.initiatorDrain ??= Promise.withResolvers<void>()
+        this.initiatorDrain ??= Promise.withResolvers<undefined>()
         await this.initiatorDrain.promise
       }
       this.initiatorState = 'disposed'
@@ -678,7 +680,7 @@ export class AgentRegistry extends Service {
     run.active = false
     this.activeInitiatorRuns -= 1
     if (this.activeInitiatorRuns !== 0) return
-    this.initiatorDrain?.resolve()
+    this.initiatorDrain?.resolve(undefined)
     this.initiatorDrain = undefined
   }
 }

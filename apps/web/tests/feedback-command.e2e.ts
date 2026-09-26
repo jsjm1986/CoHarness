@@ -88,7 +88,9 @@ describe('web e2e: /feedback command acknowledgement', () => {
     // recorded session and the mounted backend's feedback-gated disclosure.
     await page.getByText(/Feedback recorded for session/).waitFor({ timeout: 10_000 })
     expect(await page.getByText(/Session sharing is feedback-gated/).count()).toBe(1)
-    const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+    const snapshot = (await captureStableAria(page, '[data-variant="others"]', scaffold.workspaceCwd))
+      // The ack row prints the anonymous user id, minted per run.
+      .replace(/Anonymous user: [0-9a-f-]+/gi, 'Anonymous user: {{uuid}}')
     await compareOrRefreshGolden(ACK_EXPECTED, snapshot, MODE)
 
     expect(tripwire.pageErrors).toEqual([])

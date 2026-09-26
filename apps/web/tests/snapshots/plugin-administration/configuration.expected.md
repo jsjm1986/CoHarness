@@ -1,0 +1,26 @@
+- region "subagent 配置":
+  - paragraph: 归属：项目 · 版本：1 · 即时配置
+  - paragraph: 当前值由默认值、部署配置和本层覆盖共同决定。恢复继承只移除本层覆盖，不修改部署默认值。
+  - group "maxDepth":
+    - text: maxDepth
+    - spinbutton "maxDepth": "2"
+    - paragraph: 已有本层覆盖 · 默认／基础值：1 · 最小 0 · 最大 9007199254740991 · 步长 1
+    - button "恢复继承：maxDepth"
+  - group "maxActiveSubagents":
+    - text: maxActiveSubagents
+    - spinbutton "maxActiveSubagents": "8"
+    - paragraph: 继承值 · 默认／基础值：8 · 最小 1 · 最大 9007199254740991 · 步长 1
+    - button "恢复继承：maxActiveSubagents"
+  - group "maxContinuableActivations":
+    - text: maxContinuableActivations
+    - spinbutton "maxContinuableActivations": "128"
+    - paragraph: 继承值 · 默认／基础值：128 · 最小 1 · 最大 9007199254740991 · 步长 1
+    - button "恢复继承：maxContinuableActivations"
+  - group "maxContinuableActivationsPerParent":
+    - text: maxContinuableActivationsPerParent
+    - spinbutton "maxContinuableActivationsPerParent": "32"
+    - paragraph: 继承值 · 默认／基础值：32 · 最小 1 · 最大 9007199254740991 · 步长 1
+    - button "恢复继承：maxContinuableActivationsPerParent"
+  - button "保存配置" [disabled]
+  - button "放弃草稿" [disabled]
+  - status: 即时配置已保存。

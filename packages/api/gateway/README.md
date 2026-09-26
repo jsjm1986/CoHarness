@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host entry provides `ctx.typertGateway`, while `@deepseek-ai/dsh-api-gateway/client` provides `ctx.remote`; both consume the same generated `InvocationDescriptor` contract and leave business selection to API Remotes and transport, request correlation, trust, and response envelopes to Connection.
 
+Trailing business parameters marked `acceptsUndefined` by the generated descriptor may be omitted. Required parameters retain their positions, including scoped identity projection. A cancellation signal remains in its declared final position; callers pass explicit `undefined` placeholders when supplying a signal after omitted options. Both supplied values and omitted values still pass Host codec validation.
+
 ## Summary
 
 Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host entry provides `ctx.typertGateway`, while `@deepseek-ai/dsh-api-gateway/client` provides `ctx.remote`; both consume the same generated `InvocationDescriptor` contract and leave business selection to API Remotes. Connection carries unary request correlation, trust, and response envelopes, while Gateway owns multiplexed Remote streams.

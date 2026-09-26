@@ -45,6 +45,8 @@ Same-process requests, descriptors, results, and event payloads are trusted type
 
 The plugin registers the `subagent` settings section with this same `Config` schema and its `cordis.yml` entry as the composition `base`; a field present in the user layer overrides that entry and a reset clears the override. `maxDepth` defaults to `1` and supplies the delegation tools' depth when their own configuration omits it. An explicit tool depth, including `provider-managed`, takes precedence. Depth `0` disables delegation through tools inheriting this setting; depth `1` permits direct children only. Changes apply on the next delegation attempt. Direct service callers continue to supply their own optional request depth.
 
+Project managers may edit only `maxDepth` and `maxActiveSubagents` through Gateway settings. Other members cannot write; continuation activation budgets remain deployment-managed. The Web Plugins settings card exposes the two limits with independent reset and help.
+
 Materialization reserves both residency slots before creating or resuming an Agent. Exceeding either residency limit rejects with `ACTIVATION_CAPACITY_EXCEEDED`; rollback or final Activation disposal releases the slot, while durable inactive child Sessions consume no slot.
 
 `maxActiveSubagents` limits live continuable children sharing uninterrupted continuable parent links — a separate axis from the residency quotas above. A non-continuable parent starts a separate pool and does not consume a slot; continuable descendants inherit that pool. Fresh creation and cold resume reserve before reconstructing the Agent, and cleanup returns the slot after handle disposal. A waiting parent, pending inbox work, and an Activation being stopped still occupy slots. Messages to a resident child reuse its slot. One-shot and external-provider runs are outside this limit. Pool inheritance does not cross a one-shot parent; its continuable children share a separate pool. Depth remains the delegation tool's separate policy.
@@ -95,6 +97,12 @@ A continuable child has one durable Session and at most one process-local **Acti
 The manager derives three internal residency conditions from Agent quiescence and the owned-child set rather than maintaining a second state machine: running (an active admission, open turn, or waking inbox work), waiting (quiescent but still owning at least one undisposed child), and settled (quiescent with every owned child disposed, so the manager disposes the `AgentHandle` and removes the Activation). A model-authored `sendMessage()` crosses one parent/child edge through Steer: a running target admits it at its nearest step boundary, an idle target starts a turn, and an absent direct-child Activation cold-resumes a new one. Host-protocol prompts keep the Queue path (`Agent.followup()`, one later FIFO turn) through the internal adapter.
 
 The manager reserves the child identity, resolves the durable descriptor, calls `ctx.agents.create()` (or `ctx.agents.resume()` for cold resume) through a private activation-owner scope, installs the returned `AgentHandle` in the Activation, establishes any continuable-parent ownership, and then submits the prompt. Cold resume never dispatches through a provider because the persisted Session already holds the initial prefix and the folded descriptor is the whole reconstruction input.
+
+### External-runtime members
+
+A provider whose runtime lives outside the harness (Claude Agent SDK, Codex app-server, a resume-capable ACP agent) can still host continuable children: `prepareContinuable` marks the capability and contributes detached data only, while the continuation manager keeps owning the in-process child Agent. The provider additionally registers an `LlmAdapter` route and advertises `agentRouteDefaults`, so each member model call becomes one turn on the durable external session keyed by the child's Session id.
+
+`@deepseek-ai/dsh-subagent/external` holds the shared member machinery: an append-only JSONL binding store (child session ↔ external session plus the pending prompt and consumed cursor), the trailing-user prompt window, and the recovery rule — a settled external answer replays without resending, a provably absent prompt resends once, and an unprovable outcome drops with `EXTERNAL_TURN_OUTCOME_UNKNOWN` rather than risking a duplicate delivery.
 
 ### Settlement delivery
 

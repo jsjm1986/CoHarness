@@ -63,6 +63,14 @@ function transport(overrides: Partial<CollaborationTransport> = {}): Collaborati
 }
 
 describe('response parsing', () => {
+  it('retains explicit account eligibility and rejects malformed eligibility fields', () => {
+    expect(parseCollaborationContext({ ...personalContext, fullAccess: true, autoReviewEligible: true }))
+      .toMatchObject({ fullAccess: true, autoReviewEligible: true })
+    expect(() => parseCollaborationContext({ ...personalContext, autoReviewEligible: 'true' }))
+      .toThrow('invalid collaboration response')
+    expect(() => parseCollaborationContext({ ...personalContext, fullAccess: 'true' }))
+      .toThrow('invalid collaboration response')
+  })
   it('accepts personal and project contexts plus full and null conversation details', () => {
     expect(parseCollaborationContext(personalContext)).toEqual(personalContext)
     expect(parseCollaborationContext(projectContext)).toEqual(projectContext)
@@ -201,6 +209,42 @@ describe('browser transport', () => {
     expect(fetcher).toHaveBeenNthCalledWith(2, '/account/api/invitations/count', { credentials: 'same-origin', signal })
   })
 
+  it('uses the project SSH target routes', async () => {
+    const target = { publicId: 41, name: 'builder', host: 'ssh-builder', workspace: '/srv/workspaces', enabled: true, shared: true }
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json({ targets: [target] }))
+      .mockResolvedValueOnce(Response.json({ publicId: 41, name: 'builder', shared: false })) as unknown as typeof fetch
+    const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+    const signal = new AbortController().signal
+
+    await expect(api.listProjectSshTargets?.(9, signal)).resolves.toEqual([target])
+    await expect(api.shareProjectSshTarget?.(9, 41, false, signal)).resolves.toEqual({ publicId: 41, name: 'builder', shared: false })
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/account/api/projects/9/ssh-targets', {
+      credentials: 'same-origin', signal,
+    })
+    expect(fetcher).toHaveBeenNthCalledWith(2, '/account/api/projects/9/ssh-targets', {
+      credentials: 'same-origin', method: 'POST', signal,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ targetId: 41, shared: false }),
+    })
+  })
+
+  it('rejects malformed project SSH target responses at the HTTP boundary', async () => {
+    for (const body of [{ targets: 'x' }, { targets: null }]) {
+      const fetcher = vi.fn().mockResolvedValueOnce(Response.json(body)) as unknown as typeof fetch
+      const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+      await expect(api.listProjectSshTargets?.(9, new AbortController().signal)).rejects.toThrow('invalid ssh target response')
+    }
+    for (const body of [null, [], { targets: [41] }, { targets: [{ publicId: 'bad' }] }]) {
+      const fetcher = vi.fn().mockResolvedValueOnce(Response.json(body)) as unknown as typeof fetch
+      const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+      await expect(api.listProjectSshTargets?.(9, new AbortController().signal)).rejects.toThrow('invalid collaboration response')
+    }
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ publicId: 'bad', name: 'x', shared: false })) as unknown as typeof fetch
+    const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+    await expect(api.shareProjectSshTarget?.(9, 41, true, new AbortController().signal)).rejects.toThrow('invalid collaboration response')
+  })
+
   it('rejects malformed user picker and invitation count responses at the HTTP boundary', async () => {
     const invalidUserLists: unknown[] = [null, 1, [1], [{ id: 'bad', username: 'x', displayName: 'x' }]]
     for (const body of invalidUserLists) {
@@ -250,6 +294,35 @@ describe('browser transport', () => {
 })
 
 describe('CollaborationClient', () => {
+  it('ignores an earlier connection generation after the account context was invalidated', async () => {
+    const old = deferred<CollaborationContext>()
+    const fresh = deferred<CollaborationContext>()
+    const loadContext = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
+    const client = new CollaborationClient(transport({ loadContext }))
+    const first = client.load()
+    client.invalidateContext()
+    const second = client.load(true)
+    old.resolve({ ...personalContext, fullAccess: true, autoReviewEligible: true })
+    await first
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: false })
+    fresh.resolve({ ...personalContext, fullAccess: false, autoReviewEligible: false })
+    await second
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: true, context: { fullAccess: false, autoReviewEligible: false } })
+    client.dispose()
+  })
+  it('withdraws verified account eligibility while refreshing and after an HTTP failure', async () => {
+    const pending = deferred<CollaborationContext>()
+    const loadContext = vi.fn().mockResolvedValueOnce({ ...personalContext, autoReviewEligible: true })
+      .mockReturnValueOnce(pending.promise)
+    const client = new CollaborationClient(transport({ loadContext }))
+    await client.load()
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: true })
+    const refresh = client.load(true)
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: false })
+    pending.reject(new CollaborationRequestError(503))
+    await refresh
+    expect(client.getSnapshot()).toMatchObject({ contextVerified: false })
+  })
   it('coalesces context loads, publishes project context, stages visibility, and clears details in personal scope', async () => {
     const first = deferred<CollaborationContext>()
     const loadContext = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValueOnce(personalContext)
@@ -413,6 +486,21 @@ describe('CollaborationClient', () => {
     bare.dispose()
     await expect(bare.listUsers()).resolves.toEqual([])
     await expect(bare.getInvitationCount()).resolves.toEqual({ pending: 0 })
+  })
+
+  it('delegates project SSH target operations and degrades when the transport omits them', async () => {
+    const rows = [{ publicId: 41, name: 'builder', host: 'h', workspace: '/w', enabled: true, shared: true }]
+    const listProjectSshTargets = vi.fn().mockResolvedValue(rows)
+    const shareProjectSshTarget = vi.fn().mockResolvedValue({ publicId: 41, name: 'builder', shared: false })
+    const client = new CollaborationClient(transport({ listProjectSshTargets, shareProjectSshTarget }))
+    await expect(client.listProjectSshTargets(9)).resolves.toEqual(rows)
+    await expect(client.shareProjectSshTarget(9, 41, false)).resolves.toEqual({ publicId: 41, name: 'builder', shared: false })
+    expect(listProjectSshTargets).toHaveBeenCalledWith(9, expect.any(AbortSignal))
+    expect(shareProjectSshTarget).toHaveBeenCalledWith(9, 41, false, expect.any(AbortSignal))
+
+    const bare = new CollaborationClient(transport())
+    await expect(bare.listProjectSshTargets(9)).rejects.toEqual(new CollaborationRequestError(503, 'ssh-targets-unavailable'))
+    await expect(bare.shareProjectSshTarget(9, 41, true)).rejects.toEqual(new CollaborationRequestError(503, 'ssh-targets-unavailable'))
   })
 
   it('rejects visibility reuse while saving or after disposal', async () => {

@@ -23,15 +23,17 @@ import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
 import { join } from 'node:path'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, realizeSeedFixture, recordFixture, rewriteSeedEvents, seedSession, watchConsole, webSnapshotMode,
+  launchWebScaffold, realizeSeedFixture, recordFixture, rewriteSeedEvents, seedSession,
+  selectedSessionFixture, systemPromptTexts, watchConsole, webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
+import { normalizeAria } from './aria-normalize.ts'
 
 const OVERLAY = fileURLToPath(new URL('./seeded-history.overlay.yml', import.meta.url))
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/seeded-history', import.meta.url))
-const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
+const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.v6.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expected.md', import.meta.url))
 // Command-row goldens over the same conversation after direct host commands.
 const COMMAND_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/command-row.expected.md', import.meta.url))
@@ -194,7 +196,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await writeFile(join(sessionCwd, 'a.txt'), 'alpha\n')
     await writeFile(join(sessionCwd, 'b.txt'), 'beta\n')
     if (MODE !== 'record') {
-      const raw = await readFile(SEED, 'utf8')
+      const raw = await readFile(await selectedSessionFixture(SEED), 'utf8')
       expect(fixtureUserPrompts(raw), 'seed fixture must carry exactly the drive prompt').toEqual([PROMPT])
       // The meter is host-plane — it takes no configuration and keys every
       // fold by Session — so pricing fixture content needs no agent at all.
@@ -261,8 +263,13 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // only — the prompt and full tool output must stay on screen.
     expect(await page.getByText(PROMPT, { exact: true }).count()).toBe(1)
 
+    await expect.poll(() => scaffold.ctx.agents.get(SessionId(SEED_ID)), {
+      timeout: 10_000,
+      message: 'selected historical session has not finished attaching its Agent',
+    }).toBeDefined()
     const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
     if (agent === undefined) throw new Error('seeded session did not attach an agent')
+    expect(systemPromptTexts(agent.session.snapshotEvents())).toContain('{{system}}')
     agent.session.append('user/message', createUserMessage({
       content: [{
         type: 'text',
@@ -563,11 +570,29 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(await body.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(false)
   })
 
+  it.skipIf(MODE === 'record')('keeps business identifiers and deadlines distinct from message statistics', async () => {
+    const text = 'Ticket 123e4567-e89b-12d3-a456-426614174000 expires at 2026-09-25T12:34:56Z; run "sleep 45s" at 12:34; target 20 tok/s.'
+    const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
+    if (agent === undefined) throw new Error('seeded session did not attach an agent')
+    agent.session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    const body = page.getByText(text, { exact: true })
+    await body.waitFor()
+    const raw = await body.ariaSnapshot()
+    const actual = normalizeAria(raw, scaffold.workspaceCwd)
+    expect(actual).toBe(raw)
+    expect(normalizeAria(raw.replace('45s', '46s'), scaffold.workspaceCwd)).not.toBe(actual)
+    expect(await page.getByRole('group', { name: 'Message timing', exact: true }).count()).toBeGreaterThan(0)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'literal-values.expected.md'), actual, MODE)
+  })
+
   it.skipIf(MODE === 'record')('issued zero model calls and stayed clean', async () => {
     // No replay fixture was installed and the llm seam is open — any stray
     // stream would have failed the turn loudly. Cleanliness pins the wire.
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['command-row.expected.md', 'feedback-row.expected.md', 'file-open-failure.expected.md', 'seed.jsonl', 'ui.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['command-row.expected.md', 'feedback-row.expected.md', 'file-open-failure.expected.md', 'literal-values.expected.md', 'seed.jsonl', 'ui.expected.md'])
   })
 })

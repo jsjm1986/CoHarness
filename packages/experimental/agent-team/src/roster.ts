@@ -353,15 +353,15 @@ export class TeamRoster {
         )
       }
 
-      const progress = Promise.withResolvers<void>()
+      const progress = Promise.withResolvers<undefined>()
       // Abort can win while the durability flush is still pending; mark the
       // later-awaited rejection handled without changing its eventual result.
       void progress.promise.catch(() => undefined)
       const stopEvent = this.ctx.on('session/event', (candidate) => {
-        if (candidate === session) progress.resolve()
+        if (candidate === session) progress.resolve(undefined)
       })
       const stopDisposed = this.ctx.on('session/disposed', (candidate) => {
-        if (candidate === session) progress.resolve()
+        if (candidate === session) progress.resolve(undefined)
       })
       const onAbort = (): void => {
         const reason: unknown = signal.reason
@@ -479,8 +479,15 @@ export class TeamRoster {
     })
   }
 
-  /** Whether a Session's own suffix identifies a provider-owned subagent child. */
+  /**
+   * Whether an Agent is a provider-owned subagent child. The session header's
+   * `origin: "subagent"` meta is durable at creation, so it already classifies
+   * at `agent/created`; the descriptor event is only appended at first-step
+   * admission and remains the authority for legacy sessions created before the
+   * origin field existed.
+   */
   private subagentDescriptor(agent: Agent): boolean {
+    if (agent.session.header.origin === 'subagent') return true
     // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     return foldSubagentDescriptor(agent.session.ownEvents()) !== undefined
   }

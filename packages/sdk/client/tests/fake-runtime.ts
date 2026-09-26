@@ -100,6 +100,21 @@ function runTurn(sessionId: string): void {
     return
   }
   event(sessionId, 'turn/start', { turn: 0 })
+  if (env.FAKE_EXECUTION_EVENT !== undefined) {
+    event(sessionId, 'gateway/execution', { kind: 'accepted', state: { revision: '1',
+      inputs: ['00000000-0000-4000-8000-000000000001'], actors: [{ userId: 7 }], primaryActorUserId: 7, unverifiedHistory: false } })
+  }
+  if (env.FAKE_WEBHOOK_EVENT !== undefined) {
+    event(sessionId, 'user/message', { turn: 0, step: 0, message: {
+      id: 'webhook-message', role: 'user', content: [{ type: 'text', text: 'External request' }],
+      source: { kind: 'webhook', provider: 'github', source: 'endpoint', deliveryId: 'delivery', ruleId: 'review',
+        form: 'notice', summary: 'github webhook handled by review' },
+    } })
+  }
+  if (env.FAKE_DELIVERABLE_EVENTS !== undefined) {
+    event(sessionId, 'deliverables/presented', { turn: 0, callId: 'present-1', files: [{ path: 'report.txt', description: 'Report' }] })
+    event(sessionId, 'workspace/changes', { turn: 0 })
+  }
   if (env.FAKE_MALFORMED_MESSAGE !== undefined) {
     event(sessionId, 'assistant/attempt', {
       turn: 0,

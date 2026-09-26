@@ -1,0 +1,8 @@
+- name: '@deepseek-ai/dsh-session'
+- name: '@deepseek-ai/dsh-session-projection'
+- name: '@deepseek-ai/dsh-attachment-local'
+  config:
+    dshHome: !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('home/', baseUrl))"
+- name: '@deepseek-ai/dsh-fs-local'
+- name: '@deepseek-ai/dsh-llm'
+- name: '@deepseek-ai/dsh-token-meter'

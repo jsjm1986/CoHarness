@@ -25,6 +25,8 @@
 
 Admin 归档频道由 PostgreSQL migration 015 启用。可通过 `HGW_ARCHIVE_RETENTION_DAYS`（默认 `30`）设置回收站保留窗口。运行时归档快照通过私有 Gateway API 对账；运行时 home 与 Gateway 归档索引必须纳入同一套备份方案。个人正文仍保存在运行时自己的存储中，由管理员阅读器按需读取。
 
+托管桌面按节点选择启用。在宿主机上安装 Cua Driver 应用并授予其操作系统桌面权限，配置已发布的 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` 包目录（将构建产物复制到发布根下的 `packages/experimental/computer-use-cua-driver-mcp`，或用 `HGW_DESKTOP_DRIVER_PACKAGE` 指向绝对包目录），并把 `HGW_DESKTOP_ID` 设为本节点的桌面标识。之后每个启动的运行时都会挂载 computer-use 服务与该提供者，并发布托管桌面策略；部署需要固定路径或 `--direct` 时，可用 `HGW_DESKTOP_DRIVER_COMMAND` 和 `HGW_DESKTOP_DRIVER_ARGS` 替换 `cua-driver` 查找与 `mcp` 参数。管理员随后在桌面协调页授权用户与项目，每位参与者在作曲器中对活动根会话和桌面完成确认后，驱动调用才会执行。`HGW_DESKTOP_ID` 未设置时，运行时不挂载驱动，也不会读取驱动包。
+
 ## 每用户开号
 
 在 `/admin` 创建用户，然后以 root 执行一次 `deploy/provision-user.sh <username>`：它创建 `harness-<username>` 系统账号并 chown `/srv/harness/users/<username>/{home,dsh}`。个人单元在每次启动时按该用户当前授权自动渲染。管理员发起的项目可以在 `HGW_PROJECTS_ROOT` 下得到 `0770` 受管目录，也可以导入从 `HGW_PROJECT_PATH_ROOTS` 下选择的既有目录；导入目录需要显式授予 `harness-project` 读写权限。用户发起的项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下创建空目录；前面的 setgid/默认 ACL 配置会让项目单元继承访问权，创建者成为 `rw` 所有者。两种来源都分配一个共享运行时，支持 `ro`/`rw` 邀请，并使用同一套对话与文件夹 scope。项目目录不能与用户数据、运行时或凭据数据、Gateway/发布/插件代码、用户受管项目存储或另一项目重叠。成员身份和个人目录权限写入会在需要时重启正在运行的个人运行时；项目 ACL 按请求检查，不要求重启共享运行时。管理员在个人和项目 scope 都保留 `danger-full-access` 预设，但项目运行时仍受内核项目路径约束。

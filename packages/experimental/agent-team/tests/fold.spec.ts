@@ -268,6 +268,52 @@ describe('Agent Teams fold', () => {
         ...event('team/task', { version: 1, teamId: TEAM, task: task() }, 0),
         data: { version: 1, teamId: 42, task: task() },
       },
+      {
+        ...event('team/message/queued', { version: 1, teamId: TEAM, message: message() }, 0),
+        data: {
+          version: 1,
+          teamId: TEAM,
+          message: {
+            ...message(),
+            gatewayExecutionScope: {
+              parentSessionId: ROOT,
+              inputs: ['00000000-0000-4000-8000-000000000001'],
+              unverifiedHistory: false,
+            },
+          },
+        },
+      },
+      {
+        ...event('team/message/queued', { version: 1, teamId: TEAM, message: message() }, 0),
+        data: {
+          version: 1,
+          teamId: TEAM,
+          message: {
+            ...message(),
+            gatewayExecutionScope: {
+              parentSessionId: ROOT,
+              inputs: [],
+              primaryActorUserId: 1,
+              unverifiedHistory: true,
+            },
+          },
+        },
+      },
+      {
+        ...event('team/message/queued', { version: 1, teamId: TEAM, message: message() }, 0),
+        data: {
+          version: 1,
+          teamId: TEAM,
+          message: {
+            ...message(),
+            gatewayExecutionScope: {
+              parentSessionId: ROOT,
+              inputs: [],
+              unverifiedHistory: false,
+            },
+          },
+        },
+      },
     ] as unknown as SessionEvent[]
 
     for (const candidate of malformed) {

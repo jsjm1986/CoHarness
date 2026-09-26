@@ -384,7 +384,9 @@ describe('native review request', () => {
       system: EXPECTED_REVIEW_POLICY,
       temperature: 0,
     })
-    expect(request).not.toHaveProperty('sessionId')
+    expect(request.sessionId).toBe(session.id)
+    expect(request.purpose).toBe('auto-review')
+    expect(request).not.toHaveProperty('executionIdentity')
     expect(request.maxTokens).toBeUndefined()
     expect(request.tools).toBeUndefined()
     expect(request.messages).toHaveLength(1)

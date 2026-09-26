@@ -1,0 +1,8 @@
+version: 1
+scenario: read-image
+profile: acp
+composition: image
+recording: authored
+header:
+  class: image
+  pin: true

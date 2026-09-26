@@ -52,6 +52,27 @@ export async function writeDefaultPreset(
   return response.result.ok ? undefined : response.result.error.message
 }
 
+/**
+ * Persist whether new-session surfaces expose preset selection.
+ * @param api - the settings wire face.
+ * @param enabled - whether the picker should be exposed.
+ * @returns the failure message, or undefined once the write landed.
+ */
+export async function writeModeSelectionEnabled(
+  api: Pick<IApiClient, 'settings'>,
+  enabled: boolean,
+): Promise<string | undefined> {
+  let response
+  try {
+    response = await api.settings.update({
+      ns: AGENT_PRESET_SETTINGS_NS, patch: { modeSelectionEnabled: enabled },
+    })
+  } catch (error) {
+    return messageOf(error)
+  }
+  return response.result.ok ? undefined : response.result.error.message
+}
+
 /** One selectable preset. */
 export interface AgentPresetOption {
   /** Preset id, written to Settings and the label's fallback. */
@@ -199,9 +220,11 @@ export class AgentPresetSettingsController {
   async load(): Promise<void> {
     const roster = await beginRosterRead(this.remote, this.store)
     if (roster === undefined) return
-    const { presets } = roster
+    const { presets, modeSelectionEnabled } = roster
     const [first] = presets
-    if (first === undefined) {
+    // While selection is hidden the saved default no longer governs: a row
+    // offering the write would claim an effect the Host refuses to apply.
+    if (first === undefined || !modeSelectionEnabled) {
       this.set({ status: 'unavailable', options: [], currentValue: '' })
       return
     }
@@ -237,7 +260,7 @@ export class AgentPresetSettingsController {
    */
   async select(id: string): Promise<void> {
     const before = this.store.getSnapshot()
-    if (before.status === 'saving' || !before.writable || id === before.currentValue) return
+    if (before.status !== 'ready' || !before.writable || id === before.currentValue) return
     const authority = this.describeFace.getSnapshot().view
     if (authority === undefined || !authority.writable) {
       this.set({

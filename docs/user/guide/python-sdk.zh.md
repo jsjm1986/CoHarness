@@ -8,7 +8,7 @@
 
 - Python 3.10 或更高版本
 - Git
-- Linux x64、Linux arm64 或 macOS 14 或更高版本的 arm64
+- Linux x64、Linux arm64、macOS 14 或更高版本的 arm64，或 Windows x64
 - DeepSeek 兼容的 API 端点与凭据
 - agent 可以修改的隔离 workspace
 
@@ -86,8 +86,8 @@ print(result.final_response)
 |---|---|
 | 系统提示词 | `DSH_SYSTEM_PROMPT`；未设置时使用 `You are a helpful software engineer assistant.` |
 | `minimal.py` 使用的模型 | `--model`，其次为 `DSH_MODEL`，最后为 `deepseek-v4-flash` |
-| 面向模型的工具 | 仅持久 `bash` 与 `str_replace_editor` |
-| Bash 超时 | 300 秒 |
+| 面向模型的工具 | 仅持久 `bash`（Windows 上为 `pwsh`）与 `str_replace_editor` |
+| 持久 shell 超时 | 300 秒 |
 | 编辑器输出上限 | 16,000 个字符 |
 | 上下文压缩 | 已关闭 |
 | 文件系统 | 裸本地后端；编辑器使用绝对路径，可以访问运行时进程可见的任何路径 |
@@ -99,7 +99,7 @@ print(result.final_response)
 
 `cwd` 用于选择 agent 可访问的 workspace，`session_root` 用于保存会话日志和状态。独立任务应使用新的 session id；只有下一次调用需要延续同一段对话和持久 shell 状态时，才复用原有 id。
 
-该组合使用 `danger-full-access`。只能在可丢弃的 checkout 或容器内运行：Bash 与编辑器可以修改运行时进程有权访问的任何路径。持久 PTY 后端需要 POSIX 终端环境，因此该组合不支持 Windows agent。
+该组合使用 `danger-full-access`。只能在可丢弃的 checkout 或容器内运行：持久 shell 与编辑器可以修改运行时进程有权访问的任何路径。该组合在 Windows 上选择 `pwsh`，在其他平台选择 `bash`。
 
 准确的组合内容归 [`jsonrpc-agent` 示例参考](../../../examples/jsonrpc-agent/README.zh.md)所有。[Python SDK 参考](../../../python/sdk/README.zh.md)介绍生命周期、结果、通知、运行时选择和配置；[Cordis primer](../../cordis-primer.zh.md)介绍组合语法。
 

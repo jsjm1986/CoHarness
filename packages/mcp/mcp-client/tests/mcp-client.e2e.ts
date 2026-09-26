@@ -72,7 +72,7 @@ function imageAgent(): object {
 }
 
 function sleep(ms: number): Promise<void> {
-  const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+  const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
   setTimeout(gate.resolve, ms)
   return gate.promise
 }
@@ -497,8 +497,8 @@ describe('streamable-http — in-process MCP server', () => {
         res.writeHead(500).end(String(error))
       })
     })
-    const listening: PromiseWithResolvers<void> = Promise.withResolvers()
-    httpServer.listen(0, '127.0.0.1', listening.resolve)
+    const listening: PromiseWithResolvers<undefined> = Promise.withResolvers()
+    httpServer.listen(0, '127.0.0.1', () => { listening.resolve(undefined) })
     await listening.promise
     const address = httpServer.address()
     if (address === null || typeof address === 'string') throw new Error(`expected a TCP AddressInfo, got ${String(address)}`)
@@ -519,8 +519,8 @@ describe('streamable-http — in-process MCP server', () => {
   afterAll(async () => {
     if (ctx) await ctx.fiber.dispose()
     await handler.close()
-    const closed: PromiseWithResolvers<void> = Promise.withResolvers()
-    httpServer.close(() => { closed.resolve() })
+    const closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
+    httpServer.close(() => { closed.resolve(undefined) })
     await closed.promise
   })
 

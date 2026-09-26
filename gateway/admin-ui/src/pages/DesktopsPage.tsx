@@ -1,3 +1,4 @@
+import { DesktopPermissions } from '../components/DesktopPermissions.tsx'
 import { Ban, Monitor, RefreshCw, ShieldOff } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -96,6 +97,7 @@ export function DesktopsPage() {
         description="查看交互桌面的独占授权、FIFO 排队与失联恢复状态。"
         meta={`${rows.length} 个资源`}
       />
+      <DesktopPermissions />
       <ErrorBanner message={error} />
       <Section
         title="桌面资源"

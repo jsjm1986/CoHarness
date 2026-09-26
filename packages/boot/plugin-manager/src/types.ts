@@ -4,6 +4,23 @@ import type { PluginInventoryEntry } from '@deepseek-ai/dsh-host-plugin-inventor
 export type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 import type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 
+/** Deployment-owned authority for current-profile management. */
+export interface PluginManagementAuthorization {
+  /** Modules a managed profile cannot disable or replace through a bundle. */
+  readonly protectedModules: ReadonlySet<string>
+  /** Recheck the current caller before profile reads or writes.
+   * @returns After the deployment permits the operation; rejects without permission.
+   */
+  authorize(): Promise<void>
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    /** Profile management requires current deployment authorization. */
+    'plugin-management/forbidden': Record<string, never>
+  }
+}
+
 /** Reasons a profile control cannot modify its target. */
 export type ReadOnlyReason = 'management-required' | 'unaddressable'
 
@@ -169,6 +186,12 @@ export interface PluginInstallLogChunk {
   /** Present on the run's last chunk: pnpm's exit code, null when it ended without one. */
   readonly exitCode?: number | null
 }
+
+/** One installation's private stream; the final result follows all retained diagnostics. */
+export type PluginInstallFrame =
+  | { readonly type: 'progress'; readonly progress: PluginInstallProgress }
+  | { readonly type: 'log'; readonly chunk: PluginInstallLogChunk }
+  | { readonly type: 'result'; readonly value: ChangeResult }
 
 /** What changed in the profile, for consumers that show it. */
 export interface PluginChange {

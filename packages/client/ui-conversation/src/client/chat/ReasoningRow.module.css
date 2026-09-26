@@ -8,6 +8,14 @@
   overflow: hidden;
 }
 
+/* Keep the collapse control reachable while its complete body scrolls. */
+.root[data-expanded] [data-open] [data-disclosure-row] {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--dsw-alias-bg-base);
+}
+
 .root[data-state='running'] .row::after {
   content: '';
   position: absolute;
@@ -71,11 +79,7 @@
 
 .thinkBody {
   padding: var(--dsw-space-1) 0 var(--dsw-space-1) 22px;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 14px;
-  line-height: 24px;
-  white-space: pre-wrap;
-  word-break: break-word;
+  min-width: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

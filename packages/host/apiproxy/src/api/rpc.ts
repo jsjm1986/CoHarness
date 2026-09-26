@@ -46,6 +46,9 @@ export interface RpcErrorDetailsMap {
   'model-unavailable': { provider: string; model: string }
   'model-forbidden': { provider: string; model: string }
   'session-conflict': { sessionId: SessionId; requestedCwd: string; existingCwd?: string }
+  'ssh-target-conflict': { sessionId: SessionId; requestedSshTarget: number; existingSshTarget?: number }
+  /** The caller is not currently qualified for the session's bound SSH execution target. */
+  'ssh/forbidden': {}
   'invalid-time-zone': { value: string }
   'workspace-attach-failed': { sessionId: SessionId; workspaceId: string }
   'workspace-not-found': { workspaceId: string }

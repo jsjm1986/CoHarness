@@ -1,0 +1,23 @@
+- tablist:
+  - tab "Browser Close" [selected]:
+    - img
+    - text: Browser
+    - button "Close":
+      - img
+  - button "New tab":
+    - img
+  - button "Fullscreen"
+  - button "Collapse right sidebar":
+    - img
+- button "Back" [disabled]:
+  - img
+- button "Forward" [disabled]:
+  - img
+- button "Reload" [disabled]:
+  - img
+- textbox "Enter an HTTP(S) address"
+- button "Open in system browser" [disabled]:
+  - img
+- button "Disable sandbox restrictions"
+- text: Enter an HTTP(S) address to start browsing
+- paragraph: Localhost and loopback addresses refer to your machine, not the Gateway or SSH host.

@@ -232,7 +232,7 @@ class WindowsJobRunner {
   private resultStarted = false
   private resultDelivered = false
   private finished = false
-  private readonly completion = Promise.withResolvers<void>()
+  private readonly completion = Promise.withResolvers<undefined>()
 
   constructor(
     private readonly argv: string[],
@@ -435,7 +435,7 @@ class WindowsJobRunner {
     this.host.off('disconnect', this.onDisconnect)
     this.host.exitCode = exitCode
     if (disconnect && this.host.connected) this.host.disconnect()
-    this.completion.resolve()
+    this.completion.resolve(undefined)
   }
 }
 

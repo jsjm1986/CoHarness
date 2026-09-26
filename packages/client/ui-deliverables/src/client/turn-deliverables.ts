@@ -10,6 +10,15 @@ import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
+import type { PresentedFile } from '@deepseek-ai/dsh-tool-present/types'
+import { isChangesEvent } from '../changes.ts'
+import { isPresentedData, isPresentedFile } from '../presented.ts'
+
+/** Declared file and its durable event coordinates. */
+export interface PresentedPath extends PresentedFile { readonly seq: number; readonly index: number }
+/** Latest workspace-change announcement for this turn. */
+export interface ChangesTurnData { readonly seq: number }
+
 interface ProducedPath {
   readonly seq: number
   readonly path: string
@@ -18,6 +27,8 @@ interface ProducedPath {
 /** Immutable produced-file facts published against one Turn. */
 export interface DeliverablesTurnData {
   readonly produced: readonly ProducedPath[]
+  readonly presented?: readonly PresentedPath[]
+  readonly changes?: ChangesTurnData
 }
 
 declare module '@deepseek-ai/dsh-client-runtime/client' {
@@ -99,6 +110,8 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
   kind: 'deliverables',
   match: (event) => {
     if (event.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
+    if (event.type === 'deliverables/presented') return isPresentedData(event.data) ? { id: String(event.data.turn), role: 'update' } : null
+    if (event.type === 'workspace/changes') return isChangesEvent(event.data) ? { id: String(event.data.turn), role: 'update' } : null
     if (event.type === 'tool/call') return { id: String(event.data.turn), role: 'update' }
     if (event.type === 'tool/result' && isAppendSurfaceEvent(event)) {
       return { id: String(event.data.turn), role: 'update' }
@@ -110,6 +123,18 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
     return { turn: match.event.data.turn, calls: new Map(), produced: [] }
   },
   update: (context, match) => {
+    if (match.event.type === 'workspace/changes') return { ...context.state, changes: { seq: match.event.seq } }
+    if (match.event.type === 'deliverables/presented') {
+      const { files } = match.event.data
+      const seq = match.event.seq
+      const presented: PresentedPath[] = []
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index]
+        if (isPresentedFile(file)) presented.push({ ...file, seq, index })
+      }
+      if (presented.length === 0) return context.state
+      return { ...context.state, presented: [...context.state.presented ?? [], ...presented] }
+    }
     if (match.event.type === 'tool/call') {
       const calls = new Map(context.state.calls)
       calls.set(
@@ -133,14 +158,41 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
     if (previous?.kind === 'turn'
       && previous.turn === context.state.turn
       && previous.key === 'deliverables'
-      && previous.value.produced === context.state.produced) return previous
+      && previous.value.produced === context.state.produced
+      && previous.value.presented === context.state.presented
+      && previous.value.changes === context.state.changes) return previous
     return {
       kind: 'turn',
       turn: context.state.turn,
       key: 'deliverables',
-      value: { produced: context.state.produced },
+      value: { produced: context.state.produced,
+        ...(context.state.presented === undefined ? {} : { presented: context.state.presented }),
+        ...(context.state.changes === undefined ? {} : { changes: context.state.changes }),
+      },
     }
   },
+}
+
+/**
+ * The turn's latest change announcement.
+ * @param owner - closing turn.
+ * @returns the announcement, or null when the Host recorded none.
+ */
+export function changesForClosing(owner: TurnTailOwnerProps): ChangesTurnData | null {
+  return owner.turn.data.get('deliverables')?.changes ?? null
+}
+
+/**
+ * Select the latest declaration of each path before the closing reply.
+ * @param owner - closing turn and sequence.
+ * @returns replayable deliveries in first-seen path order.
+ */
+export function presentedForClosing(owner: TurnTailOwnerProps): PresentedPath[] {
+  const files = new Map<string, PresentedPath>()
+  for (const file of owner.turn.data.get('deliverables')?.presented ?? []) {
+    if (file.seq < owner.seq) files.set(file.path, file)
+  }
+  return [...files.values()]
 }
 
 /**

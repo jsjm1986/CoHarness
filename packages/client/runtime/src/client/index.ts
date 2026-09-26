@@ -18,10 +18,12 @@ import type { UseProjection } from './sessions/projection-store.ts'
 import { ConversationEventRegistry } from './conversation/event-registry.ts'
 import { ConversationViewRegistry } from './conversation/view-registry.ts'
 import { ProjectUiPolicyRuntime } from './project-policy.ts'
+import { PermissionCatalogDirectory } from './permission-catalog.ts'
 import { WorkspaceResourceRegistry } from './workspace-resources.ts'
 
 export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 
+export { NavigationController, commitSessionNavigation } from './navigation.ts'
 export { SlotRegistry } from './slots.ts'
 export { ConversationEventRegistry } from './conversation/event-registry.ts'
 export { ConversationViewRegistry } from './conversation/view-registry.ts'
@@ -49,7 +51,7 @@ export type { SubagentDescendantSummary } from './sessions/subagent-lineage.ts'
 // materialization/projection implementation; no test-side mirror to drift).
 export { SessionProvideChannel } from './sessions/provide.ts'
 export type { SessionProvideChannelHost } from './sessions/provide.ts'
-export { createScope } from './scope.ts'
+export { createScope, scopeIdentityOf } from './scope.ts'
 export type { AgentScopeHandle } from './scope.ts'
 export { DirectoryBrowseError, WorkspaceCreateError, WorkspaceRuntime } from './workspaces/service.ts'
 export { abbreviateHomePath, resolveWorkspacePath } from './workspaces/path.ts'
@@ -62,6 +64,9 @@ export type {
 export { settingsControlState } from './contract/settings-scope.ts'
 export { onSettingsNavigation, requestSettingsSection } from './contract/settings-navigation.ts'
 export type { SettingsNavigationRequest } from './contract/settings-navigation.ts'
+export { sessionPersistenceKey } from './session-persistence.ts'
+export { PermissionCatalogDirectory, PermissionCatalogMirror } from './permission-catalog.ts'
+export type { SessionPermissionCatalog } from './permission-catalog.ts'
 export { ProjectUiPolicyRuntime } from './project-policy.ts'
 export type { ProjectThemePolicy, ProjectUiPolicySnapshot } from './project-policy.ts'
 export {
@@ -91,7 +96,7 @@ export type {
   SessionFace,
   SubmissionHandle,
 } from './contract/session.ts'
-export type { AgentContext, ISessions, SessionRuntimeTarget } from './contract/sessions.ts'
+export type { AgentContext, ISessions, SessionRuntimeTarget, SessionTarget, SessionReference, SessionRetainOptions, SessionRetainInfo } from './contract/sessions.ts'
 export type { IWorkspaces } from './contract/workspaces.ts'
 export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 export type {
@@ -155,6 +160,8 @@ export type {
   ProjectionsBaseline, ProjectionValueStore, SessionProjectionMap, UseProjection,
 } from './sessions/projection-store.ts'
 export type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+export { permissionAvailabilityFor, permissionAvailabilitySource, permissionUnavailableReason } from './contract/permission-availability.ts'
+export type { AccountPermissionAvailability, PermissionAvailability, PermissionUnavailableReason } from './contract/permission-availability.ts'
 export type {
   AddPaneResult, ConversationViewport, ConversationViewportMode, ConversationViewportSnapshot,
 } from './contract/conversation-viewport.ts'
@@ -246,6 +253,13 @@ declare module '@deepseek-ai/cordis' {
      * @returns true when a preview consumer accepts the resource.
      */
     'workspace/resource-open'(request: import('./workspace-resources.ts').WorkspaceResourceOpenRequest): true | undefined
+    /**
+     * Open a webpage beside the explicitly named Session.
+     * @param request - owning Session and sanitized absolute HTTP(S) URL.
+     * @mode bail
+     * @returns true when a Browser consumer accepts the link; absent handlers retain external navigation.
+     */
+    'web/browser-open'(request: { sessionId: import('@deepseek-ai/dsh-session/types').SessionId; url: string }): true | undefined
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry
@@ -259,6 +273,8 @@ declare module '@deepseek-ai/cordis' {
     workspaces: import('./contract/workspaces.ts').IWorkspaces
     /** Active project UI policy shared by theme and project settings surfaces. */
     projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
+    /** Per-runtime permission preset catalog directory; one mirror per pooled connection. */
+    permissionCatalog: import('./permission-catalog.ts').PermissionCatalogDirectory
     /** Metadata-only Workspace resource registry; providers bind one runtime target. */
     workspaceResources: WorkspaceResourceRegistry
     /** Optional provider for the multi-session conversation viewport. */
@@ -277,17 +293,24 @@ export function apply(ctx: Context): void {
   ctx.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
   const workspaceResources = new WorkspaceResourceRegistry()
   ctx.provide('workspaceResources', workspaceResources)
+  const connection = ctx.get('connection') as ConnectionHandle
   const conversation = {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
   }
-  const connection = ctx.get('connection') as ConnectionHandle
   const baseSessions = new SessionRuntime(ctx, connection.api, ctx.remote, conversation, {
     provideService: false,
+    hostDescription: connection.hostDescription,
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
+  // One catalog mirror per pooled runtime connection; sinks attribute each
+  // catalog-changed forward to the connection that delivered it, and each
+  // mirror's own hostDescription subscription covers generation resets.
+  const permissionCatalog = new PermissionCatalogDirectory(connection, sessions.list)
+  ctx.provide('permissionCatalog', permissionCatalog)
+  ctx.effect(() => () => { permissionCatalog.dispose() }, 'runtime: permission catalog directory')
   ctx.typert.contexts.registerClient('agent', {
-    identity: candidate => sessions.scopeOf(candidate),
+    identity: candidate => sessions.sessionOf(candidate)?.sessionId,
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
   ctx.effect(
@@ -306,7 +329,10 @@ export function apply(ctx: Context): void {
       // decoded frame straight to the Remote service, which fans it out to
       // `ctx.remote.$on` subscribers; no consumer reads a frame.
       const frame = envelope.payload
-      if (frame.type === 'host/remote-event') ctx.remote.$dispatch(frame.event, frame.args)
+      if (frame.type === 'host/remote-event') {
+        ctx.remote.$dispatch(frame.event, frame.args)
+        if (frame.event === 'permission-presets/catalog-changed') permissionCatalog.invalidateFor(connection)
+      }
     },
     onConnected: (description) => {
       sessions.handleConnected(description)
@@ -326,3 +352,13 @@ export function apply(ctx: Context): void {
   })
   ctx.effect(() => () => { loop.stop() }, 'runtime: connection stream loop')
 }
+
+/** Local Session owners; plugins extend this map for independent consumers. */
+export interface SessionReferenceSourceMap {
+  controllerOperation: true
+  conversation: true
+  workbench: true
+}
+
+/** Registered source of a local Session reference. */
+export type SessionReferenceSource = keyof SessionReferenceSourceMap

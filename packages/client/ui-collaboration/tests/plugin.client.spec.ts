@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry, type SessionCreateOptions, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { ProjectUiPolicyRuntime, SlotRegistry, type SessionCreateOptions, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { ConversationShareAction, type ConversationShareInjected } from '../src/client/ConversationShareAction.tsx'
 import { LogoutButton } from '../src/client/LogoutButton.tsx'
@@ -42,6 +42,8 @@ function conversationDetail(sessionId: string, visibility: 'project' | 'private'
 
 async function bench(context: CollaborationContext) {
   const ctx = new Context()
+  const policy = new ProjectUiPolicyRuntime()
+  ctx.provide('projectUiPolicy', policy)
   await ctx.plugin(SlotRegistry).await()
   ctx.provide('sessions', {})
   ctx.provide('locale', { register: vi.fn(() => () => {}) })
@@ -76,7 +78,7 @@ async function bench(context: CollaborationContext) {
       .find(entry => entry.component === ScopeControl)!
     const scope = (scopeEntry.inject as unknown as () => ScopeControlInjected)()
     await vi.waitFor(() => { expect(scope.hooks.collaboration.getSnapshot().status).toBe('ready') })
-    return { ctx, fiber, fetcher, scope, restore: () => { globalThis.fetch = originalFetch } }
+    return { ctx, policy, fiber, fetcher, scope, restore: () => { globalThis.fetch = originalFetch } }
   } catch (error) {
     globalThis.fetch = originalFetch
     throw error
@@ -84,6 +86,28 @@ async function bench(context: CollaborationContext) {
 }
 
 describe('ui-collaboration apply', () => {
+  it('publishes verified account eligibility and withdraws it on a failed reconnect refresh', async () => {
+    const b = await bench({ ...baseContext,
+      user: { ...baseContext.user, role: 'admin' }, fullAccess: true, autoReviewEligible: true,
+    })
+    try {
+      expect(b.policy.getSnapshot().accountPermissions).toBe('full-and-auto')
+      b.fetcher.mockResolvedValueOnce(new Response(null, { status: 401 }))
+      b.ctx.emit('connection/reset')
+      expect(b.policy.getSnapshot().accountPermissions).toBe('unknown')
+      await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(2) })
+      expect(b.policy.getSnapshot().accountPermissions).toBe('unknown')
+      await b.fiber.dispose()
+    } finally { b.restore() }
+  })
+
+  it('does not turn the advertised fullAccess flag into administrator identity', async () => {
+    const b = await bench({ ...baseContext, fullAccess: true, autoReviewEligible: true })
+    try {
+      expect(b.policy.getSnapshot().accountPermissions).toBe('auto')
+      await b.fiber.dispose()
+    } finally { b.restore() }
+  })
   it('declares only the services it reads', () => {
     expect(inject).toEqual(['slots', 'sessions', 'locale'])
   })

@@ -26,6 +26,7 @@
     "@shikijs/langs": "^4.4.3",
     "anser": "^2.3.5",
     "clsx": "^2.0.0",
+    "diff": "^9.0.0",
     "katex": "^0.16.47",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm": "^3.1.0",

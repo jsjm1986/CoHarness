@@ -11,12 +11,16 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { ConnectionHttpHandler, ConnectionRequestBoundary } from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-execution-authority'
 
 /** HTTP header carrying one Gateway-signed browser principal. */
 export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
 /** Private runtime HTTP path used by the Gateway's authenticated readiness probe. */
 export const GATEWAY_READINESS_PATH = '/api/internal/gateway/readiness'
+
+/** Managed webhook dispatch route; `webhook-dispatch` assertions are confined to it. */
+export const GATEWAY_WEBHOOK_DISPATCH_PATH = '/api/internal/gateway/webhook-dispatch'
 /** One-time nonce header for the Gateway readiness challenge. */
 export const GATEWAY_READINESS_NONCE_HEADER = 'x-dsh-gateway-readiness-nonce'
 /** HMAC challenge proof header. */
@@ -54,7 +58,7 @@ export interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
 }
 
 /** Private launch credential delivered through an inherited FD or systemd credential file. */
@@ -300,10 +304,10 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || claims.expiresAt <= claims.issuedAt || !nonEmptyString(claims.nonce)) {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin' && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch') {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && user.role !== 'admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && user.role !== 'admin') {
     throw new Error('invalid Gateway principal assertion')
   }
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
@@ -356,7 +360,7 @@ export function verifyGatewayPrincipal(
   }
   if (claims.scope.kind === 'personal') {
     if (claims.runtime.kind !== 'user'
-      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin')) {
+      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin' && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch')) {
       throw new Error('invalid Gateway principal assertion scope')
     }
   } else if (claims.runtime.kind !== 'project' || claims.scope.projectId !== claims.runtime.id) {
@@ -395,6 +399,15 @@ export function readGatewayRuntimeCredential(env: NodeJS.ProcessEnv = process.en
   return parseGatewayRuntimeCredential(value)
 }
 
+const PLUGIN_MANAGEMENT_PATHS = new Set([
+  'listPlugins', 'listBundles', 'inspect', 'setPluginEnabled', 'setBundleEnabled',
+  'installBundle', 'cancelInstall', 'removeBundle',
+].map(method => `/api/pluginManager/${method}`))
+PLUGIN_MANAGEMENT_PATHS.add('/api/pluginInventory/list')
+PLUGIN_MANAGEMENT_PATHS.add('/api/settings.describe')
+PLUGIN_MANAGEMENT_PATHS.add('/api/settings.mutate')
+PLUGIN_MANAGEMENT_PATHS.add('/api/_stream/pluginManager/installBundleStream')
+
 /** Authenticated Gateway context for one launched Harness runtime. */
 export class GatewayRuntime extends Service {
   static inject = ['connection']
@@ -407,7 +420,7 @@ export class GatewayRuntime extends Service {
   private readonly credential: GatewayRuntimeCredential
   private readonly gatewayUrl: URL
   private readonly publicKey: KeyObject
-  private readonly requests = new AsyncLocalStorage<GatewayRequestPrincipal>()
+  private readonly requests = new AsyncLocalStorage<{ principal: GatewayRequestPrincipal; interactive: boolean }>()
   private readonly readinessRequests = new AsyncLocalStorage<string>()
   private readonly sessionCreations = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
 
@@ -418,6 +431,10 @@ export class GatewayRuntime extends Service {
     this.organization = this.credential.organization
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
     this.publicKey = createPublicKey(this.credential.principalPublicKey)
+    if (ctx.root.get('executionAuthorityRequired') !== true) {
+      ctx.root.effect(() => ctx.root.provide('executionAuthorityRequired', true),
+        'gateway-runtime: managed application identity')
+    }
     ctx.on('connection/request', (request: ConnectionRequestBoundary, next) => {
       const requestMeta = request as ConnectionRequestBoundary & { method?: string; pathname?: string }
       const header = request.headers[GATEWAY_PRINCIPAL_HEADER]
@@ -436,7 +453,22 @@ export class GatewayRuntime extends Service {
         assertion: header,
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
       }
-      return this.requests.run(principal, next)
+      if (principal.claims.purpose === 'terminal-admin' && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || (requestMeta.pathname !== '/api/terminal/adminList' && requestMeta.pathname !== '/api/terminal/adminClose'))) {
+        throw new Error('Terminal management assertions permit only inventory and termination.')
+      }
+      if (principal.claims.purpose === 'plugin-admin' && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || !PLUGIN_MANAGEMENT_PATHS.has(requestMeta.pathname ?? ''))) {
+        throw new Error('Plugin management assertions permit only profile management HTTP endpoints.')
+      }
+      if (principal.claims.purpose === 'webhook-dispatch' && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || requestMeta.pathname !== GATEWAY_WEBHOOK_DISPATCH_PATH)) {
+        throw new Error('Webhook dispatch assertions permit only the managed dispatch endpoint.')
+      }
+      const requestScope = { principal, interactive: request.kind === 'http' }
+      return this.requests.run(requestScope, async () => {
+        try { await next() } finally { requestScope.interactive = false }
+      })
     })
     const connection = ctx.get('connection')
     if (connection === undefined) throw new Error('gateway runtime requires the connection service')
@@ -477,7 +509,16 @@ export class GatewayRuntime extends Service {
    * @returns the verified principal, or undefined outside an authenticated operation.
    */
   current(): GatewayRequestPrincipal | undefined {
-    return this.requests.getStore()
+    return this.requests.getStore()?.principal
+  }
+
+  /**
+   * Read the live HTTP caller; detached work cannot keep interactive authority.
+   * @returns the caller while the HTTP operation remains active, otherwise undefined.
+   */
+  interactive(): GatewayRequestPrincipal | undefined {
+    const scope = this.requests.getStore()
+    return scope?.interactive === true ? scope.principal : undefined
   }
 
   /**

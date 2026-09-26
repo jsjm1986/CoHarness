@@ -35,6 +35,8 @@ pnpm dsh plugin --profile web add ./packages/experimental/auto-review
 
 CLI 会在需要时初始化 profile，并将本包声明的 patch 追加到 base 与 Web 层之后。Reconciliation 将 patch 激活为 profile 层；没有 `dsh.bundle.patch` 的包只是已安装依赖。在 composer 或 `/permission` 选择器中选择带右上标 `EXP` 的 `Auto review`，并确认当前会话风险对话框。显式 `/permission auto` 命令直接切换。通用设置与未来会话默认值不提供 Auto。
 
+Gateway 受管 Session 还要求每位已验证执行参与人均获得管理员授予的 Auto 资格，并保持当前 Session 的访问权限。授予资格不会选中 Auto。执行权威在 reviewer 请求前与允许后的派发前各检查一次；输入集合、主要发起人或权威版本改变时拒绝该次审查，不额外调用模型。权威缺失、资格撤销或无法验证的恢复历史都会拒绝执行，并提示使用普通权限模式。
+
 通过同一 CLI 移除此层：
 
 ```sh
@@ -59,9 +61,11 @@ Auto 在每个受支持调用的 body 执行前审查一次，包括每个已开
 
 Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定策略、仅 cwd 的环境、带来源的项目约束、过滤后带来源的历史，以及完整待审动作。原生 schema 来自最新 request header。PTC binding 冻结其 schema，经由调度器传入临时执行元数据；开始与结算事件都不序列化描述或参数 schema。主 agent 的 `system/message` 节点、assistant 正文与 reasoning、tool results 全部排除。[决策记录](../../../.agents/notes/implemented/feature/2026-08-28-auto-review.zh.md)拥有权威、生命周期与 child 继承的理由。
 
-卸载时先关闭选择与 review admission，经由既有 preset writer 将存活 Auto Session 迁移到 Full access，再中止并等待在途 review 结清，最后撤回 listener 与 contribution。旋钮与持久终端在迁移中保持不变。持久 Auto Session 缺少完整 integration 时不能发布；安装后重新打开需要用户显式操作。重装只恢复选项，不把存活 Session 切回 Auto。
+卸载时先关闭选择与 review admission，经由既有 preset writer 将 Gateway 受管 Auto Session 迁移到 Workspace write，将独立本地 Session 迁移到 Full access，再中止并等待在途 review 结清，最后撤回 listener 与 contribution。本地 Full access 切换保留原旋钮值；受管切换恢复普通沙箱与审批设置。持久 Auto Session 缺少完整 integration 时不能发布；安装后重新打开需要用户显式操作。重装只恢复选项，不把存活 Session 切回 Auto。
 
 本包不发布 runtime invariant companion：同一个 effect 拥有选择准入、review 登记、取消与清理，不存在能与这些自有操作相互偏离的独立观察。
+
+每次 reviewer 请求携带 Session 身份与 `purpose: auto-review` 用于计量。受管请求还携带执行权威确认的不可变输入见证和一位主要发起人；这些字段是内部账务元数据，不进入 Provider 请求正文或 reviewer 文本。无论参与人数量多少，一次请求只生成一条用量记录。
 
 </details>
 
@@ -98,7 +102,7 @@ Reviewer 使用最新 `request/header.config` 的 provider 与模型，并沿用
 
 #### 模型看到什么
 
-拒绝消息为 `Auto review rejected tool "<name>"; its body was not executed`。普通原生错误渲染在前面加 `Error: `。PTC 使用既有 inner-call 异常与 catch 行为；被捕获的拒绝不强制外层 `run_code` 失败。可选原始理由是面向用户的持久结构化错误详情，绝不进入主模型内容。风险、reviewer prompt、reasoning 与原始响应都不持久化。
+Reviewer 拒绝时使用 `Auto review rejected tool "<name>"; its body was not executed`。资格检查拒绝时则说明该次执行无权使用 Auto，并提示用户选择普通权限模式或联系管理员。普通原生错误渲染在前面加 `Error: `。PTC 使用既有 inner-call 异常与 catch 行为；被捕获的拒绝不强制外层 `run_code` 失败。可选原始理由是面向用户的持久结构化错误详情，绝不进入主模型内容。风险、reviewer prompt、reasoning 与原始响应都不持久化。
 
 #### Token 影响
 

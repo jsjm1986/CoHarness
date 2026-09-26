@@ -13,8 +13,9 @@ import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { injectBootManifest, orderByModuleGraph } from '@deepseek-ai/dsh-client-modules'
-import type { ClientModuleLoaderTarget, WebBootEntry } from '@deepseek-ai/dsh-client-modules/client'
+import { bootInjections, orderByModuleGraph } from '@deepseek-ai/dsh-client-modules'
+import { renderIndexInjections } from '@deepseek-ai/dsh-host-webserver'
+import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '@deepseek-ai/dsh-client-modules/client'
 import { AppWebEntry } from '@deepseek-ai/dsh-client-web'
 
 interface AssembledPlugin extends WebBootEntry {
@@ -122,7 +123,7 @@ const bundles = new Map(PLUGINS.map(plugin => [
 ]))
 
 interface FixtureWindow extends Window {
-  __DSH_BOOT__?: { rev: string; entries: WebBootEntry[] }
+  __DSH_BOOT__?: WebBootGraph
   __ModuleLoader__?: ClientModuleLoaderTarget
 }
 
@@ -206,8 +207,15 @@ export function mountAssembledApp(search = '?fixture'): void {
   const root = document.createElement('div')
   root.id = 'root'
   document.body.appendChild(root)
-  win.__DSH_BOOT__ = { rev: 'fx', entries: PLUGINS.map(({ bundlePath: _bundlePath, ...plugin }) => plugin) }
-  const html = injectBootManifest('<head></head>', win.__DSH_BOOT__)
+  const entries = PLUGINS.map(({ bundlePath: _bundlePath, ...plugin }) => plugin)
+  win.__DSH_BOOT__ = {
+    rev: 'fx', entries,
+    batches: entries.map(row => ({
+      phase: row.id === '@deepseek-ai/dsh-client-modules' ? 'bootstrap' : 'application',
+      url: row.url, rev: row.rev, entries: [row.id],
+    })),
+  }
+  const html = renderIndexInjections('<head></head>', bootInjections(win.__DSH_BOOT__))
   const facadeSource = /<head><script>([\s\S]*?)<\/script>/.exec(html)?.[1]
   if (facadeSource === undefined) throw new Error('missing injected ModuleLoader facade')
   ;(0, eval)(facadeSource)

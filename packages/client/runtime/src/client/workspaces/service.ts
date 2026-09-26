@@ -10,6 +10,7 @@ import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
 import type { IWorkspaces } from '../contract/workspaces.ts'
+import { commitSessionNavigation } from '../navigation.ts'
 import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
 
 /** Generate one opaque browser draft reservation id. */
@@ -139,9 +140,8 @@ export class WorkspaceRuntime implements IWorkspaces {
    * list mirror, else create a fresh one on the host (`session.create` births
    * the full Session+Agent — the client holds no intermediate state). The
    * caller owns navigation: take the returned id to `sessions.open`.
-   * Resolution guarantee (both arms): the returned id is already in the list
-   * store and `sessions.binding(id)` resolves synchronously — draft hand-off
-   * may write the new scope's machine before opening.
+   * The returned identity is already catalogued. Retain it before borrowing
+   * its binding for a draft hand-off, or open it to acquire a view reference.
    * @param workspaceId - chosen Workspace (must be in the workspace list).
    * @returns the reused or newly created session id.
    */
@@ -238,10 +238,11 @@ export class WorkspaceRuntime implements IWorkspaces {
       throw new Error('workspaces.startInitialSelection: already started')
     }
     this.initialSelectionStarted = true
+    const navigation = this.sessions.beginNavigation()
     let state: 'waiting' | 'opening' | 'done' = 'waiting'
     let disposed = false
     const reconcile = (): void => {
-      if (disposed || state !== 'waiting') return
+      if (disposed || navigation.aborted || state !== 'waiting') return
       const workspace = this.list.getSnapshot()
       if (!workspace.baselinesReady) return
       const sessions = this.sessions.list.getSnapshot()
@@ -258,20 +259,17 @@ export class WorkspaceRuntime implements IWorkspaces {
         return
       }
       state = 'opening'
-      void this.openWorkspace(target).then(
-        (sessionId) => {
-          if (disposed) return
-          if (this.sessions.list.getSnapshot().current === undefined) {
-            this.sessions.open(sessionId)
-          }
+      void this.openWorkspace(target).then((sessionId) => {
+        if (disposed || navigation.aborted) return
+        return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
+          if (this.sessions.list.getSnapshot().current === undefined) this.sessions.open(sessionId)
           state = 'done'
-        },
-        (reason: unknown) => {
-          if (disposed) return
-          state = 'waiting'
-          console.warn('initial workspace selection failed:', reason)
-        },
-      )
+        })
+      }).catch((reason: unknown) => {
+        if (disposed || navigation.aborted) return
+        state = 'waiting'
+        console.warn('initial workspace selection failed:', reason)
+      })
     }
     const unsubscribe = this.list.subscribe(reconcile)
     reconcile()
@@ -304,10 +302,17 @@ export class WorkspaceRuntime implements IWorkspaces {
       this.sessions.clear()
       return
     }
+    const navigation = this.sessions.beginNavigation()
     void this.connectWorkspace(target).then(
-      (sessionId) => { this.sessions.open(sessionId) },
-      (reason: unknown) => { console.warn('new session failed:', reason) },
-    )
+      (sessionId) => {
+        if (navigation.aborted) return
+        if (this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+        return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
+          if (this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+          this.sessions.open(sessionId)
+        })
+      },
+    ).catch((reason: unknown) => { console.warn('new session failed:', reason) })
   }
 
   /**
@@ -409,6 +414,17 @@ export class WorkspaceRuntime implements IWorkspaces {
   async archiveSession(sessionId: SessionId): Promise<void> {
     const result = await this.manager.archiveSession(sessionId)
     if (!result.ok) throw new Error(`session archive failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
+   * Restore an archived session to its recorded Workspace position. The
+   * echoed archive set re-shows the session on every grouping surface; no
+   * selection change is needed because a restored session was never current.
+   * @param sessionId - archived session to restore.
+   */
+  async unarchiveSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.unarchiveSession(sessionId)
+    if (!result.ok) throw new Error(`session unarchive failed: ${result.error.code}: ${result.error.message}`)
   }
 
   /**

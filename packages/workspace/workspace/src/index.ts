@@ -6,7 +6,6 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { stat } from 'node:fs/promises'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -15,7 +14,7 @@ import { WorkspaceEntity } from './entity.ts'
 import type { WorkspaceEntityHost } from './entity.ts'
 
 export { WorkspaceMoveInvalidError } from './entity.ts'
-import { defaultWorkspaceTitle, realpathNormalize } from './paths.ts'
+import { defaultWorkspaceTitle, resolveWorkspacePath } from './paths.ts'
 import { workspaceDomainSpec } from './spec.ts'
 import type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
 import type { Workspace, WorkspaceId as WorkspaceIdBrand } from './types.ts'
@@ -23,7 +22,7 @@ import type { Workspace, WorkspaceId as WorkspaceIdBrand } from './types.ts'
 export type { Workspace } from './types.ts'
 export { workspaceDomainState, workspaceRecord, workspaceDomainSpec } from './spec.ts'
 export type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
-export { realpathNormalize } from './paths.ts'
+export { resolveWorkspacePath } from './paths.ts'
 
 /** Identifies one workspace record (see `src/types.ts` for the brand rationale). */
 export type WorkspaceId = WorkspaceIdBrand
@@ -113,14 +112,14 @@ function nextArchiveRevision(revision: number): number {
 }
 
 /**
- * Durable workspace registry. Startup waits for `sessionPersistence`, builds
+ * Durable workspace registry. Startup waits for `sessionPersistence` and `fs`, builds
  * one canonical-cwd header index, and completes the one-time history
  * bootstrap before the service becomes active. The persistence dependency is
  * mandatory so an unavailable peer can never be mistaken for an empty
  * history and commit the initialized marker.
  */
 export class WorkspaceRegistry extends Service {
-  static inject = ['storageDomain', 'sessionPersistence']
+  static inject = ['storageDomain', 'sessionPersistence', 'fs']
 
   private table?: KvTable<WorkspaceId, WorkspaceRecord>
   private global?: DomainGlobal<WorkspaceDomainState>
@@ -133,6 +132,7 @@ export class WorkspaceRegistry extends Service {
 
   private readonly host: WorkspaceEntityHost = {
     table: () => this.requireTable(),
+    resolvePath: path => resolveWorkspacePath(path, this.ctx.fs),
     sessionPath: id => this.sessionPaths.get(id),
     readSessionHeader: id => this.readSessionHeader(id),
     rememberSessionPath: (id, path) => {
@@ -171,8 +171,8 @@ export class WorkspaceRegistry extends Service {
 
   /**
    * Create or reuse a workspace for an existing directory. The path is
-   * canonicalized through `fs.realpath`; a nonexistent path rejects with the
-   * original error and a non-directory rejects. Repeated calls for the same
+   * canonicalized by the runtime filesystem; missing paths reject with
+   * `FS_NOT_FOUND` and non-directories reject. Repeated calls for the same
    * canonical path return the existing entity without changing its title.
    * A newly created workspace is prepended to the durable registry order.
    * Different canonical paths may share a display title.
@@ -186,8 +186,9 @@ export class WorkspaceRegistry extends Service {
   // drop the parameter with its @param clause and the `create(path, title?)`
   // lines in this package's README pair.
   async create(path: string, title?: string): Promise<Workspace> {
-    const canonical = await realpathNormalize(path)
-    if (!(await stat(canonical)).isDirectory()) {
+    this.requireTable()
+    const { path: canonical, info } = await resolveWorkspacePath(path, this.ctx.fs)
+    if (info.type !== 'directory') {
       throw new Error(`cannot create a workspace at '${canonical}': path is not a directory`)
     }
     return await this.enqueueOperation(() => this.createCanonical(canonical, title))
@@ -316,11 +317,8 @@ export class WorkspaceRegistry extends Service {
     }
     const placements = new Map<SessionId, ArchivedSessionEntry['workspace']>()
     for (const workspace of this.list()) {
-      for (let position = 0; position < workspace.sessionIds.length; position += 1) {
-        const sessionId = workspace.sessionIds[position]
-        if (sessionId !== undefined && !placements.has(sessionId)) {
-          placements.set(sessionId, { id: workspace.id, path: workspace.path, title: workspace.title, position })
-        }
+      for (const [position, sessionId] of workspace.sessionIds.entries()) {
+        placements.set(sessionId, { id: workspace.id, path: workspace.path, title: workspace.title, position })
       }
     }
     const result: ArchivedSessionEntry[] = []
@@ -390,13 +388,13 @@ export class WorkspaceRegistry extends Service {
 
   /**
    * Resolve by canonical directory path without creating or mutating a
-   * workspace. A missing path rejects during `realpath`; an existing unowned
+   * workspace. A missing path rejects during provider resolution; an existing unowned
    * directory returns `undefined`.
    * @param path - Existing directory path in any spelling.
    * @returns the workspace owning the canonical path, when one exists.
    */
   async resolveByPath(path: string): Promise<Workspace | undefined> {
-    const canonical = await realpathNormalize(path)
+    const { path: canonical } = await resolveWorkspacePath(path, this.ctx.fs)
     for (const entity of this.entities.values()) {
       if (entity.path === canonical) return entity
     }
@@ -707,8 +705,8 @@ export class WorkspaceRegistry extends Service {
       return
     }
     try {
-      const path = await realpathNormalize(header.cwd)
-      if (!(await stat(path)).isDirectory()) {
+      const { path, info } = await resolveWorkspacePath(header.cwd, this.ctx.fs)
+      if (info.type !== 'directory') {
         this.invalidSessionPaths.set(header.id, `cwd '${header.cwd}' is not a directory`)
         return
       }

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { officialClientBuildEnvironment, writeClientBuildRecord } from './client-build-environment.ts'
+import { coharnessClientBuildEnvironment, officialClientBuildEnvironment, writeClientBuildRecord, type ClientBuildProfile } from './client-build-environment.ts'
 import type { BuildArtifactManifest } from './build-artifacts.ts'
 
 const script = fileURLToPath(new URL('./build-artifacts.ts', import.meta.url))
@@ -13,7 +13,7 @@ const tsx = import.meta.resolve('tsx/esm')
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 5 }) })
 
-function fixture(options: { appDirectory?: string; appOutput?: string; appExport?: string } = {}) {
+function fixture(options: { appDirectory?: string; appOutput?: string; appExport?: string; profile?: ClientBuildProfile } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'dsh-build-artifacts-'))
   roots.push(root)
   const write = (path: string, contents: string | object): void => {
@@ -90,7 +90,8 @@ function fixture(options: { appDirectory?: string; appOutput?: string; appExport
   chmodSync(join(root, 'apps/cli/lib/bin.js'), 0o755)
   write('apps/web/dist/index.html', '<!doctype html><title>fixture</title>')
   if (native !== undefined) write(native, 'fixture native output')
-  writeClientBuildRecord(root, officialClientBuildEnvironment(root, { DSH_CLIENT_COMMIT_HASH: commit }))
+  const clientEnvironment = options.profile === 'official' ? officialClientBuildEnvironment : coharnessClientBuildEnvironment
+  writeClientBuildRecord(root, clientEnvironment(root, { DSH_CLIENT_COMMIT_HASH: commit }))
   // The tool query is real; this private executable supplies a controlled
   // package-manager version without running installation or repository hooks.
   write('.tools/pnpm.cjs', "if(process.argv[2]!=='--version')process.exit(2);process.stdout.write('11.7.0\\n')\n")
@@ -110,13 +111,25 @@ function fixture(options: { appDirectory?: string; appOutput?: string; appExport
   return { root, manifest, write, cli, read, commit, native }
 }
 
-describe('workspace build artifact CLI', () => {
+describe('workspace build artifact CLI', { timeout: 30_000 }, () => {
+  it('keeps official compatibility artifacts distinct from the default CoHarness consumer', () => {
+    const f = fixture({ profile: 'official' })
+    expect(f.cli('create').status).not.toBe(0)
+    const created = f.cli('create', ['--profile', 'official'])
+    expect(created.status, created.output).toBe(0)
+    expect(f.read().version).toBe(2)
+    expect(f.read().identity.profile).toBe('official')
+    expect(f.cli('verify').status).not.toBe(0)
+    const verified = f.cli('verify', ['--profile', 'official'])
+    expect(verified.status, verified.output).toBe(0)
+  })
+
   it('accepts a complete same-commit build including generated declarations, Typert, Client, Web and native outputs', () => {
     const f = fixture()
     const created = f.cli('create')
     expect(created.status, created.output).toBe(0)
     const manifest = f.read()
-    expect(manifest.identity).toMatchObject({ commit: f.commit, node: process.version, pnpm: '11.7.0', profile: 'official' })
+    expect(manifest.identity).toMatchObject({ commit: f.commit, node: process.version, pnpm: '11.7.0', profile: 'coharness' })
     expect(manifest.identity.tree).toMatch(/^[a-f0-9]{40}$/)
     expect(manifest.files.map(file => file.path)).toEqual(expect.arrayContaining([
       'vendor/cordis/lib/types/index.d.ts', 'packages/core/probe/lib/typert.host.js',

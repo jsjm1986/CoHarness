@@ -3,9 +3,12 @@ import { syncBuiltinESMExports } from 'node:module'
 import os, { tmpdir } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import type {} from '@deepseek-ai/dsh-skill'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-userdoc'
 import type { LocalUserDocStore } from '@deepseek-ai/dsh-userdoc-local'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
 
@@ -77,6 +80,30 @@ Ambient host state.
 `)
 }
 
+it('keeps document storage and upload admission inside its owned temporary world', async () => {
+  const scaffold = await launchWebScaffold()
+  const documentRoot = join(dirname(scaffold.persistenceRoot), 'documents')
+  try {
+    const documents = scaffold.ctx.get('userDocs')
+    if (documents === undefined) throw new Error('the composition mounts no document store')
+    const target = await documents.resolveTarget({ name: 'fixture.txt' })
+    expect(target.path).toBe(join(documentRoot, 'fixture.txt'))
+    const bytes = new TextEncoder().encode('isolated document')
+    const saved = await documents.save(target, new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes)
+        controller.close()
+      },
+    }))
+    expect(await readFile(saved.path, 'utf8')).toBe('isolated document')
+    expect(await documents.list()).toEqual([saved])
+    await expect(readFile(join(scaffold.workspaceCwd, 'user-documents', 'fixture.txt'))).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally {
+    await scaffold.close()
+  }
+  await expect(readFile(join(documentRoot, 'fixture.txt'))).rejects.toMatchObject({ code: 'ENOENT' })
+})
+
 it('isolates replay skill discovery from every ambient host root', async () => {
   const ambient = await mkdtemp(join(tmpdir(), 'dsh-web-ambient-skills-'))
   const dshHome = join(ambient, 'dsh-home')
@@ -113,6 +140,10 @@ it('isolates replay skill discovery from every ambient host root', async () => {
       expect(names).not.toContain('ambient-dsh')
       expect(names).not.toContain('ambient-agents')
       expect(names).not.toContain('ambient-bundled')
+      // The shipped Web composition mounts no preset skills for the standard
+      // agent; with every host root pinned inside the empty temp world the
+      // merged catalog is empty rather than merely ambient-free.
+      expect(names).toEqual([])
     } finally {
       await handle.dispose()
     }
@@ -128,5 +159,27 @@ it('isolates replay skill discovery from every ambient host root', async () => {
       else process.env.DSH_BUNDLED_SKILL_DIR = originalBundled
       await rm(ambient, { recursive: true, force: true })
     }
+  }
+})
+
+it('recovers document admission through the shipped provider restart and HTTP route', async () => {
+  const scaffold = await launchWebScaffold()
+  try {
+    const documents = scaffold.ctx.get('userDocs')
+    if (documents === undefined) throw new Error('the composition mounts no document store')
+    await documents.list()
+    const lockPath = join(dirname(scaffold.persistenceRoot), 'documents', '.upload-sessions', 'v1', '.admission.lock')
+    const exited = await promisify(execFile)(process.execPath, ['-p', 'process.pid'])
+    await writeFile(lockPath, exited.stdout, { mode: 0o600 })
+    const provider = [...scaffold.ctx.loader.entries()].find(entry => entry.options.id === 'userdoc-local')?.fiber
+    if (provider === undefined) throw new Error('the composition mounts no local document provider')
+    await provider.restart()
+    await scaffold.ctx.loader.await()
+    const response = await fetch(new URL('/api/documents', scaffold.baseUrl))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ documents: [] })
+    await expect(readFile(lockPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally {
+    await scaffold.close()
   }
 })

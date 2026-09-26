@@ -1,9 +1,10 @@
 /** Validate selected recorded Sessions before building or starting browser scenarios. */
-import { existsSync, globSync, readFileSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import ts from 'typescript'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
+import { assertSessionFixtureVersion, parseSessionFixtureName, sessionFixtureFiles } from '../packages/test-support/session-snapshot/src/session-files.ts'
 import { createWebSnapshotPlan } from './run-web-snapshots.ts'
 import { scanGoldenOwners, WEB_TESTS_ROOT } from './web-test-policy.ts'
 
@@ -46,10 +47,26 @@ export function inspectWebFixtures(root: string, scenarios: readonly string[]): 
       if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
         && /^(?:\.\.?\/)*snapshots\/[^\n]+\.jsonl$/.test(node.text)) {
         const target = resolve(dirname(entry), node.text)
-        if (!existsSync(target)) problems.push({
-          path: relative(root, target).replaceAll('\\', '/'),
-          message: `missing recorded input referenced by ${scenario}`,
-        })
+        if (!existsSync(target)) {
+          problems.push({
+            path: relative(root, target).replaceAll('\\', '/'),
+            message: `missing recorded input referenced by ${scenario}`,
+          })
+        } else {
+          const corpusPath = relative(root, target).replaceAll('\\', '/').startsWith('snapshots/')
+          try {
+            if (corpusPath && parseSessionFixtureName(basename(target)) !== undefined) {
+              for (const role of sessionFixtureFiles(readdirSync(dirname(target)))) {
+                paths.add(resolve(dirname(target), role.name))
+              }
+            } else {
+              paths.add(target)
+            }
+          } catch (error: unknown) {
+            problems.push({ path: relative(root, target).replaceAll('\\', '/'),
+              message: error instanceof Error ? error.message : String(error) })
+          }
+        }
       }
       ts.forEachChild(node, visit)
     }
@@ -78,6 +95,7 @@ export function inspectWebFixtures(root: string, scenarios: readonly string[]): 
     }
     files.push(name)
     try {
+      if (name.startsWith('snapshots/')) assertSessionFixtureVersion(basename(path), source)
       parseSessionLog(source)
     } catch (error: unknown) {
       problems.push({ path: name, message: error instanceof Error ? error.message : String(error) })

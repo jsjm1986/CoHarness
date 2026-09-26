@@ -13,6 +13,7 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionReferenceSource } from '../index.ts'
 import type { AgentContext } from '../scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type {
@@ -26,8 +27,64 @@ export type { AgentContext } from '../scope.ts'
 /** Account Gateway target used to bind a workbench pane to one runtime. */
 export type SessionRuntimeTarget = ConnectionRuntimeTarget
 
+/** Known Session identity or durable direct-parent subagent address; an address owns no lifetime. */
+export type SessionTarget = SessionId | SubagentAddress
+
+/** One independent use of an exact Client generation, without Host Agent ownership. */
+export interface SessionReference extends Disposable {
+  readonly sessionId: SessionId
+  /** Shared binding; access fails after reference release or generation disposal. */
+  readonly binding: SessionBinding
+  /** This reference's cancellable wait for the shared initial `Session.open()` attempt to settle. */
+  readonly ready: Promise<SessionBinding>
+  /** Release once; the final reference starts local scope and history teardown. */
+  release(): void
+}
+
+/** Consumer identity and optional cancellation of one acquisition waiter. */
+export interface SessionRetainOptions {
+  readonly source: SessionReferenceSource
+  readonly signal?: AbortSignal | undefined
+}
+
+/** Local ownership counts, independent of catalog membership and never persisted. */
+export interface SessionRetainInfo {
+  readonly referenceCount: number
+  /** Positive source counts only; a source without references is absent. */
+  readonly retainedBy: Readonly<Partial<Record<SessionReferenceSource, number>>>
+}
+
 /** The sessions-service face injected as `ctx.sessions`. */
 export interface ISessions {
+  /**
+   * Begin an asynchronous navigation intent, superseding any earlier intent.
+   * Selecting, clearing, scope changes, and owner disposal cancel it.
+   * @returns cancellation to check before publishing a late navigation result.
+   */
+  beginNavigation(): AbortSignal
+  /**
+   * Retain an exact Client generation and start its shared initial history opening.
+   * @param target - known identity or durable direct-parent address.
+   * @param options - required consumer source and optional independent waiter cancellation.
+   * @returns an owned reference immediately; await `reference.ready` when the initial open attempt must settle first.
+   */
+  retain(target: SessionTarget, options: SessionRetainOptions): SessionReference
+  /**
+   * Hold one reference through callback settlement, including synchronous and asynchronous failures.
+   * @param target - Session to acquire.
+   * @param options - source and acquisition cancellation.
+   * @param operation - callback using the reference only until its returned value or Promise settles.
+   * @returns the callback result after release; acquisition and callback failures propagate unchanged.
+   */
+  using<T>(target: SessionTarget, options: SessionRetainOptions, operation: (reference: SessionReference) => T | Promise<T>): Promise<T>
+  /**
+   * Observe local reference counts without retaining, creating a scope, or opening history.
+   * The returned source keeps stable identity across same-id generations and remains allocated
+   * until the Client root is disposed, even after its final subscriber leaves.
+   * @param id - explicit Session identity; Host existence is not implied.
+   * @returns a stable read-only source across same-id generations, with zero counts when none is live.
+   */
+  retainInfo(id: SessionId): ObservableSnapshot<SessionRetainInfo>
   /** The useSessions standard feed (list rows + current selection; read face — writes stay inside the domain). */
   readonly list: ObservableSnapshot<SessionListState>
   /** Current authenticated space list; unlike list, it excludes staged workbench targets. */
@@ -118,9 +175,9 @@ export interface ISessions {
    */
   provide(descriptor: SessionProvideDescriptor): () => void
   /**
-   * Resolve an Agent-scoped context view (use-and-discard).
+   * Borrow an already-retained Agent-scoped context without extending its lifetime.
    * @param id - session id.
-   * @returns scoped ctx, or undefined for a session neither listed nor already scoped.
+   * @returns the live context, or undefined without a retained generation.
    */
   scope(id: SessionId): AgentContext | undefined
   /**
@@ -137,9 +194,9 @@ export interface ISessions {
    */
   sessionOf(ctx: Context): SessionFace | undefined
   /**
-   * Resolve the stable session binding (scope-addressed assembly feed).
+   * Borrow an already-retained Session binding without extending its lifetime.
    * @param id - session id.
-   * @returns binding, or undefined for a session neither listed nor already scoped.
+   * @returns the live binding, or undefined without a retained generation.
    */
   binding(id: SessionId): SessionBinding | undefined
   /** Ensure an account-visible session is loaded into its target runtime.
@@ -157,9 +214,14 @@ export interface ISessions {
    * @param target - runtime the account scope now resolves to.
    */
   setBaseRuntimeTarget?(target: SessionRuntimeTarget): void
-  /** Resolve the target runtime currently owning one session.
+  /** Resolve the durable runtime identity, including a Session using the base connection.
+   * @param id - known Session identity.
+   * @returns its account runtime, or undefined when ownership is unknown.
+   */
+  runtimeIdentityFor?(id: SessionId): SessionRuntimeTarget | undefined
+  /** Resolve an alternate transport target for one Session.
    * @param id - session identity to locate.
-   * @returns the owning runtime target, or undefined when no runtime owns it.
+   * @returns the alternate target; undefined also denotes the existing base connection.
    */
   runtimeTargetFor?(id: SessionId): SessionRuntimeTarget | undefined
 }

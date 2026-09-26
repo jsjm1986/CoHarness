@@ -227,6 +227,20 @@ export class WorkspaceManager {
   }
 
   /**
+   * Drop one session from the registry-global archive set, then install the
+   * returned full set without waiting for the changed frame. The host treats
+   * an id that is not archived as a no-op, so a lost race with another
+   * surface resolves harmlessly.
+   * @param sessionId - archived session to restore.
+   * @returns the wire result.
+   */
+  async unarchiveSession(sessionId: SessionId): Promise<RpcResult<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>> {
+    const { result } = await this.api.workspace.unarchiveSession({ sessionId })
+    if (result.ok) this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
+    return result
+  }
+
+  /**
    * Host-frame entry. Non-workspace frames are ignored so the runtime can
    * fan one host stream out to both object managers.
    * @param envelope - host stream envelope.

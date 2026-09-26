@@ -12,6 +12,8 @@ First, model-written registration must be validated where it happens: a malforme
 
 ## Decision
 
+The model-facing execution interface described in this decision is superseded by [read-only Cordis discovery](../simplification/2026-09-22-retire-dynamic-cordis-model-tools.md). The runner lifecycle, generated API discovery rationale, and historical records remain in scope; the retained execution mechanics do not describe an available model tool.
+
 The toolset ships as [`@deepseek-ai/dsh-tool-cordis`](../../../../packages/extensions/tool-cordis/README.md) and is demoed by `examples/web-cordis`. It gives the model three tools over the live Cordis runtime in the current DSH process: inspect it, mount an in-memory temporary Plugin, and unmount that Plugin to quiescence.
 
 The vm isolates accidental global pollution, and the context façade hides framework internals. Neither restricts the authority of exposed services: a temporary Plugin can call `ctx.shell` with the host executor's privileges and reach the real filesystem and web services. It runs in the shared DSH runtime and may affect other sessions in that process. This is an opt-in development tool with bash-equivalent trust, not a security boundary or product default.

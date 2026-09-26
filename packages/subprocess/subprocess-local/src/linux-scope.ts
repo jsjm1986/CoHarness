@@ -398,8 +398,8 @@ class SystemdScopeOwner implements BoundProcessOwner {
 
   private async waitForPoll(delayMs: number, generation: number): Promise<void> {
     if (generation !== this.wakeGeneration) return
-    const wake = Promise.withResolvers<void>()
-    const waiter = { generation, resolve: wake.resolve }
+    const wake = Promise.withResolvers<undefined>()
+    const waiter = { generation, resolve: () => { wake.resolve(undefined) } }
     const sleepController = new AbortController()
     this.wakeWaiter = waiter
     try {

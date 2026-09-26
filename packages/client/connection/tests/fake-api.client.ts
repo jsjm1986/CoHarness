@@ -38,6 +38,10 @@ interface StreamConn<F> {
 }
 
 export class FakeApiClient implements IApiClient {
+  readonly desktop: IApiClient['desktop'] = {
+    status: async () => ok(null),
+    confirm: async () => ({ rpcId: RpcId('desktop-unavailable'), result: { ok: false, error: { code: 'internal', message: 'No desktop configured.', details: {} } } }),
+  }
   /** Chronological call record: [method, payload]. */
   readonly calls: { method: string; payload: unknown }[] = []
 
@@ -164,9 +168,18 @@ export class FakeApiClient implements IApiClient {
     archiveSession: (payload: unknown) => this.record('workspace.archiveSession', payload, Promise.resolve(ok({
       archivedSessionIds: [(payload as { sessionId: SessionId }).sessionId],
     }))),
+    unarchiveSession: (payload: unknown) => this.record('workspace.unarchiveSession', payload, Promise.resolve(ok({
+      archivedSessionIds: [],
+    }))),
+  }
+
+  readonly workspaceChanges: IApiClient['workspaceChanges'] = {
+    summary: (payload: unknown) => this.record('workspaceChanges.summary', payload, Promise.resolve(ok(null))),
+    diff: (payload: unknown) => this.record('workspaceChanges.diff', payload, Promise.resolve(ok(null))),
   }
 
   readonly workspaceFiles: IApiClient['workspaceFiles'] = {
+    renderOffice: async () => { throw new Error('Office preview is not configured in this fake') },
     list: (payload: unknown) => this.record('workspaceFiles.list', payload, Promise.resolve(ok({ path: '', entries: [], truncated: false }))),
     stat: (payload: unknown) => this.record('workspaceFiles.stat', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, type: 'file' as const, bytes: 0, version: 'fake' }))),
     read: (payload: unknown) => this.record('workspaceFiles.read', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, offset: 1, limit: 1, text: '', eof: true, version: 'fake' }))),

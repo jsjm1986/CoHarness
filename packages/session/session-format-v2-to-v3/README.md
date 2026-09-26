@@ -147,6 +147,8 @@ Input already marked V3 does not run V2-to-V3. Native catalog reads with `valida
 - Required predecessor PTC tags are refused even if installed. Obsolete or unknown ignorable events remain opaque, including their logical metadata, and cannot satisfy current PTC relationships. Installed ordinary event additions are admitted as log-only envelopes; unknown required types are refused by vocabulary-aware restoration. The physical codec still enforces released framing and source-event range encoding.
 - V3 event-local checks run before encoding and after decoding. Raw retired-system-header, malformed-system-payload, and required predecessor-PTC refusal run before recoverable suppression, including after corrupt rows. Strict reads reject canonical errors immediately. Recoverable canonical decoding withholds the first invalid event and its suffix; a later `turn/end` establishes a commit and rejects that suffix. Only accepted inherited markers count; a seeded accepted prefix without one is refused. Unclassified event metadata is deferred to vocabulary-aware restoration rather than discarded as canonical corruption, so it cannot hide an unknown required type.
 
+Native V3 accepts an optional boolean `draft` header and preserves it through decode, encode, and complete artifact restoration. Its private V2 relationship view omits that V3 field; released V2 headers remain strict.
+
 -----
 
 <a id="understand-the-implementation"></a>

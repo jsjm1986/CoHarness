@@ -177,6 +177,14 @@ interface SessionHeader {
   readonly agentPreset?: string
   /** True for a browser draft whose persistence is deferred until materialization. */
   readonly draft?: boolean
+  /**
+   * Managed SSH execution target bound at creation, as the Gateway-registered
+   * public target id. Durable because the session's fs/subprocess/sandbox
+   * providers ran on that host: a resume that dropped the binding would replay
+   * history the agent cannot act on and silently relocalize remote paths.
+   * Absent means host-local execution.
+   */
+  readonly sshTarget?: number
 }
 ```
 
@@ -215,6 +223,8 @@ interface CreateSessionOptions {
     readonly delegationDepth?: number
     readonly agentPreset?: string
     readonly draft?: boolean
+    /** Managed SSH target id to bind at creation; see {@link SessionHeader.sshTarget}. */
+    readonly sshTarget?: number
   }
 }
 ```

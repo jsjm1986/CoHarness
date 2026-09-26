@@ -199,6 +199,24 @@ export class SessionManager {
   // ---- Selection ----
 
   /**
+   * Validate an address and configure its Session without changing view selection.
+   * @param target - known identity or direct-parent child address.
+   * @returns validated Session identity.
+   */
+  resolveTarget(target: SessionId | SubagentAddress): SessionId {
+    const id = typeof target === 'string' ? target : target.childSessionId
+    const address = typeof target === 'string' ? this.navigationAddress(id) : target
+    if (typeof target === 'string' && !this.sessions.has(id)
+      && !this.summaries.some(summary => summary.sessionId === id) && address === undefined) {
+      throw new Error(`sessions.retain: unknown session ${id}`)
+    }
+    if (address !== undefined) this.addresses.set(id, address)
+    this.sessions.get(id)?.configureSubagent(address,
+      address === undefined ? false : this.catalogs.get(address.parentSessionId)?.parentAvailable ?? false)
+    return id
+  }
+
+  /**
    * Select a listed Session or a retained catalog-addressed child.
    * @param sessionId - listed or catalog-addressed Session id.
    */
@@ -599,6 +617,7 @@ export class SessionManager {
         ...(opts.sessionId === undefined ? {} : { sessionId: opts.sessionId }),
         ...(opts.draftId === undefined ? {} : { draftId: opts.draftId }),
         ...(opts.visibility === undefined ? {} : { visibility: opts.visibility }),
+        ...(opts.sshTarget === undefined ? {} : { sshTarget: opts.sshTarget }),
         ...(reuseWorkspaceBlank ? { reuseWorkspaceBlank: true as const } : {}),
       }
       const payload = opts.workspaceId !== undefined
@@ -614,6 +633,7 @@ export class SessionManager {
           ...(opts.cwd !== undefined ? { cwd: opts.cwd } : {}),
           ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
           ...(result.value.agentPreset !== undefined ? { agentPreset: result.value.agentPreset } : {}),
+          ...(result.value.sshTarget !== undefined ? { sshTarget: result.value.sshTarget } : {}),
         } })
       } else {
         const publishedSessionId = workspaceAttachSessionId(result.error)
@@ -906,6 +926,7 @@ export class SessionManager {
           ...(frame.origin !== undefined ? { origin: frame.origin } : {}),
           ...(frame.cwd !== undefined ? { cwd: frame.cwd } : {}),
           ...(frame.agentPreset !== undefined ? { agentPreset: frame.agentPreset } : {}),
+          ...(frame.sshTarget !== undefined ? { sshTarget: frame.sshTarget } : {}),
         })
         this.sessions.get(frame.sessionId)?.handleBlank(frame.blank)
         if (frame.origin === 'subagent' && frame.parentSessionId !== undefined) {
@@ -1205,7 +1226,7 @@ export class SessionManager {
         && prev.blank === entry.blank && prev.agentPreset === entry.agentPreset
         && prev.visibleContentSeq === entry.visibleContentSeq
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
-        && prev.workspaceId === entry.workspaceId
+        && prev.workspaceId === entry.workspaceId && prev.sshTarget === entry.sshTarget
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.pendingInteraction === entry.pendingInteraction
         && prev.projectionValues === entry.projectionValues
@@ -1267,6 +1288,8 @@ function applyMutation(summaries: readonly ClientSessionSummary[], mutation: Ses
           ? { parentSessionId: mutation.summary.parentSessionId } : {}),
         ...(existing.origin === undefined && mutation.summary.origin !== undefined
           ? { origin: mutation.summary.origin } : {}),
+        ...(existing.sshTarget === undefined && mutation.summary.sshTarget !== undefined
+          ? { sshTarget: mutation.summary.sshTarget } : {}),
         // Newest wins, not fill-only: a blank-session preset switch replaces
         // the creation-time value, and every producer of this field (the
         // create echo, the select echo, a list row) reports the CURRENT one.
@@ -1281,7 +1304,8 @@ function applyMutation(summaries: readonly ClientSessionSummary[], mutation: Ses
         && filled.parentSessionId === existing.parentSessionId
         && filled.origin === existing.origin && filled.blank === existing.blank
         && filled.visibleContentSeq === existing.visibleContentSeq
-        && filled.agentPreset === existing.agentPreset) return [...summaries]
+        && filled.agentPreset === existing.agentPreset
+        && filled.sshTarget === existing.sshTarget) return [...summaries]
       return summaries.map(summary => summary.sessionId === mutation.summary.sessionId ? filled : summary)
     }
     case 'remove':

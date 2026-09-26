@@ -31,6 +31,7 @@
 
 import type {} from '@deepseek-ai/cordis'
 import type { DshClientManifest } from '@deepseek-ai/dsh-package-manifest'
+import type { ClientEntries } from './entries.ts'
 import type { ClientModuleSystem } from './system.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -43,20 +44,19 @@ declare module '@deepseek-ai/cordis' {
 /**
  * One composed client entry pushed by the host (a graph row). Wire
  * single source: the host node half (package root) produces this same shape.
- * `immediately` marks stage-one prefetch; `inject` is informational graph
- * metadata (the authoritative edges live in each package's `dsh.client`
- * declaration and reach fibers through entry creation). `external` carries
- * module-graph edges: unlike `inject`, they constrain code arrival because
- * `require` is synchronous (see {@link WebBootGraph.entries}).
+ * `immediately` marks stage-one prefetch. `inject` names package rows whose
+ * factories must arrive before this row materializes, while Cordis separately
+ * uses the same package edges to compose entries. `external` carries exact
+ * non-inject module requests (see {@link WebBootGraph.entries}).
  */
 export interface WebBootEntry {
   /** Entry name == package name. */
   id: string
-  /** Bundle endpoint, '/plugins/<id>/client.js?rev=<rev>'. */
+  /** Revisioned single-resource combo endpoint used by HMR. */
   url: string
-  /** Bundle content hash (cache-busting consistency anchor). */
+  /** Opaque plugin-artifact revision used for HMR cache busting. */
   rev: string
-  /** Package-name dependency edges, informational (preflight display / HMR diffing). */
+  /** Package-name dependency edges used for factory arrival and plugin composition. */
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */
   immediately?: boolean
@@ -64,9 +64,24 @@ export interface WebBootEntry {
   external?: string[]
 }
 
+/** Initial scheduling phase for one revisioned combo script. */
+export type WebBootBatchPhase = 'bootstrap' | 'application'
+
+/** One initial combo script; a scheduling phase may span several descriptors. */
+export interface WebBootBatch {
+  /** Parser-blocking bootstrap or preloaded application scheduling. */
+  phase: WebBootBatchPhase
+  /** Revisioned combo script endpoint. */
+  url: string
+  /** Revision derived from the ordered entry revisions. */
+  rev: string
+  /** Graph entry ids whose factories the script registers, in execution order. */
+  entries: string[]
+}
+
 /** The composed client entry graph the host injects as `window.__DSH_BOOT__`. */
 export interface WebBootGraph {
-  /** Consistency anchor over the whole graph (content + bundle hashes). */
+  /** Consistency anchor over the current entry and batch descriptors. */
   rev: string
   /**
    * Composed entries in module-graph order — a dynamic package row precedes
@@ -74,16 +89,22 @@ export interface WebBootGraph {
    * unrelated and remains owned by fiber service waiting.
    */
   entries: WebBootEntry[]
+  /** Initial combo descriptors; every entry belongs to exactly one descriptor. */
+  batches: WebBootBatch[]
 }
 
 /** The npm-package view of one boot row: what the module table needs to fetch the bundle. */
 export interface BootModuleRow {
   /** Entry name == package name (module-table key). */
   id: string
-  /** Bundle endpoint, '/plugins/<id>/client.js?rev=<rev>'. */
+  /** Revisioned single-resource combo endpoint used after HMR invalidation. */
   url: string
-  /** Bundle content hash. */
+  /** Revisioned combo endpoint used before the first HMR invalidation. */
+  initialUrl: string
+  /** Opaque plugin-artifact revision used after HMR invalidation. */
   rev: string
+  /** Injected package rows whose factories arrive before this row materializes. */
+  inject: string[]
   /** Module specifiers this row requests from the module table ([] when the wire omits them). */
   external: string[]
 }
@@ -126,12 +147,13 @@ export function optionalStringArray(subject: string, field: string, value: unkno
 }
 
 /**
- * Narrow an unknown package manifest value to the browser declaration shared
- * by the Node graph scanner and client build tooling.
- * @param pkgName - package name used in diagnostics.
- * @param value - raw `dsh.client` value.
- * @returns the validated declaration, or undefined when absent.
- * @throws {Error} when a present declaration has malformed fields.
+ * Narrow an unknown parsed JSON value to the `dsh.client` declaration. Shared
+ * by the node half's Loader scan and the roster generator, so both read a
+ * package's browser declaration through one validator.
+ * @param pkgName - package name used as the diagnostic prefix.
+ * @param value - the raw `dsh.client` field of the package manifest.
+ * @returns the validated declaration, or undefined when the field is absent.
+ * @throws {Error} when the field is present but any member is malformed.
  */
 export function parseDshClient(pkgName: string, value: unknown): DshClientManifest | undefined {
   if (value === undefined) return undefined
@@ -153,6 +175,20 @@ export function parseDshClient(pkgName: string, value: unknown): DshClientManife
     ...(external !== undefined ? { external } : {}),
     ...(decl.immediately !== undefined ? { immediately: decl.immediately } : {}),
   }
+}
+
+/**
+ * The bare package-root specifier `specifier` names, or undefined for a subpath, a path, or any scheme-qualified
+ * specifier (`cordis:` builtins, `node:` modules, URLs).
+ * @param specifier - Loader row name.
+ * @returns the package name, or undefined.
+ */
+export function exactPackageSpecifier(specifier: string): string | undefined {
+  if (specifier.startsWith('@')) {
+    const parts = specifier.split('/')
+    return parts.length === 2 && parts.every(Boolean) ? specifier : undefined
+  }
+  return specifier.length > 0 && !specifier.includes('/') && !specifier.includes(':') ? specifier : undefined
 }
 
 /**
@@ -186,8 +222,12 @@ export function parseBootManifest(wire: unknown): BootManifest {
   if (!Array.isArray(graph.entries)) {
     throw new Error('client-modules: boot manifest entries must be an array')
   }
-  const modules: BootModuleRow[] = []
+  if (!Array.isArray(graph.batches)) {
+    throw new Error('client-modules: boot manifest batches must be an array')
+  }
+  const moduleFields: Omit<BootModuleRow, 'initialUrl'>[] = []
   const plugins: BootPluginRow[] = []
+  const seenEntryIds = new Set<string>()
   for (const value of graph.entries as unknown[]) {
     if (typeof value !== 'object' || value === null) {
       throw new Error('client-modules: boot manifest entry is not an object')
@@ -197,16 +237,19 @@ export function parseBootManifest(wire: unknown): BootManifest {
     if (typeof row.id !== 'string' || typeof row.url !== 'string' || typeof row.rev !== 'string') {
       throw new Error(`client-modules: boot manifest entry ${where} must carry string id/url/rev`)
     }
+    if (seenEntryIds.has(row.id)) throw new Error(`client-modules: duplicate graph entry "${row.id}"`)
+    seenEntryIds.add(row.id)
     const subject = `boot manifest entry ${where}`
     const inject = optionalStringArray(subject, 'inject', row.inject)
     const external = optionalStringArray(subject, 'external', row.external)
     if (row.immediately !== undefined && typeof row.immediately !== 'boolean') {
       throw new Error(`client-modules: boot manifest entry ${where} immediately must be a boolean`)
     }
-    modules.push({
+    moduleFields.push({
       id: row.id,
       url: row.url,
       rev: row.rev,
+      inject: inject === undefined ? [] : [...inject],
       external: external === undefined ? [] : [...external],
     })
     plugins.push({
@@ -215,19 +258,70 @@ export function parseBootManifest(wire: unknown): BootManifest {
       immediately: row.immediately === true,
     })
   }
+
+  const entryIds = new Set(moduleFields.map(row => row.id))
+  const initialUrls = new Map<string, string>()
+  const batchUrls = new Set<string>()
+  for (const value of graph.batches as unknown[]) {
+    if (typeof value !== 'object' || value === null) {
+      throw new Error('client-modules: boot manifest batch is not an object')
+    }
+    const batch = value as Record<string, unknown>
+    const phase = batch.phase
+    if (phase !== 'bootstrap' && phase !== 'application') {
+      throw new Error(`client-modules: boot manifest batch phase must be "bootstrap" or "application", received ${JSON.stringify(phase)}`)
+    }
+    if (typeof batch.url !== 'string' || typeof batch.rev !== 'string') {
+      throw new Error(`client-modules: boot manifest ${phase} batch must carry string url/rev`)
+    }
+    if (batchUrls.has(batch.url)) {
+      throw new Error(`client-modules: boot manifest carries duplicate batch URL ${JSON.stringify(batch.url)}`)
+    }
+    batchUrls.add(batch.url)
+    const entries = optionalStringArray(`boot manifest ${phase} batch`, 'entries', batch.entries)
+    if (entries === undefined || entries.length === 0) {
+      throw new Error(`client-modules: boot manifest ${phase} batch entries must be a non-empty string array`)
+    }
+    for (const id of entries) {
+      if (!entryIds.has(id)) {
+        throw new Error(`client-modules: boot manifest ${phase} batch names unknown entry "${id}"`)
+      }
+      if (initialUrls.has(id)) {
+        throw new Error(`client-modules: boot manifest entry "${id}" belongs to more than one batch`)
+      }
+      initialUrls.set(id, batch.url)
+    }
+  }
+  const modules = moduleFields.map((row): BootModuleRow => {
+    const initialUrl = initialUrls.get(row.id)
+    if (initialUrl === undefined) {
+      throw new Error(`client-modules: boot manifest entry "${row.id}" belongs to no initial-load batch`)
+    }
+    return { ...row, initialUrl }
+  })
   return { rev: graph.rev, modules, plugins }
+}
+
+/** Module resolver passed into a registered Client bundle factory. */
+export interface ClientBundleRequire {
+  /** Resolve a module-table dependency synchronously. */
+  (specifier: string): unknown
+  /** Load and resolve a package-local dynamic chunk asynchronously. */
+  async(specifier: string): Promise<unknown>
 }
 
 /** One client bundle's factory registration submitted through `window.__ModuleLoader__.load`. */
 export interface ClientBundleRegistration {
   /** Plugin id (package name) — the registration key; must match the graph row being executed. */
   id: string
+  /** Package-local chunk filename; absent for the package's `client.js` entry. */
+  chunk?: string
   /**
-   * Closure factory holding the whole bundle body: receives the synchronous
-   * require bound to the module table and returns the bundle's exports. Runs
-   * once, at materialization.
+   * Closure factory holding the whole bundle body: receives the module-table
+   * require whose `async` operation loads generated chunks, and returns the
+   * bundle's exports. The factory runs once, at materialization.
    */
-  factory: (require: (spec: string) => unknown) => Record<string, unknown>
+  factory: (require: ClientBundleRequire) => Record<string, unknown>
 }
 
 /** Inputs passed by the web entry when it creates the client module system. */
@@ -268,7 +362,7 @@ export interface DshWindow {
   __ModuleLoader__?: ClientModuleLoaderTarget
 }
 
-/** Per-module bookkeeping in {@link ClientModuleLoader.loadCache} (module-graph boundary, flat today). */
+/** Per-module bookkeeping in {@link ClientModuleLoader.loadCache} (flat module-graph boundary). */
 export interface ClientModuleRecord {
   /** Module id (entry name / package name). */
   id: string
@@ -276,7 +370,7 @@ export interface ClientModuleRecord {
   exports: unknown
   /** Owned `<style data-plugin>` tag ids (`data-plugin-css` values) injected during materialization. */
   styles: string[]
-  /** Observed `require()` edges (module-graph boundary; only table words can appear today). */
+  /** Observed `require()` edges (module-graph boundary; only table words can appear). */
   edges: Set<string>
 }
 
@@ -288,9 +382,11 @@ export interface ClientModuleRecord {
 export interface ClientModuleLoader {
   /** Discriminant against Node's internal loader shapes ('v1'/'v2'). */
   version: 'client'
-  /** Parsed Host boot graph shared with the web entry after module-system creation. */
+  /** Latest parsed Host graph, updated by live entry reconciliation. */
   manifest: BootManifest
-  /** Materialized-module registry: id → record. The governance-side read API for entry exports. */
+  /** Page-owned entry reconciliation, shared by boot, graph updates and HMR. */
+  entries: ClientEntries
+  /** Materialized-module registry: entry or package-local chunk id → record. */
   loadCache: Map<string, ClientModuleRecord>
   /**
    * Internal contract consumed by the vendored Loader's `tree.import`. Resolves
@@ -314,17 +410,20 @@ export interface ClientModuleLoader {
    */
   prefetch(id: string): Promise<void>
   /**
-   * Full reset of one non-bootstrap module: drop its registered factory and
-   * materialized record so the next prefetch/import reloads it (the HMR
-   * invalidation hook). The bootstrap module remains materialized.
+   * Full reset of one non-bootstrap package: drop its entry and chunk factories
+   * and materialized records so the next prefetch/import loads its one-resource
+   * combo script rather than the initial multi-resource request. The bootstrap
+   * module remains materialized.
    * @param id - entry name to invalidate.
+   * @param rev - New content revision from the HMR frame; omitted to reuse
+   * the graph revision or for page-local modules that register directly.
    */
-  invalidate(id: string): void
+  invalidate(id: string, rev?: string): void
 }
 
 /** Internal construction inputs assembled by the modules bundle's bootstrap export. */
 export interface ClientModuleSystemOptions {
-  /** Parsed boot graph owned by the resulting module system. */
+  /** Boot graph validated by {@link parseBootManifest}, owned by the resulting module system. */
   manifest: BootManifest
   /** Module-table seed: platform-singleton specifier → shell instance. */
   staticModules: Record<string, unknown>

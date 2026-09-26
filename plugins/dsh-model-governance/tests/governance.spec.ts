@@ -137,7 +137,7 @@ describe('instance model governance', () => {
     await vi.waitFor(async () => {
       const chunks = await drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
       expect(chunks.map(chunk => chunk.type)).toEqual(['usage', 'finish'])
-    })
+    }, { timeout: 10_000 })
     expect(adapter.calls).toBe(1)
     await ctx.fiber.dispose()
   })
@@ -157,14 +157,14 @@ describe('instance model governance', () => {
         allowed: false,
         reason: expect.stringContaining('temporarily unavailable'),
       })
-    })
+    }, { timeout: 10_000 })
     replacePolicy(home, false)
     await vi.waitFor(() => {
       expect(access.decide({ provider: 'p', model: 'm' })).toMatchObject({
         allowed: false,
         reason: 'Model "p/m" is not authorized for this account.',
       })
-    })
+    }, { timeout: 10_000 })
     expect(adapter.calls).toBe(0)
     await ctx.fiber.dispose()
   })

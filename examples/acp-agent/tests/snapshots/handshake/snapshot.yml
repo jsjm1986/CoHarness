@@ -1,0 +1,10 @@
+version: 1
+scenario: handshake
+profile: acp
+composition: acp-agent
+recording: authored
+sessionFormat:
+  version: 2
+  coverage: [adjacent-migration]
+header:
+  class: default

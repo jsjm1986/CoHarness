@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-09-12-computer-use-provider-registration.md) | 中文
 
+[受管桌面执行决定](2026-09-23-managed-desktop-execution.zh.md) 在实际驱动调用外增加部署拥有的授权回调。提供方身份、目录所有权及独占注册继续由本文约束；服务职责已不限于名称注册。
+
 ## Problem
 
 桌面提供方暴露不同的操作、观测格式和平台设施。DSH 需要防止在一个组合中意外启用两个提供方，同时让各提供方的集成正常工作，而不承诺通用操作 API。

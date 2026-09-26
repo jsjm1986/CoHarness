@@ -304,9 +304,16 @@ describe('PTC mode typed values: keyless real-process contracts', () => {
       provider: 'Tool',
       names: [
         'cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self',
-        'cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'run_code',
+        'run_code',
       ],
     })
+    for (const retired of ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine']) {
+      const rejected = await runCode(ctx, `return await tools.${retired}({})`, testToolSignal, agent)
+      expect(rejected.isError).toBe(true)
+      expect(JSON.stringify(rejected)).toContain(`${retired} is not a function`)
+    }
+    expect(ctx.dynamicCordisRunner.listPlugins(agent)).toEqual([])
+
   })
 })
 

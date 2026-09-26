@@ -1,0 +1,50 @@
+/** A fixed bootstrap runs inside the opaque iframe; no Host callbacks enter its document. */
+import { decodeText, encodeBytes, encodeText } from './bytes.ts'
+
+/** One statically declared local script, stylesheet, or image, already read under the source file's authority. */
+export interface HtmlAsset {
+  readonly kind: 'script' | 'stylesheet' | 'image'
+  /** Original HTML attribute, not a Host absolute path. */
+  readonly reference: string
+  /** Blob MIME type: stylesheets and SVG documents require it; scripts and raster images only record it. */
+  readonly type: string
+  readonly data: Uint8Array<ArrayBuffer>
+}
+
+/** Complete bytes for one document; dependencies are finite and never requested by iframe messages. */
+export interface HtmlBundle {
+  readonly data: Uint8Array<ArrayBuffer>
+  readonly assets: readonly HtmlAsset[]
+}
+
+/**
+ * Build the outer iframe document. Its resource URLs are created inside the sandbox,
+ * because that opaque origin cannot load resource URLs created by the parent.
+ * @param bundle - complete HTML bytes and optional static dependencies.
+ * @returns bootstrap HTML; invalid UTF-8 throws before navigation.
+ */
+export function createHtmlDocument(bundle: HtmlBundle): string {
+  const payload = encodeText(JSON.stringify({
+    html: decodeText(bundle.data),
+    assets: bundle.assets.map(asset => ({ kind: asset.kind, reference: asset.reference, type: asset.type, data: encodeBytes(asset.data) })),
+  }))
+  return `<!doctype html><meta charset="utf-8"><script>(()=>{
+const bytes=data=>Uint8Array.from(atob(data),character=>character.charCodeAt(0));
+const text=data=>new TextDecoder('utf-8',{fatal:true}).decode(bytes(data));
+const bundle=JSON.parse(text("${payload}"));
+let html=bundle.html;
+if(bundle.assets.length){
+  const parsed=new DOMParser().parseFromString(html,'text/html');
+  for(const asset of bundle.assets){
+    const attribute=asset.kind==='stylesheet'?'href':'src';
+    const selector=asset.kind==='script'?'script[src]':asset.kind==='stylesheet'?'link[rel~="stylesheet" i][href]':'img[src]';
+    const url=URL.createObjectURL(new Blob([bytes(asset.data)],{type:asset.type}));
+    for(const element of parsed.querySelectorAll(selector)){
+      if(element.getAttribute(attribute)===asset.reference)element.setAttribute(attribute,url);
+    }
+  }
+  html='<!doctype html>'+parsed.documentElement.outerHTML;
+}
+document.open();document.write(html);document.close();
+})()</script>`
+}

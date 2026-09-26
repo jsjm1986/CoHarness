@@ -139,7 +139,7 @@ describe('classifyCiPrScope', () => {
 
   it('falls back to full when a scoped candidate touches metadata or infra', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/session/session-format/src/chain.ts',
       'packages/session/session-format/package.json',
     ], '')).toMatchObject({ reason: 'full', coverageMode: 'full', snapshotMode: 'full' })
   })
@@ -158,7 +158,7 @@ describe('classifyCiPrScope', () => {
 
   it('keeps the browser inventory when the lockfile or a manifest moves', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/session/session-format/src/chain.ts',
       'pnpm-lock.yaml',
     ], '')).toMatchObject({ coverageMode: 'full', snapshotMode: 'full' })
   })
@@ -233,7 +233,7 @@ describe('classifyCiPrScope', () => {
       'packages/client/ui-workbench/src/pane.ts',
     ], '', new Set(['client/ui-workbench']))).toMatchObject({
       snapshotMode: 'focused',
-      webGroups: ['lifecycle', 'shell', 'workbench'],
+      webGroups: ['documents', 'lifecycle', 'shell', 'workbench'],
     })
   })
 
@@ -248,10 +248,10 @@ describe('classifyCiPrScope', () => {
     })
   })
 
-  it('keeps the scoped snapshot when the browser surface is not supplied', () => {
+  it('honors an explicit browser consumer even without the discovered package set', () => {
     expect(classifyCiPrScope([
       'packages/client/ui-conversation/src/message-row.ts',
-    ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'scoped' })
+    ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'focused', webGroups: ['conversation', 'mobile', 'subagent', 'workbench'] })
   })
 
   it('forces full runtime coverage for Session and Cordis seams', () => {
@@ -372,7 +372,7 @@ describe('web verification tier selection', () => {
       'vitest.snapshot.config.ts',
       'knip.config.ts',
       '.oxlintrc.json',
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/session/session-format/src/chain.ts',
       'packages/interaction/commands/src/router.ts',
       'apps/cli/tests/source-launch.compat.spec.ts',
       'python/sdk/src/deepseek_harness/session.py',
@@ -398,6 +398,61 @@ describe('web verification tier selection', () => {
       webGroups: [],
       webScenarios: exactScenarioFiles(policy, ['workbench.e2e.ts']),
     })
+  })
+
+  it('routes the shared ACP edit fixture to its real browser consumer', () => {
+    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl'])).toMatchObject({
+      runExpensive: true,
+      snapshotMode: 'focused',
+      webGroups: [], webScenarios: expect.arrayContaining(['diff-context.e2e.ts']) as string[],
+    })
+  })
+
+  it('selects every shared-input owner and the common smoke scenarios', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl'
+    const combined = {
+      ...policy,
+      sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts', 'workbench.e2e.ts'] },
+    }
+    const plan = classifyWebVerification([input], packages, combined, new Map())
+    expect(plan).toEqual({ mode: 'focused', groups: [], scenarios: exactScenarioFiles(combined, ['diff-context.e2e.ts', 'workbench.e2e.ts']) })
+    const selected = plan.scenarios
+    expect(selected).toEqual(expect.arrayContaining(['diff-context.e2e.ts', 'workbench.e2e.ts', ...policy.smokeScenarios]))
+    expect(selected).not.toContain('subagent-conversation.e2e.ts')
+  })
+
+  it('treats a declared Markdown input as runtime evidence while leaving unrelated examples scoped', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    const input = 'examples/shared-prose.md'
+    const supplied = { ...policy, sharedInputs: { ...policy.sharedInputs, [input]: ['diff-context.e2e.ts'] } }
+    expect(classifyCiPrScope([input], '', packages, supplied)).toMatchObject({
+      runExpensive: true, changedDocsOnly: false, snapshotMode: 'focused', webGroups: [], webScenarios: exactScenarioFiles(supplied, ['diff-context.e2e.ts']),
+    })
+    expect(web(['examples/acp-agent/tests/snapshots/unrelated/session.jsonl'])).toMatchObject({
+      snapshotMode: 'scoped', webGroups: [],
+    })
+    expect(web(['examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl.backup'])).toMatchObject({
+      snapshotMode: 'scoped', webGroups: [],
+    })
+    expect(web(['new-runtime-input.dat'])).toMatchObject({ snapshotMode: 'full' })
+  })
+
+  it('fails on a shared relation with no registered consumer instead of falling back', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    const input = 'examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl'
+    expect(() => classifyWebVerification([input], packages, {
+      ...policy, sharedInputs: { [input]: ['removed.e2e.ts'] },
+    }, new Map())).toThrow(/unknown scenario/)
+  })
+
+  it('does not let a shared-input declaration narrow runtime or dependency validation', () => {
+    const policy = loadWebTestPolicy(process.cwd())
+    for (const input of ['pnpm-lock.yaml', 'packages/client/runtime/src/index.ts', 'scripts/web-test-policy.json']) {
+      expect(classifyWebVerification([input], packages, {
+        ...policy, sharedInputs: { [input]: ['diff-context.e2e.ts'] },
+      }, new Map())).toEqual({ mode: 'full', groups: [], scenarios: [] })
+    }
   })
 
   it('routes a committed golden to every referencing scenario without the rest of their groups', () => {
@@ -577,4 +632,18 @@ describe('clientSurfacePackages', () => {
     expect(packages.has('extensions/ui-cordis')).toBe(true)
     expect(packages.has('session/session-format')).toBe(false)
   })
+})
+
+it('selects assembled Admin plugin verification without unrelated runtime matrices', () => {
+  for (const path of ['gateway/admin-ui/src/plugins/transport.ts', 'gateway/admin-ui/src/pages/PluginsPage.tsx', 'gateway/admin-ui/src/App.tsx']) {
+    expect(classifyCiPrScope([path], '')).toMatchObject({
+      runExpensive: false, coverageMode: 'skip', compatMode: 'skip', windowsMode: 'skip',
+      adminUiMode: 'full', snapshotMode: 'focused', webGroups: [], webScenarios: expect.arrayContaining(['plugin-administration.e2e.ts']) as string[],
+    })
+  }
+  for (const path of ['packages/boot/plugin-manager/src/index.ts', 'packages/host/plugin-inventory/src/index.ts']) {
+    expect(classifyCiPrScope([path], '', new Set())).toMatchObject({
+      adminUiMode: 'full', snapshotMode: 'focused', webGroups: ['settings'], webScenarios: [],
+    })
+  }
 })

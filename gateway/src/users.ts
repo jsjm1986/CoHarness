@@ -79,21 +79,22 @@ export class UserService {
   }
 
   /** Atomically update administrator-editable fields for one user. */
-  patch(id: number, next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled'; displayName?: string }): void {
+  patch(id: number, next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled'; displayName?: string; autoReviewEligible?: boolean }): void {
     this.db.transaction(() => {
-      const current = this.db.prepare(`SELECT role, status FROM users WHERE id = ? AND deleted_at IS NULL`)
-        .get(id) as { role: 'admin' | 'user'; status: 'active' | 'disabled' } | undefined
+      const current = this.db.prepare(`SELECT role, status, auto_review_eligible FROM users WHERE id = ? AND deleted_at IS NULL`)
+        .get(id) as { role: 'admin' | 'user'; status: 'active' | 'disabled'; auto_review_eligible: number } | undefined
       if (current === undefined) return
       this.assertNotLastAdmin(id, { role: next.role, status: next.status })
       const role = next.role ?? current.role
       const status = next.status ?? current.status
       const displayName = next.displayName
+      const autoReviewEligible = next.autoReviewEligible === undefined ? current.auto_review_eligible : Number(next.autoReviewEligible)
       if (displayName === undefined) {
-        this.db.prepare(`UPDATE users SET role = ?, status = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
-          .run(role, status, Date.now(), id)
+        this.db.prepare(`UPDATE users SET role = ?, status = ?, auto_review_eligible = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
+          .run(role, status, autoReviewEligible, Date.now(), id)
       } else {
-        this.db.prepare(`UPDATE users SET role = ?, status = ?, display_name = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
-          .run(role, status, displayName, Date.now(), id)
+        this.db.prepare(`UPDATE users SET role = ?, status = ?, display_name = ?, auto_review_eligible = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
+          .run(role, status, displayName, autoReviewEligible, Date.now(), id)
       }
       if (status === 'disabled') this.db.prepare(`DELETE FROM auth_sessions WHERE user_id = ?`).run(id)
     })()

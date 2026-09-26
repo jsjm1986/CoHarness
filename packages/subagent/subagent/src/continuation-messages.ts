@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-subagent/continuation-messages
  */
 
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { boundContextSummary, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -18,6 +19,8 @@ export interface AgentMessageSource {
   readonly form: 'relay'
   /** Session id of the Agent whose tool call produced the message. */
   readonly senderSessionId: SessionId
+  /** Participants captured when the sender produced this delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
 }
 
 /**
@@ -35,6 +38,8 @@ export interface SubagentSettledMessageSource {
   readonly summary: string
   /** Session id of the child that settled. */
   readonly senderSessionId: SessionId
+  /** Participants captured when the sender produced this delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
 }
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -46,7 +51,9 @@ declare module '@deepseek-ai/dsh-llm' {
 
 /** Build durable attribution for one adjacent-Agent message. */
 function agentMessageSource(sender: Agent): AgentMessageSource {
+  const scope = executionAuthorityOf(sender.ctx)?.capture(sender)
   return {
+    ...(scope === undefined ? {} : { gatewayExecutionScope: scope }),
     kind: 'agent-message',
     form: 'relay',
     senderSessionId: sender.id,
@@ -130,11 +137,13 @@ function settlementSummary(childId: SessionId, stopReason: SubagentResult['stopR
  * Build the runtime-owned settlement notice from the child's nonempty closing text.
  * @param childId - durable child session id named in the notice.
  * @param terminal - recorded terminal state for the settled Activation.
+ * @param scope - verified child participants captured before disposing its Agent.
  * @returns the durable user-message representation delivered to the parent.
  */
 export function createSettlementMessage(
   childId: SessionId,
   terminal: ActivationTerminal,
+  scope?: ExecutionInheritance,
 ): ReturnType<typeof createUserMessage> {
   const summary = settlementSummary(childId, terminal.stopReason)
   // Parent providers receive this notice as a user message and may reject
@@ -155,6 +164,7 @@ export function createSettlementMessage(
       form: 'notice' as const,
       summary: boundContextSummary(summary),
       senderSessionId: childId,
+      ...(scope === undefined ? {} : { gatewayExecutionScope: scope }),
     },
   })
 }

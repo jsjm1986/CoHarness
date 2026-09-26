@@ -9,10 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: /user-invoke-demo and confirm the fixture wiring {{clock}}
+- text: /user-invoke-demo and confirm the fixture wiring
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: USER_INVOKE_REPLY acknowledged; following the injected skill.
@@ -24,10 +27,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -41,10 +45,11 @@
   - img
 - button "0% of context used"
 - button "Send message" [disabled]
-- button "1 turns · 1 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 1 steps{{throughput}} tok/s
-- button "272 tok · Cache hit 0%":
-  - img
-  - text: 272 tokCache hit 0%
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "272 tok · Cache hit 0%":
+    - img
+    - text: 272 tokCache hit 0%
 - separator "Adjust transcript content width"

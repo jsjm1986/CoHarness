@@ -134,8 +134,12 @@ describe('web e2e: Markdown inline-code links', () => {
     await inlineCodeLink.focus()
     expect(await inlineCodeLink.evaluate(element => document.activeElement === element)).toBe(true)
 
-    const popupPromise = page.waitForEvent('popup')
     await inlineCodeLink.click()
+    const browserPanel = page.locator('[data-sidebar-right-panel]')
+    await browserPanel.getByRole('alert').waitFor()
+    expect(await browserPanel.locator('[data-sidebar-browser-frame]').count()).toBe(0)
+    const popupPromise = page.context().waitForEvent('page')
+    await inlineCodeLink.click({ modifiers: ['Shift'] })
     const popup = await popupPromise
     await popup.waitForURL(linkUrl, { timeout: 15_000 })
     expect(popup.url()).toBe(linkUrl)

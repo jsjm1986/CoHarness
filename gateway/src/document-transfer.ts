@@ -500,18 +500,26 @@ async function acquireRuntimeLease(
   }
 }
 
+/** A streamed response could not confirm release of its runtime operation lease. */
+export class DocumentLeaseReleaseError extends Error {
+  constructor(cause: unknown) {
+    super('document runtime lease release failed', { cause })
+    this.name = 'DocumentLeaseReleaseError'
+  }
+}
+
+async function releaseDocumentLease(release: () => Promise<void>): Promise<void> {
+  try { await release() } catch (error: unknown) { throw new DocumentLeaseReleaseError(error) }
+}
+
 /** Keep a runtime lease until a returned streaming response reaches EOF/cancel. */
-function leaseResponse(response: Response, release: () => Promise<void>): Response {
+async function leaseResponse(response: Response, release: () => Promise<void>): Promise<Response> {
   if (response.body === null) {
-    void release().catch(() => {})
+    await releaseDocumentLease(release)
     return response
   }
-  let released = false
-  const finish = async (): Promise<void> => {
-    if (released) return
-    released = true
-    await release().catch(() => {})
-  }
+  let finishing: Promise<void> | undefined
+  const finish = (): Promise<void> => finishing ??= releaseDocumentLease(release)
   const reader = response.body.getReader()
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -524,7 +532,10 @@ function leaseResponse(response: Response, release: () => Promise<void>): Respon
           controller.enqueue(next.value)
         }
       } catch (error) {
-        await finish()
+        try { await finish() } catch (failure: unknown) {
+          controller.error(failure)
+          return
+        }
         controller.error(error)
       }
     },
@@ -1055,6 +1066,7 @@ function syntheticUser(principal: GatewayPrincipalClaims): UserRow {
     status: 'active',
     homePath: '',
     mustChangePassword: false,
+    autoReviewEligible: false,
   }
 }
 
@@ -1897,9 +1909,11 @@ export function createGatewayDocumentScopeHandler(
   deps: DocumentTransferDependencies,
 ): GatewayDocumentScopeHandler {
   return async ({ user, request, operation, scope: requested, signal }) => {
+    signal.throwIfAborted()
     const read = operation === 'list' || operation === 'directories' || operation === 'content'
       || (operation === 'trash' && (request.method ?? 'GET') === 'GET')
     const authorized = await authorizedScope(deps, user, requested, read ? 'read' : 'write')
+    signal.throwIfAborted()
     const releaseLease = await acquireRuntimeLease(deps, authorized.runtime)
     let handedOff = false
     const incoming = new URL(request.url ?? '/', 'http://gateway')
@@ -1920,6 +1934,7 @@ export function createGatewayDocumentScopeHandler(
     const upstreamSignal = timeoutSignal === undefined ? signal : AbortSignal.any([signal, timeoutSignal])
     let response: Response
     try {
+      signal.throwIfAborted()
       try {
         response = await fetch(target, {
           method: forwardMethod,
@@ -1963,7 +1978,7 @@ export function createGatewayDocumentScopeHandler(
       return responseWithSafeJson(response, body)
     } finally {
       drainForwardedRequest(request, hasBody)
-      if (!handedOff) await releaseLease().catch(() => {})
+      if (!handedOff) await releaseDocumentLease(releaseLease)
     }
   }
 }

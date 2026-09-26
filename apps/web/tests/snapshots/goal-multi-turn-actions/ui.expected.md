@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -42,10 +44,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "5 tool calls · 6 intermediate messages":
   - text: 5 tool calls · 6 intermediate messages
   - img
@@ -106,10 +109,11 @@
 - button "Branch into a new conversation":
   - img
 - tooltip "Branch into a new conversation"
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -123,10 +127,11 @@
   - img
 - button "9% of context used"
 - button "Send message" [disabled]
-- button "2 turns · 12 steps · {{throughput}} tok/s":
-  - img
-  - text: 2 turns · 12 steps{{throughput}} tok/s
-- button "115K tok · Cache hit 91%":
-  - img
-  - text: 115K tokCache hit 91%
+- group "Session statistics":
+  - "button \"2 turns · 12 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "2 turns · 12 steps{{throughput}} tok/s"
+  - button "115K tok · Cache hit 91%":
+    - img
+    - text: 115K tokCache hit 91%
 - separator "Adjust transcript content width"

@@ -1,0 +1,9 @@
+version: 1
+scenario: session-title-after-turn
+profile: acp
+composition: session-title
+recording: authored
+header:
+  class: default
+replay:
+  override: true

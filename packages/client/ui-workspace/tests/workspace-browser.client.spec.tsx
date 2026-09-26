@@ -28,6 +28,7 @@ const summary = (id: string, updatedAt: number, overrides: Partial<SessionSummar
 const sessionState = (items: readonly SessionSummary[], overrides: Partial<SessionListState> = {}): SessionListState => ({
   ids: items.map(item => item.id),
   byId: Object.fromEntries(items.map(item => [item.id, item])),
+  archivedById: {},
   current: undefined,
   phase: 'ready',
   subagentsByParent: {}, jobsBySession: {},
@@ -238,6 +239,26 @@ describe('WorkspaceBrowser', () => {
       expect.stringContaining('three'),
       expect.stringContaining('one'),
     ])
+  })
+
+  it('reports the latest navigation error and ignores failure from an older selection', async () => {
+    const first = Promise.withResolvers<undefined>()
+    const second = Promise.withResolvers<undefined>()
+    const open = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockResolvedValue(undefined)
+    mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+      open,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.click(screen.getByText('alpha-s'))
+    fireEvent.click(screen.getByText('alpha-s'))
+    await act(async () => { first.reject(new Error('obsolete failure')); await first.promise.catch(() => {}) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    await act(async () => { second.reject(new Error('Access revoked')); await second.promise.catch(() => {}) })
+    expect(screen.getByRole('alert').textContent).toBe('Access revoked')
+    fireEvent.click(screen.getByText('alpha-s'))
+    await waitFor(() => { expect(screen.queryByRole('alert')).toBeNull() })
   })
 
   it('expands a group on click and opens a session row', () => {

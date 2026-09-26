@@ -55,6 +55,8 @@ kind: "package-reference"
 
 切换到 Auto 时，服务先同步执行其准入检查；每次预设切换随后只改变实际值不同的旋钮，再次选择当前已生效的预设不会产生任何变化。当前值解析顺序为：仍匹配的最近一次记录选择，其次是配置表中的第一个匹配项，否则为 `custom`。用户通过 `/permission` 命令切换：不带参数调用时报告当前预设与所有可用条目，带预设参数时切换过去。
 
+部署可提供异步 `authorizeSelection(agent, name)` 与 `authorizeDefault(name)` 策略。命令等待选择授权后才写入权限事件，取消后晚到的授权不会改变 Session。`permission` 设置写入在持久化前等待默认值授权；Gateway 的 Full access 默认值要求实时管理员检查。受管部署在执行权威不可用时拒绝写入。注册与设置恢复不执行依赖当前请求的写入授权。
+
 ### 用户看到什么
 
 客户端从进程级目录渲染可选条目：先按表顺序列出配置预设，再在 Auto integration 存活时列出 Auto。客户端把这份快照与 Session 当前值合并；不匹配的 `custom` 值可以标记当前控件，但绝不会成为可选目录行。Auto 的身份与 Full access 旋钮组合固定在本服务内部。shipped 客户端的 locale 字典拥有 Auto 的 label 与 description，而配置预设保留 Host 提供的展示信息。调用方不能通过通用 contribution API 发布其他预设；他们可以从 `custom` 切换出去，但不能通过此服务选中或持久化一个具名 custom 预设。

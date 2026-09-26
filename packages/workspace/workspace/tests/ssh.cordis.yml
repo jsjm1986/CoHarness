@@ -1,0 +1,46 @@
+[
+  {
+    "id": "session",
+    "name": "@deepseek-ai/dsh-session"
+  },
+  {
+    "id": "projections",
+    "name": "@deepseek-ai/dsh-session-projection"
+  },
+  {
+    "id": "persistence",
+    "name": "@deepseek-ai/dsh-session-persistence-jsonl"
+  },
+  {
+    "id": "storage",
+    "name": "@deepseek-ai/dsh-storage"
+  },
+  {
+    "id": "storage-json",
+    "name": "@deepseek-ai/dsh-storage-json"
+  },
+  {
+    "id": "domain",
+    "name": "@deepseek-ai/dsh-storage-domain"
+  },
+  {
+    "id": "policy",
+    "name": "@deepseek-ai/dsh-sandbox-policy"
+  },
+  {
+    "id": "ssh",
+    "name": "@deepseek-ai/dsh-ssh"
+  },
+  {
+    "id": "filesystem",
+    "name": "@deepseek-ai/dsh-fs-ssh"
+  },
+  {
+    "id": "subprocess",
+    "name": "@deepseek-ai/dsh-subprocess-ssh"
+  },
+  {
+    "id": "workspaces",
+    "name": "@deepseek-ai/dsh-workspace"
+  }
+]

@@ -374,17 +374,20 @@ describe('ToolRow', () => {
   })
 
   it('renders summarySuffix outside the ellipsized summary span, and drops it on a failure line', () => {
-    const view = render(<ToolRow {...rowProps} summarySuffix="+2" />)
+    const diff = { card: { diffs: [{ path: 'file.txt', oldText: 'old', newText: 'new' }] } }
+    const view = render(<ToolRow {...rowProps} diff={diff} summarySuffix="+2" />)
     const summary = view.getByText('List files')
     const suffix = view.getByText('+2')
     // Separate spans: .summary truncates, the suffix must not travel inside it.
     expect(summary.contains(suffix)).toBe(false)
+    expect(view.queryByText('+1 -1')).toBeNull()
     view.unmount()
     // The failure line replaces the summary wholesale, so the suffix goes with it.
     const failed = render(
-      <ToolRow {...rowProps} state="error" errorSummary="boom" summarySuffix="+2" />,
+      <ToolRow {...rowProps} diff={diff} state="error" errorSummary="boom" summarySuffix="+2" />,
     )
     expect(failed.queryByText('+2')).toBeNull()
+    expect(failed.queryByText('+1 -1')).toBeNull()
   })
 
   it('an error file row drops the open-file link (the summary is failure prose, not the path)', () => {

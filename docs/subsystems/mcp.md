@@ -136,4 +136,30 @@ register(server: string, provider: McpResourceProvider): () => void
 ```
 
 Source: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resources/src/index.ts)
+
+<a id="mcp-events"></a>
+
+### `mcp/*` events
+
+<a id="mcptool-call--waterfall"></a>
+
+#### `mcp/tool-call` — waterfall
+
+Wrap the actual MCP transport call with server-specific deployment policy. Listeners for other servers delegate without changing the execution.
+
+```ts cordis-catalog
+/**
+ * Wrap the actual MCP transport call with server-specific deployment policy.
+ * Listeners for other servers delegate without changing the execution.
+ * @mode waterfall
+ * @param serverName - configured MCP server identity.
+ * @param invocation - immutable caller and invocation-owned transport cancellation.
+ * @param next - dispatch the request once policy admits it.
+ */
+'mcp/tool-call'( serverName: string, invocation: { readonly execution: ToolExecution; signal: AbortSignal }, next: () => Promise<unknown>, ): Promise<unknown>
+```
+
+Types: [ToolExecution](tools.md)
+
+Source: [`packages/mcp/mcp-client/src/tools.ts`](../../packages/mcp/mcp-client/src/tools.ts)
 <!-- END GENERATED cordis-surface -->

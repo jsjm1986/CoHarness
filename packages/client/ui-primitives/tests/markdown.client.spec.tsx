@@ -17,6 +17,21 @@ describe('MessageText', () => {
 })
 
 describe('MarkdownText', () => {
+  it('renders compact reasoning with the same complete safe Markdown as body text', () => {
+    const text = '# Heading\n\n**Decision**\n\n```txt\n  untouched indentation\n```\n\n[unsafe](javascript:alert(1))'
+    const view = render(<MarkdownText text={text} variant="compact" />)
+    expect(view.container.firstElementChild?.className).toContain('compact')
+    expect(view.getByRole('heading', { name: 'Heading' })).toBeTruthy()
+    expect(view.getByText('Decision').tagName).toBe('STRONG')
+    expect(view.container.querySelector('pre code')?.textContent).toBe('  untouched indentation')
+    expect(view.container.querySelector('[data-code-block-banner]')).not.toBeNull()
+    expect(view.queryByRole('link', { name: 'unsafe' })).toBeNull()
+    const completeText = view.container.textContent
+    view.rerender(<MarkdownText text={text} />)
+    expect(view.container.firstElementChild?.className).not.toContain('compact')
+    expect(view.container.textContent).toBe(completeText)
+  })
+
   it('renders CommonMark and GFM elements as semantic DOM', () => {
     const markdown = [
       '# Heading',

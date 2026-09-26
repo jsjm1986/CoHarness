@@ -38,6 +38,9 @@
       ],
       "@deepseek-ai/schemastery": [
         "../../vendor/schemastery/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-execution-authority": [
+        "../../packages/context/execution-authority/lib/types/index.d.ts"
       ]
     }
   },

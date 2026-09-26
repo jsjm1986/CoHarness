@@ -4,7 +4,7 @@ import {
   createClientModuleSystem, parseBootManifest,
   type ClientBundleRegistration, type ClientModuleLoader, type ClientModuleLoaderTarget, type WebBootEntry, type WebBootGraph,
 } from '@deepseek-ai/dsh-client-modules/client'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { assertEntriesActive, bootClient, type EntryStateLabel } from '../src/boot-client.ts'
 import { FIBER_STATE } from '../src/loader-status.ts'
 
@@ -15,6 +15,7 @@ function graphOf(ids: readonly string[]): WebBootGraph {
   return {
     rev: 'graph',
     entries,
+    batches: [{ phase: 'application', url: '/application.js', rev: 'batch', entries: [...ids] }],
   }
 }
 
@@ -76,17 +77,21 @@ describe('bootClient', () => {
     await ctx.fiber.dispose()
   })
 
-  it('surfaces the Loader import error for a row that is neither seeded nor a graph row', async () => {
+  it('reports and logs an import failure for a row that is neither seeded nor a graph row', async () => {
     const { modules } = modulesOf(graphOf(['seeded']), { seeded: { apply: () => {} } })
     const manifest = parseBootManifest(graphOf(['ghost']))
     const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    const error = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+    onTestFinished(() => { error.mockRestore() })
     const sink = stateSink()
 
     await expect(bootClient({ ctx, modules, manifest, onEntryState: sink.onEntryState })).rejects.toThrow(
       'web boot: 1 entry did not activate\nghost: import failed (see console for the import error)',
     )
     expect(sink.states.get('ghost')).toEqual(['loading', 'failed'])
-    await ctx.fiber.dispose()
+    expect(error).toHaveBeenCalledOnce()
+    expect(error.mock.calls[0]?.[0]).toHaveProperty('message', expect.stringContaining('client-modules: cannot resolve'))
   })
 })
 

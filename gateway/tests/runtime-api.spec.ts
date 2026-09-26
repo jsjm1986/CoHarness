@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3'
+import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import { generateKeyPairSync } from 'node:crypto'
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool } from 'pg'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 import {
@@ -56,6 +57,7 @@ function user(id: number, role: UserRow['role'] = 'user'): UserRow {
     status: 'active',
     homePath: `/tmp/user-${String(id)}`,
     mustChangePassword: false,
+    autoReviewEligible: false,
   }
 }
 
@@ -123,6 +125,7 @@ function fixture() {
   const deps = {
     context: {
       organizationSlug: ORGANIZATION_SLUG,
+      nodeId: '00000000-0000-4000-8000-000000000099',
       pool: { query } as unknown as Pool,
     },
     instances: {
@@ -168,6 +171,7 @@ function fixture() {
   })
   return {
     append,
+    query,
     deps,
     handler: createRuntimeApiHandler(deps),
     issuePrincipal,
@@ -179,6 +183,42 @@ function fixture() {
     archiveAck,
   }
 }
+
+describe('profile management authorization', () => {
+  it('admits an active administrator and rechecks a later revocation', async () => {
+    const runtime = fixture()
+    const principal = runtime.issuePrincipal(ADMIN_ID)
+    const path = '/internal/runtime/plugin-management/authorize'
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 204 })
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining("m.role='admin'"), [ORGANIZATION_ID, ADMIN_ID])
+    runtime.query.mockResolvedValueOnce({ rows: [] })
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 403 })
+  })
+
+  it('admits only the profile purpose at the profile authority endpoint', async () => {
+    const runtime = fixture()
+    const issue = (purpose: 'plugin-admin' | 'terminal-admin') => runtime.principals.issue({
+      user: user(ADMIN_ID, 'admin'), purpose,
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'ro' },
+      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    })
+    const path = '/internal/runtime/plugin-management/authorize'
+    expect(await request(runtime.handler, path, { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 204 })
+    expect(await request(runtime.handler, path, { body: {}, principal: issue('terminal-admin') })).toMatchObject({ status: 403 })
+    expect(await request(runtime.handler, '/internal/runtime/terminal-management/authorize', { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 403 })
+    runtime.query.mockResolvedValueOnce({ rows: [] })
+    expect(await request(runtime.handler, path, { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 403 })
+  })
+
+  it('rejects a member or a missing principal before looking up deployment authority', async () => {
+    const runtime = fixture()
+    const path = '/internal/runtime/plugin-management/authorize'
+    expect(await request(runtime.handler, path, { body: {}, principal: runtime.issuePrincipal(CREATOR_ID) }))
+      .toMatchObject({ status: 403 })
+    expect(await request(runtime.handler, path, { body: {} })).toMatchObject({ status: 403 })
+    expect(runtime.query).not.toHaveBeenCalled()
+  })
+})
 
 async function prepare(
   runtime: ReturnType<typeof fixture>,
@@ -937,7 +977,7 @@ describe('runtime session body migration', () => {
         sessionId: 'session-legacy',
         sourceRevision: wireRevision,
         migrationId: 'migration-1',
-        targetHeader: { id: 'session-legacy', version: 4, createdAt: CREATED_AT },
+        targetHeader: { id: 'session-legacy', version: sessionFormatCatalog.currentVersion, createdAt: CREATED_AT },
         ...overrides,
       },
     })
@@ -964,7 +1004,7 @@ describe('runtime session body migration', () => {
       },
     })
     expect(conversations.migrate).toHaveBeenCalledWith(
-      'session-legacy', 'migration-1', '7:40', 4, expect.any(Function),
+      'session-legacy', 'migration-1', '7:40', sessionFormatCatalog.currentVersion, expect.any(Function),
     )
   })
 
@@ -982,13 +1022,17 @@ describe('runtime session body migration', () => {
           source: { kind: 'user' },
         } },
         { type: 'assistant/message', seq: 4, time: CREATED_AT + 4, data: {
-          message: { content: [{ type: 'text', text: 'legacy answer' }] },
+          turn: 1, step: 1, message: {
+            id: 'm4', role: 'assistant',
+            content: [{ type: 'text', text: 'legacy answer' }],
+            source: { kind: 'model', provider: 'test', model: 'test' },
+          },
         } },
         { type: 'step/end', seq: 5, time: CREATED_AT + 5, data: { turn: 1, step: 1 } },
-        { type: 'turn/end', seq: 6, time: CREATED_AT + 6, data: { reason: { kind: 'completed' } } },
+        { type: 'turn/end', seq: 6, time: CREATED_AT + 6, data: { turn: 1, reason: { kind: 'completed' } } },
         { type: 'session/end-seed', seq: 7, time: CREATED_AT + 7, data: {} },
       ])
-      expect(migrated.sessionFormatVersion).toBe(4)
+      expect(migrated.sessionFormatVersion).toBe(sessionFormatCatalog.currentVersion)
       expect(migrated.events.map((event: ConversationEvent) => event.seq)).toEqual(
         migrated.events.map((_event: ConversationEvent, index: number) => index),
       )
@@ -1016,7 +1060,7 @@ describe('runtime session body migration', () => {
       sourceRevision: `postgres:${ORGANIZATION_ID}:user:77:7:40`,
     }],
     ['a mismatched target id', {
-      targetHeader: { id: 'session-other', version: 4, createdAt: CREATED_AT },
+      targetHeader: { id: 'session-other', version: sessionFormatCatalog.currentVersion, createdAt: CREATED_AT },
     }],
     ['a non-current target version', {
       targetHeader: { id: 'session-legacy', version: 2, createdAt: CREATED_AT },
@@ -1052,75 +1096,28 @@ describe('runtime session body migration', () => {
 describe('desktop coordination endpoints', () => {
   function desktopFixture() {
     const runtime = fixture()
-    const repo = new SqliteDesktopCoordinatorRepository(new Database(':memory:'))
+    const database = new Database(':memory:')
+    onTestFinished(() => { database.close() })
+    const repo = new SqliteDesktopCoordinatorRepository(database)
     const desktops = new DesktopCoordinator(repo, { generationOf: async () => GENERATION })
     return { ...runtime, desktops, ready: desktops.initialize() }
   }
 
   const desktop = { node: 'node-a', desktop: 'seat-1' }
 
-  it('acquires, heartbeats, and releases a desktop grant', async () => {
-    const runtime = desktopFixture()
-    await runtime.ready
-    const handler = createRuntimeApiHandler({ ...runtime.deps, desktops: runtime.desktops })
-    const principal = runtime.issuePrincipal(CREATOR_ID)
-    const acquired = await request(handler, '/internal/runtime/desktop/acquire', {
-      principal, body: { ...desktop, requestId: 'r1' },
-    })
-    expect(acquired.status).toBe(200)
-    const grant = acquired.body as { status: string; grantId: string }
-    expect(grant.status).toBe('granted')
-    const heartbeat = await request(handler, '/internal/runtime/desktop/heartbeat', {
-      principal, body: { grantId: grant.grantId },
-    })
-    expect(heartbeat.body).toMatchObject({ status: 'held' })
-    const released = await request(handler, '/internal/runtime/desktop/release', {
-      principal, body: { grantId: grant.grantId },
-    })
-    expect(released.body).toMatchObject({ released: true })
-  })
-
-  it('queues a second runtime for the same desktop', async () => {
-    const runtime = desktopFixture()
-    await runtime.ready
-    const handler = createRuntimeApiHandler({ ...runtime.deps, desktops: runtime.desktops })
-    const first = await request(handler, '/internal/runtime/desktop/acquire', {
-      principal: runtime.issuePrincipal(CREATOR_ID), body: { ...desktop, requestId: 'r1' },
-    })
-    expect((first.body as { status: string }).status).toBe('granted')
-    const second = await request(handler, '/internal/runtime/desktop/acquire', {
-      principal: runtime.issuePrincipal(MEMBER_ID), body: { ...desktop, requestId: 'r2' },
-    })
-    expect((second.body as { status: string }).status).toBe('queued')
-  })
-
-  it('reports coordination status by request id', async () => {
-    const runtime = desktopFixture()
-    await runtime.ready
-    const handler = createRuntimeApiHandler({ ...runtime.deps, desktops: runtime.desktops })
-    const principal = runtime.issuePrincipal(CREATOR_ID)
-    await request(handler, '/internal/runtime/desktop/acquire', {
-      principal, body: { ...desktop, requestId: 'r1' },
-    })
-    const status = await request(handler, '/internal/runtime/desktop/status', {
-      principal, body: { ...desktop, requestId: 'r1' },
-    })
-    expect((status.body as { status: string }).status).toBe('granted')
-  })
-
-  it('forbids another holder from releasing the grant', async () => {
-    const runtime = desktopFixture()
-    await runtime.ready
-    const handler = createRuntimeApiHandler({ ...runtime.deps, desktops: runtime.desktops })
-    const acquired = await request(handler, '/internal/runtime/desktop/acquire', {
-      principal: runtime.issuePrincipal(CREATOR_ID), body: { ...desktop, requestId: 'r1' },
-    })
-    const grant = acquired.body as { grantId: string }
-    const response = await request(handler, '/internal/runtime/desktop/release', {
-      principal: runtime.issuePrincipal(MEMBER_ID), body: { grantId: grant.grantId },
-    })
-    expect(response.status).toBe(403)
-  })
+  it.each(['acquire', 'status', 'cancel', 'heartbeat', 'release', 'confirm-stopped'])(
+    'rejects caller-supplied node or workflow identity on %s', async action => {
+      const runtime = desktopFixture()
+      await runtime.ready
+      const handler = createRuntimeApiHandler({ ...runtime.deps, desktops: runtime.desktops })
+      const response = await request(handler, `/internal/runtime/desktop/${action}`, {
+        principal: runtime.issuePrincipal(CREATOR_ID),
+        body: { ...desktop, requestId: 'r1', runId: 'forged-root' },
+      })
+      expect(response.status).toBe(400)
+      expect(await runtime.desktops.listResources()).toEqual([])
+    },
+  )
 
   it('reports unavailable when the coordinator is absent', async () => {
     const runtime = fixture()
@@ -1130,13 +1127,13 @@ describe('desktop coordination endpoints', () => {
     expect(response).toMatchObject({ status: 503, body: { error: 'desktop-coordination-unavailable' } })
   })
 
-  it('rejects a missing principal assertion', async () => {
+  it('rejects legacy acquisition without a registered execution Session', async () => {
     const runtime = desktopFixture()
     await runtime.ready
     const handler = createRuntimeApiHandler({ ...runtime.deps, desktops: runtime.desktops })
     const response = await request(handler, '/internal/runtime/desktop/acquire', {
       body: { ...desktop, requestId: 'r1' },
     })
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(400)
   })
 })

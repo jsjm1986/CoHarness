@@ -274,6 +274,9 @@ export class SubagentRuntime extends TypertRemoteService {
     this.settingsSource = () => config
     ctx.inject(['settings'], (settingsCtx) => {
       settingsCtx.settings.installSection(ctx, SUBAGENT_SETTINGS_NAMESPACE, SubagentRuntime.Config, config, {
+        owner: 'project',
+        projectWrite: 'manager',
+        projectWritePaths: [['maxDepth'], ['maxActiveSubagents']],
         validate: (value) => { assertSubagentMaxDepth(value.maxDepth) },
         setSource: (source) => { this.settingsSource = source },
         onChange: () => {},
@@ -284,6 +287,7 @@ export class SubagentRuntime extends TypertRemoteService {
       const resolved = (): Required<Config> => this.settingsSource() as Required<Config>
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
+        agentRouteDefaults: name => this.expectProvider(name).agentRouteDefaults,
         observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
       }, () => ({
         maxActivations: resolved().maxContinuableActivations,
@@ -820,10 +824,7 @@ export class SubagentRuntime extends TypertRemoteService {
       { when: request.persona !== undefined, cap: 'persona' },
     ]
     for (const { when, cap } of needs) {
-      const supported = cap === 'agentOptions'
-        ? provider.capabilities.agentOptions !== false
-        : provider.capabilities[cap]
-      if (when && !supported) {
+      if (when && !provider.capabilities[cap]) {
         throw new SubagentError(
           `subagent provider "${provider.name}" does not support the "${cap}" capability`,
           'UNSUPPORTED_CAPABILITY',

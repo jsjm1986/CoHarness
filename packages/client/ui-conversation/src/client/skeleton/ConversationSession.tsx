@@ -150,6 +150,7 @@ export function ConversationSessionHeader({
             </div>
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', { compact })}
+              {renderSlot('conversation.session.header.corner', {})}
             </div>
           </div>
         </>

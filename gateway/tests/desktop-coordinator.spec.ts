@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import Database from 'better-sqlite3'
 import {
   DEFAULT_DESKTOP_COORDINATOR_CONFIG,
@@ -51,6 +51,26 @@ function harness(options: { now?: () => number; generations?: Record<string, num
 const desktop = { node: 'node-a', desktop: 'seat-1' }
 
 describe('DesktopCoordinator', () => {
+  it('isolates grant retries, queue cancellation and lease operations by the exact driving Session', async () => {
+    const { coordinator, db } = harness()
+    onTestFinished(() => { db.close() })
+    await coordinator.initialize()
+    const c = claims(), resource = { node: 'node-a', desktop: 'seat-1' }
+    const first = await coordinator.acquire(c, { ...resource, requestId: 'same-request', runId: 'session-a' })
+    expect(first.status).toBe('granted')
+    if (first.status !== 'granted') throw new Error('missing desktop grant')
+    const second = await coordinator.acquire(c, { ...resource, requestId: 'same-request', runId: 'session-b' })
+    expect(second.status).toBe('queued')
+    expect(await coordinator.status(c, { ...resource, requestId: 'same-request' })).toEqual({ status: 'unknown' })
+    expect(await coordinator.heartbeat(c, first.grantId, 'session-b')).toBe('lost')
+    await expect(coordinator.release(c, first.grantId, 'session-b')).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(coordinator.confirmStopped(c, first.grantId, 'session-b')).rejects.toMatchObject({ code: 'forbidden' })
+    expect(await coordinator.cancel(c, { ...resource, requestId: 'same-request', runId: 'session-a' })).toBe(false)
+    expect(await coordinator.heartbeat(c, first.grantId, 'session-a')).toBe('held')
+    await coordinator.release(c, first.grantId, 'session-a')
+    expect(await coordinator.status(c, { ...resource, requestId: 'same-request', runId: 'session-b' })).toMatchObject({ status: 'granted' })
+  })
+
   it('grants one desktop and serializes a second holder into FIFO order', async () => {
     const { coordinator } = harness()
     await coordinator.initialize()

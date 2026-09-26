@@ -1,3 +1,5 @@
+import { desktopStatusRequestSchema, desktopConfirmRequestSchema } from '../api/desktop.schema.ts'
+import { workspaceFilesRenderOfficeRequestSchema } from '../api/workspace-files.schema.ts'
 /**
  * Server side of the fetch carrier: maps an ApiProxy onto a pure
  * WHATWG Request->Response function. Two-level parse: full form (type/rpcId/method +
@@ -6,6 +8,7 @@
  * business errors are always 200 + ServerResponse.
  */
 
+import { workspaceChangesSummaryRequestSchema, workspaceChangesDiffRequestSchema } from '../api/workspace-changes.schema.ts'
 import { randomUUID } from 'node:crypto'
 import type { z } from 'zod'
 import type { ApiProxy, MuxFrame, HostFrame } from '../api/index.ts'
@@ -37,6 +40,7 @@ import {
 } from '../api/host.schema.ts'
 import {
   workspaceArchiveSessionRequestSchema,
+  workspaceUnarchiveSessionRequestSchema,
   workspaceCreateRequestSchema,
   workspaceDeleteRequestSchema,
   workspaceInsertBeforeRequestSchema,
@@ -109,6 +113,8 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
   'session.cancel': { schema: sessionCancelRequestSchema, invoke: (api, r) => api.sessions.cancel(r) },
   'subagent.history': { schema: subagentHistoryRequestSchema, invoke: (api, r, signal) => api.subagents.history(r, signal) },
+  'desktop.status': { schema: desktopStatusRequestSchema, invoke: (api, r, signal) => api.desktop.status(r, signal) },
+  'desktop.confirm': { schema: desktopConfirmRequestSchema, invoke: (api, r, signal) => api.desktop.confirm(r, signal) },
   'host.describe': { schema: hostDescribeRequestSchema, invoke: (api, r) => api.host.describe(r) },
   'host.pickDirectory': { schema: hostPickDirectoryRequestSchema, invoke: (api, r, signal) => api.host.pickDirectory(r, signal) },
   'host.listDirectory': { schema: hostListDirectoryRequestSchema, invoke: (api, r, signal) => api.host.listDirectory(r, signal) },
@@ -121,7 +127,11 @@ const UNARY_ROUTES: UnaryRoutes = {
   'workspace.insertBefore': { schema: workspaceInsertBeforeRequestSchema, invoke: (api, r) => api.workspace.insertBefore(r) },
   'workspace.insertSessionBefore': { schema: workspaceInsertSessionBeforeRequestSchema, invoke: (api, r) => api.workspace.insertSessionBefore(r) },
   'workspace.archiveSession': { schema: workspaceArchiveSessionRequestSchema, invoke: (api, r) => api.workspace.archiveSession(r) },
+  'workspace.unarchiveSession': { schema: workspaceUnarchiveSessionRequestSchema, invoke: (api, r) => api.workspace.unarchiveSession(r) },
+  'workspaceChanges.summary': { schema: workspaceChangesSummaryRequestSchema, invoke: (api, r, signal) => api.workspaceChanges.summary(r, signal) },
+  'workspaceChanges.diff': { schema: workspaceChangesDiffRequestSchema, invoke: (api, r, signal) => api.workspaceChanges.diff(r, signal) },
   'workspaceFiles.list': { schema: workspaceFilesListRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.list(r, signal) },
+  'workspaceFiles.renderOffice': { schema: workspaceFilesRenderOfficeRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.renderOffice(r, signal) },
   'workspaceFiles.stat': { schema: workspaceFilesStatRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.stat(r, signal) },
   'workspaceFiles.read': { schema: workspaceFilesReadRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.read(r, signal) },
   'workspaceFiles.readBytes': { schema: workspaceFilesReadBytesRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.readBytes(r, signal) },
@@ -196,7 +206,10 @@ async function handleUnary<K extends keyof RpcMethodMap>(
       return Response.json(encodeHistoryServerResponse(
         response.rpcId,
         response.result.value as ResponseValue<'session.history'>,
-        historyPageTargetBytes,
+        // A call-addressed turn is indivisible: dropping its prefix can remove
+        // the requested call while returning an apparently successful read.
+        'toolCallId' in payload.data && payload.data.toolCallId !== undefined
+          ? Number.MAX_SAFE_INTEGER : historyPageTargetBytes,
       ))
     }
     return fullResponse(response)

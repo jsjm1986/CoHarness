@@ -294,7 +294,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     }
     // oxlint-disable-next-line eslint/prefer-const -- The owner can query readiness before the handle is published.
     let handle: LocalTerminalHandle | undefined
-    const directSettlement = Promise.withResolvers<void>()
+    const directSettlement = Promise.withResolvers<undefined>()
     const owner = scope?.bindOwner({
       running: () => handle?.running ?? true,
       settled: directSettlement.promise,
@@ -315,7 +315,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     this.terminals.add(handle)
     const release = async (): Promise<void> => {
       // terminate() can wait on this direct-exit promise.
-      directSettlement.resolve()
+      directSettlement.resolve(undefined)
       if (spec.shellActivity === true) return
       await handle.terminate()
       this.terminals.delete(handle)

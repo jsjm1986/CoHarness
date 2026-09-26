@@ -33,9 +33,11 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'compaction/prune',
   'compaction/start',
   'compaction/summary',
+  'deliverables/presented',
   'feedback/message-delete',
   'feedback/message-put',
   'feedback/record',
+  'gateway/execution',
   'goal/change',
   'hook/invoked',
   'hook/result',
@@ -77,6 +79,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'user/message',
   'userdoc/attached',
   'web/deepseek-search-llm-request',
+  'workspace/changes',
 ])
 
 /** Event types whose model-visible effects require an explicit pure interpreter. */

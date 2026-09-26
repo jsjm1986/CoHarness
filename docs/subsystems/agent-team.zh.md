@@ -30,6 +30,8 @@ Lead Session 首先存储完整 queued message。只有 target 的 pending inbox
 ```ts type-equiv
 /** One peer message retained until its target Session records it. */
 interface TeamMessageSnapshot {
+  /** Captured participants; Team routing never recovers identity from the latest caller. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly id: TeamMessageId
   readonly senderId: SessionId
   readonly senderName: string
@@ -44,6 +46,8 @@ target Session 会在 pending inbox 条目和最终用户消息上保留消息�
 ```ts type-equiv
 /** Source retained by the target Session for durable mailbox de-duplication. */
 interface TeamMessageSource {
+  /** Verified adjacent routing-host scope for this exact queued delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly kind: 'team-message'
   readonly teamId: TeamId
   readonly messageId: TeamMessageId

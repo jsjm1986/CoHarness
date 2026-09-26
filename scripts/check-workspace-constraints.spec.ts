@@ -190,3 +190,13 @@ it('rejects a shared Web payload that omits the stylesheet chunks', () => {
     ...manifest, files: ['lib/index.js', 'lib/types/**/*.d.ts'],
   } })).toEqual([expect.stringContaining('package.json files must be')])
 })
+
+
+it('publishes the Workbench PDF chunk while rejecting unrestricted client chunks', () => {
+  const dir = 'packages/client/ui-workbench'
+  const manifest = JSON.parse(readFileSync(`${dir}/package.json`, 'utf8')) as WorkspaceManifest['manifest']
+  expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+  expect(expectedDshPackageFiles(manifest)).toContain('lib/client.pdf.js')
+  expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.map(file => file === 'lib/client.pdf.js' ? 'lib/client.*.js' : file) } }))
+    .toContainEqual(expect.stringContaining('package.json files must be'))
+})

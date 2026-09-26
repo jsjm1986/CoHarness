@@ -32,9 +32,9 @@
 
 [`minimal.cordis.yml`](minimal.cordis.yml) 是 Web `minimal` preset 的完整独立版本。`DSH_SYSTEM_PROMPT` 选择它的系统提示词，未设置时使用 `You are a helpful software engineer assistant.`。它为新建会话抑制每个 system-prompt runtime-context 贡献，且不挂载上下文压缩插件。面向模型的工具严格只有：
 
-- 所有者作用域内持久化的 `bash`
+- 所有者作用域内持久化的 `bash`（Linux/macOS），Windows 上为 `pwsh`
 - 提供 `view`、`create`、`str_replace` 与 `insert` 的 `str_replace_editor`
 
-它组合了内置运行时所需的本地 PTY、裸 `fs-local` 后端、供持久 Bash 使用的 danger-full-access 策略，以及未压缩的 JSONL 持久化。Bash 和编辑器绝对路径可以修改运行时进程有权访问的任何路径，因此只能针对可丢弃的 checkout 或容器运行该变体。持久 PTY 需要 POSIX 终端环境，因此不适用于 Windows agent 接口。
+它组合了内置运行时所需的本地 PTY、裸 `fs-local` 后端、供持久 shell 使用的 danger-full-access 策略，以及未压缩的 JSONL 持久化。`disabled: !!js` 条件选择平台的 shell 方言，因此 Windows 组合挂载 PowerShell 工具而非 Bash。持久 shell 和编辑器绝对路径可以修改运行时进程有权访问的任何路径，因此只能针对可丢弃的 checkout 或容器运行该变体。
 
 [`minimal.py`](minimal.py)通过 Python SDK 运行该组合，并把 `DSH_MODEL` 作为默认模型。[Python SDK 教程](../../docs/user/guide/python-sdk.zh.md)介绍安装、运行、workspace 选择与 session 标识；[SDK 参考](../../python/sdk/README.zh.md)归属运行时生命周期与结果语义。

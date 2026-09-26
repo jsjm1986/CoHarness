@@ -3360,3 +3360,21 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+.dataTable .terminalIdentity {
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.deploymentStatus {
+  display: grid;
+  gap: 12px;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}

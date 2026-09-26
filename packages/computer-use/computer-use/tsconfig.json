@@ -13,6 +13,18 @@
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
     }
   ]
 }

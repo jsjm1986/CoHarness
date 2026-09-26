@@ -4,16 +4,20 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  materializeProfilePatch,
   normalizeSessionLog,
   normalizeSessionSnapshot,
+  normalizeSessionSnapshots,
   normalizeStdout,
   refreshFixtureReplacements,
-  scrubRequestHeaders,
+  scrubModelRequestBulk,
+  sessionFixtureNames,
+  snapshotChildEnvironment,
   stabilizeRefreshLog,
   tokenizeSessionFixtureCwd,
   type HarvestedLog,
   type NormalizeContext,
-} from '@deepseek-ai/dsh-acp-snapshot'
+} from '@deepseek-ai/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 import {
   decompressZstdFrame,
@@ -22,12 +26,15 @@ import {
 import { describe, expect, it } from 'vitest'
 
 const snapshotsDir = join(dirname(fileURLToPath(import.meta.url)), 'snapshots')
+// The advanced-toolchain Session corpus is owned by snapshots/session; this
+// test renders the same recorded behavior through the headless stream-json
+// interface, so it replays the corpus generation read-only and refreshes only
+// its own stream-json oracle.
+const advancedCorpusDir = join(snapshotsDir, '../../../../snapshots/session/advanced-toolchain')
 const advancedScenarioDir = join(snapshotsDir, 'advanced-toolchain')
-const advancedSessionFixture = join(advancedScenarioDir, 'session.jsonl')
 const advancedStreamExpected = join(advancedScenarioDir, 'stream-json.expected.jsonl')
-const advancedConfigPath = fileURLToPath(new URL('../advanced.cordis.snapshot.yml', import.meta.url))
 const ptyScenarioDir = join(snapshotsDir, 'pty-tools')
-const ptySessionFixture = join(ptyScenarioDir, 'session.jsonl')
+const ptySessionFixture = join(ptyScenarioDir, 'session.v6.jsonl')
 const ptyStreamExpected = join(ptyScenarioDir, 'stream-json.expected.jsonl')
 const ptyConfigPath = fileURLToPath(new URL('../pty.cordis.snapshot.yml', import.meta.url))
 const goalScenarioDir = join(snapshotsDir, 'goal-tools')
@@ -37,7 +44,7 @@ const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', im
 const malformedProviderScenarioDir = join(snapshotsDir, 'malformed-provider')
 const malformedProviderConfigPath = fileURLToPath(new URL('../malformed-provider.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
-const compactionSessionFixture = join(compactionScenarioDir, 'session.jsonl')
+const compactionSessionFixture = join(compactionScenarioDir, 'session.v6.jsonl')
 const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expected.jsonl')
 const compactionConfigPath = fileURLToPath(new URL('../compaction.cordis.snapshot.yml', import.meta.url))
 const credentialsScenarioDir = join(snapshotsDir, 'missing-credential')
@@ -108,11 +115,14 @@ async function deepseekDefaultsServer(options: { protocol?: 'messages' } = {}): 
       requests.push(JSON.parse(body) as JsonObject)
       paths.push(request.url ?? '')
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      let keepAlives = 3
+      // Keep-alive comments must span a longer silent window than the fixture's
+      // streamIdleTimeoutMs so a missing watchdog reset still kills the stream,
+      // while the wider per-comment gap tolerates loaded-host timer drift.
+      let keepAlives = 6
       const write = (): void => {
         if (keepAlives-- > 0) {
           response.write(': keep-alive\n\n')
-          setTimeout(write, 60)
+          setTimeout(write, 200)
           return
         }
         if (options.protocol === 'messages') {
@@ -252,7 +262,7 @@ function normalizeHeadlessStream(rawStdout: string, cwd: string): string {
     }
     return record.event as JsonObject
   })
-  const normalizedEvents = parseJsonl(scrubRequestHeaders(normalizeSessionLog(
+  const normalizedEvents = parseJsonl(scrubModelRequestBulk(normalizeSessionLog(
     `${events.map(event => JSON.stringify(event)).join('\n')}\n`,
     context,
   )))
@@ -260,6 +270,21 @@ function normalizeHeadlessStream(rawStdout: string, cwd: string): string {
     ? { ...record, event: normalizedEvents[index] }
     : record)
   return normalizeStdout(`${normalizedRecords.map(record => JSON.stringify(record)).join('\n')}\n`, context)
+}
+
+/** Normalize the product `--json` projection: leading session, event rows, final text. */
+function normalizeProjectedJsonStream(rawStdout: string, cwd: string): string {
+  const records = parseJsonl(rawStdout)
+  if (records.length === 0) throw new Error('headless --json snapshot emitted no records')
+  const first = records[0]
+  if (first?.type !== 'session' || typeof first.sessionId !== 'string') {
+    throw new Error('headless --json snapshot did not open with a session record')
+  }
+  if (records.at(-1)?.type !== 'final') {
+    throw new Error('headless --json snapshot did not end with a final record')
+  }
+  const context: NormalizeContext = { sessionIds: [first.sessionId], cwd }
+  return normalizeStdout(`${records.map(record => JSON.stringify(record)).join('\n')}\n`, context)
 }
 
 /** Zero durable goal timestamps inside both metadata records and rendered XML JSON. */
@@ -293,6 +318,39 @@ async function scenarioPrompt(dir: string, label: string): Promise<string> {
   const prompt = input.steps?.find(step => step.op === 'prompt')?.text
   if (typeof prompt !== 'string') throw new Error(`${label} input has no prompt step`)
   return prompt
+}
+
+/** Extract the recorded request-header route from a corpus session fixture. */
+function corpusRoute(fixture: string): { provider: string; model: string } {
+  for (const record of parseJsonl(fixture)) {
+    if (record.type !== 'request/header' || !isRecord(record.data)) continue
+    const header = record.data.header
+    if (!isRecord(header) || !isRecord(header.config)) continue
+    const { provider, model } = header.config
+    if (typeof provider === 'string' && typeof model === 'string') return { provider, model }
+  }
+  throw new Error('corpus fixture has no request/header route')
+}
+
+/** Derive the recorded user task from a corpus session's first splice. */
+async function corpusPrompt(file: string, label: string): Promise<string> {
+  for (const record of parseJsonl(await readFile(file, 'utf8'))) {
+    if (record.type !== 'agent/inbox/spliced' || !isRecord(record.data)) continue
+    const inserted = record.data.inserted
+    if (!Array.isArray(inserted)) continue
+    for (const message of inserted) {
+      if (!isRecord(message) || !Array.isArray(message.content)) continue
+      const text = (message.content as unknown[]).find(
+        (block): block is JsonObject => isRecord(block) && block.type === 'text',
+      )
+      if (typeof text?.text === 'string') return text.text
+    }
+  }
+  throw new Error(`${label} corpus fixture has no user prompt`)
+}
+
+function isRecord(value: unknown): value is JsonObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 async function readPersistedLog(file: string): Promise<string> {
@@ -822,34 +880,51 @@ describe('headless stream-json snapshots', () => {
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('replays the advanced toolchain through the one-shot app', async () => {
-    const prompt = await scenarioPrompt(advancedScenarioDir, 'advanced-toolchain')
-    const fixtureFiles = [
-      advancedSessionFixture,
-      join(advancedScenarioDir, 'session.1.jsonl'),
-      join(advancedScenarioDir, 'session.2.jsonl'),
-    ]
-    let expectedSessions = await Promise.all(fixtureFiles.map(file => readFile(file, 'utf8')))
+    const fixtureNames = sessionFixtureNames(await readdir(advancedCorpusDir))
+    expect(fixtureNames.length).toBe(3)
+    const fixtureFiles = fixtureNames.map(name => join(advancedCorpusDir, name))
+    const primaryFixture = await readFile(fixtureFiles[0] as string, 'utf8')
+    const prompt = await corpusPrompt(fixtureFiles[0] as string, 'advanced-toolchain')
+    const route = corpusRoute(primaryFixture)
+    const expectedSessions = await Promise.all(fixtureFiles.map(file => readFile(file, 'utf8')))
+    const patchRoot = '.snapshot-patches'
+    const baseCompositionDir = join(advancedCorpusDir, '../text-turn')
+    const compositionDir = join(advancedCorpusDir, '../cordis-inspect-jsdoc')
     let runCwd = ''
     const result = await runLoaderSmoke({
       label: 'advanced headless stream-json snapshot',
       tempDirPrefix: 'headless-snapshot-advanced-',
-      binScript,
-      libBinScript: binScript,
-      configPath: advancedConfigPath,
-      binArgs: [advancedConfigPath, prompt],
+      binScript: dshBinScript,
+      sourceImport: 'tsx/esm',
+      extendEnv: false,
+      configPath: join(baseCompositionDir, 'cordis.yml'),
+      binArgs: [
+        '--profile', 'headless',
+        '--patch', join(baseCompositionDir, 'cordis.yml'),
+        '--patch', join(patchRoot, '1-cordis.snapshot.yml'),
+        '--patch', join(baseCompositionDir, 'model.cordis.yml'),
+        '--json', prompt,
+      ],
       tsconfigPath,
-      env: {
+      env: snapshotChildEnvironment('replay', {
         DSH_SNAPSHOT: 'replay',
-        DSH_SNAPSHOT_FILE: advancedSessionFixture,
-        DSH_SNAPSHOT_CHILD_FILES: [
-          join(advancedScenarioDir, 'session.1.jsonl'),
-          join(advancedScenarioDir, 'session.2.jsonl'),
-        ].join(delimiter),
+        DSH_SNAPSHOT_PROVIDER: route.provider,
+        DSH_SNAPSHOT_MODEL: route.model,
+        DSH_SNAPSHOT_FILE: fixtureFiles[0],
+        DSH_SNAPSHOT_CHILD_FILES: fixtureFiles.slice(1).join(delimiter),
+        DSH_TELEMETRY_DISABLED: '1',
+        COHARNESS_HEADLESS_PROGRESS: '1',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      }),
+      prepare: async (cwd) => {
+        runCwd = cwd
+        await mkdir(join(cwd, patchRoot), { recursive: true })
+        materializeProfilePatch(
+          join(compositionDir, 'cordis.snapshot.yml'), cwd, 'headless', join(cwd, patchRoot), 1,
+        )
       },
-      prepare: (cwd) => { runCwd = cwd },
       inspect: async (cwd) => {
-        const logs = await persistedLogs(cwd)
+        const logs = await persistedLogs(cwd, join(cwd, '.dsh', 'sessions'))
         expect(logs).toHaveLength(3)
         const parents = logs.filter(log => typeof log.header.parentSession !== 'string')
         expect(parents).toHaveLength(1)
@@ -859,41 +934,20 @@ describe('headless stream-json snapshots', () => {
           .sort((left, right) => Number(left.header.createdAt) - Number(right.header.createdAt))
         const actualSessions = [parent, ...children]
         const actualContext = contextFromLogs(actualSessions.map(log => log.content))
-        if (refreshing) {
-          const harvested = actualSessions.map((log): HarvestedLog => ({
-            id: String(log.header.id),
-            createdAt: Number(log.header.createdAt),
-            ...typeof log.header.parentSession === 'string'
-              ? { parentSession: log.header.parentSession }
-              : {},
-            content: log.content,
-          }))
-          const replacements = refreshFixtureReplacements(harvested, expectedSessions)
-          expectedSessions = await Promise.all(actualSessions.map(async (actual, index) => {
-            const existing = expectedSessions[index]
-            const file = fixtureFiles[index]
-            if (existing === undefined || file === undefined) {
-              throw new Error(`headless snapshot has no fixture for persisted log ${index}`)
-            }
-            const stable = tokenizeSessionFixtureCwd(
-              stabilizeRefreshLog(actual.content, existing, replacements, actualContext),
-            )
-            await writeFile(file, stable)
-            return stable
-          }))
-        }
         const expectedContext = contextFromLogs(expectedSessions)
-        for (const [index, actual] of actualSessions.entries()) {
-          const expected = expectedSessions[index]
+        const actualNormalized = normalizeSessionSnapshots(
+          actualSessions.map(log => log.content), actualContext)
+        const expectedNormalized = normalizeSessionSnapshots(expectedSessions, expectedContext)
+        for (const [index, actual] of actualNormalized.entries()) {
+          const expected = expectedNormalized[index]
           if (expected === undefined) throw new Error(`headless snapshot has no fixture for persisted log ${index}`)
-          expect(normalizeSessionSnapshot(actual.content, actualContext))
-            .toBe(normalizeSessionSnapshot(expected, expectedContext))
+          expect(actual).toBe(expected)
         }
       },
     })
 
     expect(result.stderr).toBe('')
-    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    const normalized = normalizeProjectedJsonStream(result.stdout, runCwd)
     if (refreshing) await writeFile(advancedStreamExpected, normalized)
     expect(normalized).toBe(await readFile(advancedStreamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)

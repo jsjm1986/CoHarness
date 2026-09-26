@@ -73,7 +73,7 @@ function sleep(ms: number): Promise<void> {
   // Annotated binding (not withResolvers<void>()): the tests lint layer runs
   // no-invalid-void-type with default options, which rejects the explicit
   // type argument in call position but accepts the inferred form.
-  const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+  const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
   setTimeout(gate.resolve, ms)
   return gate.promise
 }
@@ -157,7 +157,7 @@ describe('reconnect supervisor', () => {
     await ctx.plugin(McpResources)
     const config = stdioConfig({ initialDelayMs: 2, maxDelayMs: 8, maxAttempts: 2 })
     const handle = startConnection(ctx, config, resolveReconnectPolicy(config.reconnect, 'reconnect'))
-    const reconnectGate: PromiseWithResolvers<void> = Promise.withResolvers()
+    const reconnectGate: PromiseWithResolvers<undefined> = Promise.withResolvers()
     try {
       await handle.ready
       ctx.mcpResources.register('srv', handle.resources)
@@ -171,7 +171,7 @@ describe('reconnect supervisor', () => {
       expect(result.isError).toBe(true)
       expect(JSON.stringify(result.content)).toContain('server is disconnected')
     } finally {
-      reconnectGate.resolve()
+      reconnectGate.resolve(undefined)
       await handle.dispose()
       await ctx.fiber.dispose()
     }
@@ -299,7 +299,7 @@ describe('reconnect supervisor', () => {
 
   it('suppresses retry reporting when disposal owns a pending connect rejection', async () => {
     const { warns } = captureLogs(ctx)
-    const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+    const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
     mockConnect.mockImplementation(() => gate.promise)
     const handle = startConnection(ctx, stdioConfig(), resolveReconnectPolicy(undefined, 'reconnect'))
     await vi.waitFor(() => { expect(instances).toHaveLength(1) })
@@ -315,12 +315,12 @@ describe('reconnect supervisor', () => {
 
   it('stops reconnecting when disposal overlaps failed-generation cleanup', async () => {
     vi.useFakeTimers()
-    const entered: PromiseWithResolvers<void> = Promise.withResolvers()
-    const closed: PromiseWithResolvers<void> = Promise.withResolvers()
+    const entered: PromiseWithResolvers<undefined> = Promise.withResolvers()
+    const closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
     const { warns } = captureLogs(ctx)
     mockConnect.mockRejectedValue(new Error('initialize failed'))
     mockClose.mockImplementation(async function (this: { onclose?: () => void }) {
-      entered.resolve()
+      entered.resolve(undefined)
       await closed.promise
       this.onclose?.()
     })
@@ -329,7 +329,7 @@ describe('reconnect supervisor', () => {
       await entered.promise
       expect(warns.some(line => line.includes('connection attempt failed'))).toBe(true)
       const disposing = handle.dispose()
-      closed.resolve()
+      closed.resolve(undefined)
       await disposing
       await handle.ready
       await vi.runAllTimersAsync()
@@ -337,7 +337,7 @@ describe('reconnect supervisor', () => {
       expect(mockListTools).not.toHaveBeenCalled()
       expect(warns.some(line => line.includes('retrying'))).toBe(false)
     } finally {
-      closed.resolve()
+      closed.resolve(undefined)
       await handle.dispose()
       await ctx.fiber.dispose()
       vi.useRealTimers()
@@ -348,7 +348,7 @@ describe('reconnect supervisor', () => {
     vi.useFakeTimers()
     try {
       const { errors } = captureLogs(ctx)
-      const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+      const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
       if (phase === 'connect') mockConnect.mockImplementation(() => gate.promise)
       else mockListTools.mockImplementation(() => gate.promise.then(() => listing('late')))
       mockClose.mockResolvedValue(undefined)
@@ -357,7 +357,7 @@ describe('reconnect supervisor', () => {
 
       const disposing = handle.dispose()
       await vi.advanceTimersByTimeAsync(5_000)
-      gate.resolve()
+      gate.resolve(undefined)
       await vi.advanceTimersByTimeAsync(5_000)
       await disposing
 
@@ -370,14 +370,14 @@ describe('reconnect supervisor', () => {
   })
 
   it('closes a transport that attaches after disposal starts', async () => {
-    const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+    const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
     mockConnect.mockImplementation(function (this: { transport: object | undefined }) {
       this.transport = undefined
       return gate.promise.then(() => { this.transport = {} })
     })
     const handle = startConnection(ctx, stdioConfig(), resolveReconnectPolicy(undefined, 'reconnect'))
     const disposing = handle.dispose()
-    gate.resolve()
+    gate.resolve(undefined)
     await disposing
     expect(mockClose).toHaveBeenCalledTimes(1)
     expect(mockListTools).not.toHaveBeenCalled()

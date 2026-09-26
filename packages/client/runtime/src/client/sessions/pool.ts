@@ -11,6 +11,7 @@ import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { SessionRemotes } from './remotes.ts'
 import type {
+  SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo,
   AgentContext,
   ISessions,
   SessionRuntimeTarget,
@@ -31,6 +32,7 @@ import type { WorkspaceResourceTarget } from '../workspace-resources.ts'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '../contract/store.ts'
 
 interface RuntimeEntry {
+  references?: number
   key: string
   target: ConnectionRuntimeTarget
   readonly runtime: Runtime
@@ -70,6 +72,8 @@ export class SessionRuntimePool implements ISessions {
   private readonly archivedByTarget = new Map<string, ReadonlySet<SessionId>>()
   private readonly sessionOwners = new Map<SessionId, RuntimeEntry>()
   private readonly providers = new Map<SessionProvideDescriptor, Map<RuntimeEntry, () => void>>()
+  private stagedIds: readonly SessionId[] = []
+  private readonly retentionSources = new Map<SessionId, ObservableSnapshot<SessionRetainInfo>>()
   private activeSession: SessionId | undefined
   private readonly provideListeners = new Set<() => void>()
   private currentProvideSnapshot: SessionMaybeProvideInfo
@@ -95,7 +99,7 @@ export class SessionRuntimePool implements ISessions {
       },
     }
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, current: undefined, phase: 'pending',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })
     this.currentScopeList = base.list
@@ -148,6 +152,7 @@ export class SessionRuntimePool implements ISessions {
   private rebuild(): void {
     const ids: SessionId[] = []
     const byId: Record<SessionId, SessionSummary> = {}
+    const archivedById: Record<SessionId, SessionSummary> = {}
     const subagentsByParent: SessionListState['subagentsByParent'] = {}
     const jobsBySession: SessionListState['jobsBySession'] = {}
     for (const entry of this.entries.values()) {
@@ -156,14 +161,17 @@ export class SessionRuntimePool implements ISessions {
       for (const id of state.ids) if (!archived.has(id) && !ids.includes(id)) ids.push(id)
       for (const id of Object.keys(state.byId) as SessionId[]) {
         const summary = state.byId[id]
-        if (summary === undefined || archived.has(id) || byId[id] !== undefined) continue
-        byId[id] = entry.target.kind === 'project'
+        if (summary === undefined) continue
+        const projected = entry.target.kind === 'project'
           ? {
             ...summary,
             projectId: entry.target.projectId,
             ...(entry.target.projectName === undefined ? {} : { workspaceName: entry.target.projectName }),
           }
           : summary
+        if (archived.has(id)) {
+          if (archivedById[id] === undefined) archivedById[id] = projected
+        } else if (byId[id] === undefined) byId[id] = projected
       }
       Object.assign(subagentsByParent, state.subagentsByParent)
       Object.assign(jobsBySession, state.jobsBySession)
@@ -180,7 +188,7 @@ export class SessionRuntimePool implements ISessions {
       this.notifyProvide()
     }
     this.list.set({
-      ids, byId, current: current !== undefined && byId[current] !== undefined ? current : undefined,
+      ids, byId, archivedById, current: current !== undefined && byId[current] !== undefined ? current : undefined,
       phase: this.base.list.getSnapshot().phase,
       subagentsByParent, jobsBySession,
       currentAddress: owner?.runtime.list.getSnapshot().currentAddress,
@@ -205,6 +213,7 @@ export class SessionRuntimePool implements ISessions {
       const runtime = new Runtime(fiber.ctx, connection.api, this.remote, this.conversation, {
         persistSelection: false,
         provideService: false,
+        hostDescription: connection.hostDescription,
       })
       entry = { key, target, runtime, connection, fiber }
       this.entries.set(key, entry)
@@ -232,7 +241,14 @@ export class SessionRuntimePool implements ISessions {
         onHostEnvelope: (envelope: Parameters<Runtime['handleHostEnvelope']>[0]) => {
           runtime.handleHostEnvelope(envelope)
           const frame = envelope.payload
-          if (frame.type === 'host/remote-event') this.rootCtx.remote.$dispatch(frame.event, frame.args)
+          if (frame.type === 'host/remote-event') {
+            this.rootCtx.remote.$dispatch(frame.event, frame.args)
+            // The delivering connection's catalog alone repulls; other runtime
+            // mirrors keep their own host's value.
+            if (frame.event === 'permission-presets/catalog-changed' && establishedEntry.connection !== undefined) {
+              this.rootCtx.get('permissionCatalog')?.invalidateFor(establishedEntry.connection)
+            }
+          }
           if (frame.type === 'host/workspace-file-changed') this.rootCtx.get('workspaceResources')?.handleChange(establishedEntry.target, frame)
         },
         onConnected: (description) => {
@@ -362,6 +378,7 @@ export class SessionRuntimePool implements ISessions {
         && ((failure.error as unknown as { status: number }).status === 401
           || (failure.error as unknown as { status: number }).status === 403)
     if (denied) {
+      this.beginNavigation()
       this.rootCtx.get('workspaceResources')?.disconnect(target,
         new WorkspaceResourceError('access-revoked', 'Workspace access has expired or been revoked'))
     }
@@ -384,6 +401,10 @@ export class SessionRuntimePool implements ISessions {
     registry.connected(target)
   }
 
+  runtimeIdentityFor(id: SessionId): SessionRuntimeTarget | undefined {
+    return this.sessionOwners.get(id)?.target
+  }
+
   runtimeTargetFor(id: SessionId): SessionRuntimeTarget | undefined {
     const owner = this.sessionOwners.get(id)
     // The base runtime's sessions ride the base connection; a target here
@@ -396,6 +417,7 @@ export class SessionRuntimePool implements ISessions {
   setBaseRuntimeTarget(target: SessionRuntimeTarget): void {
     const baseEntry = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (baseEntry === undefined || targetKey(baseEntry.target) === targetKey(target)) return
+    this.beginNavigation()
     const archived = this.archivedByTarget.get(baseEntry.key)
     this.entries.delete(baseEntry.key)
     this.archivedByTarget.delete(baseEntry.key)
@@ -407,7 +429,83 @@ export class SessionRuntimePool implements ISessions {
     this.rebuild()
   }
 
+  beginNavigation(): AbortSignal {
+    return this.base.beginNavigation()
+  }
+
+  retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {
+    const id = typeof target === 'string' ? target : target.childSessionId
+    const owner = this.sessionOwners.get(id)
+      ?? (typeof target === 'string' ? undefined : this.sessionOwners.get(target.parentSessionId))
+    if (owner === undefined) throw new Error(`sessions.retain: unknown session ${id}`)
+    owner.references = (owner.references ?? 0) + 1
+    let reference: SessionReference
+    try {
+      reference = owner.runtime.retain(target, options)
+    } catch (error) {
+      owner.references--
+      this.releaseUnused(this.stagedIds)
+      throw error
+    }
+    let released = false
+    const release = (): void => {
+      if (released) return
+      released = true
+      owner.references = (owner.references ?? 1) - 1
+      reference.release()
+      this.releaseUnused(this.stagedIds)
+    }
+    const owned: SessionReference = {
+      sessionId: reference.sessionId,
+      get binding() { return reference.binding },
+      ready: reference.ready,
+      release,
+      [Symbol.dispose]: release,
+    }
+    return owned
+  }
+
+  async using<T>(
+    target: SessionTarget,
+    options: SessionRetainOptions,
+    operation: (reference: SessionReference) => T | Promise<T>,
+  ): Promise<T> {
+    const reference = this.retain(target, options)
+    try {
+      await reference.ready
+      return await operation(reference)
+    } finally {
+      reference.release()
+    }
+  }
+
+  retainInfo(id: SessionId): ObservableSnapshot<SessionRetainInfo> {
+    const existing = this.retentionSources.get(id)
+    if (existing !== undefined) return existing
+    const empty: SessionRetainInfo = Object.freeze({ referenceCount: 0, retainedBy: Object.freeze({}) })
+    const ownerSource = (): ObservableSnapshot<SessionRetainInfo> | undefined => this.sessionOwners.get(id)?.runtime.retainInfo(id)
+    const source: ObservableSnapshot<SessionRetainInfo> = {
+      getSnapshot: () => ownerSource()?.getSnapshot() ?? empty,
+      subscribe: (listener) => {
+        let current = ownerSource()
+        let stop = current?.subscribe(listener)
+        const stopList = this.list.subscribe(() => {
+          const next = ownerSource()
+          if (next === current) return
+          stop?.()
+          current = next
+          stop = next?.subscribe(listener)
+          listener()
+        })
+        return () => { stopList(); stop?.() }
+      },
+    }
+    this.retentionSources.set(id, source)
+    return source
+  }
+
   open(id: SessionId): void {
+    this.beginNavigation()
     const owner = this.sessionOwners.get(id)
     if (owner === undefined) throw new Error(`sessions.select: unknown session ${id}`)
     this.activeSession = id
@@ -427,6 +525,7 @@ export class SessionRuntimePool implements ISessions {
   }
 
   setAdditionalStaged(ids: readonly SessionId[]): void {
+    this.stagedIds = [...ids]
     const grouped = new Map<RuntimeEntry, SessionId[]>()
     for (const id of ids) {
       const owner = this.sessionOwners.get(id)
@@ -446,7 +545,8 @@ export class SessionRuntimePool implements ISessions {
     // non-base target prevents its sessions from leaking into the ordinary
     // current-space navigation list.
     for (const entry of [...this.entries.values()]) {
-      if (entry.runtime === this.base || [...retained].some(id => this.sessionOwners.get(id) === entry)) continue
+      if (entry.runtime === this.base || (entry.references ?? 0) > 0
+        || [...retained].some(id => this.sessionOwners.get(id) === entry)) continue
       this.releaseEntry(entry)
     }
     this.rebuild()
@@ -505,6 +605,7 @@ export class SessionRuntimePool implements ISessions {
   provideInfoFor(id: SessionId): SessionProvideInfo | undefined { return this.sessionOwners.get(id)?.runtime.provideInfoFor(id) }
   subagentAddress(id: SessionId): SubagentAddress | undefined { return this.sessionOwners.get(id)?.runtime.subagentAddress(id) }
   openSubagent(address: SubagentAddress): void {
+    this.beginNavigation()
     const owner = this.sessionOwners.get(address.childSessionId) ?? this.sessionOwners.get(address.parentSessionId)
     if (owner === undefined) throw new Error(`sessions.selectSubagent: unknown session ${address.childSessionId}`)
     owner.runtime.openSubagent(address)

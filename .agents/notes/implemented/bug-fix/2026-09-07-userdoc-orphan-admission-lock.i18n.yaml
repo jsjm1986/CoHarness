@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-07-userdoc-orphan-admission-lock.md
-2026-09-07-userdoc-orphan-admission-lock.md: 565d745b897a56505f50083a659d7517efb0c888
-2026-09-07-userdoc-orphan-admission-lock.zh.md: d6e7772347ab54efcae027af10fd6ebbf7763745
+2026-09-07-userdoc-orphan-admission-lock.md: 84955ed523632278d8ced522426b684fabe017ad
+2026-09-07-userdoc-orphan-admission-lock.zh.md: 7da9ba8c88ce5ceaea1d4834d252275ed884e74a

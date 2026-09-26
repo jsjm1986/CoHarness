@@ -13,6 +13,9 @@
     - button "Agent 预设":
       - img
       - text: Agent 预设
+    - button "已归档会话":
+      - img
+      - text: 已归档会话
   - button "打开配置文件"
   - button "关闭":
     - img
@@ -31,6 +34,14 @@
       - listitem:
         - 'button "展开设置: Agent 循环"':
           - text: Agent 循环 Agent 如何派发工具调用。
+          - img
+      - listitem:
+        - 'button "展开设置: Subagent"':
+          - text: Subagent 设置 Subagent 的递归层级和并行数量。
+          - img
+      - listitem:
+        - 'button "展开设置: 模型选择"':
+          - text: 模型选择 允许 Agent 为 Subagent 选择模型
           - img
       - listitem:
         - 'button "展开设置: 网页搜索"':

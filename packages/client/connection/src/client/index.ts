@@ -26,9 +26,9 @@ export type {
   ApprovalResponsePayload, QuestionResponsePayload, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
-  DirectoryEntry, DirectoryListing,
+  DirectoryEntry, DirectoryListing, DesktopConfirmation,
   ToolCallView, ToolResultView, WorkspaceApi, WorkspaceId, WorkspaceView,
-  WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
+  WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
   SkillsApi, SkillEntry,
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   MessageId, ModelReasoningEffort, ModelSelection, QueueAction, QueuedInboxItem, SessionModels,
@@ -107,6 +107,22 @@ interface ClientTransportGlobal {
   __DSH_CONNECTION_RECOVERY__?: unknown
 }
 
+function targetKey(target: ConnectionRuntimeTarget): string {
+  return target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`
+}
+
+/**
+ * Handles derived from one root connection share this state: the session
+ * resolver is registered once on the base connection, and target handles are
+ * memoized so a consumer resolving an already-opened runtime receives the same
+ * started handle the runtime pool drives instead of a second unstarted loop.
+ */
+interface ConnectionShared {
+  root: ConnectionHandle | undefined
+  readonly handles: Map<string, ConnectionHandle>
+  sessionTarget?: ((sessionId: SessionId) => ConnectionRuntimeTarget | undefined) | undefined
+}
+
 /**
  * The ctx.connection service API: the API client plus a one-shot
  * controller starter (the runtime plugin supplies sinks when its object layer
@@ -127,9 +143,17 @@ export interface ConnectionHandle {
   readonly state: ConnectionStateSource
   /** Generic logical RPC channels over the same Connection transport. */
   readonly rpc: ClientConnectionRpc
-  /** Create an independent authenticated transport for another runtime target. */
+  /**
+   * Resolve another runtime target's authenticated transport. Target handles
+   * are memoized per runtime: callers share the pool-started connection, so
+   * `state`, `hostDescription`, and `rpc` observe the live loop.
+   */
   readonly forTarget?: (target: ConnectionRuntimeTarget) => ConnectionHandle
-  /** Resolve a session-addressed operation through its owning runtime transport. */
+  /**
+   * Resolve a session-addressed operation through the pooled connection of the
+   * runtime that owns the session; falls back to this connection while the
+   * session's owner is the base runtime or unresolved.
+   */
   readonly forSession?: (sessionId: SessionId) => ConnectionHandle
   /** Register the runtime object's session-to-target resolver. */
   readonly registerSessionTargetResolver?: (resolve: (sessionId: SessionId) => ConnectionRuntimeTarget | undefined) => () => void
@@ -157,12 +181,15 @@ function createConnectionHandle(
   rpc: ClientConnectionRpc,
   accountPreferences?: AccountPreferencesTransport,
   projectModelSettings?: ProjectModelSettingsTransport,
+  shared?: ConnectionShared,
+  target?: ConnectionRuntimeTarget,
 ): ConnectionHandle {
+  const sharedState = shared ?? { root: undefined, handles: new Map<string, ConnectionHandle>() }
+  const ownKey = target === undefined ? 'personal' : targetKey(target)
   let started = false
   let controller: ConnectionController | undefined
   let description: HostDescription | undefined
   let state: ConnectionState | undefined
-  let sessionTarget: ((sessionId: SessionId) => ConnectionRuntimeTarget | undefined) | undefined
   const descriptionListeners = new Set<() => void>()
   const stateListeners = new Set<() => void>()
   const publishDescription = (next: HostDescription | undefined): void => {
@@ -207,22 +234,34 @@ function createConnectionHandle(
       },
     },
     rpc,
-    forTarget: next => createConnectionHandle(
-      new WebApiClient(next),
-      pageLocation,
-      bootstrapRecovery,
-      createWebConnectionRpc(undefined, next),
-      undefined,
-      undefined,
-    ),
+    forTarget: (next) => {
+      const key = targetKey(next)
+      if (key === ownKey) return handle
+      if (key === 'personal') return sharedState.root ?? handle
+      const existing = sharedState.handles.get(key)
+      if (existing !== undefined) return existing
+      const child = createConnectionHandle(
+        new WebApiClient(next),
+        pageLocation,
+        bootstrapRecovery,
+        createWebConnectionRpc(undefined, next),
+        undefined,
+        undefined,
+        sharedState,
+        next,
+      )
+      sharedState.handles.set(key, child)
+      return child
+    },
     forSession: (id) => {
-      const target = sessionTarget?.(id)
-      return target === undefined ? handle : handle.forTarget?.(target) ?? handle
+      const target = sharedState.sessionTarget?.(id)
+      if (target === undefined) return sharedState.root ?? handle
+      return handle.forTarget?.(target) ?? sharedState.root ?? handle
     },
     registerSessionTargetResolver: (resolve) => {
-      if (sessionTarget !== undefined) throw new Error('connection: session target resolver is already registered')
-      sessionTarget = resolve
-      return () => { if (sessionTarget === resolve) sessionTarget = undefined }
+      if (sharedState.sessionTarget !== undefined) throw new Error('connection: session target resolver is already registered')
+      sharedState.sessionTarget = resolve
+      return () => { if (sharedState.sessionTarget === resolve) sharedState.sessionTarget = undefined }
     },
     reconnect() {
       controller?.reconnect()
@@ -252,12 +291,16 @@ function createConnectionHandle(
         stop: () => {
           controller?.stop()
           controller = undefined
+          if (target !== undefined && sharedState.handles.get(ownKey) === handle) {
+            sharedState.handles.delete(ownKey)
+          }
           publishDescription(undefined)
           publishState(undefined)
         },
       }
     },
   }
+  if (shared === undefined) sharedState.root = handle
   return handle
 }
 
@@ -287,3 +330,5 @@ export function apply(ctx: Context): void {
   )
   ctx.provide('connection', handle)
 }
+
+export { ConnectionRpcStreamInterrupted } from '../rpc-stream.ts'

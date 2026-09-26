@@ -1,8 +1,8 @@
 import { once } from 'node:events'
 import { generateKeyPairSync } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import type { AddressInfo } from 'node:net'
+import { connect, createServer, type AddressInfo, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -17,6 +17,7 @@ import { createProxyHandlers } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
+import { barrier } from './barrier.ts'
 
 // Resolve from a real cwd path (not import.meta.url, which is a virtual URL
 // under vitest) so the absolute ws path stays requireable by the plain-node child.
@@ -40,6 +41,13 @@ const server = http.createServer((req, res) => {
     return
   }
   if (req.url === '/api/hold') { res.writeHead(200); res.write('authorized-prefix'); return }
+  if (req.url === '/api/sse') {
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    res.write('data: open\\n\\n')
+    const timer = setTimeout(() => { res.write('data: tick\\n\\n'); res.end() }, 250)
+    req.on('close', () => clearTimeout(timer))
+    return
+  }
   if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
   if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
   res.setHeader('content-type', 'application/json')
@@ -47,17 +55,66 @@ const server = http.createServer((req, res) => {
 })
 const wss = new WebSocketServer({ server })
 wss.on('connection', (socket, req) => { socket.send(JSON.stringify({ host: req.headers.host, principal: req.headers[${JSON.stringify('x-dsh-gateway-principal')}] ?? null })) })
-server.listen(Number(process.argv[1]), '127.0.0.1')
+server.listen(0, '127.0.0.1', () => {
+  fs.writeFileSync(process.argv[2], String(server.address().port))
+})
 `
 
 let cleanup: Array<() => Promise<void> | void> = []
-afterEach(async () => { for (const fn of cleanup.reverse()) await fn(); cleanup = [] })
+afterEach(async () => {
+  const failures: unknown[] = []
+  for (const fn of cleanup.reverse()) {
+    try { await fn() } catch (error) { failures.push(error) }
+  }
+  cleanup = []
+  if (failures.length) throw new AggregateError(failures, 'proxy fixture cleanup failed')
+})
 
-async function setup(withPrincipal = false) {
+/** Hold the assigned Gateway endpoint while each real child binds its own ephemeral port. */
+async function runtimeRelay(portFile: string): Promise<number> {
+  const sockets = new Set<Socket>()
+  const relay = createServer((downstream) => {
+    sockets.add(downstream)
+    downstream.on('close', () => sockets.delete(downstream))
+    // The manager retries signed readiness while the child publishes its listener.
+    let port: number
+    try { port = Number(readFileSync(portFile, 'utf8')) } catch (error) {
+      downstream.destroy()
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      return
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      downstream.destroy()
+      throw new Error('fixture child published an invalid listener')
+    }
+    const upstream = connect(port, '127.0.0.1')
+    sockets.add(upstream)
+    upstream.on('close', () => { sockets.delete(upstream); downstream.destroy() })
+    downstream.on('close', () => upstream.destroy())
+    upstream.on('error', () => downstream.destroy())
+    downstream.on('error', () => upstream.destroy())
+    downstream.pipe(upstream).pipe(downstream)
+  })
+  cleanup.push(async () => {
+    for (const socket of sockets) socket.destroy()
+    if (relay.listening) await new Promise<void>((resolve, reject) => {
+      relay.close(error => error ? reject(error) : resolve())
+    })
+  })
+  relay.listen(0, '127.0.0.1')
+  await once(relay, 'listening')
+  return (relay.address() as AddressInfo).port
+}
+
+async function setup(withPrincipal = false, env: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: '43200' })
-  cfg.dshCommand = [process.execPath, '-e', ECHO_DSH, '{port}']
+  cleanup.push(() => { db.close() })
+  const portFile = join(root, 'child-port')
+  const port = await runtimeRelay(portFile)
+  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: String(port), ...env })
+  cfg.dshCommand = [process.execPath, '-e', ECHO_DSH, '{port}', portFile]
   const deps: GatewayDeps = {
     cfg,
     auth: new AuthService(db, cfg),
@@ -66,6 +123,7 @@ async function setup(withPrincipal = false) {
     audit: new AuditService(db),
     instances: new InstanceManager(db, cfg),
   }
+  cleanup.push(() => deps.instances.stopAll())
   const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678' })
   await deps.users.changeOwnPassword(alice.id, 'pw-12345678')
   const signer = withPrincipal
@@ -73,18 +131,20 @@ async function setup(withPrincipal = false) {
     : undefined
   const handlers = createProxyHandlers(deps, signer)
   const server = createGatewayServer(deps, handlers)
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  // Teardown order matters: stop instances first (drops the upstream socket so
-  // the proxied upgrade pipe ends), then close proxy and server. server.close()'s
-  // callback can stall on a detached (upgraded) socket, so race it with a short
-  // timeout after forcibly dropping tracked connections.
-  cleanup.push(() => new Promise<void>((resolve) => {
-    server.closeAllConnections()
-    const timer = setTimeout(resolve, 1500)
-    server.close(() => { clearTimeout(timer); resolve() })
-  }))
+  const connections = new Set<Socket>()
+  server.on('connection', socket => {
+    connections.add(socket)
+    socket.on('close', () => connections.delete(socket))
+  })
+  cleanup.push(async () => {
+    // Upgraded WebSockets are not included in closeAllConnections().
+    for (const socket of connections) socket.destroy()
+    if (server.listening) await new Promise<void>((resolve, reject) => {
+      server.close(error => error ? reject(error) : resolve())
+    })
+  })
   cleanup.push(() => handlers.close())
-  cleanup.push(() => deps.instances.stopAll())
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   cfg.publicOrigins.push(base)
   const loginRes = await fetch(`${base}/login`, {
@@ -203,6 +263,31 @@ describe('proxy handlers', () => {
     expect((await fetch(`${base}/api/echo`, { headers: { cookie } })).status).toBe(401)
   })
 
+  it('rechecks a login revoked while runtime admission is waiting', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const admitted = barrier()
+    const release = barrier()
+    const original = deps.instances.operationRef!.bind(deps.instances)
+    deps.instances.operationRef = async (target, delta, generation) => {
+      await original(target, delta, generation)
+      if (delta === 1) {
+        admitted.resolve()
+        await release.promise
+      }
+    }
+    const response = fetch(`${base}/api/echo`, { headers: { cookie } })
+    try {
+      await admitted.promise
+      await deps.auth.revoke(cookie.slice('hgw_session='.length))
+      release.resolve()
+      expect((await response).status).toBe(403)
+    } finally {
+      release.resolve()
+      await response
+    }
+  })
+
   it('invalidates only matching targets and terminates in-flight HTTP bodies', async () => {
     const { deps, base, cookie, handlers, alice } = await setup(true)
     await deps.instances.ensureRunning(alice)
@@ -224,6 +309,15 @@ describe('proxy handlers', () => {
     handlers.invalidateAccess({ userId: alice.id })
     await Promise.all([closed, ended])
     reader.releaseLock()
+  })
+
+  it('does not abort an event stream that idles past the upstream timeout', async () => {
+    const { deps, base, cookie } = await setup(false, { HGW_UPSTREAM_TIMEOUT_MS: '100' })
+    await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
+    const response = await fetch(`${base}/api/sse`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    const body = await response.text()
+    expect(body).toBe('data: open\n\ndata: tick\n\n')
   })
 
   it('proxies websocket upgrades with rewritten host', async () => {

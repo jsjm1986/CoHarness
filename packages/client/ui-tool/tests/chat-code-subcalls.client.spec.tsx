@@ -112,6 +112,7 @@ async function bench(snapshot: ConversationSnapshot) {
   const list = createSnapshotStore<SessionListState>({
     ids: [SID],
     byId: { [SID]: { id: SID, title: 'S', displayTitle: 'S', running: false, blank: false, updatedAt: 1 } },
+    archivedById: {},
     current: SID,
     phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   })
@@ -162,7 +163,7 @@ async function bench(snapshot: ConversationSnapshot) {
   ctx.provide('connection', {
     api: { settings: {} },
     isLoopback: true,
-    hostDescription: { getSnapshot: () => ({ canOpenPath: true }), subscribe: () => () => {} },
+    hostDescription: { getSnapshot: () => ({ canOpenPath: true, executionAuthorityRequired: false }), subscribe: () => () => {} },
   } as never)
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)

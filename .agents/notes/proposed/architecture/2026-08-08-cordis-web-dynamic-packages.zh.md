@@ -14,6 +14,8 @@ Status: proposed
 
 ## Proposal
 
+模型执行工具部分由[退役决策](../../implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.zh.md)替代。Host/Client 生命周期和历史 UI 仍是独立的程序化消费者；此提案不提供替代模型执行入口。
+
 ### 核心原则
 
 - Host 保存 Plugin、Package、Run、审批和版本指针的唯一进程级权威状态。

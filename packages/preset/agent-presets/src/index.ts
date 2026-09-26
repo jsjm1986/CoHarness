@@ -25,7 +25,7 @@ import { stat } from 'node:fs/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { evaluate } from '@deepseek-ai/cordis-plugin-loader'
 import z from '@deepseek-ai/schemastery'
-import { bindScopeParent, createScope, scopeOf, type Scope, type ScopeKey, type ScopeParentBinding } from '@deepseek-ai/dsh-scope'
+import { bindScopeParent, createScope, scopeOf, scopeParentOf, type Scope, type ScopeKey, type ScopeParentBinding } from '@deepseek-ai/dsh-scope'
 // Type-only: resolves the `agent/created` lifecycle event this service watches.
 import type { Agent } from '@deepseek-ai/dsh-agent'
 // Type-only: resolves ctx.pluginPackages for the resolution-generation package lookup.
@@ -65,13 +65,16 @@ export const SETTINGS_NAMESPACE = 'agent-presets'
 
 /** The user-writable slice of this plugin's config. */
 export interface AgentPresetSettings {
-  /** Preset mounted when a session names none. */
+  /** Preset mounted when a session names none and mode selection is shown. */
   default?: string
+  /** Whether visible mode selection and the saved `default` govern unnamed new sessions. */
+  modeSelectionEnabled?: boolean
 }
 
 /** Runtime schema for the user-writable slice. */
 export const AgentPresetSettingsSchema: z<AgentPresetSettings> = z.object({
   default: z.string(),
+  modeSelectionEnabled: z.boolean(),
 })
 
 export { COMPOSITION_FILE, discoverPresets, scanRoot } from './discovery.ts'
@@ -80,7 +83,7 @@ export {
   METADATA_FILE, readPresetMetadata, renderPresetMetadata, type PresetMetadata,
 } from './metadata.ts'
 export {
-  inactiveRows, leakedServices, livePresetMounts, mountPreset, serviceForAgent, standingMountFor,
+  environmentForAgent, inactiveRows, leakedServices, livePresetMounts, mountPreset, serviceForAgent, standingMountFor,
   type JoinedPresetMount, type PresetMount,
 } from './mount.ts'
 export {
@@ -136,9 +139,9 @@ export class AgentPresets extends TypertRemoteService {
   private readonly harnessBase: string | undefined
 
   /**
-   * The user layer over `config.default`, present only while a settings
-   * provider is composed. Held rather than snapshotted so a hot-reloaded
-   * document takes effect without a restart.
+   * The user layer over `config.default` and the picker-visibility base,
+   * present only while a settings provider is composed. Held rather than
+   * snapshotted so a hot-reloaded document takes effect without a restart.
    */
   private settings: SettingsScope<AgentPresetSettings> | undefined
 
@@ -181,8 +184,9 @@ export class AgentPresets extends TypertRemoteService {
         settingsNamespace(SETTINGS_NAMESPACE),
         AgentPresetSettingsSchema,
         {
-          base: { default: config.default }, owner: 'project', projectWrite: 'manager',
-          projectWritePaths: [['default']],
+          base: { default: config.default, modeSelectionEnabled: true },
+          owner: 'project', projectWrite: 'manager',
+          projectWritePaths: [['default'], ['modeSelectionEnabled']],
         },
       )
       this.settingsService = settingsCtx.settings
@@ -238,7 +242,21 @@ export class AgentPresets extends TypertRemoteService {
    * every running session on the preset it was composed from.
    */
   get defaultId(): string {
-    return this.settings?.get().default ?? this.config.default
+    // Hiding the picker is also the product's safe-default boundary: a saved
+    // choice must not silently compose a non-standard new session while no
+    // control reports that choice.
+    return this.selectionPolicy().defaultId
+  }
+
+  /** Read one internally consistent snapshot of the selection policy. */
+  private selectionPolicy(): { enabled: boolean; defaultId: string } {
+    const settings = this.settings?.get()
+    if (settings === undefined) return { enabled: true, defaultId: this.config.default }
+    const enabled = settings.modeSelectionEnabled ?? true
+    return {
+      enabled,
+      defaultId: enabled ? settings.default ?? this.config.default : this.config.default,
+    }
   }
 
   /**
@@ -334,17 +352,27 @@ export class AgentPresets extends TypertRemoteService {
   }
 
   /**
-   * Standing mounts by preset id, single-flight so two agents racing the
-   * first use of one preset share one composition. A settled failure is
-   * removed so a later session retries a preset whose file has been fixed; a
-   * settled success serves until the composition FILE visibly changes — each
-   * generation records its file stamp, and a stale stamp starts the next
-   * generation for sessions created afterwards. Sessions already joined keep
-   * the generation they run on; a superseded one is never disposed while the
-   * process lives (reclaimed only by whole-tree teardown), so editing files
-   * is bounded by how often compositions change, not by session count.
+   * Standing mounts by preset id and realm, single-flight so two agents
+   * racing the first use of one composition share one mount. A settled
+   * failure is removed so a later session retries a preset whose file has
+   * been fixed; a settled success serves until the composition FILE visibly
+   * changes — each generation records its file stamp, and a stale stamp
+   * starts the next generation for sessions created afterwards. Sessions
+   * already joined keep the generation they run on; a superseded one is
+   * never disposed while the process lives (reclaimed only by whole-tree
+   * teardown), so editing files is bounded by how often compositions change,
+   * not by session count.
    */
-  private readonly standing = new Map<string, Promise<StandingMount>>()
+  private readonly standing = new Map<string, Map<string | undefined, Promise<StandingMount>>>()
+
+  /**
+   * Realm mount hooks by realm key. A hook runs inside a fresh standing
+   * scope before the composition loads, which is where a host installs the
+   * environment the composition's service lookups resolve against — an SSH
+   * target's providers shadowing `fs`/`subprocess`/`sandbox` for every agent
+   * joined to that realm's generation.
+   */
+  private readonly realms = new Map<string, StandingRealmHook>()
 
   /**
    * Parent bindings of the agents this roster composed, keyed by the agent's
@@ -371,16 +399,18 @@ export class AgentPresets extends TypertRemoteService {
    * session.
    * @param agentCtx - the agent's scope context.
    * @param id - the preset id, or `undefined` for {@link defaultId}.
+   * @param realm - registered realm key whose generation the agent joins, or
+   *   `undefined` for the host-local composition.
    * @returns the preset that was composed, for the caller to record.
    * @throws when the preset is unknown or its composition is unusable.
    */
-  async mount(agentCtx: Context, id?: string): Promise<AgentPreset> {
+  async mount(agentCtx: Context, id?: string, realm?: string): Promise<AgentPreset> {
     const agentKey = scopeOf(agentCtx)
     if (agentKey === undefined) {
       throw new Error('agent-presets: refusing to compose an unscoped context; the scope key is what joins an agent to its preset')
     }
     const preset = await this.resolveMountable(id)
-    const standing = await this.ensureStanding(preset)
+    const standing = await this.ensureStanding(preset, realm)
     // The one bind of this agent's ancestry. The binding is the only re-link
     // authority, held privately so nothing outside this roster can move a
     // composed agent to another preset; a later recompose layer re-links
@@ -476,17 +506,20 @@ export class AgentPresets extends TypertRemoteService {
     }
     const projectManager = authority?.participant.scope.kind === 'project'
       && authority.participant.scope.canManage === true
-    const defaultId = this.defaultId
+    // Keep the visible policy and marked default from the same settings
+    // snapshot even when discovery yields while settings are hot-reloaded.
+    const policy = this.selectionPolicy()
     return {
       presets: (await this.list()).map(preset => ({
         id: preset.id,
         trust: preset.trust,
-        isDefault: preset.id === defaultId,
+        isDefault: preset.id === policy.defaultId,
         ...preset.name === undefined ? {} : { name: preset.name },
         ...preset.description === undefined ? {} : { description: preset.description },
         ...preset.broken === undefined ? {} : { broken: preset.broken },
       })),
       authorable: (authority?.participant.scope.kind !== 'project' || projectManager) && this.authorable,
+      modeSelectionEnabled: policy.enabled,
     }
   }
 
@@ -736,7 +769,12 @@ export class AgentPresets extends TypertRemoteService {
       throw new Error('agent-presets: refusing to recompose an unscoped context')
     }
     const preset = await this.resolveMountable(id)
-    const standing = await this.ensureStanding(preset)
+    // The current parent carries the realm the agent runs in, so a preset
+    // switch re-ensures a generation under the SAME realm: an SSH-bound
+    // session may swap its tool set but never its execution environment.
+    const parent = scopeParentOf(agentKey)
+    const realm = parent !== undefined && 'realm' in parent && typeof parent.realm === 'string' ? parent.realm : undefined
+    const standing = await this.ensureStanding(preset, realm)
     const binding = this.bindings.get(agentKey)
     if (binding === undefined) {
       this.bindings.set(agentKey, bindScopeParent(agentKey, standing.key))
@@ -766,9 +804,50 @@ export class AgentPresets extends TypertRemoteService {
     return (await this.ensureStanding(preset)).key
   }
 
+  /**
+   * Install the environment hook one realm key resolves to.
+   *
+   * The hook runs inside each NEW standing generation created under `realm`,
+   * before the preset subtree loads, so provider registrations it makes are
+   * what the composition's rows resolve. Re-registering replaces the hook for
+   * future generations; live generations keep the environment they mounted.
+   * @param realm - the realm key `mount()` callers name.
+   * @param mount - environment installer for a fresh standing scope.
+   * @returns a disposer that unregisters the hook; generations already
+   *   mounted are unaffected.
+   */
+  registerRealm(realm: string, mount: StandingRealmHook): () => void {
+    this.realms.set(realm, mount)
+    return () => {
+      if (this.realms.get(realm) === mount) this.realms.delete(realm)
+    }
+  }
+
+  /**
+   * Drop every standing generation created under `realm`.
+   *
+   * Invalidation retires the POINTER only — joined agents keep the mounted
+   * subtree, whose providers fail closed on their own — so the next join
+   * re-runs the realm hook and re-resolves the environment's admission. An
+   * SSH revocation uses this: the dead generation stops accepting new
+   * sessions while the already-joined ones unwind through their own
+   * teardown.
+   * @param realm - the realm key to retire.
+   */
+  invalidateRealm(realm: string): void {
+    for (const generations of this.standing.values()) {
+      generations.delete(realm)
+    }
+  }
+
   /** Resolve (or create, single-flight) the standing mount of one preset. */
-  private async ensureStanding(preset: AgentPreset): Promise<StandingMount> {
-    const pending = this.standing.get(preset.id)
+  private async ensureStanding(preset: AgentPreset, realm?: string): Promise<StandingMount> {
+    let generations = this.standing.get(preset.id)
+    if (generations === undefined) {
+      generations = new Map()
+      this.standing.set(preset.id, generations)
+    }
+    const pending = generations.get(realm)
     if (pending !== undefined) {
       const mounted = await pending
       // Files are the only composition editor (authoring is copy/delete), so
@@ -786,11 +865,13 @@ export class AgentPresets extends TypertRemoteService {
       // decremented when the agent's scope key dies.
       // Guarded delete: a caller that raced this one may have already started
       // the next generation, and dropping THAT pointer would fork a third.
-      if (this.standing.get(preset.id) === pending) this.standing.delete(preset.id)
-      return this.ensureStanding(preset)
+      if (generations.get(realm) === pending) generations.delete(realm)
+      return this.ensureStanding(preset, realm)
     }
     const created = (async (): Promise<StandingMount> => {
-      const key: ScopeKey = { agentPreset: preset.id }
+      const key: ScopeKey = realm === undefined
+        ? { agentPreset: preset.id }
+        : { agentPreset: preset.id, realm }
       const scope = createScope(this.selfCtx, key)
       try {
         // Stamped before the file is read: an edit racing the mount makes the
@@ -800,6 +881,17 @@ export class AgentPresets extends TypertRemoteService {
         if (stamp === undefined) {
           throw new PresetMountError(preset.id, `composition file is unreadable: ${preset.path}`)
         }
+        if (realm !== undefined) {
+          const environment = this.realms.get(realm)
+          if (environment === undefined) {
+            throw new Error(`agent-presets: unknown standing realm "${realm}"`)
+          }
+          // The realm hook installs the environment the composition resolves
+          // services from — SSH providers shadowing `fs`/`subprocess`/
+          // `sandbox` — BEFORE the rows load, so their inject captures the
+          // shadowed implementations rather than the host's.
+          await environment(scope.ctx)
+        }
         await mountPreset(scope.ctx, preset)
         return { key, scope, stamp }
       } catch (error) {
@@ -807,12 +899,12 @@ export class AgentPresets extends TypertRemoteService {
         throw error
       }
     })()
-    this.standing.set(preset.id, created)
+    generations.set(realm, created)
     // Guarded delete: a copy/remove may have cleared this pointer and a later
     // ensureStanding installed the next generation already — dropping THAT
     // pointer would fork a third standing mount.
     void created.catch(() => {
-      if (this.standing.get(preset.id) === created) this.standing.delete(preset.id)
+      if (generations.get(realm) === created) generations.delete(realm)
     })
     return created
   }
@@ -842,6 +934,18 @@ async function compositionStamp(path: string): Promise<CompositionStamp | undefi
 function sameStamp(a: CompositionStamp, b: CompositionStamp): boolean {
   return a.mtimeMs === b.mtimeMs && a.size === b.size
 }
+
+/**
+ * Environment installer for one registered standing realm.
+ *
+ * Runs inside a fresh standing scope before the preset subtree mounts, so
+ * the services the composition's rows resolve — `fs`, `subprocess`,
+ * `sandbox`, `ssh` — can be shadowed with realm-private providers. Throwing
+ * or rejecting fails the generation; the scope is disposed and no agent can
+ * join it.
+ * @param scopeCtx - the standing scope context the preset mounts under.
+ */
+export type StandingRealmHook = (scopeCtx: Context) => unknown
 
 /** One preset's standing composition. */
 interface StandingMount {

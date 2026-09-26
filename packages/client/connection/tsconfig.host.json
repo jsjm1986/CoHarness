@@ -13,7 +13,10 @@
     "src/loopback-hostname.ts",
     "src/rpc-host.ts",
     "src/rpc.ts",
-    "src/websocket-downlink.ts"
+    "src/websocket-downlink.ts",
+    "src/rpc-stream.ts",
+    "src/rpc-stream-host.ts",
+    "src/rpc-stream-reader.ts"
   ],
   "references": [
     {

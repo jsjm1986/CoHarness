@@ -31,6 +31,7 @@ export function apply(ctx: Context): void {
       render: (_args, value) => [{ type: 'text', text: value }],
     },
     async execute(args, exec) {
+      await ctx.pluginManager.authorize()
       const policy = ctx.sandboxPolicy.resolve(exec.agent === undefined ? {} : { session: exec.agent.session })
       await approveEscalation({
         requestedMode: 'danger-full-access', effectiveMode: policy.mode, subject: 'plugin management operation',
@@ -64,10 +65,10 @@ export function apply(ctx: Context): void {
           return JSON.stringify(await manager.installBundle(args.target, {
             ...args.enabled === undefined ? {} : { enabled: args.enabled },
             ...args.approvedBuilds === undefined ? {} : { approvedBuilds: args.approvedBuilds },
-          }))
+          }, exec.signal))
         case 'remove_bundle':
           if (args.target === undefined) throw new Error('target bundle name is required')
-          return JSON.stringify(await manager.removeBundle(args.target))
+          return JSON.stringify(await manager.removeBundle(args.target, exec.signal))
         /* v8 ignore next -- tool JSON validation rejects actions outside the declared enum */
         default: return assertNever(args.action)
       }

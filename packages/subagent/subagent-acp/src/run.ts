@@ -68,7 +68,7 @@ export interface AcpRunSpec {
   disposeGraceMs: number
   /**
    * Spawn function from the subprocess seam (`ctx.subprocess.spawn`), so the
-   * child rides the shared scrub, tree-scoped teardown, and service-owned
+   * child rides the shared scrub, managed-range teardown, and service-owned
    * lifetime instead of a package-local child_process path.
    */
   spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
@@ -123,8 +123,8 @@ async function settledOutcome(
   }
 }
 
-/** Bounded whole-tree exit wait: polls the handle's tree liveness until it exits or `ms` elapses. */
-async function treeExitsWithin(child: SubprocessHandle, ms: number): Promise<boolean> {
+/** Bound the provider's managed-range exit observation by the cooperative EOF grace. */
+async function rangeExitsWithin(child: SubprocessHandle, ms: number): Promise<boolean> {
   const controller = new AbortController()
   const timer = setTimeout(() => { controller.abort() }, ms)
   try {
@@ -136,26 +136,38 @@ async function treeExitsWithin(child: SubprocessHandle, ms: number): Promise<boo
 
 /**
  * Cooperative teardown ladder for an out-of-process agent, over the seam's
- * public verbs; resolves only at whole-tree quiescence: stdin EOF (the child's
+ * public verbs; resolves only at managed-range quiescence: stdin EOF (the child's
  * window to flush persistence and reap its own descendants), then the
  * terminate() escalation (SIGTERM → spec grace → SIGKILL) and its
- * whole-tree exit proof.
+ * managed-range exit proof. Observation failures do not skip termination;
+ * they are reported after the final exit wait, even if that wait succeeds.
  * @param child - the spawned ACP child's handle.
  * @param eofGraceMs - tier-1 window after stdin EOF.
+ * @throws the observation failure, or an AggregateError when both waits fail.
  */
 export async function disposeAcpChild(child: SubprocessHandle, eofGraceMs: number): Promise<void> {
-  const spawnState = { failed: false }
-  void child.done.catch(() => { spawnState.failed = true })
-  await Promise.resolve()
-  if (spawnState.failed) return
-  // A spawn failure has no process to tear down; observe the rejection so
-  // disposal in a finally block cannot surface it as unhandled.
+  // Command failure does not prove the managed range is empty. The original
+  // done promise remains available to its caller for failure classification.
+  void child.done.catch(() => {})
+  const failures: Error[] = []
   child.stdin?.end()
-  if (await treeExitsWithin(child, eofGraceMs)) return
+  let exited = false
+  try {
+    exited = await rangeExitsWithin(child, eofGraceMs)
+  } catch (error: unknown) {
+    failures.push(toError(error))
+  }
+  if (exited) return
   // terminate() owns the bounded SIGTERM→SIGKILL timer. Its unbounded wait is
   // the process owner's exit proof, not a second derived grace that can overflow.
   child.terminate()
-  await child.waitForExit()
+  try {
+    await child.waitForExit()
+  } catch (error: unknown) {
+    failures.push(toError(error))
+  }
+  if (failures.length === 1) throw failures[0] as Error
+  if (failures.length > 1) throw new AggregateError(failures, 'ACP subprocess teardown failed')
 }
 
 /**

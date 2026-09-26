@@ -22,6 +22,13 @@ export interface ConversationHeader {
   agentPreset?: string
   draft?: boolean
   title?: string
+  /**
+   * Registered SSH target public id bound to this session's execution.
+   * Deliberately not a foreign key: a deleted target must not block cleanup,
+   * and the surviving binding is what lets a later resume report the loss
+   * instead of silently relocalizing the session.
+   */
+  sshTargetId?: number
 }
 
 export interface StoredConversation {
@@ -118,6 +125,7 @@ export interface ConversationDraftReservationInput {
   cwd: string
   visibility: ConversationVisibility
   agentPreset?: string
+  sshTarget?: number
 }
 
 /** Canonical session identity returned by a draft reservation. */
@@ -324,6 +332,7 @@ interface StoredHeaderRow {
   agent_preset: string | null
   draft: boolean
   title: string | null
+  ssh_target_id: string | null
   version: string
   next_seq: string
   has_visible_content: boolean
@@ -348,6 +357,7 @@ interface ResolvedConversationHeader {
   agentPreset: string | null
   draft: boolean
   title: string | null
+  sshTargetId: number | null
 }
 
 function headerFromRow(row: StoredHeaderRow): ConversationHeader {
@@ -368,12 +378,13 @@ function headerFromRow(row: StoredHeaderRow): ConversationHeader {
     ...(row.agent_preset === null ? {} : { agentPreset: row.agent_preset }),
     ...(row.draft ? { draft: true } : {}),
     ...(row.title === null ? {} : { title: row.title }),
+    ...(row.ssh_target_id === null ? {} : { sshTargetId: Number(row.ssh_target_id) }),
   }
 }
 
 const HEADER_COLUMNS = `id,organization_id,creator_user_id,project_id,parent_session_id,root_session_id,visibility,
   session_format_version,(extract(epoch FROM created_at)*1000)::bigint::text created_at_ms,cwd,
-  seed_length::text,origin,delegation_depth,agent_preset,draft,title,version::text,next_seq::text,
+  seed_length::text,origin,delegation_depth,agent_preset,draft,title,ssh_target_id::text,version::text,next_seq::text,
   has_visible_content,visible_content_seq::text,(extract(epoch FROM last_prompt_at)*1000)::bigint::text last_prompt_at_ms`
 
 const DEFAULT_PAGE_MAX_BYTES = 512 * 1024
@@ -841,6 +852,7 @@ export class ConversationRepository {
       agentPreset: header.agentPreset ?? null,
       draft: header.draft ?? false,
       title: header.title ?? null,
+      sshTargetId: header.sshTargetId ?? null,
     }
   }
 
@@ -861,6 +873,7 @@ export class ConversationRepository {
       && row.agent_preset === header.agentPreset
       && row.draft === header.draft
       && row.title === header.title
+      && (row.ssh_target_id === null ? null : Number(row.ssh_target_id)) === header.sshTargetId
     if (!same) throw new Error(`conversation session ${header.id} already exists with different metadata`)
   }
 
@@ -876,12 +889,12 @@ export class ConversationRepository {
     }
     await client.query(`INSERT INTO harness.conversation_sessions(
       id,organization_id,creator_user_id,project_id,parent_session_id,root_session_id,visibility,
-      session_format_version,created_at,updated_at,cwd,seed_length,origin,delegation_depth,agent_preset,draft,title
-    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,to_timestamp($9/1000.0),to_timestamp($9/1000.0),$10,$11,$12,$13,$14,$15,$16)`, [
+      session_format_version,created_at,updated_at,cwd,seed_length,origin,delegation_depth,agent_preset,draft,title,ssh_target_id
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,to_timestamp($9/1000.0),to_timestamp($9/1000.0),$10,$11,$12,$13,$14,$15,$16,$17)`, [
       header.id, header.organizationId, header.creatorUserId, header.projectId,
       header.parentSessionId, header.rootSessionId, header.visibility, header.sessionFormatVersion, header.createdAt,
       header.cwd, header.seedLength, header.origin, header.delegationDepth, header.agentPreset,
-      header.draft ?? false, header.title,
+      header.draft ?? false, header.title, header.sshTargetId,
     ])
     const inserted = await client.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
       FROM harness.conversation_sessions WHERE id=$1 FOR UPDATE`, [header.id])
@@ -921,7 +934,8 @@ export class ConversationRepository {
         cwd: string
         visibility: ConversationVisibility
         agent_preset: string | null
-      }>(`SELECT session_id,user_id,project_id,cwd,visibility,agent_preset
+        ssh_target_id: string | null
+      }>(`SELECT session_id,user_id,project_id,cwd,visibility,agent_preset,ssh_target_id::text
           FROM harness.conversation_draft_reservations
           WHERE organization_id=$1 AND scope_key=$2 AND draft_id=$3 FOR UPDATE`,
       [input.organizationId, input.scopeKey, input.draftId])
@@ -931,7 +945,8 @@ export class ConversationRepository {
           || row.project_id !== (input.projectId ?? null)
           || row.cwd !== input.cwd
           || row.visibility !== input.visibility
-          || row.agent_preset !== (input.agentPreset ?? null)) {
+          || row.agent_preset !== (input.agentPreset ?? null)
+          || row.ssh_target_id !== (input.sshTarget === undefined ? null : String(input.sshTarget))) {
           throw new Error(`draft reservation "${input.draftId}" conflicts with its existing scope`)
         }
         const renewed = await client.query<{ lease_expires_at_ms: string }>(`UPDATE harness.conversation_draft_reservations
@@ -953,11 +968,12 @@ export class ConversationRepository {
         throw new Error(`session "${input.sessionId}" is already reserved by another draft`)
       }
       const inserted = await client.query<{ lease_expires_at_ms: string }>(`INSERT INTO harness.conversation_draft_reservations(
-        organization_id,scope_key,draft_id,session_id,user_id,project_id,cwd,visibility,agent_preset,lease_expires_at
-      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '1 hour')
+        organization_id,scope_key,draft_id,session_id,user_id,project_id,cwd,visibility,agent_preset,ssh_target_id,lease_expires_at
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()+interval '1 hour')
       RETURNING (extract(epoch FROM lease_expires_at)*1000)::bigint::text lease_expires_at_ms`, [
         input.organizationId, input.scopeKey, input.draftId, input.sessionId,
         input.userId ?? null, input.projectId ?? null, input.cwd, input.visibility, input.agentPreset ?? null,
+        input.sshTarget ?? null,
       ])
       return {
         draftId: input.draftId,
@@ -1029,7 +1045,13 @@ export class ConversationRepository {
     events: readonly ConversationEvent[],
     header?: ConversationHeader,
   ): Promise<'inserted' | 'duplicate'> {
-    if (events.length === 0) return 'inserted'
+    if (events.length === 0) {
+      if (header !== undefined) {
+        if (header.id !== sessionId) throw new Error('conversation append header id mismatch')
+        await this.create(header)
+      }
+      return 'inserted'
+    }
     for (let index = 0; index < events.length; index++) {
       if (events[index]!.seq !== events[0]!.seq + index) throw new Error('conversation event batch must be contiguous')
     }

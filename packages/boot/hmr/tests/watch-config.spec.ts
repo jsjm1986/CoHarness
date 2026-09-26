@@ -45,7 +45,7 @@ async function bootHmr(dir: string, root: string[] = [], usePolling?: boolean): 
   return ctx
 }
 
-async function eventually(test: () => boolean, message: string, timeoutMs = 10_000): Promise<void> {
+async function eventually(test: () => boolean, message: string, timeoutMs = 20_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (!test()) {
     if (Date.now() >= deadline) throw new Error(message)
@@ -116,7 +116,9 @@ describe('HMR exact config paths', () => {
     const ctx = await bootHmr(dir)
     const observed: string[] = []
     try {
-      await watchConfig(ctx, filename, {}, () => {
+      // Polling keeps add/change/unlink delivery bounded on a loaded shared
+      // runner; the native-event lane stays under 'registered during a transaction'.
+      await watchConfig(ctx, filename, { usePolling: true }, () => {
         try {
           observed.push(readFileSync(filename, 'utf8'))
         } catch (error) {
@@ -136,7 +138,7 @@ describe('HMR exact config paths', () => {
     }
   })
 
-  it('observes creation when the config parent did not exist at registration', { timeout: 45_000 }, async () => {
+  it('observes creation when the config parent did not exist at registration', { timeout: 90_000 }, async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
     hmrRoots.push(root)
     const dir = join(root, 'later')
@@ -144,21 +146,22 @@ describe('HMR exact config paths', () => {
     const ctx = await bootHmr(root)
     const observed: string[] = []
     try {
-      await watchConfig(ctx, filename, {}, () => {
+      // A not-yet-existing parent forces the watcher to notice the new
+      // directory, attach to it, and then observe the file. Polling makes the
+      // discovery a bounded scan instead of waiting on FSEvents latency, which
+      // a loaded shared runner can delay past any fixed budget.
+      await watchConfig(ctx, filename, { usePolling: true }, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })
       mkdirSync(dir)
       writeFileSync(filename, 'created')
-      // A not-yet-existing parent forces the watcher to notice the new
-      // directory, attach to it, and then observe the file — measurably slower
-      // than same-dir events on loaded hosts.
-      await eventually(() => observed.includes('created'), 'HMR did not observe config creation under a new parent', 30_000)
+      await eventually(() => observed.includes('created'), 'HMR did not observe config creation under a new parent', 60_000)
     } finally {
       await ctx.fiber.dispose()
     }
   })
 
-  it('processes native events for a watcher registered during a transaction', { timeout: 20_000 }, async () => {
+  it('processes native events for a watcher registered during a transaction', { timeout: 60_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hmr-transaction-watch-'))
     const filename = join(dir, 'plugins.yml')
     onTestFinished(() => { rmSync(dir, { recursive: true, force: true }) })

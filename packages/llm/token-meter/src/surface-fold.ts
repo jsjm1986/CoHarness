@@ -17,45 +17,55 @@ import type { ContentBlock, ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import type { TokenSurfaceNode } from './types.ts'
 import { estimateMessage, estimateStructuralBlock } from './estimate.ts'
 
-/** Internal image facts retained beside a heuristic surface node. */
-export interface SurfaceImageFacts {
+type FileAttachmentRef = Extract<ContentBlock, { type: 'file' }>['attachment']
+
+/** Attachment occurrences and their structural prices retained beside a heuristic node. */
+export interface SurfaceAttachmentFacts {
   readonly images: readonly ImageBlock[]
-  readonly imageFreeTokens: number
+  readonly imageStructuralTokens: number
+  readonly files: readonly FileAttachmentRef[]
+  readonly fileStructuralTokens: number
 }
 
-const imageFacts = new WeakMap<object, SurfaceImageFacts>()
+const attachmentFacts = new WeakMap<object, SurfaceAttachmentFacts>()
 
 /**
  * Read route-pricing metadata for one node created by this fold.
  * @param node - surface node produced by {@link foldSurfaceTokens}.
- * @returns image facts retained for route pricing, or `undefined` for text-only nodes.
+ * @returns attachment facts retained for request pricing, or `undefined` for text-only nodes.
  */
-export function surfaceImageFacts(node: TokenSurfaceNode): SurfaceImageFacts | undefined {
-  return imageFacts.get(node)
+export function surfaceAttachmentFacts(node: TokenSurfaceNode): SurfaceAttachmentFacts | undefined {
+  return attachmentFacts.get(node)
 }
 
-function collectImageFacts(blocks: readonly ContentBlock[], images: ImageBlock[]): number {
-  let structural = 0
+function collectAttachments(blocks: readonly ContentBlock[]): SurfaceAttachmentFacts {
+  const images: ImageBlock[] = []
+  const files: FileAttachmentRef[] = []
+  let imageStructuralTokens = 0
+  let fileStructuralTokens = 0
   for (const block of blocks) {
     if (block.type === 'image') {
       images.push(block)
-      structural += estimateStructuralBlock(block)
+      imageStructuralTokens += estimateStructuralBlock(block)
+    } else if (block.type === 'file') {
+      files.push(block.attachment)
+      fileStructuralTokens += estimateStructuralBlock(block)
     } else if (block.type === 'tool-result') {
-      structural += collectImageFacts(block.content, images)
+      const nested = collectAttachments(block.content)
+      images.push(...nested.images)
+      files.push(...nested.files)
+      imageStructuralTokens += nested.imageStructuralTokens
+      fileStructuralTokens += nested.fileStructuralTokens
     }
   }
-  return structural
+  return { images, imageStructuralTokens, files, fileStructuralTokens }
 }
 
 function makeNode(seq: SessionSeq, message: Message | null, tokens: number): TokenSurfaceNode {
   const node: TokenSurfaceNode = { seq, tokens, heuristicTokens: tokens }
   if (message !== null) {
-    const images: ImageBlock[] = []
-    const imageStructural = collectImageFacts(message.content, images)
-    if (images.length > 0) imageFacts.set(node, {
-      images,
-      imageFreeTokens: tokens - imageStructural,
-    })
+    const facts = collectAttachments(message.content)
+    if (facts.images.length > 0 || facts.files.length > 0) attachmentFacts.set(node, facts)
   }
   return node
 }

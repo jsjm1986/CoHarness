@@ -49,7 +49,7 @@ async function bench(desktop = false) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
     api: { settings: {} }, isLoopback: desktop,
-    hostDescription: { getSnapshot: () => desktop ? { canOpenPath: true } : undefined },
+    hostDescription: { getSnapshot: () => desktop ? { canOpenPath: true, executionAuthorityRequired: false } : undefined },
   })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
@@ -318,6 +318,29 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('suppresses late workspace navigation and confirmed draft discard after a newer choice', async () => {
+    const b = await bench()
+    try {
+      const resident = b.residentApi(ROOT)
+      const { state, actions } = b.inputApi(ROOT)
+      actions.setDraft('keep this draft')
+      const oldTarget = 'older-target' as SessionId
+      await b.runtime.sessions.add({ id: oldTarget }, { current: false })
+      const older = Promise.withResolvers<SessionId>()
+      b.runtime.workspaces.stub('openWorkspace', () => older.promise)
+      const pending = resident.selectWorkspace('older-workspace' as never, { discardDraft: true })
+      const newer = 'newer-selection' as SessionId
+      await b.runtime.sessions.add({ id: newer }, { current: false })
+      b.runtime.sessions.open(newer)
+      older.resolve(oldTarget)
+      await pending
+      expect(b.runtime.sessions.list.getSnapshot().current).toBe(newer)
+      expect(state.getSnapshot().draft).toBe('keep this draft')
+    } finally {
+      await b.runtime.dispose()
+    }
+  })
+
   it('selectWorkspace edge arms: no-session resident, empty-draft move, open failure retryable', async () => {
     const b = await bench()
     // No-session resident (hero before any session): connect resolves and
@@ -404,17 +427,16 @@ describe('conversation slot inject API', () => {
 })
 
 describe('details inject API', () => {
-  it('details injects the one layout callback; selection rides the shared store instead', async () => {
+  it('details exposes close while its tab owns the call identity', async () => {
     const b = await bench()
     const entry = b.entryOf('details')
     const injected = (entry.inject as unknown as () => DetailsInjected)()
-    expect(Object.keys(injected)).toEqual(['closeDetails'])
+    // `loadImage` feeds the details panel's read_image gallery through the same
+    // session-scoped attachment authorization the chat node renderer uses.
+    expect(Object.keys(injected)).toEqual(['readCall', 'loadImage', 'closeDetails'])
     injected.closeDetails()
     expect(b.layoutFake.closeDetails).toHaveBeenCalledTimes(1)
-    // The shared handle: details resolves the SAME instance conversation writes.
-    const conv = b.runtime.storeOf('conversation.session', ROOT)
-    const details = b.runtime.storeOf('details', ROOT)
-    expect(details).toBe(conv)
+    expect(entry.store).toBeUndefined()
     await b.runtime.dispose()
   })
 })

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-10-06",
+  "target": "dsh-v0.1.6-alpha.2",
+  "targetCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+  "status": "measured-local-reference",
+  "environment": {
+    "commit": "4a6c2af3aec1411f13c32e55f99c4830de7c756a",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpuModels": [
+      "Apple M4"
+    ],
+    "availableParallelism": 10,
+    "node": "v25.8.1",
+    "v8": "14.1.146.11-node.21",
+    "chromium": "151.0.7922.34"
+  },
+  "suite": {
+    "command": "pnpm run test:bench:built (vitest.bench.config.ts)",
+    "result": "7 benchmark files, 41 tests, all passed",
+    "note": "All six upstream benchmark directories are carried: session-open, agent-continuation, terminal-io, long-session-browser, conversation-fold, active-stream-reconnect. Three required local adapters preserve upstream timing boundaries: session-history-adapter.ts (replaces upstream api/session-controller with SessionQueryEngine/observeSession plus the apiproxy model-selection projection), conversation-fold/runtime-client-shim.ts (inlines client-runtime leaf modules into the plain-Node worker), and the sdk-minimal launch shape in agent-continuation workers."
+  },
+  "measurements": [
+    {
+      "name": "session-open",
+      "status": "measured",
+      "evidence": "17/17 tests pass. Synthetic released-v0 log of 127,400 logical events (200 turns x 500 text + 125 reasoning deltas, Zstandard). First-open four-phase totals ~930-1020 ms; first history ~837-976 ms; first-open Agent resume ~852-1616 ms including v0-to-v6 migration; post-upgrade reopen agent-resume median 34.7 ms; 128 MB constrained-heap completion checks pass."
+    },
+    {
+      "name": "agent-continuation",
+      "status": "measured",
+      "evidence": "800-turn tool-heavy history (13,600 events). Request history median 68.07 ms vs 297 ms budget; tool continuation median 199.45 ms vs 1,125 ms with retained heap 23.05 MiB vs 28.75 MiB; child catalog median 324.7 ms vs 1,125 ms; shipped sdk-minimal profile continuation ~980-1050 ms totals over 100 turns and 800 real file reads."
+    },
+    {
+      "name": "terminal-io",
+      "status": "measured",
+      "evidence": "4/4 tests pass. Steady overflow complete median ~37-39 ms vs 125 ms budget at 4 MiB capacity; five-MiB send median 104.4 ms vs 300 ms; tiny-chunk retained heap 6.8 MB and filtered-chunk retained 8.6 MB vs 16 MiB budget."
+    },
+    {
+      "name": "long-session-browser",
+      "status": "measured",
+      "evidence": "4/4 tests pass on the shipped-composition Web scaffold in fresh Chromium. 240-turn history: open median 177.4 ms (budget 1125), slowest older page 181.0 ms (875), first Trajectory 263.2 ms (850), first reply 242.3 ms (2750), stream main-thread task 1457.6 ms (4500), trusted draft typing 334.6 ms (1250), complete response wall 2284.5 ms (4484). All three samples report inputOverlapped true; post-GC browser heap ~60.5 MB and 16,779 DOM nodes are diagnostics."
+    },
+    {
+      "name": "conversation-fold",
+      "status": "measured",
+      "evidence": "1,200 events, 1,600 compact records, 500,000 streamed deltas: large-window fold 17.5-17.9 ms repeated min-of-3 on the arm64 reference, recalibrated expectation 18 ms vs 45 ms budget with 800 materialized Chat nodes; the first standard-hosted Ubuntu run measured 41.7 ms, inside the 2.5x scaled allowance. Delta scaling measures ~4.6-5.3x against the recalibrated 5x expectation / 6.25x bound; the CoHarness fold rebuilds location, turn-navigation, and timeline projections per window replace, so the upstream 2.5x expectation and 16 ms reference are not portable. The bound still rejects the ~11x per-delta-replay regression; see the session-open-performance-gate Agent Note."
+    },
+    {
+      "name": "active-stream-reconnect",
+      "status": "measured",
+      "evidence": "100,000-delta reasoning prefix: ClientAssistantStream.replace() median 13.36 ms vs 63 ms budget; post-GC retained heap 22.27 MiB vs 30 MiB; the next dense live frame remains accepted after replacement."
+    },
+    {
+      "name": "synthetic-history",
+      "status": "measured",
+      "evidence": "2/2 tests validate the seeded released-generation fixture: current-migration, message preservation, immutable predecessor bytes, and successor reopen before timing runs."
+    },
+    {
+      "name": "ci-gate",
+      "status": "ported",
+      "evidence": "The required 'node 24 / benchmarks' job is carried into .github/workflows/ci.yml on standard hosted ubuntu-24.04 with an unconditional pnpm store restore, Chromium install, and pnpm run check:ci:bench under DSH_GATE_VERBOSE; all-checks-passed now requires it. scripts/ci-workflow.spec.ts pins the routing, cache, step, and 15-minute timeout invariants. Hosted-runner execution evidence does not exist yet; budgets carry the upstream 2x CI scale and endpoint-specific hosted expectations."
+    }
+  ],
+  "exclusions": [
+    "No standard-hosted (ubuntu-24.04 x64) CI run has executed this lane in this fork; the measurements above are arm64 reference-machine evidence only.",
+    "Browser timings include the source-resolved test Host, transport, and Playwright actionability; they are not published-Host evidence.",
+    "conversation-fold scaling is calibrated to CoHarness's extra fold projections, not upstream's 2.5x constant.",
+    "Network transfer, real model latency, GPU presentation, sidebar cardinality, and hours-long soak remain unmeasured by design."
+  ]
+}

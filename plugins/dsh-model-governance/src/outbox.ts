@@ -13,6 +13,8 @@ export interface UsageRecord {
   actorUserId?: number
   /** Public project id from the participant claim, used only for scope verification. */
   actorProjectId?: number
+  /** Verified immutable input references; the intake validates their historical attribution. */
+  executionInputIds?: readonly string[]
   credentialSource: string
   credentialClass: 'company' | 'personal' | 'unknown'
   status: 'succeeded' | 'failed' | 'cancelled' | 'missing-usage' | 'denied'
@@ -114,6 +116,7 @@ function actorlessUsageBody(body: string): string | undefined {
   try { value = JSON.parse(body) } catch { return undefined }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
   const record = value as Record<string, unknown>
+  if (Object.hasOwn(record, 'executionInputIds')) return undefined
   if (record.kind === 'model-registration'
     || (!Object.hasOwn(record, 'actorUserId') && !Object.hasOwn(record, 'actorProjectId'))) return undefined
   delete record.actorUserId

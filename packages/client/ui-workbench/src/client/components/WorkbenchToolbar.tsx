@@ -6,7 +6,6 @@ import {
   IconPlusOutline16, IconTrashOutline16, Menu, Modal, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { AddPaneResult, ConversationViewportMode, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkbenchStore } from '../stores.ts'
@@ -14,7 +13,6 @@ import { NS } from '../locales.ts'
 import { loadWorkbenchCatalog, type WorkbenchCatalog, type WorkbenchConversation } from '../catalog.ts'
 import css from './Workbench.module.css'
 import { WorkspaceFileBrowser, type ListWorkspaceDirectory, type OpenWorkspaceResource } from './WorkspaceFileBrowser.tsx'
-import { WorkspaceFilePreview, type ReadWorkspacePreview } from './WorkspaceFilePreview.tsx'
 
 interface Actions {
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
@@ -30,11 +28,8 @@ interface Actions {
   hydrateCatalog?: (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => Promise<void>
   markCatalogReady?: () => void
   setMode: (mode: ConversationViewportMode) => void
-  readPreview?: ReadWorkspacePreview
-  readBytesPreview?: import('./WorkspaceFilePreview.tsx').ReadWorkspaceBytesPreview
   listWorkspaceDirectory?: ListWorkspaceDirectory
   openWorkspaceResource?: OpenWorkspaceResource
-  resources?: WorkspaceResourceRegistry | undefined
   /** Provider availability for the addressed Session's runtime, evaluated at render time. */
   filesAvailable?: (() => boolean) | undefined
   /** Open the Workspace file browser for the active Session and runtime target. */
@@ -60,10 +55,10 @@ export function WorkbenchToolbar({
   viewport, tabbed, inline = false, useStore, actions, useSessions, useWorkspaces,
   chooseSession, focusSession, createSession, hydrateCatalog, markCatalogReady, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
-  duplicateWorkbench, deleteWorkbench, readPreview, readBytesPreview,
-  listWorkspaceDirectory, openWorkspaceResource, resources, filesAvailable, openFiles, t,
+  duplicateWorkbench, deleteWorkbench,
+  listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
 }: Props) {
-  const { pickerOpen, replace, preview, browser } = useStore(state => state)
+  const { pickerOpen, replace, browser } = useStore(state => state)
   const sessions = useSessions(s => s)
   const workspaces = useWorkspaces(s => s)
   const [query, setQuery] = useState('')
@@ -170,7 +165,6 @@ export function WorkbenchToolbar({
   const pickerClass = css.picker ?? ''
   return (
     <div className={css.toolbar} data-workbench-toolbar="" data-inline={inline || undefined} data-tabbed={tabbed || undefined}>
-      {preview !== undefined && readPreview !== undefined && resources !== undefined && <WorkspaceFilePreview key={JSON.stringify([preview.runtimeTarget, preview.address])} request={preview} read={readPreview} readBytes={readBytesPreview} resources={resources} close={actions.closePreview} labels={{ close: t('previewClose'), reload: t('previewReload'), previous: t('previewPrevious'), next: t('previewNext'), loading: t('previewLoading'), changed: t('previewChanged'), binary: t('previewBinary') }} />}
       <div className={css.toolbarTitle}>
         <Menu open={workbenchMenuOpen} onClose={() => { setWorkbenchMenuOpen(false) }} onSelect={(id) => {
           setWorkbenchMenuOpen(false)

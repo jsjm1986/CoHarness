@@ -37,6 +37,7 @@ export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[]
   const path = join(dshHome, 'directory-grants.json')
   const entry = lstatSync(path, { throwIfNoEntry: false })
   if (entry?.isSymbolicLink()) throw new Error(`runtime grants file must not be a symbolic link: ${path}`)
+  if (entry !== undefined && !entry.isFile()) throw new Error(`runtime grants path is not a file: ${path}`)
   const noFollow = constants.O_NOFOLLOW ?? 0
   const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | noFollow, 0o600)
   try {

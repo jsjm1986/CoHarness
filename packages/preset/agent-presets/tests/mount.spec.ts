@@ -789,14 +789,15 @@ describe('editing a composition file', () => {
     const preset = await scoped.agentPresets.resolve('guarded-refresh')
     await agentOn(scoped, 'sess-guarded-refresh-seed', 'guarded-refresh')
     const service = scoped.agentPresets as unknown as {
-      standing: Map<string, Promise<{
+      standing: Map<string, Map<string | undefined, Promise<{
         key: unknown
         scope: unknown
         stamp: { mtimeMs: number; size: number }
-      }>>
+      }>>>
       ensureStanding(current: typeof preset): Promise<unknown>
     }
-    const stalePromise = service.standing.get(preset.id)!
+    const generations = service.standing.get(preset.id)!
+    const stalePromise = generations.get(undefined)!
     const stale = await stalePromise
     await writeFile(path, rowFor('afterwards'))
     const { mtimeMs, size } = await stat(path)
@@ -806,10 +807,10 @@ describe('editing a composition file', () => {
     // `await pending` yields before the guarded delete, letting the winning
     // refresher replace the pointer deterministically instead of by timing.
     const refresh = service.ensureStanding(preset)
-    service.standing.set(preset.id, newerPromise)
+    generations.set(undefined, newerPromise)
 
     expect(await refresh).toBe(newer)
-    expect(service.standing.get(preset.id)).toBe(newerPromise)
+    expect(service.standing.get(preset.id)!.get(undefined)).toBe(newerPromise)
   })
 
   it('hands a host reader the standing key without starting an agent', async () => {

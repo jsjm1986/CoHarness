@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.md
+2026-09-22-cross-gateway-access-invalidation.md: 2b1641b2b93576f235432ef6670ba6c0267973bd
+2026-09-22-cross-gateway-access-invalidation.zh.md: 1219d939330bf4f8f310ec867b54530912537dd2

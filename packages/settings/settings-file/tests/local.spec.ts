@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
@@ -376,6 +376,14 @@ describe('persist', () => {
 })
 
 describe('watch', () => {
+  beforeEach(() => {
+    // Native fs-event delivery on loaded shared runners can outlast the 5s
+    // waits below; chokidar's documented process override converts discovery
+    // to a deterministic scan without touching the tracked provider source.
+    vi.stubEnv('CHOKIDAR_USEPOLLING', '1')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
   it('publishes an external edit to registered scopes', async () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')

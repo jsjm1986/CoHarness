@@ -12,6 +12,9 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../fs/fs"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {

@@ -42,6 +42,22 @@ for line in sys.stdin:
         print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {"sessionId": params["sessionId"], "event": {"type": "agent/inbox/spliced", "data": {"target": "next-turn", "start": 0, "inserted": [{"id": "message-1"}]}}}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "method": "session.status", "params": {"sessionId": params["sessionId"], "status": "running"}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {"messageId": "message-1"}}), flush=True)
+        print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {
+            "sessionId": params["sessionId"], "event": {"type": "gateway/execution", "data": {
+                "kind": "accepted", "state": {"revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
+                    "actors": [{"userId": 7}], "primaryActorUserId": 7, "unverifiedHistory": False}
+            }}
+        }}), flush=True)
+        for event in [
+            {"type": "user/message", "data": {"turn": 0, "step": 0, "message": {
+                "id": "webhook-message", "role": "user", "content": [{"type": "text", "text": "External request"}],
+                "source": {"kind": "webhook", "provider": "github", "source": "endpoint", "deliveryId": "delivery", "ruleId": "review",
+                    "form": "notice", "summary": "github webhook handled by review"},
+            }}},
+            {"type": "deliverables/presented", "data": {"turn": 0, "callId": "present-1", "files": [{"path": "report.txt", "description": "Report"}]}},
+            {"type": "workspace/changes", "data": {"turn": 0}},
+        ]:
+            print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {"sessionId": params["sessionId"], "event": event}}), flush=True)
         print(json.dumps({
             "jsonrpc": "2.0",
             "method": "session.event",
@@ -95,9 +111,7 @@ for line in sys.stdin:
         model="deepseek-v4-flash",
         max_tokens=4096,
         cwd=str(tmp_path),
-        cordis=str(tmp_path / "cordis.yml"),
-        session_root=str(tmp_path / "sessions"),
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         env={
             "ENV_DUMP": str(env_dump),
             "INIT_DUMP": str(init_dump),
@@ -108,14 +122,29 @@ for line in sys.stdin:
         result = harness.run("say hello", session_id="main")
 
     assert result.final_response == "hello from runtime"
+    execution = next(event for event in result.events if event["type"] == "gateway/execution")
+    assert execution["data"] == {
+        "kind": "accepted", "state": {
+            "revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
+            "actors": [{"userId": 7}], "primaryActorUserId": 7, "unverifiedHistory": False,
+        },
+    }
+    assert [event for event in result.events if event["type"] in {"deliverables/presented", "workspace/changes"}] == [
+        {"type": "deliverables/presented", "data": {"turn": 0, "callId": "present-1", "files": [{"path": "report.txt", "description": "Report"}]}},
+        {"type": "workspace/changes", "data": {"turn": 0}},
+    ]
+    assert next(event for event in result.events if event["type"] == "user/message")["data"] == {
+        "turn": 0, "step": 0, "message": {
+            "id": "webhook-message", "role": "user", "content": [{"type": "text", "text": "External request"}],
+            "source": {"kind": "webhook", "provider": "github", "source": "endpoint", "deliveryId": "delivery", "ruleId": "review",
+                "form": "notice", "summary": "github webhook handled by review"},
+        },
+    }
     assert result.finish_reason == "max-tokens"
     assert result.events[-1]["type"] == "turn/end"
     dumped_env = json.loads(env_dump.read_text())
     assert dumped_env["DEEPSEEK_API_KEY"] == "env-key"
     assert dumped_env["DEEPSEEK_BASE_URL"] == "http://127.0.0.1:4321"
-    assert dumped_env["DSH_CWD"] == str(tmp_path)
-    assert dumped_env["DSH_SESSION_ROOT"] == str(tmp_path / "sessions")
-    assert dumped_env["DSH_CORDIS_CONFIG"] == str(tmp_path / "cordis.yml")
     assert json.loads(init_dump.read_text()) == {
         "cwd": str(tmp_path),
         "provider": "deepseek-official",
@@ -150,7 +179,7 @@ for line in sys.stdin:
 
     seen: list[str] = []
     with DeepSeekHarness(
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         cwd=str(tmp_path),
     ) as harness:
         session = harness.start_session("main")
@@ -188,7 +217,7 @@ for line in sys.stdin:
     )
 
     with DeepSeekHarness(
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         cwd=str(tmp_path),
     ) as harness:
         with pytest.raises(
@@ -224,7 +253,7 @@ for line in sys.stdin:
     with DeepSeekHarness(
         cwd=".",
         runtime_cwd=".",
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         env={"CAPTURE": str(capture)},
     ):
         pass
@@ -263,7 +292,7 @@ for line in sys.stdin:
     )
 
     with DeepSeekHarness(
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         cwd=str(tmp_path),
     ) as harness:
         result = harness.run("spawn a helper", session_id="main")
@@ -312,7 +341,7 @@ for line in sys.stdin:
 
     seen: list[str] = []
     with DeepSeekHarness(
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         cwd=str(tmp_path),
     ) as harness:
         result = harness.run(
@@ -367,7 +396,7 @@ for line in sys.stdin:
     )
 
     with DeepSeekHarness(
-        launch_args_override=(sys.executable, str(script)),
+        _launch_args=(sys.executable, str(script)),
         cwd=str(tmp_path),
     ) as harness:
         result = harness.run("stay in your lane", session_id="main")
@@ -401,7 +430,7 @@ for line in sys.stdin:
 """.strip()
     )
 
-    with DeepSeekHarness(launch_args_override=(sys.executable, str(script)), cwd=str(tmp_path)) as harness:
+    with DeepSeekHarness(_launch_args=(sys.executable, str(script)), cwd=str(tmp_path)) as harness:
         result = harness.run("one turn", session_id="main")
         assert harness.client._notifications.qsize() == 0
 
@@ -441,7 +470,7 @@ for line in sys.stdin:
 """.strip()
     )
 
-    with DeepSeekHarness(launch_args_override=(sys.executable, str(script)), cwd=str(tmp_path)) as harness:
+    with DeepSeekHarness(_launch_args=(sys.executable, str(script)), cwd=str(tmp_path)) as harness:
         first = harness.run("first turn", session_id="main")
         second = harness.run("second turn", session_id="main")
 
@@ -473,8 +502,8 @@ for line in sys.stdin:
     )
 
     with HarnessClient(
-        HarnessConfig(launch_args_override=(sys.executable, str(script)))
-    ) as client:
+        HarnessConfig()
+    , _launch_args=(sys.executable, str(script))) as client:
         init = client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
         assert init.serverInfo.name == "fake-dsh"
 
@@ -612,7 +641,7 @@ for line in sys.stdin:
     def broken_filter(_notification: object) -> bool:
         raise RuntimeError("bad notification filter")
 
-    with HarnessClient(HarnessConfig(launch_args_override=(sys.executable, str(script)))) as client:
+    with HarnessClient(HarnessConfig(), _launch_args=(sys.executable, str(script))) as client:
         client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
         with (
             client.subscribe_notifications(broken_filter) as broken,
@@ -649,7 +678,7 @@ for line in sys.stdin:
 """.strip()
     )
 
-    with HarnessClient(HarnessConfig(launch_args_override=(sys.executable, str(script)))) as client:
+    with HarnessClient(HarnessConfig(), _launch_args=(sys.executable, str(script))) as client:
         client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
         with pytest.raises(ValueError):
             client.session_prompt("main", [{"type": "text", "text": "fix it"}])
@@ -677,8 +706,8 @@ for line in sys.stdin:
     )
 
     with HarnessClient(
-        HarnessConfig(launch_args_override=(sys.executable, str(script)))
-    ) as client:
+        HarnessConfig()
+    , _launch_args=(sys.executable, str(script))) as client:
         client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
 
         request = client.next_request()
@@ -711,8 +740,8 @@ for line in sys.stdin:
     )
 
     with HarnessClient(
-        HarnessConfig(launch_args_override=(sys.executable, str(script)))
-    ) as client:
+        HarnessConfig()
+    , _launch_args=(sys.executable, str(script))) as client:
         init = client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
         assert init.serverInfo.name == "fake-dsh"
 
@@ -742,8 +771,8 @@ for line in sys.stdin:
     )
 
     with HarnessClient(
-        HarnessConfig(launch_args_override=(sys.executable, str(script)))
-    ) as client:
+        HarnessConfig()
+    , _launch_args=(sys.executable, str(script))) as client:
         init = client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
         assert init.serverInfo.name == "fragmented-dsh"
 
@@ -762,10 +791,11 @@ time.sleep(60)
 
     with HarnessClient(
         HarnessConfig(
-            launch_args_override=(sys.executable, str(script)),
+
+            initialize_timeout_seconds=0.1,
             request_timeout_seconds=0.1,
         )
-    ) as client:
+    , _launch_args=(sys.executable, str(script))) as client:
         start = time.monotonic()
         try:
             client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
@@ -798,10 +828,10 @@ for line in sys.stdin:
 
     client = HarnessClient(
         HarnessConfig(
-            launch_args_override=(sys.executable, str(script)),
+
             shutdown_timeout_seconds=0.1,
         )
-    )
+    , _launch_args=(sys.executable, str(script)))
     client.start()
     proc = client._proc
     assert proc is not None
@@ -830,7 +860,7 @@ for line in sys.stdin:
 """.strip()
     )
 
-    client = HarnessClient(HarnessConfig(launch_args_override=(sys.executable, str(script))))
+    client = HarnessClient(HarnessConfig(), _launch_args=(sys.executable, str(script)))
     client.start()
     proc = client._proc
     assert proc is not None
@@ -876,7 +906,7 @@ for line in sys.stdin:
 """.strip()
     )
 
-    client = HarnessClient(HarnessConfig(launch_args_override=(sys.executable, str(script))))
+    client = HarnessClient(HarnessConfig(), _launch_args=(sys.executable, str(script)))
     client.start()
     client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
     client.close()
@@ -896,10 +926,10 @@ sys.exit(42)
 
     with HarnessClient(
         HarnessConfig(
-            launch_args_override=(sys.executable, str(script)),
+
             request_timeout_seconds=2,
         )
-    ) as client:
+    , _launch_args=(sys.executable, str(script))) as client:
         with pytest.raises(Exception, match="fatal bridge exploded"):
             client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
 
@@ -928,10 +958,10 @@ with open(os.environ["SEEN"], "w") as seen:
 
     with HarnessClient(
         HarnessConfig(
-            launch_args_override=(sys.executable, str(script)),
+
             env={"SEEN": str(output)},
         )
-    ) as client:
+    , _launch_args=(sys.executable, str(script))) as client:
         client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
         threads = [
             threading.Thread(target=client.notify, args=(f"notice-{index}", {"index": index}))
@@ -946,21 +976,22 @@ with open(os.environ["SEEN"], "w") as seen:
         json.loads(line)
 
 
-def _install_fake_bundled_runtime(
+def _install_fake_bundled_dsh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Path:
-    """Install a fake runtime package that records config and serves lifecycle calls.
-
-    Returns the fake bundled default config path.
-    """
-    runtime = tmp_path / "dsh-jsonrpc-agent"
+) -> None:
+    """Install a fake runtime package that records dsh argv and serves lifecycle calls."""
+    runtime = tmp_path / "dsh.py"
     runtime.write_text(
-        """#!/usr/bin/env python3
+        """
 import json
 import os
 import sys
 
-json.dump({"DSH_CORDIS_CONFIG": os.environ.get("DSH_CORDIS_CONFIG")}, open(os.environ["ENV_DUMP"], "w"))
+json.dump({
+    "argv": sys.argv[1:],
+    "DSH_HOME": os.environ.get("DSH_HOME"),
+    "DSH_CORDIS_CONFIG": os.environ.get("DSH_CORDIS_CONFIG"),
+}, open(os.environ["ENV_DUMP"], "w"))
 for line in sys.stdin:
     msg = json.loads(line)
     if msg.get("method") == "initialize":
@@ -970,58 +1001,75 @@ for line in sys.stdin:
         break
 """.strip()
     )
-    runtime.chmod(0o755)
 
-    default_config = tmp_path / "default-cordis.yml"
     module_dir = tmp_path / "deepseek_harness_runtime"
     module_dir.mkdir()
     (module_dir / "__init__.py").write_text(
         f"""
 def resolve_bundled_launch_args(mode=None):
-    return ({str(runtime)!r},)
-
-
-def bundled_default_config_path():
-    return {str(default_config)!r}
+    return ({sys.executable!r}, {str(runtime)!r})
 """.strip()
     )
 
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.delitem(sys.modules, "deepseek_harness_runtime", raising=False)
-    return default_config
 
 
-@pytest.mark.parametrize("ambient_config", [None, ""], ids=["unset", "empty-counts-as-absent"])
-def test_client_default_launch_uses_bundled_runtime_and_injects_default_config(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ambient_config: str | None
-) -> None:
-    env_dump = tmp_path / "env.json"
-    default_config = _install_fake_bundled_runtime(tmp_path, monkeypatch)
-    if ambient_config is None:
-        monkeypatch.delenv("DSH_CORDIS_CONFIG", raising=False)
-    else:
-        monkeypatch.setenv("DSH_CORDIS_CONFIG", ambient_config)
-
-    with HarnessClient(HarnessConfig(env={"ENV_DUMP": str(env_dump)})) as client:
-        init = client.initialize(provider="deepseek-official", cwd="/workspace", model="deepseek-v4-pro")
-
-    assert init.serverInfo.name == "bundled-runtime"
-    assert json.loads(env_dump.read_text())["DSH_CORDIS_CONFIG"] == str(default_config)
-
-
-def test_client_respects_explicit_config_over_bundled_default(
+def test_client_default_launch_uses_bundled_dsh_sdk_profile_and_explicit_home(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     env_dump = tmp_path / "env.json"
-    _install_fake_bundled_runtime(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    patch = tmp_path / "sdk.patch.yml"
+    patch.write_text("[]\n")
+    _install_fake_bundled_dsh(tmp_path, monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DSH_HOME", str(tmp_path / "ambient-home"))
     monkeypatch.delenv("DSH_CORDIS_CONFIG", raising=False)
 
+    with HarnessClient(HarnessConfig(
+        profile="sdk",
+        patches=("sdk.patch.yml",),
+        dsh_home=str(home),
+        env={"ENV_DUMP": str(env_dump), "DSH_HOME": str(tmp_path / "env-home")},
+    )) as client:
+        init = client.initialize(provider="deepseek-official", cwd="/workspace", model="deepseek-v4-pro")
+
+    assert init.serverInfo.name == "bundled-runtime"
+    assert json.loads(env_dump.read_text()) == {
+        "argv": ["--profile", "sdk", "--patch", str(patch)],
+        "DSH_HOME": str(home),
+        "DSH_CORDIS_CONFIG": None,
+    }
+
+
+def test_client_accepts_explicit_environment_dsh_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env_dump = tmp_path / "env.json"
+    home = tmp_path / "environment-home"
+    _install_fake_bundled_dsh(tmp_path, monkeypatch)
+
     with HarnessClient(
-        HarnessConfig(env={"ENV_DUMP": str(env_dump), "DSH_CORDIS_CONFIG": "./explicit.yml"})
+        HarnessConfig(profile="custom", env={"ENV_DUMP": str(env_dump), "DSH_HOME": str(home)})
     ) as client:
         client.initialize(provider="deepseek-official", cwd="/workspace", model="deepseek-v4-pro")
 
-    assert json.loads(env_dump.read_text())["DSH_CORDIS_CONFIG"] == "./explicit.yml"
+    assert json.loads(env_dump.read_text()) == {
+        "argv": ["--profile", "custom"],
+        "DSH_HOME": str(home),
+        "DSH_CORDIS_CONFIG": None,
+    }
+
+
+def test_client_rejects_an_implicit_default_dsh_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_bundled_dsh(tmp_path, monkeypatch)
+    monkeypatch.delenv("DSH_HOME", raising=False)
+
+    with pytest.raises(ValueError, match="explicit dsh_home or non-empty DSH_HOME"):
+        HarnessClient(HarnessConfig(env={})).start()
 
 
 def test_client_reports_missing_bundled_runtime_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1029,4 +1077,4 @@ def test_client_reports_missing_bundled_runtime_dependency(monkeypatch: pytest.M
     monkeypatch.setattr(sys, "path", [])
 
     with pytest.raises(FileNotFoundError, match="Install deepseek-harness-runtime-bin"):
-        HarnessClient().start()
+        HarnessClient(HarnessConfig(dsh_home="/explicit/home")).start()

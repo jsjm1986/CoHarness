@@ -94,7 +94,7 @@ const users: api.AdminUser[] = [{
   role: 'user',
   status: 'active',
   homePath: '/home/alice',
-  mustChangePassword: false,
+  mustChangePassword: false, autoReviewEligible: false,
   port: 9107,
   instanceState: 'running',
 }]

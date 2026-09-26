@@ -317,43 +317,6 @@ function sameResolution(left: string, right: string): boolean {
   return canonicalPath(leftPath) === canonicalPath(rightPath)
 }
 
-/**
- * Owning package directory of a resolved module URL: the nearest directory
- * containing a package.json found climbing from the module's directory.
- * @param url - file URL of a resolved module.
- * @returns the owning package directory, or undefined above the filesystem root.
- */
-function owningPackageDir(url: string): string | undefined {
-  let dir = dirname(fileURLToPath(url))
-  while (true) {
-    if (existsSync(join(dir, 'package.json'))) return dir
-    const next = dirname(dir)
-    if (next === dir) return undefined
-    dir = next
-  }
-}
-
-/**
- * The package directory the generation expects a request to resolve into for
- * an after-fallback route: the ambient resolution anchored at the routed
- * parent, mapped to its owning package.
- * @returns the expected owning package directory, or undefined when the routed
- *   lookup fails or resolves asynchronously (the Node 22 adapter path).
- */
-function expectedPackageDir(
-  native: EsmResolve, request: string, routedParent: string, attributes: ImportAttributes,
-): string | undefined {
-  let expected: ResolveResult | Promise<ResolveResult>
-  try {
-    expected = native(request, routedParent, attributes)
-  } catch {
-    return undefined
-  }
-  /* v8 ignore next 2 -- Node 22 is the asynchronous adapter; the external version matrix covers it */
-  if (expected instanceof Promise) return undefined
-  return owningPackageDir(expected.url)
-}
-
 /** One mutable pointer to immutable generation data. */
 class ResolutionRouter {
   private current: CompiledGeneration
@@ -814,30 +777,13 @@ export function installProfileResolution(
          src but skips parents inside node_modules, so a routed lookup anchored on
          the declarer's linked manifest would still land on lib while the
          plugin's own imports reach src — splitting per-module identity such as
-         `Symbol`-keyed service facets. Ambient source results win only inside the
-         package the generation selected; anything else stays routed or mismatched. */
+         `Symbol`-keyed service facets. Ambient source results win. */
       const ambient = ambientSourceResult(native, request, parent, attributes)
       if (ambient !== undefined) {
-        const keep = (resolved: ResolveResult): ResolveResult | Promise<ResolveResult> => {
-          const ambientDir = owningPackageDir(resolved.url)
-          const expectedDir = route.kind === 'fallback'
-            ? route.entry.packageDir
-            : expectedPackageDir(native, request, routedParent, attributes)
-          if (ambientDir !== undefined && expectedDir !== undefined
-            && sameResolution(ambientDir, expectedDir)) {
-            if (cacheable) state.esm = resolved
-            return resolved
-          }
-          if (behavior === 'verify') {
-            throw new Error(
-              `profile resolution mismatch for ${JSON.stringify(request)} from ${parent}: disk resolved ${resolved.url}, generation resolved ${expectedDir ?? 'nothing'}`,
-            )
-          }
-          return routed()
-        }
         /* v8 ignore next -- Node 24+ resolves synchronously; the Node 22 matrix covers its Promise result */
-        if (ambient instanceof Promise) return ambient.then(resolved => resolved === undefined ? routed() : keep(resolved))
-        return keep(ambient)
+        if (ambient instanceof Promise) return ambient.then(resolved => resolved ?? routed())
+        if (cacheable) state.esm = ambient
+        return ambient
       }
       return routed()
     }

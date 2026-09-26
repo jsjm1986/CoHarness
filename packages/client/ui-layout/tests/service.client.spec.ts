@@ -11,12 +11,11 @@ import type { PanelActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/
 function fakePanels(): PanelActions {
   return {
     setSidebar: vi.fn(),
+    focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
     setDetails: vi.fn(),
     toggleSidebar: vi.fn(),
     setNarrow: vi.fn(),
     collapseNarrow: vi.fn(),
-    openDetails: vi.fn(),
-    closeDetails: vi.fn(),
   }
 }
 
@@ -26,20 +25,22 @@ describe('LayoutController', () => {
     const panels = fakePanels()
     service.attachPanels(panels)
 
+    const owner = { openDetails: vi.fn(), close: vi.fn() }
+    service.bindRightbar(owner)
     service.toggleSidebar()
     service.openDetails()
     service.closeDetails()
 
     expect(panels.toggleSidebar).toHaveBeenCalledTimes(1)
-    expect(panels.openDetails).toHaveBeenCalledTimes(1)
-    expect(panels.closeDetails).toHaveBeenCalledTimes(1)
+    expect(owner.openDetails).toHaveBeenCalledTimes(1)
+    expect(owner.close).toHaveBeenCalledTimes(1)
   })
 
   it('fails loud before the root entry wired its actions', () => {
     const service = new LayoutController()
     expect(() => { service.toggleSidebar() }).toThrow(/panel actions not wired/)
-    expect(() => { service.openDetails() }).toThrow(/panel actions not wired/)
-    expect(() => { service.closeDetails() }).toThrow(/panel actions not wired/)
+    expect(() => { service.openDetails() }).toThrow(/auxiliary panel owner is unavailable/)
+    expect(() => { service.closeDetails() }).toThrow(/auxiliary panel owner is unavailable/)
   })
 
   it('re-attach overwrites the stale action set (entry re-register)', () => {

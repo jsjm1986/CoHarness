@@ -17,6 +17,8 @@ function props(list: PluginInventorySettingsTabInjected['list']): PluginInventor
   return {
     t,
     list,
+    useClientSync: select => select({ syncing: false, failures: [] }),
+    retryClient: () => {},
   } as PluginInventorySettingsTabProps
 }
 
@@ -33,6 +35,27 @@ const SNAPSHOT = {
 } as unknown as Snapshot
 
 describe('PluginInventorySettingsTab', () => {
+  it('retries page synchronization without reloading Host inventory or clearing the search', async () => {
+    const list = vi.fn(async () => SNAPSHOT)
+    const retryClient = vi.fn()
+    const failed: PluginInventorySettingsTabProps = {
+      ...props(list), retryClient,
+      useClientSync: select => select({ syncing: false, failures: [{ id: 'fixture', message: 'download failed' }] }),
+    }
+    const view = render(<PluginInventorySettingsTab {...failed} />)
+    const search = await screen.findByRole('searchbox', { name: en.search })
+    fireEvent.change(search, { target: { value: 'loading' } })
+    fireEvent.click(screen.getByRole('button', { name: en.clientSyncRetry }))
+    expect(retryClient).toHaveBeenCalledOnce()
+    expect(list).toHaveBeenCalledOnce()
+    expect(screen.getByRole('alert').textContent).toBe(en.clientSyncFailed)
+    expect(view.container.querySelector('[data-client-sync-failure]')?.textContent).toContain('download failed')
+    view.rerender(<PluginInventorySettingsTab {...failed} useClientSync={select => select({ syncing: true, failures: [{ id: 'fixture', message: 'download failed' }] })} />)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: en.clientSyncRetry }).disabled).toBe(true)
+    expect((search as HTMLInputElement).value).toBe('loading')
+    expect(screen.getByRole('status').textContent).toBe(en.clientSyncing)
+  })
+
   it('renders runtime status only for enabled plugins', async () => {
     const deferred = Promise.withResolvers<Snapshot>()
     const list = vi.fn(() => deferred.promise)

@@ -13,9 +13,10 @@
  * in-menu strip with Retry remains the catalog-load surface.
  */
 import {
-  useEffect, useId, useMemo, useRef, useState, useSyncExternalStore,
+  useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type KeyboardEvent, type FocusEvent,
 } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
@@ -30,6 +31,9 @@ import css from './ModelSelect.module.css'
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
 type Pane = 'root' | 'model' | 'effort'
 type Presentation = 'trigger' | 'section'
+
+/** Keep the desktop menu unpainted until its first viewport-relative placement. */
+const MEASURE_STYLE = { left: 0, top: 0, visibility: 'hidden' as const }
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -70,8 +74,11 @@ export function ModelSelect(
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const toastSeq = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const paneFocus = useRef<'drill' | 'model' | 'effort' | null>(null)
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
   const id = useId()
   const phone = useMediaQuery('(max-width: 767px)')
 
@@ -128,11 +135,60 @@ export function ModelSelect(
   useEffect(() => {
     if (!open) return
     const closeOutside = (event: MouseEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      if (rootRef.current?.contains(event.target as Node) === true
+        || menuRef.current?.contains(event.target as Node) === true) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', closeOutside)
     return () => { document.removeEventListener('mousedown', closeOutside) }
   }, [open])
+
+  useEffect(() => {
+    if (available && !locked) return
+    paneFocus.current = null
+    setOpen(false)
+    setPane('root')
+    setToast(null)
+  }, [available, locked])
+
+  useEffect(() => {
+    const intent = paneFocus.current
+    paneFocus.current = null
+    if (!open || intent === null) return
+    const rows = itemRefs.current.filter(item => item !== null)
+    if (intent === 'drill') {
+      const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
+      ;(checked ?? rows.find(item => !item.disabled) ?? triggerRef.current)?.focus()
+      return
+    }
+    const cell = rows[intent === 'effort' ? 1 : 0]
+    ;(cell !== undefined && !cell.disabled ? cell : triggerRef.current)?.focus()
+  }, [open, pane])
+
+  /* jscpd:ignore-start -- the upstream model menu aligns right edges; useAnchoredPosition owns left-edge alignment. */
+  useLayoutEffect(() => {
+    if (!open || phone) { setMenuPos(null); return }
+    const place = (): void => {
+      const rect = triggerRef.current?.getBoundingClientRect()
+      if (rect === undefined) return
+      const margin = 12
+      const width = menuRef.current?.offsetWidth ?? 0
+      const height = menuRef.current?.offsetHeight ?? 0
+      let left = rect.right - width
+      let top = rect.top - 8 - height
+      if (width > 0) left = Math.min(Math.max(left, margin), window.innerWidth - width - margin)
+      if (height > 0) top = Math.min(Math.max(top, margin), window.innerHeight - height - margin)
+      setMenuPos({ left, top })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [open, pane, phone, state])
+  /* jscpd:ignore-end */
 
   if (!available) return null
 
@@ -155,11 +211,21 @@ export function ModelSelect(
     if (restoreFocus) queueMicrotask(() => { triggerRef.current?.focus() })
   }
 
+  const drill = (next: Pane): void => {
+    paneFocus.current = 'drill'
+    setPane(next)
+  }
+
+  const back = (from: Exclude<Pane, 'root'>): void => {
+    paneFocus.current = from
+    setPane('root')
+  }
+
   const moveFocus = (offset: number): void => {
     const items = itemRefs.current.filter(item => item !== null)
     if (items.length === 0) return
     const active = items.findIndex(item => item === document.activeElement)
-    const next = (Math.max(active, 0) + offset + items.length) % items.length
+    const next = active === -1 ? (offset > 0 ? 0 : items.length - 1) : (active + offset + items.length) % items.length
     items[next]?.focus()
   }
 
@@ -167,11 +233,34 @@ export function ModelSelect(
     if (event.key === 'Escape' && open) {
       event.preventDefault()
       // Escape backs out of a drilled pane first, then closes.
-      if (pane !== 'root' && !(phone && pane === 'model')) setPane('root')
+      if (pane !== 'root' && !(phone && pane === 'model')) back(pane)
       else close(true)
       return
     }
     if (!open) return
+    if (event.key === 'Tab') {
+      if (event.shiftKey) {
+        event.preventDefault()
+        if (pane !== 'root' && !(phone && pane === 'model')) back(pane)
+        else close(true)
+        return
+      }
+      const focused = document.activeElement
+      const rows = itemRefs.current.filter((item): item is HTMLButtonElement => item !== null)
+      if (focused instanceof HTMLButtonElement && rows.includes(focused)) {
+        event.preventDefault()
+        focused.click()
+        return
+      }
+      if (focused !== triggerRef.current) return
+      const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
+      const target = checked ?? rows.find(item => !item.disabled)
+        ?? menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')
+      if (target === undefined || target === null) return
+      event.preventDefault()
+      target.focus()
+      return
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       moveFocus(event.key === 'ArrowDown' ? 1 : -1)
@@ -179,7 +268,8 @@ export function ModelSelect(
   }
 
   const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
-    if (event.relatedTarget instanceof Node && rootRef.current?.contains(event.relatedTarget)) return
+    if (event.relatedTarget instanceof Node
+      && (rootRef.current?.contains(event.relatedTarget) === true || menuRef.current?.contains(event.relatedTarget) === true)) return
     close()
   }
 
@@ -275,7 +365,7 @@ export function ModelSelect(
                   className={clsx(css.option, selected && css.selected)}
                   key={model.id}
                   title={model.name}
-                  disabled={busy}
+                  disabled={locked || busy}
                   onClick={() => { choose({ provider: group.id, model: model.id }) }}
                 >
                   <span className={css.optionCopy}>
@@ -307,7 +397,7 @@ export function ModelSelect(
             aria-checked={effectiveEffort === level.effort}
             className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
             key={level.key}
-            disabled={busy}
+            disabled={locked || busy}
             onClick={() => { chooseEffort(level.effort) }}
           >
             <span className={css.optionCopy}>
@@ -326,6 +416,61 @@ export function ModelSelect(
       </div>
     )
   }
+
+  const menu = (
+    <div
+      ref={menuRef}
+      id={`${id}-menu`}
+      className={css.menu}
+      style={phone ? undefined : menuPos ?? MEASURE_STYLE}
+      role="menu"
+      aria-label={t('menu.aria')}
+      aria-busy={state.status === 'loading' || busy}
+    >
+      {phone && pane !== 'root' && (
+        <button
+          type="button"
+          className={css.back}
+          aria-label={t('menu.back')}
+          onClick={() => { back(pane) }}
+        >
+          <IconChevronLeftOutline14 size={16} />
+          <span>{t('menu.back')}</span>
+          <span className={css.backTitle}>{pane === 'model' ? t('menu.model') : t('menu.effort')}</span>
+        </button>
+      )}
+      {pane === 'root' && (
+        <>
+          <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('model') }}>
+            <span className={css.cellLabel}>{t('menu.model')}</span>
+            <span className={css.cellValue}>{modelLabel}</span>
+            <IconChevronRightOutline14 className={css.cellChevron} />
+          </button>
+          {reasoning !== undefined && (
+            <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('effort') }}>
+              <span className={css.cellLabel}>{t('menu.effort')}</span>
+              <span className={css.cellValue}>{effortLabel}</span>
+              <IconChevronRightOutline14 className={css.cellChevron} />
+            </button>
+          )}
+        </>
+      )}
+
+      {pane === 'model' && (
+        <>
+          {catalogStatus}
+          {modelOptions}
+        </>
+      )}
+
+      {pane === 'effort' && (
+        <>
+          {catalogStatus}
+          {effortOptions}
+        </>
+      )}
+    </div>
+  )
 
   return (
     <div ref={rootRef} className={css.root} data-model-select="" onKeyDown={onRootKeyDown} onBlur={onBlur}>
@@ -361,56 +506,7 @@ export function ModelSelect(
       {open && (
         <>
           <MobileSheetBackdrop onClose={() => { close(true) }} />
-          <div
-            id={`${id}-menu`}
-            className={css.menu}
-            role="menu"
-            aria-label={t('menu.aria')}
-            aria-busy={state.status === 'loading' || busy}
-          >
-            {phone && pane !== 'root' && (
-              <button
-                type="button"
-                className={css.back}
-                aria-label={t('menu.back')}
-                onClick={() => { setPane('root') }}
-              >
-                <IconChevronLeftOutline14 size={16} />
-                <span>{t('menu.back')}</span>
-                <span className={css.backTitle}>{pane === 'model' ? t('menu.model') : t('menu.effort')}</span>
-              </button>
-            )}
-            {pane === 'root' && (
-              <>
-                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('model') }}>
-                  <span className={css.cellLabel}>{t('menu.model')}</span>
-                  <span className={css.cellValue}>{modelLabel}</span>
-                  <IconChevronRightOutline14 className={css.cellChevron} />
-                </button>
-                {reasoning !== undefined && (
-                  <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
-                    <span className={css.cellLabel}>{t('menu.effort')}</span>
-                    <span className={css.cellValue}>{effortLabel}</span>
-                    <IconChevronRightOutline14 className={css.cellChevron} />
-                  </button>
-                )}
-              </>
-            )}
-
-            {pane === 'model' && (
-              <>
-                {catalogStatus}
-                {modelOptions}
-              </>
-            )}
-
-            {pane === 'effort' && (
-              <>
-                {catalogStatus}
-                {effortOptions}
-              </>
-            )}
-          </div>
+          {phone ? menu : createPortal(menu, document.body)}
         </>
       )}
       {toast !== null && (

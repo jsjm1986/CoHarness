@@ -20,6 +20,7 @@ interface PostgresUserRow {
   membership_status: 'active' | 'disabled'
   home_path: string
   must_change_password: boolean
+  auto_review_eligible: boolean
   port: number
   instance_state: string
 }
@@ -37,6 +38,7 @@ function toUser(row: PostgresUserRow): UserRow {
     status: row.user_status === 'active' && row.membership_status === 'active' ? 'active' : 'disabled',
     homePath: row.home_path,
     mustChangePassword: row.must_change_password,
+    autoReviewEligible: row.auto_review_eligible,
   }
 }
 
@@ -49,7 +51,7 @@ export class PostgresUserService {
 
   private selectUsers(where = ''): string {
     return `SELECT u.id internal_id,u.public_id::text,u.username::text,u.display_name,
-      u.status user_status,u.deleted_at,u.home_path,m.role,m.status membership_status,c.must_change_password,
+      u.status user_status,u.deleted_at,u.home_path,u.auto_review_eligible,m.role,m.status membership_status,c.must_change_password,
       i.port,i.observed_state instance_state
       FROM harness.users u
       JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
@@ -141,7 +143,7 @@ export class PostgresUserService {
   /** Atomically update administrator-editable fields for one user. */
   async patch(
     id: number,
-    next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled'; displayName?: string },
+    next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled'; displayName?: string; autoReviewEligible?: boolean },
   ): Promise<void> {
     await transaction(this.context.pool, async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-admin:${this.context.organizationId}`])
@@ -150,7 +152,8 @@ export class PostgresUserService {
         role: 'admin' | 'member'
         user_status: 'active' | 'disabled'
         membership_status: 'active' | 'disabled'
-      }>(`SELECT u.id,m.role,u.status user_status,m.status membership_status
+        auto_review_eligible: boolean
+      }>(`SELECT u.id,m.role,u.status user_status,m.status membership_status,u.auto_review_eligible
         FROM harness.users u
         JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
         WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL FOR UPDATE OF u,m`,
@@ -169,12 +172,13 @@ export class PostgresUserService {
       }
       const role = next.role === undefined ? row.role : next.role === 'admin' ? 'admin' : 'member'
       const status = next.status ?? row.user_status
+      const autoReviewEligible = next.autoReviewEligible ?? row.auto_review_eligible
       if (next.displayName === undefined) {
-        await client.query(`UPDATE harness.users SET status=$3,updated_at=now()
-          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id, status])
+        await client.query(`UPDATE harness.users SET status=$3,auto_review_eligible=$4,updated_at=now()
+          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id, status, autoReviewEligible])
       } else {
-        await client.query(`UPDATE harness.users SET status=$3,display_name=$4,updated_at=now()
-          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id, status, next.displayName])
+        await client.query(`UPDATE harness.users SET status=$3,display_name=$4,auto_review_eligible=$5,updated_at=now()
+          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id, status, next.displayName, autoReviewEligible])
       }
       if (next.role !== undefined) {
         await client.query(`UPDATE harness.memberships SET role=$3

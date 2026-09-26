@@ -10,7 +10,7 @@
  */
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { commitSessionNavigation, type ClientContext, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
@@ -56,6 +56,8 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const viewport = ctx.get('conversationViewport')
   const hostDescription = connection.hostDescription
+  const lifetime = new AbortController()
+  ctx.effect(() => () => { lifetime.abort() }, 'ui-workspace: navigation lifetime')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
 
   const searchSessions: WorkspaceBrowserInjected['searchSessions'] = async (query, signal) => {
@@ -72,13 +74,21 @@ export function apply(ctx: ClientContext): void {
   })
   const browserFlowSource = flowSource('sidebar.workspaces.directoryFlow')
   const pickerFlowSource = flowSource('conversation.hero.workspace.directoryFlow')
-  const openSession = (sessionId: SessionId): void => {
-    // A single-mode open must not materialize a workbench pane: on an empty
-    // pane list `replaceActive` falls back to `add`, which switches the
-    // viewport into workbench mode and collapses the session list. Route
-    // through the active pane only while the workbench is actually engaged.
-    if (viewport?.snapshot.getSnapshot().mode === 'workbench') viewport.replaceActive(sessionId)
-    ctx.sessions.open(sessionId)
+  const openSession = async (
+    sessionId: SessionId,
+    navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal]),
+  ): Promise<void> => {
+    await commitSessionNavigation(ctx.sessions, sessionId, navigation, () => {
+      if (ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+      // A single-mode open must not materialize a workbench pane: on an empty
+      // pane list `replaceActive` falls back to `add`, which switches the
+      // viewport into workbench mode and collapses the session list. Route
+      // through the active pane only while the workbench is actually engaged.
+      if (viewport?.snapshot.getSnapshot().mode === 'workbench' && !viewport.replaceActive(sessionId).ok) {
+        throw new Error(ctx.locale.bind(NS)('navigation.unavailable'))
+      }
+      ctx.sessions.open(sessionId)
+    })
   }
   const browserInjected = (): WorkspaceBrowserInjected => ({
     // Explicit group actions keep their target; unscoped New Session inherits
@@ -87,17 +97,14 @@ export function apply(ctx: ClientContext): void {
     open: openSession,
     searchSessions,
     searchResultLimit: ctx.sessions.searchResultLimit,
-    renameSession: async (sessionId, title) => {
-      // Row → session-face hop: rename is a per-session verb (ISession), not
-      // a list-service verb; the binding resolves any listed session.
-      const session = ctx.sessions.binding(sessionId)?.session
-      if (session === undefined) throw new Error(`unknown session "${sessionId}"`)
-      const result = await session.rename(title)
+    renameSession: async (sessionId, title) => ctx.sessions.using(sessionId, { source: 'controllerOperation' }, async (reference) => {
+      const result = await reference.binding.session.rename(title)
       if (!result.ok) throw new Error(result.error.message)
-    },
+    }),
     forkSession: (sessionId) => {
+      const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal])
       ctx.sessions.fork({ sessionId, increaseTitle: true })
-        .then((childId) => { openSession(childId) })
+        .then(childId => openSession(childId, navigation))
         .catch(() => {
           // Fork or child-rename failure keeps the current selection.
         })

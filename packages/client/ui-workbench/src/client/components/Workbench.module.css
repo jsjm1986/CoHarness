@@ -107,8 +107,13 @@
 
 .toolbar[data-inline] { flex: none; min-height: 0; padding: 0; border: 0; background: transparent; }
 .filePreview {
-  width: min(960px, calc(100vw - 32px));
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
 }
+
+.filePreviewActions { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; }
 
 .filePreviewText {
   max-height: 65vh;
@@ -129,6 +134,29 @@
 .fileBrowserEntry:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
 
 .filePreviewImage { display: block; max-width: 100%; max-height: 65vh; margin: 0 auto; object-fit: contain; }
+
+.markdownDocument {
+  min-width: 0;
+  padding: 10px 12px;
+  font-family: var(--dsw-font, inherit);
+  white-space: normal;
+}
+
+.htmlFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  border: none;
+  background: var(--dsw-alias-bg-base);
+}
+
+.previewStatus {
+  margin: 0;
+  padding: 10px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: normal;
+}
 
 /* Sidebar workbench panel: one scrolling column under the region chrome. */
 .sidebarPanel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--dsw-space-3); overflow-y: auto; padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-3); --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); }

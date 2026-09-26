@@ -16,6 +16,8 @@ Gateway runtime 在创建 Agent 前预留按 scope 限定的 `(draftId, sessionI
 
 Gateway 会话行在同一 append 事务中维护 `has_visible_content`、`visible_content_seq` 和 `last_prompt_at`。`listSnapshots()` 将这些事实提供给冷消费者；有 Gateway 索引时，冷列表不再为了判定空白而解析大日志。迁移回填会对含转义 NUL 的历史事件 JSON 采用保守归类，不对该值使用 PostgreSQL JSON 运算符。已有空根会话可以进入仅管理员可见的 dry-run，并通过现有保留窗口进入可恢复的 empty-draft 回收站。
 
+JSONL 在物理 header 读取器和格式 catalog 元数据适配器中都保留可选布尔字段 `draft`。冷读取收到与写入端接纳时相同的生命周期标记；丢弃该标记不能替代可见内容判断。[V5 后继](../bug-fix/2026-09-22-v5-draft-header-successor.zh.md)确认物理 header 修正，不改变已提交 generation 的字节。未知 header 键和非布尔 draft 值仍然无效。
+
 ## Alternatives considered
 
 **持久化每个新 Session，再由 Client 隐藏。** 否决：数据库、归档索引和 workspace 成员关系仍会累积被放弃的根会话，并且多个标签页仍然互相独立。

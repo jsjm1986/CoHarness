@@ -12,15 +12,6 @@
       "path": "../../boot/app-boot"
     },
     {
-      "path": "../../ptc-runtime/ptc-runtime-node"
-    },
-    {
-      "path": "../../sandbox/sandbox-windows-acl"
-    },
-    {
-      "path": "../../subprocess/subprocess-local"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {

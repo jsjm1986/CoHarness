@@ -6,7 +6,7 @@ English | [中文](2026-08-25-admin-archive-channel.zh.md)
 
 ## Problem
 
-Runtime archive membership was stored only in each Workspace registry. The regular Web client intentionally hid those sessions and offered no recovery or administration surface, so an organization administrator could not find, inspect, restore, or retire archived conversations across personal and project runtimes.
+Runtime archive membership was stored only in each Workspace registry. The regular Web client intentionally hid those sessions; its only restore surface is the per-user Archived sessions Settings page ([the unarchive restore-surface note](2026-09-25-session-unarchive-restore-surface.md)), which cannot find, inspect, or retire archived conversations across personal and project runtimes — the organization-scoped gap this channel owns.
 
 ## Decision
 

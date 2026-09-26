@@ -1,0 +1,2 @@
+{"type":"session","version":6,"id":"{{session:2}}","createdAt":1786358409171,"cwd":"{{cwd}}","parentSession":"{{session:1}}","isSeeded":false,"origin":"subagent","delegationDepth":1}
+{"type":"approval/policy","data":{"policy":"never","source":"delegation"}}

@@ -4,6 +4,12 @@
  * participates in method lookup, invocation, or type exposure.
  */
 
+import { ConnectionRpcStreamInterrupted } from '@deepseek-ai/dsh-client-connection/client'
+import { RemoteStreamCarrierError } from './stream-error.ts'
+import { RemoteStream, type RemoteStreamOptions } from './remote-stream.ts'
+export { RemoteStream, type RemoteStreamOptions, type RemoteStreamItem } from './remote-stream.ts'
+export { RemoteStreamCarrierError } from './stream-error.ts'
+
 import { Service } from '@deepseek-ai/cordis'
 import type { Context, Events } from '@deepseek-ai/cordis'
 import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-client-connection/client'
@@ -54,7 +60,14 @@ interface RemoteNamespaceHandle {
 }
 
 /** Typed Remote service augmented by generated direct namespaces. */
-export type ClientRemote = TypertClientRemote
+export interface ClientRemote extends TypertClientRemote {
+  /**
+   * Supervise a read stream using its owning Connection's readiness.
+   * @param options - domain opener and terminal outcome handling.
+   * @returns a cancellable single-consumer stream; mutations are never replayed.
+   */
+  $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -124,6 +137,15 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     super(ctx, 'remote')
     this.ownerCtx = ctx
     ctx.effect(() => () => { this.subscriptions.length = 0 }, 'api-gateway.client.subscriptions')
+  }
+
+  $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item> {
+    const connection = this.ownerCtx.get('connection') as ConnectionHandle
+    const target = options.sessionId === undefined ? connection : connection.forSession?.(options.sessionId) ?? connection
+    return new RemoteStream({ generation: {
+      getSnapshot: () => target.state.getSnapshot() === 'connected' ? target : undefined,
+      subscribe: listener => target.state.subscribe(listener),
+    } }, options)
   }
 
   async $mount(contribution: TypertRemoteContribution): ReturnType<TypertClientRemote['$mount']> {
@@ -373,7 +395,7 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     scoped: ScopedMethod | undefined,
     callerCtx: Context,
     values: readonly unknown[],
-  ): Promise<RemoteResult<unknown>> {
+  ): Promise<RemoteResult<unknown> | AsyncIterable<unknown>> {
     if (scoped !== undefined) {
       const binder = this.ownerCtx.typert.contexts.getClient(scoped.projection.context)
       const identity = binder?.identity(callerCtx)
@@ -404,15 +426,19 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     callerCtx: Context,
     values: readonly unknown[],
     boundIdentity?: BoundContextIdentity,
-  ): Promise<RemoteResult<unknown>> {
+  ): Promise<RemoteResult<unknown> | AsyncIterable<unknown>> {
     const endpoint = endpointOf(descriptor)
     if (!token.active) return withdrawn(endpoint)
-    const expected = descriptor.parameters.length - (projection?.parameterIndex === undefined ? 0 : 1)
+    const business = descriptor.parameters.filter((_parameter, index) => index !== projection?.parameterIndex)
+    const expected = business.length
+    let minimum = expected
+    while (minimum > 0 && business[minimum - 1]?.acceptsUndefined === true) minimum--
     const hasCallerSignal = descriptor.cancellation !== undefined && values.length === expected + 1
-    if (values.length !== expected && !hasCallerSignal) {
+    if ((values.length < minimum || values.length > expected) && !hasCallerSignal) {
+      const count = minimum === expected ? String(expected) : `${String(minimum)}–${String(expected)}`
       const contract = descriptor.cancellation === undefined
-        ? `${String(expected)} argument(s)`
-        : `${String(expected)} business argument(s) plus an optional AbortSignal`
+        ? `${count} argument(s)`
+        : `${count} business argument(s) plus an optional AbortSignal`
       throw new Error(
         `client api: ${endpoint} expected ${contract}, got ${String(values.length)}`,
       )
@@ -443,7 +469,8 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     const connection = this.ownerCtx.get('connection') as ConnectionHandle | undefined
     if (connection === undefined) throw new Error(`client api: ${endpoint} has no active Connection`)
     const scope = projection ?? descriptor.scope
-    const sessionId = scope?.context === 'agent' ? args[scope.wire] : undefined
+    const sessionId = scope?.context === 'agent' ? args[scope.wire]
+      : descriptor.namespace === 'terminal' ? args.sessionId : undefined
     const targetConnection = typeof sessionId === 'string'
       ? connection.forSession?.(sessionId as SessionId) ?? connection
       : connection
@@ -451,6 +478,22 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     const signal = callerSignal === undefined
       ? token.abort.signal
       : AbortSignal.any([token.abort.signal, callerSignal])
+    if (descriptor.mode === 'stream') {
+      return (async function* () {
+        if (targetConnection.rpc.stream === undefined) throw new Error('This Connection does not support Remote streams')
+        try {
+          for await (const result of targetConnection.rpc.stream('/api', endpoint, { args }, signal)) {
+            signal.throwIfAborted()
+            if (!result.ok) throw rebuiltFailure(result.error)
+            yield result.value
+          }
+        } catch (error) {
+          if (signal.aborted) throw cancelledFailure(endpoint, error).error
+          if (error instanceof ConnectionRpcStreamInterrupted) throw new RemoteStreamCarrierError(error.message, { cause: error })
+          throw error
+        }
+      })()
+    }
     try {
       const result = await targetConnection.rpc.call('/api', endpoint, { args }, signal)
       if (!mountActive(token)) return withdrawn(endpoint)
@@ -473,7 +516,7 @@ type InvokeRemote = (
   scoped: ScopedMethod | undefined,
   callerCtx: Context,
   args: readonly unknown[],
-) => Promise<RemoteResult<unknown>>
+) => Promise<RemoteResult<unknown> | AsyncIterable<unknown>>
 
 class RemoteNamespaceService extends Service {
   private readonly methods = new Map<string, RemoteMethodRecord>()
@@ -540,13 +583,22 @@ class RemoteNamespaceService extends Service {
       Object.defineProperty(this, method, {
         configurable: true,
         enumerable: true,
-        get: function (this: RemoteNamespaceService): (...args: unknown[]) => Promise<RemoteResult<unknown>> {
+        get: function (this: RemoteNamespaceService): (
+          ...args: unknown[]
+        ) => Promise<RemoteResult<unknown> | AsyncIterable<unknown>> | AsyncIterable<unknown> {
           const callerCtx = this.ctx
           const current = this.methods.get(method)
           const direct = current?.direct
           const scoped = current?.scoped
+          const invoke = this.invokeRemote
           return (...args: unknown[]) => {
-            return this.invokeRemote(direct, scoped, callerCtx, args)
+            if ((direct ?? scoped)?.descriptor.mode !== 'stream') return invoke(direct, scoped, callerCtx, args)
+            return (async function* () {
+              const result = await invoke(direct, scoped, callerCtx, args)
+              if (Symbol.asyncIterator in result) yield* result
+              // Stream dispatch returns only an iterator or a withdrawn failure.
+              else throw (result as Extract<RemoteResult<never>, { ok: false }>).error
+            })()
           }
         },
       })

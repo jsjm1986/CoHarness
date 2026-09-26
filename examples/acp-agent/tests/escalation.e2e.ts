@@ -12,7 +12,7 @@ import {
   launchAcpTestAgent,
   type AgentUnderTest,
   type LaunchedAcpTestAgent,
-} from '@deepseek-ai/dsh-acp-snapshot'
+} from '@deepseek-ai/dsh-session-snapshot'
 import { cleanupAcpExampleTest } from './cleanup.ts'
 
 const STANDARD_EXECUTION_UPDATES = new Set([

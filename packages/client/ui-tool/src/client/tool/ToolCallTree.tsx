@@ -13,13 +13,15 @@ function callName(node: ToolCallBlock): string {
 
 /** One atomic call dispatched through the Tool-owned keyed slot. */
 const ToolCall = memo(function ToolCall({
-  renderSlot, callId, toolName, block, openFile, selected, cwd, home, inspectCall, t, children,
-}: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 't'> & {
+  renderSlot, callId, toolName, block, openFile, selected, cwd, home, openCallDetails, inspectCall, nested, renderMessageImages,
+  t, children,
+}: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 'openCallDetails' | 'renderMessageImages' | 't'> & {
   callId: string
   toolName: string
   block: ToolCallBlock
   selected: boolean
   home?: string | undefined
+  nested?: boolean | undefined
   children?: ReactNode
 }) {
   const owner: ToolCallOwnerProps = useMemo(() => ({
@@ -29,8 +31,11 @@ const ToolCall = memo(function ToolCall({
     openFile,
     cwd,
     home,
+    nested,
+    renderMessageImages,
+    openDetails: openCallDetails === undefined ? undefined : () => { openCallDetails(callId) },
     inspect: () => { inspectCall(callId) },
-  }), [callId, toolName, block, openFile, cwd, home, inspectCall])
+  }), [callId, toolName, block, openFile, cwd, home, nested, renderMessageImages, openCallDetails, inspectCall])
   // An Auto-review denial is the call's whole story: route it through the
   // generic row so a keyed toolview cannot hide the denial behind its own card.
   const autoReviewDenied = useMemo(
@@ -56,10 +61,11 @@ const ToolCall = memo(function ToolCall({
 })
 
 const ToolCallBranch = memo(function ToolCallBranch({
-  renderSlot, block, selectedCallId, cwd, home, openFile, inspectCall, t,
-}: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
+  renderSlot, block, selectedCallId, cwd, home, openFile, openCallDetails, inspectCall, nested, renderMessageImages, t,
+}: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 'openCallDetails' | 'renderMessageImages' | 't'> & {
   block: ToolCallBlock
   home?: string | undefined
+  nested?: boolean | undefined
 }) {
   return (
     <ToolCall
@@ -71,6 +77,9 @@ const ToolCallBranch = memo(function ToolCallBranch({
       selected={block.callId === selectedCallId}
       cwd={cwd}
       home={home}
+      nested={nested}
+      renderMessageImages={renderMessageImages}
+      openCallDetails={openCallDetails}
       inspectCall={inspectCall}
       t={t}
     >
@@ -84,7 +93,10 @@ const ToolCallBranch = memo(function ToolCallBranch({
               selectedCallId={selectedCallId}
               cwd={cwd}
               home={home}
+              nested
+              renderMessageImages={renderMessageImages}
               openFile={openFile}
+              openCallDetails={openCallDetails}
               inspectCall={inspectCall}
               t={t}
             />
@@ -102,7 +114,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
  * @returns the Tool call tree.
  */
 export function ToolCallTree({
-  renderSlot, node, selectedCallId, cwd, openFile, inspectCall, useHostDescription, t,
+  renderSlot, node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, renderMessageImages, useHostDescription, t,
 }: ToolTreeProps) {
   const home = useHostDescription(description => description?.home)
   const block = node.data.root
@@ -114,7 +126,9 @@ export function ToolCallTree({
       cwd={cwd}
       home={home}
       openFile={openFile}
+      openCallDetails={openCallDetails}
       inspectCall={inspectCall}
+      renderMessageImages={renderMessageImages}
       t={t}
     />
   )

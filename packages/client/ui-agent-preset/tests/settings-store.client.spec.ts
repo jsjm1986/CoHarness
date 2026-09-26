@@ -31,13 +31,17 @@ interface Recorded { ns: string; patch: unknown }
 
 /** A client whose roster and write outcome the test controls. */
 function fakeApi(
-  presets: { id: string; trust: 'system' | 'user'; isDefault: boolean }[],
+  _presets: { id: string; trust: 'system' | 'user'; isDefault: boolean }[],
   options: {
     writes?: Recorded[]
     failWrite?: string
     failList?: string
     failWriteWith?: Error
     readOnly?: boolean
+    /** The roster's `modeSelectionEnabled` answer; a settings write moves it. */
+    modeSelection?: boolean
+    /** The settings document's saved `default`, written through `update`. */
+    savedDefault?: string
   } = {},
 ): IApiClient {
   return {
@@ -57,10 +61,11 @@ function fakeApi(
         if (options.failWrite !== undefined) {
           return Promise.resolve({ rpcId: 'r', result: { ok: false as const, error: { code: 'internal', message: options.failWrite, details: {} } } })
         }
-        // A committed write moves the roster's default, exactly as the host does.
-        for (const preset of presets) {
-          preset.isDefault = preset.id === (payload.patch as { default?: string }).default
-        }
+        // A committed write moves the settings document, exactly as the host
+        // does; the roster read then resolves the effective default from it.
+        const patch = payload.patch as { default?: string; modeSelectionEnabled?: boolean }
+        if (patch.modeSelectionEnabled !== undefined) options.modeSelection = patch.modeSelectionEnabled
+        if (patch.default !== undefined) options.savedDefault = patch.default
         return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } })
       },
     },
@@ -70,13 +75,25 @@ function fakeApi(
 /** The Remote roster the settings row reads. */
 function fakeRemote(
   presets: { id: string; trust: 'system' | 'user'; isDefault: boolean }[],
-  options: { failList?: string } = {},
+  options: { failList?: string; modeSelection?: boolean; savedDefault?: string } = {},
 ): Pick<ClientRemote, 'agentPresets'> {
   return {
     agentPresets: {
-      list: () => Promise.resolve(options.failList === undefined
-        ? { ok: true as const, value: { presets, authorable: true } }
-        : { ok: false as const, error: { code: 'internal', message: options.failList, details: {} } }),
+      list: () => {
+        // The roster reports the Host-effective default: the fixture's flag
+        // is the deployment choice, which a saved default overrides only
+        // while selection stays enabled.
+        const deployment = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id
+        const enabled = options.modeSelection ?? true
+        const effective = enabled ? options.savedDefault ?? deployment : deployment
+        return Promise.resolve(options.failList === undefined
+          ? { ok: true as const, value: {
+            presets: presets.map(preset => ({ ...preset, isDefault: preset.id === effective })),
+            authorable: true,
+            modeSelectionEnabled: enabled,
+          } }
+          : { ok: false as const, error: { code: 'internal', message: options.failList, details: {} } })
+      },
     },
   } as unknown as Pick<ClientRemote, 'agentPresets'>
 }
@@ -148,6 +165,23 @@ describe('the agent-preset settings controller', () => {
     // A deployment composing no presets is valid: every session shares the
     // host composition and the row renders nothing.
     expect(controller.store.getSnapshot().status).toBe('unavailable')
+    expect(controller.store.getSnapshot().error).toBeNull()
+  })
+
+  it('reports an unavailable row while the roster hides selection', async () => {
+    const controller = derivedBench([
+      { id: 'standard', trust: 'system', isDefault: true },
+    ], { modeSelection: false })
+
+    await controller.load()
+
+    // The row composes nothing the user can change; it reads like an empty
+    // roster rather than an error or a writable picker.
+    expect(controller.store.getSnapshot()).toMatchObject({
+      status: 'unavailable', error: null, currentValue: '', options: [],
+    })
+
+    await controller.select('standard')
     expect(controller.store.getSnapshot().error).toBeNull()
   })
 
@@ -269,16 +303,23 @@ describe('the new-session chip controller', () => {
       failSelectReason?: string
       failList?: string
       throwOn?: 'list' | 'select'
+      modeSelection?: boolean
+      list?: () => Promise<{
+        ok: true
+        value: { presets: unknown[]; authorable: boolean; modeSelectionEnabled: boolean }
+      }>
     } = {},
   ): AgentPresetSeatController {
     const remote = {
       agentPresets: {
-        list: () => {
+        list: options.list ?? (() => {
           if (options.throwOn === 'list') return Promise.reject(new Error('socket closed'))
           return Promise.resolve(options.failList === undefined
-            ? { ok: true as const, value: { presets, authorable: true } }
+            ? { ok: true as const, value: {
+              presets, authorable: true, modeSelectionEnabled: options.modeSelection ?? true,
+            } }
             : { ok: false as const, error: { code: 'internal', message: options.failList, details: {} } })
-        },
+        }),
         select: (_sessionId: string, agentPreset: string) => {
           if (options.throwOn === 'select') return Promise.reject(new Error('socket closed'))
           options.writes?.push({ ns: 'select', patch: agentPreset })
@@ -463,6 +504,55 @@ describe('the new-session chip controller', () => {
     expect(controller.store.getSnapshot().current).toBe('minimal')
   })
 
+  it('takes picker visibility from the newest roster answer', async () => {
+    const first = Promise.withResolvers<Awaited<ReturnType<typeof remoteRoster>>>()
+    const second = Promise.withResolvers<Awaited<ReturnType<typeof remoteRoster>>>()
+    const replies = [first.promise, second.promise]
+    const controller = chip(ROSTER, undefined, { list: () => replies.shift()! })
+
+    const older = controller.load()
+    const newer = controller.load()
+    second.resolve(remoteRoster(false))
+    await newer
+    first.resolve(remoteRoster(true))
+    await older
+
+    // The stale reply resolves last but must not re-show a picker the newer
+    // roster answer already hid.
+    expect(controller.store.getSnapshot()).toMatchObject({
+      showPicker: false, current: 'standard', error: null,
+    })
+  })
+
+  it('hides while the roster reports selection off', async () => {
+    const controller = chip(ROSTER, undefined, { modeSelection: false })
+
+    await controller.load()
+
+    // The deployment default still names the session about to start; the
+    // picker is the only thing the policy removes.
+    expect(controller.store.getSnapshot()).toMatchObject({
+      showPicker: false, current: 'standard',
+      options: ROSTER.map(preset => ({ id: preset.id, trust: preset.trust })),
+    })
+  })
+
+  it('drops an unconsumed stage when the roster reloads with selection off', async () => {
+    const writes: Recorded[] = []
+    const rosters = [remoteRoster(true), remoteRoster(false)]
+    const controller = chip(ROSTER, undefined, { writes, list: () => Promise.resolve(rosters.shift()!) })
+    await controller.load()
+    await controller.select('minimal')
+
+    await controller.load()
+    await controller.apply()
+
+    // A hidden picker cannot serve a staged pick: the stage is dropped
+    // rather than landing a choice no visible control reported.
+    expect(writes).toEqual([])
+    expect(controller.store.getSnapshot()).toMatchObject({ showPicker: false, current: 'standard' })
+  })
+
   it('reports a refused roster read without emptying the chip', async () => {
     const controller = chip(ROSTER, undefined, { failList: 'host down' })
 
@@ -489,7 +579,11 @@ describe('the new-session chip controller', () => {
       agentPresets: {
         list: () => Promise.resolve({
           ok: true as const,
-          value: { presets: [{ id: 'standard', trust: 'system', isDefault: true }], authorable: true },
+          value: {
+            presets: [{ id: 'standard', trust: 'system', isDefault: true }],
+            authorable: true,
+            modeSelectionEnabled: true,
+          },
         }),
       },
     } as unknown as Pick<ClientRemote, 'agentPresets'>
@@ -506,3 +600,18 @@ describe('the new-session chip controller', () => {
 
 
 })
+
+/** A roster answer whose picker policy the test chooses. */
+function remoteRoster(modeSelectionEnabled: boolean) {
+  return {
+    ok: true as const,
+    value: {
+      presets: [
+        { id: 'standard', trust: 'system' as const, isDefault: true },
+        { id: 'minimal', trust: 'system' as const, isDefault: false },
+      ],
+      authorable: true,
+      modeSelectionEnabled,
+    },
+  }
+}

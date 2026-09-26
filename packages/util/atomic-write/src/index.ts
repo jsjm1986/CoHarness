@@ -11,6 +11,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
+import { rmSync } from 'node:fs'
 import { lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -183,9 +184,22 @@ export async function withFileLock<T>(
     await new Promise(resolve => setTimeout(resolve, delay))
     delay = Math.min(delay * 2, LOCK_RETRY_MAX_MS)
   }
+  // `process.exit` abandons the `finally` release; the exit event still runs
+  // synchronous listeners, so an owner leaving by an explicit exit does not
+  // orphan its lock for the next contender to quarantine.
+  const releaseOnExit = (): void => {
+    try {
+      rmSync(lockPath)
+    } catch {
+      // The lock is already gone, or the filesystem is unreachable at exit;
+      // either way the holder can do nothing more.
+    }
+  }
+  process.once('exit', releaseOnExit)
   try {
     return await operation()
   } finally {
+    process.removeListener('exit', releaseOnExit)
     await rm(lockPath, { force: true })
   }
 }

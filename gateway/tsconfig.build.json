@@ -9,8 +9,10 @@
     "rewriteRelativeImportExtensions": true,
     "tsBuildInfoFile": "./lib/tsconfig.tsbuildinfo",
     "paths": {
+      "@deepseek-ai/dsh-brand": ["../packages/util/brand/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/lib/types/discovery.d.ts"],
-      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/catalog-default.d.ts"],
+      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-format-catalog": ["../packages/session/session-format-catalog/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/lib/types/surface.d.ts"],
       "@deepseek-ai/dsh-util-values": ["../packages/util/values/lib/types/index.d.ts"]
     }

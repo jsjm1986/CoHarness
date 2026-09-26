@@ -16,6 +16,8 @@ Gateway runtimes reserve a scope-qualified `(draftId, sessionId)` pair before Ag
 
 Gateway session rows maintain `has_visible_content`, `visible_content_seq`, and `last_prompt_at` in the same transaction as event appends. `listSnapshots()` exposes these facts to cold consumers, which do not parse a large log merely to decide whether a row is blank. Migration backfill classifies legacy event JSON containing escaped NUL conservatively without applying PostgreSQL JSON operators to that value. Existing blank roots are eligible for an administrator-only dry-run and recoverable empty-draft trash flow with the existing retention window.
 
+JSONL preserves the optional boolean `draft` through both its physical-header reader and its format-catalog metadata adapter. A cold read receives the same lifecycle marker the writer accepted; dropping it is not a substitute for evaluating visible content. The [V5 successor](../bug-fix/2026-09-22-v5-draft-header-successor.md) acknowledges the physical-header correction and leaves committed generation bytes unchanged. Unknown header keys and non-boolean draft values remain invalid.
+
 ## Alternatives considered
 
 **Persist every new Session and hide it in the Client.** Rejected because the database, archive index, and workspace membership would still accumulate abandoned roots and competing tabs would remain independent.

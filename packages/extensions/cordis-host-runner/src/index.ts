@@ -14,6 +14,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { JsonValue } from '@deepseek-ai/dsh-session/types'
 import { TypertLookupFailure, TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
+import { authorizeDynamicHostExecution } from './authorization.ts'
 import { isPlugin, normalizeHandler } from './guard.ts'
 import { CordisInspectRegistryService } from './inspect-registry.ts'
 import { missingServices, startHostHalf } from './lifecycle.ts'
@@ -294,6 +295,11 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     }
   }
 
+  /** Recheck deployment authority without borrowing the target Session's permission. */
+  private authorizeExecution(): Promise<void> {
+    return authorizeDynamicHostExecution(this.rootCtx)
+  }
+
   /**
    * Define a new Plugin's first Package or append a Package to an existing Plugin.
    * @param request - Session ownership, Plugin selection, metadata, and source code.
@@ -303,10 +309,10 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (this.disposed) throw new Error('dynamic Cordis runner is disposed')
     const name = request.name.trim()
     const purpose = request.purpose.trim()
-    if (name.length === 0) throw new Error('cordis_define needs a non-empty `name`')
-    if (purpose.length === 0) throw new Error('cordis_define needs a non-empty `purpose`')
+    if (name.length === 0) throw new Error('dynamic Cordis definition needs a non-empty `name`')
+    if (purpose.length === 0) throw new Error('dynamic Cordis definition needs a non-empty `purpose`')
     if (request.code.host === undefined && request.code.client === undefined) {
-      throw new Error('cordis_define needs `code.host`, `code.client`, or both')
+      throw new Error('dynamic Cordis definition needs `code.host`, `code.client`, or both')
     }
     if (request.code.host !== undefined) precheckCode(request.code.host, 'code.host')
     if (request.code.client !== undefined) precheckCode(request.code.client, 'code.client')
@@ -315,7 +321,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (request.plugin.kind === 'new') {
       const prefix = request.plugin.idPrefix.trim()
       if (!/^[a-z]{3,6}$/.test(prefix)) {
-        throw new Error('cordis_define `plugin.idPrefix` must contain 3–6 lowercase English letters')
+        throw new Error('dynamic Cordis definition `plugin.idPrefix` must contain 3–6 lowercase English letters')
       }
       this.registry.assertDefinitionCapacity(request.sessionId, undefined, {
         ...(request.code.host === undefined ? {} : { hostCode: request.code.host }),
@@ -397,13 +403,13 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
   }
 
   /**
-   * Start or update one Package for a model tool call. An unauthorized Client
+   * Start or update one programmatically defined Package. An unauthorized Client
    * Package waits for approval; Plugin-wide authorization covers later versions.
    * @param agent - Agent whose Session must own the Plugin.
    * @param pluginId - Stable Plugin identity to activate.
    * @param packageId - Immutable Package version to activate.
    * @param mode - Whether to run the current version or switch versions.
-   * @param signal - Tool-call cancellation signal while the activation request is being created.
+   * @param signal - Caller cancellation signal while the activation request is being created.
    * @returns The successful activation identity or an actionable refusal.
    */
   async run(
@@ -416,6 +422,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (this.disposed) {
       return { ok: false, reason: 'plugin-missing', message: 'dynamic Cordis runner is disposed' }
     }
+    await this.authorizeExecution()
     const plan = this.resolvePlan(agent, pluginId, packageId, mode)
     if (!plan.ok) return plan.response
     if (signal?.aborted === true) {
@@ -482,7 +489,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
    * @param pluginId - Stable Plugin identity to activate.
    * @param packageId - Immutable Package version to activate.
    * @param mode - Whether to run the current version or switch versions.
-   * @param requestId - Model-driven request identity, or null for a direct user gesture.
+   * @param requestId - Programmatic request identity, or null for a direct user gesture.
    * @param approveFutureVersions - Whether this approval covers later Packages of the same Plugin.
    * @returns The exact Host activation or a failure message.
    */
@@ -496,6 +503,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     approveFutureVersions: boolean,
   ): Promise<DynamicCordisHostHalfResult> {
     if (this.disposed) return { ok: false, message: 'dynamic Cordis runner is disposed' }
+    await this.authorizeExecution()
     const plan = this.resolvePlan(agent, pluginId, packageId, mode, requestId === null)
     if (!plan.ok) return { ok: false, message: plan.response.message }
     let attempt: DynamicCordisRunAttempt
@@ -571,7 +579,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
   }
 
   /**
-   * Resolve one model-driven Client activation request.
+   * Resolve one programmatically requested Client activation.
    * @param requestId - Request identity to settle once.
    * @param resolution - Browser refusal or exact Client activation result.
    * @returns Whether the still-pending request accepted this resolution.
@@ -582,6 +590,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     resolution: DynamicCordisRunResolution,
   ): Promise<DynamicCordisResolveAck> {
     if (this.disposed) return { accepted: false }
+    if (resolution.ok) await this.authorizeExecution()
     const existing = this.resolvingRequests.get(requestId)
     if (existing !== undefined) return existing
     const operation = this.resolveRequestRunOnce(requestId, resolution)
@@ -602,6 +611,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (pending === undefined) return { accepted: false }
     const plugin = this.registry.get(pending.pluginId)
     if (plugin !== undefined) await this.authorizeRegistrySession(plugin.sessionId, 'approve')
+    if (resolution.ok) await this.authorizeExecution()
     if (resolution.ok && plugin?.run?.pluginRunId !== resolution.pluginRunId) return { accepted: false }
     if (!resolution.ok && resolution.pluginRunId !== undefined
       && plugin?.run?.pluginRunId !== resolution.pluginRunId) return { accepted: false }
@@ -627,6 +637,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
   ): Promise<DynamicCordisRunResponse> {
     const plugin = this.owned(agent, pluginId)
     if (plugin === undefined) return { ok: false, reason: 'plugin-missing', message: missingPluginMessage(pluginId) }
+    if (resolution.ok) await this.authorizeExecution()
     const settled = await this.settleActivation(plugin, resolution)
     this.injectUserRunOutcome(agent, pluginId, settled)
     return settled
@@ -962,7 +973,12 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       return { ok: false, code: 'plugin-not-running', message: `dynamic plugin "${pluginId}" is not running` }
     }
     await this.authorizeRegistrySession(plugin.sessionId, 'write')
-    const run = plugin.run
+    await this.authorizeExecution()
+    const current = this.registry.get(pluginId)
+    const run = current?.run
+    if (current !== plugin || run === undefined) {
+      return { ok: false, code: 'plugin-not-running', message: `dynamic plugin "${pluginId}" stopped before invocation` }
+    }
     if (run.pluginRunId !== pluginRunId) {
       return { ok: false, code: 'stale-run', message: `activation "${pluginRunId}" is no longer active` }
     }
@@ -1061,7 +1077,18 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         startedHere: false,
       }
     }
-    if (plugin.run !== undefined) await this.retract(plugin)
+    if (plugin.run !== undefined) {
+      await this.retract(plugin)
+      try {
+        await this.authorizeExecution()
+      } catch (error) {
+        if (stillRegistered() && !cancelled()) this.failAttempt(plugin, attempt, 'host-load', errorDetails(error))
+        throw error
+      }
+      if (!stillRegistered() || cancelled()) {
+        return { ok: false, message: `dynamic plugin "${plugin.pluginId}" activation ended during cleanup` }
+      }
+    }
     if (mode === 'update' || plugin.currentPackageId === undefined) plugin.nextPackageId = definition.packageId
     const run: DynamicCordisRun = {
       pluginRunId: attempt.pluginRunId,
@@ -1294,11 +1321,11 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         + 'Do not request the same activation again unless the user asks.'
     } else {
       const returnedStatus = pending.requiresApproval ? 'awaiting-approval' : 'starting'
-      text = `Cordis ${pending.mode} ${identity} failed after cordis_run returned ${returnedStatus}: `
+      text = `Cordis ${pending.mode} ${identity} failed after the activation request returned ${returnedStatus}: `
         + `${settled.reason}\n${formatErrorDetails(settled)}\n`
         + `currentPackageId: ${plugin?.currentPackageId ?? 'none'}\n`
         + `nextPackageId: ${plugin?.nextPackageId ?? pending.packageId}\n`
-        + 'Inspect the failed Package, correct it on the same Plugin when needed, and retry the activation autonomously.'
+        + 'Use cordis_inspect_self to read the failed Package and explain its diagnostics. Runtime changes require an authorized programmatic or user action.'
     }
     agent.steer(createUserMessage({
       content: [{ type: 'text', text }],
@@ -1320,8 +1347,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
           + `Slot "${failure.slot}" after activation.\n`
           + `${formatErrorDetails(failure)}\n`
           + `entryAbdicated: ${failure.abdicated}\n`
-          + 'Inspect the failed Package, fix the Client code by defining a new Package on the same Plugin, and '
-          + 'activate that Package autonomously with cordis_run mode:"update".',
+          + 'Use cordis_inspect_self to read this Package and explain the Client failure. Runtime changes require an authorized programmatic or user action.',
       }],
       source: { kind: 'plugin', plugin: 'cordis-host-runner' },
     }))
@@ -1344,8 +1370,8 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         text: `Cordis Host handler ${plugin.pluginId}/${run.packageId} (${run.pluginRunId}) failed when the Client called `
           + `host.call(${JSON.stringify(method)}).\n`
           + `${formatErrorDetails(failure)}\n`
-          + 'The Plugin remains running. Inspect this Package, correct the Host code on the same Plugin, and activate '
-          + 'the new Package autonomously with cordis_run mode:"update". If the handler needs a Service, either declare '
+          + 'The Plugin remains running. Use cordis_inspect_self to read this Package and explain the Host failure. '
+          + 'Runtime changes require an authorized programmatic or user action. If the handler needs a Service, either declare '
           + 'that Service in the returned Plugin inject list or read it with ctx.get(name) and handle undefined.',
       }],
       source: { kind: 'plugin', plugin: 'cordis-host-runner' },
@@ -1369,8 +1395,8 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         type: 'text',
         text: `Cordis ${platform} guard rejected runtime code in ${plugin.pluginId}/${run.packageId} `
           + `(${run.pluginRunId}) after activation.\n${formatErrorDetails(failure)}\n`
-          + 'The Plugin remains running. Inspect this Package, define a corrected Package on the same Plugin, and '
-          + 'activate it autonomously with cordis_run mode:"update".',
+          + 'The Plugin remains running. Use cordis_inspect_self to read this Package and explain the rejected operation. '
+          + 'Runtime changes require an authorized programmatic or user action.',
       }],
       source: { kind: 'plugin', plugin: 'cordis-host-runner' },
     }))

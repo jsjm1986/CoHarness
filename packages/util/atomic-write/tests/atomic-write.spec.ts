@@ -170,6 +170,32 @@ describe('writeFileAtomic', () => {
 })
 
 describe('withFileLock', () => {
+  it('releases the held lock through its exit listener', async () => {
+    // Capture the exit listener instead of emitting `exit` on the live
+    // process — a real emit would also run the coverage and runner hooks.
+    const exitListeners: Array<() => void> = []
+    vi.spyOn(process, 'once').mockImplementation(((event: string, listener: () => void) => {
+      if (event === 'exit') exitListeners.push(listener)
+      return process
+    }) as typeof process.once)
+
+    const dir = await scratch()
+    const target = join(dir, 'document')
+    const lockPath = `${target}.lock`
+    await withFileLock(target, async () => {
+      expect(exitListeners).toHaveLength(1)
+      exitListeners[0]!()
+      await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    })
+
+    // The exit release also tolerates the lock already being gone.
+    await withFileLock(target, async () => {
+      await rm(lockPath, { force: true })
+      exitListeners[1]!()
+    })
+    expect(await readdir(dir)).toEqual([])
+  })
+
   it('retries EPERM only when the lock path currently exists', async () => {
     const dir = await scratch()
     const target = join(dir, 'document')

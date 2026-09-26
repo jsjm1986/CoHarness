@@ -1080,19 +1080,16 @@ describe('Session', () => {
     expect(session.header.cwd).toBe('/accepted')
   })
 
-  it('migrates a supplied legacy-version header to the current format version', () => {
-    const session = Session.create(SessionId('header-legacy'), undefined, {
-      version: 0,
+  it('rejects a supplied header from a previous format generation', () => {
+    /* Migration is the storage boundary's job; a Session always carries the
+     * current version. */
+    expect(() => Session.create(SessionId('header-legacy'), undefined, {
+      version: SESSION_FORMAT_VERSION - 1,
       id: SessionId('header-legacy'),
       createdAt: 123,
       isSeeded: false,
-    } as unknown as SessionHeader, SessionLogOffset(0))
-    expect(session.header).toEqual({
-      version: SESSION_FORMAT_VERSION,
-      id: 'header-legacy',
-      createdAt: 123,
-      isSeeded: false,
-    })
+    } as unknown as SessionHeader, SessionLogOffset(0)))
+      .toThrow(/header version must be/)
   })
 
   it('rejects an exotic, non-JSON, or mismatched supplied header', () => {
@@ -1149,11 +1146,20 @@ describe('Session', () => {
       { header: { ...base, isSeeded: 'yes' }, error: /isSeeded must be a boolean/ },
       { header: { ...base, seedLength: 1 }, error: /invalid field "seedLength"/ },
       { header: { ...base, draft: 'yes' }, error: /header draft must be a boolean/ },
+      { header: { ...base, sshTarget: '7' }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: 0 }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: -3 }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: 1.5 }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: Number.MAX_SAFE_INTEGER + 1 }, error: /header sshTarget must be a positive safe integer/ },
     ]
 
     for (const { header, error } of cases) {
       expect(() => Session.create(SessionId('header-shape'), undefined, header as SessionHeader)).toThrow(error)
     }
+
+    expect(Session.create(SessionId('header-shape'), undefined, {
+      ...base, sshTarget: 7,
+    } as unknown as SessionHeader).header.sshTarget).toBe(7)
   })
 
   it('retains opaque logical header metadata except the physical v0 seed field', () => {
@@ -1168,6 +1174,19 @@ describe('Session', () => {
 
     expect((session.header as SessionHeader & { extension: { value: string } }).extension)
       .toEqual({ value: 'kept' })
+  })
+
+  it('rejects every released header generation except the installed one', () => {
+    for (let version = 0; version < SESSION_FORMAT_VERSION; version += 1) {
+      const id = SessionId(`header-v${version}`)
+      expect(() => Session.create(id, undefined, {
+        version,
+        id,
+        createdAt: 123,
+        isSeeded: false,
+        delegationDepth: 0,
+      } as SessionHeader)).toThrow(/header version must be/)
+    }
   })
 
   it('rejects seed records with invalid fixed-envelope fields', () => {

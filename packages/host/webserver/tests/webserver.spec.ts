@@ -310,6 +310,17 @@ describe('real Loader composition', () => {
     )
   })
 
+  it('preloads application batches with escaped attributes before executing them', () => {
+    const src = '/plugins/??a/client.js&rev="1"&label=<batch>'
+    const html = renderIndexInjections('<head></head><body></body>', [
+      { kind: 'script-preload', src },
+      { kind: 'script-src', placement: 'body', src },
+    ])
+    expect(html).toContain('<head><link rel="preload" as="script" href="/plugins/??a/client.js&amp;rev=&quot;1&quot;&amp;label=&lt;batch&gt;">')
+    expect(html).not.toContain('<batch>')
+    expect(html.indexOf('rel="preload"')).toBeLessThan(html.indexOf('<script src='))
+  })
+
   it('fails the fiber when the port is already taken (fail-loud at activation)', { timeout: 60_000 }, async () => {
     const first = await loadComposition()
     const takenPort = first.webServer.port

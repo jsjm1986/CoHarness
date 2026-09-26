@@ -54,6 +54,9 @@ export { REGION_BEGIN, REGION_END }
  * errors, so the partition can never silently drift from the service API.
  */
 export const SERVICE_PAGE: Record<string, string> = {
+  terminalController: 'workspace.md',
+  userTerminalAuthorization: 'collaboration.md',
+  userTerminalAdministration: 'collaboration.md',
   agentLoop: 'core.md',
   agentDefaultModel: 'core.md',
   agentPresets: 'core.md',
@@ -64,6 +67,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   authorization: 'credentials.md',
   browserUse: 'browser-use.md',
   computerUse: 'computer-use.md',
+  computerUseAuthorization: 'computer-use.md',
   userDocs: 'attachment.md',
   shell: 'shell.md',
   shellEnv: 'shell.md',
@@ -79,6 +83,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   fileReferences: 'session-reference.md',
   fs: 'filesystem.md',
   gatewayRuntime: 'collaboration.md',
+  executionAuthority: 'collaboration.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
@@ -92,6 +97,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   permissionPresetAuthorization: 'permission-presets.md',
   planMode: 'plan.md',
   pluginManager: 'boot.md',
+  pluginManagementAuthorization: 'boot.md',
   profileContext: 'boot.md',
   hmr: 'boot.md',
   mcpResources: 'mcp.md',
@@ -125,6 +131,10 @@ export const SERVICE_PAGE: Record<string, string> = {
   userQuestions: 'user-questions.md',
   web: 'web.md',
   workflowEngine: 'workflow.md',
+  workspaceChanges: 'deliverables.md',
+  ssh: 'ssh.md',
+  officeToPdf: 'office-to-pdf.md',
+  webhookRuntime: 'webhook.md',
   workspaceRegistry: 'workspace.md',
 }
 
@@ -147,6 +157,10 @@ export const SERVICE_PAGE: Record<string, string> = {
  * to a model as `cordis_runtime_inspect what:"client"`).
  */
 export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
+  webTerminals: 'client-side terminal view models — packages/api/terminal-controller/README.md owns the API',
+  sidebarRight: 'client-face navigation service — packages/client/ui-sidebar-right/README.md owns the API',
+  sidebarRightTabs: 'client-face tab registry — packages/client/ui-sidebar-right/README.md owns the API',
+  executionAuthorityRequired: 'managed-deployment marker is owned by packages/context/execution-authority/README.md',
   appExit: 'not a service: launcher-provided bounded process-exit callback — packages/boot/cmdline/README.md owns the launcher contract',
   appReady: 'not a service: launcher-provided successful-startup signal — packages/boot/cmdline/README.md owns the launcher contract',
   pluginPackages: 'profile-boot-owned package resolver service used by optional consumers — packages/boot/app-boot/README.md owns this internal API',
@@ -178,6 +192,8 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   theme: 'client-side interface-typed browser service — packages/client/ui-theme/README.md owns the API',
   workspaces: 'client-side interface-typed browser service — packages/client/runtime/README.md owns the API',
   workspaceResources: 'client-side metadata-only resource registry — packages/client/runtime/README.md owns the API',
+  permissionCatalog: 'client-side per-runtime catalog directory — packages/client/runtime/README.md owns the API',
+  sshAuthorization: 'interface-typed optional managed-deployment service (SshAuthorization) — packages/ssh/ssh/README.md owns the API',
 }
 
 /**
@@ -188,6 +204,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
  * {@link EVENT_WALK_EXEMPTIONS} names each one with its documentation owner.
  */
 export const EVENT_SCOPE_PAGE: Record<string, string> = {
+  mcp: 'mcp.md',
   'agent': 'core.md',
   'agent-loop': 'core.md',
   'agent-preset': 'core.md',
@@ -232,6 +249,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
  * exemption cannot mask another declaration in that scope.
  */
 export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
+  'web/browser-open': 'client-face addressed Web navigation request — packages/client/ui-sidebar-browser/README.md owns the API',
   'command/executed': 'client-face local command acknowledgment — packages/client/ui-commands/README.md owns the API',
   'connection/request': 'split Host Connection request-context waterfall — docs/subsystems/collaboration.md owns the API',
   'workspace/resource-open': 'client-face file preview request — packages/client/ui-workbench/README.md owns the API',
@@ -254,6 +272,13 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  WorkspaceChangesSummary: 'deliverables.md',
+  SshConnection: 'ssh.md',
+  OfficeToPdfRequest: 'office-to-pdf.md',
+  OfficeToPdfResult: 'office-to-pdf.md',
+  OfficeToPdfGeneration: 'office-to-pdf.md',
+  SshStreamEndpoint: 'ssh.md',
+  WorkspaceFileDiff: 'deliverables.md',
   Agent: 'core.md',
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',
@@ -263,6 +288,10 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   AgentStatus: 'core.md',
   AssistantStreamFrame: 'core.md',
   CollaborationAccess: 'collaboration.md',
+  ExecutionInheritance: 'collaboration.md',
+  ExecutionQuestionId: 'collaboration.md',
+  ExecutionCapability: 'collaboration.md',
+  ExecutionState: 'collaboration.md',
   CollaborationAction: 'collaboration.md',
   CollaborationAuthority: 'collaboration.md',
   CollaborationErrorCode: 'collaboration.md',
@@ -638,11 +667,15 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   DomainSpec: 'storage.md',
   DomainChanged: 'storage.md',
   DomainFacility: 'storage.md',
+  VerifiedWebhookDelivery: 'webhook.md',
+  WebhookRule: 'webhook.md',
+  WebhookRuleId: 'webhook.md',
   Workspace: 'workspace.md',
   WorkspaceId: 'workspace.md',
   WorkspaceArchiveSnapshot: 'workspace.md',
   ArchivedSessionEntry: 'workspace.md',
   WebBootGraph: 'client-modules.md',
+  ClientArtifactBaseline: 'client-modules.md',
   SessionTelemetryRecord: 'session-telemetry.md',
   WorkflowRunInfo: 'workflow.md',
   WorkflowStartRequest: 'workflow.md',
@@ -663,6 +696,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   PluginChange: 'boot.md',
   PluginInstallLogChunk: 'boot.md',
   PluginInstallProgress: 'boot.md',
+  PluginInstallFrame: 'boot.md',
   PluginInfo: 'boot.md',
   BundleInfo: 'boot.md',
   PluginSpecInspection: 'boot.md',
@@ -691,6 +725,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'Promise',
   'ReadableStream',
   'Record',
+  'Request',
   'Response',
   'Readonly',
   'Uint8Array',
@@ -698,6 +733,19 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
+  TerminalShell: 'Browser terminal shell profiles are owned by packages/api/terminal-controller/README.md',
+  TerminalEnvironment: 'Browser terminal environment fields are owned by packages/api/terminal-controller/README.md',
+  WebTerminalInfo: 'Browser terminal metadata is owned by packages/api/terminal-controller/README.md',
+  TerminalCreateRequest: 'Browser terminal allocation fields are owned by packages/api/terminal-controller/README.md',
+  TerminalAttachmentId: 'Browser terminal input ownership is owned by packages/api/terminal-controller/README.md',
+  TerminalFrame: 'Browser terminal stream frames are owned by packages/api/terminal-controller/README.md',
+  TerminalRetentionFrame: 'Browser terminal window holds are owned by packages/api/terminal-controller/README.md',
+  WebTerminalId: 'Browser terminal identity is owned by packages/api/terminal-controller/README.md',
+  TerminalAdminInfo: 'Managed terminal ownership and metadata are owned by packages/api/terminal-controller/README.md',
+  TerminalOwnerId: 'Managed terminal ownership and metadata are owned by packages/api/terminal-controller/README.md',
+  TerminalAuthority: 'Managed terminal ownership and metadata are owned by packages/api/terminal-controller/README.md',
+  'z.ZodType': 'Zod response validation API is owned by https://zod.dev/packages/zod',
+  Socket: 'Node.js byte stream API is owned by https://nodejs.org/api/net.html#class-netsocket',
   SessionHandle: 'persistence handle contract is owned by packages/session/session-persistence/README.md',
   SessionHandleMode: 'persistence handle mode is owned by packages/session/session-persistence/README.md',
   PersistenceSessionHandle: 'private persistence handle implementation is owned by packages/session/session-persistence/src/index.ts',
@@ -709,6 +757,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   ConsumeTokenRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertTextRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   AgentHandle: 'agent ownership handle is owned by packages/core/agent/README.md',
+  StandingRealmHook: 'realm mount hook is owned by packages/preset/agent-presets/src/index.ts',
   AgentPreset: 'discovered preset record is owned by packages/preset/agent-presets/README.md',
   AgentPresetComposition: 'preset composition inventory is owned by packages/preset/agent-presets/README.md',
   AgentPresetCompositionRow: 'preset composition inventory row is owned by packages/preset/agent-presets/README.md',

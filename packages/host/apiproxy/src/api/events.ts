@@ -219,6 +219,7 @@ export type HostFrame =
     origin?: 'subagent'
     cwd?: string
     agentPreset?: string
+    sshTarget?: number
   }
   | { type: 'host/session-removed'; sessionId: SessionId }
   | { type: 'host/session-status'; sessionId: SessionId; running: boolean }

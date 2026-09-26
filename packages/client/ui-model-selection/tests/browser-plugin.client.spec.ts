@@ -135,7 +135,10 @@ async function bench() {
   }
   return {
     ctx, fiber, mint, calls,
-    contribution: () => contribution!,
+    contribution: () => {
+      if (contribution?.ui.kind !== 'popupSelect') throw new Error('model command must select an option')
+      return { ...contribution, ui: contribution.ui }
+    },
     seat: () => seats.get('conversation.input.model')!,
     hostCurrent: () => current,
     setHostCurrent: (selection: ModelSelection) => { current = selection },

@@ -28,6 +28,7 @@ function listStore() {
     byId: {
       [SID]: { id: SID, title: 'r', displayTitle: 'r', running: false, blank: false, updatedAt: 0 },
     },
+    archivedById: {},
     current: undefined,
     phase: 'ready',
     subagentsByParent: {}, jobsBySession: {},

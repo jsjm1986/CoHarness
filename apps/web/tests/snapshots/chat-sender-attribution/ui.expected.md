@@ -4,7 +4,8 @@
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Zhou ZHOU_PROMPT 7/25 {{clock}}
+- text: Zhou ZHOU_PROMPT
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: ZHOU_REPLY
@@ -16,14 +17,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Lin admin LIN_PROMPT 7/25 {{clock}}
+- text: Lin admin LIN_PROMPT
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: LIN_REPLY
@@ -35,10 +38,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -51,6 +55,7 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "2 turns · 2 steps":
-  - img
-  - text: 2 turns · 2 steps
+- group "Session statistics":
+  - button "2 turns · 2 steps":
+    - img
+    - text: 2 turns · 2 steps

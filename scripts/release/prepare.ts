@@ -15,7 +15,7 @@ function matchesEnvironment(report: GateEvidence, check: ReleaseCheck): boolean 
   if (check.environment === 'windows-native') return env.runnerOS.toLowerCase() === 'windows' && env.execution === 'native'
   if (check.environment === 'linux-sandbox') return env.runnerOS.toLowerCase() === 'linux'
   if (check.environment === 'macos-sandbox') return env.runnerOS.toLowerCase() === 'macos'
-  return check.environment !== 'artifact' || env.buildProfile === 'official'
+  return check.environment !== 'artifact' || env.buildProfile === 'coharness'
 }
 
 async function main(): Promise<void> {

@@ -456,6 +456,9 @@
         fetch: true
         searchTimeoutMs: 60000
 
+    - id: present
+      name: '@deepseek-ai/dsh-tool-present'
+
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'
 

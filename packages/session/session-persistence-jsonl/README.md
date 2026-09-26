@@ -14,11 +14,11 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
 <root>/
   --<normalized-cwd>--/          # readable project directory (or _no-cwd/)
     <encoded-id>/                # session-owned directory
-      session.jsonl.zstd         # default: checksummed header frame + append frames
-      session.jsonl              # only with compression: 'none'
+      session.v5.jsonl.zstd      # default: checksummed header frame + append frames
+      session.v5.jsonl           # only with compression: 'none'
 ```
 
-- The first logical line is the private v0 physical header tagged `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset?, draft? }`. Its optional numeric `seedLength` stays byte-compatible: absence decodes to `SessionHeader.isSeeded: false`, while zero or a positive value decodes to `isSeeded: true` plus the exact `inheritedEventCount`, so the logical header never carries the positional integer. A foreign header that marks seeded lineage with a boolean `isSeeded: true` instead of `seedLength` is refused as a different harness build rather than silently read as unseeded. `delegationDepth` is required on disk and is `0` for a top-level session; a missing or invalid value rejects the log. `agentPreset` is durable because it decides the resumed session's tools and prompt — restoring a different composition would replay history the model can no longer act on. Every subsequent logical line is one storage record; `assistant/chunk` events are never dropped, and `seq` stays contiguous across the decoded log (`events[i].seq === i`).
+- The current artifact is `session.v5.jsonl.zstd` or `session.v5.jsonl`; older committed generations retain their versioned names. Its first logical line is a header tagged `{ type: 'session', version: 5, id, cwd?, createdAt, parentSession?, isSeeded, origin?, delegationDepth, agentPreset?, draft? }`. `isSeeded` is explicit; the inherited prefix length is carried by the inherited `session/end-seed` marker. `delegationDepth` is required on disk and is `0` for a top-level Session. The optional `draft` field accepts only a boolean and retains both explicit values through listing, inspection, and cold reads; omission stays absent. Unknown header fields remain invalid. `agentPreset` is durable because it determines the resumed tools and prompt. Each subsequent current-format line stores one settled Session event, including its nested Assistant stream data, with contiguous event sequences.
 - A storage record is one `SessionEvent` JSON verbatim. Released v0/v1 artifacts may instead contain **packed chunk rows** (`text-chunks` / `reasoning-chunks` / `tool-call-chunks`; bare slash-less tags like the header's `session`): one line holding a run of ≥3 consecutive same-block `assistant/chunk` delta events, `seq0`/`time0` plus per-member `dt` gaps reconstructing every member's `seq`/`time` exactly. The lossless codec lives in `@deepseek-ai/dsh-session` (`packChunkRuns`/`decodeStorageRecord`); the current writer never packs — packed rows reach this backend only inside the historical generations its catalog decodes, which load identically to unpacked rows.
 - Surface `sourceEventSeqs` arrays use lossless inclusive ranges for profitable consecutive runs; readers accept both range and legacy number-array forms.
 - The project directory keeps the normalized cwd readable for navigation and is bounded for filesystem component limits. Separator replacement and truncation are intentionally lossy, so cwd strings that normalize alike share a project directory; session ids still select distinct session directories. On a case-insensitive filesystem, identity validation accepts an alternate path spelling only when filesystem canonicalization resolves both spellings to the same transcript. The configured root remains deployment-controlled: it may be project-local, shared, temporary, or centralized. The [project-session directory decision](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.md) records this tradeoff.
@@ -57,7 +57,7 @@ Plaintext body reads scan bounded byte windows and retain decoded events without
 
 ## Invariants
 
-**Runtime invariant:** No companion is published. Each session is one append-only log whose lifecycle is covered by the shared coordinator specs; the backend adds only byte-level storage.
+No runtime invariant companion is published: immutable-generation and append ordering are enforced by the storage coordinator and checked against files in persistence tests; this provider keeps no independent domain index.
 
 ## Model Experience
 
@@ -77,7 +77,7 @@ JSONL storage does not mutate live request prefixes. A resumed loop can reuse pr
 
 ## Known Limitations and Deferred Work
 
-- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2/v3 artifacts to current v4 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
+- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2/v3/v4 artifacts to current v5 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
 - **The flat-file storage layout does not load** — use a separate root or move pre-release artifacts into the project/session directory layout before loading.
 - **Compressed files are not directly line-readable** — use the backend to load them, or select `compression: 'none'` before writing a fresh root when external line readers are required.
 - **Nothing deletes session files** — logs accumulate under `root` until removed externally (the seam has no deletion API).

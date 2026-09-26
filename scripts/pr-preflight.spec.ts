@@ -62,7 +62,7 @@ function fixture(): { root: string; base: string } {
     write(root, path, "process.stdout.write('mechanical check\\n')\n")
   }
   write(root, 'scripts/web-test-policy.json', { version: 1, groups: ['smoke', 'conversation'],
-    scenarios: { 'smoke.e2e.ts': 'smoke', 'subject.e2e.ts': 'conversation' }, packages: {}, fullPrefixes: [], webInfraPrefixes: [],
+    scenarios: { 'smoke.e2e.ts': 'smoke', 'subject.e2e.ts': 'conversation' }, packages: {}, sharedInputs: {}, fullPrefixes: [], webInfraPrefixes: [],
     smokeScenarios: ['smoke.e2e.ts'], unknown: 'full' })
   write(root, 'apps/web/tests/smoke.e2e.ts', '// smoke\n')
   write(root, 'apps/web/tests/subject.e2e.ts', "const golden = 'snapshots/subject'\n")

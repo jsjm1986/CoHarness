@@ -554,10 +554,12 @@ async resolve(id?: string): Promise<AgentPreset>
  * session.
  * @param agentCtx - the agent's scope context.
  * @param id - the preset id, or `undefined` for {@link defaultId}.
+ * @param realm - registered realm key whose generation the agent joins, or
+ *   `undefined` for the host-local composition.
  * @returns the preset that was composed, for the caller to record.
  * @throws when the preset is unknown or its composition is unusable.
  */
-async mount(agentCtx: Context, id?: string): Promise<AgentPreset>
+async mount(agentCtx: Context, id?: string, realm?: string): Promise<AgentPreset>
 
 /**
  * Join one agent to the SAME standing composition another already runs on.
@@ -739,6 +741,33 @@ async recompose(agentCtx: Context, id: string): Promise<AgentPreset>
  * @throws when the preset is unknown or its composition is unusable.
  */
 async standingKeyFor(id?: string): Promise<ScopeKey>
+
+/**
+ * Install the environment hook one realm key resolves to.
+ *
+ * The hook runs inside each NEW standing generation created under `realm`,
+ * before the preset subtree loads, so provider registrations it makes are
+ * what the composition's rows resolve. Re-registering replaces the hook for
+ * future generations; live generations keep the environment they mounted.
+ * @param realm - the realm key `mount()` callers name.
+ * @param mount - environment installer for a fresh standing scope.
+ * @returns a disposer that unregisters the hook; generations already
+ *   mounted are unaffected.
+ */
+registerRealm(realm: string, mount: StandingRealmHook): () => void
+
+/**
+ * Drop every standing generation created under `realm`.
+ *
+ * Invalidation retires the POINTER only — joined agents keep the mounted
+ * subtree, whose providers fail closed on their own — so the next join
+ * re-runs the realm hook and re-resolves the environment's admission. An
+ * SSH revocation uses this: the dead generation stops accepting new
+ * sessions while the already-joined ones unwind through their own
+ * teardown.
+ * @param realm - the realm key to retire.
+ */
+invalidateRealm(realm: string): void
 ```
 
 Types: [ScopeKey](scope.zh.md)

@@ -1,5 +1,5 @@
 import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { type Agent, type AgentOptions } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -54,6 +54,24 @@ function text(blocks: readonly { type: string; text?: string }[]): string {
 }
 
 describe('startInProcessRun', () => {
+  it('captures the delegated scope and relays it through a mounted execution authority', async () => {
+    const { ctx, parent } = await setup([textResponse('driver answer')])
+    const scope = {
+      parentSessionId: parent.id,
+      inputs: ['00000000-0000-4000-8000-000000000001' as never],
+      primaryActorUserId: 1,
+      unverifiedHistory: false,
+    }
+    const authority = { capture: () => scope, relay: vi.fn(async () => scope) }
+    ctx.provide('executionAuthority', authority as never)
+
+    const run = await startInProcessRun(request(parent), {})
+    const result = await run.result
+    expect(result.stopReason).toBe('completed')
+    expect(authority.relay).toHaveBeenCalledOnce()
+    await run.dispose()
+  })
+
   it('returns only after publication, drives a fresh child, and disposes it', async () => {
     const { ctx, parent } = await setup([textResponse('driver answer')])
     const run = await startInProcessRun(request(parent), {})
@@ -65,6 +83,23 @@ describe('startInProcessRun', () => {
     await run.dispose()
     await run.dispose()
     expect(ctx.agents.get(run.id)).toBeUndefined()
+  })
+
+  it('marks the child as provider-owned before publication announces it', async () => {
+    // Agent Teams and other `agent/created` observers classify children through
+    // session meta before the descriptor lands at first-step admission, so the
+    // `origin` marker must already be durable when that announcement fires.
+    const { ctx, parent } = await setup([textResponse('driver answer')])
+    const atCreated = new Map<SessionId, string | undefined>()
+    ctx.on('agent/created', ({ agent }) => {
+      if (agent.session.header.parentSession === parent.id) {
+        atCreated.set(agent.id, agent.session.header.origin)
+      }
+    })
+    const run = await startInProcessRun(request(parent), {})
+    expect(atCreated.get(run.id)).toBe('subagent')
+    await run.result
+    await run.dispose()
   })
 
   it('uses explicit child model selectors when the parent has none and preserves its cwd', async () => {

@@ -1,0 +1,1 @@
+- text: Ticket 123e4567-e89b-12d3-a456-426614174000 expires at 2026-09-25T12:34:56Z; run "sleep 45s" at 12:34; target 20 tok/s.

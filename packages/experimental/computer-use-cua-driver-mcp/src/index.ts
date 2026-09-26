@@ -50,6 +50,14 @@ export const Config: z<Partial<Config>, Config> = z.object({
  * @returns initial MCP tool-discovery completion.
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
+  ctx.on('mcp/tool-call', async (serverName, invocation, next) => {
+    if (serverName !== 'cua-driver-mcp') return next()
+    return ctx.computerUse.run({ ...invocation.execution, signal: invocation.signal }, async (signal) => {
+      const previous = invocation.signal
+      invocation.signal = signal
+      try { return await next() } finally { invocation.signal = previous }
+    })
+  })
   const connection = McpClient.Config({
     command: config.command,
     args: config.args,

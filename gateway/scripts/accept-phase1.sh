@@ -27,7 +27,7 @@ check() { # check <name> <expected> <actual>
 }
 
 echo "== scratch root: $ROOT"
-HGW_DATABASE_URL="$DATABASE_URL" npx tsx scripts/prepare-acceptance-postgres.ts || exit 1
+HGW_DATABASE_URL="$DATABASE_URL" npx tsx --tsconfig tsconfig.run.json scripts/prepare-acceptance-postgres.ts || exit 1
 # Instance policy plugins are mounted by package name; plain Node loads their built lib/.
 if [ ! -f ../plugins/dsh-directory-guard/lib/index.js ]; then
   (cd ../plugins/dsh-directory-guard && npx tsc -p tsconfig.build.json)
@@ -37,7 +37,9 @@ if [ ! -f ../plugins/dsh-model-governance/lib/index.js ]; then
 fi
 HGW_DATABASE_URL="$DATABASE_URL" HGW_ORGANIZATION_SLUG=acceptance HGW_COMPUTE_NODE_NAME=local \
   HGW_PORT="$PORT" HGW_INSTANCE_PORT_BASE="$INSTANCE_PORT_BASE" HGW_USERS_ROOT="$ROOT/users" \
-  npx tsx src/index.ts >"$LOG" 2>&1 &
+  HGW_STATE_ROOT="$ROOT/state" HGW_PROJECTS_ROOT="$ROOT/projects" \
+  HGW_USER_PROJECTS_ROOT="$ROOT/user-projects" HGW_PROJECT_RUNTIMES_ROOT="$ROOT/project-runtimes" \
+  npx tsx --tsconfig tsconfig.run.json src/index.ts >"$LOG" 2>&1 &
 GW_PID=$!
 trap 'kill $GW_PID 2>/dev/null; wait $GW_PID 2>/dev/null' EXIT
 
@@ -47,8 +49,12 @@ for _ in $(seq 1 50); do
 done
 check "gateway healthz" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$ORIGIN/healthz")"
 
-ADMIN_PW="$(sed -n 's/.*username: admin  password: //p' "$LOG" | head -1)"
-[ -n "$ADMIN_PW" ] || { echo "FATAL: bootstrap admin password not found in $LOG"; exit 1; }
+ADMIN_PW=""
+for _ in $(seq 1 50); do
+  [ -s "$ROOT/state/bootstrap-admin-password" ] && ADMIN_PW="$(cat "$ROOT/state/bootstrap-admin-password")" && break
+  sleep 0.2
+done
+[ -n "$ADMIN_PW" ] || { echo "FATAL: bootstrap admin password not found in $ROOT/state/bootstrap-admin-password"; exit 1; }
 
 login() { # login <jar> <user> <pw> -> http code (302 on success)
   curl -s -o /dev/null -w '%{http_code}' -c "$1" -H "Origin: $ORIGIN" \
@@ -99,11 +105,11 @@ grep -q '@deepseek-ai/dsh-model-governance' "$ROOT/users/u1/dsh/cordis.patch.yml
 [ -f "$ROOT/users/u1/dsh/directory-grants.json" ] \
   && check "u1 grants file written before start" "yes" "yes" \
   || check "u1 grants file written before start" "yes" "no"
-MODULES="$ROOT/users/u1/dsh/profiles/node_modules/@deepseek-ai"
-[ -L "$MODULES/dsh-directory-guard" ] && check "guard package linked into profile" "yes" "yes" \
-  || check "guard package linked into profile" "yes" "no"
-[ -L "$MODULES/dsh-model-governance" ] && check "governance package linked into profile" "yes" "yes" \
-  || check "governance package linked into profile" "yes" "no"
+MODULES="$ROOT/users/u1/dsh/profiles/web/node_modules/@deepseek-ai"
+[ -f "$MODULES/dsh-directory-guard/lib/index.js" ] && check "guard package materialized into profile" "yes" "yes" \
+  || check "guard package materialized into profile" "yes" "no"
+[ -f "$MODULES/dsh-model-governance/lib/index.js" ] && check "governance package materialized into profile" "yes" "yes" \
+  || check "governance package materialized into profile" "yes" "no"
 POLICY="$ROOT/users/u1/dsh/model-governance.json"
 [ -f "$POLICY" ] && check "u1 model policy projected before start" "yes" "yes" \
   || check "u1 model policy projected before start" "yes" "no"

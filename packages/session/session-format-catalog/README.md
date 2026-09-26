@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`.
+`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`. Backends that store decoded headers and event rows instead of released JSONL (SQLite, Gateway/PostgreSQL, detached coordinator reads) use `sessionLogicalFormatCatalog`, which projects stored metadata onto the released requirements, normalizes the declared CoHarness v2 database dialect, and runs the same released edges and current-artifact validation.
 
 ## Table of Contents
 
@@ -40,7 +40,7 @@ const headerRecord = sessionFormatCatalog.encodeCurrentHeader(current.header, cu
 const eventRecords = current.events.map(sessionFormatCatalog.encodeCurrentEvent)
 ```
 
-Import `sessionFormatCatalog` from the package root. JSONL and fixture readers create one restore, push each parsed physical row through `decodeRow()`, and call `finish()` once. Writers serialize the returned current artifact through `encodeCurrentHeader()` and `encodeCurrentEvent()`. Listing calls `readHeader()` and never opens event bodies.
+Import `sessionFormatCatalog` from the package root. JSONL and fixture readers create one restore, push each parsed physical row through `decodeRow()`, and call `finish()` once. Writers serialize the returned current artifact through `encodeCurrentHeader()` and `encodeCurrentEvent()`. Listing calls `readHeader()` and never opens event bodies. Database providers call `sessionLogicalFormatCatalog.readHeader()` on stored metadata and stream decoded events through `createStream()`; `migrate()` and `migrateHeader()` cover the detached forms.
 
 Production historical reads select `{ recovery: 'recoverable', validation: 'transformed' }`. Worker and fixture verification select `{ recovery: 'strict', validation: 'current' }`. Transformed validation runs the released-current rules after migration but deliberately skips installed semantic validation for input that is already current.
 
@@ -54,7 +54,7 @@ The catalog contains all supported historical readers directly. A profile cannot
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`src/generated.ts`](src/generated.ts) is the static owner of codec and edge ordering. [`src/current.ts`](src/current.ts) delegates final header, envelope, message, surface, seed, and current request-header validation to the installed Session semantics. The low-level constructor rejects duplicate codecs, duplicate edges, gaps, and entries beyond the current version before any Session read can begin.
+[`src/generated.ts`](src/generated.ts) is the static owner of codec and edge ordering. [`src/current.ts`](src/current.ts) delegates final header, envelope, message, surface, seed, and current request-header validation to the installed Session semantics. [`src/logical.ts`](src/logical.ts) compiles the same released edges for decoded stored input and routes the v2 edge through [`src/coharness-v2-dialect.ts`](src/coharness-v2-dialect.ts), which owns only the CoHarness ordering and normalization policy while reusing the released stage's admission and transformation primitives. The low-level constructor rejects duplicate codecs, duplicate edges, gaps, and entries beyond the current version before any Session read can begin.
 
 </details>
 

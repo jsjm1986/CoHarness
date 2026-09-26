@@ -6,7 +6,7 @@ npm scope 为 `@deepseek-ai/dsh-*`；Cordis `Service` 子类和函数插件通�
 
 ## 概述
 
-harness 由 `packages/` 能力组组装而成。把本页当作顶层地图，进入各组的包列表。
+harness 由 `packages/` 能力组组成。各组 README 列出组内的包。
 
 ## 层级结构
 
@@ -51,6 +51,7 @@ harness 由 `packages/` 能力组组装而成。把本页当作顶层地图，�
 | [`settings/`](settings/README.zh.md) | 用户设置 seam + 基于文件的提供方 | 产品：稳定 API |
 | [`credentials/`](credentials/README.zh.md) | 凭据引用 seam + 环境变量优先于 `.env` 的提供方 | 产品：稳定 API |
 | [`storage/`](storage/README.zh.md) | 非会话存储中枢 + 后端 + 领域形式 | 产品：稳定 API |
+| [`webhook/`](webhook/README.zh.md) | 已验证事件规则与会话创建 | 产品 — 可选入口 |
 | [`workspace/`](workspace/README.zh.md) | Workspace 实体 | 产品：稳定 API |
 | [`sdk/`](sdk/README.zh.md) | 进程外运行时 SDK：JSON-RPC 协议、TypeScript 客户端和服务器插件 | 产品：稳定 API |
 | [`acp/`](acp/README.zh.md) | 仅面向自动化的 ACP（Agent Client Protocol）服务器 | 产品：稳定 API |

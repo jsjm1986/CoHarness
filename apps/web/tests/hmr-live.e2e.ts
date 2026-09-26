@@ -75,7 +75,10 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   const binPath = join(REPO_ROOT, 'apps/cli/lib/bin.js')
   if (!existsSync(binPath)) throw new Error('HMR browser test needs the built dsh bin; run pnpm run build first')
   const clientBuildEnvironment = readClientBuildRecord(REPO_ROOT).environment
-  const clientBundlePaths = globSync('packages/*/*/lib/client.js{,.map}', { cwd: REPO_ROOT })
+  // Back up every client bundle the build record digests: dev:web rewrites
+  // multi-entry chunks (client.terminal.js, client.pdf.js) too, and a stale
+  // dev rebuild left behind fails the built-artifact record check.
+  const clientBundlePaths = globSync('packages/*/*/lib/client{,.js,.js.map,.*.js,.*.js.map}', { cwd: REPO_ROOT })
     .map(path => join(REPO_ROOT, path))
   const originalClientBundles = await Promise.all(clientBundlePaths.map(async path => [path, await readFile(path)] as const))
   const distPath = join(REPO_ROOT, 'apps/web/dist')
@@ -97,6 +100,10 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
   const failures: unknown[] = []
   try {
+    const storagePatch = join(world, 'storage.patch.yml')
+    await writeFile(storagePatch, JSON.stringify([
+      { id: 'userdoc-local', config: { uploadRoot: join(world, 'documents') } },
+    ]) + '\n')
     subprocessFiber = await subprocessCtx.plugin(LocalSubprocessRuntime)
     watcher = subprocessCtx.subprocess.spawn(spawnSpec(
       ['pnpm', 'run', 'dev:web'],
@@ -105,7 +112,7 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     ))
     await waitForOutput(watcher, /dev-web: watching/, 'pnpm run dev:web')
     host = subprocessCtx.subprocess.spawn(spawnSpec(
-      [process.execPath, binPath, 'web', '--no-open', '--port', '0'],
+      [process.execPath, binPath, 'web', '--patch', storagePatch, '--no-open', '--port', '0'],
       world,
       {
         DEEPSEEK_API_KEY: 'keyless-hmr-no-call',
@@ -138,6 +145,12 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     await Promise.all(originalClientBundles.map(async ([path, content]) => {
       await writeFile(path, content).catch((error: unknown) => failures.push(error))
     }))
+    for (const path of globSync('packages/*/*/lib/client{,.js,.js.map,.*.js,.*.js.map}', { cwd: REPO_ROOT })) {
+      const absolute = join(REPO_ROOT, path)
+      if (!clientBundlePaths.includes(absolute)) {
+        await rm(absolute, { force: true }).catch((error: unknown) => failures.push(error))
+      }
+    }
     await rm(distPath, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
     await cp(distBackupPath, distPath, { recursive: true }).catch((error: unknown) => failures.push(error))
     await rm(distBackup, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))

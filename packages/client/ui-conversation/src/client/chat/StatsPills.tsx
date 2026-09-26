@@ -270,7 +270,7 @@ export const StatsPills = memo(function StatsPills({ useSession, useProjection, 
   // data-composer-stats: InputBar's `.root:has([data-composer-stats])` rule
   // tightens the composer's bottom clearance only while this row renders.
   return (
-    <div className={css.root} data-composer-stats>
+    <div className={css.root} data-composer-stats role="group" aria-label={t('stats.details')}>
       {stats.steps > 0 && (
         <TimePill
           stats={stats}

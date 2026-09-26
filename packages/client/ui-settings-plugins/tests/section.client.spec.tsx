@@ -18,6 +18,11 @@ import type { ConfigurablePluginsTabProps } from '../src/client/ConfigurablePlug
 import { PluginsSettingsSection } from '../src/client/PluginsSettingsSection.tsx'
 import type { PluginsSettingsSectionProps, PluginsSettingsTabEntry } from '../src/client/PluginsSettingsSection.tsx'
 import { WebSearchCard } from '../src/client/WebSearchCard.tsx'
+import { SubagentModelSelectionCard, type SubagentModelSelectionCardProps } from '../src/client/SubagentModelSelectionCard.tsx'
+import type { SubagentModelSelectionCardState } from '../src/client/subagent-model-selection-card-controller.ts'
+import { SubagentLimitsCard } from '../src/client/SubagentLimitsCard.tsx'
+import type { SubagentLimitsCardProps } from '../src/client/SubagentLimitsCard.tsx'
+import type { SubagentLimitsCardState } from '../src/client/subagent-limits-card-controller.ts'
 import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
@@ -39,6 +44,47 @@ const settled: CardShell = {
   saving: false,
   failed: false,
 }
+
+describe('Subagent limits card', () => {
+  it('shows upstream delegation rules, validates depth, and respects read-only ownership', () => {
+    const state: SubagentLimitsCardState = {
+      ...settled, maxDepth: field('1'), maxActiveSubagents: field('8'),
+    }
+    const actions = cardActions()
+    const props = {
+      t, ...actions, useSubagentLimitsCard: bindSnapshotSelector(createSnapshotStore(state)),
+    } as unknown as SubagentLimitsCardProps
+    const { rerender } = render(<SubagentLimitsCard {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Subagent' }))
+    fireEvent.click(screen.getByRole('button', { name: en.subagentDepthHelpLabel }))
+    const depth = screen.getByLabelText(en.subagentMaxDepth)
+    const help = screen.getByRole('region', { name: en.subagentDepthHelpLabel })
+    expect(depth.getAttribute('aria-describedby')).toContain(help.id)
+    expect(screen.getByText(en.subagentDepthZero)).toBeTruthy()
+    fireEvent.change(depth, { target: { value: '0' } })
+    expect(actions.edit).toHaveBeenCalledWith('maxDepth', '0')
+    fireEvent.click(screen.getByRole('button', { name: en.subagentDepthHelpLabel }))
+    expect(screen.queryByRole('region', { name: en.subagentDepthHelpLabel })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: en.subagentCapacityHelpLabel }))
+    expect(screen.getByText(en.subagentCapacityHelp)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.subagentMaxActive), { target: { value: '12' } })
+    expect(actions.edit).toHaveBeenCalledWith('maxActiveSubagents', '12')
+    rerender(<SubagentLimitsCard {...props} useSubagentLimitsCard={bindSnapshotSelector(createSnapshotStore({
+      ...state, maxDepth: { ...field('3'), overridden: true }, maxActiveSubagents: { ...field('12'), overridden: true },
+    }))} />)
+    for (const button of screen.getAllByRole('button', { name: en.reset })) fireEvent.click(button)
+    expect(actions.resetField.mock.calls).toEqual([['maxDepth'], ['maxActiveSubagents']])
+    rerender(<SubagentLimitsCard {...props} useSubagentLimitsCard={bindSnapshotSelector(createSnapshotStore({
+      ...state, writable: false, writableReason: 'project' as const,
+      maxDepth: { ...field('invalid'), invalid: true, overridden: true },
+      maxActiveSubagents: { ...field('8'), overridden: true },
+    }))} />)
+    expect(screen.getByLabelText(en.subagentMaxDepth)).toHaveProperty('disabled', true)
+    expect(screen.getByText(en.readOnlyProject)).toBeTruthy()
+    expect(screen.getByText(en.subagentDepthInvalid)).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: en.reset }).every(button => (button as HTMLButtonElement).disabled)).toBe(true)
+  })
+})
 
 /** One control's state, defaulting to an inherited value. */
 function field(text: string, rest: Partial<CardFieldState> = {}): CardFieldState {
@@ -415,5 +461,45 @@ describe('WebSearchCard', () => {
       ['maxUses', '4'],
     ])
     expect(actions.resetField.mock.calls).toEqual([['baseURL'], ['maxUses']])
+  })
+})
+
+describe('Subagent model selection card', () => {
+  it('renders catalog failures, unavailable saved routes and revision conflicts', () => {
+    const store = createSnapshotStore<SubagentModelSelectionCardState>({
+      ...settled, enabled: true, catalogStatus: 'error', catalogPartial: true, conflicted: true, invalid: true,
+      candidates: [
+        { key: 'a/one', provider: 'a', providerName: 'Alpha', model: 'one', modelName: 'One', available: true, selected: true },
+        { key: 'a/two', provider: 'a', providerName: 'Alpha', model: 'two', modelName: 'Two', available: true, selected: false },
+        { key: 'b/gone', provider: 'b', providerName: 'Beta', model: 'gone', modelName: 'Gone', available: false, selected: true },
+      ],
+    })
+    const toggleModel = vi.fn()
+    const toggleEnabled = vi.fn()
+    const retryCatalog = vi.fn()
+    const props = { t, useSubagentModelSelectionCard: bindSnapshotSelector(store),
+      toggleModel, toggleEnabled, retryCatalog, save: vi.fn(), discard: vi.fn() } as unknown as SubagentModelSelectionCardProps
+    const { rerender } = render(<SubagentModelSelectionCard {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Model selection' }))
+    expect(screen.getByText(en.subagentModelSelectionConflict)).toBeTruthy()
+    expect(screen.getByText(en.subagentModelSelectionPartial)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retryCatalog).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Two/ }))
+    expect(toggleModel).toHaveBeenCalledWith('a/two')
+    fireEvent.click(screen.getByRole('switch'))
+    expect(toggleEnabled).toHaveBeenCalledOnce()
+    store.set({ ...store.getSnapshot(), candidates: store.getSnapshot().candidates.filter(candidate => candidate.available) })
+    rerender(<SubagentModelSelectionCard {...props} />)
+    expect(screen.queryByText(en.subagentModelSelectionUnavailableGroup)).toBeNull()
+    for (const catalogStatus of ['loading', 'ready', 'idle'] as const) {
+      store.set({ ...store.getSnapshot(), candidates: [], catalogStatus, catalogPartial: false, conflicted: false, invalid: false })
+      rerender(<SubagentModelSelectionCard {...props} />)
+      if (catalogStatus === 'ready') expect(screen.getByText(en.subagentModelSelectionEmpty)).toBeTruthy()
+    }
+    store.set({ ...store.getSnapshot(), enabled: false, writable: false, writableReason: 'deployment' })
+    rerender(<SubagentModelSelectionCard {...props} />)
+    expect(screen.getByText(en.subagentModelSelectionOff)).toBeTruthy()
+    expect(screen.getByRole('switch').hasAttribute('disabled')).toBe(true)
   })
 })

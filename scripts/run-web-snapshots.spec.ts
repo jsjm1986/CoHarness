@@ -64,7 +64,7 @@ describe('browser execution plan', () => {
       writeFileSync(path, text)
     }
     try {
-      write('scripts/web-test-policy.json', JSON.stringify(policy))
+      write('scripts/web-test-policy.json', JSON.stringify({ ...policy, sharedInputs: {} }))
       for (const file of Object.keys(policy.scenarios)) write(`${WEB_TESTS_ROOT}${file}`)
       expect(createWebSnapshotPlan(fixture, ['--focused', '--scenarios', JSON.stringify(exact)], {}).scenarios).toEqual(exact)
       rmSync(join(fixture, WEB_TESTS_ROOT, 'goal-bar.e2e.ts'))
@@ -75,7 +75,7 @@ describe('browser execution plan', () => {
       rmSync(join(fixture, WEB_TESTS_ROOT, 'unregistered.e2e.ts'))
       rmSync(join(fixture, WEB_TESTS_ROOT, 'hmr-live.e2e.ts'))
       const scenarios = Object.fromEntries(Object.entries(policy.scenarios).filter(([file]) => file !== 'hmr-live.e2e.ts'))
-      write('scripts/web-test-policy.json', JSON.stringify({ ...policy, scenarios }))
+      write('scripts/web-test-policy.json', JSON.stringify({ ...policy, scenarios, sharedInputs: {} }))
       expect(() => createWebSnapshotPlan(fixture, [], {})).toThrow(/serial owners are missing/)
     } finally {
       rmSync(fixture, { recursive: true, force: true })

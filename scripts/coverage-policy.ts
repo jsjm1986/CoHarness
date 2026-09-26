@@ -31,6 +31,8 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       'packages/terminal/terminal-bash',
       'packages/experimental/ptc-runtime-python',
       'packages/sandbox/sandbox-local',
+      // OpenSSH multiplexing and Unix-socket helper streams require POSIX endpoints.
+      'packages/ssh/*',
     ]
     : []
 
@@ -77,6 +79,13 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
   // process.platform), so non-Linux coverage lanes can never cover them.
   const linuxOnlyCoverageExclusions = platform !== 'linux'
     ? ['packages/subprocess/subprocess-local/src/linux-execve.ts']
+    : []
+
+  // POSIX execution world: the remote-target recorder speaks POSIX shell on
+  // the execution side, and its suites gate on process.platform, so the
+  // Windows coverage lane can never cover the source.
+  const posixCoverageExclusions = platform === 'win32'
+    ? ['packages/deliverables/workspace-changes/src/execution.ts']
     : []
 
   // pwsh-local's run/start/lifecycle suites self-skip without a real pwsh
@@ -205,6 +214,7 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       ...windowsOnlyCoverageExclusions,
       ...windowsRunnerCoverageExclusions,
       ...linuxOnlyCoverageExclusions,
+      ...posixCoverageExclusions,
       ...pwshCoverageExclusions,
     ],
     excludedTests: windowsUnsupportedTests,

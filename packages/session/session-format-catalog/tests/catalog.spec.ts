@@ -27,7 +27,7 @@ describe('first-party Session format catalog', () => {
     }
     expect(() => { validateInstalledCurrentSessionArtifact(artifact) }).toThrow(/image index 0 does not exist/)
   })
-  it('statically owns the complete adjacent v0 to v4 chain', () => {
+  it('statically owns the complete adjacent v0 to v6 chain', () => {
     const header = {
       type: 'session',
       version: 0,
@@ -37,13 +37,13 @@ describe('first-party Session format catalog', () => {
       delegationDepth: 0,
     }
 
-    expect(sessionFormatCatalog.currentVersion).toBe(4)
+    expect(sessionFormatCatalog.currentVersion).toBe(6)
     expect(sessionFormatCatalog.readHeader(header)).toEqual({
       status: 'migration-required',
       storedVersion: 0,
-      targetVersion: 4,
+      targetVersion: 6,
       header: {
-        version: 4,
+        version: 6,
         id: 'catalog',
         createdAt: 1,
         isSeeded: true,
@@ -57,13 +57,27 @@ describe('first-party Session format catalog', () => {
     })
     restore.decodeRow({ type: 'turn/start', seq: 0, time: 2, data: { turn: 1 } })
     expect(restore.finish()).toMatchObject({
-      header: { version: 4, id: 'catalog' },
+      header: { version: 6, id: 'catalog' },
+    })
+  })
+
+  it('projects an sshTarget-bearing stored header onto the logical header', () => {
+    const header = {
+      type: 'session', version: 6, id: 'ssh-target', createdAt: 1,
+      isSeeded: false, delegationDepth: 0, sshTarget: 42,
+    }
+    expect(sessionFormatCatalog.readHeader(header)).toEqual({
+      status: 'current', storedVersion: 6, targetVersion: 6,
+      header: {
+        version: 6, id: 'ssh-target', createdAt: 1, isSeeded: false,
+        delegationDepth: 0, sshTarget: 42,
+      },
     })
   })
 
   it('restores the installed current vocabulary without freezing ordinary payload additions', () => {
     const header = {
-      type: 'session', version: 4, id: 'current-growth', createdAt: 1, isSeeded: false, delegationDepth: 0,
+      type: 'session', version: 6, id: 'current-growth', createdAt: 1, isSeeded: false, delegationDepth: 0,
     }
     const restore = (rows: readonly unknown[]) => {
       const current = sessionFormatCatalog.createRestore(header, {
@@ -102,7 +116,7 @@ describe('first-party Session format catalog', () => {
         restore.decodeRow({ type: 'feedback/record', seq: 0, time: 1, data: { text: 'inherited' } })
       }
       const artifact = restore.finish()
-      expect(artifact.header.version).toBe(4)
+      expect(artifact.header.version).toBe(6)
       expect(artifact.inheritedEventCount).toBe(seedLength)
       expect(artifact.events.at(-1)).toEqual({
         type: 'session/end-seed', seq: seedLength, time: 1, data: { inherited: true },
@@ -123,7 +137,7 @@ describe('first-party Session format catalog', () => {
     const restore = sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })
     for (const row of rows) restore.decodeRow(row)
     expect(restore.finish()).toEqual({
-      header: { version: 4, id: 'v2-identity', createdAt: 1, isSeeded, delegationDepth: 0 },
+      header: { version: 6, id: 'v2-identity', createdAt: 1, isSeeded, delegationDepth: 0 },
       inheritedEventCount: isSeeded ? 4 : 0,
       events: [
         { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
@@ -200,7 +214,7 @@ describe('first-party Session format catalog', () => {
       { ...rows[8], seq: 9 }, { ...rows[9], seq: 10 },
     ]
     expect(artifact).toEqual({
-      header: { version: 4, id: sourceHeader.id, createdAt: 1, isSeeded: false, delegationDepth: 0 },
+      header: { version: 6, id: sourceHeader.id, createdAt: 1, isSeeded: false, delegationDepth: 0 },
       inheritedEventCount: 0, events: expected,
     })
     const currentHeader = deepFreeze(sessionFormatCatalog.encodeCurrentHeader(artifact.header, artifact.inheritedEventCount))

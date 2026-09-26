@@ -76,6 +76,7 @@ export interface GatewayUserService {
     role?: 'admin' | 'user'
     status?: 'active' | 'disabled'
     displayName?: string
+    autoReviewEligible?: boolean
   }): Awaitable<void>
   getByUsername(username: string): Awaitable<UserRow | null>
   setStatus(id: number, status: 'active' | 'disabled'): Awaitable<void>

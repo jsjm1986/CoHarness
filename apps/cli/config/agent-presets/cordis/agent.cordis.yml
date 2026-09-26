@@ -1,16 +1,7 @@
-# The `cordis` agent preset: the standard coding agent, plus the ability to
-# read and write the runtime it is running in.
-#
-# It exists so a person can ask an agent to author another agent. Everything in
-# `standard` is here unchanged; what is added is the self-referential Cordis
-# toolset, a skill that teaches composition authoring, and a persona that says
-# which of the two planes an edit belongs to.
-#
-# TRUST: `cordis_mount` evaluates model-written JavaScript against the live
-# runtime, and a composition this agent writes becomes a preset other sessions
-# mount. Treat a session on this preset as shell access — the toolset's own
-# documentation makes the same statement.
-
+# Creator combines the standard coding capabilities with read-only runtime
+# discovery and authorized persistent Plugin and preset authoring.
+# Profile changes affect every session; model tools cannot define or execute
+# process-local dynamic Cordis code.
 
 # The preset's own persona, shadowing the deployment default for this agent.
 # `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
@@ -227,6 +218,9 @@
 - id: tool-ask-user
   name: '@deepseek-ai/dsh-tool-ask-user'
 
+- id: present
+  name: '@deepseek-ai/dsh-tool-present'
+
 - id: tool-todo
   name: '@deepseek-ai/dsh-tool-todo'
   config:
@@ -240,10 +234,9 @@
     fetch: true
     searchTimeoutMs: 60000
 
-# ── self-modification ───────────────────────────────────────────────────────
+# ── runtime inspection ─────────────────────────────────────────────────────
 
-# Read the live runtime, mount a temporary plugin, unmount it. The toolset is a
-# trust boundary, not a sandbox — see this file's header.
+# Read-only API discovery accompanies Plugin Manager's persistent install path.
 - id: tool-cordis
   name: '@deepseek-ai/dsh-tool-cordis'
 

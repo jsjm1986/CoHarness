@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../context/agent-instructions"
     },
     {
