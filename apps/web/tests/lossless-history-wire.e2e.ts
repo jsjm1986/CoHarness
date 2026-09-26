@@ -229,8 +229,12 @@ function buildSeed(): SeedEvidence {
 
   for (let turn = 1; turn <= LARGE_TURNS; turn++) {
     at({ type: 'turn/start', data: { turn } })
+    // The v2→v3 migration refuses a pre-step surface without a system head, so
+    // turn 1 opens its step first; later turns keep the released pre-step
+    // ordering once the head exists.
+    if (turn === 1) at({ type: 'step/start', data: { turn, step: 1 } })
     appendUser(USER_MARKERS[turn - 1] as string)
-    at({ type: 'step/start', data: { turn, step: 1 } })
+    if (turn !== 1) at({ type: 'step/start', data: { turn, step: 1 } })
     appendAssistant(
       turn,
       1,
