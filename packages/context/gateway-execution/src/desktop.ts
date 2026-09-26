@@ -142,6 +142,7 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
 
   private async renew(workflow: Workflow): Promise<void> {
     const held = workflow.grant
+    /* v8 ignore next -- acquire() assigns workflow.grant synchronously before starting this monitor. */
     if (held === undefined) throw new Error('Desktop lease is not held.')
     const interval = Math.min(this.pollMs, Math.floor(held.grantTtlMs / 3))
     const signal = AbortSignal.any([workflow.controller.signal, workflow.watch.signal])
@@ -161,6 +162,7 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
 
   private async checkLease(workflow: Workflow, actor: Agent, signal: AbortSignal): Promise<void> {
     const grantId = workflow.grant?.grantId
+    /* v8 ignore next -- run() and renew() invoke this only while workflow.grant is assigned. */
     if (grantId === undefined) throw new Error('Desktop lease is not held.')
     const result = heartbeat.parse(await this.host.request(actor, 'heartbeat', { grantId }, signal))
     signal.throwIfAborted()

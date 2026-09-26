@@ -10,12 +10,12 @@ const config = {
   workspace: '/srv/work', requestTimeoutMs: 5_000, bootstrapPath: '/opt/dsh/ptc.js', bootstrapHash: 'b'.repeat(64),
   maxFrameBytes: 1024, maxPending: 4, leaseMs: 10_000,
 }
-function fixture() {
+function fixture(identity: { kind: 'user' | 'project'; id: number } = { kind: 'project', id: 7 }) {
   let principal: GatewayRequestPrincipal | undefined =
     { claims: { user: { id: 12 }, expiresAt: Date.now() + 60_000 } } as GatewayRequestPrincipal
   let available = true
   const request = vi.fn<GatewayRuntime['request']>(async () => Response.json({ userId: 12, config }))
-  const runtime = { interactive: () => principal, request, identity: { kind: 'project' as const, id: 7, generation: 1 } }
+  const runtime = { interactive: () => principal, request, identity: { kind: identity.kind, id: identity.id, generation: 1 } }
   const service = new GatewaySshAuthorization(runtime, () => available)
   services.push(service)
   return { service, request, signal: new AbortController().signal,
@@ -95,4 +95,40 @@ it('cancels every grant when its provider is disposed', async () => {
   f.service.dispose()
   expect(resolved.signal.aborted).toBe(true)
   await expect(f.service.resolve(1, f.signal)).rejects.toThrow()
+})
+
+it('resolves a minimal configuration under the provider lifetime and releases the mount explicitly', async () => {
+  const minimal = {
+    host: 'builder', node: '/usr/bin/node', helper: '/opt/dsh/helper.js', helperHash: 'a'.repeat(64),
+    workspace: '/srv/work',
+  }
+  const f = fixture()
+  f.request.mockResolvedValueOnce(Response.json({ userId: 12, config: minimal }))
+  const resolved = await f.service.resolve(1)
+  expect(resolved.config).toEqual(minimal)
+  resolved.release?.()
+  expect(resolved.signal.aborted).toBe(true)
+})
+
+it('carries a declared password credential reference into the released configuration', async () => {
+  const f = fixture()
+  f.request.mockResolvedValueOnce(Response.json({ userId: 12, config: { ...config, passwordRef: 'SSH_BUILDER_PASSWORD' } }))
+  await expect(f.service.resolve(1, f.signal)).resolves.toMatchObject({ config: { passwordRef: 'SSH_BUILDER_PASSWORD' } })
+})
+
+it('scopes grants to the caller alone under a user runtime identity', async () => {
+  const f = fixture({ kind: 'user', id: 9 })
+  const resolved = await f.service.resolve(1, f.signal)
+  f.service.invalidate({ projectId: 7 })
+  expect(resolved.signal.aborted).toBe(false)
+  f.service.invalidate({ userId: 12 })
+  expect(resolved.signal.aborted).toBe(true)
+})
+
+it('notifies live listeners that disposal revoked every mount', () => {
+  const f = fixture()
+  const seen: unknown[] = []
+  f.service.onInvalidated((subject) => { seen.push(subject) })
+  f.service.dispose()
+  expect(seen).toEqual([{}])
 })

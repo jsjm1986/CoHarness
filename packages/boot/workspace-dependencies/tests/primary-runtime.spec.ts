@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -14,8 +14,24 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { installPrimaryRuntime, readPrimaryRuntime, workspaceDependencyPaths, type PrimaryRuntimeManifest } from '../src/primary-runtime.ts'
 import * as workspaceDependencies from '../src/index.ts'
 
+/** Destinations a staged rename must refuse, exercising installPayload's swap rollback. */
+const renameRefusals = vi.hoisted(() => new Set<string>())
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...original,
+    rename: vi.fn(async (source: string, destination: string) => {
+      if (renameRefusals.delete(destination)) throw new Error(`primary-runtime.spec: refused rename into ${destination}`)
+      return original.rename(source, destination)
+    }),
+  }
+})
+
 const roots: string[] = []
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
+afterEach(async () => {
+  renameRefusals.clear()
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+})
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-primary-runtime-'))
@@ -206,4 +222,102 @@ it('rejects installation inside its payload through a linked parent', async () =
   await symlink(source, alias, process.platform === 'win32' ? 'junction' : 'dir')
   await expect(installPrimaryRuntime(source, join(alias, 'installed'))).rejects.toThrow('must not overlap')
   await expect(readFile(join(source, 'installed', 'runtime.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+})
+
+it('rejects non-object runtime metadata and manifests without locked distributions', async () => {
+  const { source, manifest } = await fixture()
+  await writeFile(join(source, 'runtime.json'), '42')
+  await expect(readPrimaryRuntime(source)).rejects.toThrow('invalid metadata')
+  const unlocked = {
+    desktopVersion: manifest.desktopVersion, platform: manifest.platform, arch: manifest.arch,
+    components: manifest.components,
+  }
+  await writeFile(join(source, 'runtime.json'), JSON.stringify(unlocked))
+  await expect(readPrimaryRuntime(source)).resolves.toEqual(unlocked)
+})
+
+it('rejects non-absolute or overlapping source and installation paths', async () => {
+  const { source, root } = await fixture()
+  await expect(installPrimaryRuntime('relative', root)).rejects.toThrow('must be absolute')
+  await expect(installPrimaryRuntime(source, 'relative')).rejects.toThrow('must be absolute')
+  await expect(installPrimaryRuntime(source, join(source, 'installed'))).rejects.toThrow('must not overlap')
+  await expect(installPrimaryRuntime(source, dirname(source))).rejects.toThrow('must not overlap')
+})
+
+it('restores the previous release when the staged swap cannot land', async () => {
+  const { source, root, manifest } = await fixture()
+  await installPrimaryRuntime(source, root)
+  await writeFile(join(source, 'runtime.json'), JSON.stringify({ ...manifest, desktopVersion: '2.0.0' }))
+  renameRefusals.add(root)
+  await expect(installPrimaryRuntime(source, root)).rejects.toThrow('refused rename')
+  expect((await readPrimaryRuntime(root)).desktopVersion).toBe('1.0.0')
+})
+
+it('reports a failed staged swap on a clean installation', async () => {
+  const { source, root } = await fixture()
+  renameRefusals.add(root)
+  await expect(installPrimaryRuntime(source, root)).rejects.toThrow('refused rename')
+  await expect(readFile(join(root, 'runtime.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+})
+
+interface RegisteredDependencyTool {
+  execute(args: unknown, exec: { readonly signal: AbortSignal }): Promise<unknown>
+  presentCall(args: unknown): unknown
+}
+
+function toolHarness(ctx: Context) {
+  const state: { tool?: RegisteredDependencyTool } = {}
+  ctx.provide('tools', {
+    register: (tool: unknown) => {
+      state.tool = tool as RegisteredDependencyTool
+      return () => {}
+    },
+  } as never)
+  ctx.provide('fs', { processPathFromHostPath: (path: string) => path } as never)
+  return state
+}
+
+it('requires absolute deployment paths before registering its tool', async () => {
+  const { source, root } = await fixture()
+  const ctx = new Context()
+  const harness = toolHarness(ctx)
+  try {
+    expect(() => workspaceDependencies.apply(ctx, { source: 'relative', root })).toThrow('must be absolute')
+    expect(() => workspaceDependencies.apply(ctx, { source, root: 'relative' })).toThrow('must be absolute')
+    expect(harness.tool).toBeUndefined()
+    workspaceDependencies.apply(ctx, { source, root })
+    expect(harness.tool?.presentCall({})).toEqual({ card: 'generic', title: 'Load workspace dependencies', kind: 'read' })
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+it('unwinds a pending installation on disposal and retries a failed one', async () => {
+  const { source, root, manifest } = await fixture()
+  const ctx = new Context()
+  const harness = toolHarness(ctx)
+  workspaceDependencies.apply(ctx, { source, root })
+  const execute = harness.tool?.execute.bind(harness.tool)
+  if (execute === undefined) throw new Error('tool was not registered')
+  // A manually held writer lock parks the install until contention times out.
+  await mkdir(dirname(root), { recursive: true })
+  const canonical = join(await realpath(dirname(root)), basename(root))
+  const held = `${canonical}.lock`
+  await writeFile(held, `${process.pid}\n`)
+  const running = execute({}, { signal: new AbortController().signal })
+  try {
+    await ctx.fiber.dispose()
+    await expect(running).rejects.toThrow('timed out waiting for the writer lock')
+  } finally {
+    await rm(held, { force: true })
+  }
+  const recovered = new Context()
+  const second = toolHarness(recovered)
+  try {
+    workspaceDependencies.apply(recovered, { source, root })
+    await expect(second.tool!.execute({}, { signal: new AbortController().signal }))
+      .resolves.toEqual(workspaceDependencyPaths(root, manifest))
+  } finally {
+    await recovered.fiber.dispose()
+  }
 })

@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import { apply as applyConnection, inject as connectionInject } from '@deepseek-ai/dsh-client-connection'
@@ -49,6 +49,7 @@ class GoalService extends Service {
   lastSignal: AbortSignal | undefined
   nextResult: unknown = undefined
   businessError: Error | undefined
+  watchParked = 0
 
   constructor(ctx: Context) {
     super(ctx, 'goals')
@@ -96,6 +97,24 @@ class GoalService extends Service {
     this.lastSignal = signal
     yield value
     yield this.nextResult
+  }
+
+  @Remote({ mode: 'stream' })
+  async *watchUntilAbort(value: unknown, signal: AbortSignal): AsyncGenerator {
+    this.calls.push('watchUntilAbort')
+    yield value
+    this.watchParked += 1
+    await new Promise<void>((resolve) => {
+      if (signal.aborted) resolve()
+      else signal.addEventListener('abort', () => { resolve() }, { once: true })
+    })
+    throw new Error('fixture stream revoked')
+  }
+
+  @Remote({ mode: 'stream' })
+  notAStream(): unknown {
+    this.calls.push('notAStream')
+    return 'not-an-async-iterable'
   }
 
   strictOnly(request: { readonly title: string }): unknown {
@@ -163,9 +182,11 @@ function fakeHttpServer(routes: WebRoute[]): Pick<WebServer, 'register' | 'tapIn
   }
 }
 
-async function serveRoute(route: WebRoute): Promise<{ readonly origin: string; close(): Promise<void> }> {
+async function serveRoute(route: WebRoute, failures?: unknown[]): Promise<{ readonly origin: string; close(): Promise<void> }> {
   const server = createServer((request, response) => {
-    void route.handler(request, response)
+    const work = Promise.resolve(route.handler(request, response))
+    if (failures === undefined) { void work; return }
+    void work.catch((error: unknown) => { failures.push(error); response.destroy() })
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address() as AddressInfo
@@ -1272,6 +1293,102 @@ describe('TypertGatewayService', () => {
 })
 
 describe('Remote stream dispatch', () => {
+  it('rejects a stream Remote whose result is not an AsyncIterable', async () => {
+    const { ctx, service } = await setup()
+    try {
+      await expectCode(ctx.typertGateway.invoke({
+        namespace: 'goals', method: 'notAStream', args: {}, mode: 'stream',
+      }), 'gateway/result-invalid')
+      expect(service.calls).toEqual(['notAStream'])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('serves Remote streams over the trusted /api/_stream HTTP subtree', async () => {
+    const ctx = new Context().extend({ fixtureScope: 'stream-caller' })
+    const routes: WebRoute[] = []
+    ctx.provide('webServer', fakeHttpServer(routes) as WebServer)
+    const connectionFiber = ctx.plugin({ inject: [...connectionInject], apply: applyConnection })
+    await connectionFiber
+    await ctx.plugin(TypertRegistry)
+    const gatewayFiber = ctx.plugin(TypertGatewayService)
+    await gatewayFiber
+    const goalFiber = ctx.plugin(GoalService)
+    await goalFiber
+    const service = rawGoalService(ctx)
+    const failures: unknown[] = []
+    const route = routes[0]
+    if (route === undefined) throw new Error('fixture Connection did not register its /api route')
+    const server = await serveRoute(route, failures)
+    const post = (endpoint: string, payload: unknown, init?: RequestInit) => fetch(
+      `${server.origin}/api/_stream/${endpoint}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: `stream-${endpoint}`, method: endpoint, payload }),
+        ...init,
+      },
+    )
+    const frames = async (response: Response) => (await response.text())
+      .trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
+    let gatewayDisposed = false
+    try {
+      service.nextResult = 2
+      const streamed = await post('goals/watch', { args: { value: 1 } })
+      expect(streamed.status).toBe(200)
+      expect(await frames(streamed)).toEqual([
+        { rpcId: 'stream-goals/watch', type: 'result', result: { ok: true, value: 1 } },
+        { rpcId: 'stream-goals/watch', type: 'result', result: { ok: true, value: 2 } },
+        { rpcId: 'stream-goals/watch', type: 'end' },
+      ])
+      expect(service.calls).toEqual(['watch'])
+
+      // Payload shape is validated before the endpoint is invoked; each
+      // refusal ends the stream with the failure as its only frame.
+      for (const payload of [null, [], { args: {}, extra: true }, { only: true }, { args: null }, { args: [] }]) {
+        const body = await frames(await post('goals/watch', payload))
+        expect(body).toHaveLength(1)
+        expect(body[0]).toMatchObject({ type: 'result', result: { ok: false, error: { code: 'gateway/internal' } } })
+        expect(JSON.stringify(body[0])).toContain('plain-object args field')
+      }
+      expect(service.calls).toEqual(['watch'])
+
+      // An invocation failure on a live carrier still travels as a result frame.
+      const refused = await frames(await post('goals/absent', { args: {} }))
+      expect(refused).toHaveLength(1)
+      expect(refused[0]).toMatchObject({
+        type: 'result',
+        result: { ok: false, error: { code: 'gateway/invocation-unavailable' } },
+      })
+
+      // Teardown while the carrier signal is already aborted ends the stream
+      // without a failure frame: the business throw is the caller's own revoke.
+      const parked = await post('goals/watchUntilAbort', { args: { value: 'attached' } })
+      if (parked.body === null) throw new Error('stream response has no body')
+      const reader = parked.body.getReader()
+      const decoder = new TextDecoder()
+      let buffered = ''
+      while (!buffered.includes('\n')) {
+        const chunk = await reader.read()
+        if (chunk.done) throw new Error('stream closed before its first frame')
+        buffered += decoder.decode(chunk.value, { stream: true })
+      }
+      expect(JSON.parse(buffered.split('\n', 1)[0]!)).toMatchObject({
+        type: 'result', result: { ok: true, value: 'attached' },
+      })
+      await vi.waitFor(() => { expect(service.watchParked).toBe(1) })
+      await gatewayFiber.dispose()
+      gatewayDisposed = true
+      await vi.waitFor(() => { expect(failures).toHaveLength(1) })
+      await expect(reader.read()).rejects.toThrow()
+      reader.releaseLock()
+    } finally {
+      await server.close()
+      await goalFiber.dispose()
+      if (!gatewayDisposed) await gatewayFiber.dispose()
+      await connectionFiber.dispose()
+    }
+  })
+
   it('requires stream mode before invoking a stream and rejects streaming unary endpoints', async () => {
     const { ctx, service } = await setup()
     try {

@@ -234,6 +234,61 @@ describe('managed execution identity', () => {
     await expect(authority.authorizeDesktop(f.agent, 'display-0', new AbortController().signal)).rejects.toThrow(/ownership changed/)
   })
 
+  it('binds user terminal and SSH authorization to the live authorization watch', async () => {
+    const f = await fixture()
+    await expect(f.ctx.get('userTerminalAuthorization')!.authorize(f.agent.session.id, new AbortController().signal))
+      .rejects.toMatchObject({ code: 'terminal/forbidden' })
+    await expect(f.ctx.get('sshAuthorization')!.resolve(1, new AbortController().signal))
+      .rejects.toMatchObject({ code: 'ssh/forbidden' })
+  })
+
+  it('reports terminal revocation drain failures during invalidation cleanup', async () => {
+    const f = await fixture()
+    const drainRevoked = vi.fn().mockRejectedValueOnce(new Error('drain failed')).mockResolvedValue(undefined)
+    f.ctx.provide('terminalController', { drainRevoked } as never)
+    const loggerError = vi.spyOn(f.ctx.logger, 'error')
+    f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
+    await vi.waitFor(() => {
+      expect(loggerError).toHaveBeenCalledWith('Revoked user terminal cleanup failed', expect.any(Error))
+    })
+  })
+
+  it('resolves a removed live desktop owner to the caller while settling', async () => {
+    const f = await fixture({ config: { desktop: 'display-0', desktopPollMs: 60_000 } })
+    const childSession = f.ctx.sessions.create(SessionId('desktop-orphaned'))
+    const child = { ...f.agent, id: childSession.id, session: childSession } as Agent
+    const phantom = { ...f.agent, id: SessionId('phantom-root'), session: childSession } as Agent
+    f.agents.set(child.id, child)
+    f.agents.set(SessionId('phantom-key'), phantom)
+    f.owners.set(child.id, phantom)
+    Object.assign(f.agent, { status: 'idle' })
+    f.responses.set('/acquire', async () => Response.json({ status: 'granted', grantId: 'grant', fencing: 1, grantTtlMs: 300_000 }))
+    f.responses.set('/heartbeat', async () => Response.json({ status: 'held' }))
+    f.responses.set('/release', async () => Response.json({ released: true }))
+    await expect(f.ctx.computerUseAuthorization.run({ agent: f.agent, signal: new AbortController().signal } as ToolExecution,
+      async () => 'effect')).resolves.toBe('effect')
+    expect(f.requests.some(row => row.path.endsWith('/desktop/release'))).toBe(true)
+  })
+
+  it('applies its own desktop interval defaults when constructed outside schema resolution', async () => {
+    const ctx = new Context()
+    const projections = ctx.plugin(SessionProjectionRegistry)
+    ctx.provide('gatewayRuntime', { identity: { kind: 'user', id: 1, generation: 1 },
+      interactive: () => undefined, current: () => undefined,
+      request: vi.fn(async () => new Response(null, { status: 503 })) } as never)
+    ctx.provide('agents', { get: () => undefined, list: () => [], roots: () => [],
+      isOwnedBy: () => false, currentInitiator: () => undefined } as never)
+    ctx.provide('sessionQuery', { observeSession: vi.fn() } as never)
+    ctx.provide('permissionPresets', { current: () => 'workspace-write' } as never)
+    ctx.provide('sandboxPolicy', { resolve: () => ({ mode: 'workspace-write' }) } as never)
+    await projections
+    const service = new GatewayExecution(ctx, { desktop: 'display-0' })
+    expect(service).toBeInstanceOf(GatewayExecution)
+    expect(ctx.get('computerUseAuthorization')).toBeDefined()
+    await ctx.fiber.dispose()
+    await projections.dispose()
+  })
+
   it('offers Full access only to a live administrator and removes the policy on unload', async () => {
     const f = await fixture()
     const policy = f.ctx.get('permissionPresetAuthorization')!

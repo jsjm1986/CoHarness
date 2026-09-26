@@ -66,7 +66,7 @@ function fixture(identity: TerminalClient.TerminalIdentitySource = { key: ownerK
     const fiber = ctx.plugin({ apply: (child) => { new TerminalClient.ClientTerminals(child, remote, identity) } })
     cleanups.push(async () => { await ctx.fiber.dispose() })
     await fiber
-    return { service: ctx.webTerminals, dispose: () => fiber.dispose() }
+    return { ctx, service: ctx.webTerminals, dispose: () => fiber.dispose() }
   }
   return { remote, view, service }
 }
@@ -733,6 +733,25 @@ it('keeps other holds usable when releasing one transport fails', async () => {
   failure.mockRestore()
   service.retainTabs([{ sessionId, tabId: 'a', contentId: 'a' }])
   await expect.poll(() => h.remote.retain).toHaveBeenCalledTimes(2)
+})
+
+it('logs a background view disposal failure after its tab left the sidebar', async () => {
+  const h = fixture()
+  const { ctx, service } = await h.service()
+  const warnings: unknown[][] = []
+  ctx.logger.warn = ((...args: unknown[]) => { warnings.push(args) }) as typeof ctx.logger.warn
+  service.retainTabs([{ sessionId, tabId: 'tab', contentId: 'tab' }])
+  const model = service.view(sessionId, 'tab', 'tab', info.id)
+  // oxlint-disable-next-line typescript/unbound-method -- the spy restores the captured prototype reference through call().
+  const original = TerminalView.prototype.dispose
+  const failure = vi.spyOn(model, 'dispose').mockImplementationOnce(async function (this: TerminalView) {
+    await original.call(this)
+    throw new Error('view teardown failed')
+  })
+  service.retainTabs([])
+  await expect.poll(() => failure).toHaveBeenCalledOnce()
+  await expect.poll(() => warnings).toHaveLength(1)
+  expect(warnings[0]).toEqual(['Terminal view disposal failed', new Error('view teardown failed')])
 })
 
 it('ignores a delayed retention failure after the restored view was disposed', async () => {

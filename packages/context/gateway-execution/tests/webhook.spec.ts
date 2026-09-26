@@ -13,7 +13,7 @@ interface Fixture {
   handler: (req: IncomingMessage, res: ServerResponse) => void
   respond(res: FakeResponse, body: unknown): Promise<{ status: number; json: unknown }>
   principal(value: GatewayRequestPrincipal | undefined): void
-  failSession(error: Error): void
+  failSession(error: unknown): void
   sessionCalls: string[]
 }
 
@@ -25,7 +25,7 @@ interface FakeResponse {
   end(body?: string): void
 }
 
-function fixture(options: { withRoute?: boolean; failSession?: Error } = {}): Fixture {
+function fixture(options: { withRoute?: boolean; failSession?: unknown } = {}): Fixture {
   let principal: GatewayRequestPrincipal | undefined = {
     claims: { purpose: 'webhook-dispatch', expiresAt: Date.now() + 60_000, user: { id: 12 } },
   } as GatewayRequestPrincipal
@@ -205,4 +205,40 @@ it('maps Session creation failures to a bounded dispatch error', async () => {
   const f = fixture({ failSession: new Error('agent failed') })
   const result = await f.respond(fakeResponse(), validBody)
   expect(result).toEqual({ status: 502, json: { error: 'dispatch-failed' } })
+})
+
+it.each([{ provider: 'p', model: 'm' }, { provider: 'p', model: 'm', maxTokens: 4096 }])(
+  'adapts an optional model override into Session creation (%j)', async (model) => {
+    const f = fixture()
+    const body = { ...validBody, request: { ...validBody.request, model } }
+    expect((await f.respond(fakeResponse(), body)).status).toBe(200)
+  })
+
+it('rejects a delivery event that JSON cannot round-trip', async () => {
+  const f = fixture()
+  const raw = JSON.stringify(validBody).replace('"event":{"action":"opened"}', '"event":-0')
+  expect(await f.respond(fakeResponse(), raw)).toEqual({ status: 400, json: { error: 'invalid-dispatch' } })
+})
+
+it('maps input validation failures to an invalid-dispatch response', async () => {
+  const f = fixture({ failSession: new TypeError('model is not configurable') })
+  expect(await f.respond(fakeResponse(), validBody)).toEqual({ status: 400, json: { error: 'invalid-dispatch' } })
+})
+
+it('logs non-Error dispatch failures verbatim', async () => {
+  const f = fixture({ failSession: 'revoked' })
+  expect(await f.respond(fakeResponse(), validBody)).toEqual({ status: 502, json: { error: 'dispatch-failed' } })
+})
+
+it('leaves an already-committed response untouched when its write fails', async () => {
+  const f = fixture()
+  const res = fakeResponse()
+  res.end = (body?: string) => {
+    res.body = body ?? ''
+    res.writableEnded = true
+    throw new TypeError('socket closed')
+  }
+  const result = await f.respond(res, validBody)
+  expect(result.status).toBe(200)
+  expect((result.json as { sessionId: string }).sessionId).toMatch(/^webhook-/)
 })

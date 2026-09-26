@@ -69,6 +69,19 @@ it('converts bounded versioned reads, preserves source identity, and rechecks ca
   expect(render).toHaveBeenCalledTimes(1)
 })
 
+it('converts a provider file that reports no byte size', async () => {
+  const { api, ctx, request } = await harness()
+  const stat = ctx.fs.stat.bind(ctx.fs)
+  vi.spyOn(ctx.fs, 'stat').mockImplementation(async (...args) => {
+    const info = await stat(...args)
+    return info === undefined || info.type !== 'file' ? info : { type: 'file', version: info.version }
+  })
+
+  const converted = await api.renderOffice(request(), new AbortController().signal)
+
+  expect(converted.result).toMatchObject({ ok: true, value: { path: 'report.docx', bytes: pdf.toString('base64') } })
+})
+
 it('reads a cold Session header without creating an Agent', async () => {
   const { ctx, api, id, request } = await harness({ bytes: 16 })
   const cold = SessionId('cold-office-reader')
