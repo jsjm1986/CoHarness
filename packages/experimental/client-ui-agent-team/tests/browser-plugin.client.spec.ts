@@ -5,6 +5,10 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { TeamMemberView as TeamRosterMember, TeamTaskId } from '@deepseek-ai/dsh-experimental-agent-team/client'
 import type {} from '@deepseek-ai/dsh-experimental-agent-team/remote'
+
+// The generated remote artifact lives in lib/, which no-build test lanes
+// cannot resolve; the client entry only forwards the contribution.
+vi.mock('@deepseek-ai/dsh-experimental-agent-team/remote', () => ({ default: { package: '@deepseek-ai/dsh-experimental-agent-team', descriptors: [] } }))
 import { RemoteError, type TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { TeamAction, type TeamActionInjected } from '../src/client/TeamAction.tsx'
 import { inject, mountAgentTeamUi } from '../src/client/mount.ts'
