@@ -7,13 +7,16 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 5"
   - button "Jump to turn 6"
   - button "Jump to turn 7"
   - button "Jump to turn 8"
 - button "Load earlier"
-- text: WIRE_USER_05 {{date}} {{clock}}
+- text: WIRE_USER_05
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_05":
@@ -30,11 +33,12 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}}
+- group "Message timing": "{{date}} {{clock}}"
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
-- text: WIRE_USER_06 {{date}} {{clock}}
+- text: WIRE_USER_06
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_06":
@@ -54,14 +58,16 @@
 - button "Usage 450 tok · Cache hit 75%":
   - img
   - text: Usage 450 tok · Cache hit 75%
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{date}} {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{date}} {{clock}}"
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
-- text: WIRE_USER_TOOL {{date}} {{clock}}
+- text: WIRE_USER_TOOL
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_TOOL_CALL":
@@ -72,9 +78,10 @@
 - button "Bash Verify history wire pagination" [expanded]:
   - img
   - text: Bash Verify history wire pagination
-- text: Done {{workspace}} printf 'WIRE_TOOL_OUTPUT\n'
+- text: "Done {{workspace}} printf 'WIRE_TOOL_OUTPUT\\n'"
 - button "Copy"
 - text: WIRE_TOOL_OUTPUT
+- button "Open details in sidebar"
 - button "Inspect"
 - button "Think WIRE_REASONING_TOOL_DONE":
   - img
@@ -92,14 +99,16 @@
 - button "Usage 900 tok · Cache hit 75%":
   - img
   - text: Usage 900 tok · Cache hit 75%
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{date}} {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{date}} {{clock}}"
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
-- text: WIRE_USER_INTERRUPTED {{date}} {{clock}}
+- text: WIRE_USER_INTERRUPTED
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - button "Think WIRE_INTERRUPTED_REASONING":
@@ -119,10 +128,11 @@
 - button "Usage 450 tok · Cache hit 75%":
   - img
   - text: Usage 450 tok · Cache hit 75%
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{date}} {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{date}} {{clock}}"
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -137,10 +147,11 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "8 turns · 9 steps · {{throughput}} tok/s":
-  - img
-  - text: 8 turns · 9 steps{{throughput}} tok/s
-- button "4.1K tok · Cache hit 75%":
-  - img
-  - text: 4.1K tokCache hit 75%
+- group "Session statistics":
+  - "button \"8 turns · 9 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "8 turns · 9 steps{{throughput}} tok/s"
+  - button "4.1K tok · Cache hit 75%":
+    - img
+    - text: 4.1K tokCache hit 75%
 - separator "Adjust transcript content width"

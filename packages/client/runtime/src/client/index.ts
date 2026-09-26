@@ -137,7 +137,7 @@ export {
   EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, sanitizeAssistantText, toAssistantBlock, toAssistantBlocks,
 } from './sessions/conversation.ts'
 export { emptyAssistantBlock, IncrementalAssistantBlocks } from './sessions/partial.ts'
-export { isTokenDelta } from './sessions/assistant-timing.ts'
+export { assistantStreamFirstTokenTime, isTokenDelta } from './sessions/assistant-timing.ts'
 export { contextForm, contextProducer, sessionRecallLabels } from './sessions/context-producer.ts'
 export { displayFailureMessage, isSessionPersistenceFailureMessage } from './sessions/failure-display.ts'
 export type {
