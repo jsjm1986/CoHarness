@@ -38,12 +38,12 @@
   "dependencies": {
     "@babel/code-frame": "^7.29.0",
     "chokidar": "^4.0.3",
-    "picomatch": "^4.0.3",
+    "picomatch": "^4.0.7",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "devDependencies": {
     "@types/babel__code-frame": "^7.27.0",
-    "@types/picomatch": "^3.0.2",
+    "@types/picomatch": "^4.0.3",
     "esbuild": "^0.28.2",
     "@deepseek-ai/cordis-plugin-timer": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
