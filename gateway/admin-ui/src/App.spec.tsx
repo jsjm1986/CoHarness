@@ -32,7 +32,7 @@ describe('App', () => {
     expect(screen.queryByText('DeepSeek Harness')).toBeNull()
     expect(screen.getAllByRole('navigation', { name: '管理导航' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '用户' })).toHaveLength(2)
-    expect(screen.getAllByRole('link')).toHaveLength(20)
+    expect(screen.getAllByRole('link')).toHaveLength(26)
     expect(screen.getAllByRole('link', { name: '归档' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '桌面' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '插件' })).toHaveLength(2)

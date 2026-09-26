@@ -778,6 +778,7 @@ jobs:
           mkdir -p node_modules/@deepseek-ai
           ln -s ../gateway/node_modules/@types node_modules/@types
           ln -s ../gateway/node_modules/@standard-schema node_modules/@standard-schema
+          ln -s ../gateway/node_modules/zod node_modules/zod
           ln -s ../../vendor/cosmokit node_modules/@deepseek-ai/cosmokit
           gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog
       - name: Typecheck Gateway
