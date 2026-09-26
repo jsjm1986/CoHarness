@@ -1212,6 +1212,26 @@ def build_snapshot_files(
     }
     normalized = normalize_snapshot_value({"result": result_value, "logs": logs}, replacements)
     assert isinstance(normalized, dict)
+    notifications = normalized["result"]["notifications"]
+    assert isinstance(notifications, list)
+    # session.event notifications merge every session's stream; each session
+    # emits in seq order but sessions interleave by arrival. Canonically sort
+    # them back into their own positions so the race cannot flake the snapshot.
+    event_rows = [row for row in notifications if isinstance(row, dict) and row.get("method") == "session.event"]
+    event_positions = [
+        index for index, row in enumerate(notifications)
+        if isinstance(row, dict) and row.get("method") == "session.event"
+    ]
+
+    def event_key(row: dict[str, object]) -> tuple[object, object]:
+        payload = row.get("payload")
+        assert isinstance(payload, dict)
+        event = payload.get("event")
+        assert isinstance(event, dict)
+        return payload.get("sessionId"), event.get("seq")
+
+    for position, row in zip(event_positions, sorted(event_rows, key=event_key)):
+        notifications[position] = row
     normalized_logs = normalized["logs"]
     assert isinstance(normalized_logs, dict)
     files = {"result.json": json.dumps(normalized["result"], indent=2, ensure_ascii=False) + "\n"}

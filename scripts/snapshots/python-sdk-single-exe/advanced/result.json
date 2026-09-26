@@ -1489,1213 +1489,6 @@
     {
       "method": "session.event",
       "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "agent/inbox/spliced",
-          "seq": 3,
-          "time": 0,
-          "data": {
-            "target": "next-turn",
-            "start": 0,
-            "inserted": [
-              {
-                "content": [
-                  {
-                    "type": "text",
-                    "text": "Run the advanced packaged-runtime snapshot scenario."
-                  }
-                ],
-                "source": {
-                  "kind": "user"
-                },
-                "role": "user",
-                "id": "{{message:1}}"
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "method": "session.status",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "status": "running"
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "turn/start",
-          "seq": 4,
-          "time": 0,
-          "data": {
-            "turn": 1
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "agent/inbox/spliced",
-          "seq": 5,
-          "time": 0,
-          "data": {
-            "target": "next-turn",
-            "start": 0,
-            "removedCount": 1,
-            "inserted": []
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/start",
-          "seq": 6,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 1
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "system/message",
-          "seq": 7,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 1,
-            "message": {
-              "role": "system",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "You are an AI agent powered by DeepSeek Harness.\n\nTrack every background job id you start. You are notified in-session when a job finishes — do not busy-poll or sleep on one; keep working on independent steps and do not duplicate a running job's work. Before giving a final answer, collect every still-relevant job with job_output (set wait: true only when you are genuinely blocked on it), and job_kill jobs that stopped mattering.\n\n# Harness runtime inspection\n\nUse cordis_inspect_list to discover Host and Client providers, then cordis_inspect_query to read exact Service, Event, Tool, Theme or Slot APIs. These tools are read-only; queries do not invoke business methods.\n\nUse cordis_inspect_self to inspect existing session-owned Plugin summaries, version pointers, or an exact Package's source and diagnostics. An explicit @pluginId reference identifies an inspection target; it does not authorize execution or modification. Dynamic definitions remain process-local and may be unavailable after restart.\n\nFor a requested persistent Plugin or MCP change, load the cordis-plugin-development Skill and use Plugin Manager's authorized installation workflow. Inspect results describe APIs; they are not business data or an alternative execution path.\n\nUse the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.\n\n## Writing code for run_code\n\n`run_code` takes two required arguments: `code` — the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped) — and `description`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly.\n\nInside the program:\n\n- Call tools as `await tools.name(args)` — quoted access for exotic names: `tools[\"my-tool\"](args)`. Every call resolves to the tool's typed canonical JSON value. Tool arguments must be lossless JSON.\n- A FAILED tool call rejects with `ToolCallError`, whose `toolName` identifies the failed tool and whose `message` is human-readable — `try/catch` it to handle and continue.\n- Independent read-only calls MAY overlap under `Promise.all` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with `await`.\n- Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output. A successful tool result containing an image is attached after the run so you can inspect it on the next step; every other intermediate result stays out of the conversation, so extract just what you need.\n\nProgram-only SDK bindings:\n\n```ts\ntype JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }\n\ninterface ToolArgsMap {\n  /** List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call. */\n  cordis_inspect_list: Record<string, JsonValue>;\n  /** Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props. */\n  cordis_inspect_query: {\n    /** Runtime platform that owns the Provider. */\n    platform: \"host\" | \"client\";\n    /** Exact Provider ID returned by cordis_inspect_list. */\n    provider: string;\n    /** Exact method name declared by the Provider manifest. */\n    method: string;\n    /** Optional query input; it must satisfy the method input schema. */\n    input?: JsonValue;\n  } & Record<string, JsonValue>;\n  /** Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers. */\n  cordis_inspect_self: {\n    /** Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin. */\n    pluginId?: string;\n    /** Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned. */\n    packageId?: string;\n  } & Record<string, JsonValue>;\n  /** Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops. */\n  job_kill: {\n    /** Job id returned by the tool that started the background work. */\n    job_id: string;\n    /** Optional short reason, recorded in the log and forwarded to the job. */\n    reason?: string;\n  } & Record<string, JsonValue>;\n  /** List your background jobs (running and finished) with their ids, kinds, and statuses. */\n  job_list: Record<string, JsonValue>;\n  /** Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap. */\n  job_output: {\n    /** Job id returned by the tool that started the background work. */\n    job_id: string;\n    /** Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive. */\n    wait?: boolean;\n    /** Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum. */\n    timeout_ms?: number;\n  } & Record<string, JsonValue>;\n  /** Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved. */\n  present: {\n    files: {\n      /** Path of an existing regular file. Relative paths use the Session working directory. */\n      path: string;\n      /** Brief description for the user. */\n      description?: string;\n    }[];\n  } & Record<string, JsonValue>;\n  /** Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`. */\n  subagent: {\n    /** A short (3-5 word) description of the delegated task, for display. */\n    description: string;\n    /** The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs. */\n    prompt: string;\n    /** Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill. */\n    run_in_background?: boolean;\n  } & Record<string, JsonValue>;\n  /** Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn. The workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result. Script-body hooks: - `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly. - `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages. - `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`. - `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim. Misused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`. Constraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes. */\n  workflow: {\n    /** The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`). */\n    script: string;\n    /** The workflow identity block (plain JSON — never code). */\n    meta: {\n      /** Short kebab-case workflow name. */\n      name: string;\n      /** One-line description of what the workflow does. */\n      description: string;\n      /** Optional guidance on when this workflow applies. */\n      whenToUse?: string;\n      /** Optional phase declarations matched by phase() calls. */\n      phases?: ({\n        /** The phase title phase() calls match by exact string. */\n        title: string;\n        /** Optional one-line description of the phase. */\n        detail?: string;\n        /** Optional provider override this phase is expected to use. */\n        provider?: string;\n        /** Optional model override this phase is expected to use. */\n        model?: string;\n      } & Record<string, JsonValue>)[];\n    } & Record<string, JsonValue>;\n    /** Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\"files\": [...]}). */\n    args?: Record<string, JsonValue>;\n  } & Record<string, JsonValue>;\n}\n\ninterface ToolOutputMap {\n  cordis_inspect_list: JsonValue;\n  cordis_inspect_query: JsonValue;\n  cordis_inspect_self: JsonValue;\n  job_kill: {\n    outcome: \"cancellation-requested\" | \"already-finished\";\n    job: {\n      id: string;\n      kind: string;\n      label: string;\n      status: \"running\" | \"stopping\" | \"completed\" | \"killed\" | \"failed\";\n      detail?: string;\n      startedAt: number;\n      finishedAt?: number;\n    };\n  };\n  job_list: ({\n    id: string;\n    kind: string;\n    label: string;\n    status: \"running\" | \"stopping\" | \"completed\" | \"killed\" | \"failed\";\n    detail?: string;\n    startedAt: number;\n    finishedAt?: number;\n  })[];\n  job_output: {\n    text: string;\n    job: {\n      id: string;\n      kind: string;\n      label: string;\n      status: \"running\" | \"stopping\" | \"completed\" | \"killed\" | \"failed\";\n      detail?: string;\n      startedAt: number;\n      finishedAt?: number;\n    };\n  };\n  present: {\n    turn: number;\n    files: {\n      path: string;\n      description?: string;\n    }[];\n  };\n  subagent: {\n    kind: \"background\";\n    jobId: string;\n  } | {\n    kind: \"continuable\";\n    subagentId: string;\n  } | {\n    kind: \"foreground\";\n    runId: string;\n    output: JsonValue[];\n  };\n  workflow: {\n    runId: string;\n    agentsStarted: number;\n    result: JsonValue;\n  };\n}\n\ntype ToolName = keyof ToolOutputMap\n\ndeclare class ToolCallError extends Error {\n  readonly name: \"ToolCallError\";\n  readonly toolName: ToolName;\n}\n\ndeclare const tools: {\n  [K in ToolName]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]>;\n}\n```"
-                }
-              ],
-              "source": {
-                "kind": "plugin",
-                "plugin": "@deepseek-ai/dsh-system-prompt"
-              },
-              "id": "{{message:2}}"
-            }
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "user/message",
-          "seq": 8,
-          "time": 0,
-          "data": {
-            "content": [
-              {
-                "type": "text",
-                "text": "Run the advanced packaged-runtime snapshot scenario."
-              }
-            ],
-            "source": {
-              "kind": "user"
-            },
-            "role": "user",
-            "id": "{{message:1}}"
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "user/message",
-          "seq": 9,
-          "time": 0,
-          "data": {
-            "content": [
-              {
-                "type": "text",
-                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
-              }
-            ],
-            "source": {
-              "kind": "plugin",
-              "plugin": "@deepseek-ai/dsh-system-prompt",
-              "form": "snapshot",
-              "sections": [
-                {
-                  "name": "sandbox:policy",
-                  "text": "Current DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations."
-                },
-                {
-                  "name": "approval:policy",
-                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
-                }
-              ]
-            },
-            "role": "user",
-            "id": "{{message:3}}"
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "session/title",
-          "seq": 10,
-          "time": 0,
-          "data": {
-            "title": "Run the advanced packaged-runtime snapsh",
-            "messageSeqs": [
-              8
-            ],
-            "source": {
-              "kind": "fallback"
-            }
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "request/header",
-          "seq": 11,
-          "time": 0,
-          "data": {
-            "header": {
-              "config": {
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "maxTokens": 256000,
-                "reasoningEffort": "high"
-              },
-              "adapterDefaults": {
-                "reasoningEffort": true,
-                "maxTokens": true
-              },
-              "tools": [
-                {
-                  "name": "cordis_inspect_list",
-                  "description": "List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {}
-                  }
-                },
-                {
-                  "name": "cordis_inspect_query",
-                  "description": "Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "platform": {
-                        "type": "string",
-                        "description": "Runtime platform that owns the Provider.",
-                        "enum": [
-                          "host",
-                          "client"
-                        ]
-                      },
-                      "provider": {
-                        "type": "string",
-                        "description": "Exact Provider ID returned by cordis_inspect_list."
-                      },
-                      "method": {
-                        "type": "string",
-                        "description": "Exact method name declared by the Provider manifest."
-                      },
-                      "input": {
-                        "description": "Optional query input; it must satisfy the method input schema."
-                      }
-                    },
-                    "required": [
-                      "platform",
-                      "provider",
-                      "method"
-                    ]
-                  }
-                },
-                {
-                  "name": "cordis_inspect_self",
-                  "description": "Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "pluginId": {
-                        "type": "string",
-                        "description": "Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin."
-                      },
-                      "packageId": {
-                        "type": "string",
-                        "description": "Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned."
-                      }
-                    }
-                  }
-                },
-                {
-                  "name": "job_kill",
-                  "description": "Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "job_id": {
-                        "type": "string",
-                        "description": "Job id returned by the tool that started the background work."
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "Optional short reason, recorded in the log and forwarded to the job."
-                      }
-                    },
-                    "required": [
-                      "job_id"
-                    ]
-                  }
-                },
-                {
-                  "name": "job_list",
-                  "description": "List your background jobs (running and finished) with their ids, kinds, and statuses.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {}
-                  }
-                },
-                {
-                  "name": "job_output",
-                  "description": "Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "job_id": {
-                        "type": "string",
-                        "description": "Job id returned by the tool that started the background work."
-                      },
-                      "wait": {
-                        "type": "boolean",
-                        "description": "Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive."
-                      },
-                      "timeout_ms": {
-                        "type": "number",
-                        "description": "Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum."
-                      }
-                    },
-                    "required": [
-                      "job_id"
-                    ]
-                  }
-                },
-                {
-                  "name": "present",
-                  "description": "Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "files": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "path": {
-                              "type": "string",
-                              "description": "Path of an existing regular file. Relative paths use the Session working directory."
-                            },
-                            "description": {
-                              "type": "string",
-                              "description": "Brief description for the user."
-                            }
-                          },
-                          "required": [
-                            "path"
-                          ]
-                        }
-                      }
-                    },
-                    "required": [
-                      "files"
-                    ]
-                  }
-                },
-                {
-                  "name": "run_code",
-                  "description": "Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. The working directory is the Session's current directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "code": {
-                        "type": "string",
-                        "description": "The program: the body of an async TypeScript function."
-                      },
-                      "description": {
-                        "type": "string",
-                        "description": "Clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \"Count TODO markers across packages\"; \"Read failing test and its fixture\"; \"Rename config key in every cordis.yml\"."
-                      },
-                      "timeoutMs": {
-                        "type": "number",
-                        "description": "Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline."
-                      },
-                      "sandbox_permissions": {
-                        "type": "string",
-                        "description": "Wider sandbox mode for this complete program execution; requires justification and approval.",
-                        "enum": [
-                          "workspace-write",
-                          "danger-full-access"
-                        ]
-                      },
-                      "justification": {
-                        "type": "string",
-                        "description": "Reason this complete program needs wider access, shown to the user for approval."
-                      }
-                    },
-                    "required": [
-                      "code",
-                      "description"
-                    ]
-                  }
-                },
-                {
-                  "name": "subagent",
-                  "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "description": {
-                        "type": "string",
-                        "description": "A short (3-5 word) description of the delegated task, for display."
-                      },
-                      "prompt": {
-                        "type": "string",
-                        "description": "The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs."
-                      },
-                      "run_in_background": {
-                        "type": "boolean",
-                        "description": "Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill."
-                      }
-                    },
-                    "required": [
-                      "description",
-                      "prompt"
-                    ]
-                  }
-                },
-                {
-                  "name": "workflow",
-                  "description": "Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.\n\nThe workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result.\n\nScript-body hooks:\n- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly.\n- `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages.\n- `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.\n- `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.\n\nMisused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`.\n\nConstraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "script": {
-                        "type": "string",
-                        "description": "The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`)."
-                      },
-                      "meta": {
-                        "type": "object",
-                        "description": "The workflow identity block (plain JSON — never code).",
-                        "additionalProperties": true,
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "description": "Short kebab-case workflow name."
-                          },
-                          "description": {
-                            "type": "string",
-                            "description": "One-line description of what the workflow does."
-                          },
-                          "whenToUse": {
-                            "type": "string",
-                            "description": "Optional guidance on when this workflow applies."
-                          },
-                          "phases": {
-                            "type": "array",
-                            "description": "Optional phase declarations matched by phase() calls.",
-                            "items": {
-                              "type": "object",
-                              "additionalProperties": true,
-                              "properties": {
-                                "title": {
-                                  "type": "string",
-                                  "description": "The phase title phase() calls match by exact string."
-                                },
-                                "detail": {
-                                  "type": "string",
-                                  "description": "Optional one-line description of the phase."
-                                },
-                                "provider": {
-                                  "type": "string",
-                                  "description": "Optional provider override this phase is expected to use."
-                                },
-                                "model": {
-                                  "type": "string",
-                                  "description": "Optional model override this phase is expected to use."
-                                }
-                              },
-                              "required": [
-                                "title"
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "name",
-                          "description"
-                        ]
-                      },
-                      "args": {
-                        "type": "object",
-                        "description": "Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\"files\": [...]}).",
-                        "additionalProperties": true
-                      }
-                    },
-                    "required": [
-                      "script",
-                      "meta"
-                    ]
-                  }
-                }
-              ]
-            },
-            "reason": "initial"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "request/context",
-          "seq": 12,
-          "time": 0,
-          "data": {
-            "provider": "deepseek-official",
-            "model": "smoke-model",
-            "contextWindow": 1000000
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "session-log-deepseek/delivery-accepted",
-          "seq": 13,
-          "time": 0,
-          "data": {
-            "sessionId": "{{parent}}",
-            "sessionFormatVersion": 6,
-            "throughSeq": 12
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "assistant/message",
-          "seq": 14,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 1,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "tool-call",
-                  "id": "advanced-inspect",
-                  "name": "cordis_inspect_list",
-                  "arguments": "{}"
-                }
-              ],
-              "source": {
-                "kind": "model",
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "replayState": {
-                  "response": {
-                    "kind": "deepseek-messages",
-                    "version": 1,
-                    "model": "smoke-model"
-                  },
-                  "blocks": [
-                    {
-                      "type": "tool-call"
-                    }
-                  ]
-                }
-              },
-              "id": "{{message:4}}"
-            },
-            "usage": {
-              "inputTokens": 3,
-              "outputTokens": 3,
-              "totalTokens": 6
-            },
-            "stream": [
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-start",
-                  "index": 0,
-                  "blockType": "tool-call"
-                }
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-inspect",
-                "name": "cordis_inspect_list",
-                "args": [
-                  ""
-                ]
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-inspect",
-                "args": [
-                  "{}"
-                ]
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-end",
-                  "index": 0,
-                  "block": {
-                    "type": "tool-call",
-                    "id": "advanced-inspect",
-                    "name": "cordis_inspect_list",
-                    "arguments": "{}"
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "usage",
-                  "usage": {
-                    "inputTokens": 3,
-                    "outputTokens": 3,
-                    "totalTokens": 6
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "finish",
-                  "reason": {
-                    "kind": "tool-calls"
-                  },
-                  "replayState": {
-                    "response": {
-                      "kind": "deepseek-messages",
-                      "version": 1,
-                      "model": "smoke-model"
-                    },
-                    "blocks": [
-                      {
-                        "type": "tool-call"
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/call",
-          "seq": 15,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 1,
-            "callId": "advanced-inspect",
-            "name": "cordis_inspect_list",
-            "arguments": "{}"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/result",
-          "seq": 16,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 1,
-            "message": {
-              "source": {
-                "kind": "tool",
-                "callId": "advanced-inspect"
-              },
-              "content": [
-                {
-                  "type": "tool-result",
-                  "toolCallId": "advanced-inspect",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "{\n  \"providers\": [\n    {\n      \"platform\": \"host\",\n      \"id\": \"Service\",\n      \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listService\",\n          \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"service\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Service key. Omit it for the compact Service and method-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Service directory, or one exact Service contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Event\",\n      \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listEvents\",\n          \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"event\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Event name. Omit it for the compact Event and listener-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Event directory, or one exact Event contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Builtin\",\n      \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n      \"methods\": [\n        {\n          \"name\": \"listBuiltins\",\n          \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Tool\",\n      \"description\": \"Tools visible to the requesting Agent, including scoped and dynamic registrations.\",\n      \"methods\": [\n        {\n          \"name\": \"listTools\",\n          \"description\": \"Return every Tool schema currently callable by this Agent.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    }\n  ]\n}"
-                    }
-                  ],
-                  "isError": false
-                }
-              ],
-              "role": "user",
-              "id": "{{message:5}}"
-            }
-          },
-          "sourceEventSeqs": [
-            15
-          ],
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/end",
-          "seq": 17,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 1
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/start",
-          "seq": 18,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "session-log-deepseek/delivery-accepted",
-          "seq": 19,
-          "time": 0,
-          "data": {
-            "sessionId": "{{parent}}",
-            "sessionFormatVersion": 6,
-            "throughSeq": 18
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "assistant/message",
-          "seq": 20,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "tool-call",
-                  "id": "advanced-code",
-                  "name": "run_code",
-                  "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
-                }
-              ],
-              "source": {
-                "kind": "model",
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "replayState": {
-                  "response": {
-                    "kind": "deepseek-messages",
-                    "version": 1,
-                    "model": "smoke-model"
-                  },
-                  "blocks": [
-                    {
-                      "type": "tool-call"
-                    }
-                  ]
-                }
-              },
-              "id": "{{message:6}}"
-            },
-            "usage": {
-              "inputTokens": 3,
-              "outputTokens": 3,
-              "totalTokens": 6
-            },
-            "stream": [
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-start",
-                  "index": 0,
-                  "blockType": "tool-call"
-                }
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-code",
-                "name": "run_code",
-                "args": [
-                  ""
-                ]
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-code",
-                "args": [
-                  "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
-                ]
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-end",
-                  "index": 0,
-                  "block": {
-                    "type": "tool-call",
-                    "id": "advanced-code",
-                    "name": "run_code",
-                    "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "usage",
-                  "usage": {
-                    "inputTokens": 3,
-                    "outputTokens": 3,
-                    "totalTokens": 6
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "finish",
-                  "reason": {
-                    "kind": "tool-calls"
-                  },
-                  "replayState": {
-                    "response": {
-                      "kind": "deepseek-messages",
-                      "version": 1,
-                      "model": "smoke-model"
-                    },
-                    "blocks": [
-                      {
-                        "type": "tool-call"
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/call",
-          "seq": 21,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2,
-            "callId": "advanced-code",
-            "name": "run_code",
-            "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/ptc-dispatch-start",
-          "seq": 22,
-          "time": 0,
-          "data": {
-            "rootCallId": "advanced-code",
-            "parentCallId": "advanced-code",
-            "subCallId": "advanced-code:ptc:1",
-            "name": "cordis_inspect_query",
-            "arguments": {
-              "platform": "host",
-              "provider": "Tool",
-              "method": "listTools"
-            }
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/ptc-dispatch",
-          "seq": 23,
-          "time": 0,
-          "data": {
-            "rootCallId": "advanced-code",
-            "parentCallId": "advanced-code",
-            "subCallId": "advanced-code:ptc:1",
-            "name": "cordis_inspect_query",
-            "arguments": {
-              "platform": "host",
-              "provider": "Tool",
-              "method": "listTools"
-            },
-            "isError": false,
-            "content": [
-              {
-                "type": "text",
-                "text": "{\n  \"platform\": \"host\",\n  \"provider\": \"Tool\",\n  \"method\": \"listTools\",\n  \"data\": {\n    \"tools\": [\n      {\n        \"name\": \"job_output\",\n        \"description\": \"Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"wait\": {\n              \"type\": \"boolean\",\n              \"description\": \"Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive.\"\n            },\n            \"timeout_ms\": {\n              \"type\": \"number\",\n              \"description\": \"Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"job_list\",\n        \"description\": \"List your background jobs (running and finished) with their ids, kinds, and statuses.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"job_kill\",\n        \"description\": \"Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"reason\": {\n              \"type\": \"string\",\n              \"description\": \"Optional short reason, recorded in the log and forwarded to the job.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_list\",\n        \"description\": \"List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_query\",\n        \"description\": \"Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"platform\": {\n              \"type\": \"string\",\n              \"description\": \"Runtime platform that owns the Provider.\",\n              \"enum\": [\n                \"host\",\n                \"client\"\n              ]\n            },\n            \"provider\": {\n              \"type\": \"string\",\n              \"description\": \"Exact Provider ID returned by cordis_inspect_list.\"\n            },\n            \"method\": {\n              \"type\": \"string\",\n              \"description\": \"Exact method name declared by the Provider manifest.\"\n            },\n            \"input\": {\n              \"description\": \"Optional query input; it must satisfy the method input schema.\"\n            }\n          },\n          \"required\": [\n            \"platform\",\n            \"provider\",\n            \"method\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_self\",\n        \"description\": \"Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"pluginId\": {\n              \"type\": \"string\",\n              \"description\": \"Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin.\"\n            },\n            \"packageId\": {\n              \"type\": \"string\",\n              \"description\": \"Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned.\"\n            }\n          }\n        }\n      },\n      {\n        \"name\": \"present\",\n        \"description\": \"Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"files\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"object\",\n                \"additionalProperties\": false,\n                \"properties\": {\n                  \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"Path of an existing regular file. Relative paths use the Session working directory.\"\n                  },\n                  \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"Brief description for the user.\"\n                  }\n                },\n                \"required\": [\n                  \"path\"\n                ]\n              }\n            }\n          },\n          \"required\": [\n            \"files\"\n          ]\n        }\n      },\n      {\n        \"name\": \"subagent\",\n        \"description\": \"Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"A short (3-5 word) description of the delegated task, for display.\"\n            },\n            \"prompt\": {\n              \"type\": \"string\",\n              \"description\": \"The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs.\"\n            },\n            \"run_in_background\": {\n              \"type\": \"boolean\",\n              \"description\": \"Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill.\"\n            }\n          },\n          \"required\": [\n            \"description\",\n            \"prompt\"\n          ]\n        }\n      },\n      {\n        \"name\": \"workflow\",\n        \"description\": \"Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.\\n\\nThe workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result.\\n\\nScript-body hooks:\\n- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly.\\n- `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages.\\n- `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.\\n- `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.\\n\\nMisused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`.\\n\\nConstraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"script\": {\n              \"type\": \"string\",\n              \"description\": \"The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`).\"\n            },\n            \"meta\": {\n              \"type\": \"object\",\n              \"description\": \"The workflow identity block (plain JSON — never code).\",\n              \"additionalProperties\": true,\n              \"properties\": {\n                \"name\": {\n                  \"type\": \"string\",\n                  \"description\": \"Short kebab-case workflow name.\"\n                },\n                \"description\": {\n                  \"type\": \"string\",\n                  \"description\": \"One-line description of what the workflow does.\"\n                },\n                \"whenToUse\": {\n                  \"type\": \"string\",\n                  \"description\": \"Optional guidance on when this workflow applies.\"\n                },\n                \"phases\": {\n                  \"type\": \"array\",\n                  \"description\": \"Optional phase declarations matched by phase() calls.\",\n                  \"items\": {\n                    \"type\": \"object\",\n                    \"additionalProperties\": true,\n                    \"properties\": {\n                      \"title\": {\n                        \"type\": \"string\",\n                        \"description\": \"The phase title phase() calls match by exact string.\"\n                      },\n                      \"detail\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional one-line description of the phase.\"\n                      },\n                      \"provider\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional provider override this phase is expected to use.\"\n                      },\n                      \"model\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional model override this phase is expected to use.\"\n                      }\n                    },\n                    \"required\": [\n                      \"title\"\n                    ]\n                  }\n                }\n              },\n              \"required\": [\n                \"name\",\n                \"description\"\n              ]\n            },\n            \"args\": {\n              \"type\": \"object\",\n              \"description\": \"Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\\\"files\\\": [...]}).\",\n              \"additionalProperties\": true\n            }\n          },\n          \"required\": [\n            \"script\",\n            \"meta\"\n          ]\n        }\n      },\n      {\n        \"name\": \"run_code\",\n        \"description\": \"Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. The working directory is the Session's current directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"code\": {\n              \"type\": \"string\",\n              \"description\": \"The program: the body of an async TypeScript function.\"\n            },\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"Clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \\\"Count TODO markers across packages\\\"; \\\"Read failing test and its fixture\\\"; \\\"Rename config key in every cordis.yml\\\".\"\n            },\n            \"timeoutMs\": {\n              \"type\": \"number\",\n              \"description\": \"Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline.\"\n            },\n            \"sandbox_permissions\": {\n              \"type\": \"string\",\n              \"description\": \"Wider sandbox mode for this complete program execution; requires justification and approval.\",\n              \"enum\": [\n                \"workspace-write\",\n                \"danger-full-access\"\n              ]\n            },\n            \"justification\": {\n              \"type\": \"string\",\n              \"description\": \"Reason this complete program needs wider access, shown to the user for approval.\"\n            }\n          },\n          \"required\": [\n            \"code\",\n            \"description\"\n          ]\n        }\n      }\n    ]\n  }\n}"
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/result",
-          "seq": 24,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2,
-            "message": {
-              "source": {
-                "kind": "tool",
-                "callId": "advanced-code"
-              },
-              "content": [
-                {
-                  "type": "tool-result",
-                  "toolCallId": "advanced-code",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "{\n  \"value\": 42,\n  \"tools\": [\n    \"job_output\",\n    \"job_list\",\n    \"job_kill\",\n    \"cordis_inspect_list\",\n    \"cordis_inspect_query\",\n    \"cordis_inspect_self\",\n    \"present\",\n    \"subagent\",\n    \"workflow\",\n    \"run_code\"\n  ]\n}"
-                    }
-                  ],
-                  "isError": false
-                }
-              ],
-              "role": "user",
-              "id": "{{message:7}}"
-            }
-          },
-          "sourceEventSeqs": [
-            21
-          ],
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/end",
-          "seq": 25,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 2
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/start",
-          "seq": 26,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "session-log-deepseek/delivery-accepted",
-          "seq": 27,
-          "time": 0,
-          "data": {
-            "sessionId": "{{parent}}",
-            "sessionFormatVersion": 6,
-            "throughSeq": 26
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "assistant/message",
-          "seq": 28,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "tool-call",
-                  "id": "advanced-direct-child",
-                  "name": "subagent",
-                  "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
-                }
-              ],
-              "source": {
-                "kind": "model",
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "replayState": {
-                  "response": {
-                    "kind": "deepseek-messages",
-                    "version": 1,
-                    "model": "smoke-model"
-                  },
-                  "blocks": [
-                    {
-                      "type": "tool-call"
-                    }
-                  ]
-                }
-              },
-              "id": "{{message:8}}"
-            },
-            "usage": {
-              "inputTokens": 3,
-              "outputTokens": 3,
-              "totalTokens": 6
-            },
-            "stream": [
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-start",
-                  "index": 0,
-                  "blockType": "tool-call"
-                }
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-direct-child",
-                "name": "subagent",
-                "args": [
-                  ""
-                ]
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-direct-child",
-                "args": [
-                  "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
-                ]
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-end",
-                  "index": 0,
-                  "block": {
-                    "type": "tool-call",
-                    "id": "advanced-direct-child",
-                    "name": "subagent",
-                    "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "usage",
-                  "usage": {
-                    "inputTokens": 3,
-                    "outputTokens": 3,
-                    "totalTokens": 6
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "finish",
-                  "reason": {
-                    "kind": "tool-calls"
-                  },
-                  "replayState": {
-                    "response": {
-                      "kind": "deepseek-messages",
-                      "version": 1,
-                      "model": "smoke-model"
-                    },
-                    "blocks": [
-                      {
-                        "type": "tool-call"
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/call",
-          "seq": 29,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3,
-            "callId": "advanced-direct-child",
-            "name": "subagent",
-            "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
-          }
-        }
-      }
-    },
-    {
-      "method": "subagent.started",
-      "payload": {
-        "parentSessionId": "{{parent}}",
-        "childSessionId": "{{agent-1}}"
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
         "sessionId": "{{agent-1}}",
         "event": {
           "type": "permission/preset",
@@ -2706,6 +1499,13 @@
             "origin": "inferred"
           }
         }
+      }
+    },
+    {
+      "method": "session.status",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "status": "running"
       }
     },
     {
@@ -2739,13 +1539,6 @@
       }
     },
     {
-      "method": "session.status",
-      "payload": {
-        "sessionId": "{{agent-1}}",
-        "status": "running"
-      }
-    },
-    {
       "method": "session.event",
       "payload": {
         "sessionId": "{{agent-1}}",
@@ -2772,24 +1565,6 @@
             "start": 0,
             "removedCount": 1,
             "inserted": []
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "subagent/catalog",
-          "seq": 30,
-          "time": 0,
-          "data": {
-            "version": 0,
-            "childId": "{{agent-1}}",
-            "childCreatedAt": 0,
-            "mode": "one-shot",
-            "label": "Check direct child"
           }
         }
       }
@@ -3426,286 +2201,6 @@
       }
     },
     {
-      "method": "session.status",
-      "payload": {
-        "sessionId": "{{agent-1}}",
-        "status": "idle"
-      }
-    },
-    {
-      "method": "subagent.finished",
-      "payload": {
-        "provider": "spawn",
-        "agentId": "{{agent-1}}",
-        "parentSessionId": "{{parent}}",
-        "childSessionId": "{{agent-1}}",
-        "status": "ok",
-        "stopReason": "completed",
-        "lastAssistantMessage": [
-          {
-            "type": "text",
-            "text": "DIRECT_CHILD_OK"
-          }
-        ]
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/result",
-          "seq": 31,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3,
-            "message": {
-              "source": {
-                "kind": "tool",
-                "callId": "advanced-direct-child"
-              },
-              "content": [
-                {
-                  "type": "tool-result",
-                  "toolCallId": "advanced-direct-child",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "DIRECT_CHILD_OK"
-                    }
-                  ],
-                  "isError": false
-                }
-              ],
-              "role": "user",
-              "id": "{{message:9}}"
-            }
-          },
-          "sourceEventSeqs": [
-            29
-          ],
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/end",
-          "seq": 32,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 3
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "step/start",
-          "seq": 33,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 4
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "session-log-deepseek/delivery-accepted",
-          "seq": 34,
-          "time": 0,
-          "data": {
-            "sessionId": "{{parent}}",
-            "sessionFormatVersion": 6,
-            "throughSeq": 33
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "assistant/message",
-          "seq": 35,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 4,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "tool-call",
-                  "id": "advanced-workflow",
-                  "name": "workflow",
-                  "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
-                }
-              ],
-              "source": {
-                "kind": "model",
-                "provider": "deepseek-official",
-                "model": "smoke-model",
-                "replayState": {
-                  "response": {
-                    "kind": "deepseek-messages",
-                    "version": 1,
-                    "model": "smoke-model"
-                  },
-                  "blocks": [
-                    {
-                      "type": "tool-call"
-                    }
-                  ]
-                }
-              },
-              "id": "{{message:10}}"
-            },
-            "usage": {
-              "inputTokens": 3,
-              "outputTokens": 3,
-              "totalTokens": 6
-            },
-            "stream": [
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-start",
-                  "index": 0,
-                  "blockType": "tool-call"
-                }
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-workflow",
-                "name": "workflow",
-                "args": [
-                  ""
-                ]
-              },
-              {
-                "type": "tool-call-chunks",
-                "time0": 0,
-                "index": 0,
-                "dt": [],
-                "id": "advanced-workflow",
-                "args": [
-                  "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
-                ]
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "block-end",
-                  "index": 0,
-                  "block": {
-                    "type": "tool-call",
-                    "id": "advanced-workflow",
-                    "name": "workflow",
-                    "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "usage",
-                  "usage": {
-                    "inputTokens": 3,
-                    "outputTokens": 3,
-                    "totalTokens": 6
-                  }
-                }
-              },
-              {
-                "type": "chunk",
-                "time": 0,
-                "chunk": {
-                  "type": "finish",
-                  "reason": {
-                    "kind": "tool-calls"
-                  },
-                  "replayState": {
-                    "response": {
-                      "kind": "deepseek-messages",
-                      "version": 1,
-                      "model": "smoke-model"
-                    },
-                    "blocks": [
-                      {
-                        "type": "tool-call"
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "surfaceOp": "append"
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool/call",
-          "seq": 36,
-          "time": 0,
-          "data": {
-            "turn": 1,
-            "step": 4,
-            "callId": "advanced-workflow",
-            "name": "workflow",
-            "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool-workflow/run-start",
-          "seq": 37,
-          "time": 0,
-          "data": {
-            "runId": "{{workflow-run}}",
-            "name": "advanced-exe-snapshot"
-          }
-        }
-      }
-    },
-    {
-      "method": "subagent.started",
-      "payload": {
-        "parentSessionId": "{{parent}}",
-        "childSessionId": "{{agent-2}}"
-      }
-    },
-    {
       "method": "session.event",
       "payload": {
         "sessionId": "{{agent-2}}",
@@ -3751,13 +2246,6 @@
       }
     },
     {
-      "method": "session.status",
-      "payload": {
-        "sessionId": "{{agent-2}}",
-        "status": "running"
-      }
-    },
-    {
       "method": "session.event",
       "payload": {
         "sessionId": "{{agent-2}}",
@@ -3784,41 +2272,6 @@
             "start": 0,
             "removedCount": 1,
             "inserted": []
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "subagent/catalog",
-          "seq": 38,
-          "time": 0,
-          "data": {
-            "version": 0,
-            "childId": "{{agent-2}}",
-            "childCreatedAt": 0,
-            "mode": "one-shot"
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{parent}}",
-        "event": {
-          "type": "tool-workflow/agent-start",
-          "seq": 39,
-          "time": 0,
-          "data": {
-            "runId": "{{workflow-run}}",
-            "seq": 1,
-            "label": "workflow-child",
-            "phase": "Delegate",
-            "childId": "{{agent-2}}"
           }
         }
       }
@@ -4276,6 +2729,13 @@
       }
     },
     {
+      "method": "subagent.started",
+      "payload": {
+        "parentSessionId": "{{parent}}",
+        "childSessionId": "{{agent-1}}"
+      }
+    },
+    {
       "method": "session.event",
       "payload": {
         "sessionId": "{{agent-2}}",
@@ -4305,6 +2765,13 @@
             "throughSeq": 13
           }
         }
+      }
+    },
+    {
+      "method": "session.status",
+      "payload": {
+        "sessionId": "{{agent-1}}",
+        "status": "running"
       }
     },
     {
@@ -4449,6 +2916,1539 @@
             "reason": {
               "kind": "completed"
             }
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "agent/inbox/spliced",
+          "seq": 3,
+          "time": 0,
+          "data": {
+            "target": "next-turn",
+            "start": 0,
+            "inserted": [
+              {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Run the advanced packaged-runtime snapshot scenario."
+                  }
+                ],
+                "source": {
+                  "kind": "user"
+                },
+                "role": "user",
+                "id": "{{message:1}}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "turn/start",
+          "seq": 4,
+          "time": 0,
+          "data": {
+            "turn": 1
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "agent/inbox/spliced",
+          "seq": 5,
+          "time": 0,
+          "data": {
+            "target": "next-turn",
+            "start": 0,
+            "removedCount": 1,
+            "inserted": []
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 6,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 1
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "system/message",
+          "seq": 7,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 1,
+            "message": {
+              "role": "system",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "You are an AI agent powered by DeepSeek Harness.\n\nTrack every background job id you start. You are notified in-session when a job finishes — do not busy-poll or sleep on one; keep working on independent steps and do not duplicate a running job's work. Before giving a final answer, collect every still-relevant job with job_output (set wait: true only when you are genuinely blocked on it), and job_kill jobs that stopped mattering.\n\n# Harness runtime inspection\n\nUse cordis_inspect_list to discover Host and Client providers, then cordis_inspect_query to read exact Service, Event, Tool, Theme or Slot APIs. These tools are read-only; queries do not invoke business methods.\n\nUse cordis_inspect_self to inspect existing session-owned Plugin summaries, version pointers, or an exact Package's source and diagnostics. An explicit @pluginId reference identifies an inspection target; it does not authorize execution or modification. Dynamic definitions remain process-local and may be unavailable after restart.\n\nFor a requested persistent Plugin or MCP change, load the cordis-plugin-development Skill and use Plugin Manager's authorized installation workflow. Inspect results describe APIs; they are not business data or an alternative execution path.\n\nUse the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.\n\n## Writing code for run_code\n\n`run_code` takes two required arguments: `code` — the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped) — and `description`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly.\n\nInside the program:\n\n- Call tools as `await tools.name(args)` — quoted access for exotic names: `tools[\"my-tool\"](args)`. Every call resolves to the tool's typed canonical JSON value. Tool arguments must be lossless JSON.\n- A FAILED tool call rejects with `ToolCallError`, whose `toolName` identifies the failed tool and whose `message` is human-readable — `try/catch` it to handle and continue.\n- Independent read-only calls MAY overlap under `Promise.all` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with `await`.\n- Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output. A successful tool result containing an image is attached after the run so you can inspect it on the next step; every other intermediate result stays out of the conversation, so extract just what you need.\n\nProgram-only SDK bindings:\n\n```ts\ntype JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }\n\ninterface ToolArgsMap {\n  /** List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call. */\n  cordis_inspect_list: Record<string, JsonValue>;\n  /** Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props. */\n  cordis_inspect_query: {\n    /** Runtime platform that owns the Provider. */\n    platform: \"host\" | \"client\";\n    /** Exact Provider ID returned by cordis_inspect_list. */\n    provider: string;\n    /** Exact method name declared by the Provider manifest. */\n    method: string;\n    /** Optional query input; it must satisfy the method input schema. */\n    input?: JsonValue;\n  } & Record<string, JsonValue>;\n  /** Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers. */\n  cordis_inspect_self: {\n    /** Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin. */\n    pluginId?: string;\n    /** Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned. */\n    packageId?: string;\n  } & Record<string, JsonValue>;\n  /** Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops. */\n  job_kill: {\n    /** Job id returned by the tool that started the background work. */\n    job_id: string;\n    /** Optional short reason, recorded in the log and forwarded to the job. */\n    reason?: string;\n  } & Record<string, JsonValue>;\n  /** List your background jobs (running and finished) with their ids, kinds, and statuses. */\n  job_list: Record<string, JsonValue>;\n  /** Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap. */\n  job_output: {\n    /** Job id returned by the tool that started the background work. */\n    job_id: string;\n    /** Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive. */\n    wait?: boolean;\n    /** Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum. */\n    timeout_ms?: number;\n  } & Record<string, JsonValue>;\n  /** Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved. */\n  present: {\n    files: {\n      /** Path of an existing regular file. Relative paths use the Session working directory. */\n      path: string;\n      /** Brief description for the user. */\n      description?: string;\n    }[];\n  } & Record<string, JsonValue>;\n  /** Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`. */\n  subagent: {\n    /** A short (3-5 word) description of the delegated task, for display. */\n    description: string;\n    /** The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs. */\n    prompt: string;\n    /** Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill. */\n    run_in_background?: boolean;\n  } & Record<string, JsonValue>;\n  /** Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn. The workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result. Script-body hooks: - `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly. - `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages. - `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`. - `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim. Misused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`. Constraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes. */\n  workflow: {\n    /** The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`). */\n    script: string;\n    /** The workflow identity block (plain JSON — never code). */\n    meta: {\n      /** Short kebab-case workflow name. */\n      name: string;\n      /** One-line description of what the workflow does. */\n      description: string;\n      /** Optional guidance on when this workflow applies. */\n      whenToUse?: string;\n      /** Optional phase declarations matched by phase() calls. */\n      phases?: ({\n        /** The phase title phase() calls match by exact string. */\n        title: string;\n        /** Optional one-line description of the phase. */\n        detail?: string;\n        /** Optional provider override this phase is expected to use. */\n        provider?: string;\n        /** Optional model override this phase is expected to use. */\n        model?: string;\n      } & Record<string, JsonValue>)[];\n    } & Record<string, JsonValue>;\n    /** Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\"files\": [...]}). */\n    args?: Record<string, JsonValue>;\n  } & Record<string, JsonValue>;\n}\n\ninterface ToolOutputMap {\n  cordis_inspect_list: JsonValue;\n  cordis_inspect_query: JsonValue;\n  cordis_inspect_self: JsonValue;\n  job_kill: {\n    outcome: \"cancellation-requested\" | \"already-finished\";\n    job: {\n      id: string;\n      kind: string;\n      label: string;\n      status: \"running\" | \"stopping\" | \"completed\" | \"killed\" | \"failed\";\n      detail?: string;\n      startedAt: number;\n      finishedAt?: number;\n    };\n  };\n  job_list: ({\n    id: string;\n    kind: string;\n    label: string;\n    status: \"running\" | \"stopping\" | \"completed\" | \"killed\" | \"failed\";\n    detail?: string;\n    startedAt: number;\n    finishedAt?: number;\n  })[];\n  job_output: {\n    text: string;\n    job: {\n      id: string;\n      kind: string;\n      label: string;\n      status: \"running\" | \"stopping\" | \"completed\" | \"killed\" | \"failed\";\n      detail?: string;\n      startedAt: number;\n      finishedAt?: number;\n    };\n  };\n  present: {\n    turn: number;\n    files: {\n      path: string;\n      description?: string;\n    }[];\n  };\n  subagent: {\n    kind: \"background\";\n    jobId: string;\n  } | {\n    kind: \"continuable\";\n    subagentId: string;\n  } | {\n    kind: \"foreground\";\n    runId: string;\n    output: JsonValue[];\n  };\n  workflow: {\n    runId: string;\n    agentsStarted: number;\n    result: JsonValue;\n  };\n}\n\ntype ToolName = keyof ToolOutputMap\n\ndeclare class ToolCallError extends Error {\n  readonly name: \"ToolCallError\";\n  readonly toolName: ToolName;\n}\n\ndeclare const tools: {\n  [K in ToolName]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]>;\n}\n```"
+                }
+              ],
+              "source": {
+                "kind": "plugin",
+                "plugin": "@deepseek-ai/dsh-system-prompt"
+              },
+              "id": "{{message:2}}"
+            }
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "user/message",
+          "seq": 8,
+          "time": 0,
+          "data": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Run the advanced packaged-runtime snapshot scenario."
+              }
+            ],
+            "source": {
+              "kind": "user"
+            },
+            "role": "user",
+            "id": "{{message:1}}"
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "user/message",
+          "seq": 9,
+          "time": 0,
+          "data": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+              }
+            ],
+            "source": {
+              "kind": "plugin",
+              "plugin": "@deepseek-ai/dsh-system-prompt",
+              "form": "snapshot",
+              "sections": [
+                {
+                  "name": "sandbox:policy",
+                  "text": "Current DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations."
+                },
+                {
+                  "name": "approval:policy",
+                  "text": "Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+                }
+              ]
+            },
+            "role": "user",
+            "id": "{{message:3}}"
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "session/title",
+          "seq": 10,
+          "time": 0,
+          "data": {
+            "title": "Run the advanced packaged-runtime snapsh",
+            "messageSeqs": [
+              8
+            ],
+            "source": {
+              "kind": "fallback"
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "request/header",
+          "seq": 11,
+          "time": 0,
+          "data": {
+            "header": {
+              "config": {
+                "provider": "deepseek-official",
+                "model": "smoke-model",
+                "maxTokens": 256000,
+                "reasoningEffort": "high"
+              },
+              "adapterDefaults": {
+                "reasoningEffort": true,
+                "maxTokens": true
+              },
+              "tools": [
+                {
+                  "name": "cordis_inspect_list",
+                  "description": "List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                {
+                  "name": "cordis_inspect_query",
+                  "description": "Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "description": "Runtime platform that owns the Provider.",
+                        "enum": [
+                          "host",
+                          "client"
+                        ]
+                      },
+                      "provider": {
+                        "type": "string",
+                        "description": "Exact Provider ID returned by cordis_inspect_list."
+                      },
+                      "method": {
+                        "type": "string",
+                        "description": "Exact method name declared by the Provider manifest."
+                      },
+                      "input": {
+                        "description": "Optional query input; it must satisfy the method input schema."
+                      }
+                    },
+                    "required": [
+                      "platform",
+                      "provider",
+                      "method"
+                    ]
+                  }
+                },
+                {
+                  "name": "cordis_inspect_self",
+                  "description": "Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pluginId": {
+                        "type": "string",
+                        "description": "Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin."
+                      },
+                      "packageId": {
+                        "type": "string",
+                        "description": "Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned."
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "job_kill",
+                  "description": "Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "job_id": {
+                        "type": "string",
+                        "description": "Job id returned by the tool that started the background work."
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Optional short reason, recorded in the log and forwarded to the job."
+                      }
+                    },
+                    "required": [
+                      "job_id"
+                    ]
+                  }
+                },
+                {
+                  "name": "job_list",
+                  "description": "List your background jobs (running and finished) with their ids, kinds, and statuses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                {
+                  "name": "job_output",
+                  "description": "Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "job_id": {
+                        "type": "string",
+                        "description": "Job id returned by the tool that started the background work."
+                      },
+                      "wait": {
+                        "type": "boolean",
+                        "description": "Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive."
+                      },
+                      "timeout_ms": {
+                        "type": "number",
+                        "description": "Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum."
+                      }
+                    },
+                    "required": [
+                      "job_id"
+                    ]
+                  }
+                },
+                {
+                  "name": "present",
+                  "description": "Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "files": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "Path of an existing regular file. Relative paths use the Session working directory."
+                            },
+                            "description": {
+                              "type": "string",
+                              "description": "Brief description for the user."
+                            }
+                          },
+                          "required": [
+                            "path"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "files"
+                    ]
+                  }
+                },
+                {
+                  "name": "run_code",
+                  "description": "Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. The working directory is the Session's current directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "description": "The program: the body of an async TypeScript function."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \"Count TODO markers across packages\"; \"Read failing test and its fixture\"; \"Rename config key in every cordis.yml\"."
+                      },
+                      "timeoutMs": {
+                        "type": "number",
+                        "description": "Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline."
+                      },
+                      "sandbox_permissions": {
+                        "type": "string",
+                        "description": "Wider sandbox mode for this complete program execution; requires justification and approval.",
+                        "enum": [
+                          "workspace-write",
+                          "danger-full-access"
+                        ]
+                      },
+                      "justification": {
+                        "type": "string",
+                        "description": "Reason this complete program needs wider access, shown to the user for approval."
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "description"
+                    ]
+                  }
+                },
+                {
+                  "name": "subagent",
+                  "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "description": "A short (3-5 word) description of the delegated task, for display."
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "description": "The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs."
+                      },
+                      "run_in_background": {
+                        "type": "boolean",
+                        "description": "Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill."
+                      }
+                    },
+                    "required": [
+                      "description",
+                      "prompt"
+                    ]
+                  }
+                },
+                {
+                  "name": "workflow",
+                  "description": "Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.\n\nThe workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result.\n\nScript-body hooks:\n- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly.\n- `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages.\n- `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.\n- `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.\n\nMisused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`.\n\nConstraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "script": {
+                        "type": "string",
+                        "description": "The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`)."
+                      },
+                      "meta": {
+                        "type": "object",
+                        "description": "The workflow identity block (plain JSON — never code).",
+                        "additionalProperties": true,
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Short kebab-case workflow name."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "One-line description of what the workflow does."
+                          },
+                          "whenToUse": {
+                            "type": "string",
+                            "description": "Optional guidance on when this workflow applies."
+                          },
+                          "phases": {
+                            "type": "array",
+                            "description": "Optional phase declarations matched by phase() calls.",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "description": "The phase title phase() calls match by exact string."
+                                },
+                                "detail": {
+                                  "type": "string",
+                                  "description": "Optional one-line description of the phase."
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "description": "Optional provider override this phase is expected to use."
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "description": "Optional model override this phase is expected to use."
+                                }
+                              },
+                              "required": [
+                                "title"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description"
+                        ]
+                      },
+                      "args": {
+                        "type": "object",
+                        "description": "Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\"files\": [...]}).",
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "script",
+                      "meta"
+                    ]
+                  }
+                }
+              ]
+            },
+            "reason": "initial"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "request/context",
+          "seq": 12,
+          "time": 0,
+          "data": {
+            "provider": "deepseek-official",
+            "model": "smoke-model",
+            "contextWindow": 1000000
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "session-log-deepseek/delivery-accepted",
+          "seq": 13,
+          "time": 0,
+          "data": {
+            "sessionId": "{{parent}}",
+            "sessionFormatVersion": 6,
+            "throughSeq": 12
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "assistant/message",
+          "seq": 14,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 1,
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool-call",
+                  "id": "advanced-inspect",
+                  "name": "cordis_inspect_list",
+                  "arguments": "{}"
+                }
+              ],
+              "source": {
+                "kind": "model",
+                "provider": "deepseek-official",
+                "model": "smoke-model",
+                "replayState": {
+                  "response": {
+                    "kind": "deepseek-messages",
+                    "version": 1,
+                    "model": "smoke-model"
+                  },
+                  "blocks": [
+                    {
+                      "type": "tool-call"
+                    }
+                  ]
+                }
+              },
+              "id": "{{message:4}}"
+            },
+            "usage": {
+              "inputTokens": 3,
+              "outputTokens": 3,
+              "totalTokens": 6
+            },
+            "stream": [
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-start",
+                  "index": 0,
+                  "blockType": "tool-call"
+                }
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-inspect",
+                "name": "cordis_inspect_list",
+                "args": [
+                  ""
+                ]
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-inspect",
+                "args": [
+                  "{}"
+                ]
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-end",
+                  "index": 0,
+                  "block": {
+                    "type": "tool-call",
+                    "id": "advanced-inspect",
+                    "name": "cordis_inspect_list",
+                    "arguments": "{}"
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "usage",
+                  "usage": {
+                    "inputTokens": 3,
+                    "outputTokens": 3,
+                    "totalTokens": 6
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "finish",
+                  "reason": {
+                    "kind": "tool-calls"
+                  },
+                  "replayState": {
+                    "response": {
+                      "kind": "deepseek-messages",
+                      "version": 1,
+                      "model": "smoke-model"
+                    },
+                    "blocks": [
+                      {
+                        "type": "tool-call"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.status",
+      "payload": {
+        "sessionId": "{{agent-1}}",
+        "status": "idle"
+      }
+    },
+    {
+      "method": "subagent.finished",
+      "payload": {
+        "provider": "spawn",
+        "agentId": "{{agent-1}}",
+        "parentSessionId": "{{parent}}",
+        "childSessionId": "{{agent-1}}",
+        "status": "ok",
+        "stopReason": "completed",
+        "lastAssistantMessage": [
+          {
+            "type": "text",
+            "text": "DIRECT_CHILD_OK"
+          }
+        ]
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/call",
+          "seq": 15,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 1,
+            "callId": "advanced-inspect",
+            "name": "cordis_inspect_list",
+            "arguments": "{}"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/result",
+          "seq": 16,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 1,
+            "message": {
+              "source": {
+                "kind": "tool",
+                "callId": "advanced-inspect"
+              },
+              "content": [
+                {
+                  "type": "tool-result",
+                  "toolCallId": "advanced-inspect",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "{\n  \"providers\": [\n    {\n      \"platform\": \"host\",\n      \"id\": \"Service\",\n      \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listService\",\n          \"description\": \"Progressive Host Service discovery: compact capability/signature directory, then one exact coding contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"service\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Service key. Omit it for the compact Service and method-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Service directory, or one exact Service contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Event\",\n      \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n      \"methods\": [\n        {\n          \"name\": \"listEvents\",\n          \"description\": \"Progressive Host Event discovery: compact listener directory, then one exact event contract.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"event\": {\n                \"type\": \"string\",\n                \"description\": \"Exact Event name. Omit it for the compact Event and listener-signature directory.\"\n              }\n            },\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"Compact Event directory, or one exact Event contract with only its referenced type declarations.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Builtin\",\n      \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n      \"methods\": [\n        {\n          \"name\": \"listBuiltins\",\n          \"description\": \"Plain-JavaScript symbols available to a dynamic Host half.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    },\n    {\n      \"platform\": \"host\",\n      \"id\": \"Tool\",\n      \"description\": \"Tools visible to the requesting Agent, including scoped and dynamic registrations.\",\n      \"methods\": [\n        {\n          \"name\": \"listTools\",\n          \"description\": \"Return every Tool schema currently callable by this Agent.\",\n          \"inputSchema\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"additionalProperties\": false\n          },\n          \"outputSchema\": {\n            \"description\": \"JSON data owned by this inspect provider.\"\n          }\n        }\n      ]\n    }\n  ]\n}"
+                    }
+                  ],
+                  "isError": false
+                }
+              ],
+              "role": "user",
+              "id": "{{message:5}}"
+            }
+          },
+          "sourceEventSeqs": [
+            15
+          ],
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/end",
+          "seq": 17,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 1
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 18,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 2
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "session-log-deepseek/delivery-accepted",
+          "seq": 19,
+          "time": 0,
+          "data": {
+            "sessionId": "{{parent}}",
+            "sessionFormatVersion": 6,
+            "throughSeq": 18
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "assistant/message",
+          "seq": 20,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 2,
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool-call",
+                  "id": "advanced-code",
+                  "name": "run_code",
+                  "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
+                }
+              ],
+              "source": {
+                "kind": "model",
+                "provider": "deepseek-official",
+                "model": "smoke-model",
+                "replayState": {
+                  "response": {
+                    "kind": "deepseek-messages",
+                    "version": 1,
+                    "model": "smoke-model"
+                  },
+                  "blocks": [
+                    {
+                      "type": "tool-call"
+                    }
+                  ]
+                }
+              },
+              "id": "{{message:6}}"
+            },
+            "usage": {
+              "inputTokens": 3,
+              "outputTokens": 3,
+              "totalTokens": 6
+            },
+            "stream": [
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-start",
+                  "index": 0,
+                  "blockType": "tool-call"
+                }
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-code",
+                "name": "run_code",
+                "args": [
+                  ""
+                ]
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-code",
+                "args": [
+                  "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
+                ]
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-end",
+                  "index": 0,
+                  "block": {
+                    "type": "tool-call",
+                    "id": "advanced-code",
+                    "name": "run_code",
+                    "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "usage",
+                  "usage": {
+                    "inputTokens": 3,
+                    "outputTokens": 3,
+                    "totalTokens": 6
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "finish",
+                  "reason": {
+                    "kind": "tool-calls"
+                  },
+                  "replayState": {
+                    "response": {
+                      "kind": "deepseek-messages",
+                      "version": 1,
+                      "model": "smoke-model"
+                    },
+                    "blocks": [
+                      {
+                        "type": "tool-call"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/call",
+          "seq": 21,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 2,
+            "callId": "advanced-code",
+            "name": "run_code",
+            "arguments": "{\"code\": \"const result = await tools.cordis_inspect_query({ platform: 'host', provider: 'Tool', method: 'listTools' }); return { value: 21 * 2, tools: result.data.tools.map(tool => tool.name) }\", \"description\": \"Inspect callable tools through the packaged PTC runtime\"}"
+          }
+        }
+      }
+    },
+    {
+      "method": "subagent.started",
+      "payload": {
+        "parentSessionId": "{{parent}}",
+        "childSessionId": "{{agent-2}}"
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/ptc-dispatch-start",
+          "seq": 22,
+          "time": 0,
+          "data": {
+            "rootCallId": "advanced-code",
+            "parentCallId": "advanced-code",
+            "subCallId": "advanced-code:ptc:1",
+            "name": "cordis_inspect_query",
+            "arguments": {
+              "platform": "host",
+              "provider": "Tool",
+              "method": "listTools"
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/ptc-dispatch",
+          "seq": 23,
+          "time": 0,
+          "data": {
+            "rootCallId": "advanced-code",
+            "parentCallId": "advanced-code",
+            "subCallId": "advanced-code:ptc:1",
+            "name": "cordis_inspect_query",
+            "arguments": {
+              "platform": "host",
+              "provider": "Tool",
+              "method": "listTools"
+            },
+            "isError": false,
+            "content": [
+              {
+                "type": "text",
+                "text": "{\n  \"platform\": \"host\",\n  \"provider\": \"Tool\",\n  \"method\": \"listTools\",\n  \"data\": {\n    \"tools\": [\n      {\n        \"name\": \"job_output\",\n        \"description\": \"Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"wait\": {\n              \"type\": \"boolean\",\n              \"description\": \"Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive.\"\n            },\n            \"timeout_ms\": {\n              \"type\": \"number\",\n              \"description\": \"Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"job_list\",\n        \"description\": \"List your background jobs (running and finished) with their ids, kinds, and statuses.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"job_kill\",\n        \"description\": \"Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"job_id\": {\n              \"type\": \"string\",\n              \"description\": \"Job id returned by the tool that started the background work.\"\n            },\n            \"reason\": {\n              \"type\": \"string\",\n              \"description\": \"Optional short reason, recorded in the log and forwarded to the job.\"\n            }\n          },\n          \"required\": [\n            \"job_id\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_list\",\n        \"description\": \"List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {}\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_query\",\n        \"description\": \"Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate the compact signature directory, then query the exact service or event for its structured contract and referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its complete registration contract and props.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"platform\": {\n              \"type\": \"string\",\n              \"description\": \"Runtime platform that owns the Provider.\",\n              \"enum\": [\n                \"host\",\n                \"client\"\n              ]\n            },\n            \"provider\": {\n              \"type\": \"string\",\n              \"description\": \"Exact Provider ID returned by cordis_inspect_list.\"\n            },\n            \"method\": {\n              \"type\": \"string\",\n              \"description\": \"Exact method name declared by the Provider manifest.\"\n            },\n            \"input\": {\n              \"description\": \"Optional query input; it must satisfy the method input schema.\"\n            }\n          },\n          \"required\": [\n            \"platform\",\n            \"provider\",\n            \"method\"\n          ]\n        }\n      },\n      {\n        \"name\": \"cordis_inspect_self\",\n        \"description\": \"Inspect dynamic Cordis objects owned by the current Session at increasing levels of detail. With no IDs, list only Plugin summaries. With pluginId alone, return version pointers, the latest Run, and every Package summary. Only pluginId plus packageId returns that immutable Package's Host/Client source and runtime diagnostics. packageId cannot be supplied alone. Query an exact Package before handling @pluginId, repairing a recorded runtime failure. This Tool is read-only: it neither executes code nor changes version pointers.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"pluginId\": {\n              \"type\": \"string\",\n              \"description\": \"Existing session-owned Plugin ID or an explicit @pluginId reference; omit it to list every current Plugin.\"\n            },\n            \"packageId\": {\n              \"type\": \"string\",\n              \"description\": \"Exact immutable Package ID owned by pluginId; when specified, source and diagnostics are returned.\"\n            }\n          }\n        }\n      },\n      {\n        \"name\": \"present\",\n        \"description\": \"Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"files\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"object\",\n                \"additionalProperties\": false,\n                \"properties\": {\n                  \"path\": {\n                    \"type\": \"string\",\n                    \"description\": \"Path of an existing regular file. Relative paths use the Session working directory.\"\n                  },\n                  \"description\": {\n                    \"type\": \"string\",\n                    \"description\": \"Brief description for the user.\"\n                  }\n                },\n                \"required\": [\n                  \"path\"\n                ]\n              }\n            }\n          },\n          \"required\": [\n            \"files\"\n          ]\n        }\n      },\n      {\n        \"name\": \"subagent\",\n        \"description\": \"Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Give it a complete, standalone prompt: it does not see this conversation. This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"A short (3-5 word) description of the delegated task, for display.\"\n            },\n            \"prompt\": {\n              \"type\": \"string\",\n              \"description\": \"The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs.\"\n            },\n            \"run_in_background\": {\n              \"type\": \"boolean\",\n              \"description\": \"Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill.\"\n            }\n          },\n          \"required\": [\n            \"description\",\n            \"prompt\"\n          ]\n        }\n      },\n      {\n        \"name\": \"workflow\",\n        \"description\": \"Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.\\n\\nThe workflow's identity rides the `meta` parameter as JSON: required `name` (short kebab-case) and `description` strings, optional `whenToUse` string and `phases` array (`{title, detail?, provider?, model?}`). The `script` parameter is the plain JavaScript body ONLY (NOT TypeScript, and NO `export const meta` statement — meta is a parameter, not code), running with top-level await; end with `return <value>` — the value must be JSON-serializable and is this tool's result.\\n\\nScript-body hooks:\\n- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf — no pattern/format/numeric bounds) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides (either may be provided alone). Anything else (`effort`/`isolation`/`agentType`) is rejected loudly.\\n- `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. An ordinary stage throw drops that ITEM to `null` and skips its remaining stages.\\n- `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.\\n- `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.\\n\\nMisused hooks (bad arguments, unknown options, unsupported schemas, tripped caps) throw errors that ALWAYS kill the script — they never dissolve into a per-item `null`.\\n\\nConstraints: concurrency and total-agent caps apply; no filesystem, network, timers, or Node.js APIs are provided — the agents do the work, the script only coordinates them. The run executes in the foreground: this call returns when the whole script finishes.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"script\": {\n              \"type\": \"string\",\n              \"description\": \"The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`).\"\n            },\n            \"meta\": {\n              \"type\": \"object\",\n              \"description\": \"The workflow identity block (plain JSON — never code).\",\n              \"additionalProperties\": true,\n              \"properties\": {\n                \"name\": {\n                  \"type\": \"string\",\n                  \"description\": \"Short kebab-case workflow name.\"\n                },\n                \"description\": {\n                  \"type\": \"string\",\n                  \"description\": \"One-line description of what the workflow does.\"\n                },\n                \"whenToUse\": {\n                  \"type\": \"string\",\n                  \"description\": \"Optional guidance on when this workflow applies.\"\n                },\n                \"phases\": {\n                  \"type\": \"array\",\n                  \"description\": \"Optional phase declarations matched by phase() calls.\",\n                  \"items\": {\n                    \"type\": \"object\",\n                    \"additionalProperties\": true,\n                    \"properties\": {\n                      \"title\": {\n                        \"type\": \"string\",\n                        \"description\": \"The phase title phase() calls match by exact string.\"\n                      },\n                      \"detail\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional one-line description of the phase.\"\n                      },\n                      \"provider\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional provider override this phase is expected to use.\"\n                      },\n                      \"model\": {\n                        \"type\": \"string\",\n                        \"description\": \"Optional model override this phase is expected to use.\"\n                      }\n                    },\n                    \"required\": [\n                      \"title\"\n                    ]\n                  }\n                }\n              },\n              \"required\": [\n                \"name\",\n                \"description\"\n              ]\n            },\n            \"args\": {\n              \"type\": \"object\",\n              \"description\": \"Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\\\"files\\\": [...]}).\",\n              \"additionalProperties\": true\n            }\n          },\n          \"required\": [\n            \"script\",\n            \"meta\"\n          ]\n        }\n      },\n      {\n        \"name\": \"run_code\",\n        \"description\": \"Execute a TypeScript program against the available tools. Takes two required arguments: `code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work), and `description`, a short summary of what the program does. Call tools as `await tools.name(args)` per the declarations in the system prompt. Only what you print or return is program output — curate it. Image-bearing subtool results are attached after the run. Each call runs in a fresh Node process. Node APIs are available through await import(...). Relative paths use the supplied working directory; process.env starts empty. Direct filesystem access follows this execution's sandbox policy. The working directory is the Session's current directory. A sandbox escalation approves this complete program for one execution only. Nested tools retain their own policies and approvals. Request wider access only after evidence of a denial. Earlier effects may already have completed: inspect them before explicitly retrying. Programs are never replayed automatically.\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"code\": {\n              \"type\": \"string\",\n              \"description\": \"The program: the body of an async TypeScript function.\"\n            },\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"Clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \\\"Count TODO markers across packages\\\"; \\\"Read failing test and its fixture\\\"; \\\"Rename config key in every cordis.yml\\\".\"\n            },\n            \"timeoutMs\": {\n              \"type\": \"number\",\n              \"description\": \"Positive elapsed-time budget in milliseconds, including nested tool and approval waits. Default 120000; capped at 600000. Zero does not disable the deadline.\"\n            },\n            \"sandbox_permissions\": {\n              \"type\": \"string\",\n              \"description\": \"Wider sandbox mode for this complete program execution; requires justification and approval.\",\n              \"enum\": [\n                \"workspace-write\",\n                \"danger-full-access\"\n              ]\n            },\n            \"justification\": {\n              \"type\": \"string\",\n              \"description\": \"Reason this complete program needs wider access, shown to the user for approval.\"\n            }\n          },\n          \"required\": [\n            \"code\",\n            \"description\"\n          ]\n        }\n      }\n    ]\n  }\n}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "method": "session.status",
+      "payload": {
+        "sessionId": "{{agent-2}}",
+        "status": "running"
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/result",
+          "seq": 24,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 2,
+            "message": {
+              "source": {
+                "kind": "tool",
+                "callId": "advanced-code"
+              },
+              "content": [
+                {
+                  "type": "tool-result",
+                  "toolCallId": "advanced-code",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "{\n  \"value\": 42,\n  \"tools\": [\n    \"job_output\",\n    \"job_list\",\n    \"job_kill\",\n    \"cordis_inspect_list\",\n    \"cordis_inspect_query\",\n    \"cordis_inspect_self\",\n    \"present\",\n    \"subagent\",\n    \"workflow\",\n    \"run_code\"\n  ]\n}"
+                    }
+                  ],
+                  "isError": false
+                }
+              ],
+              "role": "user",
+              "id": "{{message:7}}"
+            }
+          },
+          "sourceEventSeqs": [
+            21
+          ],
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/end",
+          "seq": 25,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 2
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 26,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 3
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "session-log-deepseek/delivery-accepted",
+          "seq": 27,
+          "time": 0,
+          "data": {
+            "sessionId": "{{parent}}",
+            "sessionFormatVersion": 6,
+            "throughSeq": 26
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "assistant/message",
+          "seq": 28,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 3,
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool-call",
+                  "id": "advanced-direct-child",
+                  "name": "subagent",
+                  "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
+                }
+              ],
+              "source": {
+                "kind": "model",
+                "provider": "deepseek-official",
+                "model": "smoke-model",
+                "replayState": {
+                  "response": {
+                    "kind": "deepseek-messages",
+                    "version": 1,
+                    "model": "smoke-model"
+                  },
+                  "blocks": [
+                    {
+                      "type": "tool-call"
+                    }
+                  ]
+                }
+              },
+              "id": "{{message:8}}"
+            },
+            "usage": {
+              "inputTokens": 3,
+              "outputTokens": 3,
+              "totalTokens": 6
+            },
+            "stream": [
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-start",
+                  "index": 0,
+                  "blockType": "tool-call"
+                }
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-direct-child",
+                "name": "subagent",
+                "args": [
+                  ""
+                ]
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-direct-child",
+                "args": [
+                  "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
+                ]
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-end",
+                  "index": 0,
+                  "block": {
+                    "type": "tool-call",
+                    "id": "advanced-direct-child",
+                    "name": "subagent",
+                    "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "usage",
+                  "usage": {
+                    "inputTokens": 3,
+                    "outputTokens": 3,
+                    "totalTokens": 6
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "finish",
+                  "reason": {
+                    "kind": "tool-calls"
+                  },
+                  "replayState": {
+                    "response": {
+                      "kind": "deepseek-messages",
+                      "version": 1,
+                      "model": "smoke-model"
+                    },
+                    "blocks": [
+                      {
+                        "type": "tool-call"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/call",
+          "seq": 29,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 3,
+            "callId": "advanced-direct-child",
+            "name": "subagent",
+            "arguments": "{\"description\": \"Check direct child\", \"prompt\": \"Reply with exactly DIRECT_CHILD_OK and nothing else.\", \"run_in_background\": false}"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "subagent/catalog",
+          "seq": 30,
+          "time": 0,
+          "data": {
+            "version": 0,
+            "childId": "{{agent-1}}",
+            "childCreatedAt": 0,
+            "mode": "one-shot",
+            "label": "Check direct child"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/result",
+          "seq": 31,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 3,
+            "message": {
+              "source": {
+                "kind": "tool",
+                "callId": "advanced-direct-child"
+              },
+              "content": [
+                {
+                  "type": "tool-result",
+                  "toolCallId": "advanced-direct-child",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "DIRECT_CHILD_OK"
+                    }
+                  ],
+                  "isError": false
+                }
+              ],
+              "role": "user",
+              "id": "{{message:9}}"
+            }
+          },
+          "sourceEventSeqs": [
+            29
+          ],
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/end",
+          "seq": 32,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 3
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "step/start",
+          "seq": 33,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 4
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "session-log-deepseek/delivery-accepted",
+          "seq": 34,
+          "time": 0,
+          "data": {
+            "sessionId": "{{parent}}",
+            "sessionFormatVersion": 6,
+            "throughSeq": 33
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "assistant/message",
+          "seq": 35,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 4,
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool-call",
+                  "id": "advanced-workflow",
+                  "name": "workflow",
+                  "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
+                }
+              ],
+              "source": {
+                "kind": "model",
+                "provider": "deepseek-official",
+                "model": "smoke-model",
+                "replayState": {
+                  "response": {
+                    "kind": "deepseek-messages",
+                    "version": 1,
+                    "model": "smoke-model"
+                  },
+                  "blocks": [
+                    {
+                      "type": "tool-call"
+                    }
+                  ]
+                }
+              },
+              "id": "{{message:10}}"
+            },
+            "usage": {
+              "inputTokens": 3,
+              "outputTokens": 3,
+              "totalTokens": 6
+            },
+            "stream": [
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-start",
+                  "index": 0,
+                  "blockType": "tool-call"
+                }
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-workflow",
+                "name": "workflow",
+                "args": [
+                  ""
+                ]
+              },
+              {
+                "type": "tool-call-chunks",
+                "time0": 0,
+                "index": 0,
+                "dt": [],
+                "id": "advanced-workflow",
+                "args": [
+                  "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
+                ]
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "block-end",
+                  "index": 0,
+                  "block": {
+                    "type": "tool-call",
+                    "id": "advanced-workflow",
+                    "name": "workflow",
+                    "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "usage",
+                  "usage": {
+                    "inputTokens": 3,
+                    "outputTokens": 3,
+                    "totalTokens": 6
+                  }
+                }
+              },
+              {
+                "type": "chunk",
+                "time": 0,
+                "chunk": {
+                  "type": "finish",
+                  "reason": {
+                    "kind": "tool-calls"
+                  },
+                  "replayState": {
+                    "response": {
+                      "kind": "deepseek-messages",
+                      "version": 1,
+                      "model": "smoke-model"
+                    },
+                    "blocks": [
+                      {
+                        "type": "tool-call"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool/call",
+          "seq": 36,
+          "time": 0,
+          "data": {
+            "turn": 1,
+            "step": 4,
+            "callId": "advanced-workflow",
+            "name": "workflow",
+            "arguments": "{\"script\": \"phase('Delegate')\\nconst reply = await agent('Reply with exactly WORKFLOW_CHILD_OK and nothing else.', { label: 'workflow-child' })\\nreturn { reply }\", \"meta\": {\"name\": \"advanced-exe-snapshot\", \"description\": \"exercise one packaged workflow child\"}}"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool-workflow/run-start",
+          "seq": 37,
+          "time": 0,
+          "data": {
+            "runId": "{{workflow-run}}",
+            "name": "advanced-exe-snapshot"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "subagent/catalog",
+          "seq": 38,
+          "time": 0,
+          "data": {
+            "version": 0,
+            "childId": "{{agent-2}}",
+            "childCreatedAt": 0,
+            "mode": "one-shot"
+          }
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{parent}}",
+        "event": {
+          "type": "tool-workflow/agent-start",
+          "seq": 39,
+          "time": 0,
+          "data": {
+            "runId": "{{workflow-run}}",
+            "seq": 1,
+            "label": "workflow-child",
+            "phase": "Delegate",
+            "childId": "{{agent-2}}"
           }
         }
       }
