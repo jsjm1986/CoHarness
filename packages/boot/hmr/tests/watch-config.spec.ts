@@ -118,7 +118,9 @@ describe('HMR exact config paths', () => {
     try {
       // Polling keeps add/change/unlink delivery bounded on a loaded shared
       // runner; the native-event lane stays under 'registered during a transaction'.
-      await watchConfig(ctx, filename, { usePolling: true }, () => {
+      // Single-shot writes need no stabilization sampling, whose repeated
+      // stats can starve on the shared UV threadpool under the coverage lane.
+      await watchConfig(ctx, filename, { usePolling: true, awaitWriteFinish: false }, () => {
         try {
           observed.push(readFileSync(filename, 'utf8'))
         } catch (error) {
@@ -149,8 +151,10 @@ describe('HMR exact config paths', () => {
       // A not-yet-existing parent forces the watcher to notice the new
       // directory, attach to it, and then observe the file. Polling makes the
       // discovery a bounded scan instead of waiting on FSEvents latency, which
-      // a loaded shared runner can delay past any fixed budget.
-      await watchConfig(ctx, filename, { usePolling: true }, () => {
+      // a loaded shared runner can delay past any fixed budget. The write is
+      // single-shot, so stabilization sampling is off: its repeated stats can
+      // starve on the shared UV threadpool under the coverage lane.
+      await watchConfig(ctx, filename, { usePolling: true, awaitWriteFinish: false }, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })
       mkdirSync(dir)
