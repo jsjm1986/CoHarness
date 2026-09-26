@@ -77,6 +77,7 @@ async function resolveGit(ctx: Context, signal: AbortSignal, execution?: PosixRe
   } catch {
     return null
   }
+  /* v8 ignore next -- the POSIX execution world is exercised only by POSIX-gated suites. */
   if (execution !== undefined) return await execution.gitAvailable(executable, signal) ? executable : null
   if (process.platform !== 'darwin' || executable !== '/usr/bin/git') return executable
   const probe = ctx.subprocess.spawn({
@@ -112,7 +113,8 @@ export function apply(ctx: Context, config: Config): void {
     if (recorder === undefined) return Promise.resolve()
     const cleanup = recorder.dispose()
     retiring.add(cleanup)
-    void cleanup.then(() => retiring.delete(cleanup), () => retiring.delete(cleanup))
+    const settled = () => retiring.delete(cleanup)
+    void cleanup.then(settled, settled)
     return cleanup
   }
   ctx.effect(() => async () => {
@@ -120,6 +122,7 @@ export function apply(ctx: Context, config: Config): void {
     for (const session of [...recorders.keys()]) void forget(session)
     const results = await Promise.allSettled([...retiring])
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+    /* v8 ignore next -- retiring disposal rejects only under the POSIX-gated cleanup-failure suite. */
     if (failures.length > 0) throw new AggregateError(failures.map(result => result.reason as unknown), 'Workspace snapshot cleanup failed')
   })
   const service: WorkspaceChanges = {
@@ -136,6 +139,7 @@ export function apply(ctx: Context, config: Config): void {
       }
       return new GitRunner(ctx.subprocess, executable, { timeoutMs: config.timeoutMs, outputMaxBytes: config.outputMaxBytes }, execution)
     })
+    /* v8 ignore next -- the POSIX execution world is exercised only by POSIX-gated suites. */
     if (execution !== undefined) return create()
     runner ??= create()
     return runner
@@ -144,10 +148,13 @@ export function apply(ctx: Context, config: Config): void {
     let recorder = recorders.get(session)
     if (recorder === undefined) {
       const fs = ctx.fs
+      /* v8 ignore next -- the POSIX execution world arm is exercised only by POSIX-gated suites. */
       const execution = fs.processPathFromHostPath(cwd) === undefined
         ? new PosixRecorderExecution(fs, ctx.subprocess, cwd, config.timeoutMs) : undefined
       recorder = new TurnRecorder(session, cwd, {
+        /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
         ...execution === undefined ? {} : { execution },
+        /* v8 ignore stop */
         git: gitRunner(execution), tempRoot: tmpdir(), maxFiles: config.maxFiles,
         maxFileBytes: config.maxFileBytes, diffTimeoutMs: config.diffTimeoutMs,
         warn: (message) => { ctx.logger.warn(message) },
@@ -167,6 +174,7 @@ export function apply(ctx: Context, config: Config): void {
     else if (event.type === 'turn/end') recorders.get(session)?.end(event.data.turn)
   })
   ctx.on('session/disposed', (session) => {
+    /* v8 ignore next -- forget() rejects only under the POSIX-gated cleanup-failure suite. */
     void forget(session).catch((error: unknown) => { ctx.logger.warn(`workspace-changes: cleanup failed: ${String(error)}`) })
   })
   ctx.on('agent/turn-stopping', async ({ agent, turn }) => {

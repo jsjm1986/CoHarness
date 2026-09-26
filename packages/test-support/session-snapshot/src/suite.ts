@@ -333,6 +333,7 @@ export function claimSharedSnapshot(
 export async function writeOwnedHeaderSnapshot(path: string, content: string): Promise<void> {
   let borrowed = false
   try { borrowed = (await lstat(path)).isSymbolicLink() } catch (error) {
+    /* v8 ignore next -- Windows reports a lookup through a file as ENOENT, so the POSIX lanes own this rethrow. */
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
   if (borrowed) {

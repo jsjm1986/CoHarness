@@ -81,6 +81,13 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
     ? ['packages/subprocess/subprocess-local/src/linux-execve.ts']
     : []
 
+  // POSIX execution world: the remote-target recorder speaks POSIX shell on
+  // the execution side, and its suites gate on process.platform, so the
+  // Windows coverage lane can never cover the source.
+  const posixCoverageExclusions = platform === 'win32'
+    ? ['packages/deliverables/workspace-changes/src/execution.ts']
+    : []
+
   // pwsh-local's run/start/lifecycle suites self-skip without a real pwsh
   // (executor.spec.ts hasPwsh), leaving this file
   // far below per-file 100% on pwsh-less hosts; the exemption keeps those hosts
@@ -207,6 +214,7 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       ...windowsOnlyCoverageExclusions,
       ...windowsRunnerCoverageExclusions,
       ...linuxOnlyCoverageExclusions,
+      ...posixCoverageExclusions,
       ...pwshCoverageExclusions,
     ],
     excludedTests: windowsUnsupportedTests,

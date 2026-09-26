@@ -139,12 +139,15 @@ export class TurnRecorder {
     this.state = state
     void this.enqueue(async (signal) => {
       try {
-        this.paths ??= this.env.execution === undefined
-          ? {
-            cwd: await realpath(this.cwd), home: await canonicalPath(homedir()),
-            temporaryRoots: await temporaryRoots(), scratchRoot: this.env.tempRoot,
-          }
-          : await this.env.execution.paths(signal)
+        if (this.paths === undefined) {
+          /* v8 ignore else -- the POSIX execution world is exercised only by POSIX-gated suites. */
+          if (this.env.execution === undefined) {
+            this.paths = {
+              cwd: await realpath(this.cwd), home: await canonicalPath(homedir()),
+              temporaryRoots: await temporaryRoots(), scratchRoot: this.env.tempRoot,
+            }
+          } else this.paths = await this.env.execution.paths(signal)
+        }
         const repository = await this.locate(this.paths, signal)
         if (repository === null) return
         const tree = await snapshotTree(repository.git, repository.workspace, signal)
@@ -171,10 +174,10 @@ export class TurnRecorder {
     void this.enqueue(async (signal) => {
       const paths = this.paths
       if (paths === undefined) return
-      const canonical = this.env.execution === undefined
-        ? canonicalPath(resolve(paths.cwd, path))
-        : this.env.execution.canonical(path, signal)
-      const absolute = await canonical
+      let absolute: string
+      /* v8 ignore else -- the POSIX execution world is exercised only by POSIX-gated suites. */
+      if (this.env.execution === undefined) absolute = await canonicalPath(resolve(paths.cwd, path))
+      else absolute = await this.env.execution.canonical(path, signal)
       if (state.captures.has(absolute)) return
       const capture = await this.captureFile(absolute, signal)
       if (capture !== undefined) state.captures.set(absolute, capture)
@@ -262,6 +265,7 @@ export class TurnRecorder {
     this.records.clear()
     await this.chain
     try {
+      /* v8 ignore next -- execution scratch exists only under POSIX-gated suites. */
       if (this.executionScratch !== undefined) await this.executionScratch.storage.remove(await this.executionScratch.directory)
     } finally {
       if (this.scratch !== undefined) await rm(await this.scratch, { recursive: true, force: true })
@@ -294,15 +298,17 @@ export class TurnRecorder {
 
   private snapshotDir(scratchRoot: string, signal: AbortSignal): Promise<string> {
     if (this.env.execution === undefined) return this.scratchDir()
+    /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
     this.executionScratch ??= { storage: this.env.execution, directory: this.env.execution.temporary(join(scratchRoot, 'dsh-workspace-changes-'), signal) }
     return this.executionScratch.directory
+    /* v8 ignore stop */
   }
 
   private async captureFile(absolute: string, signal: AbortSignal): Promise<Capture | undefined> {
     const directory = join(await this.scratchDir(), 'captures')
-    return this.env.execution === undefined
-      ? captureFile(absolute, directory, this.env.maxFileBytes)
-      : this.env.execution.capture(absolute, directory, this.env.maxFileBytes, signal)
+    /* v8 ignore else -- the POSIX execution world is exercised only by POSIX-gated suites. */
+    if (this.env.execution === undefined) return captureFile(absolute, directory, this.env.maxFileBytes)
+    else return this.env.execution.capture(absolute, directory, this.env.maxFileBytes, signal)
   }
 
   /** The repository enclosing the working directory, located once; null keeps retrying each turn. */

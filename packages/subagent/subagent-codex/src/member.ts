@@ -131,6 +131,7 @@ export function recoverCodexThread(
   try {
     raw = readFileSync(path, 'utf8')
   } catch {
+    /* v8 ignore next -- an unreadable rollout needs POSIX mode bits; POSIX-gated suites own this arm. */
     return { kind: 'unknown' }
   }
   const entries: CodexRolloutEntry[] = []
