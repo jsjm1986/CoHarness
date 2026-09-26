@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
@@ -376,11 +376,19 @@ describe('persist', () => {
 })
 
 describe('watch', () => {
+  beforeEach(() => {
+    // Native fs-event delivery on loaded shared runners can outlast the 5s
+    // waits below; chokidar's documented process override converts discovery
+    // to a deterministic scan without touching the tracked provider source.
+    vi.stubEnv('CHOKIDAR_USEPOLLING', '1')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
   it('publishes an external edit to registered scopes', async () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
     await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
+    const ctx = await boot({ path, debounceMs: 10 })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
     expect(scope.get().theme).toBe('light')
 
@@ -394,7 +402,7 @@ describe('watch', () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
     await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
+    const ctx = await boot({ path, debounceMs: 10 })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
 
     // Replace the external edit atomically so this case observes one complete
@@ -414,7 +422,7 @@ describe('watch', () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
     await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
+    const ctx = await boot({ path, debounceMs: 10 })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
 
     await rm(path)
@@ -426,7 +434,7 @@ describe('watch', () => {
   it('does not republish its own persisted write', async () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
-    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
+    const ctx = await boot({ path, debounceMs: 10 })
     const events: unknown[] = []
     ctx.on('settings/updated', (ns, _next, _prev, source) => {
       events.push({ ns, source })
