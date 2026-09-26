@@ -157,6 +157,30 @@ describe('session snapshot identity redaction', () => {
     expect(result).toContain(proseUuid)
   })
 
+  it('leaves a feedback acknowledgement that names no anonymous principal unchanged', () => {
+    const source = [
+      { type: 'command/run', data: { commandId: 'feedback-1', name: 'feedback' } },
+      { type: 'command/done', data: { commandId: 'feedback-1', text: 'Feedback failed; nothing recorded.' } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const [result] = redactSessionSnapshotIds([source])
+    expect(result).toContain('Feedback failed; nothing recorded.')
+  })
+
+  it('claims rpc parameter ids and compaction ids while ignoring non-volatile field values', () => {
+    const compactionId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const paramId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const source = [
+      { type: 'example', data: { sessionId: 'stable-name', messageId: 'plain-name' } },
+      { type: 'example', data: { params: { id: paramId, other: 'x' } } },
+      { type: 'compaction/start', data: { compactionId } },
+    ].map(record => JSON.stringify(record)).join('\n')
+    const [redacted] = redactSessionSnapshotIds([source])
+    expect(redacted).toContain('"sessionId":"stable-name"')
+    expect(redacted).toContain('"messageId":"plain-name"')
+    expect(redacted).toContain('"id":"{{id:1}}"')
+    expect(redacted).toContain('"compactionId":"{{compaction:1}}"')
+  })
+
   it('collapses branded goal-<uuid> compounds across state and literal payloads', () => {
     const goalUuid = 'aaaaaaaa-0000-4000-8000-00000000000a'
     const goalId = `goal-${goalUuid}`

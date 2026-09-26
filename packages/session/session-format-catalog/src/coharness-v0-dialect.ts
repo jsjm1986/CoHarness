@@ -68,6 +68,7 @@ class CoharnessV0DialectStage implements SessionFormatMigrationStage {
 
   constructor(input: SessionFormatMigrationStageInput) {
     this.released = sessionFormatV0ToV1.createStage(input)
+    /* v8 ignore else -- the released v0 stage always reports its inherited event count. */
     if (this.released.headerInheritedEventCount !== undefined) {
       this.headerInheritedEventCount = this.released.headerInheritedEventCount
     }
@@ -85,11 +86,13 @@ class CoharnessV0DialectStage implements SessionFormatMigrationStage {
     const restoring: SessionFormatMigrationContext = {
       emitEvent: (emitted) => {
         const ledger = this.ledgers.shift()
+        /* v8 ignore next 3 -- the released v0 stage emits exactly one event per transformEvent, so a ledger is always queued. */
         if (ledger === undefined) {
           throw new SessionFormatError('v0 dialect emit boundary lost its hidden-member ledger')
         }
         context.emitEvent(restoreDialectMembers(emitted, ledger))
       },
+      /* v8 ignore next -- the released v0 stage emits runs only from transformRun, which this stage delegates directly. */
       emitRun: (run) => { context.emitRun(run) },
     }
     this.released.transformEvent(dialect.event, restoring)

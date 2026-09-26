@@ -47,6 +47,15 @@ describe('logical Session format catalog', () => {
       .toMatchObject({ status: 'malformed' })
   })
 
+  it('carries an sshTarget binding through the logical header read', () => {
+    const result = sessionLogicalFormatCatalog.readHeader({
+      version: 6, id: 'ssh', createdAt: 1, isSeeded: false, delegationDepth: 0, sshTarget: 42,
+    })
+    expect(result).toMatchObject({ status: 'current', storedVersion: 6, targetVersion: 6 })
+    if (result.status !== 'current') throw new Error('expected current header')
+    expect(result.header.sshTarget).toBe(42)
+  })
+
   it('keeps source artifacts detached and upgrades the header only', () => {
     const events: SessionFormatEvent[] = [{ type: 'turn/start', seq: 0, time: 3, data: { turn: 1 } }]
     const migrated = migrate({ version: 1, id: 'artifact', createdAt: 2 }, events)

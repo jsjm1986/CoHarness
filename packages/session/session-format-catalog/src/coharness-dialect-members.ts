@@ -108,6 +108,7 @@ function restoreSource(
   source: unknown,
   removed: RemovedSourceMembers,
 ): unknown {
+  /* v8 ignore next -- a member is ledgered only for a record source, and the emitted carrier re-emits that record. */
   if (!isRecord(source)) return source
   let restored = source
   if (removed.documents !== undefined && restored['documents'] === undefined) {
@@ -154,8 +155,10 @@ export function hideDialectMembers(raw: SessionFormatEvent): DialectEvent {
     event = { ...event, data: { ...data, version: 3 } }
   }
 
+  /* v8 ignore start -- non-record data returned at intake, and the rewrites above only replace record data. */
   const eventData = isRecord(event.data) ? event.data : undefined
   if (eventData === undefined) return { event, presetOrigin, sourceMembers }
+  /* v8 ignore stop */
 
   const direct = hideSourceMembers(eventData['source'])
   if (direct !== undefined) {
@@ -187,6 +190,7 @@ export function hideDialectMembers(raw: SessionFormatEvent): DialectEvent {
       patched[index] = { ...item, source: hidden.source }
     }
     if (patched !== undefined) {
+      /* v8 ignore next -- event.data is always a record here; the cond-expr only re-narrows the type after reassignment. */
       const current = isRecord(event.data) ? event.data : eventData
       event = { ...event, data: { ...current, [field]: patched } }
     }
@@ -205,12 +209,14 @@ export function hideDialectMembers(raw: SessionFormatEvent): DialectEvent {
  */
 export function restoreDialectMembers(emitted: SessionFormatEvent, dialect: DialectEvent): SessionFormatEvent {
   if (dialect.presetOrigin === undefined && dialect.sourceMembers.length === 0) return emitted
+  /* v8 ignore start -- every ledgered event carried record data, and the released edge re-emits a record for the admitted type. */
   const data = isRecord(emitted.data) ? { ...emitted.data } : undefined
   if (data === undefined) {
     /* The released stage emits a record payload for every admitted type; a
      * non-record emission means the source was never ours to restore. */
     return emitted
   }
+  /* v8 ignore stop */
   if (dialect.presetOrigin !== undefined && emitted.type === 'permission/preset') {
     data['origin'] = dialect.presetOrigin
   }
@@ -221,8 +227,10 @@ export function restoreDialectMembers(emitted: SessionFormatEvent, dialect: Dial
       continue
     }
     const list = data[member.field]
+    /* v8 ignore next -- the released edge re-emits the same list the member was hidden from, so the slot always exists. */
     if (!Array.isArray(list) || member.index === undefined || member.index >= list.length) continue
     const item: unknown = list[member.index]
+    /* v8 ignore next -- emitted list items keep the record shape whose source member was hidden. */
     if (!isRecord(item)) continue
     const patched = list.slice()
     patched[member.index] = { ...item, source: restoreSource(item['source'], removed) as SessionFormatJsonValue }

@@ -152,6 +152,8 @@ function staleRefreshFixtures(dir: string): void {
   writeFileSync(join(dir, 'pin-turn', 'tool-schemas.expected.json'), '{"initial":[{"name":"stale"}],"changes":[]}\n')
   writeFileSync(join(dir, 'plain-turn', 'tool-schemas.1.expected.json'), '{"initial":[{"name":"stale-child"}],"changes":[]}\n')
   writeFileSync(join(dir, 'plain-turn', 'system-prompt.1.expected.md'), 'STALE CHILD PROMPT\n')
+  // Refresh may bootstrap an absent expected-workspace tree but never rewrite a committed one.
+  rmSync(join(dir, 'plain-turn', 'workspace.expected'), { recursive: true, force: true })
 
   const plainBehaviorFile = join(dir, 'plain-turn', 'behavior.json')
   const plainBehavior = JSON.parse(readFileSync(plainBehaviorFile, 'utf8')) as Record<string, unknown>
@@ -1003,6 +1005,33 @@ describe('stabilizeFixtureMessageIds', () => {
     expect((records[8]?.data as { id: string }).id).toBe('not-a-uuid')
   })
 
+  it('rewrites a complete message embedded in a title request', () => {
+    const freshId = '11111111-1111-4111-8111-111111111111'
+    const existingId = '22222222-2222-4222-8222-222222222222'
+    const log = (id: string): string => [
+      JSON.stringify({ type: 'session', id: 'same', cwd: '{{cwd}}' }),
+      JSON.stringify({
+        type: 'session/title-llm-request',
+        data: {
+          titleProvider: 'fake',
+          messages: [{
+            id,
+            role: 'user',
+            content: [{ type: 'text', text: 'same title prompt' }],
+            source: { kind: 'plugin', plugin: 'dsh-session-title-llm' },
+          }],
+        },
+      }),
+      '',
+    ].join('\n')
+
+    const stable = stabilizeFixtureMessageIds([log(freshId)], [log(existingId)])[0] as string
+    const record = JSON.parse(stable.trim().split('\n')[1] as string) as {
+      data: { messages: { id: string }[] }
+    }
+    expect(record.data.messages[0]?.id).toBe(existingId)
+  })
+
   it('matches cwd-bearing messages only after the fresh log reaches fixture-ready form', () => {
     const freshId = '11111111-1111-4111-8111-111111111111'
     const existingId = '22222222-2222-4222-8222-222222222222'
@@ -1585,6 +1614,47 @@ describe('stabilizeRefreshLog', () => {
       .map(line => (JSON.parse(line) as { data: { id: string } }).data.id)
     expect(outputIds).toEqual(freshNames.map(name => ids[name as keyof typeof ids]))
   })
+
+  it('keeps fresh spellings when one fresh cwd spelling would map to two existing spellings', () => {
+    const fresh = [
+      '{"type":"session","id":"same","createdAt":200,"cwd":"/fresh"}',
+      '{"type":"tool/result","data":{"p":"/fresh"}}',
+      '{"type":"tool/result","data":{"p":"/fresh"}}',
+      '',
+    ].join('\n')
+    const existing = [
+      '{"type":"session","id":"same","createdAt":100,"cwd":"/old"}',
+      '{"type":"tool/result","data":{"p":"/old"}}',
+      '{"type":"tool/result","data":{"p":"/private/old"}}',
+      '',
+    ].join('\n')
+
+    expect(stabilize(fresh, existing)).toBe([
+      '{"type":"session","id":"same","createdAt":100,"cwd":"/old"}',
+      '{"type":"tool/result","data":{"p":"/fresh"}}',
+      '{"type":"tool/result","data":{"p":"/fresh"}}',
+      '',
+    ].join('\n'))
+  })
+
+  it('keeps fresh spellings when two fresh cwd spellings would map to one existing spelling', () => {
+    const fresh = [
+      '{"type":"session","id":"same","createdAt":200,"cwd":"/fresh"}',
+      '{"type":"tool/result","data":{"p":"/private/fresh"}}',
+      '',
+    ].join('\n')
+    const existing = [
+      '{"type":"session","id":"same","createdAt":100,"cwd":"/old"}',
+      '{"type":"tool/result","data":{"p":"/old"}}',
+      '',
+    ].join('\n')
+
+    expect(stabilize(fresh, existing)).toBe([
+      '{"type":"session","id":"same","createdAt":100,"cwd":"/old"}',
+      '{"type":"tool/result","data":{"p":"/private/fresh"}}',
+      '',
+    ].join('\n'))
+  })
 })
 
 it('refreshes owned headers but refuses to overwrite a borrowed header', async () => {
@@ -1598,5 +1668,14 @@ it('refreshes owned headers but refuses to overwrite a borrowed header', async (
     expect(readFileSync(owner, 'utf8')).toBe('first\n')
     await writeOwnedHeaderSnapshot(owner, 'reviewed\n')
     expect(readFileSync(alias, 'utf8')).toBe('reviewed\n')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+it('rethrows a header stat failure other than a missing file', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'snapshot-header-stat-'))
+  try {
+    const file = join(root, 'owner.json')
+    writeFileSync(file, 'x')
+    await expect(writeOwnedHeaderSnapshot(join(file, 'child.json'), 'x\n')).rejects.toThrow('ENOTDIR')
   } finally { rmSync(root, { recursive: true, force: true }) }
 })

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { sessionLogicalFormatCatalog } from '../src/index.ts'
+import { coharnessV0ToV1Dialect } from '../src/coharness-v0-dialect.ts'
+import { coharnessV1ToV2Dialect } from '../src/coharness-v1-dialect.ts'
 import { coharnessV2ToV3Dialect } from '../src/coharness-v2-dialect.ts'
-import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
+import type { SessionFormatEvent, SessionFormatEventRun, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 
 /** Legacy flat `assistant/message` field carrying the model source record. */
 const LEGACY_ASSISTANT_SOURCE_KEY = ['pro', 'venance'].join('')
@@ -689,6 +691,82 @@ describe('dialect stage run handling', () => {
     expect(stage.finish(context)).toBe(0)
     expect(output.map(item => item.type)).toEqual(['turn/start'])
   })
+
+  it('passes an assistant chunk run through the v0 stage and expands other runs per member event', () => {
+    const sourceHeader = { version: 0, id: 's', createdAt: 1, isSeeded: false, delegationDepth: 0 } as SessionFormatHeader
+    const stage = coharnessV0ToV1Dialect.createStage({
+      sourceHeader,
+      targetHeader: coharnessV0ToV1Dialect.migrateHeader(sourceHeader),
+      sourceInheritedEventCount: 0,
+      sourceKind: 'decoded',
+    })
+    expect(stage.headerInheritedEventCount).toBe(0)
+    const output: SessionFormatEvent[] = []
+    const runs: SessionFormatEventRun[] = []
+    const context = {
+      emitEvent: (value: SessionFormatEvent) => { output.push(value) },
+      emitRun: (run: SessionFormatEventRun) => { runs.push(run) },
+    }
+    const chunkRun = {
+      runType: 'released-assistant-chunks', firstSeq: 0, eventCount: 1,
+      turn: 1, step: 1, lastSeq: 0, lastTime: 1, stream: {},
+      *expand() { yield event('assistant/chunk', 0, {}) },
+    } as unknown as SessionFormatEventRun
+    stage.transformRun(chunkRun, context)
+    expect(runs).toEqual([chunkRun])
+    stage.transformRun({
+      runType: 'test-run', firstSeq: 0, eventCount: 2,
+      *expand() {
+        yield event('turn/start', 0, { turn: 1 })
+        yield event('user/message', 1, { ...USER_MESSAGE, source: DIALECT_USER_SOURCE })
+      },
+    }, context)
+    /* Non-chunk runs expand member-by-member, so each event gets its own
+     * hidden-member ledger and restore on the emit boundary. */
+    expect(output.map(item => item.type)).toEqual(['turn/start', 'user/message'])
+    expect(output[1]?.data).toMatchObject({ source: DIALECT_USER_SOURCE })
+    expect(stage.finish(context)).toBe(0)
+  })
+
+  it('delegates runs on the v1 stage to the released run handling', () => {
+    const sourceHeader = { version: 1, id: 's', createdAt: 1, isSeeded: false, delegationDepth: 0 } as SessionFormatHeader
+    const stage = coharnessV1ToV2Dialect.createStage({
+      sourceHeader,
+      targetHeader: coharnessV1ToV2Dialect.migrateHeader(sourceHeader),
+      sourceInheritedEventCount: 0,
+      sourceKind: 'decoded',
+    })
+    /* The released v1 stage never reports an inherited count. */
+    expect(stage.headerInheritedEventCount).toBeUndefined()
+    const output: SessionFormatEvent[] = []
+    const context = {
+      emitEvent: (value: SessionFormatEvent) => { output.push(value) },
+      emitRun: () => {},
+    }
+    stage.transformRun({
+      runType: 'test-run', firstSeq: 0, eventCount: 1,
+      *expand() { yield event('turn/start', 0, { turn: 1 }) },
+    }, context)
+    expect(output.map(item => item.type)).toEqual(['turn/start'])
+    expect(stage.finish(context)).toBe(0)
+  })
+
+  it('emits a dialect-only event at the v0 stage unchanged', () => {
+    const sourceHeader = { version: 0, id: 's', createdAt: 1, isSeeded: false, delegationDepth: 0 } as SessionFormatHeader
+    const stage = coharnessV0ToV1Dialect.createStage({
+      sourceHeader,
+      targetHeader: coharnessV0ToV1Dialect.migrateHeader(sourceHeader),
+      sourceInheritedEventCount: 0,
+      sourceKind: 'decoded',
+    })
+    const output: SessionFormatEvent[] = []
+    const context = {
+      emitEvent: (value: SessionFormatEvent) => { output.push(value) },
+      emitRun: () => {},
+    }
+    stage.transformEvent(event('userdoc/attached', 0, USERDOC_ATTACHED), context)
+    expect(output).toEqual([event('userdoc/attached', 0, USERDOC_ATTACHED)])
+  })
 })
 
 describe('logical catalog header surface', () => {
@@ -989,9 +1067,9 @@ describe('dialect member admission', () => {
     }
   })
 
-  it('refuses an undeclared permission/preset origin', () => {
+  it.each(['invented', 7] as const)('refuses an undeclared permission/preset origin %j', (origin) => {
     expect(() => migrateVersion(0, turnWithStep([
-      event('permission/preset', 0, { preset: 'workspace-write', origin: 'invented' }),
+      event('permission/preset', 0, { preset: 'workspace-write', origin }),
       event('user/message', 0, USER_MESSAGE),
     ]), {}, 0)).toThrow()
   })
@@ -1036,6 +1114,86 @@ describe('dialect member admission', () => {
       .toMatchObject(DIALECT_USER_SOURCE)
   })
 
+  it('preserves each hidden source member independently on a direct source', () => {
+    const canManageOnly = {
+      kind: 'user',
+      participant: {
+        userId: 1, username: 'admin', displayName: 'admin', role: 'admin',
+        scope: { kind: 'project', projectId: 7, projectName: 'p', mode: 'rw', canManage: true },
+      },
+    }
+    const documentsOnly = {
+      kind: 'user',
+      documents: [{ ref: USERDOC_ATTACHED.ref, representation: { kind: 'path' } }],
+    }
+    const migrated = migrateVersion(0, turnWithStep([
+      event('user/message', 0, { ...USER_MESSAGE, id: 'u-a', source: canManageOnly }),
+      event('user/message', 0, { ...USER_MESSAGE, id: 'u-b', source: documentsOnly }),
+    ]), {}, 0)
+    const sourceOf = (id: string) =>
+      (migrated.events.find(item => (item.data as { id?: string }).id === id)?.data as { source: unknown }).source
+    expect(sourceOf('u-a')).toMatchObject(canManageOnly)
+    expect(sourceOf('u-b')).toMatchObject(documentsOnly)
+  })
+
+  it('leaves non-project participant scopes and absent canManage flags on the released payload', () => {
+    const source = {
+      kind: 'user',
+      documents: [{ ref: USERDOC_ATTACHED.ref, representation: { kind: 'path' } }],
+      participant: {
+        userId: 1, username: 'admin', displayName: 'admin', role: 'admin',
+        scope: { kind: 'project', projectId: 7, projectName: 'p', mode: 'rw' },
+      },
+    }
+    const migrated = migrateVersion(0, turnWithStep([
+      event('user/message', 0, { ...USER_MESSAGE, source }),
+    ]), {}, 0)
+    const message = migrated.events.find(item => item.type === 'user/message')
+    expect(message?.data).toMatchObject({ source })
+  })
+
+  it('preserves independently hidden members on inserted message sources', () => {
+    const canManageOnly = {
+      kind: 'user',
+      participant: {
+        userId: 1, username: 'admin', displayName: 'admin', role: 'admin',
+        scope: { kind: 'project', projectId: 7, projectName: 'p', mode: 'rw', canManage: true },
+      },
+    }
+    const documentsOnly = {
+      kind: 'user',
+      documents: [{ ref: USERDOC_ATTACHED.ref, representation: { kind: 'path' } }],
+    }
+    const inserted = [
+      { id: 'u-9', role: 'user', content: [{ type: 'text', text: 'q' }], source: canManageOnly },
+      { id: 'u-8', role: 'user', content: [{ type: 'text', text: 'p' }], source: documentsOnly },
+      { id: 'u-7', role: 'user', content: [{ type: 'text', text: 'r' }], source: { kind: 'user' } },
+    ]
+    const migrated = migrateVersion(0, turnWithStep([
+      event('agent/inbox/spliced', 0, { target: 'next-turn', start: 0, inserted }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)
+    const spliced = migrated.events.find(item => item.type === 'agent/inbox/spliced')
+    const sources = (spliced?.data as { inserted: Array<{ source?: unknown }> }).inserted
+      .map(item => item.source)
+    expect(sources[0]).toMatchObject(canManageOnly)
+    expect(sources[1]).toMatchObject(documentsOnly)
+    expect(sources[2]).toMatchObject({ kind: 'user' })
+  })
+
+  it('lets the released stage refuse a non-record message inside a spliced list', () => {
+    expect(() => migrateVersion(0, turnWithStep([
+      event('agent/inbox/spliced', 0, {
+        target: 'next-turn', start: 0,
+        inserted: [
+          'not-a-message',
+          { id: 'u-9', role: 'user', content: [{ type: 'text', text: 'q' }], source: DIALECT_USER_SOURCE },
+        ],
+      }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)).toThrow()
+  })
+
   it('carries userdoc/attached through the chain unchanged', () => {
     const migrated = migrateVersion(0, turnWithStep([
       event('user/message', 0, { ...USER_MESSAGE, source: DIALECT_USER_SOURCE }),
@@ -1045,11 +1203,82 @@ describe('dialect member admission', () => {
     expect(attached?.data).toMatchObject(USERDOC_ATTACHED)
   })
 
-  it('refuses a userdoc/attached payload outside the declared form', () => {
+  it('carries an inline userdoc/attached representation through the chain', () => {
+    const inline = { ...USERDOC_ATTACHED, representation: { kind: 'inline', text: 'doc text' } }
+    const source = {
+      ...DIALECT_USER_SOURCE,
+      documents: [{ ref: USERDOC_ATTACHED.ref, representation: { kind: 'inline', text: 'doc text' } }],
+    }
+    const migrated = migrateVersion(1, turnWithStep([
+      event('user/message', 0, { ...USER_MESSAGE, source }),
+      event('userdoc/attached', 0, inline),
+    ]), {}, 0)
+    const attached = migrated.events.find(item => item.type === 'userdoc/attached')
+    expect(attached?.data).toMatchObject(inline)
+  })
+
+  it.each([
+    [null],
+    [{ ...USERDOC_ATTACHED, version: 2 }],
+    [{ ...USERDOC_ATTACHED, messageId: 5 }],
+    [{ ...USERDOC_ATTACHED, index: 'x' }],
+    [{ ...USERDOC_ATTACHED, ref: null }],
+    [{ ...USERDOC_ATTACHED, representation: null }],
+    [{ ...USERDOC_ATTACHED, representation: { kind: 'blob' } }],
+  ] as const)('refuses a userdoc/attached payload outside the declared form %j', (data) => {
     expect(() => migrateVersion(0, turnWithStep([
       event('user/message', 0, USER_MESSAGE),
-      event('userdoc/attached', 0, { ...USERDOC_ATTACHED, version: 2 }),
+      event('userdoc/attached', 0, data),
     ]), {}, 0)).toThrow('undeclared payload')
+  })
+
+  it('emits a synthesized seeded marker ahead of the restored cut event', () => {
+    const migrated = migrateVersion(1, [
+      event('turn/start', 0, { turn: 1 }),
+      event('step/start', 1, { turn: 1, step: 1 }),
+      event('user/message', 2, { ...USER_MESSAGE, source: DIALECT_USER_SOURCE }),
+      event('step/end', 3, { turn: 1, step: 1 }),
+      event('turn/end', 4, { turn: 1, reason: { kind: 'completed' } }),
+    ], { isSeeded: true }, 2)
+    /* The seeded cut has no in-band marker, so the released stage synthesizes
+     * session/end-seed ahead of the first post-cut event; the dialect ledger
+     * stays queued for the carrier and restores its hidden members. */
+    expect(migrated.events.map(item => item.type)).toEqual([
+      'turn/start', 'step/start', 'system/message', 'session/end-seed', 'user/message', 'step/end', 'turn/end',
+    ])
+    expect(migrated.events[3]?.data).toEqual({ inherited: true })
+    expect(migrated.events[4]?.data).toMatchObject({ source: DIALECT_USER_SOURCE })
+    expect(migrated.inheritedEventCount).toBe(3)
+  })
+
+  it('emits a synthesized goal/change ahead of its rewritten carrier message', () => {
+    const goal = { id: 'g-1', revision: 1, objective: 'do it', phase: 'active', maxGoalRounds: 1 }
+    const migrated = migrateVersion(1, [
+      event('turn/start', 0, { turn: 1 }),
+      event('step/start', 1, { turn: 1, step: 1 }),
+      event('user/message', 2, {
+        id: 'u-g', role: 'user',
+        content: [{
+          type: 'text',
+          text: `<goal_state>${JSON.stringify({ goal, roundsStarted: 1, createdAt: 1, updatedAt: 1 })}</goal_state>`,
+        }],
+        source: {
+          kind: 'goal', goalId: 'g-1', revision: 1, round: 0,
+          change: {
+            kind: 'goal/change', version: 1, operation: 'create',
+            goal, roundsStarted: 1, createdAt: 1, updatedAt: 1,
+          },
+        },
+      }),
+      event('step/end', 3, { turn: 1, step: 1 }),
+      event('turn/end', 4, { turn: 1, reason: { kind: 'completed' } }),
+    ], {}, 0)
+    /* The split emits the synthesized goal/change first; the ledger stays
+     * queued until the rewritten user/message carrier arrives. */
+    const types = migrated.events.map(item => item.type)
+    expect(types.slice(0, 5)).toEqual(['turn/start', 'step/start', 'system/message', 'goal/change', 'user/message'])
+    const message = migrated.events[4]
+    expect(message?.data).toMatchObject({ id: 'u-g', source: { kind: 'plugin', plugin: 'goal' } })
   })
 
   it('still refuses unknown event types', () => {

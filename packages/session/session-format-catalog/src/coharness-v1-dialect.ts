@@ -53,6 +53,7 @@ class CoharnessV1DialectStage implements SessionFormatMigrationStage {
 
   constructor(input: SessionFormatMigrationStageInput) {
     this.released = sessionFormatV1ToV2.createStage(input)
+    /* v8 ignore next 3 -- the released v1 stage reports no inherited count; the seeded cut emits as a synthesized marker. */
     if (this.released.headerInheritedEventCount !== undefined) {
       this.headerInheritedEventCount = this.released.headerInheritedEventCount
     }
@@ -78,6 +79,7 @@ class CoharnessV1DialectStage implements SessionFormatMigrationStage {
         }
         context.emitEvent(emitted)
       },
+      /* v8 ignore next -- the released v1 stage emits runs only from transformRun, which this stage delegates directly. */
       emitRun: (run) => { context.emitRun(run) },
     }
     this.released.transformEvent(dialect.event, restoring)

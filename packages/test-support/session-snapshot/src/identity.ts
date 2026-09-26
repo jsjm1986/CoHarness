@@ -85,6 +85,7 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
     if (canonical !== null) {
       const canonicalKind = canonical[1] as IdentityKind
       const ordinal = Number(canonical[2])
+      /* v8 ignore next -- reserve() already claimed an ordinal for every canonical token in the logs. */
       nextByKind.set(canonicalKind, Math.max(nextByKind.get(canonicalKind) ?? 0, ordinal))
       tokenByValue.set(value, value)
       return
@@ -128,6 +129,7 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
   const mineGoalIds = (value: unknown): void => {
     if (typeof value === 'string') {
       for (const match of value.matchAll(GOAL_COMPOUND_RE)) {
+        /* v8 ignore next -- the uuid capture is required whenever the goal-compound regex matches. */
         if (match[1] !== undefined) claim(match[1], 'goal')
       }
       return

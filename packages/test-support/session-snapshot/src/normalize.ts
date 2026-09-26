@@ -281,6 +281,7 @@ function redactWithContext(raw: string, ctx: NormalizeContext): string {
   const headers = ctx.sessionIds.map(id => JSON.stringify({ type: 'session', id }))
   const normalized = redactSessionSnapshotIds([...headers, ...logs, raw])
   const last = normalized.at(-1)
+  /* v8 ignore next -- the appended raw transcript guarantees a trailing element. */
   if (last === undefined) throw new Error('redaction dropped the appended transcript')
   return last
 }

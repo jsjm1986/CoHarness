@@ -192,6 +192,18 @@ Additional instructions from: nested\AGENTS.md`,
     expect(out).not.toContain('"id"')
   })
 
+  it('keeps volatile ids verbatim under identityMode preserve while still scrubbing cwd', () => {
+    const raw = JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: { sessionId: ctx.sessionIds[0], note: `at ${ctx.cwd}/x` },
+    })
+    const out = normalizeStdout(raw, ctx, { identityMode: 'preserve' })
+    expect(out).toContain(ctx.sessionIds[0] as string)
+    expect(out).toContain('{{cwd}}')
+    expect(out).not.toContain('{{session:')
+  })
+
   it('stabilizes only the top-level event timestamp and spill byte count in event-read text', () => {
     const raw = JSON.stringify({
       jsonrpc: '2.0',
