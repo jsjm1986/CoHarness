@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-26-job-settle-pacing-in-snapshots.md
+2026-09-26-job-settle-pacing-in-snapshots.md: a3e09c13fae23adfb24fb9fb0a69bc7c559ec832
+2026-09-26-job-settle-pacing-in-snapshots.zh.md: 983a09141ad0884e805b8ac70c50c69945cffb1f
