@@ -25,8 +25,9 @@ import {
 /**
  * Member tests for persistent Codex children: the app-server speaks over an
  * in-memory PassThrough pair scripted by the test (same seam as the one-shot
- * spec), and `HOME` is redirected so `recoverCodexThread` reads fixture
- * rollouts — no real codex binary, no network.
+ * spec), and `HOME`/`USERPROFILE` are redirected — `os.homedir()` follows the
+ * platform variable — so `recoverCodexThread` reads fixture rollouts. No real
+ * codex binary, no network.
  */
 
 const signal = new AbortController().signal
@@ -237,6 +238,28 @@ describe('CodexMemberTransport', () => {
     expect(outcomeText(second)).toBe('second answer')
   })
 
+  it('refuses a resume response that names a different thread', async () => {
+    const dir = root()
+    const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
+    const messages = userMessages(['task one', 'task two'])
+    await memberTurn(dir, store, messages.slice(0, 1), {
+      threadId: 'thread-9', answer: 'first answer', resume: false,
+    })
+
+    const child = fakeChild()
+    const transport = new CodexMemberTransport(memberConfig(dir), () => child.handle)
+    const turn = collect(externalMemberTurn(
+      { sessionId: SessionId('child-1'), messages, signal },
+      store, transport,
+    ))
+    const initialize = await child.peer.nextMethod('initialize')
+    child.peer.respond(initialize, { userAgent: 'codex-cli 0.153.4' })
+    await child.peer.nextMethod('initialized')
+    const resume = await child.peer.nextMethod('thread/resume')
+    child.peer.respond(resume, { thread: { id: 'thread-other' } })
+    await expect(turn).rejects.toThrow('resumed a different thread')
+  })
+
   it('persists the binding and pending record before the prompt issues', async () => {
     const dir = root()
     const child = SessionId('child-1')
@@ -268,6 +291,7 @@ describe('CodexMemberTransport', () => {
 
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     writeRollout(home, 'thread-9', [])
     const second = await memberTurn(dir, store, messages, {
       threadId: 'thread-9', answer: 'retried answer', resume: true,
@@ -296,6 +320,7 @@ describe('CodexMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const child = SessionId('child-1')
     const messages = userMessages(['task one'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -319,6 +344,7 @@ describe('CodexMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const child = SessionId('child-1')
     const messages = userMessages(['unknown task'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -340,6 +366,7 @@ describe('CodexMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const child = SessionId('child-1')
     const messages = userMessages(['lost task'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -357,6 +384,7 @@ describe('CodexMemberTransport', () => {
   it('proves absent when no rollout file exists for the thread', () => {
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const recovery = recoverCodexThread('no-such-thread', {
       prompt: 'p',
       throughMessageId: userMessages(['x'])[0]!.id,

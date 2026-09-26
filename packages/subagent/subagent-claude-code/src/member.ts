@@ -58,9 +58,18 @@ interface ClaudeSessionFileEntry {
   }
 }
 
-/** Claude Code's project-directory slug: the workspace path with separators flattened. */
-function projectSlug(cwd: string): string {
-  return cwd.replaceAll('/', '-')
+/**
+ * Claude Code's project-directory slug under `~/.claude/projects/`: the
+ * product flattens every character outside `[a-zA-Z0-9]` to `-`, so
+ * separators, drive colons, dots, underscores, and non-ASCII text all fold
+ * (`C:\git\cc-plus` reads as `C--git-cc-plus`). The mapping is intentionally
+ * lossy — distinct workspaces can share one slug — and recovery accepts that
+ * product behavior rather than inventing a decodable scheme.
+ * @param cwd - the workspace whose sessions Claude Code files under the slug.
+ * @returns the product-encoded project directory name.
+ */
+export function projectSlug(cwd: string): string {
+  return cwd.replace(/[^a-zA-Z0-9]/g, '-')
 }
 
 /** Join the text blocks of one session-file message; string content reads as-is. */

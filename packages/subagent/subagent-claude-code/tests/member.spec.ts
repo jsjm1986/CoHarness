@@ -17,14 +17,16 @@ import {
   CLAUDE_MEMBER_ROUTE,
   ClaudeMemberAdapter,
   ClaudeMemberTransport,
+  projectSlug,
   recoverClaudeSession,
   type ClaudeMemberConfig,
 } from '../src/member.ts'
 
 /**
  * Member tests for persistent Claude children: `query` is mocked at the SDK
- * boundary (same seam as the one-shot spec), and `HOME` is redirected so
- * `recoverClaudeSession` reads fixture transcripts — no real CLI, no network.
+ * boundary (same seam as the one-shot spec), and `HOME`/`USERPROFILE` are
+ * redirected — `os.homedir()` follows the platform variable — so
+ * `recoverClaudeSession` reads fixture transcripts. No real CLI, no network.
  */
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
@@ -155,11 +157,19 @@ function outcomeText(chunks: StreamChunk[]): string {
 
 /** Write one durable Claude transcript under the stubbed HOME for `cwd`'s slug. */
 function writeTranscript(home: string, cwd: string, sessionId: string, entries: object[]): void {
-  const slug = cwd.replaceAll('/', '-')
+  const slug = cwd.replace(/[^a-zA-Z0-9]/g, '-')
   const dir = join(home, '.claude', 'projects', slug)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, `${sessionId}.jsonl`), entries.map(e => JSON.stringify(e)).join('\n') + '\n')
 }
+
+describe('projectSlug', () => {
+  it('flattens every non-alphanumeric character the way Claude Code does', () => {
+    expect(projectSlug('/Users/me/work/repo')).toBe('-Users-me-work-repo')
+    expect(projectSlug('C:\\git\\cc-plus')).toBe('C--git-cc-plus')
+    expect(projectSlug('D:\\MatLab_HomeWork\\v1.2')).toBe('D--MatLab-HomeWork-v1-2')
+  })
+})
 
 describe('ClaudeMemberTransport', () => {
   it('runs the first turn fresh and resumes the bound session after it', async () => {
@@ -260,6 +270,7 @@ describe('ClaudeMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const child = SessionId('child-1')
     const messages = userMessages(['task one'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -284,6 +295,7 @@ describe('ClaudeMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const child = SessionId('child-1')
     const messages = userMessages(['lost task'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -305,6 +317,7 @@ describe('ClaudeMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const child = SessionId('child-1')
     const messages = userMessages(['unknown task'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
@@ -327,6 +340,7 @@ describe('ClaudeMemberTransport', () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
     const recovery = recoverClaudeSession(dir, 'no-such-session', {
       prompt: 'p',
       throughMessageId: userMessages(['x'])[0]!.id,
