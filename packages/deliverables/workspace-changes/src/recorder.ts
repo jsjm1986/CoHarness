@@ -297,11 +297,13 @@ export class TurnRecorder {
   }
 
   private snapshotDir(scratchRoot: string, signal: AbortSignal): Promise<string> {
-    if (this.env.execution === undefined) return this.scratchDir()
-    /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
-    this.executionScratch ??= { storage: this.env.execution, directory: this.env.execution.temporary(join(scratchRoot, 'dsh-workspace-changes-'), signal) }
-    return this.executionScratch.directory
-    /* v8 ignore stop */
+    /* v8 ignore else -- the POSIX execution world is exercised only by POSIX-gated suites. */
+    if (this.env.execution === undefined) {
+      return this.scratchDir()
+    } else {
+      this.executionScratch ??= { storage: this.env.execution, directory: this.env.execution.temporary(join(scratchRoot, 'dsh-workspace-changes-'), signal) }
+      return this.executionScratch.directory
+    }
   }
 
   private async captureFile(absolute: string, signal: AbortSignal): Promise<Capture | undefined> {
