@@ -50,12 +50,12 @@ function updates(ctx: Context): CredentialRef[] {
 describe('resolveSpec', () => {
   it('defaults to .credentials.yaml under the harness home with watching on', () => {
     const spec = resolveSpec({ dshHome: '/custom/home' })
-    expect(spec).toEqual({ filename: resolve('/custom/home/.credentials.yaml'), watch: true, debounceMs: 100 })
+    expect(spec).toEqual({ filename: resolve('/custom/home/.credentials.yaml'), watch: true, watchUsePolling: false, debounceMs: 100 })
   })
 
   it('lets an explicit path win over the home', () => {
     const spec = resolveSpec({ path: '/etc/dsh/creds.yaml', dshHome: '/ignored', watch: false, debounceMs: 5 })
-    expect(spec).toEqual({ filename: resolve('/etc/dsh/creds.yaml'), watch: false, debounceMs: 5 })
+    expect(spec).toEqual({ filename: resolve('/etc/dsh/creds.yaml'), watch: false, watchUsePolling: false, debounceMs: 5 })
   })
 })
 
@@ -441,7 +441,7 @@ describe('real hot reload', () => {
     // Watching starts on an existing document: creation racing watcher setup
     // is a chokidar readiness gap, not the reload contract under test.
     await writeCredentials(path, 'version: 1\nrefs:\n  DSH_CRED_TEST: boot\n')
-    const ctx = await boot({ path, debounceMs: 10 })
+    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
     const seen = updates(ctx)
 
     await writeCredentials(path, 'version: 1\nrefs:\n  DSH_CRED_TEST: live\n  DSH_CRED_OTHER: extra\n')

@@ -26,6 +26,8 @@ export interface Config {
   dshHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
+  /** Whether Chokidar polls instead of using native filesystem events. */
+  watchUsePolling?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
   debounceMs?: number
 }
@@ -44,6 +46,7 @@ interface ResolvedSpec {
   filename: string
   format: SettingsFormat
   watch: boolean
+  watchUsePolling: boolean
   debounceMs: number
 }
 
@@ -63,6 +66,7 @@ export function resolveSpec(config: Config): ResolvedSpec {
     filename,
     format,
     watch: config.watch ?? true,
+    watchUsePolling: config.watchUsePolling ?? false,
     debounceMs: config.debounceMs ?? 100,
   }
 }
@@ -108,6 +112,7 @@ export class FileSettingsProvider extends SettingsProvider {
     path: z.string(),
     dshHome: z.string(),
     watch: z.boolean().default(true),
+    watchUsePolling: z.boolean().default(false),
     debounceMs: z.number().min(0).default(100),
   })
 
@@ -237,6 +242,7 @@ export class FileSettingsProvider extends SettingsProvider {
     yield* super[Service.init]()
     const watcher = this.spec.watch
       ? chokidarWatch(await canonicalizeWatchPath(this.spec.filename), {
+        usePolling: this.spec.watchUsePolling,
         ignoreInitial: true,
         awaitWriteFinish: {
           stabilityThreshold: this.spec.debounceMs,

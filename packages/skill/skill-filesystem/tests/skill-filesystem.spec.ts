@@ -612,6 +612,7 @@ describe('FileSystemSkillProvider', () => {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
       watch: true,
+      watchUsePolling: true,
       watchStabilityThresholdMs: 20,
       watchPollIntervalMs: 10,
     })
@@ -722,6 +723,7 @@ describe('FileSystemSkillProvider', () => {
       customSkillDirs: [join(first, '.agents/skills')],
       watch: true,
       watchMaxProjects: 1,
+      watchUsePolling: true,
       watchStabilityThresholdMs: 20,
       watchPollIntervalMs: 10,
     })
@@ -762,6 +764,7 @@ describe('FileSystemSkillProvider', () => {
         agentsHome: join(home, '.agents'),
         customSkillDirs: [nonDirectoryRoot],
         watch: true,
+        watchUsePolling: true,
         watchStabilityThresholdMs: 20,
         watchPollIntervalMs: 10,
       })
@@ -795,6 +798,7 @@ describe('FileSystemSkillProvider', () => {
       agentsHome: join(home, '.agents'),
       watch: true,
       watchFollowSymlinks: true,
+      watchUsePolling: true,
       watchStabilityThresholdMs: 20,
       watchPollIntervalMs: 10,
     })

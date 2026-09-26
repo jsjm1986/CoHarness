@@ -380,7 +380,7 @@ describe('watch', () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
     await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 10 })
+    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
     expect(scope.get().theme).toBe('light')
 
@@ -394,7 +394,7 @@ describe('watch', () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
     await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 10 })
+    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
 
     // Replace the external edit atomically so this case observes one complete
@@ -414,7 +414,7 @@ describe('watch', () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
     await writeFile(path, 'ui-theme:\n  theme: light\n')
-    const ctx = await boot({ path, debounceMs: 10 })
+    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
 
     await rm(path)
@@ -426,7 +426,7 @@ describe('watch', () => {
   it('does not republish its own persisted write', async () => {
     const dir = await tempDir()
     const path = join(dir, 'settings.yaml')
-    const ctx = await boot({ path, debounceMs: 10 })
+    const ctx = await boot({ path, debounceMs: 10, watchUsePolling: true })
     const events: unknown[] = []
     ctx.on('settings/updated', (ns, _next, _prev, source) => {
       events.push({ ns, source })

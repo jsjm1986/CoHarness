@@ -116,7 +116,9 @@ describe('HMR exact config paths', () => {
     const ctx = await bootHmr(dir)
     const observed: string[] = []
     try {
-      await watchConfig(ctx, filename, {}, () => {
+      // Polling keeps add/change/unlink delivery bounded on a loaded shared
+      // runner; the native-event lane stays under 'registered during a transaction'.
+      await watchConfig(ctx, filename, { usePolling: true }, () => {
         try {
           observed.push(readFileSync(filename, 'utf8'))
         } catch (error) {
