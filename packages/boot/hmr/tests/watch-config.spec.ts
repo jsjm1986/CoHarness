@@ -144,14 +144,15 @@ describe('HMR exact config paths', () => {
     const ctx = await bootHmr(root)
     const observed: string[] = []
     try {
-      await watchConfig(ctx, filename, {}, () => {
+      // A not-yet-existing parent forces the watcher to notice the new
+      // directory, attach to it, and then observe the file. Polling makes the
+      // discovery a bounded scan instead of waiting on FSEvents latency, which
+      // a loaded shared runner can delay past any fixed budget.
+      await watchConfig(ctx, filename, { usePolling: true }, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })
       mkdirSync(dir)
       writeFileSync(filename, 'created')
-      // A not-yet-existing parent forces the watcher to notice the new
-      // directory, attach to it, and then observe the file — measurably slower
-      // than same-dir events on loaded hosts.
       await eventually(() => observed.includes('created'), 'HMR did not observe config creation under a new parent', 60_000)
     } finally {
       await ctx.fiber.dispose()
