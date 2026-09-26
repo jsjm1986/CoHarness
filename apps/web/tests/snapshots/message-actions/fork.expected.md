@@ -2,6 +2,6 @@
   - treeitem "Independent sessions" [expanded]:
     - img
     - text: Independent sessions
-  - treeitem "Use the read tool twice (2) now" [selected]
-  - treeitem "Use the read tool twice (1) now"
-  - treeitem "Use the read tool twice 1min"
+  - "treeitem \"Use the read tool twice (2) {{ago}}\" [selected]"
+  - "treeitem \"Use the read tool twice (1) {{ago}}\""
+  - "treeitem \"Use the read tool twice {{ago}}\""

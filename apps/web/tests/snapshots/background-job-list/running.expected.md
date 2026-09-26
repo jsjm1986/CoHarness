@@ -1,2 +1,2 @@
 - list "Background jobs":
-  - listitem: bash sleep 45 running 0s
+  - listitem: "bash sleep 45 running {{duration}}"

@@ -51,6 +51,27 @@ describe('ARIA runtime measurements', () => {
     expect(result).toContain('- paragraph: 用时 2分42秒')
   })
 
+  it('normalizes the trailing relative-time label on dated session rows', () => {
+    const snapshot = '- tree "Sessions":\n  - treeitem "Use the read tool twice now" [selected]\n  - treeitem "Plan a small change 2min"\n- treeitem "Standalone row 5min" [selected]\n- paragraph: Plan a small change 2min'
+    const result = normalizeAria(snapshot, cwd)
+    expect(result).toContain('Use the read tool twice {{ago}}')
+    expect(result).toContain('Plan a small change {{ago}}')
+    expect(result).toContain('Standalone row {{ago}}')
+    expect(result).toContain('- paragraph: Plan a small change 2min')
+    const drifted = snapshot.replace('twice now', 'twice 1min').replace('change 2min"', 'change 3min"').replace('row 5min', 'row 4h')
+    expect(normalizeAria(drifted, cwd)).toBe(result)
+    expect(normalizeAria(snapshot.replace('read', 'write'), cwd)).not.toBe(result)
+  })
+
+  it('normalizes live durations inside the background-jobs list only', () => {
+    const snapshot = '- list "Background jobs":\n  - listitem: bash sleep 45 running 0s\n  - listitem: "bash sleep 45 signal: SIGTERM 0s"\n- paragraph: bash sleep 45 running 0s'
+    const result = normalizeAria(snapshot, cwd)
+    expect(result).toContain('bash sleep 45 running {{duration}}')
+    expect(result).toContain('SIGTERM {{duration}}')
+    expect(result).toContain('- paragraph: bash sleep 45 running 0s')
+    expect(normalizeAria(snapshot.replace('running 0s', 'running 3s').replace('SIGTERM 0s', 'SIGTERM 3s'), cwd)).toBe(result)
+  })
+
   const cases = JSON.parse(readFileSync(new URL('../../../packages/test-support/session-snapshot/tests/fixtures/comparison-cases.json', import.meta.url), 'utf8')) as {
     name: string
     left: unknown

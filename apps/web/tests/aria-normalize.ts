@@ -1,16 +1,28 @@
 /** ARIA comparison preserves prose and only redacts measurements in named UI statistics. */
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 
-type RuntimeScope = 'timing' | 'clock' | undefined
+type RuntimeScope = 'timing' | 'clock' | 'ago' | 'elapsed' | undefined
 
 function runtimeScope(key: string): RuntimeScope {
   if (/^group "(?:Message timing|消息时间与速度)"$/.test(key)) return 'clock'
   if (/^(?:group|dialog) "(?:Session statistics|会话统计|Turn time and speed|本轮用时和速度)"$/.test(key)) return 'timing'
+  if (/^tree "(?:Sessions|会话|Subagent sessions|子代理会话|Search results|搜索结果)"$/.test(key)) return 'ago'
+  if (/^list "(?:Background jobs|后台任务)"$/.test(key)) return 'elapsed'
   return undefined
 }
 
 function normalizeMeasurement(value: string, scope: RuntimeScope): string {
   if (scope === undefined) return value
+  if (scope === 'ago') {
+    // Session rows date their trailing label against the live clock; a seeded
+    // row's "now" drifts to "1min" and beyond as the suite runs.
+    return value.replace(/(^|\s)(?:now|刚刚|\d+(?:min|h|d|mo|y)|\d+(?:个月|分钟|小时|天|年)|\d+(?:\.\d+)?s|\d+秒)(?: ago|前)?(?=["']?\s*(?:\[[^\]]*\]\s*)*$)/g, '$1{{ago}}')
+  }
+  if (scope === 'elapsed') {
+    // Background-job rows print the live elapsed duration; the seeded command
+    // text stays literal around it.
+    return value.replace(/\d+h \d+m|\d+m \d+s|\d+(?:\.\d+)?s|\d+小时\d+分|\d+分\d+秒|\d+秒/g, '{{duration}}')
+  }
   let result = value
     .replace(/\b(?:\d+d(?: \d+h(?: \d+m \d+s)?)?|\d+h \d+m \d+s|\d+m ?\d+s|\d+(?:\.\d+)?s|\d+(?:\.\d+)?ms)\b/g, '{{duration}}')
     .replace(/\b\d[\d,]*(?:\.\d+)? ms\b/g, '{{duration}}')
@@ -42,8 +54,11 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
   if (document.errors.length > 0) throw new Error(`invalid ARIA snapshot: ${document.errors[0]!.message}`)
   const edits: { start: number; end: number; value: string }[] = []
   const base = workspaceCwd.split(/[\\/]/).pop() ?? ''
-  const visit = (node: unknown, scope: RuntimeScope): void => {
+  const visit = (node: unknown, baseScope: RuntimeScope): void => {
     if (isScalar(node) && typeof node.value === 'string') {
+      // A treeitem captured as the region root carries no `tree "Sessions"`
+      // ancestor, so dated rows are also recognized by the role prefix alone.
+      const scope = baseScope ?? (node.value.startsWith('treeitem ') ? 'ago' as const : undefined)
       let value = replacePath(node.value, workspaceCwd, '{{cwd}}')
       value = replacePath(value, base, '{{workspace}}')
       // Minted session/agent ids reach prose (a child's parent-agent
@@ -66,13 +81,13 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
         edits.push({ start: node.range[0], end: node.range[1], value: JSON.stringify(value) })
       }
     } else if (isSeq(node)) {
-      for (const item of node.items) visit(item, scope)
+      for (const item of node.items) visit(item, baseScope)
     } else if (isMap(node)) {
       for (const pair of node.items) {
         const childScope = isScalar(pair.key) && typeof pair.key.value === 'string'
-          ? runtimeScope(pair.key.value) ?? scope
-          : scope
-        visit(pair.key, scope)
+          ? runtimeScope(pair.key.value) ?? baseScope
+          : baseScope
+        visit(pair.key, baseScope)
         visit(pair.value, childScope)
       }
     }
