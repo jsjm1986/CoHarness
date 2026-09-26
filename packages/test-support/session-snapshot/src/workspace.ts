@@ -1,7 +1,7 @@
 /** Capture readable, path-stable workspace state for recorded-session tests. */
 
 import { mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 
 /** Marker that lets Git retain an expected empty directory without becoming expected workspace state. */
 export const EMPTY_WORKSPACE_MARKER = '.empty'
@@ -94,7 +94,9 @@ export async function captureWorkspaceSnapshot(
           ? { path, kind: 'binary', base64: bytes.toString('base64') }
           : { path, kind: 'text', content })
       } else {
-        captured.push({ path, kind: 'symlink', target: await readlink(absolute) })
+        // Windows reports dir-link targets with backslashes; keep the stored
+        // entry on the same POSIX separators `path` uses.
+        captured.push({ path, kind: 'symlink', target: (await readlink(absolute)).replaceAll(sep, '/') })
       }
     }
     return captured

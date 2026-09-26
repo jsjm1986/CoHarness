@@ -1676,6 +1676,8 @@ it('rethrows a header stat failure other than a missing file', async () => {
   try {
     const file = join(root, 'owner.json')
     writeFileSync(file, 'x')
-    await expect(writeOwnedHeaderSnapshot(join(file, 'child.json'), 'x\n')).rejects.toThrow('ENOTDIR')
+    // Windows reports ENOENT for a path through a file where POSIX raises ENOTDIR.
+    const code = process.platform === 'win32' ? 'ENOENT' : 'ENOTDIR'
+    await expect(writeOwnedHeaderSnapshot(join(file, 'child.json'), 'x\n')).rejects.toThrow(code)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
