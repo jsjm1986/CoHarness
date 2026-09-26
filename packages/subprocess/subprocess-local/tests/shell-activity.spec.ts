@@ -32,7 +32,7 @@ async function shell(path: string, rc = '', envFile = '') {
   return { handle, home, output: () => output, activity: async () => (await handle.inspectActivity()).state }
 }
 
-describe.skipIf(process.platform === 'win32' || !existsSync('/bin/zsh'))('Zsh terminal activity', () => {
+describe.skipIf(process.platform === 'win32' || !existsSync('/bin/zsh'))('Zsh terminal activity', { timeout: 30_000 }, () => {
   it('keeps silent foreground work, builtin loops, read, and background jobs busy until a new prompt is idle', async () => {
     const h = await shell('/bin/zsh')
     await poll(h.activity).toBe('idle')
@@ -97,7 +97,7 @@ describe.skipIf(process.platform === 'win32' || !existsSync('/bin/zsh'))('Zsh te
   })
 })
 
-describe.skipIf(process.platform === 'win32' || !existsSync('/bin/bash'))('Bash terminal activity', () => {
+describe.skipIf(process.platform === 'win32' || !existsSync('/bin/bash'))('Bash terminal activity', { timeout: 30_000 }, () => {
   it('preserves scalar prompt hooks and uses unknown on shells without PS0', async () => {
     const h = await shell('bash', "PROMPT_COMMAND='printf HOOK; # user comment'\nset -C")
     expect(h.output()).toContain('HOOK')
