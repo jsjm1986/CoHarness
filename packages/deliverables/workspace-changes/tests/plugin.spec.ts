@@ -531,7 +531,8 @@ describe('workspace-changes without git', () => {
       expect(info).toHaveBeenCalledTimes(probe.available ? 0 : 1)
       await ctx.fiber.dispose()
     }
-  })
+    // Four boots against the real subprocess runtime on a shared runner.
+  }, 30_000)
 })
 
 it.skipIf(process.platform === 'win32')('captures execution-target file edits when target git is unavailable', async () => {

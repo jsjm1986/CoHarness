@@ -52,6 +52,11 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       // business identifiers are content, covered by seeded-history's
       // normalize-preserves-identifiers case.
       value = value.replace(/session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'session-{{uuid}}')
+      // Trajectory tooltips and similar chrome print seeded event times in
+      // the runner's local zone (HH:MM:SS AM/PM); they are wall-clock output
+      // even outside a timing group, while bare HH:MM deadlines in message
+      // text stay literal.
+      value = value.replace(/\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\s*[AP]M/gi, '{{clock}}')
       value = normalizeMeasurement(value, scope)
       if (value !== node.value) {
         if (node.range == null) throw new Error('ARIA scalar has no source range')
