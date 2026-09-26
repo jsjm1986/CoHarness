@@ -1365,6 +1365,27 @@ describe('runScenario', () => {
     expect(result.sessionLogs[1]?.parentSession).toBe(result.sessionId)
   })
 
+  it('orders sibling top-level logs by createdAt then id', { timeout: 20_000 }, async () => {
+    const { fixtureFile } = await scenario({
+      logs: [
+        // Later createdAt and later id, enumerated first: the comparator's
+        // parentless rank is a tie, so createdAt then id decides.
+        { file: 'b1/zz-other/session.jsonl', lines: [{ type: 'session', version: 0, id: 'zzzzzzzz-0000-4000-8000-000000000000', createdAt: 900 }] },
+        { file: 'b1/aa-other/session.jsonl', lines: [{ type: 'session', version: 0, id: 'yyyyyyyy-0000-4000-8000-000000000000', createdAt: 900 }] },
+        { file: 'b2/main/session.jsonl', lines: [{ type: 'session', version: 0, id: '{{SID}}', createdAt: 100 }] },
+      ],
+    })
+    const result = await runScenario(
+      { steps: [...boot, { op: 'prompt', text: 'go' }] },
+      { agent: AGENT, mode: 'replay', fixtureFile },
+    )
+    expect(result.sessionLogs.map(l => [l.id, l.createdAt])).toEqual([
+      [result.sessionId, 100],
+      ['yyyyyyyy-0000-4000-8000-000000000000', 900],
+      ['zzzzzzzz-0000-4000-8000-000000000000', 900],
+    ])
+  })
+
   it('rejects an empty persisted generation', { timeout: 20_000 }, async () => {
     const { fixtureFile } = await scenario({ logs: [{ file: 'b/empty/session.jsonl', lines: [] }] })
     await expect(runScenario(

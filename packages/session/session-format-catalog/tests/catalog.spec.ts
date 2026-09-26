@@ -61,6 +61,20 @@ describe('first-party Session format catalog', () => {
     })
   })
 
+  it('projects an sshTarget-bearing stored header onto the logical header', () => {
+    const header = {
+      type: 'session', version: 6, id: 'ssh-target', createdAt: 1,
+      isSeeded: false, delegationDepth: 0, sshTarget: 42,
+    }
+    expect(sessionFormatCatalog.readHeader(header)).toEqual({
+      status: 'current', storedVersion: 6, targetVersion: 6,
+      header: {
+        version: 6, id: 'ssh-target', createdAt: 1, isSeeded: false,
+        delegationDepth: 0, sshTarget: 42,
+      },
+    })
+  })
+
   it('restores the installed current vocabulary without freezing ordinary payload additions', () => {
     const header = {
       type: 'session', version: 6, id: 'current-growth', createdAt: 1, isSeeded: false, delegationDepth: 0,

@@ -77,6 +77,7 @@ function migrateFormatEvents(
     inheritedEventCount,
     {
       emitEvent: (event) => { migrated.push(event as unknown as SessionEvent) },
+      /* v8 ignore next -- the logical migration chain refuses compact runs upstream, so this typed-boundary callback never fires. */
       emitRun: () => { throw new SessionFormatError('stored Session logical migration cannot emit compact runs') },
     },
   )

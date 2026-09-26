@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import { ToolCallId, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { createSettlementMessage } from '../src/continuation-messages.ts'
+import { createAgentMessage, createSettlementMessage } from '../src/continuation-messages.ts'
 
 const childId = SessionId('settled-child')
 const summary = { type: 'text', text: `Background subagent ${childId} finished and will do no further work unless you send it more.` }
@@ -53,5 +56,23 @@ describe('continuable settlement content', () => {
       first,
       second,
     ])
+  })
+
+  it('attributes the captured execution scope to relay and settlement notices', () => {
+    const scope: ExecutionInheritance = {
+      inputs: ['00000000-0000-4000-8000-000000000001' as ExecutionInheritance['inputs'][number]],
+      primaryActorUserId: 7,
+      unverifiedHistory: false,
+    }
+    const ctx = new Context()
+    ctx.provide('executionAuthority', { capture: () => scope })
+
+    const relay = createAgentMessage({ id: SessionId('sender'), ctx } as Agent, [
+      { type: 'text', text: 'ping' },
+    ])
+    expect(relay.source).toMatchObject({ gatewayExecutionScope: scope })
+
+    const settled = createSettlementMessage(childId, { stopReason: 'completed' }, scope)
+    expect(settled.source).toMatchObject({ gatewayExecutionScope: scope })
   })
 })

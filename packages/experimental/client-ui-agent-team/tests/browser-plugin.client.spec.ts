@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-experimental-agent-team/remote'
 import { RemoteError, type TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { TeamAction, type TeamActionInjected } from '../src/client/TeamAction.tsx'
 import { inject, mountAgentTeamUi } from '../src/client/mount.ts'
+import { apply as clientApply } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
 const SESSION = 'team-session' as SessionId
@@ -24,6 +25,7 @@ async function bench(options: {
   registrationFailure?: boolean
   remoteFailure?: 'view' | 'update'
   refreshGate?: Promise<void>
+  clientApply?: (ctx: Context) => Promise<unknown>
 } = {}) {
   const ctx = new Context()
   const calls: { method: string; args: unknown[] }[] = []
@@ -119,7 +121,7 @@ async function bench(options: {
   }
   const fiber = options.registrationFailure === true
     ? ctx.plugin({ apply() {} })
-    : ctx.plugin({ inject: [...inject], apply: clientCtx => mountAgentTeamUi(clientCtx, REMOTE) })
+    : ctx.plugin({ inject: [...inject], apply: options.clientApply ?? (clientCtx => mountAgentTeamUi(clientCtx, REMOTE)) })
   const activation: Promise<unknown> = options.registrationFailure === true
     ? mountAgentTeamUi(ctx, REMOTE).catch((error: unknown) => error)
     : fiber.await()
@@ -294,6 +296,12 @@ describe('ui-team browser plugin', () => {
     } as never, () => null)
     await Promise.resolve()
     expect(b.entry()).toBeDefined()
+  })
+
+  it('mounts the generated remote through the client entry', async () => {
+    const b = await bench({ clientApply })
+    expect(b.entry()).toMatchObject({ component: TeamAction })
+    await b.fiber.dispose()
   })
 
   it('keeps the node half inert', () => {

@@ -45,6 +45,7 @@ describe('runLoaderSmoke', () => {
       configPath,
       tsconfigPath,
       mode: 'src',
+      sourceImport: 'tsx/esm',
       env: { LOADER_SMOKE_MARKER: 'present' },
     })
     const output = JSON.parse(result.stdout) as {

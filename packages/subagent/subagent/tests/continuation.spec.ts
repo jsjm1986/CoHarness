@@ -1988,6 +1988,17 @@ describe('continuable durability and teardown', () => {
     expect(ctx.agents.get(started.childId)).toBeUndefined()
   })
 
+  it('collects an execution-scope capture failure into the teardown failure', async () => {
+    const { ctx, parent } = await setup([])
+    await ctx.subagents.startContinuable(startSpec(parent))
+    // Provided after the child's start so the failure lands inside teardown.
+    ctx.provide('executionAuthority', {
+      capture() { throw new Error('authority offline') },
+    })
+
+    await expect(drainManager(ctx)).rejects.toMatchObject({ code: 'ACTIVATION_TEARDOWN_FAILED' })
+  })
+
   it('rejects new materialization and delivery once draining begins', async () => {
     const { ctx, parent } = await setup([textResponse('done')])
     const started = await ctx.subagents.startContinuable(startSpec(parent))

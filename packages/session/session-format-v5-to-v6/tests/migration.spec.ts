@@ -37,3 +37,37 @@ it.each([undefined, false, true])('preserves already-written draft=%j while prom
   expect(decoder.finish(collector)).toBe(0)
   expect(restoreReleasedV6Artifact({ header: target, events: [], inheritedEventCount: 0 }, new Set()).header).toBe(target)
 })
+
+it('rejects headers outside the V5/V6 boundary on every entry point', () => {
+  expect(() => { assertReleasedV6Header({ ...header, version: 5 }) })
+    .toThrow('expected format v6 header')
+  expect(() => releasedV6SessionFormatCodec.decodeHeader({ ...header, version: 5 }))
+    .toThrow('expected format v6 physical Session header')
+  expect(() => releasedV6SessionFormatCodec.decodeHeader(42))
+    .toThrow('expected format v6 physical Session header')
+})
+
+it('expands compact runs through the adjacent stage and requires the seeded inherited cut', () => {
+  const stage = sessionFormatV5ToV6.createStage({
+    sourceHeader: { ...header, isSeeded: true },
+    targetHeader: { ...header, version: 6 },
+    sourceInheritedEventCount: undefined,
+    sourceKind: 'transformed',
+  })
+  const emitted: unknown[] = []
+  const context = {
+    emitEvent: (event: unknown) => { emitted.push(event) },
+    emitRun: () => { throw new Error('runs cannot pass an expanding stage') },
+  }
+  const row = { seq: 0, time: 1, type: 'turn/start', data: { turn: 1 } }
+  stage.transformRun({
+    runType: 'fixture',
+    firstSeq: 0,
+    eventCount: 1,
+    expand: () => [row],
+  }, context)
+  expect(emitted).toEqual([row])
+  // A seeded artifact's inherited cut arrives through its `session/end-seed`
+  // marker; finishing without one refuses a fabricated zero cut.
+  expect(() => stage.finish(context)).toThrow('format v5 seeded artifact has no inherited cut')
+})

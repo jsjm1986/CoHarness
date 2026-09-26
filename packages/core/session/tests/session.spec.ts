@@ -1146,11 +1146,20 @@ describe('Session', () => {
       { header: { ...base, isSeeded: 'yes' }, error: /isSeeded must be a boolean/ },
       { header: { ...base, seedLength: 1 }, error: /invalid field "seedLength"/ },
       { header: { ...base, draft: 'yes' }, error: /header draft must be a boolean/ },
+      { header: { ...base, sshTarget: '7' }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: 0 }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: -3 }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: 1.5 }, error: /header sshTarget must be a positive safe integer/ },
+      { header: { ...base, sshTarget: Number.MAX_SAFE_INTEGER + 1 }, error: /header sshTarget must be a positive safe integer/ },
     ]
 
     for (const { header, error } of cases) {
       expect(() => Session.create(SessionId('header-shape'), undefined, header as SessionHeader)).toThrow(error)
     }
+
+    expect(Session.create(SessionId('header-shape'), undefined, {
+      ...base, sshTarget: 7,
+    } as unknown as SessionHeader).header.sshTarget).toBe(7)
   })
 
   it('retains opaque logical header metadata except the physical v0 seed field', () => {

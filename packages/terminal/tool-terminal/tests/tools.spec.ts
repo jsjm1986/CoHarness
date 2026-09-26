@@ -318,6 +318,13 @@ describe('tool-terminal foreground API', () => {
       content: [{ type: 'text', text: 'ok' }], isError: false,
       meta: sendMeta({ kind: 'exited', exitCode: null, signal: null }),
     })).toEqual({ card: 'terminal', output: 'ok', exitCode: null })
+    // A malformed sessionStatus narrows to no exit claim rather than a fabricated one.
+    for (const sessionStatus of ['running', null, []]) {
+      expect(definition?.presentResult?.({ sessionId: 'pty-1', text: 'x' }, {
+        content: [{ type: 'text', text: 'ok' }], isError: false,
+        meta: { viewport: '', waitReason: 'session_exit', sessionStatus, truncated: false },
+      })).toEqual({ card: 'terminal', output: 'ok' })
+    }
 
     expect(ctx.tools.get('terminal_open')?.presentCall?.({ type: 'stub' })).toMatchObject({ card: 'generic', title: 'Open terminal stub' })
     expect(ctx.tools.get('terminal_open')?.presentCall?.({ type: 'stub', name: 'main' })).toMatchObject({ card: 'generic', title: 'Open terminal main' })
