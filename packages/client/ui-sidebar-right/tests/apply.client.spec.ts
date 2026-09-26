@@ -13,13 +13,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { createSnapshotStore, ProjectUiPolicyRuntime } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, ProjectUiPolicyRuntime, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/index.ts'
 import type { GuideInjected, SidebarRightInjected } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
 import { SidebarRightController } from '../src/client/service.ts'
 import { SidebarRightTabRegistry } from '../src/client/tab-registry.ts'
 import type { createSidebarRightStore } from '../src/client/stores.ts'
+import type { RightbarActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 import { RightbarSeat } from '../src/client/shell/SidebarRight.tsx'
 import { RightbarRoot } from '../src/client/shell/RightbarRoot.tsx'
 import { ExpandButton, BlankExpandButton } from '../src/client/shell/ExpandButton.tsx'
@@ -61,7 +62,10 @@ async function boot() {
       return () => { dictionaries.delete(ns) }
     }),
   }
-  const layout = { bindRightbar: vi.fn(() => () => {}), focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() }
+  const layout = {
+    bindRightbar: vi.fn((_owner: RightbarActions) => () => {}),
+    focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
+  }
   const resources = { pin: vi.fn<(address: string, signal: AbortSignal) => void>() }
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
@@ -69,7 +73,7 @@ async function boot() {
   ctx.provide('workspaceResources', resources as never)
   const sessions = {
     retain: vi.fn(() => ({ release: vi.fn() })),
-    list: createSnapshotStore({ current: SESSION, byId: { [SESSION]: { id: SESSION } } }),
+    list: createSnapshotStore({ current: SESSION as SessionId | undefined, byId: { [SESSION]: { id: SESSION } } }),
   }
   ctx.provide('sessions', sessions as never)
   const policy = new ProjectUiPolicyRuntime()
@@ -305,5 +309,108 @@ describe('ui-sidebar-right apply', () => {
     await ctx.plugin({ inject: [...inject], apply }).await()
     expect(ctx.sidebarRightTabs.get('guide')?.id).toBe(GUIDE_ID)
     expect(registered).toHaveLength(8)
+  })
+
+  it('routes tool details through the bar binding and collapses on close', async () => {
+    const { ctx, seat, layout, sessions, fiber } = await boot()
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    const binding = layout.bindRightbar.mock.calls[0]?.[0] as RightbarActions
+    binding.openDetails(SESSION, { callId: 'call-1' })
+    expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
+    // A title lookup for a non-tool address falls back to the generic label.
+    expect(ctx.sidebarRightTabs.get('tool-details')?.title('dsh-resource://file/session/s/x.txt'))
+      .toBe('tab.tool.title')
+    const tab = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs)
+      .find(item => item.kind === 'tool-details')
+    expect(tab?.contentId).toBe(`dsh-resource://tool/session/${SESSION}/call-1`)
+
+    // No explicit Session falls back to the mounted current Session.
+    binding.openDetails(undefined, { callId: 'call-2' })
+    expect(() => binding.openDetails(SESSION, undefined)).toThrow('require an explicit Session and call')
+    sessions.list.set({ current: undefined, byId: {} })
+    expect(() => binding.openDetails(undefined, { callId: 'call-3' })).toThrow('require an explicit Session and call')
+
+    binding.close(SESSION)
+    expect(instance.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(false)
+    await fiber.dispose()
+  })
+
+  it('pins a workspace file tab and releases the session reference when the pin fails', async () => {
+    const { ctx, seat, resources, sessions, fiber } = await boot()
+    ctx.sidebarRightTabs.register({
+      id: 'test/file', kind: 'file', patterns: ['dsh-resource://file/**'], title: address => address,
+    })
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    const reference = { release: vi.fn() }
+    sessions.retain.mockReturnValueOnce(reference as never)
+    resources.pin.mockImplementationOnce(() => { throw new Error('pin failed') })
+    expect(() => {
+      ctx.sidebarRight.openResourceIn(SESSION, `dsh-resource://file/session/${SESSION}/a.txt`)
+    }).toThrow('pin failed')
+    expect(reference.release).toHaveBeenCalled()
+    await fiber.dispose()
+  })
+
+  it('clears a persisted layout whose resource tab failed ownership validation', async () => {
+    const values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+      removeItem: (key: string) => { values.delete(key) },
+    })
+    try {
+      const { ctx, seat, description, policy, fiber } = await boot()
+      description.set({ executionAuthorityRequired: true })
+      policy.setVerifiedAccountId(1)
+      const key = sessionPersistenceKey(ctx.sessions, SESSION, true, 1)
+      if (key === undefined) throw new Error('expected a persistence key')
+      const storage = `dsh.sidebar-right.v1.${key}`
+      values.set(storage, JSON.stringify({
+        bySession: {
+          [key]: {
+            layout: {
+              nodes: {
+                pane1: { kind: 'pane', id: 'pane1', host: 'dock', tabs: ['tab1'], activeTabId: 'tab1' },
+              },
+              tabs: {
+                tab1: {
+                  id: 'tab1', kind: 'file', title: 'a',
+                  // Another Session's resource: the restore must not adopt it.
+                  contentId: 'dsh-resource://file/session/s-other/a.txt',
+                },
+              },
+              rootId: 'pane1', floats: [], activePaneId: 'pane1', expanded: true, mode: 'push',
+            },
+            minted: 1,
+          },
+        },
+      }))
+      const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+      const instance = handle.create(SESSION)
+      expect(values.has(storage)).toBe(false)
+      expect(instance.getSnapshot().bySession).toEqual({})
+      await fiber.dispose()
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('drops only the session binding when nothing was persisted', async () => {
+    const { seat, fiber } = await boot()
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    // 's-anon' has no owned persistence key, so clearing skips storage removal.
+    const instance = handle.create('s-anon' as SessionId)
+    expect(() => instance.clearPersisted()).not.toThrow()
+    await fiber.dispose()
+  })
+
+  it('focuses the bar from the corner, blank-input, and mobile expand faces', async () => {
+    const { seat, injectedOf, layout, fiber } = await boot()
+    for (const name of ['conversation.session.header.corner', 'conversation.input.left', 'shell.mobile.header.actions']) {
+      (injectedOf(seat(name)) as { focus(): void }).focus()
+      expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
+    }
+    await fiber.dispose()
   })
 })

@@ -20,6 +20,7 @@ function read(key: string | undefined, origin: string): BrowserState {
       if (saved.index < -1 || saved.index >= saved.entries.length || (saved.index === -1) !== (saved.entries.length === 0)) continue
       const entries = saved.entries.map(url => parseBrowserAddress(url, origin))
       if (entries.some(entry => !entry.ok)) continue
+      /* v8 ignore next -- the some() continue above already rejects every unparseable entry */
       const targets = entries.flatMap(entry => entry.ok ? [entry.target] : [])
       const target = targets[saved.index]
       state.byTab[id as TabId] = { ...BrowserNavigation.empty(), entries: targets, index: saved.index,

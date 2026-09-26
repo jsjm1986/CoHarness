@@ -18,10 +18,12 @@ export function parseToolAddress(address: string): { sessionId: SessionId; callI
   const match = /^dsh-resource:\/\/tool\/session\/([^/]+)\/([^/]+)$/u.exec(address)
   if (match === null) return undefined
   const [, encodedSession, encodedCall] = match
+  /* v8 ignore if -- the pattern above captures both groups unconditionally */
   if (encodedSession === undefined || encodedCall === undefined) return undefined
   try {
     const sessionId = decodeURIComponent(encodedSession) as SessionId
     const callId = decodeURIComponent(encodedCall)
+    /* v8 ignore next -- each segment matched [^/]+, so neither decode can be empty */
     return sessionId.length > 0 && callId.length > 0 ? { sessionId, callId } : undefined
   } catch (_invalidEncoding) { return undefined }
 }

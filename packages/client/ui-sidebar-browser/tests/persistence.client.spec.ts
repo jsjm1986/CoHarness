@@ -56,6 +56,38 @@ it('rejects damaged storage, foreign-origin policy violations and invalid histor
   setupState.dispose()
 })
 
+it('restores an empty history without a pending request', () => {
+  const setupState = setup()
+  setupState.values.set(
+    'dsh.sidebar-browser.scoped.v1.account:1/runtime:personal/session:one',
+    JSON.stringify({ version: 1, tabs: { tab9: { entries: [], index: -1 } } }))
+  const store = setupState.handle.create('one')
+  expect(store.getSnapshot().byTab['tab9' as TabId]?.entries).toEqual([])
+  expect(store.getSnapshot().byTab['tab9' as TabId]?.request).toBeUndefined()
+  setupState.dispose()
+})
+
+it('serves bare stores off-scope and skips writes with no live owner key', () => {
+  const setupState = setup()
+  // A scopeless create returns an unwired instance: no restore, no writes.
+  const bare = setupState.handle.create(undefined)
+  expect(bare.getSnapshot().byTab).toEqual({})
+
+  const store = setupState.handle.create('one')
+  const navigation = new BrowserNavigation()
+  navigation.navigate({ kind: 'https', url: 'https://example.test/', title: 'example.test' })
+  store.actions.replace(tab, navigation.snapshot)
+  const size = setupState.values.size
+  // A same-key notification is a no-op: no restore, no extra write.
+  setupState.setKey('account:1/runtime:personal/session:one')
+  expect(setupState.values.size).toBe(size)
+  // Losing the owner key stops persistence: mutations no longer reach storage.
+  setupState.setKey(undefined)
+  store.actions.replace(tab, navigation.snapshot)
+  expect(setupState.values.size).toBe(size)
+  setupState.dispose()
+})
+
 it('keeps closed-tab removal and unavailable storage local to its owner', () => {
   const setupState = setup()
   const store = setupState.handle.create('one')

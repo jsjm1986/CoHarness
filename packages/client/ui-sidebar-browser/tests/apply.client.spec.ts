@@ -41,8 +41,10 @@ async function boot() {
     }),
   }
   ctx.provide('sidebarRightTabs', tabs as never)
-  ctx.provide('sidebarRight', { openSessionTab: vi.fn() } as never)
-  ctx.provide('layout', { focusRightbar: vi.fn() } as never)
+  const openSessionTab = vi.fn()
+  const focusRightbar = vi.fn()
+  ctx.provide('sidebarRight', { openSessionTab } as never)
+  ctx.provide('layout', { focusRightbar } as never)
   ctx.provide('sessions', { list: createSnapshotStore({ byId: {} }) } as never)
   ctx.provide('connection', { hostDescription: createSnapshotStore(undefined) } as never)
   ctx.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
@@ -50,7 +52,7 @@ async function boot() {
   ctx.provide('locale', locale as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { tabs, registered, dictionaries, fiber }
+  return { ctx, tabs, registered, dictionaries, fiber, openSessionTab, focusRightbar }
 }
 
 describe('ui-sidebar-browser apply', () => {
@@ -76,6 +78,26 @@ describe('ui-sidebar-browser apply', () => {
     const browser = injectFace('session', { replace: vi.fn(), forget: vi.fn() }) as BrowserInjected
     expect(browser.keyedHooks.browserFrame('missing')).toBeUndefined()
     expect(typeof browser.mount).toBe('function')
+  })
+
+  it('opens the session browser tab on web/browser-open and focuses the bar', async () => {
+    const { ctx, openSessionTab, focusRightbar, fiber } = await boot()
+    expect(ctx.bail('web/browser-open', { sessionId: 's1' as never, url: 'https://example.test/' })).toBe(true)
+    expect(openSessionTab).toHaveBeenCalledWith('s1', 'browser', { params: { url: 'https://example.test/' } })
+    expect(focusRightbar).toHaveBeenCalledWith('s1')
+    await fiber.dispose()
+  })
+
+  it('scopes persisted history through the live owner key', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://app.test' } })
+    const { registered, fiber } = await boot()
+    const store = registered[0]?.store as { create(scopeKey?: string): { getSnapshot(): unknown } }
+    // The scope key resolves against live ownership stores; no owned session
+    // here means the key stays undefined and the restore reads nothing.
+    const scoped = store.create('s1')
+    expect(scoped.getSnapshot()).toEqual({ byTab: {} })
+    await fiber.dispose()
+    vi.unstubAllGlobals()
   })
 
   it('removes every registration when the plugin is disposed', async () => {

@@ -128,6 +128,7 @@ export function apply(ctx: ClientContext): void {
           ctx.workspaceResources.pin({ ...file, runtimeTarget, address: workspaceResourceAddress(sessionId, file.path) }, signal)
         }
         signal.addEventListener('abort', () => { reference.release() }, { once: true })
+        /* v8 ignore if -- the domain pins an occurrence before any sync can abort it; this guards an abort racing the listener attach */
         if (signal.aborted) reference.release()
       } catch (error) {
         reference.release()

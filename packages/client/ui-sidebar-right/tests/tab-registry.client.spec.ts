@@ -281,6 +281,19 @@ describe('SidebarRightTabRegistry — lifetime', () => {
     expect(seen).toHaveBeenCalledTimes(2)
   })
 
+  it('logs a throwing subscriber and still notifies the rest', () => {
+    const registry = new SidebarRightTabRegistry(new Context())
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const seen = vi.fn()
+    const boom = new Error('subscriber failed')
+    registry.subscribe(() => { throw boom })
+    registry.subscribe(seen)
+    registry.register(typeFor('text', ['dsh-resource://file/**']))
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('tab registry subscriber failed'), boom)
+    expect(seen).toHaveBeenCalledTimes(1)
+    error.mockRestore()
+  })
+
   it('keeps entries reference-stable between changes', () => {
     const registry = new SidebarRightTabRegistry(new Context())
     registry.register(typeFor('text', ['dsh-resource://file/**']))

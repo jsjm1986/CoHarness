@@ -622,6 +622,28 @@ describe('SidebarRightController — a tab\'s own actions', () => {
     second()
     third()
   })
+
+  it('opens a kind into an adopted session directly and refuses an unadopted one', () => {
+    const { controller, adopt, instance, titles } = harness()
+    const release = adopt(SESSION, instance)
+    controller.openSessionTab(SESSION, 'guide')
+    expect(titles()).not.toEqual([])
+    expect(() => { controller.openSessionTab(OTHER, 'guide') }).toThrow('Session is not adopted')
+    release()
+  })
+
+  it('expands a named adopted session or the mounted one, refusing a session with no surface', () => {
+    const { controller, adopt, instance, publish, layout } = harness()
+    const release = adopt(SESSION, instance)
+    publish()
+    controller.setExpandedIn(SESSION, true)
+    expect(layout().expanded).toBe(true)
+    // Omitted session resolves the mounted binding's owner.
+    controller.setExpandedIn(undefined, false)
+    expect(layout().expanded).toBe(false)
+    expect(() => { controller.setExpandedIn(OTHER, true) }).toThrow('no adopted surface')
+    release()
+  })
 })
 
 describe('SidebarRightController — the readable slice', () => {
