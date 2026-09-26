@@ -40,7 +40,7 @@
     {
       "name": "long-session-browser",
       "status": "measured",
-      "evidence": "4/4 tests pass on the shipped-composition Web scaffold in fresh Chromium. 240-turn history: open median 177.4 ms (budget 1125), slowest older page 181.0 ms (875), first Trajectory 263.2 ms (650), first reply 242.3 ms (2750), stream main-thread task 1457.6 ms (4500), trusted draft typing 334.6 ms (1250), complete response wall 2284.5 ms (4484). All three samples report inputOverlapped true; post-GC browser heap ~60.5 MB and 16,779 DOM nodes are diagnostics."
+      "evidence": "4/4 tests pass on the shipped-composition Web scaffold in fresh Chromium. 240-turn history: open median 177.4 ms (budget 1125), slowest older page 181.0 ms (875), first Trajectory 263.2 ms (850), first reply 242.3 ms (2750), stream main-thread task 1457.6 ms (4500), trusted draft typing 334.6 ms (1250), complete response wall 2284.5 ms (4484). All three samples report inputOverlapped true; post-GC browser heap ~60.5 MB and 16,779 DOM nodes are diagnostics."
     },
     {
       "name": "conversation-fold",

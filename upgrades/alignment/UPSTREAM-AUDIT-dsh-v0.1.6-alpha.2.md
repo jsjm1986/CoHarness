@@ -454,6 +454,8 @@ B10 验证中运行 `verify-default-product-isolation`、`verify-package-depende
 
 **conversation-fold 缩放比重校准（有依据的本地分化）。** 上游期望 2.5×/上限 3.125× 假定 fold 成本与记录数成比例；本地 fold 每次窗口替换还重建 location、turn-navigation 与 timeline 投影，小窗口固定成本抬高比值。实测缩放稳定 4.6–5.3，期望改为 5×/上限 6.25×——判别力保留（逐 delta 重放退化约 11× 仍被拒）。同一笔额外汇编也使绝对时间期望重校准为 18 ms（上限 45 ms）：首个托管 Ubuntu 运行实测 41.7 ms，超出按上游较轻 fold 校准的 40 ms 上限、但在按本地参考机的 2.5 倍系数预算内。依据写入 `session-open-performance-gate` note 双语。
 
+**long-session-browser Trajectory 上限重校准（同型边界修正）。** 上游 520 ms 目标/650 ms 上限处于实测托管分布内部：上游自己的 run 35095609422 已记录 666.7/630.8 ms 中位数（旧上限拒绝其首次执行），本分支 run 36208631023/36215749263 的中位数为 629.5/658.4 ms、逐样本 596.9–664.7 ms。目标改为 680 ms（上限 850 ms），对最大实测中位数向上取整，记录样本对照同步覆盖新区间；其他终点预算不变。依据写入 `frontend-performance-budgets` note 双语。
+
 **CI 门禁补齐（真实缺口）。** `ci.yml` 新增 `node-24-bench` job：标准托管 `ubuntu-24.04`、不经 failover 路由、无 `needs`（独立测量车道）、15 分钟超时、pnpm store 无条件恢复、Chromium 安装与 `DSH_GATE_VERBOSE=1` 的 `check:ci:bench`；`all-checks-passed` 收编该 job。`ci-workflow.spec.ts` 移植上游三组断言（failover 无关性、cache 形态、步骤与超时钉住），21/21 通过。
 
 **附带发现的真实缺口（已修复）。** `request-freeze.spec.ts`（WeakSet 冻结证明的专属 spec）未随优化一同移植——已按本地语义适配补入：`dsh-llm` 携带自有 `deepFreeze`（避免 client bundle 依赖 host-only util 包，spy 目标随之改到 `dsh-llm` 再导出面），且本地 `fromRestore` 在收养时即深冻结恢复图（`freezeRestoredObject`），"包装器可变"断言按本地更强冻结语义反转，5/5 通过。上游五个支撑 note 三件套补齐：`session-open-performance-gate`（fold 校准行按本地化）、`frontend-performance-budgets`、`standard-hosted-benchmark-runner`、`backend-continuation-performance`、`agent-request-freeze-evidence`，及被其引用的 `minimal-profiles-persistent-shell-only`（对未采纳的 base-editor 决策的交叉引用按本地事实改写）。六个配对全部经 `verify-translation-pairing` 重录/通过，note 内零死链。
