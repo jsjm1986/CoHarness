@@ -27,8 +27,11 @@ const WORKER_TIMEOUT_MS = 60_000
  * The large window contains 500,000 streamed deltas compacted into 1,600
  * stream records. The budget separates the record-proportional fold from the
  * per-delta replay that needs hundreds of milliseconds for the same window.
+ * The CoHarness fold also rebuilds the location, turn-navigation, and
+ * timeline projections per window replace; repeated reference measurements
+ * place the fold at 18 ms.
  */
-const EXPECTED_LARGE_FOLD_MS = 16
+const EXPECTED_LARGE_FOLD_MS = 18
 const LARGE_FOLD_BUDGET_MS = ciTimeBudget(EXPECTED_LARGE_FOLD_MS)
 
 /**
