@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest'
 import { RemoteProcesses } from '../src/helper-processes.ts'
 import { authenticateStream } from '../src/stream-security.ts'
 
-describe('SSH TLS cancellation ownership', () => {
+// The helper runs on the POSIX SSH endpoint only; its stream transports are
+// Unix sockets, which a native Windows host cannot listen on.
+describe.skipIf(process.platform === 'win32')('SSH TLS cancellation ownership', () => {
   it('cancels an authenticated stream before closing its underlying socket', async () => {
     const root = await mkdtemp('/tmp/dsh-ssh-tls-life-')
     const owner = new RemoteProcesses(new Context(), root, 1, 5000)

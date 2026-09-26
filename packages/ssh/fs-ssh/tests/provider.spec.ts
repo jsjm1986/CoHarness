@@ -40,7 +40,9 @@ describe('SSH filesystem provider', () => {
     const path = `/remote/work/${name}`
     const url = fs.fileUrl({ targetKey: FsTargetKey(path), displayPath: path })
     expect(url).toBe(`file:///remote/work/${encoded}`)
-    expect(fileURLToPath(url)).toBe(path)
+    // Decoding is the host's fileURLToPath; a POSIX remote spelling only
+    // round-trips on a POSIX host.
+    if (process.platform !== 'win32') expect(fileURLToPath(url)).toBe(path)
   })
 
   it('keeps remote canonical paths and sends relative spelling to the remote resolver', async () => {

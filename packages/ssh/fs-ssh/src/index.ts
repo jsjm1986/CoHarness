@@ -1,6 +1,5 @@
 /** Filesystem provider preserving remote identities and helper-owned atomic mutations. */
 import { posix } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { FileSystem, FsError } from '@deepseek-ai/dsh-fs'
 import type { FsDirEntry, FsEditOutcome, FsEditRequest, FsErrorCode, FsInfo, FsPathInfo, FsTarget, FsVersion, FsWriteIntent, FsWriteOutcome } from '@deepseek-ai/dsh-fs'
 import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
@@ -16,6 +15,27 @@ const errorCodes: Record<FsErrorCode, true> = {
   FS_STALE_VERSION: true, FS_NOT_OBSERVED: true, FS_AMBIGUOUS_EDIT: true, FS_EDIT_NOT_FOUND: true, FS_ABORTED: true,
 }
 
+const utf8 = new TextEncoder()
+
+/**
+ * Serialize one remote absolute path into `file:` URI form. The execution
+ * world is POSIX on every SSH target, so percent-encoding follows the URL
+ * path rules Node's `pathToFileURL` applies on a POSIX host — never the
+ * host's separator or drive-letter rules.
+ */
+function posixFileUrl(path: string): string {
+  let out = 'file://'
+  for (const char of path) {
+    const code = char.codePointAt(0) as number
+    if (code < 0x21 || code > 0x7a || '"#%<>?[\\]^`'.includes(char)) {
+      for (const byte of utf8.encode(char)) out += `%${byte.toString(16).toUpperCase().padStart(2, '0')}`
+    } else {
+      out += char
+    }
+  }
+  return out
+}
+
 /** Remote filesystem paired with the SSH subprocess and sandbox providers. */
 export class SshFileSystem extends FileSystem {
   static inject = ['ssh', 'sandboxPolicy']
@@ -29,7 +49,7 @@ export class SshFileSystem extends FileSystem {
   override processPath(target: FsTarget): string { return String(target.targetKey) }
 
   override fileUrl(target: FsTarget): string {
-    return pathToFileURL(this.processPath(target)).href
+    return posixFileUrl(this.processPath(target))
   }
 
   override contains(parent: FsTarget, child: FsTarget): boolean {
