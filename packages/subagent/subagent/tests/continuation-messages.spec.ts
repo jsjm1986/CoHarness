@@ -60,6 +60,7 @@ describe('continuable settlement content', () => {
 
   it('attributes the captured execution scope to relay and settlement notices', () => {
     const scope: ExecutionInheritance = {
+      parentSessionId: childId,
       inputs: ['00000000-0000-4000-8000-000000000001' as ExecutionInheritance['inputs'][number]],
       primaryActorUserId: 7,
       unverifiedHistory: false,

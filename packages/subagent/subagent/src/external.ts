@@ -310,6 +310,7 @@ export function externalPromptWindow(
   let throughMessageId: MessageId | undefined
   for (let i = windowStart; i < messages.length; i++) {
     const message = messages[i]
+    /* v8 ignore next -- the first loop bounds windowStart to a dense run of user messages, so neither guard can fire here. */
     if (message === undefined || message.role !== 'user') return undefined
     const text = message.content
       .filter(block => block.type === 'text')

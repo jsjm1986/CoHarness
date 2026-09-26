@@ -158,6 +158,7 @@ class ClaudeMemberSession implements ExternalMemberSession {
       env: this.config.env,
       disposeGraceMs: this.config.disposeGraceMs,
       spawn: this.spawn,
+      /* v8 ignore next -- the member spec feeds only claudeQueryOptions, which never reads onError. */
       onError: () => undefined,
     }
     const options = {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Options, Query, SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
@@ -10,6 +10,9 @@ import {
   ExternalBindingStore,
   EXTERNAL_TURN_OUTCOME_UNKNOWN,
   externalMemberTurn,
+  type ExternalMemberSession,
+  type ExternalTurnBound,
+  type ExternalTurnOutcome,
 } from '@deepseek-ai/dsh-subagent/external'
 import type { SubprocessHandle } from '@deepseek-ai/dsh-subprocess'
 import {
@@ -105,7 +108,7 @@ function queryFrom(messages: readonly SDKMessage[]): Query {
 
 interface CapturedQuery {
   prompt: string
-  options: { resume?: string; persistSession?: boolean }
+  options: Options
 }
 
 const captured: CapturedQuery[] = []
@@ -114,19 +117,24 @@ beforeEach(() => {
   queryMock.mockReset()
 })
 
+/** Invoke the member's process seam the way the SDK does, so the session captures its child. */
+function spawnFor(options: Options): void {
+  const spawn = options.spawnClaudeCodeProcess
+  if (spawn === undefined) throw new Error('member query must carry a process seam')
+  spawn({
+    command: '/sdk/claude',
+    args: [],
+    ...options.cwd === undefined ? {} : { cwd: options.cwd },
+    env: options.env ?? {},
+    signal: options.abortController?.signal ?? new AbortController().signal,
+  })
+}
+
 /** Script the next `query` call to spawn a fake child and stream `messages`. */
 function scriptQuery(messages: readonly SDKMessage[]): void {
   queryMock.mockImplementationOnce(({ prompt, options }: { prompt: string; options: Options }) => {
     captured.push({ prompt, options })
-    const spawn = options.spawnClaudeCodeProcess
-    if (spawn === undefined) throw new Error('member query must carry a process seam')
-    spawn({
-      command: '/sdk/claude',
-      args: [],
-      ...options.cwd === undefined ? {} : { cwd: options.cwd },
-      env: options.env ?? {},
-      signal: options.abortController?.signal ?? new AbortController().signal,
-    })
+    spawnFor(options)
     return queryFrom(messages)
   })
 }
@@ -351,6 +359,208 @@ describe('ClaudeMemberTransport', () => {
   })
 })
 
+describe('ClaudeMemberSession', () => {
+  /** Drive one member turn to completion, returning its yielded pieces. */
+  async function collectTurn(session: ExternalMemberSession) {
+    const pieces: (string | ExternalTurnBound | ExternalTurnOutcome)[] = []
+    for await (const piece of session.turn('task', signal)) pieces.push(piece)
+    return pieces
+  }
+
+  it('propagates an already-aborted open signal into the SDK options', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open('claude-session-1', AbortSignal.abort())
+    scriptQuery([success('answer')])
+    await collectTurn(session)
+    // The turn's own signal is live; only the session controller aborted.
+    expect(captured[0]!.options.abortController?.signal.aborted).toBe(true)
+    await session.dispose()
+  })
+
+  it('propagates an open-signal abort that arrives after open', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const controller = new AbortController()
+    const session = await transport.open('claude-session-1', controller.signal)
+    controller.abort(new Error('stop'))
+    scriptQuery([success('answer')])
+    await collectTurn(session)
+    expect(captured[0]!.options.abortController?.signal.aborted).toBe(true)
+    await session.dispose()
+  })
+
+  it('forwards the configured native model to the SDK options', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(
+      { ...memberConfig(dir), model: 'claude-test-model' },
+      spawnDouble(),
+    )
+    const session = await transport.open('claude-session-1', signal)
+    scriptQuery([success('answer')])
+    await collectTurn(session)
+    expect(captured[0]!.options.model).toBe('claude-test-model')
+    await session.dispose()
+  })
+
+  it('denies an unattended tool-permission callback instead of asking a human', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(
+      { ...memberConfig(dir), permissionMode: 'dontAsk' },
+      spawnDouble(),
+    )
+    const session = await transport.open('claude-session-1', signal)
+    const denials: Promise<unknown>[] = []
+    queryMock.mockImplementationOnce(({ prompt, options }: { prompt: string; options: Options }) => {
+      captured.push({ prompt, options })
+      spawnFor(options)
+      denials.push(options.canUseTool!('Bash', { command: 'ls' }, {
+        signal: options.abortController!.signal,
+        toolUseID: 'tool-1',
+        requestId: 'request-1',
+      }))
+      return queryFrom([success('answer')])
+    })
+    await collectTurn(session)
+    await expect(denials[0]!).resolves.toMatchObject({ behavior: 'deny' })
+    await session.dispose()
+  })
+
+  it('fails the turn on a non-success result and keeps the reported errors', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open('claude-session-1', signal)
+    scriptQuery([{
+      type: 'result',
+      subtype: 'error_max_turns',
+      is_error: true,
+      errors: ['hit the turn cap', 'second detail'],
+      session_id: 'claude-session-1',
+    } as unknown as SDKResultMessage])
+    await expect(collectTurn(session))
+      .rejects.toThrow('claude member turn failed (error_max_turns): hit the turn cap; second detail')
+    await session.dispose()
+  })
+
+  it('reports "no result" when a failure result carries no error list', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open('claude-session-1', signal)
+    scriptQuery([
+      // A non-array `errors` cannot feed the detail join either.
+      {
+        type: 'result', subtype: 'error_during_execution', is_error: true,
+        errors: 'not-a-list', session_id: 'claude-session-1',
+      } as unknown as SDKResultMessage,
+      {
+        type: 'result', subtype: 'error_during_execution', is_error: true,
+        session_id: 'claude-session-1',
+      } as unknown as SDKResultMessage,
+    ])
+    await expect(collectTurn(session))
+      .rejects.toThrow('claude member turn failed (error_during_execution): no result')
+    await session.dispose()
+  })
+
+  it('rethrows an Error the SDK stream fails with', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open('claude-session-1', signal)
+    queryMock.mockImplementationOnce(({ options }: { prompt: string; options: Options }) => {
+      spawnFor(options)
+      return Object.assign((async function* (): AsyncGenerator<SDKMessage, void> {
+        yield { type: 'system', subtype: 'init', session_id: 'claude-session-1' } as unknown as SDKMessage
+        throw new Error('sdk stream died')
+      })(), { close: vi.fn() })
+    })
+    await expect(collectTurn(session)).rejects.toThrow('sdk stream died')
+    await session.dispose()
+  })
+
+  it('wraps a non-Error SDK stream rejection', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open('claude-session-1', signal)
+    queryMock.mockImplementationOnce(({ options }: { prompt: string; options: Options }) => {
+      spawnFor(options)
+      return Object.assign((async function* (): AsyncGenerator<SDKMessage, void> {
+        // A protocol-level rejection is not guaranteed to be an Error.
+        throw 'raw sdk failure'
+      })(), { close: vi.fn() })
+    })
+    await expect(collectTurn(session)).rejects.toThrow('raw sdk failure')
+    await session.dispose()
+  })
+
+  it('fails a turn that ends without a result message', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open('claude-session-1', signal)
+    // An assistant message carries no session_id and no result: the turn has
+    // nothing to mint from and nothing to settle on.
+    scriptQuery([{
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'thinking' }] },
+    } as unknown as SDKMessage])
+    await expect(collectTurn(session))
+      .rejects.toThrow('claude member turn ended without a result')
+    await session.dispose()
+  })
+
+  it('proves an unbound session absent without reading a transcript', async () => {
+    const dir = root()
+    const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
+    const session = await transport.open(undefined, signal)
+    await expect(session.recover(
+      { prompt: 'p', throughMessageId: userMessages(['x'])[0]!.id },
+      signal,
+    )).resolves.toEqual({ kind: 'absent' })
+    await session.dispose()
+  })
+})
+
+describe('recoverClaudeSession transcript variants', () => {
+  function pending(prompt: string) {
+    return { prompt, throughMessageId: userMessages(['x'])[0]!.id }
+  }
+
+  it('joins assistant text while skipping entries that carry no usable text', () => {
+    const dir = root()
+    const home = root()
+    vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
+    writeTranscript(home, dir, 'claude-v', [
+      { type: 'user', message: { role: 'user', content: 'task' } },
+      // A user entry with no message at all reads as empty text, as does one
+      // whose only block lost its text field — neither can match the prompt.
+      { type: 'user' },
+      { type: 'user', message: { role: 'user', content: [{ type: 'text' }] } },
+      { type: 'user', message: { role: 'user', content: 'later question' } },
+      { type: 'assistant', message: { role: 'assistant', content: [] } },
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'settled' }] } },
+    ])
+    expect(recoverClaudeSession(dir, 'claude-v', pending('task')))
+      .toEqual({ kind: 'result', text: 'settled' })
+  })
+
+  it('stops parsing at a torn tail line', () => {
+    const dir = root()
+    const home = root()
+    vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
+    writeTranscript(home, dir, 'claude-t', [
+      { type: 'user', message: { role: 'user', content: 'task' } },
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'answer' }] } },
+    ])
+    appendFileSync(
+      join(home, '.claude', 'projects', projectSlug(dir), 'claude-t.jsonl'),
+      '{"type":',
+    )
+    expect(recoverClaudeSession(dir, 'claude-t', pending('task')))
+      .toEqual({ kind: 'result', text: 'answer' })
+  })
+})
+
 describe('ClaudeMemberAdapter', () => {
   it('rejects auxiliary model calls — the member route serves conversation only', () => {
     const dir = root()
@@ -365,5 +575,25 @@ describe('ClaudeMemberAdapter', () => {
       purpose: 'compaction',
       sessionId: SessionId('child-1'),
     })).toThrow(/auxiliary/)
+  })
+
+  it('reports the fixed member model and serves conversation requests', async () => {
+    const dir = root()
+    const adapter = new ClaudeMemberAdapter(
+      new ClaudeMemberTransport(memberConfig(dir), spawnDouble()),
+      new ExternalBindingStore(join(dir, 'bindings.jsonl')),
+    )
+    expect(adapter.providerInfo('route-x')).toEqual({ id: 'route-x', name: 'Claude Code member' })
+    await expect(adapter.listModels('route-x')).resolves.toEqual([
+      { provider: 'route-x', id: CLAUDE_MEMBER_MODEL, name: 'Claude Code member' },
+    ])
+    // A conversation request returns the shared external-turn iterable.
+    const stream = adapter.stream({
+      provider: CLAUDE_MEMBER_ROUTE,
+      model: CLAUDE_MEMBER_MODEL,
+      messages: userMessages(['x']),
+      sessionId: SessionId('child-1'),
+    })
+    expect(typeof stream[Symbol.asyncIterator]).toBe('function')
   })
 })

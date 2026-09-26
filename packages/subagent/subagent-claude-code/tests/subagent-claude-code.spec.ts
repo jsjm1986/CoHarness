@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import type {
@@ -23,7 +24,8 @@ import {
   vi,
 } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import LlmRuntime, { type ContentBlock } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, type ContentBlock, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type {
   SubprocessHandle,
@@ -33,6 +35,7 @@ import type {
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import * as claudeCode from '../src/index.ts'
+import { CLAUDE_MEMBER_MODEL, CLAUDE_MEMBER_ROUTE } from '../src/member.ts'
 import {
   claudeSpawnSpec,
   ManagedClaudeCodeProcess,
@@ -361,6 +364,64 @@ describe('named persistent member routes', () => {
       expect(ctx.subagents.getProvider('claude-code')!.agentRouteDefaults!.provider).toBe(firstRoute.provider)
     } finally {
       await ctx.fiber.dispose()
+    }
+  })
+
+  it('prepares continuable members and drives member turns through ctx.subprocess.spawn', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      const child = fakeChild()
+      const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => child.handle)
+      await ctx.plugin(claudeCode, { stateDir: dir, memberCwd: dir })
+
+      const provider = ctx.subagents.getProvider('claude-code')!
+      await expect(provider.prepareContinuable!({
+        sessionId: SessionId('continuable-child'),
+        parent: fakeParent,
+        signal: new AbortController().signal,
+      })).resolves.toEqual({})
+
+      queryMock.mockImplementationOnce(({ options }) => {
+        options.spawnClaudeCodeProcess!(sdkSpawnOptions({
+          cwd: options.cwd!,
+          env: options.env!,
+          signal: options.abortController!.signal,
+        }))
+        return queryFrom([{
+          type: 'result',
+          subtype: 'success',
+          is_error: false,
+          result: 'member answer',
+          session_id: 'claude-session-ctx',
+          usage: { input_tokens: 3, output_tokens: 5 },
+        } as unknown as SDKResultMessage])
+      })
+      const chunks: StreamChunk[] = []
+      for await (const chunk of ctx.llm.stream({
+        provider: CLAUDE_MEMBER_ROUTE,
+        model: CLAUDE_MEMBER_MODEL,
+        sessionId: SessionId('ctx-member-child'),
+        messages: [createUserMessage({
+          content: [{ type: 'text', text: 'member task' }],
+          source: { kind: 'user' },
+        })],
+      })) chunks.push(chunk)
+      const text = chunks
+        .filter((c): c is StreamChunk & { type: 'text-delta'; text: string } => c.type === 'text-delta')
+        .map(c => c.text)
+        .join('')
+      expect(text).toBe('member answer')
+      // The plugin-built transport spawns through the shared subprocess seam,
+      // and the member session reaps that child when the turn settles.
+      expect(spawn).toHaveBeenCalledOnce()
+      expect(child.terminate).toHaveBeenCalledOnce()
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
 })
