@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "Process details":
   - text: Process details
   - img
@@ -16,7 +18,8 @@
   - img
   - img
   - text: System prompt
-- text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
+- text: Reply with a one-sentence description of event sourcing, then stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":
@@ -38,6 +41,7 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- img
-- text: 1 turns · 1 steps
+- group "Session statistics":
+  - img
+  - text: 1 turns · 1 steps
 - separator "Adjust transcript content width"
