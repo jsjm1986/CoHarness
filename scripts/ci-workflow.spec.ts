@@ -244,7 +244,12 @@ describe('CI workflow', () => {
     // wall-clock budgets never share a runner with a concurrent aggregate.
     expect(aggregate.needs).toContain('node-24-bench')
     expect(node24Bench.name).toBe('node 24 / benchmarks')
-    expect(node24Bench.env).toBeUndefined()
+    // Only the uploaded-evidence identity lives in job env: no failover or
+    // capacity variables may steer the measurement lane.
+    expect(node24Bench.env).toEqual({
+      DSH_EVIDENCE_JOB_NAME: 'node 24 / benchmarks',
+      DSH_EVIDENCE_ARTIFACT_NAME: 'gate-evidence-node-24-bench-${{ github.run_attempt }}',
+    })
     expect(node24Bench.steps).toContainEqual({
       name: 'Install benchmark browser and hosted dependencies',
       run: 'pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium',
@@ -530,7 +535,10 @@ describe('CI workflow', () => {
     expect(benchmark.if).toBe("github.event_name == 'pull_request'")
     expect(benchmark.needs).toBeUndefined()
     expect(benchmark['continue-on-error']).toBeUndefined()
-    expect(benchmark.env).toBeUndefined()
+    expect(benchmark.env).toEqual({
+      DSH_EVIDENCE_JOB_NAME: 'node 24 / benchmarks',
+      DSH_EVIDENCE_ARTIFACT_NAME: 'gate-evidence-node-24-bench-${{ github.run_attempt }}',
+    })
     expect(aggregate.needs).toContain('node-24-bench')
   })
 
