@@ -149,17 +149,28 @@ describe('HMR exact config paths', () => {
     const observed: string[] = []
     try {
       // A not-yet-existing parent forces the watcher to notice the new
-      // directory, attach to it, and then observe the file. Polling makes the
-      // discovery a bounded scan instead of waiting on FSEvents latency, which
-      // a loaded shared runner can delay past any fixed budget. The write is
-      // single-shot, so stabilization sampling is off: its repeated stats can
-      // starve on the shared UV threadpool under the coverage lane.
-      await watchConfig(ctx, filename, { usePolling: true, awaitWriteFinish: false }, () => {
+      // directory, attach to it, and then observe the file. The watched root's
+      // stat changes only when its own entries do, so a lone mkdir is a
+      // one-shot diff: a coalesced or dropped tick forfeits the scan and
+      // nothing re-triggers it. Toggling a probe entry on every poll is the
+      // directory form of the rewrite loop above — each delivered event is a
+      // fresh chance to bind the new parent, whose first scan already sees the
+      // file. Native events come off the kernel queue; fs.watchFile polling
+      // would also need a UV-threadpool stat per tick, which starves under
+      // the coverage lane.
+      await watchConfig(ctx, filename, { awaitWriteFinish: false }, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })
       mkdirSync(dir)
       writeFileSync(filename, 'created')
-      await eventually(() => observed.includes('created'), 'HMR did not observe config creation under a new parent', 60_000)
+      const probe = join(root, '.watch-probe')
+      let probing = false
+      await eventually(() => {
+        probing = !probing
+        if (probing) writeFileSync(probe, '')
+        else rmSync(probe, { force: true })
+        return observed.includes('created')
+      }, 'HMR did not observe config creation under a new parent', 60_000)
     } finally {
       await ctx.fiber.dispose()
     }
