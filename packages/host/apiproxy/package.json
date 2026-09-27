@@ -80,7 +80,7 @@
     "@deepseek-ai/dsh-util-crypto": "workspace:^",
     "@deepseek-ai/dsh-workspace": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "zod": "^4.4.3",
     "@deepseek-ai/dsh-workspace-changes": "workspace:^",
     "@deepseek-ai/dsh-office-to-pdf": "workspace:^"
