@@ -38,7 +38,8 @@ import { ToolBody } from './tabs/tool/ToolBody.tsx'
 import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
 import { GuideTitle } from './tabs/guide/GuideTitle.tsx'
 import { ExpandButton, BlankExpandButton } from './shell/ExpandButton.tsx'
-import { RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
+import { AUTO_FULLSCREEN_BELOW, RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
+import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
 import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
 import { SidebarSessionViews } from './session-views.ts'
 import { createSidebarRightController, type SidebarRightController } from './service.ts'
@@ -56,7 +57,7 @@ export type { GuideBodyProps, GuideInjected } from './tabs/guide/GuideBody.tsx'
 export type { ExpandButtonProps } from './shell/ExpandButton.tsx'
 export type { SidebarRightState, SurfaceState } from './stores.ts'
 export type {
-  ISidebarRight, SidebarRightBinding, SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions,
+  ISidebarRight, SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions,
   SidebarRightPlacement, SidebarRightCloseHandler, SurfaceActions,
 } from './service.ts'
 export type {
@@ -119,13 +120,20 @@ export function apply(ctx: ClientContext): void {
   // selection changes; the root below drives `select` through the frame's
   // target prop so a pinned `targetSessionId` wins over current selection.
   const views = new SidebarSessionViews(ctx.sessions)
-  ctx.effect(() => () => { views.dispose() }, 'ui-sidebar-right: retained Session views')
+  const current = ctx.sessions.list
+  ctx.effect(() => {
+    const sync = (): void => { views.select(current.getSnapshot().current) }
+    const unsubscribe = current.subscribe(sync)
+    sync()
+    return () => { unsubscribe(); views.dispose() }
+  }, 'ui-sidebar-right: retained Session views')
   const validateResource = (sessionId: SessionId, address: string): void => {
     const target = parseWorkspaceResourceAddress(address) ?? parseToolAddress(address)
     const owner = target?.sessionId ?? tabs.get(tabs.claim(address).kind)?.resourceSession?.(address)
     if (owner !== sessionId) throw new Error('Sidebar resource does not belong to this Session')
   }
-  const { controller, adopt, forget } = createSidebarRightController(
+  const layout: ILayout = ctx.layout
+  const { controller, adopt, forget, show, measure } = createSidebarRightController(
     tabs,
     (address, signal, sessionId) => {
       if (!address.startsWith('dsh-resource://')) return
@@ -145,8 +153,29 @@ export function apply(ctx: ClientContext): void {
         throw error
       }
     },
+    {
+      autoFullscreen: () => layout.viewportWidth.getSnapshot() < AUTO_FULLSCREEN_BELOW,
+      openWithFocus: (sessionId, open) => { openWithPaneFocus(document, sessionId, open) },
+      closeWithFocus: (sessionId, paneId, close) => { closeWithPaneFocus(document, sessionId, paneId, close) },
+    },
     { discoverSaved: false, validateResource },
   )
+  // The Session on screen: the selected one in the mounted right column.
+  // The source notifies before React renders its change, so the service names
+  // the arriving Session before any component of that commit reads it, and
+  // its seat mints the Session's store in the same render.
+  ctx.effect(() => {
+    const sync = (): void => {
+      const selected = views.source.getSnapshot().find(view => view.selected)
+      show(selected?.sessionId)
+    }
+    const unsubscribe = views.source.subscribe(sync)
+    sync()
+    return () => {
+      unsubscribe()
+      show(undefined)
+    }
+  }, 'ui-sidebar-right: on-screen Session')
   const disposeRegistry = ctx.reflect.provide('sidebarRightTabs', tabs)
   const disposeService = ctx.reflect.provide('sidebarRight', controller)
   // Registered first, so it tears down last: the faces outlive every seat and
@@ -226,13 +255,11 @@ export function apply(ctx: ClientContext): void {
         } }
       },
     }
-    const layout: ILayout = ctx.layout
-    const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab'> = {
+    const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom'> = {
       syncPresentation({ shown, track, fullscreen }) {
         if (shown) layout.openRightbar(track, fullscreen)
         else layout.closeRightbar()
       },
-      bindService: binding => controller.bind(binding),
       splitPane: (paneId) => { controller.split(paneId) },
       toggleFullscreen: () => { const target = controller.commandTarget(); if (target !== undefined) controller.toggleFullscreen(target) },
       openTab: (kind, options) => { controller.openTab(kind, options) },
@@ -282,6 +309,7 @@ export function apply(ctx: ClientContext): void {
         store,
         inject: (sessionId): SidebarRightInjected => ({
           ...injected,
+          measureRoom: (canSplitPane) => { measure(sessionId, canSplitPane) },
           closeTab: (tabId) => {
             try { controller.closeIn(sessionId, tabId) }
             catch (error) { console.error('Sidebar tab close failed:', error) }

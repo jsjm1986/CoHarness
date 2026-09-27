@@ -11,6 +11,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
 
 beforeEach(() => {
@@ -56,18 +57,40 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('shell.mobile.header.actions')).toEqual({ kind: 'list', scope: 'session' })
   })
 
-  it('injects no business face and attaches the layout actions', async () => {
+  it('publishes the frame\'s measured viewport width from the root store', async () => {
     const { ctx, slots } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    const actions = {
-      toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn(),
-    }
-    const injected = (slots.entries('root')[0]!.inject as (actions: never) => object)(actions as never)
-    expect(typeof (injected as { dismissRightbar: unknown }).dismissRightbar).toBe('function')
+    const instance = (slots.entries('root')[0]!.store as ReturnType<typeof createLayoutStore>).create()
     const layout = ctx.get('layout') as LayoutController
+    const seen: number[] = []
+    const unsubscribe = layout.viewportWidth.subscribe(() => { seen.push(layout.viewportWidth.getSnapshot()) })
+    try {
+      instance.actions.setViewportWidth(700)
+      expect(layout.viewportWidth.getSnapshot()).toBe(700)
+      expect(seen).toContain(700)
+    } finally {
+      unsubscribe()
+      await fiber.dispose()
+    }
+  })
+
+  it('injects only the dismissRightbar hook while the service drives the shared store instance', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const entry = slots.entries('root')[0]!
+    const injected = (entry.inject as () => object)()
+    expect(injected).toEqual({ dismissRightbar: expect.any(Function) })
+    const handle = entry.store as ReturnType<typeof createLayoutStore>
+    const instance = handle.create()
+    expect(handle.create()).toBe(instance)
+    const layout = ctx.get('layout') as LayoutController
+    instance.actions.setViewportWidth(1440)
+    const before = instance.getSnapshot().sidebar
     layout.toggleSidebar()
-    expect(actions.toggleSidebar).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().sidebar).not.toBe(before)
+    await fiber.dispose()
   })
 
   it('theme presenter applies the initial snapshot, follows theme/change, and unwinds on dispose', async () => {

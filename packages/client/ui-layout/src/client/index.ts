@@ -8,10 +8,10 @@
  * presenter, which projects ctx.theme snapshots onto document.body.
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { PanelActions } from './service.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
@@ -163,8 +163,17 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh: shortcutZh, en: shortcutEn }), 'ui-layout: command labels')
   const shortcutT = ctx.locale.bind('shortcuts.layout')
 
-  const layout = new LayoutController()
   ctx.effect(() => {
+    // Exclusive store: one eagerly-created instance shared by the service and
+    // the root entry, so ctx.layout reads live geometry before first render.
+    const handle = createLayoutStore()
+    const instance = handle.create()
+    const store: typeof handle = { ...handle, create: () => instance }
+    const viewportWidth: HostObservable<number> = {
+      getSnapshot: () => instance.getSnapshot().viewportWidth,
+      subscribe: listener => instance.subscribe(listener),
+    }
+    const layout = new LayoutController(instance.actions, viewportWidth)
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeShortcut = ctx.shortcuts.register({
       id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => shortcutT('toggle'), aliases: ['sidebar', 'toggle left sidebar'],
@@ -188,15 +197,8 @@ export function apply(ctx: ClientContext): void {
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },
-      // Exclusive store: the factory itself — the framework instantiates per
-      // entry and delivers useStore/actions to AppFrame as standard props.
-      store: createLayoutStore,
-      // The hook's only side effect connects the root store to ctx.layout;
-      // conversation business actions belong to their registrants.
-      inject: (actions: PanelActions) => {
-        layout.attachPanels(actions)
-        return { dismissRightbar: () => { layout.closeDetails() } }
-      },
+      store,
+      inject: () => ({ dismissRightbar: () => { layout.closeDetails() } }),
     }, AppFrame)
     return () => {
       disposeShortcut()

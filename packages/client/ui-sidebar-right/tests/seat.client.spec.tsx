@@ -61,7 +61,10 @@ function transition(property = 'transform') {
 async function mountSeat(viewportWidth = 1440, canShow = true, entryCount = 0) {
   const runtime = await SlotTestRuntime.create()
   runtimes.push(runtime)
-  const frame = { bindRightbar: () => () => {}, focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() }
+  const frame = {
+    bindRightbar: () => () => {}, focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
+    viewportWidth: createSnapshotStore(viewportWidth),
+  }
   const pin = vi.fn<(address: string, signal: AbortSignal) => void>()
   runtime.ctx.provide('layout', frame as never)
   runtime.ctx.provide('workspaceResources', { pin } as never)
@@ -167,7 +170,6 @@ describe('RightbarSeat presentation', () => {
     expect(h.view.container.querySelector('[data-sidebar-right-panel]')).not.toBeNull()
     expect(h.layout()).toBe(retained)
   })
-
 
 
   it.each([0, 1, 2])('selects the default from %i guide entries and protects only a sole guide', async (entryCount) => {

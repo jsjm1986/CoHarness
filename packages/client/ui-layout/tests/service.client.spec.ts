@@ -1,10 +1,12 @@
 /**
  * LayoutController behavior: the cross-plugin panel-action face. Geometry
  * lives in the entry store (layout-store.spec.ts) — here we assert the
- * delegation contract: attachPanels wiring, the three actions forwarding, the
- * unwired fail-loud, and re-attach overwriting a stale action set.
+ * delegation contract: the constructor-bound panel actions forward, the
+ * auxiliary-panel owner round-trips, and separately constructed controllers
+ * keep their own instances.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { LayoutController } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 import type { PanelActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 
@@ -20,10 +22,9 @@ function fakePanels(): PanelActions {
 }
 
 describe('LayoutController', () => {
-  it('forwards the three panel actions to the attached set', () => {
-    const service = new LayoutController()
+  it('forwards the panel actions to the constructor-bound set', () => {
     const panels = fakePanels()
-    service.attachPanels(panels)
+    const service = new LayoutController(panels, createSnapshotStore(1440))
 
     const owner = { openDetails: vi.fn(), close: vi.fn() }
     service.bindRightbar(owner)
@@ -36,23 +37,44 @@ describe('LayoutController', () => {
     expect(owner.close).toHaveBeenCalledTimes(1)
   })
 
-  it('fails loud before the root entry wired its actions', () => {
-    const service = new LayoutController()
-    expect(() => { service.toggleSidebar() }).toThrow(/panel actions not wired/)
-    expect(() => { service.openDetails() }).toThrow(/auxiliary panel owner is unavailable/)
-    expect(() => { service.closeDetails() }).toThrow(/auxiliary panel owner is unavailable/)
+  it('exposes the shared store width through its viewportWidth observable', () => {
+    const viewportWidth = createSnapshotStore(0)
+    const service = new LayoutController(fakePanels(), viewportWidth)
+    const seen: number[] = []
+    const unsubscribe = service.viewportWidth.subscribe(() => { seen.push(service.viewportWidth.getSnapshot()) })
+    try {
+      viewportWidth.set(700)
+      expect(service.viewportWidth.getSnapshot()).toBe(700)
+      expect(seen).toEqual([700])
+    } finally { unsubscribe() }
   })
 
-  it('re-attach overwrites the stale action set (entry re-register)', () => {
-    const service = new LayoutController()
-    const stale = fakePanels()
-    const fresh = fakePanels()
-    service.attachPanels(stale)
-    service.attachPanels(fresh)
+  it('can toggle the sidebar immediately after construction', () => {
+    const panels = fakePanels()
+    const service = new LayoutController(panels, createSnapshotStore(1440))
 
     service.toggleSidebar()
 
-    expect(stale.toggleSidebar).not.toHaveBeenCalled()
-    expect(fresh.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(panels.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(panels.setSidebar).not.toHaveBeenCalled()
+  })
+
+  it('keeps separately constructed controllers bound to their own instances', () => {
+    const first = fakePanels()
+    const second = fakePanels()
+    const firstService = new LayoutController(first, createSnapshotStore(1440))
+    const secondService = new LayoutController(second, createSnapshotStore(1440))
+    firstService.toggleSidebar()
+    expect(first.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(second.toggleSidebar).not.toHaveBeenCalled()
+    secondService.closeRightbar()
+    expect(first.closeRightbar).not.toHaveBeenCalled()
+    expect(second.closeRightbar).toHaveBeenCalledTimes(1)
+  })
+
+  it('throws when no auxiliary-panel owner is bound', () => {
+    const service = new LayoutController(fakePanels(), createSnapshotStore(1440))
+    expect(() => { service.openDetails() }).toThrow(/auxiliary panel owner is unavailable/)
+    expect(() => { service.closeDetails() }).toThrow(/auxiliary panel owner is unavailable/)
   })
 })

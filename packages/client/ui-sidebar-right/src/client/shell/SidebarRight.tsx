@@ -49,7 +49,6 @@ import type { TabOccurrence } from '../tab-domain.ts'
 import type { SidebarRightTabNavigation } from '../contract/slots.ts'
 import type { TabHookContext } from '../tab-info.ts'
 import css from './SidebarRight.module.css'
-import { closeWithPaneFocus, openWithPaneFocus } from './close-focus.ts'
 
 /** The store share the seat receives. */
 type Store = PropsStore<ReturnType<typeof createSidebarRightStore>>
@@ -78,30 +77,13 @@ export interface SidebarRightInjected {
    */
   readonly syncPresentation: (presentation: SidebarRightPresentation) => void
   /**
-   * Publish this seat's session, actions, and the store's surfaces to `ctx.sidebarRight`.
+   * Record this seat's room rule for `ctx.sidebarRight`'s splits, replacing its previous one.
    *
-   * The service is root-scoped and cannot read a per-entry store, so the only
-   * honest source is the mounted seat. The seat calls it after each commit
-   * while it is active, each call replacing the previous binding, and calls
-   * the latest release when it leaves the screen; the service publishes the
-   * bound session through `ctx.sidebarRight.mounted`.
-   * @param binding - what a command needs to act on this session, and what a tab's own action needs to act on its.
-   * @returns a release callback that clears this binding while it is still the latest.
+   * The docking kit measures its panes after it renders; the seat forwards each
+   * reading, and the service applies it when it splits this seat's Session.
+   * @param canSplitPane - whether two working halves of a docked pane would fit; unmeasured panes fit.
    */
-  readonly bindService: (binding: {
-    sessionId: SessionId
-    actions: Store['actions']
-    /** Every session's surface as last committed; the mounted one is `surfaces[sessionId]`. */
-    surfaces: Readonly<Record<string, SurfaceState>>
-    /** The room rule's verdict for a docked pane, as the kit last measured it. */
-    canSplitPane: (paneId: PaneId) => boolean
-    /** Commit a keyboard/menu close and retain focus on a surviving visible pane. */
-    closeWithFocus: (paneId: PaneId, close: () => void) => void
-    /** Commit a page operation and focus the pane it selects. */
-    openWithFocus: (open: () => PaneId | undefined) => void
-    /** Narrow viewports present an expanded panel fullscreen. */
-    autoFullscreen?: boolean
-  }) => () => void
+  readonly measureRoom: (canSplitPane: (paneId: PaneId) => boolean) => void
   /**
    * The navigation face's `openTab`, for the strip's add control: a new tab is
    * the guide opened by kind, through the same path as every other open.
@@ -384,31 +366,30 @@ function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<H
   )
 }
 
+/** Frame widths below this present an expanded panel fullscreen, whatever its recorded mode. */
+export const AUTO_FULLSCREEN_BELOW = 768
+
 /**
  * The right column's occupant: stable tab containers, docked or floating.
- * It is also where the
- * frame learns the panel's presentation, and where `ctx.sidebarRight` learns
- * which session it is acting on, because this is the seat that knows both.
+ * It is also where the frame learns the panel's presentation, because this is
+ * the seat that knows it. `ctx.sidebarRight` names the on-screen Session
+ * itself; this seat reports only the room its kit measured.
  */
 export function RightbarSeat({
-  sessionId, width, viewportWidth, canShow, useStore, actions, t, renderSlot, syncPresentation, bindService, openTab, closeTab,
+  sessionId, width, viewportWidth, canShow, useStore, actions, t, renderSlot, syncPresentation, measureRoom, openTab, closeTab,
   useTabTypes, useTabNavigation, occurrence, retainTab, active, useShortcuts, splitPane, toggleFullscreen,
 }: RightbarSeatProps): ReactNode {
   // One store instance per session, so this map holds this session's surface.
-  // The binding published below serves the public face's commands on the
-  // mounted session; a tab's own actions route through the controller's
-  // adopted stores instead.
   const shortcuts = useShortcuts(entries => entries)
-  const surfaces = useStore(state => state.bySession)
-  const surface = surfaces[sessionId]
+  const surface = useStore(state => state.bySession[sessionId])
   const shown = active && surface !== undefined && surface.layout.expanded
-  const autoFullscreen = viewportWidth < 768
+  const autoFullscreen = viewportWidth < AUTO_FULLSCREEN_BELOW
   const fullscreen = autoFullscreen || surface?.layout.mode === 'fullscreen'
   const panelRef = useRef<HTMLDivElement | null>(null)
-  // The kit's room-rule readings, kept in a ref: the service reads them at
-  // call time through the binding, and a reading never re-renders anything.
-  const room = useRef<ReadonlyMap<PaneId, HalvesFit>>(new Map())
-  const reportRoom = useCallback((fits: ReadonlyMap<PaneId, HalvesFit>): void => { room.current = fits }, [])
+  // A reading never re-renders anything: the service applies it when it splits.
+  const reportRoom = useCallback((fits: ReadonlyMap<PaneId, HalvesFit>): void => {
+    measureRoom(paneId => fits.get(paneId)?.row !== false)
+  }, [measureRoom])
   const track = shown && !autoFullscreen
 
   useEffect(() => {
@@ -453,22 +434,6 @@ export function RightbarSeat({
     ? () => { syncPresentation({ shown: false, track: false, fullscreen: false }) }
     : undefined, [syncPresentation, active])
 
-  // Republished on every committed change: the service's readers answer from the
-  // last commit, and its commands act on the session actually on screen. A
-  // republish replaces the previous binding without releasing it, because a
-  // release between them would leave the service unbound while the rest of
-  // that commit's effects run; the latest binding is released only when the
-  // seat leaves the screen.
-  const release = useRef<(() => void) | undefined>(undefined)
-  useEffect(() => {
-    if (active) {
-      release.current = bindService({ sessionId, actions, surfaces, autoFullscreen,
-        closeWithFocus: (paneId, close) => { closeWithPaneFocus(document, sessionId, paneId, close) },
-        openWithFocus: (open) => { openWithPaneFocus(document, sessionId, open) },
-        canSplitPane: paneId => room.current.get(paneId)?.row !== false })
-    }
-  }, [bindService, sessionId, actions, surfaces, autoFullscreen, active])
-  useEffect(() => active ? () => { release.current?.() } : undefined, [active])
   // The Tab domain is not synced here: the controller adopted this session's
   // store as the runtime minted it and reconciles on the store's own commits,
   // on screen or not.

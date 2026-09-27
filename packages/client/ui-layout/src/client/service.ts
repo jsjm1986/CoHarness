@@ -9,7 +9,7 @@
  * declared action set, delivered as the registration's bound actions.
  */
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
+import type { BoundActions, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DetailsOwnerProps } from './index.ts'
 import type { createLayoutStore } from './stores.ts'
 
@@ -23,6 +23,8 @@ export type PanelActions = BoundActions<ReturnType<typeof createLayoutStore>>
  * only).
  */
 export interface ILayout {
+  /** The frame's measured width in CSS pixels, from the same root store; the `rightbar` owner reads it for the auto-fullscreen rule. */
+  readonly viewportWidth: HostObservable<number>
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void
   /** Open details, optionally pinned to an explicit Session.
@@ -62,23 +64,20 @@ export interface RightbarActions {
 
 /** Cross-plugin panel-action face (ctx.layout). */
 export class LayoutController implements ILayout {
-  #panels: PanelActions | undefined
   #rightbar: RightbarActions | undefined
 
   /**
-   * Adopt the root entry's bound store actions. Called from the root
-   * registration's inject hook (a sanctioned assembly side effect), so the
-   * face is live from the entry's first render; on entry re-register the
-   * fresh actions overwrite the stale set.
-   * @param actions - bound actions of the entry's layout store instance.
+   * @param panels - actions of the instance shared with the root entry.
+   * @param viewportWidth - root store's measured frame width source.
    */
-  attachPanels(actions: PanelActions): void {
-    this.#panels = actions
-  }
+  constructor(
+    private readonly panels: PanelActions,
+    readonly viewportWidth: HostObservable<number>,
+  ) {}
 
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void {
-    this.#require().toggleSidebar()
+    this.panels.toggleSidebar()
   }
 
   /** Open details, optionally pinned to an explicit Session.
@@ -106,17 +105,10 @@ export class LayoutController implements ILayout {
   }
 
   /** Bind the frame to the Session that initiated a panel action. */
-  focusRightbar(sessionId: SessionId): void { this.#require().focusRightbar(sessionId) }
+  focusRightbar(sessionId: SessionId): void { this.panels.focusRightbar(sessionId) }
   /** Report visible geometry from the tab owner. */
-  openRightbar(track: boolean, fullscreen: boolean): void { this.#require().openRightbar(track, fullscreen) }
+  openRightbar(track: boolean, fullscreen: boolean): void { this.panels.openRightbar(track, fullscreen) }
   /** Clear visible geometry without changing the tab owner's layout. */
-  closeRightbar(): void { this.#require().closeRightbar() }
+  closeRightbar(): void { this.panels.closeRightbar() }
 
-  #require(): PanelActions {
-    // Callers are UI gestures, which cannot fire before the root entry
-    // rendered (the inject hook runs in its first render) — reaching this
-    // unwired is a boot-order bug, not a race to tolerate.
-    if (this.#panels === undefined) throw new Error('layout: panel actions not wired (root entry not mounted)')
-    return this.#panels
-  }
 }
