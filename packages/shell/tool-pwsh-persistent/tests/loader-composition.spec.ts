@@ -33,8 +33,8 @@ const hasPwsh = spawnSync(
 ).status === 0
 
 // Shell and console-host versions for a failure message: the Windows console host, not this
-// process, decides how the prompt marker and its tail reach the session, and its build differs
-// between the runners that pass this case and the self-hosted pool that fails it.
+// process, decides how the prompt marker and its tail reach the session, and its build on the
+// self-hosted pool is unknown.
 const HOST_FACTS_COMMAND = [
   '"pwsh $($PSVersionTable.PSVersion) PSReadLine $((Get-Module PSReadLine -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1).Version)"',
   'if ($env:OS -eq \'Windows_NT\') { "conhost $((Get-Item (Join-Path $env:SystemRoot \'System32\\conhost.exe\')).VersionInfo.FileVersion)" }',
@@ -195,7 +195,7 @@ describe.skipIf(!hasPwsh)('persistent pwsh through a real cordis.yml Loader comp
     const settleReasons: TerminalWaitReason[] = []
     vi.spyOn(terminals, 'startSend').mockImplementation((owner, id, request) => {
       const operation = startSend(owner, id, request)
-      timeline.track(operation)
+      timeline.track(operation, request)
       void operation.done.then(
         (settled) => { settleReasons.push(settled.waitReason) },
         // A rejected send is the tool's error path, not a settle reason.
@@ -252,13 +252,17 @@ describe.skipIf(!hasPwsh)('persistent pwsh through a real cordis.yml Loader comp
     expect(text(await execute('after-exit', 'Write-Output "$PWD"'))).toBe(root)
 
     // Six commands settle on the controlled prompt; no send may fall back to the
-    // silence tier, which is the 3.5 s-per-call degradation this suite pins. The
+    // silence tier, which is the 3.3 s-per-call degradation this suite pins. The
     // counts alone do not say which tier settled which send, so every reason the
     // run recorded and the per-send timeline ride in the failure message (the
     // self-hosted Windows lane reported one to two stdin_read settlements per
-    // run on 2026-09-25..27, every other send at the plain silence bound).
-    const failure = (): string => `${JSON.stringify(settleReasons)}\n${timeline.format()}`
-    expect(settleReasons.filter(reason => reason === 'stdin_read').length, failure()).toBeGreaterThanOrEqual(6)
-    expect(settleReasons, failure()).not.toContain('inferred_idle')
+    // run on 2026-09-25..27, every other send at the plain silence bound). The
+    // message is built only when an assertion is about to fail: formatting runs
+    // the host-facts shell probe, which a passing run must not pay for.
+    const stdinReads = settleReasons.filter(reason => reason === 'stdin_read').length
+    const degraded = stdinReads < 6 || settleReasons.includes('inferred_idle')
+    const failure = degraded ? `${JSON.stringify(settleReasons)}\n${timeline.format()}` : ''
+    expect(stdinReads, failure).toBeGreaterThanOrEqual(6)
+    expect(settleReasons, failure).not.toContain('inferred_idle')
   }, 120_000)
 })
