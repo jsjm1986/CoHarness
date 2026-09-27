@@ -26,6 +26,8 @@ Both target slots are declared by other plugins, so `apply` uses `slots.inject()
 
 The shared sidebar projection hides rows whose durable Session summary has `origin: 'subagent'`; users enter those conversations through the selected parent's subagent header catalog. Each visible ordinary row inherits the blue activity indicator while any descendant reached through uninterrupted subagent-origin lineage is running, and its hover and assistive text report the exact running-descendant count without describing an idle parent as running. Ordinary forks remain visible and terminate this aggregation because lineage alone does not set their origin. Pending user interaction outranks the session's own running state, and either remains the primary row status while descendant activity stays available as a separate hover and assistive status. With neither present, descendant activity outranks the green unviewed-completion reminder; the reminder returns once no descendant is running. The runtime keeps hidden rows available for conversation, title, and addressed transport state.
 
+Session selection loads history before changing the current view. Failed loading preserves the existing view and draft and reports the error in the browser region; selecting the row again retries. A superseded request cannot display an obsolete error or select its target.
+
 ## Summary
 
 This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion. Pending interactions appear as warning dots, active scheduled tasks as alarm markers, and subagent-origin Sessions remain hidden. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, the add action is unavailable.
@@ -45,6 +47,6 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **No fuzzy content search or event deep links** — the content backend uses literal token/phrase matching, and selecting a result opens the Session rather than the matching event.
-- **No Session deletion or unarchive control** — sessions can be archived, but archived sessions have no viewing or unarchive surface, and Workspace registration deletion does not delete Sessions.
+- **No Session deletion control** — sessions can be archived here and restored through the Archived sessions Settings page ([`ui-settings-unarchive-sessions`](../ui-settings-unarchive-sessions/README.md)); Workspace registration deletion does not delete Sessions.
 - **Pending user interaction is not aggregated into collapsed groups** — a waiting row inside a collapsed group lights no group-header indicator and becomes visible only after that group is expanded.
 - **Native folder selection depends on the local Host carrier** — under the `-native` composition, in-process or remote browser deployments cannot open a local operating-system dialog; platform failures are shown in a retryable modal. Remote-capable picking is the `-browse` composition's in-app flow.

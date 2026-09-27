@@ -54,6 +54,8 @@ const rpcDomainErrorSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('model-unavailable'), message: z.string(), details: z.object({ provider: z.string(), model: z.string() }) }),
   z.object({ code: z.literal('model-forbidden'), message: z.string(), details: z.object({ provider: z.string(), model: z.string() }) }),
   z.object({ code: z.literal('session-conflict'), message: z.string(), details: z.object({ sessionId: z.string(), requestedCwd: z.string(), existingCwd: z.string().optional() }) }),
+  z.object({ code: z.literal('ssh-target-conflict'), message: z.string(), details: z.object({ sessionId: z.string(), requestedSshTarget: z.number().int().positive(), existingSshTarget: z.number().int().positive().optional() }) }),
+  z.object({ code: z.literal('ssh/forbidden'), message: z.string(), details: z.object({}) }),
   z.object({ code: z.literal('invalid-time-zone'), message: z.string(), details: z.object({ value: z.string() }) }),
   z.object({ code: z.literal('workspace-attach-failed'), message: z.string(), details: z.object({ sessionId: z.string(), workspaceId: z.string() }) }),
   z.object({ code: z.literal('workspace-not-found'), message: z.string(), details: z.object({ workspaceId: z.string() }) }),

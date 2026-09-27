@@ -1,0 +1,9 @@
+version: 1
+scenario: fs-glob-sampling
+profile: acp
+composition: fs-search
+recording: live
+header:
+  class: fs-search
+  pin: true
+platform: posix

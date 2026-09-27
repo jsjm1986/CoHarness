@@ -63,7 +63,7 @@ function sleep(ms: number): Promise<void> {
   // Annotated binding (not withResolvers<void>()): the tests lint layer runs
   // no-invalid-void-type with default options, which rejects the explicit
   // type argument in call position but accepts the inferred form.
-  const gate: PromiseWithResolvers<void> = Promise.withResolvers()
+  const gate: PromiseWithResolvers<undefined> = Promise.withResolvers()
   setTimeout(gate.resolve, ms)
   return gate.promise
 }
@@ -192,7 +192,7 @@ describe('apply (plugin lifecycle)', () => {
   })
 
   it('keeps the Cordis plugin loading until initial discovery publishes its tools', async () => {
-    const connection: PromiseWithResolvers<void> = Promise.withResolvers()
+    const connection: PromiseWithResolvers<undefined> = Promise.withResolvers()
     mockConnect.mockImplementation(async () => {
       await connection.promise
     })
@@ -204,7 +204,7 @@ describe('apply (plugin lifecycle)', () => {
     expect(activated).toBe(false)
     expect(ctx.tools.get('mcp__srv__remote')).toBeUndefined()
 
-    connection.resolve()
+    connection.resolve(undefined)
     await activation
     expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
     await fiber.dispose()
@@ -219,11 +219,11 @@ describe('apply (plugin lifecycle)', () => {
   })
 
   it('closes the transport when its owner unloads during initial connection', async () => {
-    const connecting: PromiseWithResolvers<void> = Promise.withResolvers()
+    const connecting: PromiseWithResolvers<undefined> = Promise.withResolvers()
     mockConnect.mockImplementation(() => connecting.promise)
     mockClose.mockImplementation(function (this: { onclose?: () => void }) {
       this.onclose?.()
-      connecting.resolve()
+      connecting.resolve(undefined)
       return Promise.resolve()
     })
     const fiber = ctx.plugin({ name: 'mcp-pending-startup', inject, apply }, { ...stdioConfig, reconnect: { enabled: false } })
@@ -236,7 +236,7 @@ describe('apply (plugin lifecycle)', () => {
       expect(mockListTools).not.toHaveBeenCalled()
       expect(ctx.tools.schemas()).toEqual([])
     } finally {
-      connecting.resolve()
+      connecting.resolve(undefined)
       await ctx.fiber.dispose()
     }
   })

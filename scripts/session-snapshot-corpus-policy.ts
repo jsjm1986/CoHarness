@@ -2,25 +2,7 @@
 
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 
-// `dsh-session-snapshot` is not carried (upstream-sync.json); the two manifest
-// types upstream imported from it are declared here so the policy still checks
-// corpus inventories structurally.
-/** Historical format or retired capability one retained scenario permanently exercises. */
-type SnapshotSessionFormatCoverage =
-  | 'multi-hop'
-  | 'packed-row'
-  | 'retry-failure'
-  | 'shipped-profile'
-  | 'adjacent-migration'
-  | 'retired-tools'
-
-/** Explicit historical generation retained by an owning scenario. */
-interface SnapshotSessionFormatManifest {
-  /** Selected fixture generation; absent manifest metadata tracks the current writer. */
-  readonly version: number
-  /** Migration or retired-tool behavior that requires this immutable fixture. */
-  readonly coverage: readonly SnapshotSessionFormatCoverage[]
-}
+import type { SnapshotSessionFormatManifest } from '@deepseek-ai/dsh-session-snapshot'
 
 /** One owning scenario's selected parent and child generations. */
 export interface SnapshotCorpusScenarioGenerations {
@@ -39,7 +21,7 @@ export interface SnapshotCorpusGenerationSummary {
   readonly retainedScenarios: number
 }
 
-const MAX_RETAINED_ROLES = 10
+const MAX_RETAINED_ROLES = 13
 const REQUIRED_V0_COVERAGE = new Set([
   'multi-hop',
   'packed-row',

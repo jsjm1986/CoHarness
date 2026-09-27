@@ -42,6 +42,7 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
  * prominent heading in the pull request description.
  */
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
+  '@deepseek-ai/dsh-deque': ['Deque'],
   '@deepseek-ai/dsh-llm': ['callConfigEquals'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
   '@deepseek-ai/schemastery': ['default'],
@@ -49,15 +50,15 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 
 /** Runtime exports that require every consumer to resolve the provider's shared peer instance. */
 const PEER_REQUIRED_HOST_EXPORTS = {
+  '@deepseek-ai/dsh-client-connection': ['createRpcStreamHttpHandler', 'RPC_STREAM_PATH'],
   '@deepseek-ai/dsh-commands/brand': ['CommandDefinitionId'],
   '@deepseek-ai/dsh-host-apiproxy': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES', 'toFetchHandler'],
   '@deepseek-ai/dsh-host-apiproxy/api': ['RpcId', 'clientRequestSchema', 'serverRequestJson'],
-  '@deepseek-ai/dsh-host-webserver': ['renderIndexInjections'],
   '@deepseek-ai/dsh-llm': ['MessageId', 'freezeMessage'],
   '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
-  '@deepseek-ai/dsh-session-format': ['sessionFormatCatalog'],
   '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
   '@deepseek-ai/dsh-settings': ['settingsNamespace'],
+  '@deepseek-ai/dsh-subprocess': ['SubprocessExecutableNotFoundError'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */

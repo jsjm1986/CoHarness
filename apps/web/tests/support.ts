@@ -1,7 +1,6 @@
-// Shared plumbing for the web smoke tests (dist location, free port, failure shots).
+// Shared plumbing for the web smoke tests (dist location and failure shots).
 import { existsSync, mkdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
@@ -37,22 +36,6 @@ export function requireDist(): void {
   if (!existsSync(DIST_INDEX)) {
     throw new Error('web app dist not built — run `pnpm run build` from the repository root (`pnpm run test:web` does this first)')
   }
-}
-
-/** OS-assigned free port, released before use (the spawned `dsh web` needs a concrete --port). */
-export function probeFreePort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const probe = createServer()
-    probe.once('error', reject)
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address()
-      if (address === null || typeof address === 'string') {
-        probe.close(() => { reject(new Error('port probe returned no address')) })
-        return
-      }
-      probe.close(() => { resolvePort(address.port) })
-    })
-  })
 }
 
 /**

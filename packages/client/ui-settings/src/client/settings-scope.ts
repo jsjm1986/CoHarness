@@ -44,13 +44,24 @@ import {
 
 type SettingsFace = Pick<IApiClient, 'settings'>
 
+/** Host settings scope supporting one atomic namespace mutation. */
+export interface SettingsMutationScope<T> extends SettingsScope<T> {
+  /**
+   * Persist related fields together, rejecting the whole mutation on validation or revision failure.
+   * @param ops - changes applied as one Host transaction.
+   * @param expectedRevision - draft revision; omitted uses the latest queued namespace revision.
+   * @returns settlement after the mutation and any recovery read.
+   */
+  mutate(ops: SettingsPathOpView[], expectedRevision?: number): Promise<void>
+}
+
 /**
  * One namespace's derived view over the shared describe mirror, plus that
  * namespace's serialized Host writes. Writes carry the latest known namespace
  * revision, fold their answers back into the mirror, and teardown waits for
  * the operation already crossing the wire.
  */
-export class SettingsScopeController<T> implements SettingsScope<T> {
+export class SettingsScopeController<T> implements SettingsMutationScope<T> {
   private readonly store: SnapshotStore<SettingsScopeSnapshot<T>>
   private tail: Promise<void> = Promise.resolve()
   private writeGeneration = 0
@@ -117,7 +128,7 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
    * @returns settlement after the write and any latest-write recovery read.
    */
   set(field: string, value: unknown): Promise<void> {
-    return this.write({ op: 'set', path: [field], value })
+    return this.mutate([{ op: 'set', path: [field], value }])
   }
 
   /**
@@ -127,10 +138,16 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
    * @returns settlement after the clear and any latest-write recovery read.
    */
   unset(field: string): Promise<void> {
-    return this.write({ op: 'unset', path: [field] })
+    return this.mutate([{ op: 'unset', path: [field] }])
   }
 
-  private write(op: SettingsPathOpView): Promise<void> {
+  /**
+   * Queue an atomic Host mutation through the shared namespace write queue.
+   * @param ops - changes applied together by the Host.
+   * @param expectedRevision - fixed draft revision, or the latest queued revision when omitted.
+   * @returns settlement after the mutation and any recovery read.
+   */
+  mutate(ops: SettingsPathOpView[], expectedRevision?: number): Promise<void> {
     const generation = ++this.writeGeneration
     return this.enqueue(async () => {
       const before = this.getSnapshot()
@@ -139,12 +156,12 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
         return
       }
       this.setWriteState({ status: 'saving' })
-      const revision = this.pendingRevision ?? this.getSnapshot().revision
+      const revision = expectedRevision ?? this.pendingRevision ?? this.getSnapshot().revision
       let response: Awaited<ReturnType<SettingsFace['settings']['mutate']>>
       try {
         response = await this.api.settings.mutate({
           ns: this.spec.namespace,
-          ops: [op],
+          ops,
           ...(revision === undefined ? {} : { expectedRevision: revision }),
         })
       } catch (settingsWriteFailure) {
@@ -325,6 +342,18 @@ export class SettingsScopeBinder extends Service {
    * settings transport.
    * @param spec - domain-owned namespace contract.
    * @returns the bound scope consumed by the domain's services and rows.
+   */
+  bind<T>(spec: SettingsScopeSpec<T> & { source?: 'host' }): SettingsMutationScope<T>
+  /**
+   * Select account or fallback storage with the scalar preference interface.
+   * @param spec - namespace and storage owner.
+   * @returns a scope backed by the selected persistence provider.
+   */
+  bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T>
+  /**
+   * Bind the selected storage owner to the calling plugin lifetime.
+   * @param spec - namespace, persistence owner and optional decoder.
+   * @returns a derived scope; Host scopes additionally support atomic mutations.
    */
   bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T> {
     const ctx = this.ctx

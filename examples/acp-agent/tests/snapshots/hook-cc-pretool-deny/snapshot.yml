@@ -1,0 +1,7 @@
+version: 1
+scenario: hook-cc-pretool-deny
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: default

@@ -7,6 +7,9 @@ export type { TypertGatewayAuthorizationRequest } from '@deepseek-ai/dsh-typert-
 
 /** One Remote method request after a carrier has decoded its envelope. */
 export interface InvokeRemoteRequest {
+  /** Stream endpoints must be invoked explicitly as streams; unary calls never open a stream. */
+  readonly mode?: 'stream'
+
   /** Remote namespace selected by the generated descriptor. */
   readonly namespace: string
   /** Exported Service method name. */

@@ -297,6 +297,48 @@ async function migrationFiles(directory: string): Promise<MigrationFile[]> {
   return migrations
 }
 
+/** Packaged-versus-applied migration diff for the deploy applier's plan and status output. */
+export interface MigrationPlan {
+  /** Versions recorded in `harness.schema_migrations`. */
+  applied: number[]
+  /** Packaged migrations not yet recorded. */
+  pending: Array<{ version: number; name: string }>
+  /** Applied versions whose recorded name or checksum differs from the packaged file. */
+  drifted: number[]
+  /** Highest packaged version, or 0 when the directory is empty. */
+  current: number
+}
+
+/** Read-only migration diff; never acquires the advisory lock or writes the ledger. */
+export async function migrationPlan(pool: Pool, directory: string): Promise<MigrationPlan> {
+  const migrations = await migrationFiles(directory)
+  let rows: Array<{ version: number; name: string; checksum: string }> = []
+  try {
+    const existing = await pool.query<{ version: number; name: string; checksum: string }>(
+      'SELECT version, name, checksum FROM harness.schema_migrations ORDER BY version',
+    )
+    rows = existing.rows
+  } catch (error) {
+    const code = error !== null && typeof error === 'object' && 'code' in error ? (error as { code?: unknown }).code : undefined
+    if (code !== '42P01' && code !== '3F000') throw error
+  }
+  const byVersion = new Map(migrations.map(migration => [migration.version, migration]))
+  const applied: number[] = []
+  const drifted: number[] = []
+  for (const row of rows) {
+    applied.push(row.version)
+    const migration = byVersion.get(row.version)
+    if (migration === undefined || migration.name !== row.name || migration.checksum !== row.checksum) {
+      drifted.push(row.version)
+    }
+  }
+  const appliedSet = new Set(applied)
+  const pending = migrations
+    .filter(migration => !appliedSet.has(migration.version))
+    .map(migration => ({ version: migration.version, name: migration.name }))
+  return { applied, pending, drifted, current: migrations.at(-1)?.version ?? 0 }
+}
+
 /** Apply immutable SQL migrations under one PostgreSQL advisory lock. */
 export async function runMigrations(pool: Pool, directory: string): Promise<{ applied: number[]; current: number }> {
   const migrations = await migrationFiles(directory)

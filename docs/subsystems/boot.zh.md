@@ -14,7 +14,9 @@
 
 `InstallBundleOptions.enabled` 默认为 true，false 表示安装但不选择组合包层。`approvedBuilds` 在安装前向指定的待审批包名授予持久脚本权限。
 
-`ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名。
+`ChangeResult.changed` 报告磁盘修改，独立于 `application`：`applied`、`restart-required`、`overridden`、`cancelled` 或 `failed`。可选的 `error` 包含可本地化的错误码和外部诊断。`packageResult` 记录 pnpm 退出码、有界输出、截断标志及完整诊断日志路径。`pendingBuilds` 列出整个 profile 尚未决定的包；`approvedBuilds` 记录本次操作授予权限的包名。
+
+`PluginInstallFrame` 是一帧私有的进度、日志或最终结果。`installBundleStream` 要求唯一请求 id，仅携带本次安装的诊断，并在传输关闭时取消所属安装。消费者必须同时确认最终结果及流正常结束；不得重连并重放安装。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -53,6 +55,21 @@ async getLinked(url: string): Promise<string[]>
 
 Source: [`packages/boot/hmr/src/index.ts`](../../packages/boot/hmr/src/index.ts)
 
+<a id="ctxpluginmanagementauthorization--pluginmanagementauthorization"></a>
+
+### `ctx.pluginManagementAuthorization` — `PluginManagementAuthorization`
+
+Deployment-owned authority for current-profile management.
+
+```ts cordis-catalog
+/** Recheck the current caller before profile reads or writes.
+ * @returns After the deployment permits the operation; rejects without permission.
+ */
+authorize(): Promise<void>
+```
+
+Source: [`packages/boot/plugin-manager/src/types.ts`](../../packages/boot/plugin-manager/src/types.ts)
+
 <a id="ctxpluginmanager--pluginmanager"></a>
 
 ### `ctx.pluginManager` — `PluginManager`
@@ -60,6 +77,11 @@ Source: [`packages/boot/hmr/src/index.ts`](../../packages/boot/hmr/src/index.ts)
 Manage profile files and apply their declared reload lifecycle.
 
 ```ts cordis-catalog
+/** Check deployment authority independently of tool approval or sandbox mode.
+ * @returns After the current caller is permitted to manage this profile.
+ */
+async authorize(): Promise<void>
+
 /** Read current plugins, including why a row cannot be changed through the profile patch.
  * @returns Current runtime entries with persistent patch targets.
  */
@@ -70,7 +92,7 @@ Manage profile files and apply their declared reload lifecycle.
  * @returns Package versions, one-liners, rows, activation selections, whether the installation offers the
  * bundle, and removal availability.
  */
-@Remote listBundles(): Promise<BundleInfo[]>
+@Remote async listBundles(): Promise<BundleInfo[]>
 
 /** Read what a spec names before installing it.
  * @param spec One package spec: a registry name, an absolute path, a git address, or a tarball.
@@ -84,14 +106,14 @@ Manage profile files and apply their declared reload lifecycle.
  * @param enabled Whether the plugin should run.
  * @returns Saved and runtime outcomes, including higher-priority overrides.
  */
-@Remote setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>
+@Remote async setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>
 
 /** Select or remove a bundle layer while retaining installed dependencies.
  * @param name Bundle package name.
  * @param enabled Whether the bundle contributes its patch layer.
  * @returns Persisted and runtime outcomes.
  */
-@Remote setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult>
+@Remote async setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult>
 
 /**
  * Install a package using the same pnpm implementation as dsh plugin. A run
@@ -100,9 +122,18 @@ Manage profile files and apply their declared reload lifecycle.
  * @param spec One package spec, including local paths relative to the invocation directory.
  * @param options Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and
  * the pending build scripts to allow for this profile before pnpm runs.
+ * @param signal Cancellation from the calling tool or Remote transport.
  * @returns Package-manager diagnostics and observed activation outcome.
  */
-@Remote installBundle(spec: string, options?: InstallBundleOptions): Promise<ChangeResult>
+@Remote async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult>
+
+/** Install with request-scoped progress; disconnect cancels and waits for cleanup.
+ * @param spec - Registry, Git, tarball or absolute path package spec.
+ * @param options - Activation, build-script approval and unique request identity.
+ * @param signal - Transport lifetime; cancellation does not imply cleanup has finished.
+ * @returns Ordered progress, diagnostics and the final installation result.
+ */
+@Remote({ mode: 'stream' }) async * installBundleStream( spec: string, options: InstallBundleOptions & { requestId: PluginInstallRequestId }, signal: AbortSignal, ): AsyncIterable<PluginInstallFrame>
 
 /** Stop an installation this manager owns and wait until its files are back.
  * @param requestId The id the installation was started with.
@@ -113,9 +144,10 @@ Manage profile files and apply their declared reload lifecycle.
 
 /** Unload and remove a profile-owned bundle dependency through dsh plugin's pnpm path.
  * @param name Installed dependency name.
+ * @param signal Cancellation from the calling tool or Remote transport.
  * @returns Removal diagnostics and the remaining profile state.
  */
-@Remote removeBundle(name: string): Promise<ChangeResult>
+@Remote async removeBundle(name: string, signal?: AbortSignal): Promise<ChangeResult>
 ```
 
 Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)

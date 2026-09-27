@@ -148,7 +148,7 @@ describe('Conversation registries', () => {
     const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     await sessions.refresh()
     await Promise.resolve()
-    sessions.scope(sessionId)
+    sessions.open(sessionId)
     const rebuild = vi.spyOn(Session.prototype, 'rebuildConversationRegistry')
 
     events.register(eventDefinition('message'))

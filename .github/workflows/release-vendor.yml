@@ -122,7 +122,7 @@ jobs:
           DSH_GATE_REPORT_DIR: .artifacts/gates
           DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-vendor-pack-${{ github.run_attempt }}
           DSH_EVIDENCE_JOB_NAME: Pack npm tarballs
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
           DSH_GATE_ARTIFACT_GLOBS: '["dist/npm-vendor/*.tgz"]'
         with:
           external: npm-pack

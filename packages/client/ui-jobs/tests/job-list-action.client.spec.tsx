@@ -37,6 +37,7 @@ function props(jobs: readonly JobView[] | undefined): JobListActionProps {
   const state = {
     ids: [SESSION],
     byId: {},
+    archivedById: {},
     current: SESSION,
     phase: 'ready',
     subagentsByParent: {},

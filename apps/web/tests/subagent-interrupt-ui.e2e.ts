@@ -272,11 +272,13 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     await input.waitFor({ timeout: 15_000 })
     expect(await input.isDisabled()).toBe(false)
 
-    // Queue a follow-up through Send while independent Stop remains available.
+    // Queue a follow-up while independent Stop remains available. The running
+    // child's primary action names its delivery like an ordinary session: the
+    // default busy-state preference is Queue.
     const promptResponse = page.waitForResponse(response =>
       new URL(response.url()).pathname === '/api/subagents/prompt')
     await input.fill(FOLLOWUP)
-    await page.getByRole('button', { name: 'Send message' }).click()
+    await page.getByRole('button', { name: 'Queue message' }).click()
     expect(((await (await promptResponse).json()) as { result: { ok: boolean } }).result)
       .toMatchObject({ ok: true })
 

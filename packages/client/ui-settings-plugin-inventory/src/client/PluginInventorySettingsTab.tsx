@@ -7,10 +7,16 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PluginInventoryLocaleKey } from './locales.ts'
+import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import css from './PluginInventorySettingsTab.module.css'
 
 /** Registration-side Remote face used by the section. */
 export interface PluginInventorySettingsTabInjected {
+  /** Page-owned plugin synchronization, independent of Host enablement. */
+  hooks: { clientSync: ObservableSnapshot<ClientEntryState> }
+  /** Retry failed entries in this page's Loader. */
+  retryClient: () => void
   /** Read a current Host inventory snapshot. */
   list: () => Promise<PluginInventorySnapshot>
   /** Resolve a preset's display name in the active browser locale. */
@@ -235,7 +241,10 @@ export function PluginInventorySettingsTab({
   list,
   presetName: suppliedPresetName,
   t,
+  useClientSync,
+  retryClient,
 }: PluginInventorySettingsTabProps): ReactNode {
+  const clientSync = useClientSync(snapshot => snapshot)
   const presetName: PresetName = suppliedPresetName ?? (preset => preset.name ?? preset.id)
   const catalogId = useId()
   const sectionId = `${catalogId}-groups`
@@ -278,6 +287,14 @@ export function PluginInventorySettingsTab({
 
   return (
     <div className={css.section} aria-busy={state.status === 'loading'}>
+      {clientSync.syncing ? <p className={css.status} role="status">{t('clientSyncing')}</p> : null}
+      {clientSync.failures.length === 0 ? null : (
+        <div className={css.failure} data-client-sync-failure>
+          <p role="alert">{t('clientSyncFailed')}</p>
+          <ul>{clientSync.failures.map(failure => <li key={failure.id}>{failure.id}: {failure.message}</li>)}</ul>
+          <button type="button" disabled={clientSync.syncing} onClick={retryClient}>{t('clientSyncRetry')}</button>
+        </div>
+      )}
       {state.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
       {state.status === 'error' ? (
         <div className={css.failure}>

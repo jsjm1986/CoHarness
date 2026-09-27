@@ -3,6 +3,7 @@
  * Session's registered workspace; host absolute paths never cross this API.
  */
 
+import type { OfficeToPdfGeneration } from '@deepseek-ai/dsh-office-to-pdf/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
@@ -43,8 +44,30 @@ export interface WorkspaceFileByteWindow {
   version: string
 }
 
+/** Complete converted PDF with the authorized source's relative identity. */
+export interface WorkspaceOfficePreview {
+  path: string
+  version: string
+  /** Base64 PDF bytes, bounded by the conversion provider's output limit. */
+  bytes: string
+  missingFonts: string[]
+  /** Converter lifetime, including its font and engine configuration. */
+  generation: OfficeToPdfGeneration
+}
+
 /** Read-only Workspace file methods. */
 export interface WorkspaceFilesApi {
+  /** Convert an Office file after the same authorization as ordinary previews.
+   * @param request - Session, relative file, optional source version, and conversion priority.
+   * @param signal - caller cancellation.
+   * @returns complete PDF, source identity, missing fonts, and converter generation.
+   */
+  renderOffice(request: RpcRequest<{
+    sessionId: SessionId
+    path: string
+    version?: string
+    priority?: 'foreground' | 'background'
+  }>, signal: AbortSignal): Promise<RpcResponse<WorkspaceOfficePreview>>
   /** List a bounded prefix of direct children without reading file content.
    * @param request - Session, relative directory (`.` by default), and optional entry limit.
    * @param signal - caller cancellation.

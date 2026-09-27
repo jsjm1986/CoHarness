@@ -1,0 +1,9 @@
+version: 1
+scenario: fs-delete-recreate
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: default
+workspace:
+  final: true

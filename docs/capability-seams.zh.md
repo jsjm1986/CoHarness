@@ -9,13 +9,25 @@
 
 ```mermaid
 flowchart LR
+  pkg_execution_authority["execution-authority"]
+  svc_executionAuthority["ctx.executionAuthority<br/>Verified human participants and current execution privileges"]
+  pkg_gateway_execution["gateway-execution"]
+  pkg_host_apiproxy["host-apiproxy"]
+  pkg_subagent["subagent"]
+  pkg_subagent_in_process_driver["subagent-in-process-driver"]
+  pkg_experimental_agent_team["experimental-agent-team"]
+  pkg_experimental_auto_review["experimental-auto-review"]
+  pkg_plugin_manager["plugin-manager"]
+  svc_pluginManagementAuthorization["ctx.pluginManagementAuthorization<br/>Deployment authorization for plugin management"]
+  pkg_cordis_host_runner["cordis-host-runner"]
   pkg_hmr["hmr"]
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
-  pkg_plugin_manager["plugin-manager"]
   svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
   pkg_ui_settings_plugin_inventory["ui-settings-plugin-inventory"]
   svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
+  pkg_office_to_pdf["office-to-pdf"]
+  svc_officeToPdf["ctx.officeToPdf<br/>Office to PDF conversion"]
   pkg_mcp_resources["mcp-resources"]
   svc_mcpResources["ctx.mcpResources<br/>Scoped MCP resource access"]
   pkg_mcp_client["mcp-client"]
@@ -25,6 +37,7 @@ flowchart LR
   pkg_experimental_browser_use_chrome_devtools_mcp["experimental-browser-use-chrome-devtools-mcp"]
   pkg_experimental_browser_use_stagehand_native["experimental-browser-use-stagehand-native"]
   pkg_computer_use["computer-use"]
+  svc_computerUseAuthorization["ctx.computerUseAuthorization<br/>Desktop execution authorization"]
   svc_computerUse["ctx.computerUse<br/>Computer-use provider registration"]
   pkg_experimental_computer_use_cua_driver_mcp["experimental-computer-use-cua-driver-mcp"]
   pkg_experimental_computer_use_cua_driver_native["experimental-computer-use-cua-driver-native"]
@@ -103,6 +116,8 @@ flowchart LR
   svc_storageDomain["ctx.storageDomain<br/>Domain data facility"]
   pkg_workspace["workspace"]
   svc_messageFeedback["ctx.messageFeedback<br/>Lifecycle-bound message feedback"]
+  pkg_workspace_changes["workspace-changes"]
+  svc_workspaceChanges["ctx.workspaceChanges<br/>Host per-turn changed-file summaries"]
   svc_workspaceRegistry["ctx.workspaceRegistry<br/>Workspace entity registry"]
   svc_sessionQuery["ctx.sessionQuery<br/>Session reads, traces, filters, and search"]
   pkg_session_reference["session-reference"]
@@ -137,7 +152,6 @@ flowchart LR
   svc_commands["ctx.commands<br/>Human command registry"]
   pkg_session_projection["session-projection"]
   svc_sessionProjections["ctx.sessionProjections<br/>Session projection units"]
-  pkg_host_apiproxy["host-apiproxy"]
   pkg_session_projection_cache["session-projection-cache"]
   svc_sessionProjectionCache["ctx.sessionProjectionCache<br/>Persisted projection cache"]
   pkg_skill["skill"]
@@ -153,6 +167,11 @@ flowchart LR
   pkg_agent_spine_demo["agent-spine-demo"]
   pkg_goal["goal"]
   svc_goals["ctx.goals<br/>Same-session goal domain"]
+  pkg_ssh["ssh"]
+  svc_ssh["ctx.ssh<br/>POSIX SSH connection owner"]
+  pkg_fs_ssh["fs-ssh"]
+  pkg_subprocess_ssh["subprocess-ssh"]
+  pkg_sandbox_ssh["sandbox-ssh"]
   pkg_subprocess["subprocess"]
   svc_subprocess["ctx.subprocess<br/>Subprocess seam"]
   pkg_subprocess_local["subprocess-local"]
@@ -171,6 +190,10 @@ flowchart LR
   svc_shellEnv["ctx.shellEnv<br/>Managed bash environment registry"]
   pkg_terminal["terminal"]
   svc_terminals["ctx.terminals<br/>Persistent PTY session registry"]
+  pkg_api_terminal_controller["api-terminal-controller"]
+  svc_terminalController["ctx.terminalController<br/>User-terminal control remote service"]
+  svc_userTerminalAuthorization["ctx.userTerminalAuthorization<br/>User-terminal authorization policy"]
+  svc_userTerminalAdministration["ctx.userTerminalAdministration<br/>User-terminal administration policy"]
   pkg_sandbox["sandbox"]
   svc_sandbox["ctx.sandbox<br/>Process-sandbox seam"]
   pkg_sandbox_local["sandbox-local"]
@@ -192,7 +215,6 @@ flowchart LR
   pkg_fs_observation_policy["fs-observation-policy"]
   pkg_compaction["compaction"]
   svc_compaction["ctx.compaction<br/>Compaction seam"]
-  pkg_subagent["subagent"]
   svc_subagents["ctx.subagents<br/>Subagent provider and continuation service"]
   pkg_subagent_spawn_in_process["subagent-spawn-in-process"]
   pkg_subagent_fork_in_process["subagent-fork-in-process"]
@@ -225,6 +247,9 @@ flowchart LR
   svc_webServer["ctx.webServer<br/>HTTP route registration"]
   pkg_connection["connection"]
   pkg_modules["modules"]
+  pkg_webhook["webhook"]
+  svc_webhookRuntime["ctx.webhookRuntime<br/>Webhook rule runtime"]
+  pkg_webhook_github["webhook-github"]
   svc_clientModules["ctx.clientModules<br/>Client plugin graph host"]
   pkg_workflow["workflow"]
   svc_workflowEngine["ctx.workflowEngine<br/>Workflow script engine"]
@@ -235,7 +260,6 @@ flowchart LR
   pkg_lsp_local["lsp-local"]
   pkg_tool_lsp["tool-lsp"]
   svc_apiProxy["ctx.apiProxy<br/>Host API dispatch"]
-  pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
   pkg_acp --> svc_approval
@@ -245,6 +269,9 @@ flowchart LR
   pkg_agent_presets --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
   pkg_api_gateway --> svc_typertGateway
+  pkg_api_terminal_controller --> svc_terminalController
+  pkg_api_terminal_controller --> svc_userTerminalAdministration
+  pkg_api_terminal_controller --> svc_userTerminalAuthorization
   pkg_apiproxy --> svc_apiProxy
   pkg_app_boot --> svc_profileContext
   pkg_approval --> svc_approval
@@ -261,6 +288,7 @@ flowchart LR
   pkg_compaction_basic --> svc_compaction
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
   pkg_computer_use --> svc_computerUse
+  pkg_computer_use --> svc_computerUseAuthorization
   pkg_cordis_host_runner --> svc_cordisInspect
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
@@ -269,6 +297,7 @@ flowchart LR
   pkg_directory_picker --> svc_directoryPicker
   pkg_directory_picker_browse --> svc_directoryPicker
   pkg_directory_picker_native --> svc_directoryPicker
+  pkg_execution_authority --> svc_executionAuthority
   pkg_experimental_browser_use_chrome_devtools_mcp --> svc_browserUse
   pkg_experimental_browser_use_playwright_mcp --> svc_browserUse
   pkg_experimental_browser_use_stagehand_native --> svc_browserUse
@@ -280,6 +309,11 @@ flowchart LR
   pkg_fs --> svc_fs
   pkg_fs_local --> svc_fs
   pkg_fs_sandbox --> svc_fs
+  pkg_fs_ssh --> svc_fs
+  pkg_gateway_execution --> svc_executionAuthority
+  pkg_gateway_execution --> svc_pluginManagementAuthorization
+  pkg_gateway_execution --> svc_userTerminalAdministration
+  pkg_gateway_execution --> svc_userTerminalAuthorization
   pkg_gateway_runtime --> svc_gatewayRuntime
   pkg_goal --> svc_goals
   pkg_hmr --> svc_hmr
@@ -298,9 +332,11 @@ flowchart LR
   pkg_model_access --> svc_modelAccess
   pkg_model_provider_config --> svc_modelProviderConfig
   pkg_modules --> svc_clientModules
+  pkg_office_to_pdf --> svc_officeToPdf
   pkg_permission_presets --> svc_permissionPresetAuthorization
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
+  pkg_plugin_manager --> svc_pluginManagementAuthorization
   pkg_plugin_manager --> svc_pluginManager
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
@@ -308,6 +344,7 @@ flowchart LR
   pkg_sandbox --> svc_sandbox
   pkg_sandbox_local --> svc_sandbox
   pkg_sandbox_policy --> svc_sandboxPolicy
+  pkg_sandbox_ssh --> svc_sandbox
   pkg_session --> svc_sessions
   pkg_session_persistence --> svc_sessionPersistence
   pkg_session_persistence_gateway --> svc_sessionPersistence
@@ -332,6 +369,7 @@ flowchart LR
   pkg_skill_filesystem --> svc_skills
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
+  pkg_ssh --> svc_ssh
   pkg_storage --> svc_storage
   pkg_storage_domain --> svc_storageDomain
   pkg_storage_json --> svc_storage
@@ -345,6 +383,7 @@ flowchart LR
   pkg_subagent_spawn_in_process --> svc_subagents
   pkg_subprocess --> svc_subprocess
   pkg_subprocess_local --> svc_subprocess
+  pkg_subprocess_ssh --> svc_subprocess
   pkg_system_prompt --> svc_systemPrompt
   pkg_terminal --> svc_terminals
   pkg_terminal_bash --> svc_terminals
@@ -360,10 +399,12 @@ flowchart LR
   pkg_web_search_deepseek --> svc_web
   pkg_web_search_exa --> svc_web
   pkg_web_search_perplexity --> svc_web
+  pkg_webhook --> svc_webhookRuntime
   pkg_webserver --> svc_webServer
   pkg_workflow --> svc_workflowEngine
   pkg_workflow_ptc --> svc_workflowEngine
   pkg_workspace --> svc_workspaceRegistry
+  pkg_workspace_changes --> svc_workspaceChanges
   svc_agentDefaultModel --> pkg_headless
   svc_agentDefaultModel --> pkg_host_apiproxy
   svc_agentLoop --> pkg_agent_spine_demo
@@ -386,6 +427,7 @@ flowchart LR
   svc_compaction --> pkg_compaction_basic
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
+  svc_computerUseAuthorization --> pkg_computer_use
   svc_cordisInspect --> pkg_tool_cordis
   svc_credentials --> pkg_apiproxy
   svc_credentials --> pkg_llm_deepseek
@@ -395,6 +437,11 @@ flowchart LR
   svc_deepseekLlmApiExtensions --> pkg_session_log_deepseek
   svc_directoryPicker --> pkg_apiproxy
   svc_dynamicCordisRunner --> pkg_tool_cordis
+  svc_executionAuthority --> pkg_experimental_agent_team
+  svc_executionAuthority --> pkg_experimental_auto_review
+  svc_executionAuthority --> pkg_host_apiproxy
+  svc_executionAuthority --> pkg_subagent
+  svc_executionAuthority --> pkg_subagent_in_process_driver
   svc_fs --> pkg_tool_fs
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
@@ -414,7 +461,10 @@ flowchart LR
   svc_modelAccess --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_apiproxy
   svc_modelProviderConfig --> pkg_llm_pi_ai
+  svc_officeToPdf --> pkg_host_apiproxy
   svc_permissionPresetAuthorization --> pkg_collaboration_gateway
+  svc_pluginManagementAuthorization --> pkg_cordis_host_runner
+  svc_pluginManagementAuthorization --> pkg_plugin_manager
   svc_pluginManager --> pkg_plugin_manager
   svc_pluginManager --> pkg_ui_settings_plugin_inventory
   svc_profileContext --> pkg_plugin_manager
@@ -456,6 +506,9 @@ flowchart LR
   svc_shellEnv --> pkg_tool_pwsh
   svc_skills --> pkg_tool_skill
   svc_spillStore --> pkg_spill_policy
+  svc_ssh --> pkg_fs_ssh
+  svc_ssh --> pkg_sandbox_ssh
+  svc_ssh --> pkg_subprocess_ssh
   svc_storage --> pkg_storage_domain
   svc_storageDomain --> pkg_message_feedback
   svc_storageDomain --> pkg_workspace
@@ -475,6 +528,8 @@ flowchart LR
   svc_systemPrompt --> pkg_tool_terminal
   svc_systemPrompt --> pkg_tool_web
   svc_systemPrompt --> pkg_tools
+  svc_terminalController --> pkg_gateway_execution
+  svc_terminalController --> pkg_host_apiproxy
   svc_terminals --> pkg_tool_terminal
   svc_tokenMeter --> pkg_compaction_basic
   svc_toolResultPruner --> pkg_compaction_basic
@@ -492,10 +547,13 @@ flowchart LR
   svc_typert --> pkg_typert_loader
   svc_userDocs --> pkg_tool_userdoc
   svc_userQuestions --> pkg_tool_ask_user
+  svc_userTerminalAdministration --> pkg_api_terminal_controller
+  svc_userTerminalAuthorization --> pkg_api_terminal_controller
   svc_web --> pkg_tool_web
   svc_webServer --> pkg_connection
   svc_webServer --> pkg_hmr
   svc_webServer --> pkg_modules
+  svc_webhookRuntime --> pkg_webhook_github
   svc_workflowEngine --> pkg_tool_ralph
   svc_workflowEngine --> pkg_tool_workflow
   svc_workspaceRegistry --> pkg_apiproxy
@@ -504,11 +562,15 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.executionAuthority` | `seam` | [`execution-authority`](../packages/context/execution-authority) | [`gateway-execution`](../packages/context/gateway-execution) | [`host-apiproxy`](../packages/host/apiproxy), [`subagent`](../packages/subagent/subagent), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`experimental-agent-team`](../packages/experimental/agent-team), [`experimental-auto-review`](../packages/experimental/auto-review) | - | 输入传输层记录已认证参与人；委派工作继承其权限限制，特权操作重新核验当前授权。 |
+| `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | 受管运行时在 profile 和动态插件操作前核验当前管理员权限，包括排队等待的变更。 |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | 拥有模块与精确配置 watcher；应用变更共享其队列，自动重载等待应用文件锁。 |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | 与 CLI 共享 profile 包操作，并向 Web 与 agent 调用方报告持久化与运行中状态。 |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | dsh 启动器提供纯数据 profile 位置与组合输入；重载调度属于 dsh-hmr。 |
+| `ctx.officeToPdf` | `core` | [`office-to-pdf`](../packages/document/office-to-pdf) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | 已授权的延迟源读取交由有界 Host 转换器处理，采用声明的原生引擎或 Node WASM。 |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | 连接持有的提供方在调用方 agent 作用域内提供共享资源工具。 |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | 每个服务实例对应一个提供方拥有的名称。提供方按存活 Session 管理各自的工具与浏览器资源；共享服务本身没有浏览器操作 API。 |
+| `ctx.computerUseAuthorization` | `core` | [`computer-use`](../packages/computer-use/computer-use) | - | [`computer-use`](../packages/computer-use/computer-use) | - | 部署政策在实际原生和 MCP 操作前后执行授权与取消控制；受管运行时在政策缺失时拒绝操作。 |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | 每个服务实例对应一个提供方拥有的名称。各提供方也拥有自己的模型工具；服务没有通用操作 API、运行时选择或 Session 工作流锁。 |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |
 | `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | [`tool-userdoc`](../packages/attachment/tool-userdoc) | - | 上传落成真实的命名文件，且位于工具授权策略已经放行的目录内。个人文档 Consumer 增加有界发现和文本读取，不暴露主机路径；已附加文档仍可使用常规文件系统工具。 |
@@ -532,6 +594,7 @@ flowchart LR
 | `ctx.storage` | `seam` | [`storage`](../packages/storage/storage) | [`storage-json`](../packages/storage/storage-json), [`storage-sqlite`](../packages/storage/storage-sqlite) | [`storage-domain`](../packages/storage/storage-domain) | - | 各后端以不同名称并列注册；数据形态（领域优先）挂载到枢纽上，并将类型化操作转换为不透明的 KV 单元原语。 |
 | `ctx.storageDomain` | `core` | [`storage-domain`](../packages/storage/storage-domain) | - | [`workspace`](../packages/workspace/workspace), [`message-feedback`](../packages/feedback/message-feedback) | - | 等待所有已配置后端就绪，然后将领域形态发布为一个受生命周期约束的服务，用于类型化持久状态。 |
 | `ctx.messageFeedback` | `core` | [`message-feedback`](../packages/feedback/message-feedback) | - | - | - | 拥有本地逐 assistant 消息反馈、生命周期与目标校验、逐条目 compare-and-set 及 Host 一元 Remote 契约，且不进入 Session 历史或遥测。 |
+| `ctx.workspaceChanges` | `core` | [`workspace-changes`](../packages/deliverables/workspace-changes) | - | - | - | 按 Session 与事件序号提供 workspace/changes 公告的摘要及各文件的轮次前后比较，直至该 Session 释放；日志仅携带轮次。 |
 | `ctx.workspaceRegistry` | `core` | [`workspace`](../packages/workspace/workspace) | - | `apiproxy` | - | 通过领域设施拥有带 WorkspaceId 品牌类型的记录；稳定的 sessionIds 账户驱动 Host RPC 与 GUI 投影。 |
 | `ctx.sessionQuery` | `seam` | [`session-query`](../packages/session-query/session-query) | [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | [`session-reference`](../packages/context/session-reference), [`tool-session-query`](../packages/session-query/tool-session-query) | - | 该接口提供精确读取、过滤和追踪；具体后端还提供全文协调、排序、摘要片段和游标世代，而模型消费方负责工作区权限与不含游标的渲染。 |
 | `ctx.fileReferences` | `seam` | [`file-reference`](../packages/context/file-reference) | [`file-reference-local`](../packages/context/file-reference-local) | - | - | 该接口通过其一元 Remote 契约返回指定 Agent cwd 内仅含路径的补全候选；提供方负责命名空间访问和排序，但不会读取文件内容。 |
@@ -550,17 +613,21 @@ flowchart LR
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | 通过 settings 分层默认 `ModelSelection`，让直接入口与 Host 支撑的 Agent 入口共享同一个状态所有者。 |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | 唯一的具体循环插件；扩展包依赖 dsh-agent 的事件和服务，而不依赖此包。 |
 | `ctx.goals` | `core` | [`goal`](../packages/goal/goal) | - | - | - | 从会话日志折叠带修订版本的目标状态，并将实时延续激活保留在进程本地。 |
-| `ctx.subprocess` | `seam` | [`subprocess`](../packages/subprocess/subprocess) | [`subprocess-local`](../packages/subprocess/subprocess-local) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash), [`lsp-stdio`](../packages/lsp/lsp-stdio), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | - | Bash 执行器、PTY shell 后端、LSP Host，以及进程外 ACP、Codex 和 Claude Code subagent 后端都通过 ctx.subprocess 执行 spawn；该服务负责进程坐标、进程树／会话生命周期、stdio 处置、终端机制和 kill 升级。 |
+| `ctx.ssh` | `core` | [`ssh`](../packages/ssh/ssh) | - | [`fs-ssh`](../packages/ssh/fs-ssh), [`subprocess-ssh`](../packages/ssh/subprocess-ssh), [`sandbox-ssh`](../packages/ssh/sandbox-ssh) | - | 负责一条经过认证的 OpenSSH 连接、已安装辅助程序身份、独立程序流，以及配套远端提供方的断连清理。 |
+| `ctx.subprocess` | `seam` | [`subprocess`](../packages/subprocess/subprocess) | [`subprocess-local`](../packages/subprocess/subprocess-local), [`subprocess-ssh`](../packages/ssh/subprocess-ssh) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash), [`lsp-stdio`](../packages/lsp/lsp-stdio), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | - | Bash 执行器、PTY shell 后端、LSP Host，以及进程外 ACP、Codex 和 Claude Code subagent 后端都通过 ctx.subprocess 执行 spawn；该服务负责进程坐标、进程树／会话生命周期、stdio 处置、终端机制和 kill 升级。 |
 | `ctx.shell` | `seam` | [`shell`](../packages/shell/shell) | [`bash-local`](../packages/shell/bash-local), [`bash-sandbox`](../packages/shell/bash-sandbox), [`pwsh-local`](../packages/shell/pwsh-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) | - | 面向模型的 shell 工具和钩子桥接消费此 seam；沙箱、远程或 PowerShell 执行器可以替换 bash-local，而无需改动这些消费方。 |
 | `ctx.shellEnv` | `core` | [`shell-env`](../packages/shell/shell-env) | - | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh) | - | 插件声明限定于 effect 作用域的 DSH_* 事实；每个 shell 工具在每次执行时收集一份可信快照，其执行器据此重建命名空间。 |
 | `ctx.terminals` | `seam` | [`terminal`](../packages/terminal/terminal) | [`terminal-bash`](../packages/terminal/terminal-bash) | [`tool-terminal`](../packages/terminal/tool-terminal) | - | 注册表负责精确到 Agent 的会话身份和清理；后端负责终端机制，tool-terminal 则提供限定于所有者作用域的模型接口。 |
-| `ctx.sandbox` | `seam` | [`sandbox`](../packages/sandbox/sandbox) | [`sandbox-local`](../packages/sandbox/sandbox-local) | [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash) | - | 消费方交出即将执行 spawn 的确切 argv；与宿主共享文件系统和内核的后端按每次调用的策略包装该 argv，并报告强制执行情况。 |
+| `ctx.terminalController` | `core` | [`api-terminal-controller`](../packages/api/terminal-controller) | - | [`host-apiproxy`](../packages/host/apiproxy), [`gateway-execution`](../packages/context/gateway-execution) | - | 在经验证的创建者授权下拥有交互式终端组；Host 桥将其暴露给用户，Gateway 在撤权时排空在用的授权。 |
+| `ctx.userTerminalAuthorization` | `seam` | [`api-terminal-controller`](../packages/api/terminal-controller) | [`gateway-execution`](../packages/context/gateway-execution) | [`api-terminal-controller`](../packages/api/terminal-controller) | - | 受管部署逐次操作校验交互用户与当前可写范围；管理一旦开始而策略缺席，控制器即拒绝服务。 |
+| `ctx.userTerminalAdministration` | `seam` | [`api-terminal-controller`](../packages/api/terminal-controller) | [`gateway-execution`](../packages/context/gateway-execution) | [`api-terminal-controller`](../packages/api/terminal-controller) | - | 管理员权限仅覆盖清单与终止操作——永远不包括屏幕或输入访问。 |
+| `ctx.sandbox` | `seam` | [`sandbox`](../packages/sandbox/sandbox) | [`sandbox-local`](../packages/sandbox/sandbox-local), [`sandbox-ssh`](../packages/ssh/sandbox-ssh) | [`bash-sandbox`](../packages/shell/bash-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash) | - | 消费方交出即将执行 spawn 的确切 argv；与宿主共享文件系统和内核的后端按每次调用的策略包装该 argv，并报告强制执行情况。 |
 | `ctx.sandboxPolicy` | `core` | [`sandbox-policy`](../packages/sandbox/sandbox-policy) | - | [`bash-sandbox`](../packages/shell/bash-sandbox), [`fs-sandbox`](../packages/fs/fs-sandbox), [`terminal-bash`](../packages/terminal/terminal-bash) | - | 统一保存部署默认模式和工作区根目录；只有沙箱执行器和提供方读取该服务（工具层使用它同时导出的纯 `sandbox/mode` 折叠区）。两类强制执行组件都读取该服务，因此 bash 与 fs 不会限制到不同的根目录。 |
 | `ctx.approval` | `seam` | `approval` | [`acp`](../packages/acp/acp) | [`tools`](../packages/core/tools), [`tool-bash`](../packages/shell/tool-bash) | - | 一次性权限决策通过 `approval/request` waterfall（瀑布式事件）分派；回答方是监听器（即 ACP 为自身 agent 提供的桥接），没有回答方时以 `unavailable` 关闭失败。 |
 | `ctx.permissionPresets` | `core` | [`permission-presets`](../packages/interaction/permission-presets) | - | - | - | 面向用户的预设表（`workspace-write`／`danger-full-access`），将沙箱模式与审批策略选项组合在一起；一次切换会写入一个 `permission/preset` 事件，并贯通到两个选项事件。 |
 | `ctx.permissionPresetAuthorization` | `core` | [`permission-presets`](../packages/interaction/permission-presets) | - | [`collaboration-gateway`](../packages/context/collaboration-gateway) | - | 可选的部署策略决定当前已认证请求是否可以选择各个预设；Gateway 提供方在管理员请求之外会关闭失败。 |
 | `ctx.ptcRuntime` | `seam` | [`ptc-runtime`](../packages/ptc-runtime/ptc-runtime) | [`ptc-runtime-node`](../packages/ptc-runtime/ptc-runtime-node), [`experimental-ptc-runtime-python`](../packages/experimental/ptc-runtime-python) | [`tools`](../packages/core/tools) | - | 使用 Host 提供的异步绑定运行一段由模型编写的程序；各后端采用不同的基础环境和语言（工具注册表在 PTC mode 下消费该服务）。 |
-| `ctx.fs` | `seam` | [`fs`](../packages/fs/fs) | [`fs-local`](../packages/fs/fs-local), [`fs-sandbox`](../packages/fs/fs-sandbox) | [`tool-fs`](../packages/fs/tool-fs) | [`fs-observation-policy`](../packages/fs/fs-observation-policy) | tool-fs 通过 ctx.fs 执行读取／写入／编辑；fs-sandbox 按共享沙箱模式限制变更；fs-observation-policy 通过 fs/* 事件门禁贡献基于观测状态的检查。 |
+| `ctx.fs` | `seam` | [`fs`](../packages/fs/fs) | [`fs-local`](../packages/fs/fs-local), [`fs-sandbox`](../packages/fs/fs-sandbox), [`fs-ssh`](../packages/ssh/fs-ssh) | [`tool-fs`](../packages/fs/tool-fs) | [`fs-observation-policy`](../packages/fs/fs-observation-policy) | tool-fs 通过 ctx.fs 执行读取／写入／编辑；fs-sandbox 按共享沙箱模式限制变更；fs-observation-policy 通过 fs/* 事件门禁贡献基于观测状态的检查。 |
 | `ctx.compaction` | `seam` | [`compaction`](../packages/compaction/compaction) | [`compaction-basic`](../packages/compaction/compaction-basic) | [`compaction-basic`](../packages/compaction/compaction-basic) | - | 基础后端消费步骤后的压力事件和请求错误恢复事件；不存在面向模型的压缩工具。 |
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-dsh-sdk`](../packages/subagent/subagent-dsh-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | 提供方实现传输；该服务还负责可选的、基于 Activation 的延续编排，tool-subagent 选择一次性或可延续委派，tool-subagent-control 传递后续消息，而 tool-ralph 要求一条全新的结构化输出路由。 |
 | `ctx.subagentModelSelection` | `core` | [`tool-subagent`](../packages/subagent/tool-subagent) | - | [`tool-subagent`](../packages/subagent/tool-subagent) | - | 该设置服务校验并快照委派工具使用的宿主 allowlist，仅在显式启用模型选择支持时生效；发布的组合默认保持关闭。 |
@@ -570,6 +637,7 @@ flowchart LR
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | 后端保存过大的工具文本，并返回面向模型的定位信息和取回提示；spill-policy 是 tools/post-execute 消费方，负责决定何时 spill。 |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | 带判别标记的交互能力：原生后端在 Host 显示设备上打开一个操作系统选择器，浏览后端为应用内浏览器提供列表与创建原语；双端后端通过其浏览器侧填充 ui-workspace 目录流程的 slot（不通过协议发布）。 |
 | `ctx.webServer` | `core` | `webserver` | - | `connection`, `modules`, [`hmr`](../packages/boot/hmr) | - | 普通的 node:http 载体：具名路由注册表、索引转换 tap，以及静态 dist 回退；Web 传输插件注册自己的路由。 |
+| `ctx.webhookRuntime` | `core` | [`webhook`](../packages/webhook/webhook) | - | [`webhook-github`](../packages/webhook/webhook-github) | - | 即发即弃的受信任规则注册表，其回调在释放时中止并排干；创建会话是唯一的内置动作，提供方自持交付接收。 |
 | `ctx.clientModules` | `core` | `modules` | - | [`hmr`](../packages/boot/hmr) | - | 通过增量 `dsh.client` 扫描组合 __DSH_BOOT__ 入口图，提供插件组合包，并通知重建／图变更订阅方。 |
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-ptc`](../packages/workflow/workflow-ptc) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | 每个上下文使用一个引擎，与 bash 相同，且没有具名提供方注册表；通用工作流与固定 Ralph 消费方启动运行，其中的 agent() 调用通过 ctx.subagents 扇出。 |
 | `ctx.lsp` | `seam` | [`lsp`](../packages/lsp/lsp) | `lsp-local` | [`tool-lsp`](../packages/lsp/tool-lsp) | - | 提供方注册与选择，加上恰好四种操作的标准化查询执行；该 seam 不提供协议逃生口，后端必须转换为标准化请求和结果。 |

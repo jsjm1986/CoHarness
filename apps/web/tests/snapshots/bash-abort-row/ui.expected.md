@@ -7,16 +7,20 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "2 tool calls · 1 intermediate message":
   - text: 2 tool calls · 1 intermediate message
   - img
-- text: "Run two shell commands: wait for cancellation, then write skipped.txt. {{date}} {{clock}}"
+- text: "Run two shell commands: wait for cancellation, then write skipped.txt."
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - 'button "Failed Bash Error: tool call aborted" [expanded]':
   - img
   - text: "Failed Bash Error: tool call aborted"
 - text: "IN { \"command\": \"node -e \\\"require('node:fs').writeFileSync('started.txt', 'started'); setInterval(() => {}, 1000)\\\"\", \"description\": \"Wait until cancellation\" } OUT Error: tool call aborted"
+- button "Open details in sidebar"
 - button "Inspect"
 - 'button "Failed Bash Error: tool call aborted before dispatch"':
   - img
@@ -33,10 +37,11 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns · 1 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 1 steps{{throughput}} tok/s
-- button "20 tok · Cache hit 0%":
-  - img
-  - text: 20 tokCache hit 0%
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "20 tok · Cache hit 0%":
+    - img
+    - text: 20 tokCache hit 0%
 - separator "Adjust transcript content width"

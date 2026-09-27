@@ -30,7 +30,7 @@ Upstream's `remote.spec` asserts behavior that the local preset remote deliberat
 
 `tests/remote.spec.ts` asserts `gateway/internal` wrapping for unrelated throws, an empty-id `PresetNotWritableError` on the rootless roster, and switchability of command-only sessions. `tests/mount.spec.ts` asserts `PresetMountError` with flattened member lines for the `nested-broken` group fixture.
 
-The roster API carries no `includeShippedRoot`, `modeSelectionEnabled`, or `authorable` flags; the shipped root is derived by `profile-boot` patches ([the derived shipped preset root](2026-08-29-derived-shipped-preset-root.md)) and mode selection is a product surface the cloud offer does not expose through this remote.
+The roster API carries no `includeShippedRoot` flag; the shipped root is derived by `profile-boot` patches ([the derived shipped preset root](2026-08-29-derived-shipped-preset-root.md)). The remote roster does report the caller-scoped `authorable` hint and the `modeSelectionEnabled` policy flag — read facts only, with the write living in the `agent-presets` settings namespace ([the picker-visibility policy note](../feature/2026-09-25-agent-preset-picker-visibility-policy.md)).
 
 ## Testing
 

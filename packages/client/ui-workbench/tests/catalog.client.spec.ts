@@ -52,7 +52,11 @@ describe('catalog wire validation', () => {
   })
   it.each([
     { sessionId: '' }, { title: 4 }, { cwd: 4 }, { visibility: 'public' }, { creatorUserId: '1' },
-    { creatorUserId: 1.5 }, { creatorDisplayName: 2 }, { updatedAt: null }, { blank: 'false' }, { canWrite: null },
+    { creatorUserId: 1.5 }, { creatorUserId: 0 }, { creatorUserId: -1 },
+    { updatedAt: Infinity }, { updatedAt: -1 },
+    { visibleContentSeq: '1' }, { visibleContentSeq: null }, { visibleContentSeq: -1 },
+    { visibleContentSeq: 1.5 }, { visibleContentSeq: Number.MAX_SAFE_INTEGER + 1 },
+    { lastPromptAt: '1' }, { lastPromptAt: null }, { lastPromptAt: Infinity }, { lastPromptAt: -1 }, { creatorDisplayName: 2 }, { updatedAt: null }, { blank: 'false' }, { canWrite: null },
     { runtime: { kind: 'unknown' } }, { runtime: { kind: 'project', projectId: 0, projectName: 'A' } },
     { runtime: { kind: 'project', projectId: 0.5, projectName: 'A' } },
     { runtime: { kind: 'project', projectId: '1', projectName: 'A' } }, { runtime: { kind: 'project', projectId: 1 } },
@@ -60,7 +64,7 @@ describe('catalog wire validation', () => {
     expect(() => parseWorkbenchCatalog({ ...valid(), items: [{ sessionId: 's', runtime: { kind: 'personal' }, visibility: 'private', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true, ...fields }] })).toThrow('invalid workbench conversation')
   })
   it('accepts a complete personal row and rw project', () => {
-    expect(parseWorkbenchCatalog({ ...valid(), projects: [{ projectId: 1, name: 'A', mode: 'rw' }], items: [{ sessionId: 's', runtime: { kind: 'personal' }, title: 'Title', cwd: '/work', visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }] }).items).toHaveLength(1)
+    expect(parseWorkbenchCatalog({ ...valid(), projects: [{ projectId: 1, name: 'A', mode: 'rw' }], items: [{ sessionId: 's', runtime: { kind: 'personal' }, title: 'Title', cwd: '/work', visibleContentSeq: 0, lastPromptAt: 0, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }] }).items).toHaveLength(1)
   })
 })
 

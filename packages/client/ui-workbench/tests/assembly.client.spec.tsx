@@ -7,6 +7,8 @@ import { apply as applyConversation, inject as conversationInject } from '@deeps
 import { apply as applyWorkspace, inject as workspaceInject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISession, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { apply as applyAuxiliary, inject as auxiliaryInject } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import { ProjectUiPolicyRuntime, WorkspaceResourceRegistry, createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/apply.ts'
 
 usePinnedBrowserLanguages('zh-CN')
@@ -33,11 +35,13 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('assembled workbench', () => {
   it('binds two independent composers and preserves the first pane on focus changes', async () => {
     const runtime = await SlotTestRuntime.create()
-    runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+    runtime.provide('connection', { api: { settings: {} }, isLoopback: false, hostDescription: createSnapshotStore({ executionAuthorityRequired: false }) })
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
-    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn() })
+    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
+    runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
+    runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
@@ -61,6 +65,7 @@ describe('assembled workbench', () => {
       details: { kind: 'single', scope: 'session' },
     }, Root)
     await runtime.mount({ inject: [...conversationInject], apply: applyConversation })
+    await runtime.mount({ inject: [...auxiliaryInject], apply: applyAuxiliary })
     await runtime.mount({ inject: [...inject], apply })
     const viewport = runtime.ctx.get('conversationViewport')
     if (viewport === undefined) throw new Error('workbench capability missing')
@@ -102,7 +107,9 @@ describe('assembled workbench sidebar panel', () => {
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
     runtime.provide('settingsScope', { bind: () => scope.scope } as never)
-    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn() })
+    runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
+    runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
+    runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
@@ -129,6 +136,7 @@ describe('assembled workbench sidebar panel', () => {
     )
     await runtime.mount({ inject: [...conversationInject], apply: applyConversation })
     await runtime.mount({ inject: [...workspaceInject], apply: applyWorkspace })
+    await runtime.mount({ inject: [...auxiliaryInject], apply: applyAuxiliary })
     await runtime.mount({ inject: [...inject], apply })
     const viewport = runtime.ctx.get('conversationViewport')
     if (viewport === undefined) throw new Error('workbench capability missing')

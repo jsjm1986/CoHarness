@@ -34,6 +34,7 @@ const ROW_READY: AgentPresetSettingsState = {
 }
 
 const SEAT_READY: AgentPresetSeatState = {
+  showPicker: true,
   current: 'standard',
   options: [
     { id: 'standard', trust: 'system', name: '标准模式', description: '完整的编码 agent。' },
@@ -67,7 +68,7 @@ function renderSeat(state: Partial<AgentPresetSeatState> = {}) {
     useAgentPresetSeat: bindSnapshotSelector(store),
     t: (key: keyof typeof en) => en[key],
   } as unknown as AgentPresetSeatProps)} />)
-  return actions
+  return { ...actions, store }
 }
 
 function renderLabel(
@@ -274,6 +275,16 @@ describe('the new-session chip', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('closes itself when the picker preference turns off', () => {
+    const seat = renderSeat()
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
+
+    act(() => { seat.store.set({ ...SEAT_READY, showPicker: false }) })
+
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })
 

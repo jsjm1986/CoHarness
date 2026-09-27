@@ -54,9 +54,11 @@ async function mount(): Promise<Bench> {
   const api = new FakeApiClient()
   const bench: Bench = { ctx, sinks: undefined, dispatched: [] }
   // Stands in for api-gateway's Remote service: this spec owns the carrier's
-  // handoff, not the fan-out behind it.
+  // handoff, not the fan-out behind it. `$on` accepts subscriptions silently —
+  // the permission catalog's catalog-changed listener lands here.
   ctx.reflect.provide('remote', {
     $dispatch: (event: string, args: readonly unknown[]) => { bench.dispatched.push([event, ...args]) },
+    $on: () => () => {},
   })
   const handle: ConnectionHandle = {
     api,

@@ -10,6 +10,7 @@ export default defineConfig({
     // source. These aliases keep its value imports on the same React instance
     // while reusing the real runtime and primitive components.
     alias: {
+      '@deepseek-ai/dsh-host-apiproxy/api': resolve(__dirname, '../../packages/host/apiproxy/src/api/index.ts'),
       '@deepseek-ai/cordis': resolve(__dirname, '../../vendor/cordis/src/index.ts'),
       '@deepseek-ai/cosmokit': resolve(__dirname, '../../vendor/cosmokit/src/index.ts'),
       '@deepseek-ai/schemastery': resolve(__dirname, '../../vendor/schemastery/src/index.ts'),

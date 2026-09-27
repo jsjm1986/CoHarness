@@ -1,0 +1,11 @@
+# Optional webhook ingress over the shipped Web composition; no product profile enables it.
+- insert:
+    - id: webhook-runtime
+      name: '@deepseek-ai/dsh-webhook'
+    - id: webhook-github
+      name: '@deepseek-ai/dsh-webhook-github'
+      config:
+        source: acceptance
+        path: /webhook-acceptance
+        secretEnv: DSH_WEBHOOK_ACCEPTANCE_SECRET
+        maxBodyBytes: 4096

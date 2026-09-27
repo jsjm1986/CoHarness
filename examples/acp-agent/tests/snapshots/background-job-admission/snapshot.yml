@@ -1,0 +1,12 @@
+version: 1
+scenario: background-job-admission
+profile: acp
+composition: background-job-admission
+recording: authored
+header:
+  class: default
+replay:
+  override: true
+platform: posix
+workspace:
+  final: true

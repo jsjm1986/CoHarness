@@ -4,7 +4,7 @@ import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { canonicalSessionFixture, inspectSessionFixtureLayouts, isPhysicalSessionFixture } from './session-fixture-layout.ts'
 
 const LEGACY_HEADER = '  {"type":"session","version":0,"id":"fixture","createdAt":1,"delegationDepth":0}  '
-const CURRENT_HEADER = '{"type":"session","version":4,"id":"fixture","createdAt":1,"isSeeded":false,"delegationDepth":0}'
+const CURRENT_HEADER = '{"type":"session","version":6,"id":"fixture","createdAt":1,"isSeeded":false,"delegationDepth":0}'
 const VERSIONLESS_HEADER = '{"type":"session","id":"fixture","createdAt":1,"delegationDepth":0}'
 
 function legacyChunkRows(): string[] {

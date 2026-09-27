@@ -14,6 +14,8 @@ Combining definition, approval, execution, version switching, capability discove
 
 ## Proposal
 
+The model execution-tool portion is superseded by the [retirement decision](../../implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.md). The Host/Client lifecycle and historical UI remain separate programmatic consumers; this proposal does not provide an alternative model execution entry.
+
 ### Core principles
 
 - The Host is the sole process-wide authority for Plugins, Packages, Runs, approvals, and version pointers.

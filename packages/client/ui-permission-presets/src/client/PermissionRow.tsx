@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { permissionUnavailableReason, type ObservableSnapshot, type PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconChevronDownOutline14, Menu, RiskConfirmation,
@@ -20,6 +21,8 @@ export interface PermissionRowInjected {
   hooks: {
     /** Permission settings snapshot bound by the renderer as usePermission. */
     permission: SnapshotStore<PermissionSettingsState>
+    /** Current account qualification and the settings transport's own deployment marker. */
+    permissionAvailability: ObservableSnapshot<PermissionAvailability>
   }
   /** Load the descriptor when the row first renders. */
   load: () => Promise<void>
@@ -38,8 +41,9 @@ export type PermissionRowProps =
  * @param props - composed slot props.
  * @returns the row, or null when the host does not expose permission settings.
  */
-export function PermissionRow({ load, select, usePermission, t }: PermissionRowProps) {
+export function PermissionRow({ load, select, usePermission, usePermissionAvailability, t }: PermissionRowProps) {
   const state = usePermission(snapshot => snapshot)
+  const availability = usePermissionAvailability(value => value)
   const [open, setOpen] = useState(false)
   const [confirmingFullAccess, setConfirmingFullAccess] = useState(false)
   const [acknowledged, setAcknowledged] = useState(false)
@@ -55,6 +59,12 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
     setConfirmingFullAccess(false)
   }, [state.status, state.writable])
 
+  useEffect(() => {
+    setOpen(false)
+    setAcknowledged(false)
+    setConfirmingFullAccess(false)
+  }, [availability])
+
   if (state.status === 'unavailable') return null
   const selected = state.options.find(option => option.id === state.currentValue)
   const labelFor = (option: { id: string; label: string }): string =>
@@ -66,13 +76,15 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
    * each other's internals). */
   const label = (selected === undefined ? undefined : labelFor(selected))
     ?? (busy ? t('loading') : t('unavailable'))
+  const currentUnavailable = permissionUnavailableReason(state.currentValue, availability)
   const description: string = state.error
-    ?? (state.writableReason === 'project' ? t('managedByProject')
-      : state.writableReason === 'account' ? t('managedByAccount')
-        : state.writableReason === 'organization' ? t('managedByOrganization')
-          : state.writableReason === 'provider' || state.writableReason === 'deployment'
-            ? t('managedByDeployment')
-            : t('description'))
+    ?? (currentUnavailable !== undefined ? t(`unavailable.${currentUnavailable}`)
+      : state.writableReason === 'project' ? t('managedByProject')
+        : state.writableReason === 'account' ? t('managedByAccount')
+          : state.writableReason === 'organization' ? t('managedByOrganization')
+            : state.writableReason === 'provider' || state.writableReason === 'deployment'
+              ? t('managedByDeployment')
+              : t('description'))
 
   return (
     <>
@@ -84,10 +96,15 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
         <Menu
           open={open}
           onClose={() => { setOpen(false) }}
-          items={state.options.map(option => ({ id: option.id, label: labelFor(option) }))}
+          items={state.options.filter(option => option.id !== 'auto').map((option) => {
+            const reason = permissionUnavailableReason(option.id, availability)
+            return { id: option.id, disabled: reason !== undefined,
+              label: reason === undefined ? labelFor(option) : `${labelFor(option)} — ${t(`unavailable.${reason}`)}` }
+          })}
           selectedId={state.currentValue}
           onSelect={(id) => {
             setOpen(false)
+            if (id === 'auto' || permissionUnavailableReason(id, availability) !== undefined) return
             if (id === state.currentValue) return
             if (id === FULL_ACCESS_PRESET) {
               setAcknowledged(false)
@@ -131,6 +148,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
         onConfirm={() => {
           setAcknowledged(false)
           setConfirmingFullAccess(false)
+          if (permissionUnavailableReason(FULL_ACCESS_PRESET, availability) !== undefined) return
           void select(FULL_ACCESS_PRESET)
         }}
       />

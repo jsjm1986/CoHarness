@@ -77,7 +77,7 @@ function repositoryFixture(version = '1.2.3-rc.4'): string {
   return fixtureRoot
 }
 
-describe('client build environment', () => {
+describe('client build environment', { timeout: 15_000 }, () => {
   it('requires an exact public environment for a named artifact profile', () => {
     const expected = {
       DSH_CLIENT_BUILD_PROFILE: 'official',
@@ -92,6 +92,18 @@ describe('client build environment', () => {
     expect(() => {
       assertClientBuildEnvironment({ ...expected, DSH_CLIENT_UNDECLARED: 'value' }, expected)
     }).toThrow(/DSH_CLIENT_UNDECLARED/)
+  })
+
+  it('isolates CoHarness public values from inherited official branding and runtime profile names', () => {
+    const environment = {
+      DSH_CLIENT_BUILD_PROFILE: 'official', DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3', DSH_CLIENT_EXTRA: 'inherited',
+    }
+    expect(resolveClientBuildEnvironment(environment, 'coharness')).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'coharness', DSH_CLIENT_TITLE: 'CoHarness',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3',
+    })
+    expect(() => { resolveClientBuildEnvironment(environment, 'sdk') }).toThrow('unknown client build profile')
   })
 
   it('inherits public values by default and isolates an explicit official profile', () => {

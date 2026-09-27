@@ -2,42 +2,48 @@
 
 English | [中文](README.zh.md)
 
-Produced-files and clickable-reference feature owner. The Node half registers final-response guidance with the system-prompt registry; the browser half registers the deliverables row a finished turn ends with into the chat view's `conversation.chat.turnTail` hole and links matching inline-code references in the closing prose. The shipped Web patch is the only composition that loads this package. Removing its one cordis.yml entry removes the guidance, row, and prose links together.
-
-`deliverablesDefinition` folds each Turn's successful mutation calls into engine-published `DeliverablesTurnData`; `producedForClosing` reads that data with the closing Assistant seq. The vocabulary is the mutation tools' own follow-along `locations`, never the closing prose: a produced file is listed whether or not the model remembered to name it. A mutation is recognized by render intent, not tool name — a diff card, or a generic card whose `kind` is `edit` (the shape `str_replace_editor`'s insert presents) — so a new mutation tool joins by declaring what it does. Reads, deletes, and failed calls contribute nothing; a path appears once per Turn in first-seen order. The Conversation Location index owns Turn membership, so a Turn that mutates and then ends without content text cannot spill into the next Turn's row.
-
-`ProducedFiles` renders the row between the closing message's body and its IconActions footer: a quiet label and one file lane laid out by CSS container-width bands. The lane shows a responsive prefix of up to six chips (flexbox shrinks and ellipsizes basename text, full path as the `title`), and CSS selects the matching localized `+ N files` label for omitted paths, so the remainder stays visible without wrapping, horizontal scrolling, or JavaScript layout observation. Each chip opens through the owner-supplied `openFile` — the same Host opener the tool rows use, with the chat view resolving relative paths against the session cwd. When files are omitted, a second-line **Show in folder** action opens the session workspace through that same owner path only while the page is loopback and the current Host handshake reports `canOpenPath`; direct remote Web and headless/container Linux Hosts omit the action by default. Design rationale: the [workspace file links Agent Note](../../../.agents/notes/implemented/feature/2026-07-31-web-workspace-file-links.md).
-
-Produced-file chips use the shared `LinkIcon` classifier, so code, image, document, and unknown files have the same leading glyph language as inline links. The closing prose carries the same vocabulary. This plugin provides the `chatFileMentions` service the chat view consults per closing message: `producedFileMentions` resolves an inline-code token by exact path, or by being exactly the basename of exactly one produced path — a basename two paths share stays inert rather than guessing, so a mention link can never open the wrong file or 404. A resolved mention keeps its code chip and takes the markdown sheet's link language — link-blue at rest, underlined on hover, exactly like URL-promoted inline code — with the full path as its `title`; mentions never render inside anchors or streaming text. Decision record: the [inline file mentions Agent Note](../../../.agents/notes/implemented/feature/2026-08-07-web-inline-file-mentions.md).
-
-The Node half registers the static `ui:deliverable-file-references` system-prompt section. It asks the model to mention the primary files it successfully created or modified and to write those and any other changed-file references as Markdown inline code, using the exact file-tool path or a basename only when unique within the Turn. The guidance makes the renderer's accepted syntax explicit; it does not govern unrelated path discussions or widen the renderer's successful-mutation vocabulary.
-
 ## Summary
 
-This package renders the changed-files card a finished turn ends with — the files the turn changed, with the Host's line counts, each opening the turn's review tab on that file — plus cards for explicitly delivered files, and links matching inline-code references in the closing prose so a mentioned file opens in the right Sidebar. Listed and linked paths come from the recorded summary, successful mutations, and explicit deliveries, never from the prose. Only the shipped Web patch loads this package; removing its cordis.yml entry removes the guidance, cards, and prose links together.
+The Web turn tail shows recorded workspace changes and explicit file deliveries. Each changed-file row opens its historical comparison in the shared right sidebar; delivery cards open current files through the existing authorized Workspace preview. Turns without either event retain their successful-mutation file chips. Exact paths and unique basenames in closing prose link to produced or delivered files. The Host half contributes file-reference guidance.
+
+## Historical review and current files
+
+The [workspace recorder](../../deliverables/workspace-changes/README.md) announces summaries with `workspace/changes`; the [present tool](../../deliverables/tool-present/README.md) records `deliverables/presented`. `deliverablesDefinition` folds these events into turn data without scanning conversation history. Mutation-location fallback retains support for tools that declare diff or edit render intent.
+
+Review shows one file at a time with unified or side-by-side hunks, line wrapping, creation/deletion facts, and explicit binary or oversized states. Comparisons read the recorded turn snapshots, not current file contents. The renderer limits visible comparison lines and reports truncation. A separate preview action reads the current file. A disposed or restarted recorder yields an unavailable historical comparison rather than reconstructing one from current files.
+
+Reads use the Session's runtime connection and ApiProxy authorization. The Host checks Session access and recorded paths before and after asynchronous reads. Client readers belong to the retained Session, discard cached results on connection replacement, and abort on disposal. A review resource must declare the same Session as its sidebar. Hidden tabs do not initiate comparisons.
+
+Delivery cards preserve file descriptions and provide preview, default-application, and containing-directory actions. Native actions require an explicitly independent local Host, base runtime, loopback access, and an available desktop opener. Gateway users receive authorized previews without access to the server desktop. The directory action opens the containing folder; it does not promise platform-specific file selection.
 
 ## Invariants
 
-**Runtime invariant:** No companion is published. The package renders references already durable in session events and contributes prompt guidance; it owns no file or event relation.
+No companion is published: the UI projects durable events and authorized read results; the recorder and resource services own the file relationships.
+
+
+## Further Exploration
+
+- [Authorized review decision](../../../.agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.md)
+- [Workspace resources](../../../.agents/notes/implemented/feature/2026-09-12-cloud-workspace-file-resources.md)
 
 ## Model Experience
 
-### Clickable file-reference guidance
+### File-reference guidance
 
 #### What the model sees
 
-The guidance asks the model to name primary outputs after successful creation or modification and link every existing-file mention outside commands, configuration expressions, and code blocks, including repeats and tables. Labels default to filenames or clear aliases, with only enough parent directories to distinguish files. Precise references display `filename:24` or `filename:24–30`; their destinations retain full relative or absolute paths with `#L24` or `#L24-L30` anchors. The display suffix contains neither `#` nor `L`.
+A static system-prompt section asks the model to name primary outputs and link every mention of an existing file to its working-directory-relative or absolute path. Link labels use filenames or concise aliases, with optional line locations. Legacy inline-code references still resolve exact paths and unique basenames. The `present` tool independently owns the delivery schema and result text.
 
 #### Token effect
 
-One fixed paragraph containing an output reminder and file-reference guidance whenever this package is loaded. The `present` tool owns the delivery schema and result text.
+One fixed guidance paragraph while the Web plugin is mounted. Summary and comparison data stay outside model requests.
 
 #### KV Cache effect
 
-The section is static at first-party order 9000 for the lifetime of the package mount, so it remains in the reusable prompt prefix and does not change across Turns.
+The guidance remains unchanged throughout the plugin lifetime and is reusable across turns.
 
 ## Known Limitations and Deferred Work
 
-- **Mention matching is exact path or unique basename only.** A suffix mention (`out/index.html` written as `index.html` resolves; `deep/out/index.html` written as `out/index.html` does not) stays inert; widening the matcher is deferred until a real closing-message shape needs it.
-- **Files created indirectly by terminal commands remain outside the matching vocabulary.** Naming such a file in inline code does not make it clickable unless a successful mutation location also records that path.
-- **Native folder handoff targets the Host desktop.** A browser reached through a non-loopback authority omits the action, as does a deployment reporting no native opener. SSH forwarding that makes a remote Host look loopback-local must set the gateway's `nativeOpen: false`; so must a headless macOS/Windows Host, a WSL deployment without working Windows interop, or any Linux desktop whose display/opener probe is a false positive. Identifying the operator-visible desktop remains deployment policy.
+- Historical comparisons live only as long as the Host recorder. The Session event remains durable after its comparison is unavailable.
+- Inline-code matching accepts exact paths and unambiguous basenames; it does not guess path suffixes or files named only in prose.
+- The recorder currently captures local execution. Remote execution needs a recorder using the same remote filesystem and subprocess target.

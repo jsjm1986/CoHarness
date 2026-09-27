@@ -269,7 +269,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
         },
       },
     )
-    const closed: PromiseWithResolvers<void> = Promise.withResolvers()
+    const closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
     let attemptSettled = false
     let closeObserved = false
     let transport: Transport | undefined
@@ -278,7 +278,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     closeClient = closeGeneration
     generation.onclose = () => {
       closeObserved = true
-      closed.resolve()
+      closed.resolve(undefined)
       // A failed connect owns its close barrier in the catch path below. An
       // established generation can transition down directly from this signal.
       if (attemptSettled) generationDown(generation)

@@ -13,7 +13,8 @@ export const inject = ['systemPrompt']
 
 /** Stable final-response guidance owned by the matching renderer. */
 const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, mention the primary outputs in your final response. '
-  + 'To make those and any other changed-file references clickable in Web, format them as Markdown inline code using the exact file-tool path, or a basename when unique among the files changed in that turn.'
+  + 'Outside commands, configuration expressions, and code blocks, link every mention of an existing file, including repeats and tables, to its full path relative to the working directory or absolute; append #L24 or #L24-L30 to the target for known lines. '
+  + 'Use the filename or a clear alias as the label, adding only enough parent directories to distinguish files; keep full paths out of labels. Default to the name alone; when precise locations matter, append :24 or :24–30, with no # or L in the line suffix.'
 
 /**
  * Register model guidance for the file-reference renderer shipped by this package.
@@ -22,7 +23,7 @@ const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, men
 export function apply(ctx: Context): void {
   ctx.systemPrompt.section({
     name: 'ui:deliverable-file-references',
-    order: 190,
+    order: ctx.systemPrompt.getSectionOrder('DELIVERABLE_FILE_REFERENCES'),
     text: FILE_REFERENCE_PROMPT,
   })
 }

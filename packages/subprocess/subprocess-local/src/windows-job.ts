@@ -148,7 +148,7 @@ export function launchWindowsJob(
   const targetStdin = child.stdio[4] as Writable | null
 
   const direct = Promise.withResolvers<SubprocessOutcome>()
-  const rangeExit = Promise.withResolvers<void>()
+  const rangeExit = Promise.withResolvers<undefined>()
   let directResultType: WindowsRunnerResult['type'] | undefined
   let runnerSpawned = false
   let runnerExit: { exitCode: number | null; signal: NodeJS.Signals | null } | undefined
@@ -162,7 +162,7 @@ export function launchWindowsJob(
     const { exitCode, signal } = runnerExit
     if (exitCode === 0 && signal === null) {
       if (directResultType !== undefined) {
-        rangeExit.resolve()
+        rangeExit.resolve(undefined)
         return
       }
       // The private IPC result may arrive after the process-exit notification.
@@ -222,7 +222,7 @@ export function launchWindowsJob(
   child.once('error', (error) => {
     if (!runnerSpawned) {
       direct.reject(error)
-      rangeExit.resolve()
+      rangeExit.resolve(undefined)
       return
     }
     failInfrastructure(error)

@@ -23,7 +23,7 @@ The local provider implements the `resumable-v1` upload session used by the Web 
 
 `uploadManifestMaxBytes` bounds every manifest read (256 KiB by default). `uploadMaxConcurrent` bounds both expired-session cleanup and finalization workers; queued finalizations are cancelled when the store stops or an upload is cancelled. `uploadCleanupIntervalMs` is capped at Node's maximum timer delay (`2,147,483,647` ms), so an invalid interval cannot be clamped into a busy one-millisecond loop.
 
-The provider records the admission lock owner as a PID. During startup, a lock whose recorded process no longer exists is atomically removed before expired-session cleanup, so an interrupted runtime does not block later document requests for the full 30-second lock deadline. A live or unreadable lock remains contended and is not removed automatically.
+The provider records the admission lock owner as a PID in `.admission.lock`. Startup recovers it only when the process probe proves the owner has exited. Concurrent recoverers use a separate recovery lock and re-read ownership before removing the orphan, preserving a replacement writer's lock. Live, malformed or indeterminate owners are not reclaimed. An interrupted recovery's coordination lock requires operator verification; ordinary upload contention retains its 30-second deadline.
 
 ## Invariants
 

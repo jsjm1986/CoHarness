@@ -21,6 +21,7 @@ const alice = {
   status: 'active' as const,
   homePath: '/home/alice',
   mustChangePassword: false,
+  autoReviewEligible: false,
   port: 9101,
   instanceState: 'stopped',
 }
@@ -73,6 +74,45 @@ describe('UsersPage', () => {
 
     expect(await screen.findAllByText('运行中')).toHaveLength(2)
     expect(screen.queryAllByText('ready')).toHaveLength(0)
+  })
+
+  it('shows Auto eligibility in both layouts and edits it without selecting a preset', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.patchUser).mockImplementation(async (_id, patch) => {
+      vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, autoReviewEligible: patch.autoReviewEligible ?? false }])
+    })
+    render(<UsersPage />)
+    expect(await screen.findAllByText('未授予')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: '编辑用户' }))
+    const dialog = within(screen.getByRole('dialog', { name: '编辑 alice' }))
+    const eligibility = dialog.getByRole('checkbox', { name: '允许选择 Auto 审查' }) as HTMLInputElement
+    expect(eligibility.checked).toBe(false)
+    expect(dialog.getByText(/不会改变已有会话或新会话的默认权限/)).toBeTruthy()
+    await user.click(eligibility)
+    await user.click(dialog.getByRole('button', { name: '保存更改' }))
+    expect(api.patchUser).toHaveBeenLastCalledWith(1, { autoReviewEligible: true })
+    expect(await screen.findAllByText('已授予')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: '编辑用户' }))
+    const reopened = within(screen.getByRole('dialog', { name: '编辑 alice' }))
+    expect((reopened.getByRole('checkbox', { name: '允许选择 Auto 审查' }) as HTMLInputElement).checked).toBe(true)
+    await user.click(reopened.getByRole('checkbox', { name: '允许选择 Auto 审查' }))
+    await user.click(reopened.getByRole('button', { name: '保存更改' }))
+    expect(api.patchUser).toHaveBeenLastCalledWith(1, { autoReviewEligible: false })
+    expect(await screen.findAllByText('未授予')).toHaveLength(2)
+  })
+
+  it('changes a name and role without rewriting an unchanged Auto grant', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, autoReviewEligible: true }])
+    render(<UsersPage />)
+    await screen.findAllByText('已授予')
+    await user.click(screen.getByRole('button', { name: '编辑用户' }))
+    const dialog = within(screen.getByRole('dialog', { name: '编辑 alice' }))
+    await user.clear(dialog.getByLabelText('显示名'))
+    await user.type(dialog.getByLabelText('显示名'), 'Renamed')
+    await user.selectOptions(dialog.getByLabelText('角色'), 'admin')
+    await user.click(dialog.getByRole('button', { name: '保存更改' }))
+    expect(api.patchUser).toHaveBeenCalledWith(1, { displayName: 'Renamed', role: 'admin' })
   })
 
   it('confirms user deletion and removes the account from the list', async () => {

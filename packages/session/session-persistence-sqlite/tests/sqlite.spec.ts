@@ -700,15 +700,15 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await second.plugin(SessionStore)
     await second.plugin(SessionPersistenceSqlite, { path })
     const loaded = await second.sessionPersistence.load(id)
-    expect(loaded.meta.version).toBe(4)
+    expect(loaded.meta.version).toBe(SESSION_FORMAT_VERSION)
     const migrated = new DatabaseSync(path)
-    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 4 })
+    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: SESSION_FORMAT_VERSION })
     migrated.close()
     // The stored body was rewritten in place: a fresh store decodes the same
     // migrated event list (v2→v3 inserts the system head into the open step).
     const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
     const reread = await store.loadStored(id)
-    expect(reread?.meta.version).toBe(4)
+    expect(reread?.meta.version).toBe(SESSION_FORMAT_VERSION)
     expect(reread?.events.map(event => event.type)).toEqual(loaded.events.map(event => event.type))
     expect(reread?.events.map(event => event.type)).toContain('system/message')
     await store.close()

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import {
-  ComposerSubmissionPolicy, DEFAULT_BUSY_ENTER_BEHAVIOR,
+  ComposerSubmissionPolicy, DEFAULT_BUSY_ENTER_BEHAVIOR, resolveSubmitMode,
 } from '../src/client/input/submission-policy.ts'
 import type { ConversationSettings } from '../src/submission-settings.ts'
 
@@ -10,21 +10,21 @@ describe('ComposerSubmissionPolicy', () => {
   it('defaults to Queue and only applies the preference while running', () => {
     const policy = new ComposerSubmissionPolicy()
     expect(policy.busyEnter.getSnapshot()).toBe(DEFAULT_BUSY_ENTER_BEHAVIOR)
-    expect(policy.resolve(false, 'enter', true)).toBe('queue')
-    expect(policy.resolve(false, 'accelerated', true)).toBe('queue')
-    expect(policy.resolve(true, 'enter', true)).toBe('queue')
-    expect(policy.resolve(true, 'accelerated', true)).toBe('steer')
-    expect(policy.resolve(true, 'enter', false)).toBe('queue')
-    expect(policy.resolve(true, 'accelerated', false)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), false, 'enter', true)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), false, 'accelerated', true)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), true, 'enter', true)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), true, 'accelerated', true)).toBe('steer')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), true, 'enter', false)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), true, 'accelerated', false)).toBe('queue')
 
     const changed = vi.fn()
     policy.busyEnter.subscribe(changed)
     policy.setBusyEnter('steer')
     expect(changed).toHaveBeenCalledTimes(1)
-    expect(policy.resolve(true, 'enter', true)).toBe('steer')
-    expect(policy.resolve(true, 'accelerated', true)).toBe('queue')
-    expect(policy.resolve(false, 'enter', true)).toBe('queue')
-    expect(policy.resolve(false, 'accelerated', true)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), true, 'enter', true)).toBe('steer')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), true, 'accelerated', true)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), false, 'enter', true)).toBe('queue')
+    expect(resolveSubmitMode(policy.busyEnter.getSnapshot(), false, 'accelerated', true)).toBe('queue')
   })
 
   it('writes an explicit change through the scope after publishing it locally', () => {

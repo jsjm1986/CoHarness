@@ -112,9 +112,9 @@ export class SessionWriteBehind {
     this.cancelTimer()
     this.deadlineExpired = false
     this.automaticPaused = false
-    const barrier = Promise.withResolvers<void>()
+    const barrier = Promise.withResolvers<undefined>()
     this.barrier = barrier.promise
-    void this.drainBarrier(barrier.resolve, barrier.reject)
+    void this.drainBarrier(() => { barrier.resolve(undefined) }, barrier.reject)
     return barrier.promise
   }
 

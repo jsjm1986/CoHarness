@@ -14,7 +14,7 @@ import {
 } from './columns.ts'
 
 /**
- * Layout store state: panel width preferences in px (0 = closed), plus the
+ * Layout store state: column widths and auxiliary presentation reports, plus the
  * narrow-viewport pair — `narrow` mirrors AppFrame's breakpoint reading
  * (viewport < SIDEBAR_AUTO_COLLAPSE) so toggleSidebar can pick semantics, and
  * `narrowExpanded` is the manual override that opens the auto-collapsed
@@ -22,36 +22,58 @@ import {
  * expanded over the squeezed center, the compact mode as the overlay drawer
  * (AppFrame owns that rendering split).
  */
-type LayoutState = { sidebar: number; details: number; narrow: boolean; narrowExpanded: boolean; detailsSessionId?: SessionId }
+type LayoutState = {
+  sidebar: number
+  details: number
+  narrow: boolean
+  narrowExpanded: boolean
+  detailsSessionId?: SessionId
+  rightbarShown: boolean
+  rightbarTrack: boolean
+  rightbarFullscreen: boolean
+}
 
 /**
  * Annotation twin of the actions literal below (the export needs a declared
  * return type); drift fails assignability at the defineStore call.
  */
 type LayoutActions = {
+  focusRightbar: (draft: LayoutState, sessionId: SessionId) => void
+  openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
+  closeRightbar: (draft: LayoutState) => void
   setSidebar: (draft: LayoutState, px: number) => void
   setDetails: (draft: LayoutState, px: number) => void
   toggleSidebar: (draft: LayoutState) => void
   setNarrow: (draft: LayoutState, narrow: boolean) => void
   collapseNarrow: (draft: LayoutState) => void
-  openDetails: (draft: LayoutState, sessionId?: SessionId) => void
-  closeDetails: (draft: LayoutState, sessionId?: SessionId) => void
 }
 
 /**
- * Create the layout panel store handle. The preference IS the width, so
- * closing a panel forgets its drag width — reopening restores the contract
- * default. Actions are the complete write set: drag writes clamp
- * into the panel's contract range and never cross the open/closed line;
- * open/close transitions write 0 / the default explicitly. Below the
- * auto-collapse breakpoint (AppFrame feeds setNarrow) the sidebar toggle
- * flips the narrowExpanded override instead of the preference.
+ * Create the frame geometry store. Auxiliary visibility belongs to the tab owner;
+ * its presentation reports reserve or release the column without losing drag width.
+ * Below the auto-collapse breakpoint the sidebar toggle changes its narrow override.
  * @returns the store handle (spec + type + identity + factory in one).
  */
 export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
   const handle = defineStore({
-    init: (): LayoutState => ({ sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false }),
+    init: (): LayoutState => ({
+      sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false,
+      rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
+    }),
     actions: {
+      focusRightbar: (d, sessionId: SessionId) => { d.detailsSessionId = sessionId },
+      openRightbar: (d, track: boolean, fullscreen: boolean) => {
+        if (d.details === 0) d.details = DETAILS_DEFAULT
+        d.rightbarShown = true
+        d.rightbarTrack = track
+        d.rightbarFullscreen = fullscreen
+        d.narrowExpanded = false
+      },
+      closeRightbar: (d) => {
+        d.rightbarShown = false
+        d.rightbarTrack = false
+        d.rightbarFullscreen = false
+      },
       setSidebar: (d, px: number) => { d.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX) },
       setDetails: (d, px: number) => { d.details = clampWidth(px, DETAILS_MIN, DETAILS_MAX) },
       // Narrow toggles flip only the override: the width preference survives
@@ -61,7 +83,6 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       // into a strip between them.
       toggleSidebar: (d) => {
         if (d.narrow) {
-          if (d.details !== 0) { d.details = 0; delete d.detailsSessionId }
           d.narrowExpanded = !d.narrowExpanded
         } else d.sidebar = d.sidebar === 0 ? SIDEBAR_DEFAULT : 0
       },
@@ -75,20 +96,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       // Explicit narrow dismissal (scrim tap, compact session navigation):
       // drops only the override, never the wide width preference.
       collapseNarrow: (d) => { d.narrowExpanded = false },
-      openDetails: (d, sessionId?: SessionId) => {
-        if (d.details === 0) d.details = DETAILS_DEFAULT
-        // The same exclusivity from the other side: the details overlay
-        // replaces the squeeze-open sidebar / compact drawer rather than
-        // sharing the narrow frame with it.
-        d.narrowExpanded = false
-        if (sessionId === undefined) delete d.detailsSessionId
-        else d.detailsSessionId = sessionId
-      },
-      closeDetails: (d, sessionId?: SessionId) => {
-        if (sessionId !== undefined && d.detailsSessionId !== sessionId) return
-        d.details = 0
-        delete d.detailsSessionId
-      },
+
     },
   })
   return handle

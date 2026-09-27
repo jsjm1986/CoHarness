@@ -1,0 +1,20 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../agent-team" },
+    { "path": "../../api/remotes/tsconfig.client.json" },
+    { "path": "../../client/locale" },
+    { "path": "../../client/runtime" },
+    { "path": "../../client/ui-conversation" },
+    { "path": "../../client/ui-primitives" },
+    { "path": "../../client/ui-renderer" },
+    { "path": "../../client/ui-slots" },
+    { "path": "../../typert/protocol" }
+  ]
+}

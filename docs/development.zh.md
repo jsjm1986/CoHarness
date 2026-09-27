@@ -138,7 +138,7 @@ keyless [CI 工作流](../.github/workflows/ci.yml) 按影响范围选择 lane�
 
 `pnpm run test:web:focused -- --scenarios '<JSON array>'` 针对已完整构建的产物运行登记的场景键；数组必须包含全部必需冒烟场景。使用 `--print-plan` 可在执行前查看选择结果。分组与精确场景互斥。`pnpm run verify:web-fixtures -- --focused --scenarios '<JSON array>'` 在构建前校验已录制的 Session 输入。本地 `DSH_SNAPSHOT=refresh` 只改选中的所属场景；随后应使用相同选择，在 `DSH_SNAPSHOT=replay` 下回放。保留完整组装场景验证公共界面，在功能所属区域采集 golden，不削弱文字、状态、顺序或几何断言。
 
-`pnpm run verify-plugin-surfaces` 报告运行时插件、静态客户端、Bundle 与浏览器预取分层，不向运行时增加元数据。普通 Web 启动会禁用客户端插件 HMR，因此 Host 不会轮询客户端 bundle；只有在 `pnpm run dev:web` 正在重建 bundle 且需要无刷新重载时才设置 `DSH_CLIENT_HMR=1`。`pnpm run perf:command -- --label <name> -- <command> [args...]` 会带预热运行构建命令并输出 P95；性能测量应与正确性测试分开，并使用相同的 Node、平台和构建产物进行比较。
+`pnpm run verify-plugin-surfaces` 报告运行时插件、静态客户端、Bundle 与浏览器预取分层，不向运行时增加元数据。普通 Web 启动会向已打开页面传递插件清单变化，不轮询产物；只有在 `pnpm run dev:web` 正在重建 bundle 且需要无刷新代码替换时才设置 `DSH_CLIENT_HMR=1`。`pnpm run perf:command -- --label <name> -- <command> [args...]` 会带预热运行构建命令并输出 P95；性能测量应与正确性测试分开，并使用相同的 Node、平台和构建产物进行比较。
 
 ### 演示
 
@@ -154,7 +154,7 @@ pnpm run build
 pnpm dsh --profile headless "summarize this workspace"
 ```
 
-自指的 cordis 演示可以检查并修改其实时插件运行时，并需要相同的凭证（默认 `web`，也可用 `acp`）：
+Cordis 演示提供实时运行时的只读检查，使用相同的凭据（默认 `web`，也可选择 `acp`）：
 
 ```sh
 pnpm run demo:cordis

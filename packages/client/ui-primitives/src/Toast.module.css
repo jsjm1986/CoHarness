@@ -29,7 +29,7 @@
   transform: translateX(-50%);
   animation:
     dsh-toast-in 160ms ease-out,
-    dsh-toast-fade 1000ms ease 3000ms forwards;
+    dsh-toast-fade 1000ms ease var(--dsh-toast-hold, 3000ms) forwards;
 }
 
 .icon {
@@ -65,7 +65,7 @@
    not movement) still ends the banner before the timed unmount. */
 @media (prefers-reduced-motion: reduce) {
   .toast {
-    animation: dsh-toast-fade 1000ms ease 3000ms forwards;
+    animation: dsh-toast-fade 1000ms ease var(--dsh-toast-hold, 3000ms) forwards;
   }
 }
 

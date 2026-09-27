@@ -47,6 +47,14 @@ afterEach(() => {
 })
 
 describe('Remote model generation', { timeout: 60_000 }, () => {
+  it.each(['Iterable', 'AsyncIterable'])('rejects an unmarked %s before expanding iterator methods', (wrapper) => {
+    const root = copyFixture()
+    editFile(root, 'packages/remote/src/index.ts', source => source.replace(
+      'Promise<CreateGoalResult>', `${wrapper}<CreateGoalResult>`,
+    ).replace('  async create(', '  create(').replace('return { ref: `${agent.id}:${request.title}` }', 'throw new Error(request.title)'))
+    expect(() => new WorkspaceTypertGenerator(root).generate()).toThrow('Iterable Remote results require @Remote({ mode: "stream" })')
+  })
+
   it('discovers a Remote-only package and emits strict direct and Context descriptors', async () => {
     const generator = new WorkspaceTypertGenerator(fixtureRoot)
 

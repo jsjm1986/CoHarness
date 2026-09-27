@@ -2,7 +2,7 @@
 
 English | [中文](workspace.zh.md)
 
-A workspace is the persistent record of a directory the user works in: a stable id over a canonical path, a display title, and the ordered account of sessions that belong to it. The subsystem is one package ([dsh-workspace](../../packages/workspace/workspace), `ctx.workspaceRegistry`) — an optional host-side capability, not part of the agent-loop spine, and invisible to models (no tools, no prompt text, no session events). It stores its records through the [storage domain form](storage.md) and validates session membership against [`SessionHeader.cwd`](persistence.md#sessionheader--metadata-beside-the-log), so `storageDomain` and `sessionPersistence` are mandatory startup dependencies: an unavailable persistence peer leaves the plugin pending rather than being mistaken for an empty history. Design record: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); bootstrap and GUI ordering: [Workspace UI product-flow Agent Note](../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md).
+A workspace is the persistent record of a directory the user works in: a stable id over a canonical path, a display title, and the ordered account of sessions that belong to it. The subsystem is one package ([dsh-workspace](../../packages/workspace/workspace), `ctx.workspaceRegistry`) — an optional host-side capability, not part of the agent-loop spine, and invisible to models (no tools, no prompt text, no session events). It stores its records through the [storage domain form](storage.md) and validates session membership against [`SessionHeader.cwd`](persistence.md#sessionheader--metadata-beside-the-log), so `storageDomain`, `sessionPersistence`, and `fs` are mandatory startup dependencies: an unavailable persistence peer leaves the plugin pending rather than being mistaken for an empty history. Design record: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); bootstrap and GUI ordering: [Workspace UI product-flow Agent Note](../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md).
 
 Source: [`packages/workspace/workspace/src/types.ts`](../../packages/workspace/workspace/src/types.ts)
 
@@ -16,7 +16,7 @@ Source: [`packages/workspace/workspace/src/types.ts`](../../packages/workspace/w
 type WorkspaceId = Branded<'WorkspaceId'>
 ```
 
-`WorkspaceId` is a [branded id](core.md#branded-ids). Path identity is separate: `realpathNormalize` (`fs.realpath`; trailing slashes, `..`, and symlinks resolved) is the one uniqueness canon — workspace paths are stored canonicalized, uniqueness is string equality of canonical paths (a symlink to an owned directory collides), and attach-time session cwd checks go through the same canon.
+`WorkspaceId` is a [branded id](core.md#branded-ids). Path identity is separate: `resolveWorkspacePath` (the runtime filesystem resolves trailing slashes, `..`, and symlinks) is the one uniqueness canon — workspace paths are stored canonicalized, uniqueness is string equality of canonical paths (a symlink to an owned directory collides), and attach-time session cwd checks go through the same canon.
 
 ## The workspace entity
 
@@ -34,7 +34,7 @@ interface Workspace {
   readonly id: WorkspaceId
 
   /**
-   * Canonical directory path: the `fs.realpath` of the path given at create
+   * Canonical directory path returned by the runtime filesystem at create
    * time (trailing slashes, `..`, and symlinks all resolved). Never rewritten
    * afterwards, even when the directory disappears (see {@link status}).
    */
@@ -117,7 +117,7 @@ Ownership truth is the record's ordered `sessionIds`, never derived from session
 
 ## The registry: `ctx.workspaceRegistry`
 
-`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` canonicalizes the path, rejects a nonexistent path (the original `ENOENT`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? basename(path)` prepended to the durable registry order — a new record cannot duplicate an existing display title (`WorkspaceNameConflictError`). `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same realpath canon without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([decision](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
+`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` canonicalizes the path, rejects a nonexistent path (`FS_NOT_FOUND`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? basename(path)` prepended to the durable registry order; display titles may repeat. `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same provider-owned path identity without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([decision](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
 
 Sessions get their cwd at create time from whoever creates them, not from this registry — the API gateway resolves a new session's cwd from the chosen workspace's `path` (falling back to an explicit or default cwd), creates the session so the cwd lands in its immutable [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log), then calls `attachSession`, which re-validates that stored header cwd against the workspace path. On the first successful start, the registry bootstraps history from persisted headers alone (`id`, `cwd`, `createdAt` — never event bodies), grouping sessions with a valid canonical cwd into per-directory workspaces, newest first; the initialized marker is written last so an interrupted bootstrap resumes safely. The bootstrap is one-time: cwd-less legacy sessions stay Ungrouped, and sessions created afterwards join a workspace only through `attachSession`.
 
@@ -149,17 +149,148 @@ abstract capability(): DirectoryPickerCapability
 
 Source: [`packages/host/directory-picker/src/index.ts`](../../packages/host/directory-picker/src/index.ts)
 
+<a id="ctxterminalcontroller--terminalcontroller"></a>
+
+### `ctx.terminalController` — `TerminalController`
+
+Typed Remote control of transient Session-owned terminal processes.
+
+```ts cordis-catalog
+/**
+ * Reject unauthorized terminal callers before transport lookup can activate an Agent.
+ * @param sessionId - codec-validated Session identity from the Remote request.
+ * @param signal - request cancellation.
+ * @returns after current human authority is confirmed.
+ */
+async authorizeSession(sessionId: SessionId, signal: AbortSignal): Promise<void>
+
+/**
+ * Read the Session working directory and terminal limits without resolving a shell.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param signal - request cancellation.
+ * @returns the Session workspace directory and terminal limits.
+ */
+@Remote async environment(agent: Agent, signal: AbortSignal): Promise<TerminalEnvironment>
+
+/**
+ * Discover installed shells in the Session's execution environment.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param signal - request cancellation.
+ * @returns verified profiles, with the configured or system default first.
+ */
+@Remote async shells(agent: Agent, signal: AbortSignal): Promise<TerminalShell[]>
+
+/**
+ * List retained terminals without resolving or activating an Agent.
+ * @param sessionId - displayed Session identity, including offline history.
+ * @returns terminals retained for this Host lifetime.
+ */
+@Remote async list(sessionId: SessionId): Promise<WebTerminalInfo[]>
+
+/**
+ * Allocate a user shell once for a caller-generated identity, without Agent sandbox or approval restrictions.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param request - initial dimensions and idempotency identity.
+ * @param signal - allocation cancellation; committed terminals survive disconnection.
+ * @returns the existing or newly committed terminal.
+ */
+@Remote async create(agent: Agent, request: TerminalCreateRequest, signal: AbortSignal): Promise<WebTerminalInfo>
+
+/**
+ * Retain an existing terminal for a window without activating its Agent or taking input control.
+ * @param sessionId - owning Session identity, including an inactive saved layout.
+ * @param id - retained Host terminal identity.
+ * @param signal - physical Remote stream cancellation.
+ * @returns a hold acknowledgement followed by an open lifetime stream.
+ */
+@Remote({ mode: 'stream' }) async * retain(sessionId: SessionId, id: WebTerminalId, signal: AbortSignal): AsyncIterable<TerminalRetentionFrame>
+
+/**
+ * Attach to a terminal without binding its process lifetime to the transport.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param attachmentId - new exclusive input attachment.
+ * @param signal - physical stream cancellation.
+ * @returns screen recovery followed by output and metadata changes.
+ */
+@Remote({ mode: 'stream' }) async * follow(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, signal: AbortSignal): AsyncIterable<TerminalFrame>
+
+/**
+ * Deliver raw input, including Tab completion and control characters.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param attachmentId - current writable attachment.
+ * @param data - input bytes represented as UTF-8 text.
+ * @returns after provider input acceptance.
+ */
+@Remote async write(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, data: string): Promise<void>
+
+/**
+ * Update the dimensions of the PTY and recovery screen.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param attachmentId - current writable attachment.
+ * @param cols - column count.
+ * @param rows - row count.
+ * @returns after the resize completes.
+ */
+@Remote async resize(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, cols: number, rows: number): Promise<void>
+
+/**
+ * Rename a terminal without changing its shell.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param title - nonempty display title, at most 120 characters.
+ */
+@Remote async rename(agent: Agent, id: WebTerminalId, title: string): Promise<void>
+
+/**
+ * Close an identity to future creation and kill its process range; repeated closes succeed.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @returns after provider cleanup succeeds. A failure retains the terminal for retry.
+ */
+@Remote async close(agent: Agent, id: WebTerminalId): Promise<void>
+
+/**
+ * List process metadata without activating Sessions or reading terminal contents.
+ * @param signal - administrator request cancellation.
+ * @returns current owner coordinates and process states only.
+ */
+@Remote async adminList(signal: AbortSignal): Promise<TerminalAdminInfo[]>
+
+/**
+ * Terminate exactly one inventory entry without assuming its creator identity.
+ * @param ownerId - Host-lifetime owner returned by the current inventory.
+ * @param id - terminal within that owner.
+ * @param signal - cancellation before admitting termination; accepted cleanup remains owned.
+ * @returns after process cleanup succeeds; missing entries are already closed.
+ */
+@Remote async adminClose(ownerId: TerminalOwnerId, id: WebTerminalId, signal: AbortSignal): Promise<void>
+
+/**
+ * Await or retry cleanup only for owners whose authority has already ended.
+ * This lifecycle operation never exposes output or opens a new process.
+ * @returns after every stopping owner has released its subprocess resources.
+ */
+async drainRevoked(): Promise<void>
+```
+
+Types: [Agent](core.md) · [SessionId](core.md)
+
+Source: [`packages/api/terminal-controller/src/index.ts`](../../packages/api/terminal-controller/src/index.ts)
+
 <a id="ctxworkspaceregistry--workspaceregistry"></a>
 
 ### `ctx.workspaceRegistry` — `WorkspaceRegistry`
 
-Durable workspace registry. Startup waits for `sessionPersistence`, builds one canonical-cwd header index, and completes the one-time history bootstrap before the service becomes active. The persistence dependency is mandatory so an unavailable peer can never be mistaken for an empty history and commit the initialized marker.
+Durable workspace registry. Startup waits for `sessionPersistence` and `fs`, builds one canonical-cwd header index, and completes the one-time history bootstrap before the service becomes active. The persistence dependency is mandatory so an unavailable peer can never be mistaken for an empty history and commit the initialized marker.
 
 ```ts cordis-catalog
 /**
  * Create or reuse a workspace for an existing directory. The path is
- * canonicalized through `fs.realpath`; a nonexistent path rejects with the
- * original error and a non-directory rejects. Repeated calls for the same
+ * canonicalized by the runtime filesystem; missing paths reject with
+ * `FS_NOT_FOUND` and non-directories reject. Repeated calls for the same
  * canonical path return the existing entity without changing its title.
  * A newly created workspace is prepended to the durable registry order.
  * Different canonical paths may share a display title.
@@ -232,7 +363,7 @@ restoreSession(sessionId: SessionId): Promise<void>
 
 /**
  * Resolve by canonical directory path without creating or mutating a
- * workspace. A missing path rejects during `realpath`; an existing unowned
+ * workspace. A missing path rejects during provider resolution; an existing unowned
  * directory returns `undefined`.
  * @param path - Existing directory path in any spelling.
  * @returns the workspace owning the canonical path, when one exists.

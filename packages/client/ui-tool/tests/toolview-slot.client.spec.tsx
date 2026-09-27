@@ -10,7 +10,7 @@
 // the declaration then land through slots.inject when the chat entry appears.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, fireEvent, within } from '@testing-library/react'
 import type { ISession, SessionId, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotTestRuntime, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
@@ -67,7 +67,7 @@ async function bench(nodes: ToolResultNode[]) {
   runtime.provide('connection', {
     api: { settings: {} },
     isLoopback: true,
-    hostDescription: { getSnapshot: () => ({ canOpenPath: true }), subscribe: () => () => {} },
+    hostDescription: { getSnapshot: () => ({ canOpenPath: true, executionAuthorityRequired: false }), subscribe: () => () => {} },
   })
   // ui-theme's Appearance row binds a durable scope through these two.
   runtime.provide('remote', { $on: () => () => {} })
@@ -108,6 +108,22 @@ describe('keyed toolview hole through the real machinery', () => {
     // mystery: no registration under that key → render-site fallback.
     expect(view.getByText('Tool call')).toBeTruthy()
     await b.runtime.dispose()
+  })
+
+  it.each([
+    ['read', 'Read', '{"file_path":"a.txt"}'],
+    ['bash', 'Bash', '{"command":"true"}'],
+    ['mystery', 'Tool call', '{"n":1}'],
+  ])('opens %s details with the exact Session and call even without card material', async (name, title, args) => {
+    const b = await bench([toolResult(3, 'addressed-call', name, args)])
+    try {
+      const view = b.runtime.renderRoot()
+      fireEvent.click(view.getByText(title, { exact: true }))
+      const row = view.container.querySelector('[data-chat-call-id="addressed-call"]')
+      expect(row).not.toBeNull()
+      fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Open details in sidebar' }))
+      expect(b.layout.openDetails).toHaveBeenCalledWith(SID, { callId: 'addressed-call' })
+    } finally { await b.runtime.dispose() }
   })
 
   it('renders top-level Cordis calls with lifecycle titles over the generic variants', async () => {

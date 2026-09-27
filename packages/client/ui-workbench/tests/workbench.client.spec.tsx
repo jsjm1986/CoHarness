@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore, WorkspaceResourceRegistry, workspaceResourceAddress, type ConversationViewportSnapshot, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type ConversationViewportSnapshot, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
@@ -23,6 +23,7 @@ function props() {
       [SID_A]: { id: SID_A, displayTitle: 'Alpha', cwd: '/work/alpha', running: false, blank: false, updatedAt: 0 },
       [SID_B]: { id: SID_B, displayTitle: 'Beta', cwd: '/work/beta', running: true, blank: false, updatedAt: 0 },
     },
+    archivedById: {},
     current: SID_A,
     phase: 'ready',
     subagentsByParent: {},
@@ -390,7 +391,6 @@ describe('workbench toolbar edge paths', () => {
     return {
       list,
       overrides: {
-        resources: { hasProvider: () => true } as never,
         listWorkspaceDirectory: list as never,
         openWorkspaceResource: vi.fn(),
       },
@@ -405,6 +405,31 @@ describe('workbench toolbar edge paths', () => {
     act(() => { p.actions.openBrowser(owner) })
     await waitFor(() => { expect(list).toHaveBeenCalledWith(owner, '.', expect.any(AbortSignal)) })
     expect(screen.getByRole('button', { name: '发布' })).toBeTruthy()
+  })
+
+  it('dismisses the file chooser after its file is accepted by the auxiliary owner', async () => {
+    const p = props()
+    const openWorkspaceResource = vi.fn()
+    renderToolbar(p, {
+      listWorkspaceDirectory: async () => ({ entries: [{ name: 'a.txt', path: 'a.txt', type: 'file', version: 'v1' }], truncated: false }),
+      openWorkspaceResource,
+    })
+    act(() => { p.actions.openBrowser({ sessionId: SID_A, runtimeTarget: { kind: 'base' } }) })
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'a.txt' }))
+    expect(openWorkspaceResource).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SID_A, path: 'a.txt' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('retains the chooser and explains a rejected resource without hiding the failure', async () => {
+    const p = props()
+    renderToolbar(p, {
+      listWorkspaceDirectory: async () => ({ entries: [{ name: 'a.txt', path: 'a.txt', type: 'file', version: 'v1' }], truncated: false }),
+      openWorkspaceResource: () => { throw new Error('Workspace permission revoked') },
+    })
+    act(() => { p.actions.openBrowser({ sessionId: SID_A, runtimeTarget: { kind: 'base' } }) })
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'a.txt' }))
+    expect(screen.getByRole('alert').textContent).toBe('Workspace permission revoked')
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('falls back through workspaceName, cwd, and the generic root for the browser scope', async () => {
@@ -434,34 +459,6 @@ describe('workbench toolbar edge paths', () => {
     setSummary(undefined)
     act(() => { p.actions.openBrowser({ sessionId: SID_B, runtimeTarget: { kind: 'base' } }) })
     expect(await screen.findByRole('button', { name: 'Workspace 根目录' })).toBeTruthy()
-  })
-
-  it('renders the open preview only when its readers and resource registry exist', async () => {
-    const p = props()
-    const { overrides } = fileProps()
-    const resources = new WorkspaceResourceRegistry()
-    resources.register({ kind: 'base' }, {
-      stat: vi.fn(async () => ({ sessionId: SID_A, path: 'a.txt', type: 'file' as const, version: 'v1', changed: false })),
-    }, 5)
-    const view = renderToolbar(p, overrides)
-    const request = { runtimeTarget: { kind: 'base' as const }, sessionId: SID_A, path: 'a.txt', address: workspaceResourceAddress(SID_A, 'a.txt') }
-    // No preview readers on the inject face: an open request stays inert.
-    act(() => { p.actions.openPreview(request) })
-    expect(screen.queryByRole('dialog')).toBeNull()
-    const toolbarProps = { ...p, viewport: { mode: 'workbench' as const, paneIds: [], paneRatios: [] }, tabbed: false,
-      chooseSession: vi.fn(async () => ({ ok: true as const })), focusSession: vi.fn(),
-      createSession: vi.fn(async () => ({ ok: true as const })), setMode: vi.fn(), t }
-    // Readers without the resource registry keep the preview unmounted.
-    const read = vi.fn(() => new Promise(() => {}))
-    const readBytes = vi.fn(() => new Promise(() => {}))
-    view.rerender(<WorkbenchToolbar {...toolbarProps} {...overrides} resources={undefined}
-      readPreview={read as never} readBytesPreview={readBytes as never} />)
-    expect(screen.queryByRole('dialog')).toBeNull()
-    view.rerender(<WorkbenchToolbar {...toolbarProps} {...overrides} resources={resources}
-      readPreview={read as never} readBytesPreview={readBytes as never} />)
-    await waitFor(() => { expect(screen.getByRole('dialog')).toBeTruthy() })
-    act(() => { p.actions.closePreview() })
-    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('filters fallback candidates by origin, blank non-current, project identity, and archive state', async () => {

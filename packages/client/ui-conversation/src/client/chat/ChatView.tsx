@@ -17,7 +17,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type {
   ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ToolCallId } from '../contract/views.ts'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
 import type { ChatNode, TurnProcessChatData } from '../contract/chat-nodes.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
@@ -200,7 +201,7 @@ function TurnStatus({ startTime, t }: {
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder,
+  useSession, useSessions, useStore, renderSlot, sessionId, openFile, openDetails, openExternalLink, loadOlder,
   loadHistoryUntil, loadImage, inspectCall, chatScroll, forkAt,
   fileMentions, t,
 }: ChatViewSlotProps) {
@@ -220,7 +221,7 @@ export function ChatView({
   const historyWindowMode = useSession(s => s.historyWindowMode)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
-  const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string } | null>(null)
+  const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string; options?: { line?: number } } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
   const [busyTurn, setBusyTurn] = useState<number | null>(null)
@@ -229,10 +230,11 @@ export function ChatView({
   // gesture; otherwise a cancelled in-flight refusal reopens the dialog.
   const fileOpenRequest = useRef(0)
 
-  const requestOpenFile = useCallback((path: string) => {
+  const openCallDetails = useCallback((callId: ToolCallId) => { openDetails({ callId }) }, [openDetails])
+  const requestOpenFile = useCallback((path: string, options?: { line?: number }) => {
     const id = ++fileOpenRequest.current
     setFileOpenBusy(true)
-    void openFile(path).then(
+    void (options === undefined ? openFile(path) : openFile(path, options)).then(
       () => {
         if (id !== fileOpenRequest.current) return
         setFileOpenError(null)
@@ -242,6 +244,7 @@ export function ChatView({
         if (id !== fileOpenRequest.current) return
         setFileOpenError({
           path,
+          ...(options === undefined ? {} : { options }),
           message: openFailureMessage(
             error,
             t(isFolderOpenPath(path) ? 'fileOpen.folderUnknown' : 'fileOpen.unknown'),
@@ -691,121 +694,124 @@ export function ChatView({
   }, [chatScroll.save, loadHistoryUntil, navigation])
 
   return (
-    <div className={css.root}>
-      <div ref={listRef} className={css.scroll}>
-        <TurnNavigator items={navigationItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={navigateToTurn} t={t} />
-        <div ref={columnRef} className={css.column} data-chat-flow="">
-          {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
-          {openState === 'error' && openError !== null && (
-            <div className={css.openError}>
-              {t('chat.loadError', { message: openError.message, code: openError.code })}
-            </div>
-          )}
-          {openState === 'open' && historyWindowMode === 'expanding' && (
-            <div className={css.hint} data-history-expanding="" role="status" aria-live="polite">
-              {t('chat.expandingHistory')}
-            </div>
-          )}
-          {hasMore && !running && historyWindowMode === 'tail' && (
-            <div className={css.older}>
-              <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
-                {loadingOlder ? t('loading') : t('chat.loadOlder')}
+    <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
+      <div className={css.root}>
+        <div ref={listRef} className={css.scroll}>
+          <TurnNavigator items={navigationItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={navigateToTurn} t={t} />
+          <div ref={columnRef} className={css.column} data-chat-flow="">
+            {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
+            {openState === 'error' && openError !== null && (
+              <div className={css.openError}>
+                {t('chat.loadError', { message: openError.message, code: openError.code })}
+              </div>
+            )}
+            {openState === 'open' && historyWindowMode === 'expanding' && (
+              <div className={css.hint} data-history-expanding="" role="status" aria-live="polite">
+                {t('chat.expandingHistory')}
+              </div>
+            )}
+            {hasMore && !running && historyWindowMode === 'tail' && (
+              <div className={css.older}>
+                <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
+                  {loadingOlder ? t('loading') : t('chat.loadOlder')}
+                </button>
+              </div>
+            )}
+            {visibleOrder.map((nodeKey) => {
+              const node = nodeStore.get(nodeKey) as ChatNode | undefined
+              const turn = node === undefined ? undefined : nodeTurn(node)
+              const process = turn === undefined ? undefined : processByTurn.get(turn)
+              const open = turn === undefined || process === undefined
+                ? true
+                : processOpen.get(turn) ?? (turn === runningTurn)
+              const turnProcess = node?.kind === 'turn-process' && turn !== undefined
+                ? { open, setOpen: (value: boolean) => {
+                  setProcessOpen((previous) => {
+                    const next = new Map(previous)
+                    next.set(turn, value)
+                    return next
+                  })
+                } }
+                : undefined
+              return (
+                <ChatNodeSeat
+                  key={nodeKey}
+                  nodeKey={nodeKey}
+                  useSession={useSession}
+                  selectedCallId={selectedCallId}
+                  cwd={cwd}
+                  openFile={requestOpenFile}
+                  openCallDetails={openCallDetails}
+                  inspectCall={inspectCall}
+                  forkAt={forkAt}
+                  renderMessageImages={renderMessageImages}
+                  fileMentions={fileMentions}
+                  {...turnProcess === undefined ? {} : { turnProcess }}
+                  renderSlot={renderSlot}
+                  t={t}
+                />
+              )
+            })}
+            {/* No pending placeholders: questions (ui-user-questions) and approvals
+                (ApprovalPanel) both take over the composer, so a flow card would
+                double-render the same wait. */}
+            {/* Turn-level loading signal: rides the whole running turn (first-token
+                wait, tool execution, streaming) so it never flickers per step. */}
+            {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+            {pendingSteering.map(item => (
+              <PendingSteeringBubble
+                key={item.id}
+                content={item.content}
+                renderMessageImages={renderMessageImages}
+                t={t}
+              />
+            ))}
+            {steeringSubmissions.map(submission => (
+              <PendingSubmissionBubble
+                key={submission.requestId}
+                submission={submission}
+                renderMessageImages={renderMessageImages}
+                t={t}
+              />
+            ))}
+            {transcriptSubmissions.map(submission => (
+              <PendingSubmissionBubble
+                key={submission.requestId}
+                submission={submission}
+                renderMessageImages={renderMessageImages}
+                t={t}
+              />
+            ))}
+          </div>
+          {!atBottom && (
+            <div className={css.toBottomSlot}>
+              <button
+                type="button"
+                className={css.toBottom}
+                aria-label={t('chat.toBottom')}
+                onClick={() => {
+                  const local = listRef.current
+                  /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
+                  if (local !== null) toBottom(scrollerOf(local))
+                }}
+              >
+                <IconChevronDownOutline14 />
               </button>
             </div>
           )}
-          {visibleOrder.map((nodeKey) => {
-            const node = nodeStore.get(nodeKey) as ChatNode | undefined
-            const turn = node === undefined ? undefined : nodeTurn(node)
-            const process = turn === undefined ? undefined : processByTurn.get(turn)
-            const open = turn === undefined || process === undefined
-              ? true
-              : processOpen.get(turn) ?? (turn === runningTurn)
-            const turnProcess = node?.kind === 'turn-process' && turn !== undefined
-              ? { open, setOpen: (value: boolean) => {
-                setProcessOpen((previous) => {
-                  const next = new Map(previous)
-                  next.set(turn, value)
-                  return next
-                })
-              } }
-              : undefined
-            return (
-              <ChatNodeSeat
-                key={nodeKey}
-                nodeKey={nodeKey}
-                useSession={useSession}
-                selectedCallId={selectedCallId}
-                cwd={cwd}
-                openFile={requestOpenFile}
-                inspectCall={inspectCall}
-                forkAt={forkAt}
-                renderMessageImages={renderMessageImages}
-                fileMentions={fileMentions}
-                {...turnProcess === undefined ? {} : { turnProcess }}
-                renderSlot={renderSlot}
-                t={t}
-              />
-            )
-          })}
-          {/* No pending placeholders: questions (ui-user-questions) and approvals
-              (ApprovalPanel) both take over the composer, so a flow card would
-              double-render the same wait. */}
-          {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
-          {pendingSteering.map(item => (
-            <PendingSteeringBubble
-              key={item.id}
-              content={item.content}
-              renderMessageImages={renderMessageImages}
-              t={t}
-            />
-          ))}
-          {steeringSubmissions.map(submission => (
-            <PendingSubmissionBubble
-              key={submission.requestId}
-              submission={submission}
-              renderMessageImages={renderMessageImages}
-              t={t}
-            />
-          ))}
-          {transcriptSubmissions.map(submission => (
-            <PendingSubmissionBubble
-              key={submission.requestId}
-              submission={submission}
-              renderMessageImages={renderMessageImages}
-              t={t}
-            />
-          ))}
         </div>
-        {!atBottom && (
-          <div className={css.toBottomSlot}>
-            <button
-              type="button"
-              className={css.toBottom}
-              aria-label={t('chat.toBottom')}
-              onClick={() => {
-                const local = listRef.current
-                /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
-                if (local !== null) toBottom(scrollerOf(local))
-              }}
-            >
-              <IconChevronDownOutline14 />
-            </button>
-          </div>
+        {fileOpenError !== null && (
+          <FileOpenErrorDialog
+            path={fileOpenError.path}
+            message={fileOpenError.message}
+            busy={fileOpenBusy}
+            onClose={closeFileOpenError}
+            onRetry={() => { requestOpenFile(fileOpenError.path, fileOpenError.options) }}
+            t={t}
+          />
         )}
       </div>
-      {fileOpenError !== null && (
-        <FileOpenErrorDialog
-          path={fileOpenError.path}
-          message={fileOpenError.message}
-          busy={fileOpenBusy}
-          onClose={closeFileOpenError}
-          onRetry={() => { requestOpenFile(fileOpenError.path) }}
-          t={t}
-        />
-      )}
-    </div>
+    </MarkdownDelegateProvider>
   )
 }
 

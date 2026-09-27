@@ -36,3 +36,5 @@
                     - id: deepseek-v4-pro
           - id: partial-landlock-sandbox
             name: './tests/fixtures/partial-landlock-sandbox.ts'
+          - id: missing-runner-completion-waiter
+            name: './tests/fixtures/missing-runner-completion-waiter.ts'

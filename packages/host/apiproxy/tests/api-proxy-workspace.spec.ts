@@ -7,6 +7,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentFactory } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -70,6 +71,7 @@ async function harness(
   } = {},
 ) {
   const ctx = new Context()
+  await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(UserQuestionService)
@@ -569,6 +571,38 @@ describe('Host Workspace increments', () => {
       ok: false,
       error: { code: 'session-not-found', details: { sessionId: 'session-ghost' } },
     })
+    abort.abort()
+  })
+
+  it('unarchives a session, streams the set once, and no-ops ids outside the set', async () => {
+    const { api, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'unarchive-home') }))).workspace
+    const sessionId = SessionId('session-to-unarchive')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    expectOk(await api.workspace.archiveSession(request({ sessionId })))
+
+    const abort = new AbortController()
+    const stream: AsyncIterator<RpcRequest<HostFrame>> =
+      api.events.host(request({}), abort.signal)[Symbol.asyncIterator]()
+    const changed = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.unarchiveSession(request({ sessionId }))).archivedSessionIds)
+      .toEqual([])
+    expect(await changed).toMatchObject({
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [] },
+    })
+    expect(expectOk(await api.workspace.list(request({}))).archivedSessionIds).toEqual([])
+
+    // Idempotent like the registry operation: repeating the restore, and
+    // restoring an id that was never archived, both resolve with the current
+    // set and emit no frame.
+    const after = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.unarchiveSession(request({ sessionId }))).archivedSessionIds)
+      .toEqual([])
+    expect(expectOk(await api.workspace.unarchiveSession(request({ sessionId: SessionId('session-free') })))
+      .archivedSessionIds).toEqual([])
+    const otherSession = SessionId('session-after-unarchive')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: otherSession })))
+    expect((await after).payload.type).not.toBe('host/archived-sessions-changed')
     abort.abort()
   })
 })

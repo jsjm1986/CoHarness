@@ -136,4 +136,4 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   for (const plugin of ['@deepseek-ai/dsh-client-ui-layout', '@deepseek-ai/dsh-client-ui-sidebar', '@deepseek-ai/dsh-client-ui-conversation', '@deepseek-ai/dsh-client-ui-tool']) {
     expect(styleOwners).toContain(plugin)
   }
-})
+}, 240_000)

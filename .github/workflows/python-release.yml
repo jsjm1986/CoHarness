@@ -35,11 +35,11 @@ env:
 
 jobs:
   build:
-    name: Build four wheels
+    name: Build five wheels
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'python-release-dry-run'
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
-      targets: node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64
+      targets: node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64,node24-win-x64
       release: true
 
   python-compat:
@@ -179,6 +179,7 @@ jobs:
             "deepseek_harness_runtime_bin-$VERSION-py3-none-macosx_14_0_x86_64.whl" \
             "deepseek_harness_runtime_bin-$VERSION-py3-none-manylinux_2_28_aarch64.whl" \
             "deepseek_harness_runtime_bin-$VERSION-py3-none-manylinux_2_28_x86_64.whl" \
+            "deepseek_harness_runtime_bin-$VERSION-py3-none-win_amd64.whl" \
             "deepseek_harness_sdk-$VERSION-py3-none-any.whl" > "$expected"
           find dist -maxdepth 1 -type f -name '*.whl' -exec basename {} \; | sort > "$actual"
           diff -u "$expected" "$actual"
@@ -207,7 +208,7 @@ jobs:
           DSH_GATE_REPORT_DIR: .artifacts/gates
           DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-python-release-${{ github.run_attempt }}
           DSH_EVIDENCE_JOB_NAME: Validate release candidate
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
           DSH_GATE_ARTIFACT_GLOBS: '["dist/*.whl"]'
         with:
           external: python-release

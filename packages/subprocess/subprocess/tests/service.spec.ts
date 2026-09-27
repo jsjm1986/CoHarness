@@ -100,4 +100,17 @@ describe('SubprocessRuntime seam', () => {
       delete process.env.SCRUB_PROBE_PLAIN
     }
   })
+
+  it('scrubbedParentEnv defaults LANG to UTF-8 when the parent exports none, and keeps an exported LANG', () => {
+    const saved = process.env.LANG
+    try {
+      delete process.env.LANG
+      expect(scrubbedParentEnv().LANG).toBe('C.UTF-8')
+      process.env.LANG = 'zh_CN.UTF-8'
+      expect(scrubbedParentEnv().LANG).toBe('zh_CN.UTF-8')
+    } finally {
+      if (saved === undefined) delete process.env.LANG
+      else process.env.LANG = saved
+    }
+  })
 })

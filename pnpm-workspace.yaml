@@ -74,4 +74,5 @@ minimumReleaseAgeExclude:
   - w3c-xmlserializer@6.0.0
 
 patchedDependencies:
+  '@yao-pkg/pkg@6.21.0': patches/@yao-pkg__pkg@6.21.0.patch
   node-pty@1.2.0-beta.15: patches/node-pty@1.2.0-beta.15.patch

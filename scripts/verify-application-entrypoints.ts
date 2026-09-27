@@ -57,7 +57,7 @@ const ROOT_DEMO_POLICIES = new Map<string, DemoPolicy>([
   // `example` demos launch the runnable packages/examples applications, which
   // own their package bins by design rather than the product dsh launcher.
   ['demo:acp', { kind: 'example' }],
-  ['demo:cordis', { kind: 'example', wrapper: 'scripts/demo-cordis.mjs' }],
+  ['demo:cordis', { kind: 'dsh-wrapper', wrapper: 'scripts/demo-cordis.mjs' }],
   ['demo:ptc', { kind: 'example', wrapper: 'scripts/demo-ptc.mjs' }],
   ['demo:inspector', { kind: 'dsh-direct' }],
 ])

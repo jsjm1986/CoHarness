@@ -30,4 +30,4 @@ Sidebar workspace 浏览区的会话行菜单里，「Delete session」一直是
 
 ## 后果
 
-普通 Web 客户端仍没有浏览归档或恢复控件；组织 Admin 频道现在通过版本化 snapshot/reset 路径负责跨运行时查看与恢复。除非显式执行生命周期清理，数据与 slot 都会保留。`workspace.list` 响应形状变化是 pre-release 直改（无兼容层）。workspace-management e2e 固定归档隐藏与重连链路；domain 测试固定幂等、未知 id 拒绝、跨重启恢复、恢复 revision 和旧介质默认升级。[Admin 归档频道说明](2026-08-25-admin-archive-channel.zh.md)负责 Gateway 索引与生命周期规则。[空内容与归档顺序说明](../bug-fix/2026-08-25-session-list-empty-content-and-archive-ordering.zh.md)记录乱序修复。
+普通 Web 客户端通过「已归档会话」设置页自助恢复自己的归档会话（见[取消归档恢复面说明](2026-09-25-session-unarchive-restore-surface.zh.md)）；组织 Admin 频道通过版本化 snapshot/reset 路径负责跨运行时查看、恢复与清理。除非显式执行生命周期清理，数据与 slot 都会保留。`workspace.list` 响应形状变化是 pre-release 直改（无兼容层）。workspace-management e2e 固定归档隐藏与重连链路；domain 测试固定幂等、未知 id 拒绝、跨重启恢复、恢复 revision 和旧介质默认升级。[Admin 归档频道说明](2026-08-25-admin-archive-channel.zh.md)负责 Gateway 索引与生命周期规则。[空内容与归档顺序说明](../bug-fix/2026-08-25-session-list-empty-content-and-archive-ordering.zh.md)记录乱序修复。

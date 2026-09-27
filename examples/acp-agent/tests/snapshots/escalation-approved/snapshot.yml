@@ -1,0 +1,11 @@
+version: 1
+scenario: escalation-approved
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: sandbox
+  pin: true
+  systemPromptSource: text-turn
+  toolSchemasSource: text-turn
+permission: workspace-write

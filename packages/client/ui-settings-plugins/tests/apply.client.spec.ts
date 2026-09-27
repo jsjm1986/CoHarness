@@ -11,6 +11,7 @@ import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/clien
 import type {
   ConfigurablePluginsTabFace, PluginsSettingsSectionInjected,
 } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+import { SubagentModelSelectionCardController } from '../src/client/subagent-model-selection-card-controller.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
@@ -66,6 +67,20 @@ function declareRoot(slots: SlotRegistry): () => void {
 }
 
 describe('ui-settings-plugins apply', () => {
+  it('invalidates the subagent directory on adapter changes', async () => {
+    const refresh = vi.spyOn(SubagentModelSelectionCardController.prototype, 'refreshCatalog')
+    const { ctx, slots } = await bench()
+    try {
+      declareRoot(slots)
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      ctx.remote.$dispatch('llm/adapters-updated', [])
+      expect(refresh).toHaveBeenCalledOnce()
+    } finally {
+      await ctx.fiber.dispose()
+      refresh.mockRestore()
+    }
+  })
+
   it('declares the services it uses', () => {
     expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
   })
@@ -127,7 +142,7 @@ describe('ui-settings-plugins apply', () => {
     await ctx.plugin({ inject: [...inject], apply }).await()
 
     expect(slots.entries('settings.plugin.item').map(entry => entry.options.key))
-      .toEqual(['shell', 'agent-loop', 'web-search-deepseek'])
+      .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
   })
 
   it('dispatches the served namespaces its cards claim, and no others', async () => {
@@ -213,7 +228,7 @@ describe('ui-settings-plugins apply', () => {
     declareRoot(slots)
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(slots.entries('settings.plugin.item')).toHaveLength(3)
+    expect(slots.entries('settings.plugin.item')).toHaveLength(5)
 
     await fiber.dispose()
 

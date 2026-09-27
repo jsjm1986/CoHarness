@@ -7,8 +7,8 @@ import type {
   GatewaySessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
 import SessionStore, { SessionDraftId, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format/legacy'
-import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format/legacy'
+import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import { describe, expect, it, vi } from 'vitest'
 import {
   decodeSessionPersistenceCursor,
@@ -77,7 +77,7 @@ class GatewayTransport {
 
   seed(id: string, events: unknown[], header: Record<string, unknown> = {}): void {
     this.sessions.set(id, {
-      header: { id, version: 0, createdAt: 1_786_698_000_000, ...header },
+      header: { id, version: 2, createdAt: 1_786_698_000_000, ...header },
       events: structuredClone(events),
       revision: 1,
     })
@@ -139,15 +139,18 @@ class GatewayTransport {
       const source = stored.header as SessionFormatHeader & { seedLength?: number }
       const emitted: SessionFormatEvent[] = []
       const stream = sessionFormatCatalog.createStream(
-        { ...source, isSeeded: source.seedLength !== undefined },
-        source.seedLength ?? 0,
-        { emitEvent: (event) => { emitted.push(event) } },
+        source,
+        source.seedLength,
+        {
+          emitEvent: (event) => { emitted.push(event) },
+          emitRun: () => { throw new Error('logical sources carry no compact runs') },
+        },
       )
       for (const event of stored.events) stream.emitEvent(event as SessionFormatEvent)
       const inheritedEventCount = stream.finish()
       stored.events = emitted
       const { isSeeded: _isSeeded, ...targetWire } = stream.header as SessionFormatHeader & { isSeeded?: boolean }
-      const seedLength = _isSeeded === true ? inheritedEventCount : null
+      const seedLength = _isSeeded ? inheritedEventCount : null
       stored.header = { ...targetWire, ...(seedLength === null ? {} : { seedLength }) }
       stored.revision += 1
       return json(200, {
@@ -418,7 +421,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     const fiber = await mountBackend(ctx, transport)
 
     const loaded = await ctx.sessionPersistence.load(id)
-    expect(loaded.meta.version).toBe(4)
+    expect(loaded.meta.version).toBe(SESSION_FORMAT_VERSION)
     expect(transport.migrations).toHaveLength(1)
     await fiber.dispose()
   })
@@ -433,7 +436,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     const fiber = await mountBackend(ctx, transport)
     try {
       const loaded = await ctx.sessionPersistence.load(id)
-      expect(loaded.meta).toMatchObject({ version: 4, isSeeded: true, parentSession: 'parent' })
+      expect(loaded.meta).toMatchObject({ version: SESSION_FORMAT_VERSION, isSeeded: true, parentSession: 'parent' })
       expect(loaded.inheritedEventCount).toBe(events.length + 1)
       expect(transport.migrations).toHaveLength(1)
       const reloaded = await (ctx.sessionPersistence as GatewaySessionPersistence).loadStored(id)
@@ -451,7 +454,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     transport.seed(String(id), oneTurnLog())
     const fiber = await mountBackend(ctx, transport)
 
-    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 4 } })
+    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: SESSION_FORMAT_VERSION } })
     expect(transport.migrations).toHaveLength(0)
     await fiber.dispose()
   })

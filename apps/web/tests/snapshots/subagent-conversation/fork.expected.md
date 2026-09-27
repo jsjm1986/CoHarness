@@ -4,5 +4,5 @@
     - text: workspace
     - button "New session in workspace":
       - img
-  - treeitem "Explain event sourcing in one (1) now" [selected]
-  - treeitem "Ask a research subagent to now"
+  - "treeitem \"Explain event sourcing in one (1) {{ago}}\" [selected]"
+  - "treeitem \"Ask a research subagent to {{ago}}\""

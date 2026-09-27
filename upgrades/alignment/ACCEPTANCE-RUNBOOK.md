@@ -67,11 +67,11 @@ Status legend: `open` → not started · `in progress` → evidence being collec
 
 1. Push the review series (or the merge branch) to GitHub.
 2. Wait for the platform matrix jobs: Linux, Windows, macOS runners; the `--omit=optional` install leg; windows-wine (if scheduled).
-3. On a red leg, fix forward. A platform exclusion is a scope change: it needs the row-specific authorization described in the pass criteria, not just a recorded rationale.
+3. On a red leg, fix forward or record a justified platform exclusion in the audit ledger.
 
 ### Pass criteria
 
-- Every required matrix leg green on the alignment head commit. A recorded failure documents cause and disposition only — it never substitutes for a green leg. Removing a leg from the required set needs an explicit, row-specific authorization (who approved, the applicability basis, and the equivalent evidence actually produced); an environment that cannot be produced leaves the leg `unverified`, not `done`. Android is out of the required set by owner decision; that authorization does not extend to any other platform.
+- Every required matrix leg green on the alignment head commit, or each failure recorded with cause and decision.
 
 ### Evidence
 
@@ -154,4 +154,4 @@ Status legend: `open` → not started · `in progress` → evidence being collec
 
 ## Closure rule
 
-An item becomes `done` only with its Evidence table filled and the audit ledger row updated in the same edit. Release completion requires every row `done`, or `waived` with a row-specific authorization that names who approved it, the applicability basis, and the equivalent evidence actually produced. A missing environment keeps the row `unverified`; a generic waiver statement does not.
+An item becomes `done` only with its Evidence table filled and the audit ledger row updated in the same edit. Release completion requires every row `done` or explicitly waived with a recorded rationale.

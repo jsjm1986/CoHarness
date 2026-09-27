@@ -52,7 +52,7 @@ function text(result: { content: { type: string; text?: string }[] }): string {
   return result.content.filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
-describe.skipIf(!hasPwsh)('pwsh tool over the real pwsh executor', () => {
+describe.skipIf(!hasPwsh)('pwsh tool over the real pwsh executor', { timeout: 15_000 }, () => {
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'dsh-tool-pwsh-'))
     await writeFile(join(dir, 'greeting.txt'), 'hello pwsh\n')

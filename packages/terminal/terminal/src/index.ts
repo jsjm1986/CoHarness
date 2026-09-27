@@ -349,7 +349,7 @@ export class TerminalSessionService extends Service {
 
   private reserveSpawn(owner: Agent): SpawnReservation {
     const controller = new AbortController()
-    const settlement = Promise.withResolvers<void>()
+    const settlement = Promise.withResolvers<undefined>()
     const pending: PendingSpawn = { owner, controller, settled: settlement.promise, cleanupFailure: undefined }
     const owned = this.pendingSpawns.get(owner) ?? new Set<PendingSpawn>()
     owned.add(pending)
@@ -359,7 +359,7 @@ export class TerminalSessionService extends Service {
       release: (cleanupFailure) => {
         pending.cleanupFailure = cleanupFailure
         if (cleanupFailure === undefined) this.removePendingSpawn(pending)
-        settlement.resolve()
+        settlement.resolve(undefined)
       },
     }
   }

@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LlmRuntime, LlmAdapter, createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmImageRequestPricing, Message, StreamChunk, TokenUsage, UserMessage } from '@deepseek-ai/dsh-llm'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { Session, SessionId, canonicalHeader } from '@deepseek-ai/dsh-session'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -58,17 +58,23 @@ function header(model: string): EpochHeader {
 }
 
 interface Harness {
+  ctx: Context
+  llm: LlmRuntime
   meter: TokenMeter
   session: Session
 }
 
+const contexts: Context[] = []
+afterEach(async () => { await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose())) })
+
 async function harness(pricing: (model: string) => LlmImageRequestPricing | undefined): Promise<Harness> {
   const ctx = new Context()
+  contexts.push(ctx)
   new SessionProjectionRegistry(ctx)
   const llm = new LlmRuntime(ctx)
   llm.registerAdapter(['mock'], new PricingAdapter(pricing))
   const meter = new TokenMeter(ctx)
-  return { meter, session: Session.create(SessionId('route-priced')) }
+  return { ctx, llm, meter, session: Session.create(SessionId('route-priced')) }
 }
 
 /** Route price of one image-bearing message under the fixed pricing double. */
@@ -175,6 +181,16 @@ describe('route-aware image pricing', () => {
       .toThrow('route image pricing answered 0 prices for 1 occurrences')
   })
 
+  it('rejects a negative visual price instead of reducing request pressure', async () => {
+    const broken: LlmImageRequestPricing = {
+      priceImages: images => images.map(() => ({ visualTokens: -1, text: HANDLE_TEXT })),
+    }
+    const { meter, session } = await harness(() => broken)
+    session.append('user/message', imageMessage('photo'), { surfaceOp: 'append' })
+    session.append('request/header', { header: header('vision'), reason: 'initial' })
+    expect(() => meter.measure(session)).toThrow('route image pricing returned an invalid visual token count')
+  })
+
   it('prices nested tool-result images through the same route pricing', async () => {
     const { meter, session } = await harness(() => fixedPricing)
     const nested = createUserMessage({
@@ -200,5 +216,119 @@ describe('route-aware image pricing', () => {
     })
     expect(measurement.nodes[0]!.tokens)
       .toBe(imageFree + VISUAL_TOKENS + estimateContent([{ type: 'text', text: HANDLE_TEXT }]))
+  })
+})
+
+const file: FileAttachmentRef = { attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`), name: 'notes.txt', bytes: 3 }
+
+function fileMessage(): UserMessage {
+  return createUserMessage({ content: [{ type: 'file', attachment: file }], source: { kind: 'user' } })
+}
+
+function requestFileMessage(llm: LlmRuntime): UserMessage {
+  return createUserMessage({ content: [{ type: 'text', text: llm.fileRequestText(file) }], source: { kind: 'user' } })
+}
+
+describe('request-time file pricing', () => {
+  it('prices the no-path request handle without an image pricing hook or a request header', async () => {
+    const { llm, meter, session } = await harness(() => undefined)
+    const message = fileMessage()
+    session.append('user/message', message, { surfaceOp: 'append' })
+    expect(llm.fileRequestText(file)).toContain('cannot access a readable path')
+    const measurement = meter.measure(session)
+    expect(measurement.nodes[0]).toMatchObject({
+      tokens: estimateMessage(requestFileMessage(llm)), heuristicTokens: estimateMessage(message),
+    })
+    expect(measurement.totalTokens).toBe(estimateMessage(requestFileMessage(llm)))
+  })
+
+  it('keeps the structural fallback when the LLM service is absent', () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+    const meter = new TokenMeter(ctx)
+    const session = Session.create(SessionId('no-llm-file'))
+    const message = fileMessage()
+    session.append('user/message', message, { surfaceOp: 'append' })
+    expect(meter.measure(session).nodes[0]).toMatchObject({
+      tokens: estimateMessage(message), heuristicTokens: estimateMessage(message),
+    })
+  })
+
+  it('reads execution-path changes without appending events or rewriting an earlier snapshot', async () => {
+    const { ctx, llm, meter, session } = await harness(() => undefined)
+    let readPath: string | undefined = '/short/notes.txt'
+    // The filesystem mapping is an external execution-world input, independent of the durable reference.
+    ctx.provide('attachments', { fileHostPath: () => '/host/notes.txt' } as never)
+    ctx.provide('fs', { processPathFromHostPath: () => readPath } as never)
+    session.append('user/message', fileMessage(), { surfaceOp: 'append' })
+    const first = meter.measure(session)
+    expect(first.surfaceTokens).toBe(estimateMessage(requestFileMessage(llm)))
+    readPath = '/sandbox/a-longer-mounted-workspace/attachments/notes.txt'
+    const moved = meter.measure(session)
+    expect(moved.logRevision).toBe(first.logRevision)
+    expect(moved.surfaceTokens).toBeGreaterThan(first.surfaceTokens)
+    expect(moved.surfaceTokens).toBe(estimateMessage(requestFileMessage(llm)))
+    expect(moved.nodes[0]?.heuristicTokens).toBe(first.nodes[0]?.heuristicTokens)
+    readPath = undefined
+    expect(meter.measure(session).surfaceTokens).toBe(estimateMessage(requestFileMessage(llm)))
+    expect(first.surfaceTokens).toBeLessThan(moved.surfaceTokens)
+  })
+
+  it('prices every file and image occurrence inside mixed nested tool results', async () => {
+    const { llm, meter, session } = await harness(() => fixedPricing)
+    const message = createUserMessage({
+      content: [
+        { type: 'file', attachment: file },
+        { type: 'image', attachment: imageRef('outer') },
+        { type: 'tool-result', toolCallId: 'nested-files' as never, content: [
+          { type: 'text', text: 'attachments' },
+          { type: 'file', attachment: file },
+          { type: 'image', attachment: imageRef('inner') },
+        ] },
+      ], source: { kind: 'user' },
+    })
+    const projected = createUserMessage({
+      content: [
+        { type: 'text', text: llm.fileRequestText(file) },
+        { type: 'text', text: HANDLE_TEXT },
+        { type: 'tool-result', toolCallId: 'nested-files' as never, content: [
+          { type: 'text', text: 'attachments' },
+          { type: 'text', text: llm.fileRequestText(file) },
+          { type: 'text', text: HANDLE_TEXT },
+        ] },
+      ], source: { kind: 'user' },
+    })
+    session.append('user/message', message, { surfaceOp: 'append' })
+    session.append('request/header', { header: header('vision'), reason: 'initial' })
+    expect(meter.measure(session).nodes[0]).toMatchObject({
+      tokens: estimateMessage(projected) + 2 * VISUAL_TOKENS, heuristicTokens: estimateMessage(message),
+    })
+  })
+
+  it('reprices usage anchors and cold-restored files on the same execution-world scale', async () => {
+    const { ctx, llm, meter, session } = await harness(() => undefined)
+    let readPath = '/short/notes.txt'
+    ctx.provide('attachments', { fileHostPath: () => '/host/notes.txt' } as never)
+    ctx.provide('fs', { processPathFromHostPath: () => readPath } as never)
+    session.append('user/message', fileMessage(), { surfaceOp: 'append' })
+    appendSuccessfulCall(session, header('files'), { inputTokens: 5000, outputTokens: 50 })
+    const before = meter.measure(session)
+    readPath = '/sandbox/a-longer-mounted-workspace/attachments/notes.txt'
+    const moved = meter.measure(session)
+    expect(moved.surfaceTokens).toBeGreaterThan(before.surfaceTokens)
+    expect(moved.baseline).toEqual(before.baseline)
+    expect(moved.surfaceDeltaTokens).toBe(before.surfaceDeltaTokens)
+    expect(moved.totalTokens).toBe(before.totalTokens)
+
+    session.append('user/message', fileMessage(), { surfaceOp: 'append' })
+    const current = meter.measure(session)
+    expect(current.surfaceDeltaTokens - moved.surfaceDeltaTokens).toBe(estimateMessage(requestFileMessage(llm)))
+    const cold = Session.create(SessionId('cold-files'), structuredClone(session.snapshotEvents()))
+    expect(meter.measure(cold)).toEqual({ ...current, logRevision: cold.seq })
+
+    readPath = `/mounted/${'long-path'.repeat(3000)}/notes.txt`
+    const large = meter.measure(cold)
+    expect(large.baseline.kind).toBe('estimated')
+    expect(large.totalTokens).toBe(large.surfaceTokens)
   })
 })

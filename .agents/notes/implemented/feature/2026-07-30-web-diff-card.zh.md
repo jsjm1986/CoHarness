@@ -16,13 +16,13 @@ Web 客户端忽略了它。write/edit 调用落到 `GenericToolCard`，其行�
 
 `DiffBlock` 是一个 `ui-primitives` 组件，把文件改动渲染为内联 diff 表面，write/edit 调用的两个 Web 渲染点都通过它消费 diff 渲染意图：chat 工具行的行体和详情面板的 Output 区。`ui-tool/src/client/tool/models/diff-card-model.ts` 是唯一把快照的 `callView`/`resultView` 对转成组件 props 的地方，因此两个渲染点不会对一次改动产生分歧。当两侧都未声明 `card: 'diff'` 时它返回 null —— 走通用路径 —— 包括本客户端版本不认识的 `card` 值，以及已结算调用的 result view 是 generic 的情况（write/edit 的执行错误正是这样留在通用路径上的）。调用结算后 result 侧是权威：已应用的 hunk 替换仅从参数推导的 call 时 diff。分页窗口丢弃了 call 头也仍能渲染，因为 result view 携带完整改动。
 
-该组件与 TUI 共用单栏框架、行终止符规则和去重路径计数。两者的行分类不同：Web 渲染完整的变更前后两侧，而 TUI 会在有界比较完成时派生中性上下文和精确变更行，并把整侧回退标记为近似结果。
+该组件与 TUI 共用单栏框架、行终止符规则和去重路径计数。[有界比较决策](../bug-fix/2026-09-22-bounded-diff-and-terminal-state.zh.md) 规定中性上下文与变更行分类；本文规定渲染位置、几何与复制。
 
 - **路径分组。** 新文件开启一个粗体路径头；同文件的第二个 hunk（分散编辑，或 `replace_all`）以一个 `⋯` gap 开启，而非重复路径。TUI 在每个 hunk 上都保留路径头，但两个前端的 `N file(s)` 页脚都按去重路径计数，因此同文件两个 hunk 在两端都读作 `1 file`。
-- **整侧改动配色。** 旧侧每一行都以 error token 上的 `- ` 显示，新侧每一行都以 success token 上的 `+ ` 显示，并在横向滚动的盒子里以 `white-space: pre` 逐字绘制：源码行靠缩进阅读，因此滚动而不折行。新建（`oldText: null`）没有删除侧。
+- **行配色。** 删除行以 error token 上的 `- ` 显示，新增行以 success token 上的 `+ ` 显示，共享上下文保持中性色。行在横向滚动盒中保留 `white-space: pre`，使源码缩进保持可读。新建（`oldText: null`）没有删除侧。
 - **高度上限带展开控件。** 长于 `DEFAULT_DIFF_MAX_LINES`（16）的 diff 显示 `ceil(max/2)` 个头部行加剩余尾部行，中间一个按钮报告隐藏行数。分割算术与 `TerminalBlock` 和 TUI 的折叠卡片一致，因此长 diff 的头尾切片在两个前端一致。
 - **行终止符。** 每一侧的内容按 `TerminalBlock` 与 TUI 共用的终止符规则在 `\n` 上切分：空文本是零行（整文件删除的 `newText`、新建缺失的 `oldText` 侧），单个结尾换行终止其最后一行而非新增一条幻影空行，内部空行保留。
-- **页脚与复制。** 暗色 `└ +A -R · N file(s)` 页脚报告 Web 卡片完整新侧与旧侧的行数。TUI 页脚则在可用时报告精确变更行数，并把有界整侧回退标记为近似结果；两者使用相同的去重路径计数。复制控件复制带前缀的 Web diff 文本（路径头、`- `/`+ ` 行、`⋯` gap），使多文件复制保持可辨别归属。
+- **页脚与复制。** 暗色 `└ +A -R · N file(s)` 页脚统计比较结果中的增删行和去重路径，不受高度上限影响。复制写入完整的带前缀 diff，包含路径头、中性上下文、变更行与间隔标记，使折叠或多文件复制保持可辨别归属。
 
 几何、圆角、字体镜像 `CodeBlock`/`TerminalBlock`，使 diff 卡片、terminal 卡片、代码块读起来是一家；`white-space: pre` 加横向滚动是刻意的分歧。复制控件浮在卡片右上角，而非占据自己的 banner 行，因为只放一个复制按钮的 banner 会在第一行 diff 上方画出一条空带 —— TUI 的 diff 卡片也没有 banner，只有页脚。
 
@@ -38,7 +38,7 @@ chat 行把 diff 常驻渲染在路径链接摘要之下，上限 `CHAT_DIFF_MAX
 
 ## Consequences
 
-`DiffBlock` 只读 diff view 的字段，因此它是渲染意图所携带内容的纯函数 —— 与产出该视图的 presenter 一样回放安全。没有 diff 能力的 UI 仍得到 bridge 的通用回退；工具的 result 形状没有任何改变。无新增运行时依赖：不同于 terminal 卡片的 `anser`，diff 不需要解析器。
+`DiffBlock` 只读取 diff view 的字段，因此回放不依赖会话查询。没有 diff 能力的 UI 使用 bridge 的通用回退。工具结果字段保持不变；`diff` 运行时依赖和有界回退记录在[比较决策](../bug-fix/2026-09-22-bounded-diff-and-terminal-state.zh.md)中。
 
 `DiffBlock` 的多文件支路（一张卡、多个路径头）今天没有生产者：`write`/`edit` 每次调用各改一个文件，所以真实卡片显示一个文件带一个或多个 hunk。该支路为将来的多文件改动工具而构建并测试，不是为当前消费者。
 

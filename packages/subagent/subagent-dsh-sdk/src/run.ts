@@ -29,10 +29,14 @@ import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 
 /** Resolved spawn spec for an SDK runtime child process (no defaults — see Config). */
 export interface SdkRunSpec {
-  /** The executable to spawn (the child runtime — a `dsh-jsonrpc-agent` bin or packaged exe). */
-  command: string
-  /** Arguments passed to {@link command} (typically the child's `cordis.yml` path). */
-  args: string[]
+  /** Explicit dsh CLI module; omission resolves the SDK client's same-version dependency. */
+  dshBin?: string
+  /** Named child profile. */
+  profile: string
+  /** Ordered per-launch profile patch files. */
+  patches: string[]
+  /** Absolute isolated Harness home for the nested runtime. */
+  dshHome: string
   /**
    * Absolute working directory for the child process AND the workspace cwd
    * of its SDK session. The provider resolves it before this spec exists:
@@ -231,15 +235,15 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
   const id = brandString<SessionId>(randomUUID())
 
   const harness = internals.createHarness({
-    launch: {
-      command: spec.command,
-      args: spec.args,
-      cwd: spec.cwd,
-      env: { ...scrubbedParentEnv(), ...spec.env },
-      shutdownTimeoutMs: spec.shutdownTimeoutMs,
-      disposeEofGraceMs: spec.disposeEofGraceMs,
-      disposeGraceMs: spec.disposeGraceMs,
-    },
+    ...spec.dshBin === undefined ? {} : { dshBin: spec.dshBin },
+    profile: spec.profile,
+    patches: spec.patches,
+    dshHome: spec.dshHome,
+    processCwd: spec.cwd,
+    env: { ...scrubbedParentEnv(), ...spec.env },
+    shutdownTimeoutMs: spec.shutdownTimeoutMs,
+    disposeEofGraceMs: spec.disposeEofGraceMs,
+    disposeGraceMs: spec.disposeGraceMs,
     cwd: spec.cwd,
     provider: spec.provider,
     model: spec.model,

@@ -64,10 +64,8 @@
   margin: 6px;
 }
 
-/* Full-width l2 hairline between the command banner and the body — the same
-   divider the IN/OUT card draws between its sections. A running card is
-   banner-only, so it draws none. */
-.block:not([data-running]) .header {
+/* The divider follows the presence of output, including partial output while running. */
+.block[data-body] .header {
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
 

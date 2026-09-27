@@ -82,6 +82,12 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../interaction/permission-presets"
     }
   ]
 }

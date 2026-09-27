@@ -12,13 +12,15 @@ An experimental directory without a current package previously imposed placement
 
 ## Decision
 
-`packages/experimental/agent-team` and `packages/experimental/tool-agent-team` are private workspace packages. The [experimental package naming decision](2026-08-19-experimental-package-name-prefix.md) owns their npm names and promotion rename; this note owns their placement, release exclusion, and dependency isolation.
+`packages/experimental/agent-team` and `packages/experimental/tool-agent-team` live under `packages/experimental/`. The [experimental package naming decision](2026-08-19-experimental-package-name-prefix.md) owns their npm names and promotion rename; the [publication denylist decision](../process/2026-09-12-experimental-publication-denylist.md) owns their release-family membership and superseded the original private-by-default rule — both packages now publish under `publishConfig.access: public` like every non-denylisted experimental directory. This note retains their placement and dependency isolation.
 
-The dsh pack and publish set and the local baseline publisher exclude every manifest below `packages/experimental/`. `release:dsh` still advances their manifest versions with the shared dsh version without creating release tags. Workspace constraints require each experimental package to set `private: true` and omit `publishConfig`. The same top-level check rejects `dependencies`, `optionalDependencies`, and `peerDependencies` from release packages, release apps, or the Python runtime to an experimental package. Experimental packages may depend on release packages and each other; tests may use them through `devDependencies`, and examples may load them explicitly.
+The top-level check rejects `dependencies`, `optionalDependencies`, and `peerDependencies` from release packages, release apps, or the Python runtime to an experimental package. Experimental packages may depend on release packages and each other; tests may use them through `devDependencies`, and examples may load them explicitly.
+
+`packages/experimental/agent-team-profile` composes the host-side seam as an opt-in cordis patch layer, `packages/experimental/agent-team-web-profile` adds the browser layer, and `packages/experimental/client-ui-agent-team` carries the Web UI. The UI package mounts its team view only when the host Team service is present, opens teammate Sessions through the sessions service rather than the workspace browser, and drives `agentTeams/*` remote methods over the authorized Typert surface.
 
 The generic caller-reserved continuable child identity and selective direct-child drain remain in the stable Subagent service. They own Subagent identity and Activation lifecycle without importing or naming Agent Teams; the experimental Team service consumes them in the permitted direction.
 
-Experimental status changes publication and compatibility expectations only. The packages retain the repository's ordinary documentation, invariant, lifecycle, security, unit, real-composition, and snapshot requirements. Promotion requires review of the public contracts, limitations, test evidence, release payload, runtime dependents, and a named owner accepting stable-package obligations.
+Experimental status changes compatibility expectations only. The packages retain the repository's ordinary documentation, invariant, lifecycle, security, unit, real-composition, and snapshot requirements. Promotion requires review of the public contracts, limitations, test evidence, release payload, runtime dependents, and a named owner accepting stable-package obligations.
 
 ## Alternatives considered
 

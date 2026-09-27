@@ -92,9 +92,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
-        signature: 'openDetails(sessionId?: SessionId): void',
+        signature: 'openDetails(sessionId?: SessionId, target?: DetailsOwnerProps): void',
         description: 'Open details, optionally pinned to an explicit Session.',
-        parameters: [{ name: 'sessionId', description: 'fixed target; omission follows current selection.' }],
+        parameters: [{ name: 'sessionId', description: 'fixed target; omission follows current selection.' }, { name: 'target', description: 'exact Tool address and optional close action for the auxiliary tab.' }],
       },
       {
         signature: 'closeDetails(sessionId?: SessionId): void',
@@ -199,15 +199,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'scope(id: SessionId): AgentContext | undefined',
-        description: 'Resolve an Agent-scoped context view (use-and-discard).',
+        description: 'Borrow an already-retained Agent-scoped context without extending its lifetime.',
         parameters: [{ name: 'id', description: 'session id.' }],
-        returns: 'scoped ctx, or undefined for a session neither listed nor already scoped.',
+        returns: 'the live context, or undefined without a retained generation.',
       },
       {
         signature: 'binding(id: SessionId): SessionBinding | undefined',
-        description: 'Resolve the stable session binding (scope-addressed assembly feed).',
+        description: 'Borrow an already-retained Session binding without extending its lifetime.',
         parameters: [{ name: 'id', description: 'session id.' }],
-        returns: 'binding, or undefined for a session neither listed nor already scoped.',
+        returns: 'the live binding, or undefined without a retained generation.',
       },
     ],
   },
@@ -424,7 +424,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AgentContext',
-    declaration: 'export type AgentContext = Omit<Context, \'remote\'> & {\n    readonly remote: TypertClientRemote & TypertRemoteScopeApi<\'agent\'>;\n};',
+    declaration: 'export type AgentContext = Omit<Context, \'remote\'> & {\n    readonly remote: ClientRemote & TypertRemoteScopeApi<\'agent\'>;\n};',
   },
   {
     name: 'AssistantBlock',
@@ -493,6 +493,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ChildrenDecl',
     declaration: 'export type ChildrenDecl = {\n    [P in keyof SlotMap & string]?: SlotSpec<SlotMap[P]>;\n};',
+  },
+  {
+    name: 'ClientRemote',
+    declaration: 'export interface ClientRemote extends TypertClientRemote {\n    $stream<Item>(options: RemoteStreamOptions<Item>): RemoteStream<Item>;\n}',
   },
   {
     name: 'CommandNode',
@@ -567,6 +571,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ConversationViewSnapshotStore {\n    get<Target extends Extract<keyof ConversationViewSnapshotMap, string>>(target: Target): ConversationViewSnapshotMap[Target] | undefined;\n}',
   },
   {
+    name: 'DetailsOwnerProps',
+    declaration: 'export interface DetailsOwnerProps {\n    readEnabled?: boolean;\n    callId?: string;\n    toolName?: string;\n    close?: () => void;\n}',
+  },
+  {
     name: 'EntryKeyOf',
     declaration: 'export type EntryKeyOf<K extends keyof SlotMap & string> = SlotMap[K] extends {\n    kind: \'keyed\';\n    keyProps: infer P extends object;\n} ? keyof P & string : string;',
   },
@@ -603,6 +611,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HooksSources = Record<string, HostObservable<unknown>>;',
   },
   {
+    name: 'HostDescription',
+    declaration: 'export type HostDescription = import(\'@deepseek-ai/dsh-host-apiproxy/api\').ResponseValue<\'host.describe\'>;',
+  },
+  {
+    name: 'HostDescriptionSource',
+    declaration: 'export interface HostDescriptionSource {\n    getSnapshot(): HostDescription | undefined;\n    subscribe(listener: () => void): () => void;\n}',
+  },
+  {
     name: 'HostObservable',
     declaration: 'export interface HostObservable<T> {\n    getSnapshot(): T;\n    subscribe(fn: () => void): () => void;\n}',
   },
@@ -616,7 +632,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
   },
   {
     name: 'KeyedHooksSources',
@@ -775,6 +791,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type QueueAction = Parameters<SessionFace[\'updateQueue\']>[1];',
   },
   {
+    name: 'RemoteStream',
+    declaration: 'export class RemoteStream<Item> implements AsyncIterable<RemoteStreamItem<Item>> {\n    constructor(private readonly connection: RemoteStreamConnection, private readonly options: RemoteStreamOptions<Item>);\n    get signal(): AbortSignal;\n    restart(): void;\n    dispose(): Promise<void>;\n    [Symbol.asyncIterator](): AsyncIterator<RemoteStreamItem<Item>>;\n}',
+  },
+  {
+    name: 'RemoteStreamCarrierError',
+    declaration: 'export class RemoteStreamCarrierError extends Error {\n    constructor(message: string, options?: ErrorOptions);\n}',
+  },
+  {
+    name: 'RemoteStreamConnection',
+    declaration: 'export interface RemoteStreamConnection {\n    readonly generation: {\n        getSnapshot(): unknown;\n        subscribe(listener: () => void): () => void;\n    };\n}',
+  },
+  {
+    name: 'RemoteStreamItem',
+    declaration: 'export interface RemoteStreamItem<Item> {\n    readonly generation: number;\n    readonly value: Item;\n    readonly signal: AbortSignal;\n    accept(): void;\n}',
+  },
+  {
+    name: 'RemoteStreamOptions',
+    declaration: 'export interface RemoteStreamOptions<Item> {\n    readonly sessionId?: SessionId;\n    readonly name: string;\n    readonly open: (signal: AbortSignal) => AsyncIterable<Item>;\n    readonly ended: (accepted: boolean) => Error;\n    readonly carrierFailed?: (error: RemoteStreamCarrierError) => void;\n}',
+  },
+  {
     name: 'RunningToolCall',
     declaration: 'export interface RunningToolCall {\n    callId: string;\n    name: string;\n    argsRaw: string;\n    turn: number;\n    step: number;\n    time: number;\n    callView: ToolCallView | null;\n    subCalls: readonly ToolCallBlock[];\n}',
   },
@@ -788,7 +824,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionBinding',
-    declaration: 'export interface SessionBinding {\n    readonly sessionId: SessionId;\n    readonly session: SessionFace;\n    readonly ctx: AgentContext;\n}',
+    declaration: 'export interface SessionBinding {\n    readonly sessionId: SessionId;\n    readonly session: SessionFace;\n    readonly ctx: AgentContext;\n    readonly hostDescription?: HostDescriptionSource;\n}',
   },
   {
     name: 'SessionFace',
@@ -921,6 +957,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolCallBlock',
     declaration: 'export type ToolCallBlock = RunningToolCall | ToolResultNode;',
+  },
+  {
+    name: 'ToolCallId',
+    declaration: 'export type ToolCallId = string;',
   },
   {
     name: 'ToolResultNode',

@@ -281,21 +281,42 @@ export class CodexAppServerWire {
   }
 
   /**
-   * Create the run's private ephemeral thread and retain its identity.
+   * Create the run's private thread and retain its identity. Ephemeral
+   * threads serve one-shot runs; persistent member sessions pass `ephemeral:
+   * false` so the app-server persists the thread for later `thread/resume`.
    * @param cwd - parent Session workspace.
    * @param signal - unpublished-start cancellation.
+   * @param ephemeral - whether the thread lives only for this connection.
    */
-  async startThread(cwd: string, signal: AbortSignal): Promise<void> {
+  async startThread(cwd: string, signal: AbortSignal, ephemeral = true): Promise<void> {
     const response = object(await this.guarded(this.transport.request('thread/start', {
       cwd,
-      ephemeral: true,
+      ephemeral,
       ...this.model === undefined ? {} : { model: this.model },
       ...THREAD_PERMISSION_PARAMS[this.permissionMode],
     }, signal), signal), 'thread/start response')
     const thread = object(response.thread, 'thread/start thread')
     const id = string(thread.id, 'thread/start thread id')
-    if (thread.ephemeral !== true) {
+    if (ephemeral && thread.ephemeral !== true) {
       throw new Error('subagent-codex: app-server did not create an ephemeral thread')
+    }
+    this.threadId = id
+  }
+
+  /**
+   * Attach to one previously persisted thread by identity. The app-server
+   * resolves the durable thread; this wire then owns its next turn.
+   * @param threadId - the durable thread identity from an earlier `thread/start`.
+   * @param signal - caller cancellation for the resume request.
+   */
+  async resumeThread(threadId: string, signal: AbortSignal): Promise<void> {
+    const response = object(await this.guarded(this.transport.request('thread/resume', {
+      threadId,
+    }, signal), signal), 'thread/resume response')
+    const thread = object(response.thread, 'thread/resume thread')
+    const id = string(thread.id, 'thread/resume thread id')
+    if (id !== threadId) {
+      throw new Error('subagent-codex: app-server resumed a different thread than requested')
     }
     this.threadId = id
   }
@@ -371,6 +392,15 @@ export class CodexAppServerWire {
       throw new Error('subagent-codex: Codex completed without a final answer')
     }
     return { output, stopReason: 'completed' }
+  }
+
+  /**
+   * The thread identity this wire is bound to, or `undefined` before
+   * `startThread`/`resumeThread` succeeds. Persistent-member callers persist it.
+   * @returns the bound thread id.
+   */
+  collectThreadId(): string | undefined {
+    return this.threadId
   }
 
   /**

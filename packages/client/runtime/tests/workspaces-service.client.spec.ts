@@ -225,7 +225,7 @@ describe('WorkspaceManager', () => {
       rpcId: 'stale-frame' as never,
       payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s1')] },
     } as never)
-    gate.resolve(ok({ items: [], archivedSessionIds: [sid('s1'), sid('s2')] }) as never)
+    gate.resolve(ok({ items: [], archivedSessionIds: [sid('s1'), sid('s2')] }))
     await refresh
     expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2')])
   })
@@ -318,8 +318,10 @@ describe('WorkspaceRuntime', () => {
       workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true,
     }])
     expect(sessions.list.getSnapshot().byId[sid('s-blank')]).toMatchObject({ workspaceId: wid('alpha') })
-    // Resolution guarantee: the id is binding-resolvable synchronously.
-    expect(sessions.binding(sid('s-blank'))).toBeDefined()
+    // Retaining a returned identity needs no extra list-notifier flush.
+    const reusedReference = sessions.retain(sid('s-blank'), { source: 'controllerOperation' })
+    expect(reusedReference.binding.sessionId).toBe('s-blank')
+    reusedReference.release()
 
     // Miss: beta has only a non-blank session → host create with workspaceId.
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh') }))
@@ -328,8 +330,10 @@ describe('WorkspaceRuntime', () => {
     expect(betaCreate).toMatchObject({ workspaceId: 'beta' })
     expect(typeof callField(betaCreate, 'draftId')).toBe('string')
     expect(typeof callField(betaCreate, 'sessionId')).toBe('string')
-    // Same guarantee on the create arm (draft hand-off writes the machine pre-open).
-    expect(sessions.binding(sid('s-fresh'))).toBeDefined()
+    // The created identity has the same retention guarantee.
+    const createdReference = sessions.retain(sid('s-fresh'), { source: 'controllerOperation' })
+    expect(createdReference.binding.sessionId).toBe('s-fresh')
+    createdReference.release()
 
     // Miss: the stray blank matches gamma's path but is not a gamma member →
     // never reused, a fresh accounted session is created instead.
@@ -475,6 +479,7 @@ describe('WorkspaceRuntime', () => {
     }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
+    sessions.open(sid('s-blank'))
     const session = sessions.binding(sid('s-blank'))!.session
     api.onPrompt = () => Promise.resolve(err({ code: 'internal', message: 'agent busy', details: {} }) as never)
     await session.prompt([{ type: 'text', text: 'hi' }], 'queue')
@@ -633,6 +638,39 @@ describe('WorkspaceRuntime', () => {
     expect(clear).toHaveBeenCalledOnce()
   })
 
+  it.each(['select', 'clear', 'newer-request'] as const)('a late New Session result cannot supersede %s', async (action) => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('target')] as never[] }))
+    api.onList = () => Promise.resolve(ok({ items: ['old', 'late', 'new'].map(id => ({
+      sessionId: sid(id), updatedAt: 1, running: false, blank: false,
+    })) }))
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      sessions.open(sid('old'))
+      const pending = deferred<SessionId>()
+      const connect = vi.spyOn(workspaces, 'connectWorkspace').mockReturnValue(pending.promise)
+      workspaces.startSession(wid('target'))
+      if (action === 'select') sessions.open(sid('new'))
+      else if (action === 'clear') sessions.clear()
+      else {
+        connect.mockResolvedValue(sid('new'))
+        workspaces.startSession(wid('target'))
+        await Promise.resolve()
+      }
+      pending.resolve(sid('late'))
+      await pending.promise
+      await Promise.resolve()
+      await vi.waitFor(() => { expect(sessions.list.getSnapshot().current).toBe(action === 'clear' ? undefined : sid('new')) })
+      expect(sessions.binding(sid('late'))).toBeUndefined()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('uses a blank draft Workspace hint when Host membership is still pending', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
@@ -706,6 +744,47 @@ describe('WorkspaceRuntime', () => {
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [sid('s-open')] }) as never)
     await workspaces.refresh()
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle', 's-open'])
+  })
+
+  it('unarchives a session through the wire and installs the smaller echoed set', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onList = () => Promise.resolve(ok({
+      items: [
+        { sessionId: sid('s-arch'), updatedAt: 1, running: false, blank: false },
+        { sessionId: sid('s-live'), updatedAt: 2, running: false, blank: false },
+      ],
+    }) as never)
+    await sessions.refresh()
+
+    api.onWorkspaceArchiveSession = () => Promise.resolve(ok({
+      archivedSessionIds: [sid('s-arch')], archiveRevision: 1,
+    }))
+    await workspaces.archiveSession(sid('s-arch'))
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-arch'])
+
+    // The versioned echo replaces rather than merges: the restored id leaves
+    // the set even though merge semantics would union it back in.
+    api.onWorkspaceUnarchiveSession = () => Promise.resolve(ok({
+      archivedSessionIds: [], archiveRevision: 2,
+    }))
+    await expect(workspaces.unarchiveSession(sid('s-arch'))).resolves.toBeUndefined()
+    expect(api.callsOf('workspace.unarchiveSession')).toEqual([{ sessionId: 's-arch' }])
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([])
+
+    // A Host failure leaves the set untouched and surfaces as a rejection.
+    api.onWorkspaceArchiveSession = () => Promise.resolve(ok({
+      archivedSessionIds: [sid('s-live')], archiveRevision: 3,
+    }))
+    await workspaces.archiveSession(sid('s-live'))
+    api.onWorkspaceUnarchiveSession = () => Promise.resolve(err({
+      code: 'collaboration-forbidden', message: 'denied',
+      details: { action: 'write' as const, reason: 'forbidden' as const },
+    }))
+    await expect(workspaces.unarchiveSession(sid('s-live'))).rejects.toThrow(/session unarchive failed: collaboration-forbidden/)
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-live'])
   })
 
   it('clears a current archived by a remote frame and shields the set from a stale in-flight baseline', async () => {
@@ -836,6 +915,25 @@ describe('startInitialSelection', () => {
     expect(noRecent.api.callsOf('session.create')).toHaveLength(0)
     expect(() => noRecent.workspaces.startInitialSelection()).toThrow(/already started/)
     stopEmpty()
+  })
+
+  it('an explicit clear cancels initial selection even when creation finishes later', async () => {
+    const b = bench()
+    const creating = deferred<Awaited<ReturnType<FakeApiClient['onCreate']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('initial')] as never[] }))
+    b.api.onCreate = () => creating.promise
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      await Promise.all([b.workspaces.refresh(), b.sessions.refresh()])
+      await vi.waitFor(() => { expect(b.api.callsOf('session.create')).toHaveLength(1) })
+      b.sessions.clear()
+      creating.resolve(ok({ sessionId: sid('late-initial') }))
+      await vi.waitFor(() => { expect(b.sessions.list.getSnapshot().ids).toContain('late-initial') })
+      expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+      expect(b.sessions.binding(sid('late-initial'))).toBeUndefined()
+    } finally {
+      stop()
+    }
   })
 
   it('a failed connect returns to waiting and retries on the next list change', async () => {

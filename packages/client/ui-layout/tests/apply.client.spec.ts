@@ -51,7 +51,7 @@ describe('ui-layout client apply', () => {
     // …and declared the shell children in the ledger.
     expect(slots.spec('sidebar')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('conversation')).toEqual({ kind: 'single', scope: 'root' })
-    expect(slots.spec('details')).toEqual({ kind: 'single', scope: 'session' })
+    expect(slots.spec('rightbar')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('shell.mobile.header.actions')).toEqual({ kind: 'list', scope: 'session' })
   })
 
@@ -63,7 +63,7 @@ describe('ui-layout client apply', () => {
       toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn(),
     }
     const injected = (slots.entries('root')[0]!.inject as (actions: never) => object)(actions as never)
-    expect(injected).toEqual({})
+    expect(typeof (injected as { dismissRightbar: unknown }).dismissRightbar).toBe('function')
     const layout = ctx.get('layout') as LayoutController
     layout.toggleSidebar()
     expect(actions.toggleSidebar).toHaveBeenCalledOnce()

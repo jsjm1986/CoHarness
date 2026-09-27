@@ -16,9 +16,17 @@
     "python/sdk-runtime"
   ],
   "ignoreDependencies": [
+    "@deepseek-ai/cordis",
+    "@deepseek-ai/dsh-computer-use",
+    "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
+    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
+    "@deepseek-ai/dsh-experimental-browser-use-runtime",
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
+    "@deepseek-ai/dsh-skill-office",
+    "@yao-pkg/pkg",
     "@yarnpkg/cli-dist",
-    "lightningcss",
-    "@deepseek-ai/cordis"
+    "lightningcss"
   ],
   "workspaces": {
     "packages/util/package-manifest": {
@@ -33,7 +41,8 @@
         "scripts/types/client-build-environment/index.d.ts",
         "scripts/bundle-input-isolation.ts",
         "scripts/coverage-canonical-locations.ts",
-        "scripts/web-product-bundle-isolation.ts"
+        "scripts/web-product-bundle-isolation.ts",
+        "scripts/workspace-runtime/verify-installed.ts"
       ],
       "ignoreUnresolved": [
         "client-build-environment"
@@ -61,6 +70,7 @@
         "acp-agent/tests/fixtures/child-question-tripwire.ts",
         "acp-agent/tests/fixtures/parent-sandbox-override.ts",
         "acp-agent/tests/fixtures/partial-landlock-sandbox.ts",
+        "acp-agent/tests/fixtures/missing-runner-completion-waiter.ts",
         "acp-agent/tests/fixtures/subagent-durability-failure.ts",
         "acp-agent/tests/fixtures/subagent-current-model.ts",
         "acp-agent/tests/fixtures/subagent-result-diagnostic.ts",
@@ -160,9 +170,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@deepseek-ai/dsh-api-gateway"
       ]
     },
     "packages/client/ui-primitives": {
@@ -412,16 +419,6 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/test-support/acp-snapshot": {
-      "entry": [
-        "tests/**/*.spec.ts",
-        "tests/fixtures/fake-acp-agent.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "tests/**/*.ts"
-      ]
-    },
     "packages/test-support/loader-smoke": {
       "entry": [
         "tests/**/*.spec.ts",
@@ -566,7 +563,8 @@
     },
     "packages/context/session-reference": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/fixtures/source-session.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -868,11 +866,19 @@
     "packages/subagent/subagent-dsh-sdk": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/loader/*.ts"
       ],
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-agent-instructions",
+        "@deepseek-ai/dsh-llm-deepseek",
+        "@deepseek-ai/dsh-session-checkpoint-policy",
+        "@deepseek-ai/dsh-session-persistence-jsonl",
+        "@deepseek-ai/dsh-skill-filesystem"
       ]
     },
     "packages/bundle/base": {
@@ -889,7 +895,8 @@
     },
     "packages/bundle/headless": {
       "entry": [
-        "tests/**/*.spec.ts"
+        "tests/**/*.spec.ts",
+        "tests/fixtures/provider-cwd.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -983,9 +990,6 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@deepseek-ai/.+"
       ]
     },
     "packages/acp/acp": {
@@ -1018,8 +1022,17 @@
       ]
     },
     "benchmarks": {
+      "entry": [
+        "**/*.bench.ts",
+        "**/*.bench.client.ts"
+      ],
       "project": [
         "**/*.ts"
+      ],
+      "ignoreExportsUsedInFile": true,
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-lazy-require"
       ]
     },
     "packages/subprocess/subprocess-local": {
@@ -1205,6 +1218,109 @@
       ],
       "ignoreDependencies": [
         "zod"
+      ]
+    },
+    "packages/context/gateway-execution": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/workspace/workspace": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-fs-ssh",
+        "@deepseek-ai/dsh-storage-json",
+        "@deepseek-ai/dsh-session-persistence-jsonl"
+      ]
+    },
+    "packages/api/terminal-controller": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
+    "packages/client/ui-sidebar-terminal": {
+      "entry": [
+        "tests/**/*.spec.{ts,tsx}",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "tests/**/*.{ts,tsx}"
+      ]
+    },
+    "packages/deliverables/tool-present": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/deliverables/workspace-changes": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/ssh/ssh": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/agent-team-web-profile": {
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-experimental-client-ui-agent-team"
+      ]
+    },
+    "packages/client/ui-settings-unarchive-sessions": {
+      "entry": [
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.tsx"
+      ]
+    },
+    "packages/test-support/session-snapshot": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/fixtures/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     }
   }

@@ -1,0 +1,7 @@
+version: 1
+scenario: fs-read-window
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: default

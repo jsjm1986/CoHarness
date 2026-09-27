@@ -1,0 +1,6 @@
+- region "links.txt":
+  - button "Close preview"
+  - button "Reload"
+  - button "Previous page"
+  - button "Next page" [disabled]
+  - text: Line 24 Line 25 Line 26 Line 27 Line 28 Line 29 Line 30 Line 31 Line 32

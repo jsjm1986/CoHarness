@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -16,7 +18,8 @@
   - img
   - img
   - text: System prompt
-- text: Use web_search once with queries ["DeepSeek Harness snapshot search","DeepSeek Harness multi-query search"]. Then reply exactly SEARCH_DONE and stop. {{clock}}
+- text: Use web_search once with queries ["DeepSeek Harness snapshot search","DeepSeek Harness multi-query search"]. Then reply exactly SEARCH_DONE and stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":
@@ -36,10 +39,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -53,10 +57,11 @@
   - img
 - button "0% of context used"
 - button "Send message" [disabled]
-- button "1 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 2 steps{{throughput}} tok/s
-- button "29 tok · Cache hit 0%":
-  - img
-  - text: 29 tokCache hit 0%
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "29 tok · Cache hit 0%":
+    - img
+    - text: 29 tokCache hit 0%
 - separator "Adjust transcript content width"

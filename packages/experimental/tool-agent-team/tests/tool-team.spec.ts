@@ -16,7 +16,7 @@ import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import * as ToolSubagentControl from '@deepseek-ai/dsh-tool-subagent-control'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import TeamService from '../../agent-team/src/index.ts'
 import * as toolTeam from '../src/index.ts'
 
@@ -397,6 +397,33 @@ describe('dsh-tool-team', () => {
       signal: SIGNAL,
     })
     await vi.waitFor(() => { expect(ctx.agents.get(ordinary.childId)).toBeUndefined() }, { timeout: 5_000 })
+  })
+
+  it('keeps a one-shot spawn child out of Team scope through a multi-step turn', async () => {
+    // A provider-owned one-shot child must never classify as an implicit Team
+    // root: Team tools and the team:policy section stay uninstalled, and a
+    // later step's prompt render must not trip strict membership.
+    const { ctx, lead } = await setup([
+      toolCallResponse('t1', 'noop', {}, 'working'),
+      textResponse('child done'),
+    ])
+    ctx.tools.register(defineContentToolFixture({
+      name: 'noop', description: 'probe', parameters: {},
+      execute: () => Promise.resolve([{ type: 'text' as const, text: 'noop result' }]),
+    }))
+    const run = await ctx.subagents.start('spawn', {
+      prompt: [{ type: 'text', text: 'call noop then answer' }],
+      parent: lead,
+      signal: SIGNAL,
+    })
+    const result = await run.result
+    expect(result.stopReason).toBe('completed')
+    const child = ctx.agents.get(run.id)!
+    expect(ctx.agentTeams.tryMembership(child)).toBeUndefined()
+    const childAssembly = await assembly(ctx, child)
+    expect(childAssembly.tools.some(schema => TOOL_NAMES.includes(schema.name))).toBe(false)
+    expect(renderPrompt(childAssembly)).not.toContain('Team role')
+    await run.dispose()
   })
 
   it('reinstalls Team scope before a cold-resumed teammate request', async () => {

@@ -7,10 +7,13 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Render this mathematical proof. {{clock}}
+- text: Render this mathematical proof.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - heading "Math rendering" [level=2]
@@ -42,10 +45,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -58,7 +62,8 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns · 1 steps":
-  - img
-  - text: 1 turns · 1 steps
+- group "Session statistics":
+  - button "1 turns · 1 steps":
+    - img
+    - text: 1 turns · 1 steps
 - separator "Adjust transcript content width"

@@ -88,6 +88,29 @@ function trackValues(scope: SettingsScope<UiTestSettings>): Array<UiTestSettings
 }
 
 describe('SettingsScopeController', () => {
+  it('sends coupled fields in one mutation fenced by the draft revision', async () => {
+    const mutate = vi.fn().mockResolvedValue(ok(view({ preference: 'dark' }, 5)))
+    const { mirror, scope } = derivedScope({ describe: vi.fn().mockResolvedValue(described({ preference: 'light' }, 4)), mutate })
+    await mirror.ensure()
+    await scope.mutate([
+      { op: 'set', path: ['preference'], value: 'dark' },
+      { op: 'unset', path: ['legacy'] },
+    ], 4)
+    expect(mutate).toHaveBeenCalledExactlyOnceWith({ ns: 'ui-test', expectedRevision: 4, ops: [
+      { op: 'set', path: ['preference'], value: 'dark' }, { op: 'unset', path: ['legacy'] },
+    ] })
+    expect(scope.getSnapshot()).toMatchObject({ revision: 5, value: { preference: 'dark' } })
+  })
+
+  it('does not replace a fixed draft revision with a newer mirror revision', async () => {
+    const mutate = vi.fn().mockResolvedValue(rejected())
+    const { mirror, scope } = derivedScope({ describe: vi.fn().mockResolvedValue(described({ preference: 'light' }, 8)), mutate })
+    await mirror.ensure()
+    await scope.mutate([{ op: 'set', path: ['preference'], value: 'dark' }], 4)
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: 4 }))
+    expect(scope.getSnapshot()).toMatchObject({ value: { preference: 'light' }, write: { status: 'error' } })
+  })
+
   it('starts loading and derives a schema-valid section with revision and writability', async () => {
     const describeCall = vi.fn().mockResolvedValueOnce(described({ preference: 'dark' }, 3))
     const { mirror, scope } = derivedScope({ describe: describeCall })

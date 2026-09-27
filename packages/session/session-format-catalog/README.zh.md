@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 概述
 
-`dsh-session-format-catalog` 为持久化提供一个确定性的 Session 格式读取器，且无需查询已挂载插件。它装配从最早受支持格式到[当前写入格式](../../../docs/session-format-status.zh.md)的编解码器与相邻迁移边，在模块初始化时校验完整且无缺口的迁移链，并通过 `sessionFormatCatalog` 暴露物理分派、仅 header 分类、单遍行还原和当前格式逐记录编码。
+`dsh-session-format-catalog` 为持久化提供一个确定性的 Session 格式读取器，且无需查询已挂载插件。它装配从最早受支持格式到[当前写入格式](../../../docs/session-format-status.zh.md)的编解码器与相邻迁移边，在模块初始化时校验完整且无缺口的迁移链，并通过 `sessionFormatCatalog` 暴露物理分派、仅 header 分类、单遍行还原和当前格式逐记录编码。存储已解码 header 与事件行而非发布版 JSONL 的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）使用 `sessionLogicalFormatCatalog`：它把存储元数据投影到发布版要求上，归一化声明的 CoHarness v2 数据库方言，并运行同一套发布版迁移边与当前产物校验。
 
 ## 目录
 
@@ -40,7 +40,7 @@ const headerRecord = sessionFormatCatalog.encodeCurrentHeader(current.header, cu
 const eventRecords = current.events.map(sessionFormatCatalog.encodeCurrentEvent)
 ```
 
-从包根导入 `sessionFormatCatalog`。JSONL 与 fixture（测试前置数据）读取方创建一次 restore，把每个已解析物理行传给 `decodeRow()`，再调用一次 `finish()`。Writer 通过 `encodeCurrentHeader()` 与 `encodeCurrentEvent()` 序列化返回的当前产物。列表读取调用 `readHeader()`，绝不打开事件正文。
+从包根导入 `sessionFormatCatalog`。JSONL 与 fixture（测试前置数据）读取方创建一次 restore，把每个已解析物理行传给 `decodeRow()`，再调用一次 `finish()`。Writer 通过 `encodeCurrentHeader()` 与 `encodeCurrentEvent()` 序列化返回的当前产物。列表读取调用 `readHeader()`，绝不打开事件正文。数据库 provider 对存储元数据调用 `sessionLogicalFormatCatalog.readHeader()`，并通过 `createStream()` 流式喂入已解码事件；`migrate()` 与 `migrateHeader()` 覆盖脱离对象的形态。
 
 Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transformed' }`。Worker 与 fixture 校验使用 `{ recovery: 'strict', validation: 'current' }`。Transformed validation 会在迁移后执行已发布 current 规则，但对已经是 current 的输入有意跳过已安装语义校验。
 
@@ -54,7 +54,7 @@ Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transform
 <details>
 <summary>实现细节——点击展开</summary>
 
-[`src/generated.ts`](src/generated.ts) 是编解码器与迁移边顺序的静态所有者。[`src/current.ts`](src/current.ts) 把最终标头、事件信封、消息、表面、种子和当前请求标头校验委托给已安装的 Session 语义。底层构造函数会在开始读取任何 Session 之前拒绝重复编解码器、重复迁移边、缺口，以及超过当前版本的条目。
+[`src/generated.ts`](src/generated.ts) 是编解码器与迁移边顺序的静态所有者。[`src/current.ts`](src/current.ts) 把最终标头、事件信封、消息、表面、种子和当前请求标头校验委托给已安装的 Session 语义。[`src/logical.ts`](src/logical.ts) 为已解码的存储输入编译同一套发布版迁移边，并把 v2 边路由到 [`src/coharness-v2-dialect.ts`](src/coharness-v2-dialect.ts)——后者只负责 CoHarness 的排序与归一化策略，同时复用发布版 stage 的准入与变换原语。底层构造函数会在开始读取任何 Session 之前拒绝重复编解码器、重复迁移边、缺口，以及超过当前版本的条目。
 
 </details>
 

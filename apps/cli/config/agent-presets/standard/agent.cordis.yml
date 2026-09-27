@@ -240,6 +240,9 @@
 - id: tool-ask-user
   name: '@deepseek-ai/dsh-tool-ask-user'
 
+- id: present
+  name: '@deepseek-ai/dsh-tool-present'
+
 - id: tool-todo
   name: '@deepseek-ai/dsh-tool-todo'
   config:

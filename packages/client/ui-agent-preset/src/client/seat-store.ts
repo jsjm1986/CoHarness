@@ -19,6 +19,8 @@ import type { AgentPresetOption } from './settings-store.ts'
 
 /** Hero-chip snapshot. */
 export interface AgentPresetSeatState {
+  /** Whether new-session surfaces expose preset selection. */
+  showPicker: boolean
   /** Presets the deployment supplies; empty means the chip renders nothing. */
   options: readonly AgentPresetOption[]
   /** The staged choice, empty until the roster loads. */
@@ -35,7 +37,7 @@ export interface AgentPresetSeatState {
 }
 
 const INITIAL: AgentPresetSeatState = {
-  options: [], current: '', error: null, busy: false, introduce: false,
+  showPicker: false, options: [], current: '', error: null, busy: false, introduce: false,
 }
 
 /** One session's identity and whether it has started. */
@@ -62,6 +64,9 @@ export class AgentPresetSeatController {
   /** Set while a pick is waiting for a session; cleared once applied. */
   private staged: string | undefined
 
+  /** Only the newest roster read may publish after overlapping refreshes. */
+  private loadGeneration = 0
+
   constructor(
     private readonly remote: Pick<ClientRemote, 'agentPresets'>,
     /** The session the hero is about to hand over to, when there is one. */
@@ -83,15 +88,21 @@ export class AgentPresetSeatController {
    * @returns once the snapshot reflects the host.
    */
   async load(): Promise<void> {
+    const generation = ++this.loadGeneration
     try {
       const response = await this.remote.agentPresets.list()
+      if (generation !== this.loadGeneration) return
       if (!response.ok) {
         this.set({ error: response.error.message })
         return
       }
-      const { presets } = response.value
+      const { presets, modeSelectionEnabled } = response.value
+      // A hidden picker cannot serve a staged pick: drop it rather than
+      // landing a choice no visible control reports.
+      if (!modeSelectionEnabled) this.staged = undefined
       this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
       this.set({
+        showPicker: modeSelectionEnabled,
         options: presetOptions(presets),
         // Staged pick first, then the composition the current session
         // already carries, then the deployment default. The middle term is
@@ -101,8 +112,11 @@ export class AgentPresetSeatController {
         // apply() already composed it.
         current: this.staged ?? this.currentSession()?.agentPreset ?? this.fallback,
         error: null,
+        introduce: modeSelectionEnabled && this.store.getSnapshot().introduce,
       })
+      await this.apply()
     } catch (error) {
+      if (generation !== this.loadGeneration) return
       this.set({ error: messageOf(error) })
     }
   }
@@ -133,6 +147,33 @@ export class AgentPresetSeatController {
   stage(id: string, introduce = false): void {
     this.staged = id
     this.set({ current: id, error: null, introduce })
+  }
+
+  /**
+   * Capture the exact blank Session a Settings action may bring along.
+   * @returns its id, or undefined outside a blank Session.
+   */
+  blankSessionId(): SessionId | undefined {
+    const session = this.currentSession()
+    return session?.blank === true ? session.id : undefined
+  }
+
+  /**
+   * Apply a Settings choice only if its captured Session is still current and
+   * blank. The selection uses the existing stage/apply path.
+   * @param expectedSessionId - blank Session captured before the Settings write.
+   * @param id - the effective default that the write persisted.
+   * @returns the Host refusal text, or undefined when applied or no longer relevant.
+   */
+  async syncBlankSession(
+    expectedSessionId: SessionId,
+    id: string,
+  ): Promise<string | undefined> {
+    const session = this.currentSession()
+    if (session === undefined || !session.blank || session.id !== expectedSessionId) return undefined
+    this.stage(id)
+    await this.apply()
+    return this.store.getSnapshot().error ?? undefined
   }
 
   /** Acknowledge the introduction cue once the chip has played it. */

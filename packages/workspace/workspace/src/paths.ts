@@ -3,7 +3,8 @@
  * @module @deepseek-ai/dsh-workspace/src/paths
  */
 
-import { realpath } from 'node:fs/promises'
+import { FsError } from '@deepseek-ai/dsh-fs'
+import type { FileSystem, FsInfo } from '@deepseek-ai/dsh-fs'
 import { posix, win32 } from 'node:path'
 
 /**
@@ -37,21 +38,22 @@ export function defaultWorkspaceTitle(
 }
 
 /**
- * Canonicalize a fully qualified directory path via `fs.realpath`: trailing
- * slashes, `..` segments, and symlinks are all resolved. This is the ONE
- * uniqueness canon of the package — workspace paths are stored canonicalized,
- * uniqueness is string equality of canonicalized paths (a symlink to an
- * existing workspace's directory collides), and attach-time session `cwd`
- * checks go through the same canon. Relative paths reject before `realpath` can
- * resolve them from the Host cwd or current Windows drive. A path that does not
- * exist rejects with the original `ENOENT` — this is `create`'s reject path (a
- * workspace must point at an existing directory).
- * @param path - The path to canonicalize.
- * @returns the canonical absolute path.
+ * Resolve an existing path through the execution target's filesystem. The
+ * provider owns symlink identity and process-path spelling; opaque target keys
+ * never become workspace paths. Missing paths reject without a Host fallback.
+ * @param path - Fully qualified path on the execution target.
+ * @param filesystem - Filesystem belonging to this registry's runtime.
+ * @returns Canonical process path and current metadata on that target.
  */
-export async function realpathNormalize(path: string): Promise<string> {
+export async function resolveWorkspacePath(
+  path: string,
+  filesystem: FileSystem,
+): Promise<{ path: string; info: FsInfo }> {
   if (!fullyQualifiedWorkspacePath(path)) {
     throw new TypeError(`Workspace path is not fully qualified: '${path}'`)
   }
-  return await realpath(path)
+  const target = await filesystem.resolve(path)
+  const info = await filesystem.stat(target)
+  if (info === undefined) throw new FsError(`Workspace path does not exist: '${path}'`, 'FS_NOT_FOUND')
+  return { path: filesystem.processPath(target), info }
 }

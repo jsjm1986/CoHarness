@@ -119,7 +119,7 @@ jobs:
         env:
           DSH_GOLDEN_BASE: ${{ github.event.pull_request.base.sha }}
           DSH_GOLDEN_REPLAY: pending
-        run: pnpm run summarize:goldens --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
+        run: pnpm run summarize:expected --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
 
       - name: Preserve selection comparison
         uses: actions/upload-artifact@v7
@@ -356,6 +356,61 @@ jobs:
         with:
           status: ${{ job.status }}
 
+  node-24-bench:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    name: node 24 / benchmarks
+    env:
+      DSH_EVIDENCE_JOB_NAME: "node 24 / benchmarks"
+      DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-bench-${{ github.run_attempt }}
+    # Wall-clock budgets need an otherwise idle runner, so this job runs the
+    # benchmark lane alone instead of joining a concurrent gate aggregate.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install benchmark browser and hosted dependencies
+        run: pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium
+
+      - name: Run performance benchmarks
+        env:
+          DSH_GATE_VERBOSE: '1'
+        run: pnpm run check:ci:bench
+
+      - name: Preserve gate evidence
+        if: always()
+        uses: ./.github/actions/gate-evidence
+        with:
+          status: ${{ job.status }}
+
   node-24-consumers:
     needs: pr-scope
     if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
@@ -368,6 +423,20 @@ jobs:
           && 'dsh-ubuntu-24-04-16core'
           || 'ubuntu-latest' }}
     name: node 24 / snapshots and artifacts
+    services:
+      execution-postgres:
+        image: ${{ needs.pr-scope.outputs.gateway_mode == 'full' && 'postgres:16' || '' }}
+        env:
+          POSTGRES_USER: hgw
+          POSTGRES_PASSWORD: hgw
+          POSTGRES_DB: hgw_execution
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U hgw -d hgw_execution"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       DSH_EVIDENCE_JOB_NAME: "node 24 / snapshots and artifacts"
       DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-node-24-consumers-${{ github.run_attempt }}
@@ -451,10 +520,26 @@ jobs:
           exit "$sandbox_status"
 
       # Gateway is an independent npm project outside the root pnpm workspace.
-      # Root snapshot tests import its runtime modules, so install its locked
-      # production dependency graph before the consumer gate starts.
-      - name: Install Gateway runtime dependencies
-        run: npm ci --prefix gateway --omit=dev
+      # Root snapshot tests import its runtime modules and the typed lint face
+      # reads its dev-time @types (pg, better-sqlite3), so install the full
+      # locked dependency graph before the consumer gate starts.
+      - name: Install Gateway dependencies
+        run: npm ci --prefix gateway
+
+      - name: Test Gateway execution through Loader and PostgreSQL
+        id: gateway-execution
+        if: needs.pr-scope.outputs.gateway_mode == 'full'
+        env:
+          HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution
+        run: pnpm run test:gateway:execution
+
+      - name: Record Gateway execution evidence
+        if: always() && needs.pr-scope.outputs.gateway_mode == 'full'
+        env:
+          EVIDENCE_CHECK: gateway-execution
+          EVIDENCE_COMMAND: pnpm run test:gateway:execution
+          EVIDENCE_STATUS: ${{ steps.gateway-execution.outcome == 'skipped' && 'cancelled' || steps.gateway-execution.outcome }}
+        run: node scripts/gate-evidence.ts
 
       # The browser snapshot left this aggregate: the keyless consumer gates run
       # here for every snapshot mode, and the dedicated web-verification lane
@@ -466,7 +551,7 @@ jobs:
         env:
           DSH_GOLDEN_BASE: ${{ github.event.pull_request.base.sha }}
           DSH_GOLDEN_REPLAY: ${{ job.status }}
-        run: pnpm run summarize:goldens --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
+        run: pnpm run summarize:expected --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
 
       - name: Preserve gate evidence
         if: always()
@@ -589,7 +674,11 @@ jobs:
       # Root web snapshot tests import its runtime modules.
       - name: Install Gateway runtime dependencies
         if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
-        run: npm ci --prefix gateway --omit=dev
+        run: npm ci --prefix gateway
+
+      - name: Install Admin browser dependencies
+        if: needs.pr-scope.outputs.snapshot_mode == 'full' || (needs.pr-scope.outputs.snapshot_mode == 'focused' && contains(needs.pr-scope.outputs.web_groups, 'settings'))
+        run: npm ci --prefix gateway/admin-ui
 
       - name: Install Playwright Chromium and hosted dependencies
         if: >-
@@ -627,7 +716,7 @@ jobs:
         env:
           DSH_GOLDEN_BASE: ${{ github.event.pull_request.base.sha }}
           DSH_GOLDEN_REPLAY: ${{ job.status }}
-        run: pnpm run summarize:goldens --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
+        run: pnpm run summarize:expected --base "$DSH_GOLDEN_BASE" --replay "$DSH_GOLDEN_REPLAY"
 
       - name: Preserve gate evidence
         if: always() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
@@ -690,8 +779,9 @@ jobs:
           mkdir -p node_modules/@deepseek-ai
           ln -s ../gateway/node_modules/@types node_modules/@types
           ln -s ../gateway/node_modules/@standard-schema node_modules/@standard-schema
+          ln -s ../gateway/node_modules/zod node_modules/zod
           ln -s ../../vendor/cosmokit node_modules/@deepseek-ai/cosmokit
-          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format
+          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
@@ -713,13 +803,15 @@ jobs:
           mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
       - name: Test Gateway
         run: npm test --prefix gateway
+      - name: Test Gateway PostgreSQL authorization and invalidation
+        run: npm run test:postgres --prefix gateway
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
         with:
           status: ${{ job.status }}
           external: gateway
-          command: npm test --prefix gateway
+          command: npm test --prefix gateway && npm run test:postgres --prefix gateway
 
   gateway-admin-ui:
     needs: pr-scope
@@ -742,21 +834,13 @@ jobs:
           cache-dependency-path: gateway/admin-ui/package-lock.json
       - name: Install Gateway admin UI dependencies
         run: npm ci --prefix gateway/admin-ui
-      # The admin surface re-exports workspace component sources whose
-      # third-party imports resolve from the repo install a standalone
-      # checkout does not have; provision the ones the reached graph uses.
-      - name: Install repo-level dependencies of re-exported workspace sources
-        run: |
-          SPECS=$(node -e "
-            const deps = {}
-            for (const p of ['packages/client/runtime/package.json', 'packages/client/ui-primitives/package.json']) {
-              const manifest = require(process.cwd() + '/' + p)
-              Object.assign(deps, manifest.dependencies, manifest.devDependencies)
-            }
-            console.log(['anser', 'clsx', 'immer', 'zustand'].map(name => name + '@' + deps[name]).join(' '))
-          ")
-          npm install --prefix "$RUNNER_TEMP/harness-root-deps" --no-save --no-package-lock $SPECS
-          mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+      - name: Install locked workspace sources for shared Admin components
+        run: pnpm install --frozen-lockfile
+      - name: Generate the two Admin Host Remote contributions
+        run: npm run prepare:remotes --prefix gateway/admin-ui
       - name: Test Gateway admin UI
         run: npm test --prefix gateway/admin-ui
       - name: Build Gateway admin UI
@@ -901,7 +985,9 @@ jobs:
           if (( install_status != 0 )); then exit "$install_status"; fi
           exit "$sandbox_status"
       - name: Install Gateway runtime dependencies
-        run: npm ci --prefix gateway --omit=dev
+        run: npm ci --prefix gateway
+      - name: Install Admin browser dependencies
+        run: npm ci --prefix gateway/admin-ui
       - name: Fetch pinned public upstream inputs
         run: node scripts/fetch-upstream-baseline.ts
 
@@ -996,7 +1082,9 @@ jobs:
       # Gateway is an independent npm project outside the root pnpm workspace.
       # Root snapshot tests import its runtime modules.
       - name: Install Gateway runtime dependencies
-        run: npm ci --prefix gateway --omit=dev
+        run: npm ci --prefix gateway
+      - name: Install Admin browser dependencies
+        run: npm ci --prefix gateway/admin-ui
 
       - name: Install Playwright Chromium and hosted dependencies
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
@@ -1077,7 +1165,7 @@ jobs:
 
       - name: Run compatibility smokes
         env:
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
         run: pnpm run check:node-compat
       - name: Preserve gate evidence
         if: always()
@@ -1126,10 +1214,11 @@ jobs:
           command: Ruff and pytest in python/sdk
 
 
-  # One native target makes the complete release-shaped Python path required
-  # without duplicating platform-independent behavior across the release matrix.
-  # The reusable builder owns the executable, snapshot, wheel, clean-install,
-  # GLIBC, and manylinux checks; release validation retains all native targets.
+  # The two pull-request targets exercise the complete release-shaped Python
+  # path on both POSIX and native Windows without duplicating
+  # platform-independent behavior across the release matrix. The reusable
+  # builder owns the executable, snapshot, wheel, clean-install, GLIBC, and
+  # manylinux checks; release validation retains all native targets.
   python-runtime:
     needs: pr-scope
     # The Python lanes build and exercise `python/**` plus the packaged runtime,
@@ -1137,10 +1226,10 @@ jobs:
     if: >-
       always() && ((github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit')
       || (github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'))
-    name: python runtime / release-shaped Linux x64
+    name: python runtime / release-shaped matrix
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
-      targets: node24-linux-x64
+      targets: node24-linux-x64,node24-win-x64
       ci: true
 
   # The required pull-request Windows signal: the two blocking win32 surfaces
@@ -1779,7 +1868,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-bench, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui, windows-native, release-pack, vendor-pack, native-pack, sandbox-proof, provider-proof, pi-ai-proof]
     if: always() && github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v7

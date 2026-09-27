@@ -1,0 +1,418 @@
+// @vitest-environment jsdom
+/**
+ * The plugin's wiring, and its removal when the plugin goes.
+ *
+ * The registry and the navigation controller are real, because "provided"
+ * means what those faces do; the slot, locale, frame, and resource faces are
+ * recorders, because what matters here is what was handed to them — two seats
+ * over one store, the guide's body under its own id, the frame reports, the
+ * service binding — and that every registration is gone after dispose, which
+ * is what makes a reload safe. The seats' components have their own specs.
+ */
+import { describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { createSnapshotStore, ProjectUiPolicyRuntime, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { apply, inject } from '../src/client/index.ts'
+import type { GuideInjected, SidebarRightInjected } from '../src/client/index.ts'
+import { apply as hostApply } from '../src/index.ts'
+import { SidebarRightController } from '../src/client/service.ts'
+import { SidebarRightTabRegistry } from '../src/client/tab-registry.ts'
+import type { createSidebarRightStore } from '../src/client/stores.ts'
+import type { RightbarActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
+import { RightbarSeat } from '../src/client/shell/SidebarRight.tsx'
+import { RightbarRoot } from '../src/client/shell/RightbarRoot.tsx'
+import { ExpandButton, BlankExpandButton } from '../src/client/shell/ExpandButton.tsx'
+import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
+import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
+import { ToolBody } from '../src/client/tabs/tool/ToolBody.tsx'
+import { GUIDE_ID } from '../src/client/tabs/guide/definition.ts'
+import { en, zh } from '../src/client/locales.ts'
+
+const SESSION = 's-test' as SessionId
+
+interface Recorded {
+  name: string
+  key?: string
+  locale?: string
+  store?: unknown
+  children?: unknown
+  inject?: (sessionId: SessionId) => unknown
+  component: unknown
+}
+
+async function boot() {
+  const ctx = new Context()
+  const registered: Recorded[] = []
+  const slots = {
+    inject: vi.fn((_name: string, register: Parameters<SlotRegistry['inject']>[1]) => ctx.effect(register)),
+    register: vi.fn((options: Omit<Recorded, 'component'>, component: unknown) => {
+      const entry: Recorded = { ...options, component }
+      registered.push(entry)
+      return () => { registered.splice(registered.indexOf(entry), 1) }
+    }),
+  }
+  const dictionaries = new Map<string, unknown>()
+  const locale = {
+    // Copy is the dictionary's contract; the key stands in for the translation.
+    bind: vi.fn(() => (key: string) => key),
+    register: vi.fn((ns: string, dicts: unknown) => {
+      dictionaries.set(ns, dicts)
+      return () => { dictionaries.delete(ns) }
+    }),
+  }
+  const layout = {
+    bindRightbar: vi.fn((_owner: RightbarActions) => () => {}),
+    focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
+  }
+  const resources = { pin: vi.fn<(address: string, signal: AbortSignal) => void>() }
+  ctx.provide('slots', slots as never)
+  ctx.provide('locale', locale as never)
+  ctx.provide('layout', layout as never)
+  ctx.provide('workspaceResources', resources as never)
+  const sessions = {
+    retain: vi.fn(() => ({ release: vi.fn() })),
+    list: createSnapshotStore<{ current: SessionId | undefined; byId: Record<string, { id: SessionId }> }>({
+      current: SESSION, byId: { [SESSION]: { id: SESSION } },
+    }),
+  }
+  ctx.provide('sessions', sessions as never)
+  const policy = new ProjectUiPolicyRuntime()
+  const description = createSnapshotStore({ executionAuthorityRequired: false })
+  ctx.provide('projectUiPolicy', policy)
+  ctx.provide('connection', { hostDescription: description } as never)
+  const fiber = ctx.plugin({ inject: [...inject], apply })
+  await fiber.await()
+  const seat = (name: string): Recorded => {
+    const entry = registered.find(candidate => candidate.name === name && candidate.key !== 'tool-details')
+    if (entry === undefined) throw new Error(`expected a registration into ${name}`)
+    return entry
+  }
+  const injectedOf = (entry: Recorded): unknown => {
+    if (entry.inject === undefined) throw new Error(`expected ${entry.name} to inject`)
+    return entry.inject(SESSION)
+  }
+  return { ctx, registered, dictionaries, layout, resources, fiber, seat, injectedOf, policy, description, sessions }
+}
+
+describe('ui-sidebar-right apply', () => {
+  it('keeps the host Loader entry inert', () => {
+    expect(hostApply).not.toThrow()
+  })
+
+  it('provides both faces, and registers the guide through the same two-stage path as any other type', async () => {
+    const { ctx, registered, dictionaries, seat } = await boot()
+    expect(ctx.sidebarRightTabs).toBeInstanceOf(SidebarRightTabRegistry)
+    expect(ctx.sidebarRight).toBeInstanceOf(SidebarRightController)
+    expect('adopt' in ctx.sidebarRight).toBe(false)
+    expect(dictionaries.get('sidebarRight')).toEqual({ zh, en })
+    const guide = ctx.sidebarRightTabs.get('guide')
+    expect(guide?.id).toBe(GUIDE_ID)
+    expect(guide?.priority).toBe('builtin')
+    expect(guide?.title('sidebar://guide')).toBe('tab.guide.title')
+    // Five registrations: the root and panel seats, the header's corner seat,
+    // and the guide body and chip title under the guide implementation's id.
+    // The guide draws no product copy of its own, so neither guide seat binds the dictionary.
+    expect(registered.map(entry => [entry.name, entry.key, entry.locale, entry.component])).toEqual([
+      ['sidebar.right.pane.tab', 'tool-details', undefined, ToolBody],
+      ['rightbar', undefined, undefined, RightbarRoot],
+      ['rightbar.session', undefined, 'sidebarRight', RightbarSeat],
+      ['conversation.session.header.corner', undefined, 'sidebarRight', ExpandButton],
+      ['conversation.input.left', undefined, 'sidebarRight', BlankExpandButton],
+      ['shell.mobile.header.actions', undefined, 'sidebarRight', ExpandButton],
+      ['sidebar.right.pane.tab', GUIDE_ID, undefined, GuideBody],
+      ['sidebar.right.pane.tab.title', GUIDE_ID, undefined, GuideTitle],
+    ])
+    // The panel declares the extension seats; the guide declares its chain child.
+    expect(Object.keys(seat('rightbar.session').children as object)).toEqual([
+      'sidebar.right.pane.tab', 'sidebar.right.pane.tab.title', 'sidebar.right.tab.menu.item',
+    ])
+    expect(registered.find(entry => entry.key === GUIDE_ID)?.children).toMatchObject({ 'sidebar.right.tab.guide': { kind: 'chain', scope: 'session' } })
+    // Both seats read one store: the button only needs to know whether the panel is expanded.
+    expect(seat('rightbar.session').store).toBeDefined()
+    expect(seat('conversation.session.header.corner').store).toBe(seat('rightbar.session').store)
+  })
+
+  it('hands the panel seat the frame report, the service binding, the opens, the observable registry, and the Tab domain', async () => {
+    const { ctx, layout, resources, seat, injectedOf } = await boot()
+    const injected = injectedOf(seat('rightbar.session')) as SidebarRightInjected
+    // The frame learns the composition of expanded and presentation, nothing else.
+    injected.syncPresentation({ shown: true, track: true, fullscreen: false })
+    expect(layout.openRightbar).toHaveBeenLastCalledWith(true, false)
+    injected.syncPresentation({ shown: true, track: true, fullscreen: true })
+    expect(layout.openRightbar).toHaveBeenLastCalledWith(true, true)
+    injected.syncPresentation({ shown: true, track: false, fullscreen: true })
+    expect(layout.openRightbar).toHaveBeenLastCalledWith(false, true)
+    injected.syncPresentation({ shown: false, track: false, fullscreen: false })
+    expect(layout.closeRightbar).toHaveBeenCalledOnce()
+    // The registry, observable: what the seat dispatches a kind to.
+    expect(injected.hooks.tabTypes.getSnapshot().find(type => type.kind === 'guide')?.id).toBe(GUIDE_ID)
+    const seen = vi.fn()
+    const unsubscribe = injected.hooks.tabTypes.subscribe(seen)
+    ctx.sidebarRightTabs.register({ id: 'spec/text', kind: 'text', patterns: ['dsh-resource://file/**'], title: () => 'text' })
+    expect(seen).toHaveBeenCalledOnce()
+    unsubscribe()
+    // The binding makes the service act on this seat's session; the seat's
+    // store instance is minted here from the handle the registration declared.
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create()
+    instance.clearPersisted()
+    const release = injected.bindService({ sessionId: SESSION, actions: instance.actions, surfaces: {}, canSplitPane: () => true })
+    injected.openTab('guide', { revealIfOpened: false })
+    const surface = instance.getSnapshot().bySession[SESSION]
+    expect(surface?.layout.expanded).toBe(true)
+    expect(Object.values(surface?.layout.tabs ?? {}).map(tab => tab.kind)).toEqual(['guide'])
+    // Holding a record pins its address through the resource model.
+    if (surface === undefined) throw new Error('expected a surface')
+    ctx.sidebarRight.tabDomain.sync(SESSION, surface.layout)
+    expect(resources.pin).not.toHaveBeenCalled()
+    release()
+    expect(() => { ctx.sidebarRight.toggleExpanded() }).toThrow('no session surface is mounted')
+  })
+
+  it('adopts each session\'s store instance as the runtime mints it, so a tab\'s own actions land with no seat bound', async () => {
+    const { ctx, resources, seat } = await boot()
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    // Both seats declare the same wrapped handle, so either minting adopts.
+    expect(seat('conversation.session.header.corner').store).toBe(handle)
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    // The first expansion seeds the guide; a second tab beside it makes it closable.
+    instance.actions.setExpanded(SESSION, true)
+    instance.actions.openContent(SESSION, { kind: 'text', contentId: 'dsh-resource://file/session/s-test/a.txt', title: 'a' }, () => {})
+    const guide = Object.values(instance.getSnapshot().bySession[SESSION]?.layout.tabs ?? {}).find(tab => tab.kind === 'guide')
+    if (guide === undefined) throw new Error('expected the seeded guide')
+    // Held and pinned from the store's own commit: no seat synced anything.
+    const occurrence = ctx.sidebarRight.tabDomain.occurrence(SESSION, guide)
+    expect(resources.pin).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SESSION, path: 'a.txt' }), expect.any(AbortSignal))
+    occurrence.tabActions.close()
+    expect(instance.getSnapshot().bySession[SESSION]?.layout.tabs[guide.id]).toBeUndefined()
+    expect(occurrence.signal.aborted).toBe(true)
+    expect(ctx.sidebarRight.openTabs.getSnapshot().length).toBeGreaterThan(0)
+    instance.clearPersisted()
+    expect(ctx.sidebarRight.openTabs.getSnapshot()).toEqual([])
+  })
+
+  it('rejects a foreign Session resource before committing a tab', async () => {
+    const { ctx, seat, resources, fiber } = await boot()
+    ctx.sidebarRightTabs.register({ id: 'text', kind: 'text', patterns: ['dsh-resource://file/**'], title: () => 'Text' })
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    const before = instance.getSnapshot()
+    expect(() => { ctx.sidebarRight.openResourceIn(SESSION, 'dsh-resource://file/session/foreign/private.txt') }).toThrow('does not belong')
+    expect(instance.getSnapshot()).toBe(before)
+    expect(resources.pin).not.toHaveBeenCalled()
+    await fiber.dispose()
+  })
+
+  it('holds custom resources only for their declared Session and rejects a foreign owner', async () => {
+    const { ctx, seat, resources, sessions, fiber } = await boot()
+    ctx.sidebarRightTabs.register({
+      id: 'review', kind: 'review', patterns: ['dsh-resource://review/**'], title: () => 'Review',
+      resourceSession: address => new URL(address).pathname.split('/')[1] as SessionId,
+    })
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    ctx.sidebarRight.openSessionResource(SESSION, `dsh-resource://review/${SESSION}/1`)
+    expect(sessions.retain).toHaveBeenCalledWith(SESSION, expect.objectContaining({ source: 'auxiliary' }))
+    expect(resources.pin).not.toHaveBeenCalled()
+    const before = instance.getSnapshot()
+    expect(() => { ctx.sidebarRight.openSessionResource(SESSION, 'dsh-resource://review/foreign/1') }).toThrow('does not belong')
+    expect(instance.getSnapshot()).toBe(before)
+    const reference = sessions.retain.mock.results[0]?.value as { release: ReturnType<typeof vi.fn> } | undefined
+    await fiber.dispose()
+    expect(reference?.release).toHaveBeenCalledOnce()
+  })
+
+  it('isolates account layouts and aborts held resources when account verification expires', async () => {
+    const { ctx, seat, description, policy, fiber } = await boot()
+    description.set({ executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(1)
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    ctx.sidebarRight.openResourceIn(SESSION, `dsh-resource://tool/session/${SESSION}/private-call`)
+    const tab = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs)[0]!
+    const occurrence = ctx.sidebarRight.tabDomain.occurrence(SESSION, tab)
+    policy.setVerifiedAccountId(undefined)
+    expect(occurrence.signal.aborted).toBe(true)
+    expect(ctx.sidebarRight.openTabs.getSnapshot()).toEqual([])
+    expect(instance.getSnapshot().bySession).toEqual({})
+    policy.setVerifiedAccountId(2)
+    expect(instance.getSnapshot().bySession).toEqual({})
+    policy.setVerifiedAccountId(1)
+    expect(Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs).map(item => item.contentId)).toEqual([`dsh-resource://tool/session/${SESSION}/private-call`])
+    await fiber.dispose()
+  })
+
+  it('ends old occurrences when two verified accounts restore the same tab id directly', async () => {
+    const { ctx, seat, description, policy, fiber } = await boot()
+    description.set({ executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(1)
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    instance.actions.setExpanded(SESSION, true)
+    const first = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs)[0]!
+    const old = ctx.sidebarRight.tabDomain.occurrence(SESSION, first)
+    policy.setVerifiedAccountId(2)
+    expect(old.signal.aborted).toBe(true)
+    instance.actions.open(SESSION)
+    instance.actions.setExpanded(SESSION, true)
+    const second = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs)[0]!
+    const other = ctx.sidebarRight.tabDomain.occurrence(SESSION, second)
+    expect(second.id).toBe(first.id)
+    policy.setVerifiedAccountId(1)
+    expect(other.signal.aborted).toBe(true)
+    expect(ctx.sidebarRight.tabDomain.occurrence(SESSION, first).signal.aborted).toBe(false)
+    await fiber.dispose()
+  })
+
+  it('hands the guide body the registry\'s entry boxes, observable', async () => {
+    const { ctx, seat, injectedOf } = await boot()
+    const { hooks: { guideEntries } } = injectedOf(seat('sidebar.right.pane.tab')) as GuideInjected
+    expect(guideEntries.getSnapshot()).toEqual([])
+    const seen = vi.fn()
+    guideEntries.subscribe(seen)
+    ctx.sidebarRightTabs.register({
+      id: 'spec/files',
+      kind: 'files',
+      title: () => 'Files',
+      guide: [{ id: 'default', order: 10, title: () => 'Files' }],
+    })
+    expect(seen).toHaveBeenCalledOnce()
+    expect(guideEntries.getSnapshot().map(entry => entry.kind)).toEqual(['files'])
+  })
+
+  it('takes every registration and both faces back when disposed, aborting the open records, so a reload registers again', async () => {
+    const { ctx, registered, dictionaries, fiber, seat, injectedOf } = await boot()
+    const injected = injectedOf(seat('rightbar.session')) as SidebarRightInjected
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    // Minted under the session key, so the instance is adopted and the teardown releases it.
+    const instance = handle.create(SESSION)
+    injected.bindService({ sessionId: SESSION, actions: instance.actions, surfaces: {}, canSplitPane: () => true })
+    injected.openTab('guide')
+    const surface = instance.getSnapshot().bySession[SESSION]
+    const guide = Object.values(surface?.layout.tabs ?? {})[0]
+    if (guide === undefined) throw new Error('expected the guide tab')
+    const { signal, tabActions } = ctx.sidebarRight.tabDomain.occurrence(SESSION, guide)
+    await fiber.dispose()
+    expect(signal.aborted).toBe(true)
+    // The adoption went with the plugin: a late action from the dead occurrence changes nothing.
+    tabActions.close()
+    expect(instance.getSnapshot().bySession[SESSION]?.layout.tabs[guide.id]).toBeDefined()
+    expect(ctx.get('sidebarRight')).toBeUndefined()
+    expect(ctx.get('sidebarRightTabs')).toBeUndefined()
+    expect(registered).toEqual([])
+    expect(dictionaries.size).toBe(0)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    expect(ctx.sidebarRightTabs.get('guide')?.id).toBe(GUIDE_ID)
+    expect(registered).toHaveLength(8)
+  })
+
+  it('routes tool details through the bar binding and collapses on close', async () => {
+    const { ctx, seat, layout, sessions, fiber } = await boot()
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    const binding = layout.bindRightbar.mock.calls[0]?.[0] as RightbarActions
+    binding.openDetails(SESSION, { callId: 'call-1' })
+    expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
+    // A title lookup for a non-tool address falls back to the generic label.
+    expect(ctx.sidebarRightTabs.get('tool-details')?.title('dsh-resource://file/session/s/x.txt'))
+      .toBe('tab.tool.title')
+    const tab = Object.values(instance.getSnapshot().bySession[SESSION]!.layout.tabs)
+      .find(item => item.kind === 'tool-details')
+    expect(tab?.contentId).toBe(`dsh-resource://tool/session/${SESSION}/call-1`)
+
+    // No explicit Session falls back to the mounted current Session.
+    binding.openDetails(undefined, { callId: 'call-2' })
+    expect(() => { binding.openDetails(SESSION, undefined) }).toThrow('require an explicit Session and call')
+    sessions.list.set({ current: undefined, byId: {} })
+    expect(() => { binding.openDetails(undefined, { callId: 'call-3' }) }).toThrow('require an explicit Session and call')
+
+    binding.close(SESSION)
+    expect(instance.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(false)
+    await fiber.dispose()
+  })
+
+  it('pins a workspace file tab and releases the session reference when the pin fails', async () => {
+    const { ctx, seat, resources, sessions, fiber } = await boot()
+    ctx.sidebarRightTabs.register({
+      id: 'test/file', kind: 'file', patterns: ['dsh-resource://file/**'], title: address => address,
+    })
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    const instance = handle.create(SESSION)
+    instance.actions.open(SESSION)
+    const reference = { release: vi.fn() }
+    sessions.retain.mockReturnValueOnce(reference)
+    resources.pin.mockImplementationOnce(() => { throw new Error('pin failed') })
+    expect(() => {
+      ctx.sidebarRight.openResourceIn(SESSION, `dsh-resource://file/session/${SESSION}/a.txt`)
+    }).toThrow('pin failed')
+    expect(reference.release).toHaveBeenCalled()
+    await fiber.dispose()
+  })
+
+  it('clears a persisted layout whose resource tab failed ownership validation', async () => {
+    const values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+      removeItem: (key: string) => { values.delete(key) },
+    })
+    try {
+      const { ctx, seat, description, policy, fiber } = await boot()
+      description.set({ executionAuthorityRequired: true })
+      policy.setVerifiedAccountId(1)
+      const key = sessionPersistenceKey(ctx.sessions, SESSION, true, 1)
+      if (key === undefined) throw new Error('expected a persistence key')
+      const storage = `dsh.sidebar-right.v1.${key}`
+      values.set(storage, JSON.stringify({
+        bySession: {
+          [key]: {
+            layout: {
+              nodes: {
+                pane1: { kind: 'pane', id: 'pane1', host: 'dock', tabs: ['tab1'], activeTabId: 'tab1' },
+              },
+              tabs: {
+                tab1: {
+                  id: 'tab1', kind: 'file', title: 'a',
+                  // Another Session's resource: the restore must not adopt it.
+                  contentId: 'dsh-resource://file/session/s-other/a.txt',
+                },
+              },
+              rootId: 'pane1', floats: [], activePaneId: 'pane1', expanded: true, mode: 'push',
+            },
+            minted: 1,
+          },
+        },
+      }))
+      const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+      const instance = handle.create(SESSION)
+      expect(values.has(storage)).toBe(false)
+      expect(instance.getSnapshot().bySession).toEqual({})
+      await fiber.dispose()
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('drops only the session binding when nothing was persisted', async () => {
+    const { seat, fiber } = await boot()
+    const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+    // 's-anon' has no owned persistence key, so clearing skips storage removal.
+    const instance = handle.create('s-anon')
+    expect(() => { instance.clearPersisted() }).not.toThrow()
+    await fiber.dispose()
+  })
+
+  it('focuses the bar from the corner, blank-input, and mobile expand faces', async () => {
+    const { seat, injectedOf, layout, fiber } = await boot()
+    for (const name of ['conversation.session.header.corner', 'conversation.input.left', 'shell.mobile.header.actions']) {
+      (injectedOf(seat(name)) as { focus(): void }).focus()
+      expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
+    }
+    await fiber.dispose()
+  })
+})

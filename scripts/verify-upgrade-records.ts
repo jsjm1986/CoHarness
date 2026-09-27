@@ -17,6 +17,9 @@
  * Strict checks apply to records declaring `schemaVersion: 2` or newer;
  * earlier generations keep their frozen historical shape and are validated
  * only as parseable objects. Every manifest still requires its plan pair.
+ * Schema v3 adds unique matrix areas and manifest decision ids, and compares
+ * declared file inventories with the raw Git diffs of their recorded commits.
+ * Frozen v2 records retain their original interpretation.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -147,6 +150,24 @@ function checkRow(owner: string, row: unknown): void {
   requireCommits(name, row)
 }
 
+/** Current records name each review unit once; conflicting decisions cannot share an identity. */
+function checkUniqueIdentities(path: string, rows: unknown[], field: 'area' | 'id'): void {
+  const seen = new Set<string>()
+  for (const row of rows) {
+    if (!isRecord(row)) fail(`${path} ${field} owner must be an object`)
+    const identity = requireString(path, row[field], field)
+    if (identity.trim() !== identity) fail(`${path} ${field} must not have surrounding whitespace`)
+    if (seen.has(identity)) fail(`${path} duplicate ${field} ${JSON.stringify(identity)}`)
+    seen.add(identity)
+  }
+}
+
+function requireCurrentSchema(path: string, raw: unknown): void {
+  if (!isRecord(raw) || typeof raw.schemaVersion !== 'number' || raw.schemaVersion < 3) {
+    fail(`${path} active upgrade record requires schemaVersion: 3 or newer`)
+  }
+}
+
 export function checkMatrix(path: string, raw: unknown): void {
   if (!isRecord(raw)) fail(`${path} must be a JSON object`)
   if (typeof raw.schemaVersion !== 'number' || raw.schemaVersion < 2) return // legacy generation
@@ -161,6 +182,7 @@ export function checkMatrix(path: string, raw: unknown): void {
   raw.rows.forEach((row, i) => {
     checkRow(`${path} row ${String(i)}`, row)
   })
+  if (raw.schemaVersion >= 3) checkUniqueIdentities(path, raw.rows, 'area')
 }
 
 export function checkManifest(path: string, raw: unknown): void {
@@ -184,6 +206,7 @@ export function checkManifest(path: string, raw: unknown): void {
   raw.decisions.forEach((row, i) => {
     checkRow(`${path} decision ${String(i)}`, row)
   })
+  if (raw.schemaVersion >= 3) checkUniqueIdentities(path, raw.decisions, 'id')
 }
 
 /** Files present in one directory matching `prefix` and `suffix`. */
@@ -193,6 +216,47 @@ function recordsIn(dir: string, prefix: string, suffix: string): string[] {
   return readdirSync(abs)
     .filter(name => name.startsWith(prefix) && name.endsWith(suffix) && statSync(resolve(abs, name)).isFile())
     .sort()
+}
+
+/** Compare current inventories with raw paths, including both sides of upstream renames. */
+function checkMatrixFileInventories(path: string, raw: unknown): void {
+  if (!isRecord(raw) || typeof raw.schemaVersion !== 'number' || raw.schemaVersion < 3) return
+  if (!isRecord(raw.target) || !COMMIT_ID.test(String(raw.target.commit))) fail(`${path} target.commit must be a commit id`)
+  if (!Array.isArray(raw.rows)) fail(`${path} requires rows for file inventory verification`)
+  const target = String(raw.target.commit)
+  if (raw.summary !== undefined && !isRecord(raw.summary)) fail(`${path} summary must be an object`)
+  const summary = isRecord(raw.summary) ? raw.summary : undefined
+  const ranges = [{ field: 'cumulativeFiles', baseline: raw.baseline, count: 'cumulativeChangedFiles' }]
+  if (raw.incrementBaseline !== undefined) {
+    ranges.push({ field: 'incrementFiles', baseline: raw.incrementBaseline, count: 'incrementChangedFiles' })
+  } else if (raw.rows.some((row: unknown) => isRecord(row) && Array.isArray(row.incrementFiles) && row.incrementFiles.length > 0)) {
+    fail(`${path} incrementFiles requires an incrementBaseline`)
+  }
+  for (const range of ranges) {
+    if (!isRecord(range.baseline) || !COMMIT_ID.test(String(range.baseline.commit))) {
+      fail(`${path} ${range.field} requires a baseline commit id`)
+    }
+    const changed = execFileSync('git', ['diff', '--no-ext-diff', '--no-textconv', '--no-renames', '--name-only', '-z',
+      String(range.baseline.commit), target, '--'], { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+    const expected = new Set(changed.split('\0').filter(Boolean))
+    const claimed = new Set<string>()
+    for (const row of raw.rows) {
+      if (!isRecord(row) || !Array.isArray(row[range.field])) fail(`${path} each row requires a ${range.field} array`)
+      const files = row[range.field] as unknown[]
+      for (const value of files) {
+        const file = requireString(path, value, range.field)
+        if (claimed.has(file)) fail(`${path} ${range.field} repeats path ${JSON.stringify(file)}`)
+        claimed.add(file)
+      }
+    }
+    const missing = [...expected].filter(file => !claimed.has(file))
+    const extra = [...claimed].filter(file => !expected.has(file))
+    if (missing.length > 0 || extra.length > 0) {
+      fail(`${path} ${range.field} does not match the raw Git diff: ${String(missing.length)} missing ${JSON.stringify(missing.slice(0, 5))}; ${String(extra.length)} unexpected ${JSON.stringify(extra.slice(0, 5))}`)
+    }
+    if (summary !== undefined && summary[range.count] !== expected.size) fail(`${path} summary.${range.count} must equal ${String(expected.size)}`)
+  }
+  if (summary !== undefined && summary.rows !== raw.rows.length) fail(`${path} summary.rows must equal ${String(raw.rows.length)}`)
 }
 
 /**
@@ -246,7 +310,9 @@ function main(): number {
   for (const name of recordsIn(ALIGNMENT_DIR, 'UPSTREAM-ALIGNMENT-MATRIX-', '.json')) {
     const rel = `${ALIGNMENT_DIR}/${name}`
     const parsed: unknown = JSON.parse(readFileSync(resolve(root, rel), 'utf8'))
+    if (name === `UPSTREAM-ALIGNMENT-MATRIX-${sync.syncedTag}.json`) requireCurrentSchema(rel, parsed)
     checkMatrix(rel, parsed)
+    checkMatrixFileInventories(rel, parsed)
     matrices.set(name.replace('UPSTREAM-ALIGNMENT-MATRIX-', '').replace('.json', ''), parsed)
     checked += 1
   }
@@ -261,7 +327,9 @@ function main(): number {
   }
   for (const name of recordsIn(MANIFEST_DIR, 'UPGRADE-MANIFEST-', '.json')) {
     const rel = `${MANIFEST_DIR}/${name}`
-    checkManifest(rel, JSON.parse(readFileSync(resolve(root, rel), 'utf8')) as unknown)
+    const parsed: unknown = JSON.parse(readFileSync(resolve(root, rel), 'utf8'))
+    if (name === `UPGRADE-MANIFEST-${sync.syncedTag}.json`) requireCurrentSchema(rel, parsed)
+    checkManifest(rel, parsed)
     const plan = resolve(root, PLANS_DIR, name.replace('UPGRADE-MANIFEST-', 'UPGRADE-PLAN-').replace('.json', '.md'))
     if (!existsSync(plan)) fail(`${rel} has no matching plan ${PLANS_DIR}/${name.replace('UPGRADE-MANIFEST-', 'UPGRADE-PLAN-').replace('.json', '.md')}`)
     checked += 1

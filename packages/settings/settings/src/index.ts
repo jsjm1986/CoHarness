@@ -88,6 +88,13 @@ export interface SettingsRegisterOptions<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /**
+   * Authorize a resolved in-process write before persistence. Registration and
+   * provider reloads do not call this hook; their validation stays synchronous.
+   * @param value - immutable, schema-valid next section at the front of its write queue.
+   * @returns completion when persistence is authorized; rejection leaves storage unchanged.
+   */
+  authorizeWrite?: (value: T) => Promise<void>
   /** Logical owner shown by remote configuration surfaces. */
   owner?: SettingsOwner
   /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
@@ -405,6 +412,8 @@ interface SettingsRegistration {
   projectWritePaths?: string[][]
   /** Owner-supplied check for constraints the schema cannot express. */
   validate?: (value: unknown) => void
+  /** Optional live authorization for in-process persistence only. */
+  authorizeWrite?: (value: unknown) => Promise<void>
   resolved: unknown
   /**
    * Monotonic counter over this namespace's RAW user section — bumped by any
@@ -540,6 +549,9 @@ export abstract class SettingsProvider extends Service {
       ...options?.validate === undefined
         ? {}
         : { validate: options.validate as (value: unknown) => void },
+      ...options?.authorizeWrite === undefined
+        ? {}
+        : { authorizeWrite: options.authorizeWrite as (value: unknown) => Promise<void> },
       resolved: deepFreeze(this.resolve(schema, options?.base, this.section(parsedNs), options?.validate)),
       revision: 0,
       watchers: new Set(),
@@ -597,6 +609,7 @@ export abstract class SettingsProvider extends Service {
     const scope = this.register<Namespace, T>(ns, schema, {
       base: entry,
       ...hooks.validate === undefined ? {} : { validate: hooks.validate },
+      ...hooks.authorizeWrite === undefined ? {} : { authorizeWrite: hooks.authorizeWrite },
       ...hooks.owner === undefined ? {} : { owner: hooks.owner },
       ...hooks.projectWrite === undefined ? {} : { projectWrite: hooks.projectWrite },
       ...hooks.projectWritePaths === undefined ? {} : { projectWritePaths: hooks.projectWritePaths },
@@ -801,6 +814,14 @@ export abstract class SettingsProvider extends Service {
           ? snapshot
           : (snapshot['ops'] as SettingsPathOp[]).reduce(applyPathOp, current)
       const next = deepFreeze(this.resolve(registration.schema, registration.base, section, registration.validate))
+      if (registration.authorizeWrite !== undefined) {
+        const revision = registration.revision
+        await registration.authorizeWrite(next)
+        if (this.isStopped() || this.registrations.get(ns) !== registration || !this.registrations.get(ns)?.active) {
+          throw new Error(`settings namespace "${ns}" was disposed during write authorization`)
+        }
+        if (registration.revision !== revision) throw new SettingsConflictError(ns, revision, registration.revision)
+      }
       await this.persist(ns, section)
       // The write reached storage either way; the cache must say so. Commit
       // only when this registration is still the namespace owner — a fiber
@@ -1039,6 +1060,12 @@ export interface SettingsSectionHooks<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /**
+   * Authorize an in-process write before persistence; see {@link SettingsRegisterOptions.authorizeWrite}.
+   * @param value - immutable, schema-valid next section.
+   * @returns completion when persistence is authorized.
+   */
+  authorizeWrite?: (value: T) => Promise<void>
   /** Logical owner exposed to scoped configuration surfaces. */
   owner?: SettingsOwner
   /** Whether a project manager may edit this section. */

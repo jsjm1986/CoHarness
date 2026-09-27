@@ -69,7 +69,7 @@ Verify both read and write paths. Header-only listing must not read bodies or pu
 <a id="snapshot-successors"></a>
 ## 5. Create snapshot successors
 
-Read [snapshot ownership](../../snapshots/AGENTS.md) and the [snapshot library](../../packages/test-support/acp-snapshot/README.md). Select the owning scenario, not an adapter that only references it. After implementing N+1, keep each historical file and generate its successor using the target version’s canonical parent and child filenames. Never rename a predecessor to the target filename or change only its header.
+Read [snapshot ownership](../../snapshots/AGENTS.md) and the [snapshot library](../../packages/test-support/session-snapshot/README.md). Select the owning scenario, not an adapter that only references it. After implementing N+1, keep each historical file and generate its successor using the target version’s canonical parent and child filenames. Never rename a predecessor to the target filename or change only its header.
 
 For unchanged replay input, use keyless refresh on the owner, then replay without write-back. These SDK commands use `text-turn` and the checkout's writer version. Implement and wire N+1 before using them to generate that version, and select the actual affected owner for a feature:
 

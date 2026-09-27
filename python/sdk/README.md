@@ -18,13 +18,13 @@ Installing `deepseek-harness-sdk` installs the exact same-version `deepseek-harn
 ```py
 from deepseek_harness import DeepSeekHarness
 
-with DeepSeekHarness() as harness:
+with DeepSeekHarness(dsh_home="./.harness") as harness:
     result = harness.run("Say hi.")
 ```
 
 `DeepSeekHarness` keeps its lazily started runtime subprocess for reuse across calls. Use it as a context manager, as above, or call `close()` explicitly when finished.
 
-By default, the SDK launches the bundled single-file `dsh-jsonrpc-agent` executable from the `deepseek-harness-runtime-bin` package and injects that package's default configuration (the stdio JSON-RPC server, agent core, preloaded DeepSeek adapter, JSONL session persistence with an explicitly composed semantic checkpoint policy, local bash) via `DSH_CORDIS_CONFIG`. To run a plugin composition of your own, keep the `@deepseek-ai/dsh-sdk-jsonrpc-server` entry in the config and pass the Cordis config path.
+The SDK launches the bundled `dsh` executable with the `sdk` runtime profile. Set `dsh_home` or a nonempty `DSH_HOME` explicitly; the SDK does not choose a personal home implicitly. Use `profile` and ordered `patches` to configure the shipped application. The selected profile must provide stdio JSON-RPC and its required services.
 
 ```py
 from deepseek_harness import DeepSeekHarness
@@ -33,7 +33,9 @@ with DeepSeekHarness(
     provider="deepseek-official",
     model="deepseek-v4-flash",
     max_tokens=49_152,
-    cordis="examples/jsonrpc-agent/cordis.yml",
+    dsh_home="./.harness",
+    profile="sdk",
+    patches=("./sdk.patch.yml",),
 ) as harness:
     result = harness.run("Make the requested code change.")
 ```
@@ -42,10 +44,10 @@ with DeepSeekHarness(
 
 The [Python SDK tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/python-sdk.md) provides an ordered installation and first-run path without the Web UI. The [`jsonrpc-agent` example](https://github.com/deepseek-ai/deepseek-harness/blob/master/examples/jsonrpc-agent/README.md) owns the complete standalone Cordis file used there.
 
-`Session.run()` owns an activity interval from its prompt's durable inbox receipt through the next whole-agent idle and returns `RunResult(session_id, final_response, finish_reason, events, notifications, session_root)`. `final_response` is the last committed root-session assistant text in the interval. `finish_reason` is the `kind` of the last root-session `turn/end` in the interval, such as `completed`, `max-tokens`, or `error`, and is `None` when no turn ended. A `turn/end` without a string `data.reason.kind` violates the runtime protocol and raises `SdkProtocolError`. Both result fields describe the owned interval rather than an output or ending causally assigned to the prompt. Steering, injected context, and other queued work may contribute before idle.
+`Session.run()` owns an activity interval from its prompt's durable inbox receipt through the next whole-agent idle and returns `RunResult(session_id, final_response, finish_reason, events, notifications)`. `final_response` is the last committed root-session assistant text in the interval. `finish_reason` is the `kind` of the last root-session `turn/end` in the interval, such as `completed`, `max-tokens`, or `error`, and is `None` when no turn ended. A `turn/end` without a string `data.reason.kind` violates the runtime protocol and raises `SdkProtocolError`. Both result fields describe the owned interval rather than an output or ending causally assigned to the prompt. Steering, injected context, and other queued work may contribute before idle.
 
 `HarnessClient` retains discovered subagent ancestry while each child is active, releases an edge after `subagent.finished`, and bounds the lineage map by the notification queue limit. During each `Session.run()`, `RunResult.notifications` and `on_notification` receive the root session and all known descendant notifications in wire order, including nested subagent lifecycle and session events. `RunResult.events` contains root-session events only, so descendant messages cannot replace the root response. The low-level `session_prompt()` returns the queued `MessageId` immediately; callers that bypass `Session.run()` own any later activity boundary themselves.
 
-The same behavior can be selected for the runtime subprocess with `DSH_CORDIS_CONFIG`. The injection lives in `HarnessClient.start()`, so the low-level client's default launch gets it too: when the launch resolves to the bundled runtime and neither `cordis` nor a non-empty `DSH_CORDIS_CONFIG` is set (the runtime treats an empty value as absent, and so does the injection check), the bundled default configuration is used; an explicit `runtime_bin`, `bridge_bin`, or `launch_args_override` disables the injection entirely. See the [sdk-runtime README](https://github.com/deepseek-ai/deepseek-harness/blob/master/python/sdk-runtime/README.md) for the runtime carriers (production exe vs dev-only node closure) and how to obtain them.
+`dsh_bin` selects an explicit executable; omitting it resolves the bundled runtime. Patch paths and the Harness home resolve before launch. The same options apply to `HarnessClient`; generic fake-process arguments are internal test support. See the [sdk-runtime README](https://github.com/deepseek-ai/deepseek-harness/blob/master/python/sdk-runtime/README.md) for production and development carriers.
 
-`cwd` and `runtime_cwd` are resolved to absolute paths before subprocess launch, environment injection, and the wire handshake. The low-level stdio reader retains UTF-8 fragments and joins a line only at its newline; input lines, pending requests, incoming requests, notifications, and output are bounded by `HarnessConfig`. Request and shutdown timeouts must be positive finite seconds within the SDK timer bound. The public API exposes only applied options: deployment persona and persistence belong in `cordis.yml`, while `session_root` remains the high-level convenience that sets `DSH_SESSION_ROOT`.
+`cwd` and `runtime_cwd` resolve to absolute paths before subprocess launch and the wire handshake. Input lines, pending requests, incoming requests, notifications, and output are bounded by `HarnessConfig`. Initialization, request, and shutdown timeouts must be positive finite seconds within the SDK timer bound. Persona and persistence settings belong to profile patches; the SDK returns results without choosing a storage directory.

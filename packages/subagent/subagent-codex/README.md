@@ -32,6 +32,16 @@ The provider advertises no optional start-time capabilities and reports `inherit
 | `env` | `{}` | Explicit child environment layered over the subprocess seam's credential-scrubbed parent environment. |
 | `permissionMode` | `never` | Native non-interactive approval and sandbox mode fixed for every thread from this Provider instance. |
 | `disposeGraceMs` | `3000` | Positive finite grace in milliseconds, no greater than [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md), between the shared process-tree owner's termination tiers; disposal then waits for whole-tree exit. |
+| `stateDir` | `~/.dsh/external-members` | Directory holding instance-specific binding stores; `codex.jsonl` belongs to the default instance. Used only by persistent members. |
+| `memberCwd` | harness launch directory | Workspace for member Codex threads. Used only by persistent members. |
+
+## Persistent members
+
+The default `codex` instance keeps its existing model route and `codex.jsonl` store. Other names receive separate deterministic routes and files derived from the full provider name. Names remain distinct on case-insensitive filesystems; removing one instance releases only its route. Renaming an instance changes its persistent identity and does not adopt another instance's bindings.
+
+When the `llm` service is mounted this provider also advertises `prepareContinuable`, so `ctx.subagents.startContinuable` accepts it — the Team roster's provider-selection channel included. A member child is an ordinary in-process Agent owned by the continuation manager (durable identity, inbox, persistence, restart); this package contributes only the model route: every member model call spawns `codex app-server --stdio`, attaches to the member's durable thread (`thread/resume` when bound, `thread/start` with `ephemeral: false` on the first turn), issues one turn, and disposes the process.
+
+The binding store records the harness child session ↔ Codex thread mapping and the last issued prompt; a crash mid-turn leaves the prompt provable from the durable rollout under `~/.codex/sessions/` on the next call: a settled answer replays without resending, a provably absent prompt resends once, and an unprovable one is dropped rather than duplicated. Without the `llm` service the provider stays one-shot only — no `prepareContinuable`, so continuable starts reject `UNSUPPORTED_CAPABILITY`.
 
 | `permissionMode` value | `thread/start` fields | Native behavior |
 |---|---|---|

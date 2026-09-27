@@ -15,8 +15,8 @@
  * retain identity. Pure component: everything arrives through the framework
  * shares — zero cordis or framework imports, zero self-made hooks.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { computeColumns, DETAILS_DEFAULT, SIDEBAR_DEFAULT } from './columns.ts'
@@ -27,9 +27,10 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'conversation' | 'rightbar' | 'shell.overlay' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
+  & { dismissRightbar: () => void }
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
@@ -106,6 +107,7 @@ export function AppFrame({
   renderSlot,
   SessionProvider,
   t,
+  dismissRightbar,
 }: AppFrameProps) {
   const panels = useStore(s => s)
   const detailsSession = useSessions((s) => {
@@ -130,15 +132,6 @@ export function AppFrame({
   // sidebar column survives into medium (rail or squeezed-open) while
   // compact re-seats it as the drawer.
   const overlayPanels = mode === 'compact' || mode === 'medium'
-
-  const lastSession = useRef(detailsSession)
-  useLayoutEffect(() => {
-    if (detailsSession === undefined || panels.detailsSessionId !== undefined) return
-    if (lastSession.current !== undefined && lastSession.current !== detailsSession) {
-      actions.closeDetails()
-    }
-    lastSession.current = detailsSession
-  }, [actions, detailsSession, panels.detailsSessionId])
 
   // Compact session navigation dismisses the drawer: tapping a session in it
   // must land on the conversation, not stay under the still-open drawer.
@@ -199,11 +192,16 @@ export function AppFrame({
     : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
   // Overlay modes keep details out of the track solve (the chain would
   // auto-close it against the narrow width); its open state is the overlay's.
-  const cols = computeColumns(viewport, sidebarPreference, overlayPanels || detailsSession === undefined ? 0 : panels.details)
+  const rightbarTrack = overlayPanels || detailsSession === undefined || !panels.rightbarTrack ? 0 : panels.details
+  const cols = computeColumns(viewport, sidebarPreference, rightbarTrack)
   const colsRef = useRef(cols)
   colsRef.current = cols
   const drawerOpen = mode === 'compact' && panels.narrowExpanded
-  const detailsOpen = overlayPanels && detailsSession !== undefined && panels.details > 0
+  const detailsOpen = overlayPanels && detailsSession !== undefined && panels.rightbarShown
+
+  useEffect(() => {
+    if (narrow && panels.narrowExpanded && panels.rightbarShown) dismissRightbar()
+  }, [narrow, panels.narrowExpanded, panels.rightbarShown, dismissRightbar])
 
   // The shell owns the two mobile/medium overlay surfaces, so Escape is a
   // shell action only when a nested menu/dialog does not own the gesture.
@@ -218,12 +216,12 @@ export function AppFrame({
       if (target instanceof Element
         && target.closest('[role="dialog"], [role="menu"], [role="listbox"]') !== null) return
       event.preventDefault()
-      if (detailsOpen) actions.closeDetails()
+      if (detailsOpen) dismissRightbar()
       else actions.collapseNarrow()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [actions, detailsOpen, drawerOpen])
+  }, [actions, detailsOpen, drawerOpen, dismissRightbar])
 
   // Navigation from the drawer can close it without another pointer gesture
   // (session selection, scrim tap, or Escape). Return focus to the persistent
@@ -327,46 +325,22 @@ export function AppFrame({
       {/* The conversation viewport is root-scoped; details use the selected
           Session unless an explicit pane action pins their target. */}
       <CenterColumn>{renderSlot('conversation', { compact: mode === 'compact' })}</CenterColumn>
-      {overlayPanels
-        ? (
-          <>
-            <div className={css.scrim} data-open={detailsOpen || undefined} aria-hidden onClick={() => { actions.closeDetails() }} />
-            <div
-              className={css.detailsOverlay}
-              data-open={detailsOpen || undefined}
-              // Medium caps the overlay at the details contract default;
-              // compact stretches it edge to edge (AppFrame.module.css).
-              style={{ '--frame-details-overlay-width': `${DETAILS_DEFAULT}px` } as CSSProperties}
-            >
-              {panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
-                <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
-              )}
-            </div>
-          </>
-        )
-        : (
-          <DetailsColumn>
-            <div
-              className={css.detailsPanel}
-              // The surface follows a widened drag track but never clips
-              // under the contract default: a released or squeezed track
-              // leaves it hanging over the center rather than cropping it.
-              style={{ width: Math.max(cols.details, DETAILS_DEFAULT) }}
-              data-open={cols.details > 0 || undefined}
-            >
-              {panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
-                <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
-              )}
-            </div>
-          </DetailsColumn>
-        )}
+      {overlayPanels && <div className={css.scrim} data-open={detailsOpen || undefined} aria-hidden onClick={dismissRightbar} />}
+      <DetailsColumn>
+        {renderSlot('rightbar', {
+          width: overlayPanels ? Math.min(viewport, DETAILS_DEFAULT) : Math.max(cols.details, DETAILS_DEFAULT),
+          viewportWidth: viewport,
+          canShow: overlayPanels || computeColumns(viewport, sidebarPreference, panels.details || DETAILS_DEFAULT).details > 0,
+          ...(panels.detailsSessionId === undefined ? {} : { targetSessionId: panels.detailsSessionId }),
+        })}
+      </DetailsColumn>
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>
       {/* The collapsed rail is fixed-width and the compact drawer is not a
           column: resize handles belong to the wider modes only. */}
       {mode !== 'compact' && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {cols.details > 0 && !panels.rightbarFullscreen && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
     </div>
   )
 }

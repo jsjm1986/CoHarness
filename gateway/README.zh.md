@@ -7,7 +7,8 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 ## 工具链
 
 - **Node 25**（`.nvmrc`；dsh 仓库 engines `^22.19 || >=24` 亦兼容）。`better-sqlite3` 与 `argon2` 是原生模块，ABI 绑定安装时的 Node 大版本——切换 Node 后运行 `npm rebuild better-sqlite3 argon2`，否则报 `NODE_MODULE_VERSION` 不匹配。
-- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（vitest）、`npm run typecheck`。
+- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（单元测试）、`npm run typecheck`。`HGW_TEST_DATABASE_URL` 为 `npm run test:postgres` 指定可丢弃数据库；PostgreSQL 套件串行执行并替换 `harness` schema。CI 执行这两个测试命令。
+- 托管执行：在仓库根目录，将 `HGW_TEST_DATABASE_URL` 指向可丢弃的 PostgreSQL 数据库，再运行 `pnpm run test:gateway:execution`。它需要工作区和 Gateway 运行时依赖，通过真实 Loader 和 HTTP 授权验证，无需模型 API Key；CI 在 Gateway 相关变更时于现有消费者任务中执行它。
 
 `npm run build` 会把 Gateway 源码图生成到 `lib/`，并将相对导入改写为 `.js`；生产 supervisor 必须在同一个 release 目录中执行 `node lib/index.js`。源码 `tsx` 入口只用于开发和测试。
 
@@ -31,8 +32,11 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PROJECT_RUNTIME_USER` | `harness-project` | 项目 scope systemd 单元使用的专用 Linux 账户 |
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | 用于签发浏览器请求 principal 的仅所有者可读 Ed25519 密钥对 |
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
+| `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 秒 | 持久授权变更的兜底读取及重连间隔；通知与请求准入也会触发读取 |
+| `HGW_EXECUTION_WATCH_HEARTBEAT_MS` | 15 秒 | 运行时执行监视流的存活帧间隔；必须为正数且不超过 2,147,483,647 毫秒 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
+| `HGW_WEBHOOK_SECRET_KEY_FILE` | `~/.harness-gateway/webhook-secrets.key` | 用于加密 Webhook 端点签名密钥的仅所有者可读 AES-GCM 密钥 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
 | `HGW_ARCHIVE_RETENTION_DAYS` | 30 | 归档进入回收站后自动清理前的可恢复天数 |
 | `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔，最大 2,147,483,647 毫秒 |
@@ -74,6 +78,18 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 Admin 的**归档**频道从 Gateway 归档索引列出组织级根对话。它支持按状态、标题／正文／Session ID、用户和项目筛选，打开以聊天方式展示、并把完整事件收进可折叠技术详情的分页阅读器，导出 JSON，并通过确认弹窗批量恢复、移入回收站或永久清理。个人正文仍由所属运行时保存并按需读取；项目正文使用 PostgreSQL。每次查看、导出和变更都会写入审计，但审计行不复制消息正文；运行时归档快照携带 revision，Admin 离线变更会在运行时恢复后对账。
 
+## 插件管理
+
+`/admin/plugins` 选择当前节点上已有的运行实例，适配上游管理流程，支持包检查、安装、脚本批准、取消、启停和移除。节点或代次不匹配时必须重新读取选择。页面不会启动已停止的实例。安装输出仅留在管理员请求中；传输丢失意味着结果未确认，不会自动重试。已注册的非账户设置以配置卡片呈现，继续使用现有设置所有者。表单显示解析值、继承值、归属和重启要求，只携带当前版本提交已编辑路径。秘密需明确选择保留、替换或移除本层值，绝不读回原值。发生冲突时保留草稿，管理员放弃后才能采用当前值。账户偏好仍在账户设置中管理。明确失去权限会清除私有操作流程及日志；旧目标迟到的响应不能使新目标失效。
+
+干净的 Admin 检出需要根目录和 Admin 的锁定依赖。独立测试或构建前执行 `npm run prepare:remotes --prefix gateway/admin-ui`；完整根构建已经生成这两个 codec。浏览器门禁在共享运行时构建后构建 Admin 产物，并通过真实 Gateway 路由比较[安装区域快照](../apps/web/tests/plugin-administration.e2e.ts)。
+
+## 用户终端
+
+`/admin` 的**终端**页管理带版本的用户和项目资格。个人终端需要用户资格；项目终端还需要项目授权及可写成员身份。Session 访问权限继续独立检查。资格撤销会停止保留进程并等待清理；Agent 权限选择和 Auto 资格不会授予终端访问权。
+
+选择用户或项目后，可以列出当前节点上的终端身份、Session、创建者和进程状态。读取清单不会启动空闲 runtime。管理员可以明确关闭已经审阅的条目，但不能读取输出或发送输入。关闭绑定节点和 runtime 代次；重启后必须重新读取清单。清理失败保持可见，可以刷新和重试。[终端控制器](../packages/api/terminal-controller/README.zh.md)负责进程生命周期和浏览器恢复。
+
 ## Android 薄壳与完成通知
 
 `apps/android-shell` 是通过 `DSH_ANDROID_WEB_URL` 加载已部署 Web UI 的 Capacitor 薄壳。普通 Web UI 修改直接发布到 Gateway，不需要重建 APK。只有原生工程、权限、包名、图标或通知处理逻辑变化时，才重新执行 `pnpm --dir apps/android-shell run cap:sync` 并构建。应用包名固定为 `com.coharness`。
@@ -92,6 +108,18 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。个人 runtime 暂时不可用时，Gateway 仍会返回已有的 ACL 过滤账户记录，个人启动失败不会隐藏项目对话。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
+
+Auto 审查资格是每个用户独立的管理员授权（`autoReviewEligible`），普通用户与管理员的初始值均为 false。用户列表和编辑对话框在桌面与手机布局中展示该资格。只有管理员可以通过 `/admin/api/users/:id` PATCH 修改它，且要求严格的布尔值、审计记录和跨 Gateway 访问失效通知。授予资格不会启用 Auto，不会改变当前 Session，也不会改变新会话的默认权限；项目访问继续使用既有成员权限与对话 ACL。详见[管理员所有的资格记录](../.agents/notes/implemented/bug-fix/2026-09-22-admin-auto-review-eligibility.zh.md)。
+
+桌面资格独立于 Auto 和模型权限。桌面协调页通过 `/admin/api/desktops/permissions` 编辑用户与项目授权，未配置时默认拒绝。保存携带版本并拒绝并发覆盖。执行侧 `desktop` 能力要求每位已核验参与者具备资格；项目中还要求项目授权及可写成员身份，管理员也不能绕过。修改通过访问失效 outbox 发布。运行时仅当节点通过 `HGW_DESKTOP_ID` 声明交互桌面时才携带桌面驱动：启动组合随之挂载 computer-use 服务与已配置的 Cua Driver MCP 提供者，已配置的[执行提供者](../packages/context/gateway-execution/README.zh.md) 发布负责驱动准入的托管策略。资格本身既不提供根会话确认，也不提供桌面租约。
+
+桌面确认按实际活动根会话单独记录，并绑定已认证用户、当前节点、运行时代次及精确桌面。迁移 033 将其绑定到当前用户和项目资格版本。撤销确认会发布访问失效通知；撤销资格后重新授予仍需再次确认。私有执行 API 拒绝调用者提供参与者和节点。桌面租约归属绑定已认证运行时代次和实际活动根；经过验证的子会话共享该根，其他根不能续租、释放或确认其租约已停止。协调端从服务器取得节点和参与者，不复用浏览器断言。撤权后精确持有者仍可清理；获取、状态查询及续租则要求当前资格和确认。
+
+执行授权使用 PostgreSQL 保存的已认证消息输入和问题回答的精确记录。来源记录 ID 只证明来源，不授予权限；参与者元数据与调用方提交的角色都不能赋权。编辑保留先前发起人，Session 发起人集合在不同步骤与相邻父子交换中只增不减。每次授权都会检查每位发起人的当前账户与 Session 写权限；插件管理还要求每位发起人都是管理员，Auto 则要求每位发起人都获得资格授权。未知历史输入会永久拒绝这两项特权能力，而普通执行仍要求有已验证且可写的发起人。显式模式选择检查选择者与现有发起人，但不增加发起人。个人正文仍在 JSONL 中保存；登记其运行时作用域内的谱系不会赋权。
+
+私有执行 API 随精简的来源记录 ID 集合和主发起人返回单调递增的十进制 `revision`。其 `capture` 操作可在撤权后读取这些事实，但不授予执行权限。空的历史继承必须显式声明未知历史，且发送方集合确实为空；不能遗漏已记录的发起人。重放已消费输入、初始继承或接收消息不会重设后续归因。父子传递会验证捕获的主发起人属于所选来源记录，并保留该归因；发送方的后续输入不会改变它。
+
+运行时监视连接接收 `ready`、失效提示和按配置发送的心跳帧；连接关闭或背压会释放订阅与计时器。数据库监听连接丢失会关闭这些流；在监控器重连、补读并完成待处理的本机取消前，新监视请求返回 `503`。监视通知不证明远端任务已经停止；运行时负责取消与重新授权。
 
 Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scope 的 Host 操作最多在 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 内使用已签名模式（默认 30 秒），长连接 stream 会在 principal 过期时断开。删除项目时，Gateway 会在该运行时的串行操作槽内停止共享运行时，再由 PostgreSQL 级联删除项目所属的运行时与协作记录；项目目录仍保留在磁盘上。
 
@@ -115,11 +143,29 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 
 ## PostgreSQL 控制面
 
+管理员通过管理端或 `/admin/api/webhook-endpoints`（`POST`、`POST …/update`、`POST …/mutate`，支持 `enable`/`disable`/`remove`）注册 Webhook 端点。新端点处于停用状态、对受理请求返回 404，需管理员显式启用后才接收投递。每个端点绑定 Provider（`github`）、以 `HGW_WEBHOOK_SECRET_KEY_FILE` 加密的只写签名密钥、执行账号、个人或项目运行时目标、事件与动作筛选、按 `owner/repo` 完整名与载荷 `repository.full_name` 做大小写不敏感匹配的结构化仓库筛选、`{{path}}` 标题与提示词模板以及接收限值。Provider 向公开的 `POST /webhook/<端点号>` 路由投递；网关先按存储密钥验证签名，再做持久去重，通过的投递被派发到目标运行时的受管 `webhook-dispatch` 路由，每次投递受理一个会话。管理员可查询 `/admin/api/webhook-deliveries?endpointId=<uuid>`，并使用可选的 `cursor` 与 `limit`（1–100，默认 50）。响应提供有界的投递回执，不包含事件载荷或秘密。`submitted` 表示提示词已接收，不表示 Agent 成功；`ignored` 表示配置的事件、动作或仓库筛选排除了该投递，回执的错误代码指明未命中的规则；`unknown` 阻止自动重新派发。已落定的回执可由管理员通过 `POST /admin/api/webhook-deliveries/redispatch` 重跑，按端点当前配置生成一条有审计的新回执。预留服务分别接收受理限流窗口和正文防重放窗口。窗口内的相同正文在跨节点间共用一个回执，所有已见投递 ID 在窗口过期后仍绑定该回执。派发中或结果未知时，窗口之外的自动重复请求也会被阻止。
+
 钉死版本的 PostgreSQL 17 部署位于 [`deploy/postgres/`](deploy/postgres/README.zh.md)。Gateway 入口会应用其不可变 migration，并在配置的活跃企业与计算节点无法解析时拒绝监听。认证、用户、账户偏好、项目、个人/项目实例、共享项目对话、协作抢占、审计、模型治理、项目 Provider 配置与加密凭据、额度和用量都由 PostgreSQL 支撑。内部 UUID 保留企业外键，数字公共 ID 保持现有 HTTP API 稳定。SQLite 只保留为停止写入后的最终导入源和回滚备份；运行中的 Gateway 不会打开它。
 
 每次调用都会先以 UUID 写入运行时本地的崩溃安全 outbox。仅回环的 intake 在 PostgreSQL 中按 UUID 去重，按调用时间选择生效价格版本，并根据非秘密凭据来源标签归属公司成本（`file`/`project-env`/`request` 为个人，启动环境来源为公司，未知来源按公司成本保守计入）。账本不写 API Key、提示词或回复内容。自然月使用 `HGW_USAGE_TIME_ZONE`；Token 与公司成本额度支持角色默认、按用户继承/不限/自定义，以及项目继承或显式额度。额度只在 80% 和 100% 提醒，不阻断调用。账务归属始终只属于一个用户或项目；共享项目记录在可确认时额外保存已验证的参与者 ID，用于非计费活动分析；无法还原的历史项目记录保持未归属。用户在 Web shell 看到持久阈值提醒；管理员看到分开的个人、项目和贡献者汇总、缺失计量次数以及明确的价格覆盖状态。
 Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview`、`/admin/api/usage/contributors` 与 `/admin/api/usage/health`；贡献者行只是活动投影，绝不会加到项目账务总量中。归档身份仍会保留在 overview 中，使历史个人用量与已确认的项目活动能够继续和主体总量对账。
 个人 settings 变化会使用同一套已鉴权 outbox，并以 `model-registration` 类型记录。Gateway 将 Provider/model 的新增、修改和删除与用量分开保存，并在管理员 Models 页面提供查询；记录只包含路由身份和时间戳。
+
+## 部署维护与协调恢复
+
+升级与恢复是受控操作，而不是只依赖启动迁移或 `deploy/postgres` 的 shell 脚本。`harness.cluster_control` 每个组织一行：模式（`serving`/`maintenance`/`restoring`）、节点必须确认的维护纪元、围栏陈旧写者的写纪元、以及操作员备注。`harness.deployment_operations` 是操作台账；`harness.backup_records` 登记每个转储及其受管文件清单、验证状态和取材时的写纪元。每个计算节点在 `maintenance_applied_epoch` 上报已应用的维护纪元；心跳新鲜但未确认当前纪元的节点计为活跃写者，被声明为 `offline` 的节点不计入——若它继续心跳则回到 `active`。
+
+维护窗口开启时，Gateway 以 503（`maintenance`）拒绝所有变更类 HTTP 与 runtime 调用；恢复完成后推进的写纪元会让每个在恢复前启动的进程被拒绝（`stale-epoch`）。管理员在管理端 Deployment 页或 `/admin/api/deployment*` 驱动窗口（集群状态、进入/退出维护、节点排空、恢复请求、备份创建/列出/验证）；状态变更请求全部审计。独立应用器 `pnpm pg:deploy <status|maintenance enter|maintenance exit|apply|backup|restore|restart-plan>`（`scripts/deploy-apply.ts`）在服务进程之外执行受控序列：认领待处理的管理端恢复请求、等待写者静止、在窗口内应用迁移、转储数据库并快照受管文件（principal 密钥、runtime 凭据、治理与 webhook 密钥、bootstrap 密码文件）、校验转储与全部清单摘要后再原子恢复文件、并输出滚动重启顺序。`HGW_PGDUMP_COMMAND`/`HGW_PGRESTORE_COMMAND` 配置 pg 客户端命令行——包括 `docker exec` 形式——`HGW_BACKUP_DIR` 选择产物目录。转储恢复会把 cluster control 行回滚，因此应用器在完成前重新断言 restoring 窗口；`completeRestore` 随后单调推进写纪元，使恢复前基线的写者自我围栏出局。
+
+## 跨 Gateway 撤权
+
+现有账号、项目、对话、归档或文档的访问权限变更提交后，组织内每个 Gateway 都会终止对应主体正在代理的 HTTP 响应和 WebSocket。新请求先补读持久授权记录，再在运行时准入后复核登录和项目权限。目录授权变更还会停止受影响的本地运行时，使其下次启动时读取当前授权。新建 Session／文档登记、消息追加、统计和登录过期时间的滑动续期不会终止流量。
+
+PostgreSQL 监听连接丢失时会关闭已准入的代理流量。重连等待取消完成并补读遗漏记录，再允许新流量；签名 principal 过期仍是额外的限制。冷启动 Gateway 从计算节点已成功应用的运行时版本继续处理；已有进程重连时保留自己的游标。保留 `harness.outbox` 中的 `access.invalidate` 记录，包括已设置 `completed_at` 的记录：它们是重放历史，不是可删除的任务队列。版本缺口会阻断就绪检查和代理准入。[决策记录](../.agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.zh.md)说明事务顺序、留存和成本。
+
+运行时事件流在每批发布前复核 Session 可见性。清除浏览器已经持有的内容仍由 Client 单独负责。关闭某位参与者的传输连接不能证明共享项目运行时中该参与者已启动的模型／工具任务已经停止；参与者拥有的任务取消需要独立验证。
+
+指定作用域的文档下载在授权前订阅同一访问监控器，并保持订阅直到响应读取和运行时占用释放结束。撤权会阻止后续字节，不能收回已经交付的字节。较慢的运行时停止不会延后下载取消。清理失败会被报告并阻止撤权确认，不会被当作成功释放。普通元数据和上传登记不会建立下载取消订阅。
 
 ## 目录强制的分层
 

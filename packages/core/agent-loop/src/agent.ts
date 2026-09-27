@@ -177,7 +177,7 @@ export class ReactLoopAgent implements Agent {
 
   runMaintenance<T>(job: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (this.phase.kind !== 'idle') throw new Error(`agent "${this.id}" already has active work`)
-    const done = Promise.withResolvers<void>()
+    const done = Promise.withResolvers<undefined>()
     const maintenance: Phase = {
       kind: 'maintenance',
       abort: new AbortController(),
@@ -197,7 +197,7 @@ export class ReactLoopAgent implements Agent {
           const cause = maintenance.abort.signal.reason as AgentCancelCause | undefined
           if (cause?.kind !== 'disposed' && maintenance.wakeRequested && this.inbox.hasPending) this.wakeDriver()
         } finally {
-          done.resolve()
+          done.resolve(undefined)
         }
       }
     })()
@@ -222,7 +222,7 @@ export class ReactLoopAgent implements Agent {
       }
       return
     }
-    const driver = Promise.withResolvers<void>()
+    const driver = Promise.withResolvers<undefined>()
     this.activityDone = driver.promise
     this.setPhase({
       kind: 'running',
@@ -238,10 +238,10 @@ export class ReactLoopAgent implements Agent {
       // withInitiator rejects synchronously only when its scope is closing;
       // kick is async. No driver started, so teardown can finish quiescence.
       this.setPhase({ kind: 'idle', lastTurn: this.phase.lastTurn })
-      driver.resolve()
+      driver.resolve(undefined)
       return
     }
-    void task.then(driver.resolve, driver.reject)
+    void task.then(() => { driver.resolve(undefined) }, driver.reject)
   }
 
   async whenIdle(): Promise<void> {

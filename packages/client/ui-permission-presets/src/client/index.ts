@@ -13,7 +13,9 @@
  * The General-settings row separately writes the default preset for sessions
  * created later through the host Settings API.
  */
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import { DesktopConfirmationAction, type DesktopConfirmationInjected } from './DesktopConfirmationAction.tsx'
+import { desktopEn, desktopZh } from './desktop-locales.ts'
+import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the settings slot types (this package registers a General row).
@@ -22,6 +24,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // (the settings invalidation rides the allowlist) into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ClientContext, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
+import { permissionAvailabilitySource, permissionUnavailableReason, type PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type { CommandUiContract, SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { PermissionCatalog, PermissionSelection } from '@deepseek-ai/dsh-permission-presets/client'
@@ -51,26 +54,33 @@ function selectOf(session: SessionFace | undefined): PermissionSelection | undef
 }
 
 /** Flatten the catalog + current selection into popup rows; `custom` is display state, never a target. */
-function optionsOf(value: PermissionSelection, catalog: PermissionCatalog, t: (key: string) => string): SelectOption[] {
+function optionsOf(
+  value: PermissionSelection, catalog: PermissionCatalog, availability: PermissionAvailability, t: (key: string) => string,
+): SelectOption[] {
   return catalog.options
     .filter(option => option.value !== 'custom')
-    .map(option => ({
-      id: option.value,
-      label: localizedPermissionPreset(option.value, option.name, key => t(key)),
-      ...(option.description !== undefined ? { detail: option.description } : {}),
-      ...(option.value === value.currentValue ? { active: true } : {}),
-      ...(option.value === FULL_ACCESS_PRESET
-        ? {
-          confirmation: {
-            title: t('confirm.title'),
-            description: t('confirm.description'),
-            acknowledgeLabel: t('confirm.acknowledge'),
-            cancelLabel: t('confirm.cancel'),
-            confirmLabel: t('confirm.enable'),
-          },
-        }
-        : {}),
-    }))
+    .map((option) => {
+      const reason = permissionUnavailableReason(option.value, availability)
+      return {
+        id: option.value,
+        label: localizedPermissionPreset(option.value, option.name, key => t(key)),
+        ...(reason === undefined
+          ? option.description === undefined ? {} : { detail: option.description }
+          : { disabled: true, detail: `${option.value === value.currentValue ? `${t('currentUnavailable')} ` : ''}${t(`unavailable.${reason}`)}` }),
+        ...(option.value === value.currentValue ? { active: true } : {}),
+        ...(option.value === FULL_ACCESS_PRESET && reason === undefined
+          ? {
+            confirmation: {
+              title: t('confirm.title'),
+              description: t('confirm.description'),
+              acknowledgeLabel: t('confirm.acknowledge'),
+              cancelLabel: t('confirm.cancel'),
+              confirmLabel: t('confirm.enable'),
+            },
+          }
+          : {}),
+      }
+    })
 }
 
 /**
@@ -87,6 +97,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     const disposers = [
       ctx.locale.register(ACCESS_NS, 'zh', {
+        'currentUnavailable': accessZh['currentUnavailable'],
+        'unavailable.unverified': accessZh['unavailable.unverified'],
+        'unavailable.admin-required': accessZh['unavailable.admin-required'],
+        'unavailable.auto-ineligible': accessZh['unavailable.auto-ineligible'],
         'preset.readOnly': accessZh['preset.readOnly'],
         'preset.workspaceWrite': accessZh['preset.workspaceWrite'],
         'preset.fullAccess': accessZh['preset.fullAccess'],
@@ -97,6 +111,10 @@ export function apply(ctx: ClientContext): void {
         'confirm.enable': accessZh['confirm.enable'],
       }),
       ctx.locale.register(ACCESS_NS, 'en', {
+        'currentUnavailable': accessEn['currentUnavailable'],
+        'unavailable.unverified': accessEn['unavailable.unverified'],
+        'unavailable.admin-required': accessEn['unavailable.admin-required'],
+        'unavailable.auto-ineligible': accessEn['unavailable.auto-ineligible'],
         'preset.readOnly': accessEn['preset.readOnly'],
         'preset.workspaceWrite': accessEn['preset.workspaceWrite'],
         'preset.fullAccess': accessEn['preset.fullAccess'],
@@ -113,31 +131,39 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(ACCESS_NS)
   const sessionFor = (session: ClientSessionContext): SessionFace | undefined =>
     sessions.binding(session.sessionId)?.session
+  const availabilityFor = (session: ClientSessionContext) => permissionAvailabilitySource(
+    ctx.get('projectUiPolicy'), sessions.binding(session.sessionId)?.hostDescription,
+  )
 
-  // The option table is process-wide: fetch it once and drop the cache only
-  // on the host's catalog-changed signal, which the allowlist forwards.
-  let catalogCache: PermissionCatalog | undefined
-  const catalog = async (): Promise<PermissionCatalog> => {
-    if (catalogCache === undefined) {
-      const result = await ctx.remote.permissionPresets.catalog()
-      if (!result.ok) throw new Error(`permission catalog read failed: ${result.error.code}: ${result.error.message}`)
-      catalogCache = result.value
-    }
-    return catalogCache
+  // The runtime-owned directory is the one catalog owner: each Session reads
+  // the mirror of its own runtime's connection, so a stale or foreign host's
+  // table can never publish here.
+  const catalog = async (session: ClientSessionContext): Promise<PermissionCatalog> => {
+    const directory = ctx.get('permissionCatalog')
+    if (directory === undefined) throw new Error('permission catalog read failed: the connected host serves no permission presets')
+    return directory.forSession(session.sessionId).read()
   }
-  ctx.remote.$on('permission-presets/catalog-changed', () => { catalogCache = undefined })
 
   ctx.effect(() => ctx.locale.register('settings.permission', { zh, en }), 'ui-permission: settings row dictionaries')
 
   const connection = ctx.get('connection') as ConnectionHandle
+  ctx.effect(() => ctx.locale.register('permission.desktop', { zh: desktopZh, en: desktopEn }), 'permission: desktop confirmation copy')
+  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
+    name: 'conversation.input.left', id: 'desktop-confirmation', locale: 'permission.desktop',
+    inject: (sessionId: SessionId): DesktopConfirmationInjected => ({ connection: connection.forSession?.(sessionId) ?? connection }),
+  }, DesktopConfirmationAction))
+  const defaultAvailability = permissionAvailabilitySource(ctx.get('projectUiPolicy'), connection.hostDescription)
   // The row follows the shared describe mirror, whose owning plugin already
   // refreshes it on document commits and reconnects.
   const controller = new PermissionPresetSettingsController(
-    ctx.settingsScope.describe(), connection.api, ctx.settingsSchema)
+    ctx.settingsScope.describe(), connection.api, ctx.settingsSchema, (preset) => {
+      const reason = permissionUnavailableReason(preset, defaultAvailability.getSnapshot())
+      if (reason !== undefined) throw new Error(t(`unavailable.${reason}`))
+    })
   const load = (): Promise<void> => controller.load()
   const select = (preset: string): Promise<void> => controller.select(preset)
   const injected = (): PermissionRowInjected => ({
-    hooks: { permission: controller.store },
+    hooks: { permission: controller.store, permissionAvailability: defaultAvailability },
     load,
     select,
   })
@@ -163,9 +189,21 @@ export function apply(ctx: ClientContext): void {
       options: async (session) => {
         const value = selectOf(sessionFor(session))
         if (value === undefined) throw new Error('permission presets are not available on this host')
-        return optionsOf(value, await catalog(), t)
+        const options = await catalog(session)
+        return optionsOf(value, options, availabilityFor(session).getSnapshot(), t)
+      },
+      // Eligibility changes and the owning runtime's catalog invalidations
+      // both withdraw the displayed options.
+      subscribeInvalidation: (session, listener) => {
+        const stopAvailability = availabilityFor(session).subscribe(listener)
+        const stopCatalog = ctx.get('permissionCatalog')
+          ?.forSession(session.sessionId)
+          .subscribeInvalidations(listener)
+        return () => { stopAvailability(); stopCatalog?.() }
       },
       onSelect: async (option, session) => {
+        const reason = permissionUnavailableReason(option.id, availabilityFor(session).getSnapshot())
+        if (reason !== undefined) throw new Error(t(`unavailable.${reason}`))
         const live = sessionFor(session)
         if (live === undefined) throw new Error('this session is not materialized yet')
         const result = await live.command(`/permission ${option.id}`)

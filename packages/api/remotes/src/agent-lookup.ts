@@ -4,7 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
-import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
+import { TypertLookupFailure, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-typert-registry'
 
 /** Caller-facing failures preserved by the Gateway's RPC adapter. */
@@ -12,6 +12,12 @@ export type ApiRemoteLookupError =
   | { readonly code: 'agent-busy'; readonly message: string; readonly details: { readonly reason: string } }
   | { readonly code: 'session-not-found'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
   | { readonly code: 'session-writer-held'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
+  /**
+   * The session's durable execution binding (a managed SSH target) could not
+   * be re-qualified for the joining caller — same wire code the managed
+   * authorization service raises for a refused resolve.
+   */
+  | { readonly code: 'ssh/forbidden'; readonly message: string; readonly details: Record<never, never> }
   | { readonly code: 'internal'; readonly message: string; readonly details: Record<never, never> }
 
 /** Result of resolving one session identity to its live Agent. */
@@ -37,6 +43,16 @@ export interface ApiRemoteAgentOptions {
   readonly setup?: (
     session: { meta: SessionHeader; events: readonly SessionEvent[] },
   ) => AgentSetup | Promise<AgentSetup>
+  /**
+   * Re-qualify a live Agent for the joining caller before it is handed out.
+   * Sessions carrying a durable execution binding were admitted under the
+   * FIRST joiner's grant, so a later caller — including the same caller after
+   * revocation — must pass its own admission again rather than inherit the
+   * mount.
+   * @param agent - the live Agent about to be reused.
+   * @returns a caller-facing refusal, or undefined when admission stands.
+   */
+  readonly liveAdmission?: (agent: Agent) => Promise<ApiRemoteLookupError | undefined>
 }
 
 /** Cold identity absent from the durable session store. */
@@ -137,17 +153,19 @@ export function createApiRemoteAgentResolver(
 } {
   const resumes = new Map<SessionId, Promise<Agent>>()
 
-  const fencedLiveAgent = (sessionId: SessionId): ApiRemoteAgentResult | undefined => {
+  const fencedLiveAgent = async (sessionId: SessionId): Promise<ApiRemoteAgentResult | undefined> => {
     const live = ctx.agents.get(sessionId)
     if (live === undefined) return undefined
     if (hasApiRemoteSubagentOwner(ctx, live.session, live)) {
       return { error: apiRemoteSubagentOwnershipError(sessionId) }
     }
+    const refusal = await options.liveAdmission?.(live)
+    if (refusal !== undefined) return { error: refusal }
     return { agent: live }
   }
 
   const agentFor = async (sessionId: SessionId): Promise<ApiRemoteAgentResult> => {
-    const fenced = fencedLiveAgent(sessionId)
+    const fenced = await fencedLiveAgent(sessionId)
     if (fenced !== undefined) return fenced
     const attached = ctx.sessions.get(sessionId)
     if (attached !== undefined && hasApiRemoteSubagentOwner(ctx, attached, undefined)) {
@@ -188,7 +206,7 @@ export function createApiRemoteAgentResolver(
       const agent = await resume
       // A shared resume can publish an identity that subagent routing adopts
       // before every waiter observes it; apply the live ownership policy again.
-      const published = fencedLiveAgent(sessionId)
+      const published = await fencedLiveAgent(sessionId)
       return published ?? { agent }
     } catch (error: unknown) {
       if (error instanceof ApiRemoteSessionNotFound) {
@@ -197,7 +215,7 @@ export function createApiRemoteAgentResolver(
       if (error instanceof ApiRemoteSubagentSessionOwnership) {
         return { error: apiRemoteSubagentOwnershipError(error.sessionId) }
       }
-      const fenced = fencedLiveAgent(sessionId)
+      const fenced = await fencedLiveAgent(sessionId)
       if (fenced !== undefined) return fenced
       const attached = ctx.sessions.get(sessionId)
       if (attached !== undefined && hasApiRemoteSubagentOwner(ctx, attached, undefined)) {
@@ -207,6 +225,15 @@ export function createApiRemoteAgentResolver(
       // copies, so identity by constructor is not guaranteed.
       if (error instanceof Error && error.name === 'SessionAlreadyOwnedError') {
         return { error: { code: 'session-writer-held', message: error.message, details: { sessionId } } }
+      }
+      // A cold resume re-runs the caller's SSH admission inside setup; its
+      // refusal must stay typed or callers cannot tell denial from failure.
+      // The 'ssh/forbidden' code lives in dsh-ssh's RemoteErrorDetailsMap
+      // augmentation, which this package does not import — widen to string.
+      const remote = remoteErrorOf(error)
+      const remoteCode: string | undefined = remote?.code
+      if (remoteCode === 'ssh/forbidden' && remote !== undefined) {
+        return { error: { code: 'ssh/forbidden', message: remote.message, details: {} } }
       }
       return {
         error: {

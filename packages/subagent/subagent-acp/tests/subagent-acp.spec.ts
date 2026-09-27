@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import type { SubprocessOutcome } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessHandle, SubprocessOutcome } from '@deepseek-ai/dsh-subprocess'
 import * as acp from '../src/index.ts'
 import { acpStopReason, acpContentText, DEFAULT_DISPOSE_EOF_GRACE_MS, DEFAULT_DISPOSE_GRACE_MS, disposeAcpChild, startAcpRun, toAcpPrompt, type AcpRunSpec } from '../src/run.ts'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -88,6 +88,21 @@ async function waitForFile(file: string, timeoutMs = 5000): Promise<void> {
   }
 }
 
+/** Fail one provider observation while keeping its real termination and final exit proof. */
+function failFirstExitObservation(child: SubprocessHandle, failure: Error): SubprocessHandle {
+  let failed = false
+  return new Proxy(child, {
+    get(target, property, receiver): unknown {
+      if (property === 'waitForExit') return (signal?: AbortSignal) => {
+        if (failed) return target.waitForExit(signal)
+        failed = true
+        return Promise.reject(failure)
+      }
+      return Reflect.get(target, property, receiver) as unknown
+    },
+  })
+}
+
 describe('acpStopReason', () => {
   it('maps each ACP stop reason to the harness vocabulary', () => {
     expect(acpStopReason('end_turn')).toBe('completed')
@@ -160,6 +175,19 @@ describe('child env layering (through the subprocess seam)', () => {
 })
 
 describe('disposeAcpChild (the backend-owned teardown ladder over seam verbs)', () => {
+  const children: { child: SubprocessHandle; root: string }[] = []
+  afterEach(async () => {
+    const owned = children.splice(0)
+    await Promise.all(owned.map(async ({ child, root }) => {
+      child.terminate()
+      try {
+        await child.waitForExit()
+        await child.done
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    }))
+  })
   const node = (source: string, stdin: 'pipe' | 'ignore' = 'pipe') => spawnSubprocess({
     argv: [process.execPath, '--input-type=module', '--eval', source],
     cwd: process.cwd(),
@@ -174,6 +202,101 @@ describe('disposeAcpChild (the backend-owned teardown ladder over seam verbs)', 
       expect(outcome.signal).toBe(posixSignal)
     }
   }
+
+  const ownedRunningChild = (): { child: SubprocessHandle; ready: string } => {
+    const root = mkdtempSync(join(tmpdir(), 'acp-observation-failure-'))
+    const ready = join(root, 'ready')
+    const child = node(`import { writeFileSync } from 'node:fs'; process.stdin.resume(); writeFileSync(${JSON.stringify(ready)}, 'ready'); setInterval(() => {}, 60_000)`)
+    children.push({ child, root })
+    return { child, ready }
+  }
+
+  it('terminates after an observation failure and preserves it only after the final exit wait settles', async () => {
+    const { child, ready } = ownedRunningChild()
+    await waitForFile(ready)
+    const observationFailure = new Error('cooperative exit observation failed')
+    const enteredFinalWait = Promise.withResolvers<undefined>()
+    const releaseFinalWait = Promise.withResolvers<undefined>()
+    let waits = 0
+    let settled = false
+    const handle = new Proxy(child, {
+      get(target, property, receiver): unknown {
+        if (property === 'waitForExit') return async (signal?: AbortSignal) => {
+          if (++waits === 1) throw observationFailure
+          enteredFinalWait.resolve(undefined)
+          await releaseFinalWait.promise
+          return target.waitForExit(signal)
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    const disposal = disposeAcpChild(handle, 1000).then(
+      () => { settled = true; return undefined },
+      (error: unknown) => { settled = true; return error },
+    )
+    try {
+      expect(await Promise.race([
+        enteredFinalWait.promise.then(() => 'waiting'),
+        disposal.then(() => 'settled'),
+      ])).toBe('waiting')
+      expect(settled).toBe(false)
+      expectHostTermination(await child.done, 'SIGTERM')
+      releaseFinalWait.resolve(undefined)
+      expect(await disposal).toBe(observationFailure)
+      expect(waits).toBe(2)
+      expect(await child.waitForExit()).toBe(true)
+    } finally {
+      releaseFinalWait.resolve(undefined)
+      await disposal
+    }
+  })
+
+  it('retains both observation failures after terminating the real child', async () => {
+    const { child, ready } = ownedRunningChild()
+    await waitForFile(ready)
+    const first = new Error('cooperative observation failed')
+    const final = new Error('final observation failed')
+    let waits = 0
+    const handle = new Proxy(child, {
+      get(target, property, receiver): unknown {
+        if (property === 'waitForExit') return async () => {
+          if (++waits === 1) throw first
+          await target.waitForExit()
+          throw final
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    const failure: unknown = await disposeAcpChild(handle, 1000).catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(AggregateError)
+    expect((failure as AggregateError).errors).toEqual([first, final])
+    expectHostTermination(await child.done, 'SIGTERM')
+    expect(await child.waitForExit()).toBe(true)
+  })
+
+  it('does not treat a rejected command outcome as proof that its process range has exited', async () => {
+    const { child, ready } = ownedRunningChild()
+    await waitForFile(ready)
+    const providerFailure = new Error('command observation failed while the range is live')
+    const done = Promise.reject(providerFailure)
+    void done.catch(() => {})
+    let waits = 0
+    const handle = new Proxy(child, {
+      get(target, property, receiver): unknown {
+        if (property === 'done') return done
+        if (property === 'waitForExit') return (signal?: AbortSignal) => {
+          waits++
+          return target.waitForExit(signal)
+        }
+        return Reflect.get(target, property, receiver) as unknown
+      },
+    })
+    await disposeAcpChild(handle, 50)
+    expect(waits).toBe(2)
+    expectHostTermination(await child.done, 'SIGTERM')
+    await expect(handle.done).rejects.toBe(providerFailure)
+    expect(await child.waitForExit()).toBe(true)
+  })
 
   it('tier 1: a cooperative child exits on stdin EOF without any signal', async () => {
     const child = node('process.stdin.resume(); process.stdin.on("end", () => process.exit(0))')
@@ -613,12 +736,7 @@ describe('dsh-subagent-acp', () => {
         env: { MOCK_NEWSESSION_READY: ready, MOCK_NEWSESSION_GO: go, MOCK_TEXT: 'never read' },
         disposeEofGraceMs: 1000,
         disposeGraceMs: 100,
-        spawn: spec => new Proxy(spawnSubprocess(spec), {
-          get(target, property, receiver): unknown {
-            if (property === 'waitForExit') return async () => { throw cleanupFailure }
-            return Reflect.get(target, property, receiver) as unknown
-          },
-        }),
+        spawn: spec => failFirstExitObservation(spawnSubprocess(spec), cleanupFailure),
         onError: (error) => { errors.push(error) },
       })
       await waitForFile(ready)
@@ -646,12 +764,7 @@ describe('dsh-subagent-acp', () => {
         env: { MOCK_MISSING_SESSION_ID: '1' },
         disposeEofGraceMs: 1000,
         disposeGraceMs: 100,
-        spawn: spec => new Proxy(spawnSubprocess(spec), {
-          get(target, property, receiver): unknown {
-            if (property === 'waitForExit') return async () => { throw cleanupFailure }
-            return Reflect.get(target, property, receiver) as unknown
-          },
-        }),
+        spawn: spec => failFirstExitObservation(spawnSubprocess(spec), cleanupFailure),
       }).then(() => { throw new Error('expected the aggregated startup/teardown rejection') }, (error: unknown) => error)
       expect(failure).toBeInstanceOf(AggregateError)
       const messages = (failure as AggregateError).errors.map((error: unknown) => String(error))

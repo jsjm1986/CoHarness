@@ -1,15 +1,8 @@
-// DiffBlock: the inline-diff surface for a file mutation (write/edit) — a copy
-// control over one or more per-file hunks, each a bold path header followed by
-// the removed block (`-`, error color) and the added block (`+`, success
-// color), with a dim `└ +A -R · N file(s)` footer. Unlike the TUI's exact
-// changed-row comparison, this block renders the old and new sides in full.
-// Both front ends share the line-terminator rule and distinct-path file count.
-// Output never soft-wraps — an aligned source line keeps its indentation and
-// scrolls horizontally instead of folding. Colors resolve through --dsw-*
-// tokens; geometry mirrors CodeBlock.
+/** Inline file changes with bounded exact comparison, neutral context and complete diff copying. */
 
 import { useCallback, useMemo, useState } from 'react'
 import clsx from 'clsx'
+import { structuredPatch } from 'diff'
 import { writeClipboard } from './clipboard.ts'
 import { ExpandButton } from './ExpandButton.tsx'
 import css from './DiffBlock.module.css'
@@ -29,9 +22,9 @@ export const DEFAULT_DIFF_MAX_LINES = 16
 export interface DiffHunk {
   /** The changed file's path, drawn verbatim as the hunk's header (the tool's model-facing path). */
   path: string
-  /** Prior content, or `null` for a new file / an overwrite (nothing on the removed side). */
+  /** Prior content including context, or `null` when no prior content is available. */
   oldText: string | null
-  /** Content after the change (the added side). */
+  /** Content after the change, including shared context. */
   newText: string
 }
 
@@ -66,7 +59,7 @@ export interface DiffBlockProps {
 
 /** A single rendered body line and its role, so the height cap slices a flat list. */
 interface DiffRow {
-  kind: 'path' | 'del' | 'add' | 'gap'
+  kind: 'path' | 'del' | 'add' | 'context' | 'gap'
   text: string
 }
 
@@ -81,16 +74,48 @@ const ROW_CLASS: Record<DiffRow['kind'], string | undefined> = {
   path: css.path,
   del: css.del,
   add: css.add,
+  context: css.context,
   gap: css.gap,
 }
 
+/** Bound synchronous edit-graph search; replacing one line consumes two edits. */
+const MAX_DIFF_EDIT_LENGTH = 256
+
+/** Derive exact local patches, or replace the whole fragment when the edit budget is exceeded. */
+function localHunks(diff: DiffHunk) {
+  const oldLines = contentLines(diff.oldText ?? '')
+  const newLines = contentLines(diff.newText)
+  const normalize = (lines: string[]): string => lines.map(line => `${line}\n`).join('')
+  return structuredPatch('', '', normalize(oldLines), normalize(newLines),
+    undefined, undefined, { context: 3, maxEditLength: MAX_DIFF_EDIT_LENGTH })?.hunks
+    ?? [{ lines: [...oldLines.map(line => `-${line}`), ...newLines.map(line => `+${line}`)] }]
+}
+
 /**
- * Flatten the hunks into the body's rows plus the footer counts. A path header
- * opens each new file; a same-file second hunk (a scattered edit) opens with a
- * `⋯` gap instead of repeating the path. Every old-side line counts toward
- * `removed` and every new-side line toward `added`. The file count is of
- * DISTINCT paths, matching the TUI diff card's footer, so two hunks in one file
- * read as `1 file` on both front ends.
+ * Count displayed changes using the card's bounded comparison. Shared context
+ * is excluded unless the edit budget requires a whole-fragment replacement.
+ * @param diffs - the input hunks, with the card's line-terminator semantics.
+ * @returns addition and removal counts for collapsed summaries.
+ */
+export function diffTotals(diffs: DiffHunk[]): { added: number; removed: number } {
+  let added = 0
+  let removed = 0
+  for (const diff of diffs) {
+    for (const hunk of localHunks(diff)) {
+      for (const line of hunk.lines) {
+        if (line.startsWith('+')) added++
+        if (line.startsWith('-')) removed++
+      }
+    }
+  }
+  return { added, removed }
+}
+
+/**
+ * Flatten local patches and count only added and removed rows. A path header
+ * opens each new file; gaps separate consecutive same-file fragments and distant
+ * patches within one fragment. Comparisons exceeding the edit budget count the
+ * complete old and new fragments as replaced. File counts use distinct paths.
  * @param diffs - the hunks to render.
  * @returns the body rows, the +/- totals, and the distinct-file count.
  */
@@ -105,15 +130,14 @@ function buildRows(diffs: DiffHunk[]): { rows: DiffRow[]; added: number; removed
     if (diff.path !== prevPath) rows.push({ kind: 'path', text: diff.path })
     else rows.push({ kind: 'gap', text: '⋯' })
     prevPath = diff.path
-    if (diff.oldText !== null) {
-      for (const line of contentLines(diff.oldText)) {
-        rows.push({ kind: 'del', text: line })
-        removed++
+    for (const [index, hunk] of localHunks(diff).entries()) {
+      if (index > 0) rows.push({ kind: 'gap', text: '⋯' })
+      for (const line of hunk.lines) {
+        const kind = line.startsWith('-') ? 'del' : line.startsWith('+') ? 'add' : 'context'
+        rows.push({ kind, text: line.slice(1) })
+        if (kind === 'del') removed++
+        if (kind === 'add') added++
       }
-    }
-    for (const line of contentLines(diff.newText)) {
-      rows.push({ kind: 'add', text: line })
-      added++
     }
   }
   return { rows, added, removed, files: paths.size }
@@ -135,9 +159,8 @@ function contentLines(text: string): string[] {
 }
 
 /**
- * The diff text a reader copies: each row's `-`/`+`/path/gap prefix and its
- * content, exactly what the card shows. The removed and added blocks are the
- * change; the path headers keep a multi-file copy attributable.
+ * Copy all diff rows, including collapsed rows. Changes have `- `/`+ ` prefixes,
+ * context has two spaces, and paths and gaps remain verbatim.
  * @param rows - the flattened body rows.
  * @returns the diff as plain text.
  */
@@ -146,6 +169,7 @@ function copyText(rows: DiffRow[]): string {
     switch (row.kind) {
       case 'del': return `- ${row.text}`
       case 'add': return `+ ${row.text}`
+      case 'context': return `  ${row.text}`
       case 'path': return row.text
       case 'gap': return row.text
       /* v8 ignore next -- closed-union backstop; only reached if a row kind is forged */

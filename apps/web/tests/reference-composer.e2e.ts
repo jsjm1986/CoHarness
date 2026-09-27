@@ -168,7 +168,9 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
 
     await input.fill('@')
     await expect.poll(() => menu.getByRole('option').count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
-    const snapshot = await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd)
+    const snapshot = (await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd))
+      // Session option labels carry the rows' live creation timestamps.
+      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '{{timestamp}}')
     await compareOrRefreshGolden(MENU_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Files & folders')
     expect(snapshot).toContain('Session conversations')
@@ -209,6 +211,9 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await target.waitFor({ timeout: 15_000 })
     await target.click()
     await page.getByRole('button', { name: /^Session recall\s*Research notes$/ }).waitFor({ timeout: 15_000 })
+    // The model trigger announces its current selection once the models RPC
+    // resolves; two stable captures can still precede it.
+    await page.getByRole('button', { name: /Select model, current / }).waitFor({ timeout: 15_000 })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(TARGET_SESSION_ID).join('{{targetId}}')

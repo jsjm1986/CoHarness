@@ -54,6 +54,8 @@ The provider registers as `cua-driver-mcp` before connecting. A second computer-
 
 The model sees tools under the fixed `mcp__cua-driver-mcp__` namespace. Tool names, descriptions, input schemas, canonical results, and image admission follow the existing [MCP bridge](../../mcp/mcp-client/README.md). There is no additional DSH action catalog or provider-selection tool.
 
+The fixed desktop namespace passes through the [computer-use execution policy](../../computer-use/computer-use/README.md) before MCP transport dispatch. Denied calls never reach the child; policy cancellation cancels an admitted request. Other MCP server namespaces retain their own policies.
+
 -----
 
 <a id="understand-the-implementation"></a>

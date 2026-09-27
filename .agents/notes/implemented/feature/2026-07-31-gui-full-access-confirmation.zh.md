@@ -10,6 +10,8 @@ Status: implemented
 
 ## 决策
 
+当前账户资格会在此确认流程之前检查；该新增检查由[账户资格选择器决策](../bug-fix/2026-09-22-account-qualified-permission-pickers.zh.md)负责。选项可见或确认框已勾选都不会授予服务器权限。
+
 **每个权限选择器都把 `danger-full-access` 关进共享的页面内 `RiskConfirmation` 对话框：启用按钮在用户勾选明确的风险确认复选框前保持禁用；预设以产品标签 `Full access` 展示；所有取消路径都不作任何提交。**
 
 - `RiskConfirmation`（ui-primitives）是受控的 Modal 组合：标题、说明、确认复选框、取消，以及 `acknowledged` 勾选前禁用的确认按钮。它始终是页面内对话框——Modal portal 到本文档 body，绝不打开可能落在另一块显示器上的原生或独立浏览器窗口。`Modal` 新增 `contentClassName` slot，令警示正文在受限的移动端／横屏视口内滚动，动作行保持固定。

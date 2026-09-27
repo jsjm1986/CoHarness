@@ -9,6 +9,7 @@
  * @module @deepseek-ai/dsh-subagent/continuation-activation
  */
 
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   Agent,
@@ -102,7 +103,7 @@ export interface Activation {
    */
   announced: boolean
   /** Renewed whenever a settlement watcher must re-check residency state. */
-  poke: PromiseWithResolvers<void>
+  poke: PromiseWithResolvers<undefined>
 }
 
 /** Inputs shared by fresh and resumed Activation materialization. */
@@ -507,7 +508,7 @@ export class ContinuableActivationRegistry {
       releaseSlot()
       throw error
     }
-    const settled = Promise.withResolvers<void>()
+    const settled = Promise.withResolvers<undefined>()
     const materialization: Materialization = {
       lineage,
       settled: settled.promise,
@@ -519,7 +520,7 @@ export class ContinuableActivationRegistry {
     }).finally(() => {
       this.materializations.delete(materialization)
       quota.release()
-      settled.resolve()
+      settled.resolve(undefined)
     })
   }
 
@@ -737,7 +738,7 @@ export class ContinuableActivationRegistry {
       ownedChildren: new Set(),
       observer,
       announced: false,
-      poke: Promise.withResolvers<void>(),
+      poke: Promise.withResolvers<undefined>(),
     }
     // After transfer, any failure must dispose the created handle, remove the
     // Activation, and roll back parent ownership before rejecting.
@@ -804,8 +805,8 @@ export class ContinuableActivationRegistry {
 
   /** Let a settlement watcher re-check residency after relevant state changes. */
   private wake(activation: Activation): void {
-    activation.poke.resolve()
-    activation.poke = Promise.withResolvers<void>()
+    activation.poke.resolve(undefined)
+    activation.poke = Promise.withResolvers<undefined>()
   }
 
   /** Follow one Activation to natural settlement. */
@@ -870,7 +871,7 @@ export class ContinuableActivationRegistry {
   /** Classify one Inbox and owned-child observation without reading Agent execution state. */
   private settlementState(
     activation: Activation,
-    observation: PromiseWithResolvers<void>,
+    observation: PromiseWithResolvers<undefined>,
   ): SettlementState {
     if (activation.inbox.closing !== undefined) return 'closed'
     if (activation.poke !== observation) return 'retry'
@@ -927,6 +928,12 @@ export class ContinuableActivationRegistry {
         ))
       }
     }
+    let executionScope: ExecutionInheritance | undefined
+    try {
+      executionScope = executionAuthorityOf(this.ctx)?.capture(activation.handle.agent)
+    } catch (error: unknown) {
+      failures.push(new SubagentError('Child execution identity could not be captured.', 'ACTIVATION_TEARDOWN_FAILED', { cause: error }))
+    }
     try {
       await activation.handle.dispose()
     } catch (error: unknown) {
@@ -949,19 +956,19 @@ export class ContinuableActivationRegistry {
       )
     }
     this.removeActivation(activation)
-    this.notifySettlement(activation, activation.observer.terminal(failure))
+    this.notifySettlement(activation, activation.observer.terminal(failure), executionScope)
     this.releaseOwnership(childId)
     activation.observer.settle(failure)
     if (failure !== undefined) throw failure
   }
 
   /** Tell the durable direct parent how this Activation ended. */
-  private notifySettlement(activation: Activation, terminal: ActivationTerminal): void {
+  private notifySettlement(activation: Activation, terminal: ActivationTerminal, executionScope?: ExecutionInheritance): void {
     if (!activation.announced) return
     try {
       const parent = this.ctx.agents.get(activation.parentSession)
       if (parent === undefined) return
-      const message = createSettlementMessage(activation.childId, terminal)
+      const message = createSettlementMessage(activation.childId, terminal, executionScope)
       if (this.closingTeardownFor(parent) !== undefined) {
         parent.inject(message)
         return

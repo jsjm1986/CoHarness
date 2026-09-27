@@ -150,7 +150,7 @@ function assertRequests(events: readonly SessionEvent[], header: SessionHeader) 
 
 function assertMigrated(result: Awaited<ReturnType<typeof readSession>>) {
   const { events, header, cut, session } = result
-  expect(header).toEqual({ version: 4, id, createdAt: 1, parentSession: 'parent', delegationDepth: 0, isSeeded: true })
+  expect(header).toEqual({ version: 6, id, createdAt: 1, parentSession: 'parent', delegationDepth: 0, isSeeded: true })
   expect(events.map(event => event.seq)).toEqual(Array.from({ length: 23 }, (_, seq) => seq))
   expect(events.filter(event => event.type.startsWith('assistant/'))).toEqual([{
     type: 'assistant/message', seq: 6, time: 108, surfaceOp: 'append',
@@ -215,7 +215,7 @@ describe.each([0, 1] as const)('V%s multi-edge durable publication', (version) =
     expect(written.events).toEqual(prepared.events)
     await ctx.fiber.dispose()
     contexts.splice(contexts.indexOf(ctx), 1)
-    const successor = generationLogPath(root, undefined, id, 4, compression)
+    const successor = generationLogPath(root, undefined, id, 6, compression)
     expect((await readdir(dirname(path))).filter(name => name !== 'session.lock').sort())
       .toEqual([basename(path), basename(successor)].sort())
     expect(await publishedRows(successor, compression)).toEqual([{ type: 'session', ...prepared.header }, ...prepared.events])
@@ -263,7 +263,7 @@ describe.each([0, 1] as const)('V%s multi-edge durable publication', (version) =
     expect(retried.events).toEqual(expected)
     expect(retried.cut).toBe(prepared.cut)
     assertRequests(retried.events, retried.header)
-    const successor = generationLogPath(root, undefined, id, 4, compression)
+    const successor = generationLogPath(root, undefined, id, 6, compression)
     expect(await publishedRows(successor, compression)).toEqual([{ type: 'session', ...prepared.header }, ...expected])
     expect((await readdir(dirname(path))).filter(name => name !== 'session.lock').sort())
       .toEqual([basename(path), basename(successor)].sort())

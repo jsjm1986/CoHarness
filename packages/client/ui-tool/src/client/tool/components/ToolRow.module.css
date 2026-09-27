@@ -98,6 +98,15 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Keep change counts readable beside a truncated path. */
+.diffStat {
+  margin-left: 10px;
+  font-family: var(--ds-font-family-code);
+  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 2px);
+  color: var(--dsw-alias-label-caption);
+  transform: translateY(0.5px);
+}
+
 /* File-tool path: same geometry as .summary, with a persistent link affordance. */
 .fileLink {
   flex: 1 1 auto;
@@ -282,9 +291,31 @@
 .terminalBody,
 .diffBody,
 .readBody,
+.imageBody,
 .searchBody,
 .webBody {
   margin: var(--dsw-space-1) 0 var(--dsw-space-1) var(--dsw-space-1);
+}
+
+/* The image card's in-card label: the shortened path — the same role
+   ReadBlock's own label plays. */
+.imageLabel {
+  margin-bottom: var(--dsw-space-1);
+  overflow-wrap: anywhere;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The image card's own result text (media type, dimensions, byte size) under
+   the gallery, in the same muted tone the search recovery footer uses. Always
+   rendered: the attachment presentation plugin is optional, so when nothing
+   fills the gallery this line is the only evidence an image was returned. The
+   enclosing .imageBody already carries the row indent. */
+.imageMeta {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-tertiary);
 }
 
 /* The recovery footer for a capped search: the result text (its `Full … stored

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import { SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationPaneSlotProps, ConversationSlotProps, InputZone,
 } from '../contract/slots.ts'
@@ -47,6 +47,7 @@ export function ConversationPane({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
   const [discardWorkspaceId, setDiscardWorkspaceId] = useState<WorkspaceId | undefined>()
+  const [workspaceError, setWorkspaceError] = useState<string | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
 
   // Publishes the seat's live height as --dsh-composer-height on the scroll
@@ -90,7 +91,11 @@ export function ConversationPane({
 
   const navigateWorkspace = (workspaceId: WorkspaceId, discardDraft = false): void => {
     setPendingWorkspaceId(workspaceId)
-    void selectWorkspace(workspaceId, { discardDraft }).catch(() => {
+    setWorkspaceError(undefined)
+    void selectWorkspace(workspaceId, { discardDraft }).catch((cause: unknown) => {
+      setWorkspaceError(cause instanceof SessionCreateError
+        ? t('workspace.selectFailed', { message: cause.rpcError.message, code: cause.rpcError.code })
+        : cause instanceof Error ? cause.message : String(cause))
       setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
     })
   }
@@ -219,6 +224,7 @@ export function ConversationPane({
       {hero && <HeroGlow className={css.heroGlow} />}
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
       {hero && heroWorkspaceRow}
+      {workspaceError !== undefined && <p role="alert" className={css.workspaceError}>{workspaceError}</p>}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
     </div>

@@ -27,6 +27,8 @@ interface MessageFeedbackItem {
   readonly rating: MessageFeedbackRating
   /** Optional explanation, preserved verbatim after validation. */
   readonly note?: string
+  /** Optional category chosen by the author of the feedback. */
+  readonly category?: FeedbackCategory
   /** Equality-only token replaced by every material create or update. */
   readonly version: MessageFeedbackVersion
   /** Host-assigned creation time in Unix epoch milliseconds. */
@@ -63,6 +65,8 @@ interface MessageFeedbackPutRequest {
   readonly rating: MessageFeedbackRating
   /** Optional non-blank explanation. */
   readonly note?: string
+  /** Optional category chosen by the author of the feedback. */
+  readonly category?: FeedbackCategory
   /** Observed item version, or `null` to require that no item exists. */
   readonly ifVersion: MessageFeedbackVersion | null
 }

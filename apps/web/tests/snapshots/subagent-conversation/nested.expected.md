@@ -14,7 +14,10 @@
   - button "Session log":
     - text: Session log
     - img
-- text: Give one concrete event sourcing example. {{clock}}
+  - button "Open right sidebar":
+    - img
+- text: Give one concrete event sourcing example.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - status:

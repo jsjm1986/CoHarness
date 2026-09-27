@@ -71,9 +71,9 @@ export async function watchConfig(
   watcher.on('add', onChange)
   watcher.on('change', onChange)
   watcher.on('unlink', onChange)
-  const ready = Promise.withResolvers<void>()
+  const ready = Promise.withResolvers<undefined>()
   let pending = true
-  watcher.once('ready', () => { pending = false; ready.resolve() })
+  watcher.once('ready', () => { pending = false; ready.resolve(undefined) })
   watcher.on('error', (error) => {
     if (pending) { pending = false; ready.reject(error) } else { ctx.logger.warn(error) }
   })

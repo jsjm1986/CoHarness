@@ -103,6 +103,19 @@ describe('application entrypoints', () => {
     ])
   })
 
+  it('requires the Cordis inspection demo to use the production profile launcher', () => {
+    const root = fixture()
+    write(root, 'package.json', JSON.stringify({ scripts: { 'demo:cordis': 'node scripts/demo-cordis.mjs' } }))
+    write(root, 'scripts/demo-cordis.mjs', "spawn('node', ['apps/cli/src/bin.ts', '--profile', 'web'])\n")
+    expect(applicationEntrypointViolations(root)).toEqual([])
+
+    write(root, 'scripts/demo-cordis.mjs', "spawn('node', ['packages/examples/acp-demo/src/bin.ts'])\n")
+    expect(applicationEntrypointViolations(root)).toEqual([
+      'scripts/demo-cordis.mjs: application demo wrapper must launch apps/cli/src/bin.ts',
+      'scripts/demo-cordis.mjs: application demo wrapper must not launch a package entry directly',
+    ])
+  })
+
   it('rejects a new root demo until its launch role is classified', () => {
     const root = fixture()
     write(root, 'package.json', JSON.stringify({ scripts: { 'demo:new-app': 'dsh --profile new-app' } }))

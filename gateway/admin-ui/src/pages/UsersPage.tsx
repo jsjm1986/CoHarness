@@ -32,6 +32,7 @@ import {
   PageHeader,
   Section,
   StatusBadge,
+  Switch,
 } from '../components/ui.tsx'
 
 type UserRole = AdminUser['role']
@@ -60,6 +61,7 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
   const [editName, setEditName] = useState('')
   const [editRole, setEditRole] = useState<UserRole>('user')
+  const [editAutoReviewEligible, setEditAutoReviewEligible] = useState(false)
   const [passwordTarget, setPasswordTarget] = useState<AdminUser | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [disableTarget, setDisableTarget] = useState<AdminUser | null>(null)
@@ -112,14 +114,16 @@ export function UsersPage() {
     setEditTarget(user)
     setEditName(user.displayName)
     setEditRole(user.role)
+    setEditAutoReviewEligible(user.autoReviewEligible)
   }
 
   async function onEdit(event: FormEvent) {
     event.preventDefault()
     if (editTarget === null) return
     const saved = await run(`edit:${editTarget.id}`, () => patchUser(editTarget.id, {
-      displayName: editName,
-      role: editRole,
+      ...(editName === editTarget.displayName ? {} : { displayName: editName }),
+      ...(editRole === editTarget.role ? {} : { role: editRole }),
+      ...(editAutoReviewEligible === editTarget.autoReviewEligible ? {} : { autoReviewEligible: editAutoReviewEligible }),
     }))
     if (saved) setEditTarget(null)
   }
@@ -170,6 +174,7 @@ export function UsersPage() {
                   <tr>
                     <th>用户</th>
                     <th>角色</th>
+                    <th>Auto 审查资格</th>
                     <th>账号</th>
                     <th>实例</th>
                     <th>端口</th>
@@ -181,6 +186,7 @@ export function UsersPage() {
                     <tr key={user.id}>
                       <td><UserIdentity user={user} /></td>
                       <td><RoleBadge role={user.role} /></td>
+                      <td><AutoReviewBadge eligible={user.autoReviewEligible} /></td>
                       <td><AccountBadge status={user.status} /></td>
                       <td><InstanceCell user={user} pending={pending} run={run} /></td>
                       <td><span className="codeText">{user.port}</span></td>
@@ -210,6 +216,7 @@ export function UsersPage() {
                   <div className="mobileItemBody">
                     <dl className="definitionGrid">
                       <Definition label="角色"><RoleBadge role={user.role} /></Definition>
+                      <Definition label="Auto 审查资格"><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
                       <Definition label="端口"><span className="codeText">{user.port}</span></Definition>
                     </dl>
                     <div className="mobileControlRow">
@@ -268,7 +275,7 @@ export function UsersPage() {
       <Dialog
         open={editTarget !== null}
         title={`编辑 ${editTarget?.username ?? ''}`}
-        description="更新显示名和管理角色。"
+        description="更新显示名、管理角色和 Auto 审查资格。"
         onClose={() => { if (!pending.startsWith('edit:')) setEditTarget(null) }}
         footer={(
           <>
@@ -287,6 +294,10 @@ export function UsersPage() {
               <option value="admin">管理员</option>
             </select>
           </Field>
+          <div className="field">
+            <Switch label="允许选择 Auto 审查" checked={editAutoReviewEligible} onChange={setEditAutoReviewEligible} disabled={pending.startsWith('edit:')} />
+            <span className="fieldHint">授予资格不会自动启用 Auto，也不会改变已有会话或新会话的默认权限。用户仍需在当前会话主动选择。</span>
+          </div>
         </form>
       </Dialog>
 
@@ -347,6 +358,10 @@ function UserIdentity({ user }: { user: AdminUser }) {
 
 function RoleBadge({ role }: { role: UserRole }) {
   return <StatusBadge tone={role === 'admin' ? 'info' : 'neutral'}>{role === 'admin' ? '管理员' : '普通用户'}</StatusBadge>
+}
+
+function AutoReviewBadge({ eligible }: { eligible: boolean }) {
+  return <StatusBadge tone={eligible ? 'info' : 'neutral'}>{eligible ? '已授予' : '未授予'}</StatusBadge>
 }
 
 function AccountBadge({ status }: { status: AdminUser['status'] }) {

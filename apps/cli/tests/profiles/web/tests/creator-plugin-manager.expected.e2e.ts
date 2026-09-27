@@ -73,8 +73,11 @@ it('configures MCP on a live profile, restores it on restart, and removes its to
   const first = await start()
   const initial = await first.request('initial')
   expect(initial.before).toContain('plugin_manager')
-  for (const selfModification of ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'cordis_inspect_self']) {
-    expect(initial.before).toContain(selfModification)
+  for (const inspection of ['cordis_inspect_list', 'cordis_inspect_query', 'cordis_inspect_self']) {
+    expect(initial.before).toContain(inspection)
+  }
+  for (const retired of ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine']) {
+    expect(initial.before).not.toContain(retired)
   }
   expect(initial.before).not.toContain('mcp__demo__ping')
   expect(initial.denied.isError).toBe(true)

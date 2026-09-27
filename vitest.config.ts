@@ -76,6 +76,7 @@ const coverageScopedMode = coverageScopedRaw === '1'
 const processBoundTests = [
   'packages/session/session-persistence-jsonl/tests/jsonl.spec.ts',
   'packages/subagent/subagent-acp/tests/subagent-acp.spec.ts',
+  'packages/subagent/subagent-acp/tests/member.spec.ts',
   'packages/subprocess/subprocess-local/tests/process-exit.spec.ts',
   'packages/subprocess/subprocess-local/tests/spawn.spec.ts',
   'packages/context/time-context/tests/time-context.spec.ts',

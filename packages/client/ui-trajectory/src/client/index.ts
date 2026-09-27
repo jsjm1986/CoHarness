@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // owning package) must be in the program for the register calls to type.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { createTrajectoryDurationStore } from './duration-store.ts'
+import { createTrajectoryWrapStore } from './wrap-store.ts'
 import { en, NS, zh } from './locales.ts'
 import { registerTrajectoryAssistantDefinition } from './trajectory-assistant-definition.ts'
 import { registerTrajectoryCompactionDefinitions } from './trajectory-compaction-definition.ts'
@@ -34,6 +35,7 @@ export function apply(ctx: Context): void {
   // re-registration.
   const t = ctx.locale.bind(NS)
   const duration = createTrajectoryDurationStore()
+  const wrap = createTrajectoryWrapStore()
   registerTrajectoryMessageDefinitions(ctx)
   registerTrajectoryRequestHeaderDefinition(ctx)
   registerTrajectoryAssistantDefinition(ctx)
@@ -52,13 +54,14 @@ export function apply(ctx: Context): void {
         throw new Error(`ui-trajectory: session "${sessionId}" is unavailable`)
       }
       return {
-        hooks: { duration },
+        hooks: { duration, wrap },
         loadOlder: async () => {
           const before = session.getSnapshot().views.get('trajectory')
           await session.loadOlder()
           return session.getSnapshot().views.get('trajectory') !== before
         },
         setActualDuration: (value) => { duration.set(value) },
+        setWrapLines: (value) => { wrap.set(value) },
         ensureHistoryDetail: () => session.ensureHistoryDetail(),
       }
     },

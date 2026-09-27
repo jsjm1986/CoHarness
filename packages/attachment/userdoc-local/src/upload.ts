@@ -137,14 +137,14 @@ const MAX_FINGERPRINT_LENGTH = 512
 const ADMISSION_LOCK_NAME = '.admission'
 const LOCK_WAIT_MS = 30_000
 
-/** Whether a PID still names a live process that may own an admission lock. */
-function processIsLive(pid: number): boolean {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return false
+/** Only ESRCH proves that a recorded owner no longer exists. */
+function processMayOwnLock(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return true
   try {
     process.kill(pid, 0)
     return true
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM'
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH'
   }
 }
 
@@ -328,9 +328,7 @@ function admissionLockPath(root: string): string {
   return join(sessionRoot(root), ADMISSION_LOCK_NAME)
 }
 
-/** Reclaim an admission lock left by a process that no longer exists. */
-async function recoverOrphanedAdmissionLock(root: string): Promise<void> {
-  const lockPath = admissionLockPath(root)
+async function orphanedAdmissionOwner(lockPath: string): Promise<number | undefined> {
   let owner: number
   try {
     const content = (await readFile(lockPath, 'utf8')).trim()
@@ -340,16 +338,26 @@ async function recoverOrphanedAdmissionLock(root: string): Promise<void> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
     throw error
   }
-  if (processIsLive(owner)) return
-  const quarantine = `${lockPath}.${process.pid}.${randomUUID()}.stale`
-  try {
-    await rename(lockPath, quarantine)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-    throw error
-  }
-  await rm(quarantine, { force: true })
-  console.warn(`[userdoc-local] recovered orphaned document admission lock ownerPid=${String(owner)}`)
+  return processMayOwnLock(owner) ? undefined : owner
+}
+
+/** Serialize recovery and re-read ownership before moving the actual writer lock. */
+async function recoverOrphanedAdmissionLock(root: string): Promise<void> {
+  const lockPath = `${admissionLockPath(root)}.lock`
+  if (await orphanedAdmissionOwner(lockPath) === undefined) return
+  await withFileLock(`${lockPath}.recovery`, async () => {
+    const owner = await orphanedAdmissionOwner(lockPath)
+    if (owner === undefined) return
+    const quarantine = `${lockPath}.${process.pid}.${randomUUID()}.stale`
+    try {
+      await rename(lockPath, quarantine)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    await rm(quarantine, { force: true })
+    console.warn(`[userdoc-local] recovered orphaned document admission lock ownerPid=${String(owner)}`)
+  }, { waitMs: LOCK_WAIT_MS })
 }
 
 function hashBytes(bytes: Uint8Array): string {

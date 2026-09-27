@@ -32,4 +32,6 @@ CLI 调用继承终端和认证环境；service 调用保留子进程凭据清�
 
 ## 影响
 
+Gateway 管理的 profile 还要求[部署管理员授权](2026-09-22-gateway-profile-management-authority.zh.md)；工具审批本身不能授予该资格。
+
 同一 profile 可以通过 CLI、Web 和工具管理，操作通过文件锁协调并保留 patch 优先级。运维人员需要根据报告的文件和诊断修复失败的包操作。startup 进程必须先停止，才能通过 CLI 删除其加载的包。管理组件受保护，不能通过 service 删除。

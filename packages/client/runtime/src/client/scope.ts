@@ -1,23 +1,21 @@
-/**
- * Client Agent-scope primitive: mint a Cordis context tagged with the owning
- * Agent identity. The filter lives on the scoped context, so scoped dispatch
- * remains ordinary Cordis. The key is the branded SessionId shared by the
- * client Agent and Session axes; a cold session may retain its client scope
- * after the host Agent is disposed for history viewing.
- */
+/** Client scope generations route local events independently of Host Agent residency. */
 
 import { Context as CordisContext } from '@deepseek-ai/cordis'
 import type { Context, Fiber } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
-import type { TypertClientRemote, TypertRemoteScopeApi } from '@deepseek-ai/dsh-typert-protocol'
+import type { ClientRemote, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { TypertRemoteScopeApi } from '@deepseek-ai/dsh-typert-protocol'
 
 /** Client Cordis Context carrying one Agent identity and scoped Remote namespaces. */
 export type AgentContext = Omit<Context, 'remote'> & {
-  readonly remote: TypertClientRemote & TypertRemoteScopeApi<'agent'>
+  readonly remote: ClientRemote & TypertRemoteScopeApi<'agent'>
 }
 
 /** Context tag written by {@link createScope}. */
 const kScope = Symbol('dsh.client.scope')
+
+interface ScopeIdentity {
+  readonly sessionId: SessionId
+}
 
 /** A minted Agent scope and its disposal boundary. */
 export interface AgentScopeHandle {
@@ -33,16 +31,17 @@ function agentScope(): void {}
 /**
  * Mint an Agent scope under `ctx`.
  * @param ctx - client root context the scope fiber mounts under.
- * @param key - owning session identity used as the routing tag.
+ * @param key - durable Session identity carried by this generation.
  * @returns tagged context and its backing fiber.
  */
 export function createScope(ctx: Context, key: SessionId): AgentScopeHandle {
   const fiber = ctx.plugin(agentScope)
+  const identity: ScopeIdentity = { sessionId: key }
   const scoped = fiber.ctx.extend({
-    [kScope]: key,
+    [kScope]: identity,
     [CordisContext.filter](listenerCtx: Context): boolean {
-      const tag = scopeOf(listenerCtx)
-      return tag === undefined || tag === key
+      const tag = scopeIdentityOf(listenerCtx)
+      return tag === undefined || tag === identity
     },
   }) as AgentContext
   return { fiber, ctx: scoped }
@@ -54,5 +53,14 @@ export function createScope(ctx: Context, key: SessionId): AgentScopeHandle {
  * @returns session identity, or undefined for root contexts.
  */
 export function scopeOf(ctx: Context): SessionId | undefined {
-  return (ctx as Context & { [kScope]?: SessionId })[kScope]
+  return scopeIdentityOf(ctx)?.sessionId
+}
+
+/**
+ * Read the exact generation identity inherited by a Client Context.
+ * @param ctx - scoped or root Client Context.
+ * @returns the generation identity, or undefined for an unscoped Context.
+ */
+export function scopeIdentityOf(ctx: Context): ScopeIdentity | undefined {
+  return (ctx as Context & { [kScope]?: ScopeIdentity })[kScope]
 }

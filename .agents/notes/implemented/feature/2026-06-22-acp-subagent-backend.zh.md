@@ -47,7 +47,7 @@ ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`
 
 ### 为何使用 ACP SDK 1.4.0 类型化 API？
 
-仓库在桥接层和该后端统一使用 ACP SDK 1.4.0 的 `client()` app 及类型化 `connection.agent` facade。这样请求与通知方法会从协议映射中推导类型，并提供拆卸阶段使用的连接 `closed` 生命周期 promise，同时从已发布集成中移除已弃用的 `ClientSideConnection`／`AgentSideConnection` 类。该后端仍只调用 `initialize`、`session/new` 和 `session/prompt`，因为一次 subagent 运行只拥有一个全新的子会话；桥接层的列出／恢复／关闭／配置控制继续对其他自动化客户端可用，而不会扩大此提供方的生命周期。
+仓库在桥接层和该后端统一使用 ACP SDK 1.4.0 的 `client()` app 及类型化 `connection.agent` facade。这样请求与通知方法会从协议映射中推导类型，并提供拆卸阶段使用的连接 `closed` 生命周期 promise，同时从已发布集成中移除已弃用的 `ClientSideConnection`／`AgentSideConnection` 类。`start()` 路径只调用 `initialize`、`session/new` 和 `session/prompt`，因为一次性运行只拥有一个全新的子会话；[外部运行时成员决策](../architecture/2026-09-25-external-runtime-continuable-members.zh.md) 在 `resume: true` 门后为持续成员加入 `session/load`，桥接层的列出／恢复／关闭／配置控制继续对其他自动化客户端可用，而不会扩大此提供方的生命周期。
 
 ### 为何不使用持久子进程？
 

@@ -124,14 +124,14 @@ describe('JSONL V2 PTC publication and restore', () => {
     const events = releasedV2Events()
     const source = Buffer.from([header, ...events].map(row => JSON.stringify(row)).join('\n') + '\n')
     const predecessor = generationLogPath(root, undefined, id, 2, 'none')
-    const successor = join(dirname(predecessor), 'session.v4.jsonl')
+    const successor = join(dirname(predecessor), 'session.v6.jsonl')
     await mkdir(dirname(predecessor), { recursive: true })
     await writeFile(predecessor, source)
     const sourceStat = await stat(predecessor)
 
     const reader = await ctx.sessionPersistence.open(id, 'read')
     try {
-      expect(reader.header).toEqual({ version: 4, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 })
+      expect(reader.header).toEqual({ version: 6, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 })
       expect((await reader.read()).events.map(event => event.type)).toEqual([
         'turn/start', 'step/start', 'system/message', 'user/message', 'assistant/message', 'tool/call',
         'tool/ptc-dispatch-start', 'tool/ptc-dispatch', 'tool/result', 'agent/inbox/spliced',
@@ -153,7 +153,7 @@ describe('JSONL V2 PTC publication and restore', () => {
     const published = await readFile(successor)
     const [publishedHeader, ...publishedEvents] = published.toString('utf8').trimEnd().split('\n')
       .map((row): unknown => JSON.parse(row))
-    expect(publishedHeader).toEqual({ ...header, version: 4 })
+    expect(publishedHeader).toEqual({ ...header, version: 6 })
     const expectedEvents: SessionFormatEvent[] = events.map(event => ({ ...event, seq: event.seq < 2 ? event.seq : event.seq + 1 }))
     expectedEvents[5] = { ...expectedEvents[5], type: 'tool/ptc-dispatch-start' } as SessionFormatEvent
     expectedEvents[6] = { ...expectedEvents[6], type: 'tool/ptc-dispatch' } as SessionFormatEvent
@@ -201,6 +201,6 @@ describe('JSONL V2 PTC publication and restore', () => {
     expect(await stat(predecessor)).toMatchObject({ dev: sourceStat.dev, ino: sourceStat.ino })
     expect(await readFile(successor)).toEqual(published)
     expect((await readdir(dirname(predecessor))).filter(name => name.endsWith('.jsonl')).sort())
-      .toEqual(['session.v2.jsonl', 'session.v4.jsonl'])
+      .toEqual(['session.v2.jsonl', 'session.v6.jsonl'])
   })
 })

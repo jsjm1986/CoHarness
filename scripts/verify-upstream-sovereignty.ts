@@ -2,7 +2,7 @@
  * Gate the per-package upstream sovereignty manifest in `scripts/upstream-sync.json`.
  *
  * This fork shares no git history with `deepseek-harness`; upstream release tags
- * are mirrored onto origin so `git diff <tag> HEAD` resolves. The manifest
+ * are mirrored onto origin so the baseline commit resolves. The manifest
  * records, per `packages/<group>/<pkg>` directory, how the local tree relates to
  * the synced tag: `tracked` packages hold a `src/` identical to the synced
  * commit, `adapted` packages exist upstream but carry owned `src/` deltas,
@@ -18,7 +18,8 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
@@ -206,14 +207,17 @@ interface GitRun {
   stderr: string
 }
 
-function git(repoRoot: string, args: string[]): GitRun {
-  const run = spawnSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8', maxBuffer: 1 << 26 })
+function git(repoRoot: string, args: string[], index?: string): GitRun {
+  const run = spawnSync('git', ['-C', repoRoot, ...args], {
+    encoding: 'utf8', maxBuffer: 1 << 26,
+    ...(index === undefined ? {} : { env: { ...process.env, GIT_INDEX_FILE: index } }),
+  })
   if (run.error !== undefined) fail(`git ${args.join(' ')} failed to spawn: ${run.error.message}`)
   return run
 }
 
-function gitOrFail(repoRoot: string, args: string[]): string {
-  const run = git(repoRoot, args)
+function gitOrFail(repoRoot: string, args: string[], index?: string): string {
+  const run = git(repoRoot, args, index)
   if (run.status !== 0) fail(`git ${args.join(' ')} failed: ${run.stderr.trim()}`)
   return run.stdout
 }
@@ -265,17 +269,33 @@ export function diskPackageKeys(repoRoot: string): Set<string> {
 }
 
 /**
- * Whether `packages/<key>/src` is identical between one commit and HEAD.
+ * Whether current package sources, including new files, match one commit.
  * @param repoRoot - repository root the git invocation runs in.
  * @param commit - baseline commit for the diff.
  * @param key - `<group>/<pkg>` package key.
- * @returns `true` when `git diff --quiet` reports no `src/` change.
+ * @returns `true` when Git reports no source change after checkout normalization.
  */
 export function packageSrcMatchesCommit(repoRoot: string, commit: string, key: string): boolean {
-  const run = git(repoRoot, ['diff', '--quiet', commit, 'HEAD', '--', `packages/${key}/src`])
-  if (run.status === 0) return true
-  if (run.status === 1) return false
-  fail(`git diff --quiet ${commit} HEAD -- packages/${key}/src failed: ${run.stderr.trim()}`)
+  return !changedSourcePackages(repoRoot, commit, `packages/${key}`).has(key)
+}
+
+/** Compare disk through a private index so Git owns filters, modes and ignored outputs. */
+function changedSourcePackages(repoRoot: string, commit: string, pathspec = ':(glob)packages/*/*/src/**'): Set<string> {
+  const directory = mkdtempSync(resolve(tmpdir(), 'dsh-sovereignty-'))
+  try {
+    const index = resolve(directory, 'index')
+    gitOrFail(repoRoot, ['read-tree', commit], index)
+    gitOrFail(repoRoot, ['add', '--all', '--', pathspec], index)
+    const paths = gitOrFail(repoRoot, ['diff', '--cached', '--no-renames', '--name-only', '-z', commit, '--', pathspec], index)
+    const changed = new Set<string>()
+    for (const path of paths.split('\0')) {
+      const match = /^packages\/([^/]+\/[^/]+)\/src\//.exec(path)
+      if (match !== null) changed.add(match[1] as string)
+    }
+    return changed
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 }
 
 /**
@@ -301,6 +321,7 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
 
   const disk = diskPackageKeys(repoRoot)
   const upstream = packageKeysAtCommit(repoRoot, manifest.syncedCommit)
+  const changed = changedSourcePackages(repoRoot, manifest.syncedCommit)
 
   const missingFromManifest = [...disk].filter(key => !manifestKeys.has(key)).sort()
   if (missingFromManifest.length > 0) {
@@ -343,7 +364,7 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
   for (const [key, entry] of entries) {
     // A package absent at the synced commit already holds a bijection
     // violation; diffing it would double-report the same drift.
-    if (entry.sovereignty === 'tracked' && upstream.has(key) && !packageSrcMatchesCommit(repoRoot, manifest.syncedCommit, key)) {
+    if (entry.sovereignty === 'tracked' && upstream.has(key) && changed.has(key)) {
       violations.push(`classified "tracked" but packages/${key}/src differs from ${manifest.syncedTag}`)
     }
     for (const removedPath of entry.removedUpstreamPaths ?? []) {
@@ -354,10 +375,10 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
     }
   }
   for (const [key, entry] of entries) {
-    if (entry.sovereignty === 'adapted' && upstream.has(key) && packageSrcMatchesCommit(repoRoot, manifest.syncedCommit, key)) {
+    if (entry.sovereignty === 'adapted' && upstream.has(key) && !changed.has(key)) {
       advisories.push(`classified "adapted" but packages/${key}/src is identical to ${manifest.syncedTag}; promote it to "tracked"`)
     }
-    if (entry.sovereignty === 'replaced' && upstream.has(key) && packageSrcMatchesCommit(repoRoot, manifest.syncedCommit, key)) {
+    if (entry.sovereignty === 'replaced' && upstream.has(key) && !changed.has(key)) {
       advisories.push(`classified "replaced" but packages/${key}/src is identical to ${manifest.syncedTag}; reclassify it "tracked"`)
     }
   }

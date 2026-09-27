@@ -1,0 +1,8 @@
+version: 1
+scenario: escalation-rejected
+profile: acp
+composition: acp-agent
+recording: live
+header:
+  class: sandbox
+permission: workspace-write

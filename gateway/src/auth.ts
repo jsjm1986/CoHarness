@@ -11,6 +11,8 @@ export interface UserRow {
   status: 'active' | 'disabled'
   homePath: string
   mustChangePassword: boolean
+  /** Administrator-granted eligibility; never selects a Session permission preset. */
+  autoReviewEligible: boolean
 }
 
 const LOCK_WINDOW_MS = 10 * 60 * 1000
@@ -25,6 +27,7 @@ interface DbUser {
   status: 'active' | 'disabled'
   home_path: string
   must_change_password: number
+  auto_review_eligible: number
   deleted_at: number | null
 }
 
@@ -37,6 +40,7 @@ export function toUserRow(row: DbUser): UserRow {
     status: row.status,
     homePath: row.home_path,
     mustChangePassword: row.must_change_password === 1,
+    autoReviewEligible: row.auto_review_eligible === 1,
   }
 }
 

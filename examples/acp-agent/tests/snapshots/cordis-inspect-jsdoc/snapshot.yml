@@ -1,0 +1,7 @@
+version: 1
+scenario: cordis-inspect-jsdoc
+profile: acp
+composition: advanced
+recording: authored
+header:
+  class: advanced

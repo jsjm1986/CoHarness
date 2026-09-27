@@ -14,7 +14,7 @@ The snapshot job (run 34033367752, job 101605386868) rejects both PowerShell sce
 
 The [real-shell test](../../../../packages/terminal/terminal-bash/tests/local.spec.ts) accepts either supported readiness tier, rejects timeout and exit settlements, and observes formatted child output in scrollback to prove environment persistence, current directory, and credential scrubbing. The expected text is absent from the submitted command. A private-file barrier holds execution beyond the silence settlement and releases it only after the next send settles, proving that later output remains observable without extending production timings. Session disposal precedes removal of the private test directory.
 
-The [one-shot](../../../../examples/acp-agent/tests/snapshots/pwsh-tool-turn/session.jsonl) and [persistent](../../../../examples/acp-agent/tests/snapshots/persistent-pwsh-tool-turn/session.jsonl) fixtures and owned header pins are refreshed through the built headless profile with a real PowerShell executable and recorded model replies. Policy events and available tools remain visible in the expectations; the tool result and final answer remain `PWSH_OK` and `DONE`.
+The [one-shot](../../../../examples/acp-agent/tests/snapshots/pwsh-tool-turn/session.v6.jsonl) and [persistent](../../../../examples/acp-agent/tests/snapshots/persistent-pwsh-tool-turn/session.v6.jsonl) fixtures and owned header pins are refreshed through the built headless profile with a real PowerShell executable and recorded model replies. Policy events and available tools remain visible in the expectations; the tool result and final answer remain `PWSH_OK` and `DONE`.
 
 ## Alternatives considered
 

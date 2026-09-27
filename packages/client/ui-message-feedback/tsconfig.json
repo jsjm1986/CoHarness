@@ -37,6 +37,12 @@
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../ui-commands"
+    },
+    {
+      "path": "../../feedback/command-feedback"
     }
   ]
 }

@@ -1,23 +1,8 @@
-"""Locate the bundled DeepSeek Harness SDK runtime shipped with this package.
+"""Locate the bundled dsh executable or the explicitly selected development carrier.
 
-Two runtime carriers coexist under ``runtime/``, both injected by the repo's
-``scripts/build-exe-for-python-sdk.ts`` build (neither is checked into git):
-
-- **exe (production)**: single-file Node executables named
-  ``deepseek-harness-sdk-runtime-<platform>-<arch>`` (with the legacy
-  ``dsh-jsonrpc-agent-pkg-*`` spelling accepted) and a sibling ripgrep
-  executable; macOS also uses a sibling
-  ``-spawn-helper``. The target machine needs no Node installation.
-- **node (dev-only)**: the full deploy closure under ``runtime/node/``
-  (``package.json`` + ``node_modules/``), executed as ``node
-  runtime/node/node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/packaged-bin.js`` on a
-  system Node >= 22.19. It is the current checkout's source build, never
-  selected automatically, and excluded from wheel/sdist distributions.
-
-``runtime/cordis.yml`` IS checked in: it is the default agent configuration
-the client SDK injects via ``$DSH_CORDIS_CONFIG`` for zero-config runs — the
-runtime itself always requires an explicit config and has no built-in
-fallback.
+Both carriers use runtime-bootstrap.mjs to dispatch dsh and its worker processes.
+Production resolution requires the platform executable and native sidecars;
+Node mode is explicit and never a fallback for a missing executable.
 """
 
 from __future__ import annotations
@@ -26,6 +11,7 @@ import os
 import platform
 import shutil
 import sys
+import subprocess
 from pathlib import Path
 
 PACKAGE_METADATA_FILENAME = "deepseek-harness-runtime.json"
@@ -53,21 +39,6 @@ def bundled_package_dir() -> Path:
     return root
 
 
-def bundled_default_config_path() -> Path:
-    """Path of the checked-in default runtime configuration (``runtime/cordis.yml``).
-
-    The client SDK injects this path via ``$DSH_CORDIS_CONFIG`` when the caller
-    supplies no config and the launch resolves to the bundled runtime — the
-    runtime binary itself always demands an explicit config.
-    """
-    path = bundled_package_dir() / "runtime" / "cordis.yml"
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"deepseek-harness-runtime-bin is missing the default runtime config at {path}"
-        )
-    return path
-
-
 def bundled_runtime_path() -> Path:
     """Absolute path of the bundled single-file runtime executable for the current platform.
 
@@ -81,11 +52,7 @@ def bundled_runtime_path() -> Path:
     tag = _current_platform_tag()
     runtime_dir = bundled_package_dir() / "runtime"
     extension = ".exe" if tag.startswith("win-") else ""
-    candidates = [
-        runtime_dir / f"deepseek-harness-sdk-runtime-{tag}{extension}",
-        runtime_dir / f"dsh-jsonrpc-agent-pkg-{tag}{extension}",
-    ]
-    path = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
+    path = runtime_dir / f"deepseek-harness-sdk-runtime-{tag}{extension}"
     if not path.is_file():
         raise FileNotFoundError(
             f"deepseek-harness-runtime-bin is missing the runtime executable at {path}. "
@@ -144,7 +111,7 @@ def _current_platform_tag() -> str:
         or (plat == "win" and arch != "x64")
     ):
         raise FileNotFoundError(
-            "no bundled dsh-jsonrpc-agent executable exists for this platform "
+            "no bundled dsh executable exists for this platform "
             f"(sys.platform={sys.platform!r}, machine={platform.machine()!r}); supported: "
             "Linux x64/arm64, macOS x64/arm64, and Windows x64. " + _EXE_ACQUISITION_HINT
         )
@@ -153,11 +120,7 @@ def _current_platform_tag() -> str:
 
 def _node_launch_args() -> tuple[str, str]:
     node_root = bundled_package_dir() / "runtime" / "node"
-    candidates = [
-        node_root / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js",
-        node_root / "node_modules" / "@deepseek-ai" / "dsh-sdk-jsonrpc-demo" / "lib" / "packaged-bin.js",
-    ]
-    bin_js = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
+    bin_js = node_root / "runtime-bootstrap.mjs"
     if not bin_js.is_file():
         raise FileNotFoundError(
             f"the dev-only node runtime closure is missing at {node_root} "
@@ -174,10 +137,26 @@ def _node_launch_args() -> tuple[str, str]:
     return (node, str(bin_js))
 
 
+def main() -> None:
+    """Launch the CLI with explicit DSH_HOME; wait on Windows, replace the process on POSIX."""
+    if not os.environ.get("DSH_HOME", "").strip():
+        print(
+            "dsh: the Python runtime command requires an explicit DSH_HOME; "
+            "it never uses ~/.dsh implicitly",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    argv = (*resolve_bundled_launch_args(), *sys.argv[1:])
+    if sys.platform == "win32":
+        # Windows CRT exec does not replace the process; wait and preserve the runtime status.
+        raise SystemExit(subprocess.run(argv, env=os.environ).returncode)
+    os.execvpe(argv[0], argv, os.environ)
+
+
 __all__ = [
+    "main",
     "PACKAGE_METADATA_FILENAME",
     "RUNTIME_MODE_ENV_VAR",
-    "bundled_default_config_path",
     "bundled_package_dir",
     "bundled_runtime_path",
     "resolve_bundled_launch_args",

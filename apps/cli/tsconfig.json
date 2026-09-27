@@ -76,6 +76,9 @@
     },
     {
       "path": "../../packages/shell/tool-bash"
+    },
+    {
+      "path": "../../packages/context/gateway-execution"
     }
   ]
 }

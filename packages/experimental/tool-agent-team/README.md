@@ -18,7 +18,7 @@ This package lets the model create named teammates, send them messages, inspect 
     forkProvider: fork
 ```
 
-`freshProvider` and `forkProvider` select registered continuable-subagent providers. The fixed model policy creates teammates only when the user explicitly asks for Agent Teams or teammates.
+`freshProvider` and `forkProvider` select registered continuable-subagent providers. Any provider advertising `prepareContinuable` works, including the external-runtime ones: `subagent-claude-code` and `subagent-codex` when the `llm` service is mounted, and `subagent-acp` with `resume: true` — each keeps the durable Team member as an in-process child while routing model calls through its external runtime's resumable session. A provider without the capability rejects the spawn with `UNSUPPORTED_CAPABILITY`. The fixed model policy creates teammates only when the user explicitly asks for Agent Teams or teammates.
 
 ## Tools and authority
 

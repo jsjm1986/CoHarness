@@ -67,6 +67,7 @@ export function apply(ctx: ClientContext): void {
     ctx.remote,
     api,
     () => connection.hostDescription.getSnapshot()?.canOpenPath ?? false,
+    ctx.settingsScope.describe(),
     () => {
       void controller.load()
       for (const read of rosterReaders) read()
@@ -107,6 +108,25 @@ export function apply(ctx: ClientContext): void {
   // render and simply hides the button while no flow exists.
   let creatorDraft: (() => void) | undefined
 
+  // The seat lives inside the conversation scope below, so the sync a
+  // Settings write may run against a still-blank session resolves the seat
+  // per call rather than at apply time; outside that scope it is absent.
+  let seatRef: AgentPresetSeatController | undefined
+
+  /**
+   * Capture the exact blank Session one Settings action may update.
+   * @returns the sync for the captured Session, or undefined outside one.
+   */
+  const captureBlankSessionSync = (): ((id: string) => Promise<string | undefined>) | undefined => {
+    const seat = seatRef
+    const sessionId = seat?.blankSessionId()
+    if (seat === undefined || sessionId === undefined) return undefined
+    return async (id: string) => {
+      if (seatRef !== seat) return undefined
+      return await seat.syncBlankSession(sessionId, id)
+    }
+  }
+
   // The new-session chip and the header label: one controller, because the
   // staged choice belongs to the flow rather than to any one session.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
@@ -123,6 +143,7 @@ export function apply(ctx: ClientContext): void {
     }, (sessionId, agentPreset) => {
       scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
     })
+    seatRef = seat
 
     const seatInjected = (): AgentPresetSeatInjected => ({
       hooks: { agentPresetSeat: seat.store },
@@ -166,6 +187,7 @@ export function apply(ctx: ClientContext): void {
       // on: the chip's list-change applier composes the blank session the
       // workspace connect produces or reuses.
       creatorDraft = () => {
+        if (!section.store.getSnapshot().showPicker) return
         // The introduce cue makes the chip announce the pick the user never
         // made on this screen — the stage happened back in settings.
         seat.stage('cordis', true)
@@ -190,6 +212,8 @@ export function apply(ctx: ClientContext): void {
         presetSelected()
         rosterReaders.delete(readRoster)
         creatorDraft = undefined
+        /* v8 ignore else -- a scope unload runs before the same fiber's next mount, so this cleanup never meets a newer seat */
+        if (seatRef === seat) seatRef = undefined
         chip()
         label()
       }
@@ -210,7 +234,9 @@ export function apply(ctx: ClientContext): void {
     ...creatorDraft === undefined ? {} : { startCreatorDraft: creatorDraft },
     confirmDelete: (id: string | null) => { section.confirmDelete(id) },
     remove: () => section.remove(),
-    makeDefault: (id: string) => section.makeDefault(id),
+    makeDefault: (id: string) => section.makeDefault(id, captureBlankSessionSync()),
+    setPickerVisible: (showPicker: boolean) => section.setPickerVisible(
+      showPicker, captureBlankSessionSync()),
   })
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({

@@ -1,0 +1,30 @@
+# Exercise the shipped headless profile with deterministic model output.
+- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: agent-loop
+  config:
+    agents:
+      - id: main
+        provider: cordis-inspection
+        model: cordis-inspection
+        cwd: !!js process.cwd()
+- id: agent-instructions
+  disabled: true
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+- id: skill-filesystem
+  config:
+    dshHome: './.dsh-home'
+    agentsHome: './.agents-home'
+- insert:
+    - id: cordis-host-runner
+      name: '@deepseek-ai/dsh-cordis-host-runner'
+    - id: tool-cordis
+      name: '@deepseek-ai/dsh-tool-cordis'
+    - id: cordis-inspection-llm
+      name: '../../../../../../apps/cli/tests/profiles/headless/tests/fixtures/cordis-inspection-llm.ts'

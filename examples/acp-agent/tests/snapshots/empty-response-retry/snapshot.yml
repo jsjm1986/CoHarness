@@ -1,0 +1,7 @@
+version: 1
+scenario: empty-response-retry
+profile: acp
+composition: retry
+recording: authored
+header:
+  class: default

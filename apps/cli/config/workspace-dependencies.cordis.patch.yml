@@ -1,0 +1,7 @@
+# The payload belongs to this node; SSH targets cannot use its paths.
+- insert:
+    - id: workspace-dependencies
+      name: '@deepseek-ai/dsh-workspace-dependencies'
+      config:
+        source: !!js process.env.DSH_WORKSPACE_RUNTIME_SOURCE
+        root: !!js dshHomePath('workspace-runtime')

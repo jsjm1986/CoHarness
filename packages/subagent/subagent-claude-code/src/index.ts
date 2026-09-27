@@ -6,6 +6,8 @@
  * @module @deepseek-ai/dsh-subagent-claude-code
  */
 
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -13,10 +15,13 @@ import {
   assertPositiveFinite,
   NO_START_CAPABILITIES,
   resolveChildCwd,
+  type ContinuableCreateRequest,
+  type ContinuableCreateSpec,
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
   type SubagentProvider,
 } from '@deepseek-ai/dsh-subagent'
+import { ExternalBindingStore, externalMemberIdentity } from '@deepseek-ai/dsh-subagent/external'
 import {
   CLAUDE_CODE_PERMISSION_MODES,
   DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
@@ -26,6 +31,13 @@ import {
   type ClaudeCodePermissionMode,
   type ClaudeCodeRunSpec,
 } from './run.ts'
+import {
+  CLAUDE_MEMBER_MODEL,
+  CLAUDE_MEMBER_ROUTE,
+  ClaudeMemberAdapter,
+  ClaudeMemberTransport,
+  type ClaudeMemberConfig,
+} from './member.ts'
 
 export const name = 'subagent-claude-code'
 export const inject = ['subagents', 'subprocess']
@@ -54,6 +66,17 @@ export interface Config {
   permissionMode?: ClaudeCodePermissionMode
   /** Grace in milliseconds between Claude Code managed-range termination tiers. */
   disposeGraceMs?: number
+  /**
+   * Directory holding the instance-specific member binding store (default `claude-code.jsonl`),
+   * which maps each durable child session to its Claude session id and pending
+   * prompt. Required only for continuable members; defaults under `~/.dsh`.
+   */
+  stateDir?: string
+  /**
+   * Workspace for persistent member sessions. Member turns have no parent
+   * Agent to inherit one from; defaults to the harness launch directory.
+   */
+  memberCwd?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -63,9 +86,12 @@ export const Config: z<Config> = z.object({
   permissionMode: z.union([...CLAUDE_CODE_PERMISSION_MODES])
     .default(DEFAULT_CLAUDE_CODE_PERMISSION_MODE),
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
+  stateDir: z.string().min(1),
+  memberCwd: z.string().min(1),
 })
 
-type ResolvedConfig = Omit<Required<Config>, 'model'> & Pick<Config, 'model'>
+type ResolvedConfig = Omit<Required<Config>, 'model' | 'stateDir' | 'memberCwd'>
+  & Pick<Config, 'model' | 'stateDir' | 'memberCwd'>
 /* jscpd:ignore-end */
 
 /* jscpd:ignore-start -- Cordis registration and shared-seam plumbing mirror
@@ -73,12 +99,29 @@ type ResolvedConfig = Omit<Required<Config>, 'model'> & Pick<Config, 'model'>
 class ClaudeCodeProvider implements SubagentProvider {
   readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
   readonly inheritsParentContext = false
+  readonly agentRouteDefaults?: Readonly<{ provider: string; model: string }>
 
   constructor(
     readonly name: string,
     private readonly ctx: Context,
     private readonly config: ResolvedConfig,
-  ) {}
+    memberRoute: string | undefined,
+  ) {
+    if (memberRoute !== undefined) {
+      this.agentRouteDefaults = {
+        provider: memberRoute,
+        model: config.model ?? CLAUDE_MEMBER_MODEL,
+      }
+      // Continuable members are in-process Agents whose model calls resolve to
+      // this provider's member route; the external Claude session is bound and
+      // resumed by the member adapter.
+      this.prepareContinuable = (_request: ContinuableCreateRequest) => Promise.resolve({})
+    }
+  }
+
+  declare prepareContinuable?: (
+    request: ContinuableCreateRequest,
+  ) => Promise<ContinuableCreateSpec>
 
   async start(request: ResolvedSubagentStartRequest) {
     const parentCwd = request.parent.session.header.cwd
@@ -137,6 +180,8 @@ export function apply(ctx: Context, config: Config): void {
     env: config.env as Record<string, string>,
     permissionMode: config.permissionMode ?? DEFAULT_CLAUDE_CODE_PERMISSION_MODE,
     disposeGraceMs: config.disposeGraceMs as number,
+    ...config.stateDir === undefined ? {} : { stateDir: config.stateDir },
+    ...config.memberCwd === undefined ? {} : { memberCwd: config.memberCwd },
   }
   assertPositiveFinite(
     'subagent-claude-code',
@@ -148,10 +193,41 @@ export function apply(ctx: Context, config: Config): void {
       `subagent-claude-code: disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`,
     )
   }
+  // Persistent members need the `llm` service to resolve their model route.
+  // When no LLM capability is mounted the provider stays one-shot only:
+  // without `prepareContinuable` the service rejects continuable starts.
+  const llm = ctx.get('llm')
+  const identity = externalMemberIdentity(resolved.providerName, DEFAULT_PROVIDER_NAME, CLAUDE_MEMBER_ROUTE)
+  let memberRoute: string | undefined
+  if (llm !== undefined) {
+    const memberConfig: ClaudeMemberConfig = {
+      cwd: resolved.memberCwd ?? process.cwd(),
+      ...resolved.model === undefined ? {} : { model: resolved.model },
+      permissionMode: resolved.permissionMode,
+      env: resolved.env,
+      disposeGraceMs: resolved.disposeGraceMs,
+    }
+    const store = new ExternalBindingStore(
+      join(resolved.stateDir ?? join(homedir(), '.dsh', 'external-members'), identity.filename),
+    )
+    const transport = new ClaudeMemberTransport(
+      memberConfig,
+      spec => ctx.subprocess.spawn(spec),
+    )
+    ctx.effect(() => {
+      const registration = llm.registerAdapter(
+        [identity.route],
+        new ClaudeMemberAdapter(transport, store),
+      )
+      return () => { registration() }
+    })
+    memberRoute = identity.route
+  }
   ctx.subagents.registerProvider(new ClaudeCodeProvider(
     resolved.providerName,
     ctx,
     resolved,
+    memberRoute,
   ))
 }
 /* jscpd:ignore-end */

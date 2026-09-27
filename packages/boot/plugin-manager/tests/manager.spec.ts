@@ -10,7 +10,8 @@ import {
   boot, composeEntries, initProfile, readProfilePatches, readProfileManifest, reconcileProfilePatches, OPTIONAL_BUNDLES,
   type ProfileContext,
 } from '@deepseek-ai/dsh-app-boot'
-import PluginManager, { type Config, type PluginChange, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import PluginManager, { type Config, type PluginInstallFrame, type PluginChange, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -62,6 +63,73 @@ async function fixture(reload: 'live' | 'startup' = 'live', overlay = false, pre
   }
   return { ctx, dir, manager: ctx.pluginManager, bundle, profile, stopHmr, overlays }
 }
+
+it('requires deployment authorization before exposing a managed profile', async () => {
+  const authorize = vi.fn(async () => { throw new Error('administrator required') })
+  const { manager } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { authorize, protectedModules: new Set<string>() })
+  }, { authorization: 'required' })
+  await expect(manager.listPlugins()).rejects.toThrow('administrator required')
+  expect(authorize).toHaveBeenCalledOnce()
+})
+
+it('fails closed when a required deployment authority is unavailable', async () => {
+  const { manager } = await fixture('startup', false, undefined, { authorization: 'required' })
+  await expect(manager.listPlugins()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+})
+
+it('rejects every management entry before profile mutation when deployment authority denies', async () => {
+  const { manager, dir } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => { throw new Error('administrator required') },
+    })
+  }, { authorization: 'required' })
+  const profileFiles = () => ['package.json', 'pnpm-workspace.yaml', 'cordis.patch.yml'].map((name) => {
+    const path = join(dir, name)
+    return existsSync(path) ? readFileSync(path, 'utf8') : undefined
+  })
+  const before = profileFiles()
+  const operations = [
+    () => manager.listPlugins(), () => manager.listBundles(), () => manager.inspect('bundle'),
+    () => manager.setPluginEnabled('include:managed' as Parameters<PluginManager['setPluginEnabled']>[0], false),
+    () => manager.setBundleEnabled('extra', false), () => manager.installBundle('bundle'),
+    () => manager.cancelInstall('unstarted' as PluginInstallRequestId), () => manager.removeBundle('extra'),
+  ]
+  for (const operation of operations) await expect(operation()).rejects.toThrow('administrator required')
+  expect(profileFiles()).toEqual(before)
+})
+
+it('refuses a bundle that replaces a protected entry or overrides its owner', async () => {
+  const { manager, dir, bundle, ctx } = await fixture()
+  const owner = ctx.loader.resolve('include:manager').fiber
+  for (const patch of [{ id: 'manager', disabled: true }, { id: 'include', disabled: true },
+    { insert: [{ id: 'manager', name: './plugin.mjs' }] }]) {
+    bundle('replacement', [])
+    writeFileSync(join(dir, 'node_modules', 'replacement', 'cordis.patch.yml'), JSON.stringify([patch]))
+    expect(await manager.setBundleEnabled('replacement', true)).toMatchObject({
+      changed: false, application: 'failed', error: { code: 'management-required' },
+    })
+    expect(ctx.loader.resolve('include:manager').fiber === owner).toBe(true)
+    expect(readProfileManifest('test', dir).dsh?.profile?.bundles).not.toContain('replacement')
+  }
+})
+
+it('protects deployment policy modules from profile toggles and bundle removal', async () => {
+  const modules = new Set<string>()
+  const { manager, dir } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { protectedModules: modules, authorize: async () => {} })
+  }, { authorization: 'required' })
+  modules.add(pathToFileURL(join(dir, 'node_modules', 'extra', 'plugin.mjs')).href)
+  const entry = (await manager.listPlugins()).find(row => row.entryId === 'include:managed')!
+  expect(entry.readOnlyReason).toBe('management-required')
+  expect(await manager.setPluginEnabled(entry.entryId, false)).toMatchObject({
+    changed: false, application: 'failed', error: { code: 'management-required' },
+  })
+  expect(await manager.setBundleEnabled('extra', false)).toMatchObject({
+    changed: false, application: 'failed', error: { code: 'management-required' },
+  })
+  expect(await manager.removeBundle('extra')).toMatchObject({ changed: false, application: 'failed' })
+})
 
 it('lists bundle versions and current-profile plugin targets', async () => {
   const { manager, dir } = await fixture()
@@ -219,7 +287,7 @@ it('retains approved policy and reports it as changed when the registry fails be
   expect(parse(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8'))).toEqual({ allowBuilds: { native: true } })
 })
 
-it('runs a real pnpm dependency script only after approval and retry', async () => {
+it('runs a real pnpm dependency script only after approval and retry', { timeout: 30_000 }, async () => {
   const { manager, dir, profile } = await fixture('startup')
   const addon = join(profile.cwd, 'addon')
   mkdirSync(addon)
@@ -531,6 +599,7 @@ it('stops a run on request, restores the files, and answers not-running or too-l
   const before = readFileSync(join(dir, 'package.json'), 'utf8')
   const run = manager.installBundle('slow', { requestId })
   await started.promise
+  await expect(manager.installBundle('replacement', { requestId })).rejects.toThrow('already running')
   expect(await manager.cancelInstall('00000000-0000-4000-8000-000000000000' as PluginInstallRequestId)).toEqual({ status: 'not-running' })
   expect(await manager.cancelInstall(requestId)).toEqual({ status: 'cancelled' })
   expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
@@ -744,7 +813,7 @@ it('applies watched configuration while pnpm installation is still running', asy
   expect(ctx.get('managedProbe')).toBeUndefined()
 })
 
-it('installs and removes with the bundled pnpm when PATH contains no pnpm', async () => {
+it('installs and removes with the bundled pnpm when PATH contains no pnpm', { timeout: 30_000 }, async () => {
   const pnpm = fileURLToPath(new URL('../node_modules/pnpm/bin/pnpm.mjs', import.meta.url))
   const { manager, dir } = await fixture('startup', false, undefined, { pnpmCommand: 'must-not-be-used' }, {
     command: process.execPath, args: ['--expose-internals', pnpm], env: { PATH: '', ELECTRON_RUN_AS_NODE: '1' },
@@ -766,4 +835,124 @@ it('installs and removes with the bundled pnpm when PATH contains no pnpm', asyn
   expect(removed.error).toBeUndefined()
   expect(removed.packageResult?.exitCode).toBe(0)
   expect(readProfileManifest('test', dir).dependencies ?? {}).not.toHaveProperty('@test/desktop-manager')
+})
+
+it('cancels a tool-owned installation and restores its manifest before settling', async () => {
+  const { manager, dir } = await fixture('startup')
+  const controller = new AbortController()
+  const started = Promise.withResolvers<undefined>()
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, _args, options) => {
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, pending: '1' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    const cancelled = Promise.withResolvers<undefined>()
+    options.signal!.addEventListener('abort', () => { cancelled.resolve(undefined) }, { once: true })
+    started.resolve(undefined)
+    await cancelled.promise
+    return { exitCode: 1, output: 'cancelled', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { controller.abort(); install.mockRestore() })
+  const run = manager.installBundle('pending', undefined, controller.signal)
+  try {
+    await started.promise
+    controller.abort(new Error('executing agent lost its authority'))
+    await expect(run).resolves.toMatchObject({ application: 'cancelled', changed: false })
+    expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  } finally {
+    controller.abort()
+    await run
+  }
+})
+
+it('restores an installation when its administrator loses permission before activation', async () => {
+  let allowed = true
+  const { manager, dir, bundle, ctx } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { protectedModules: new Set<string>(), authorize: async () => {
+      if (!allowed) throw new Error('administrator revoked')
+    } })
+  }, { authorization: 'required' })
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async () => {
+    bundle('pending', [{ id: 'pending', name: './plugin.mjs', config: { service: 'revokedActivation' } }])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, pending: '1' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    allowed = false
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  await expect(manager.installBundle('pending')).resolves.toMatchObject({ application: 'failed', changed: false, error: { diagnostic: 'administrator revoked' } })
+  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  const remaining: unknown = ctx.get('revokedActivation', false)
+  expect(remaining).toBeUndefined()
+})
+
+it('streams one installation through the owning manager and removes its listeners', async () => {
+  const { ctx, dir, manager, bundle } = await fixture()
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, args, options) => {
+    options.onOutput?.('installing package\n', 'stdout')
+    const name = String(args[1])
+    bundle(name, [])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, [name]: '1.0.0' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  const frames: PluginInstallFrame[] = []
+  for await (const frame of manager.installBundleStream('streamed-admin', {
+    requestId: '00000000-0000-4000-8000-000000000077' as PluginInstallRequestId, enabled: false,
+  }, new AbortController().signal)) frames.push(frame)
+  expect(frames[0]).toMatchObject({ type: 'progress', progress: { phase: 'installing' } })
+  expect(frames).toContainEqual(expect.objectContaining({ type: 'log', chunk: expect.objectContaining({ text: 'installing package\n' }) as unknown }))
+  expect(frames.at(-1)).toMatchObject({ type: 'result', value: { application: 'applied', bundle: 'streamed-admin' } })
+  expect(ctx.events._hooks['plugin-manager/install-log']).toHaveLength(0)
+})
+
+it.each([1, 2])('stops activation when cancellation arrives at post-install authorization %s', async (checkpoint) => {
+  const abort = new AbortController()
+  let installed = false, checks = 0
+  const { manager, dir, bundle } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { protectedModules: new Set<string>(), authorize: async () => {
+      if (installed && ++checks === checkpoint) abort.abort()
+    } })
+  }, { authorization: 'required' })
+  const before = readFileSync(join(dir, 'package.json'), 'utf8')
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async () => {
+    bundle('cancelled-before-activation', [])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, 'cancelled-before-activation': '1.0.0' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    installed = true
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  await expect(manager.installBundle('cancelled-before-activation', {}, abort.signal)).resolves.toMatchObject({ application: 'cancelled', changed: checkpoint === 2 })
+  expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core', 'extra'])
+  if (checkpoint === 1) expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before)
+  else expect(readProfileManifest('test', dir).dependencies).toHaveProperty('cancelled-before-activation')
+})
+
+it('acknowledges a queued install before the writer lock and cancels without spawning pnpm', async () => {
+  const { manager, dir } = await fixture('startup')
+  const ready = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+  const owner = withFileLock(join(dir, 'package.json'), async () => { ready.resolve(undefined); await release.promise })
+  await ready.promise
+  const install = vi.spyOn(operations, 'runProfilePnpm')
+  onTestFinished(() => { install.mockRestore() })
+  const requestId = 'queued-admin-install' as PluginInstallRequestId
+  const stream = manager.installBundleStream('never-started', { requestId }, new AbortController().signal)
+  const iterator = stream[Symbol.asyncIterator]()
+  try {
+    expect(await iterator.next()).toMatchObject({ value: { type: 'progress', progress: { requestId, phase: 'installing' } } })
+    const cancelled = manager.cancelInstall(requestId)
+    release.resolve(undefined)
+    await owner
+    expect(await cancelled).toEqual({ status: 'cancelled' })
+    const frames: PluginInstallFrame[] = []
+    for (let item = await iterator.next(); !item.done; item = await iterator.next()) frames.push(item.value)
+    expect(frames.at(-1)).toMatchObject({ type: 'result', value: { changed: false, application: 'cancelled' } })
+    expect(install).not.toHaveBeenCalled()
+  } finally { release.resolve(undefined); await owner; await iterator.return?.() }
 })

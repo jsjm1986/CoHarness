@@ -135,7 +135,7 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
 export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePanelProps) {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
   return (
-    <span ref={rootRef} className={css.root}>
+    <span ref={rootRef} className={css.root} role="group" aria-label={t('message.turnTime.title')}>
       <button
         type="button"
         className={css.trigger}

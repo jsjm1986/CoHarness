@@ -11,13 +11,14 @@
  * @module @deepseek-ai/dsh-subagent-in-process-driver
  */
 
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { foldConsumedWork } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionLogOffset as SessionLogOffsetType, TurnEndReason } from '@deepseek-ai/dsh-session'
-import { createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, MessageId, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
@@ -147,6 +148,8 @@ export async function startInProcessRun(
     childId,
     activationBoundary,
     structured,
+    parent,
+    inherited.executionScope,
   )
 }
 
@@ -161,6 +164,8 @@ function drivePublishedRun(
   childId: SessionId,
   boundary: SessionLogOffsetType,
   structured: StructuredAttachment | undefined,
+  parent: Agent,
+  executionScope?: ExecutionInheritance,
 ): SubagentRun {
   const child = handle.agent
   const flags = { cancelled: false }
@@ -177,8 +182,13 @@ function drivePublishedRun(
   const result: Promise<SubagentResult> = (async () => {
     try {
       if (!flags.cancelled) {
-        child.followup(createUserMessage({ content: prompt, source: { kind: 'user' } }))
+        child.followup(createUserMessage({ content: prompt, source: { kind: 'user',
+          ...(executionScope === undefined ? {} : { gatewayExecutionScope: executionScope }) } }))
         await child.whenIdle()
+      }
+      const authority = executionAuthorityOf(parent.ctx)
+      if (authority !== undefined) {
+        await authority.relay(parent.session, authority.capture(child), MessageId(`subagent-result:${child.id}`), signal)
       }
       return readResult(
         child,

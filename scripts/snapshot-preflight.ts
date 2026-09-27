@@ -22,6 +22,8 @@ export function snapshotRecordPreflight(environment: NodeJS.ProcessEnv = process
   requireSnapshotRecordKey(environment)
 }
 
+export { webLiveRequested } from '../apps/web/tests/web-live.ts'
+
 if (import.meta.main) {
   snapshotRecordPreflight()
   process.stdout.write('snapshot record preflight: DEEPSEEK_API_KEY is available\n')

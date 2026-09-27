@@ -197,3 +197,10 @@
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-mobile-font-section);
 }
+
+.unavailable {
+  display: block;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}

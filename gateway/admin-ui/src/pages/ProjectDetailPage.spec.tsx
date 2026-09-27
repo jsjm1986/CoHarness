@@ -37,7 +37,7 @@ const alice = {
   role: 'user' as const,
   status: 'active' as const,
   homePath: '/home/alice',
-  mustChangePassword: false,
+  mustChangePassword: false, autoReviewEligible: false,
   port: 9101,
   instanceState: 'running',
 }

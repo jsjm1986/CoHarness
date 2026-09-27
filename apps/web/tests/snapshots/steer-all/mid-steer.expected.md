@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 tool call · 1 intermediate message" [expanded]:
   - text: 1 tool call · 1 intermediate message
   - img
@@ -16,7 +18,8 @@
   - img
   - img
   - text: System prompt
-- text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop. {{clock}}
+- text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":

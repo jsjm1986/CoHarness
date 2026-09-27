@@ -351,7 +351,7 @@ export async function listDirectory(target: LocalTarget, signal?: AbortSignal, m
         ...(childInfo?.type === 'file' ? { size: childInfo.size } : {}),
       })
     } catch (error: unknown) {
-      throw listingIoError(join(target.displayPath, entry.name), error)
+      throw listingIoError(localDisplayPath(target.displayPath, entry.name), error)
     }
     throwIfAborted(signal, 'list')
   }

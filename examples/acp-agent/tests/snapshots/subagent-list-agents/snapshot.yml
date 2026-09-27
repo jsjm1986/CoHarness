@@ -1,0 +1,9 @@
+version: 1
+scenario: subagent-list-agents
+profile: acp
+composition: acp-agent
+recording: authored
+header:
+  class: default
+workspace:
+  final: true

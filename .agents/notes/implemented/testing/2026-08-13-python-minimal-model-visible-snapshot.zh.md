@@ -10,7 +10,7 @@ Python 通道从未比对极简组合实际展示给模型的内容。动态运�
 
 ## 决策
 
-[打包运行时冒烟测试](../../../../scripts/smoke-python-runtime.py)的 `sdk-minimal` 场景会录制 `scripts/snapshots/python-sdk-single-exe/minimal/model-visible.json`：对该回合的每个模型请求，逐字记录对外公布的工具 schema 与消息列表。system 与 user 消息保留全文，仅将场景的临时目录替换为占位符；assistant 与 tool 消息只保留调用标识，因为它们的 PTY 与文件系统文本在期望输出需要重放的各平台上并不相同。
+[打包运行时冒烟测试](../../../../scripts/smoke-python-runtime.py)的 `sdk-minimal` 场景会录制 `scripts/snapshots/python-sdk-single-exe/minimal/model-visible.json`：对该回合的每个模型请求，逐字记录对外公布的工具 schema 与消息列表。极简组合按平台选择持久 shell 方言，因此 Windows 重放 `minimal/win-x64/model-visible.json`——该文件固定 `pwsh` 工具的 schema 与面向 PowerShell 的文本；其余平台使用根目录文件。system 与 user 消息保留全文，仅将场景的临时目录替换为占位符；assistant 与 tool 消息只保留调用标识，因为它们的 PTY 与文件系统文本在期望输出需要重放的各平台上并不相同。
 
 有一条模型可见消息被排除在外：agent loop 的动态运行时上下文快照。同一组合在 macOS 上会发出它，在必需车道所用的 Linux 上不会，因此任何单一期望输出都无法承载它。该差异本身就是缺陷（[#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)）——这份期望输出覆盖其余全部模型可见消息，而不是等它先被修复。
 

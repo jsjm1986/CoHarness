@@ -259,19 +259,31 @@ export class CardForm<T> {
    */
   async save(): Promise<void> {
     const plan = this.plan()
-    const writes = plan.flatMap(item => item.run === undefined ? [] : [item.run])
-    if (plan.length === 0 || this.saving || writes.length !== plan.length) return
+    const writes = plan.flatMap(item => item.run === undefined ? [] : [{ field: item.field, run: item.run }])
+    const snapshot = this.scope.getSnapshot()
+    if (plan.length === 0 || this.saving || writes.length !== plan.length || !snapshot.writable || snapshot.status !== 'ready') return
+    const drafts = new Map(this.staged)
     this.saving = true
     this.failed = false
     this.publish()
     let landed = true
-    for (const write of writes) {
-      landed = await write() && landed
+    try {
+      for (const { field, run } of writes) {
+        const current = this.scope.getSnapshot()
+        if (!current.writable || current.status !== 'ready' || !await run()) {
+          landed = false
+          break
+        }
+        if (this.staged.get(field) === drafts.get(field)) this.staged.delete(field)
+      }
+    } catch {
+      // A settings or credential transport failure leaves unacknowledged drafts retryable.
+      landed = false
+    } finally {
+      this.saving = false
+      this.failed = !landed
+      this.publish()
     }
-    if (landed) this.staged.clear()
-    this.saving = false
-    this.failed = !landed
-    this.publish()
   }
 
   /**

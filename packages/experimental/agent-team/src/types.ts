@@ -1,5 +1,6 @@
 /** Public Agent Teams identities, durable records, and service request values. */
 
+import type { ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -98,6 +99,8 @@ export interface TeamTaskView {
 
 /** One peer message retained until its target Session records it. */
 export interface TeamMessageSnapshot {
+  /** Captured participants; Team routing never recovers identity from the latest caller. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly id: TeamMessageId
   readonly senderId: SessionId
   readonly senderName: string
@@ -108,6 +111,8 @@ export interface TeamMessageSnapshot {
 
 /** Source retained by the target Session for durable mailbox de-duplication. */
 export interface TeamMessageSource {
+  /** Verified adjacent routing-host scope for this exact queued delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly kind: 'team-message'
   readonly teamId: TeamId
   readonly messageId: TeamMessageId

@@ -12,13 +12,15 @@ Agent Teams 的服务与工具约定仍在变化，但它需要使用真实 Sess
 
 ## 决策
 
-`packages/experimental/agent-team` 与 `packages/experimental/tool-agent-team` 是私有 workspace 包。[实验性包命名决策](2026-08-19-experimental-package-name-prefix.zh.md)负责其 npm 名和 promotion 重命名；本记录负责其目录归属、发布排除与依赖隔离。
+`packages/experimental/agent-team` 与 `packages/experimental/tool-agent-team` 位于 `packages/experimental/`。[实验性包命名决策](2026-08-19-experimental-package-name-prefix.zh.md)负责其 npm 名和 promotion 重命名；[发布拒绝名单决策](../process/2026-09-12-experimental-publication-denylist.zh.md)负责其发布族成员资格，并已取代原先的默认私有规则——这两个包与所有未列入拒绝名单的实验性目录一样，现在通过 `publishConfig.access: public` 发布。本记录保留其目录归属与依赖隔离。
 
-dsh pack 与 publish 集合以及本地 baseline 发布器均排除 `packages/experimental/` 下的所有 manifest。`release:dsh` 仍会让这些 manifest 跟随 dsh 共享版本递增，但不会创建发布 tag。workspace 约束要求每个实验性包设置 `private: true` 并省略 `publishConfig`。同一个顶层检查会拒绝发布包、发布 app 或 Python runtime 通过 `dependencies`、`optionalDependencies` 或 `peerDependencies` 依赖实验性包。实验性包可以依赖发布包和其他实验性包；测试可以通过 `devDependencies` 使用它们，示例可以显式加载它们。
+同一个顶层检查会拒绝发布包、发布 app 或 Python runtime 通过 `dependencies`、`optionalDependencies` 或 `peerDependencies` 依赖实验性包。实验性包可以依赖发布包和其他实验性包；测试可以通过 `devDependencies` 使用它们，示例可以显式加载它们。
+
+`packages/experimental/agent-team-profile` 以可选 cordis patch 层组合宿主侧接缝，`packages/experimental/agent-team-web-profile` 增补浏览器层，`packages/experimental/client-ui-agent-team` 承载 Web UI。该 UI 包仅在宿主 Team 服务存在时挂载团队视图，通过 sessions 服务而非 workspace 浏览器打开队友会话，并经授权的 Typert 面调用 `agentTeams/*` 远端方法。
 
 通用的调用方预留 continuable child 身份和精确 direct-child drain 仍属于稳定 Subagent 服务。它们负责 Subagent 身份与 Activation 生命周期，不 import 或命名 Agent Teams；实验性 Team 服务沿允许的方向消费这些能力。
 
-实验性状态只改变发布与兼容性预期。这些包仍须满足仓库的一般文档、不变式、生命周期、安全、单元测试、真实组合测试和快照要求。promotion 前必须评审公开约定、限制、测试证据、发布 payload、运行时依赖方，并由一名具名 owner 接受稳定包义务。
+实验性状态只改变兼容性预期。这些包仍须满足仓库的一般文档、不变式、生命周期、安全、单元测试、真实组合测试和快照要求。promotion 前必须评审公开约定、限制、测试证据、发布 payload、运行时依赖方，并由一名具名 owner 接受稳定包义务。
 
 ## 曾考虑的替代方案
 

@@ -8,19 +8,19 @@
 
 变更通过 `ctx.remote.messageFeedback` 提交，按条目的 compare-and-set 由 Host 负责。每次 `put` 和 `delete` 都携带本 controller 最后观察到的 `version`；`version-conflict` 响应会带回权威条目，因此竞争失败时直接用该响应对账，无需重新拉取整个 Session。变更按 Session 串行，排队中的操作总是与已提交的版本比较。再次点击已记录的评分会撤回反馈；切换到另一侧会保留已有备注。
 
-`/client` 导出插件本体（`apply`/`inject`）、`MessageFeedbackActions` 组件、`MessageFeedbackController` 类以及注入面类型。
+`/client` 导出插件主体（`apply`／`inject`）及公开类型；组件与控制器保持内部实现。
 
 ## 概述
 
-本包是 Web GUI 的反馈界面：已定稿助手消息动作条中的 Like/Dislike 对、输入框浮层中的反馈弹窗及其确认与失败 toast，以及让不带文本的 `/feedback` 打开弹窗的装饰。点赞和点踩都会打开弹窗，先收集分类与可选描述，再记录所选评分。每个 Session 一个 surface 支撑所有条目，因此一次列表读取即可填充整段对话，一个弹窗同时服务 Session 与其消息。评分、分类与备注是仅写日志的 Session 事件，绝不进入模型上下文。
+消息控件继续在 Host 拥有的 sidecar 中保存可编辑评分与备注。单独输入 `/feedback` 会打开独立的 Session 弹窗，收集分类与可选说明；`/feedback <text>` 保留命令确认结果。弹窗通过 `sessionFeedback.record` 提交，追加一条仅写日志的 `feedback/record`，并可能按部署的遥测策略触发 Session 日志投递。两条路径均不启动模型回合。提交被拒绝时保留草稿供修正，成功后显示确认。草稿按 Session 隔离，在对应作用域结束时丢弃；迟到响应不能重新打开它。
 
 ## 不变量
 
-**运行时不变量：** 未发布配套入口。反馈记录位于 Host 拥有的 sidecar 域中；浏览器侧只渲染操作条与确认对话框，不持有反馈状态。
+**运行时不变量：** 未发布配套入口。Host 拥有持久反馈；客户端控制器管理可销毁的读取、草稿和提交状态。
 
 ## 模型体验
 
-无。评分、分类与备注是仅写日志的事件，不是模型输入。可选的 Session 日志投递使用请求元数据，而非模型上下文。
+无，因为消息评分仍保存在 sidecar 中，Session 意见仅写日志；两者均不进入模型上下文。
 
 #### KV Cache 影响
 

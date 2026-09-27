@@ -19,7 +19,10 @@ beforeEach(() => { localStorage.clear() })
 describe('createLayoutStore', () => {
   it('initializes the sidebar at its default width, details closed, wide viewport assumed', () => {
     const { store } = createLayoutStore().create()
-    expect(store.getSnapshot()).toEqual({ sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false })
+    expect(store.getSnapshot()).toEqual({
+      sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false,
+      rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
+    })
   })
 
   it('each create() is an independent instance (factory is not a singleton)', () => {
@@ -55,35 +58,47 @@ describe('createLayoutStore', () => {
     actions.setSidebar(400)
     actions.setNarrow(true)
     actions.toggleSidebar()
-    expect(store.getSnapshot()).toEqual({ sidebar: 400, details: 0, narrow: true, narrowExpanded: true })
+    expect(store.getSnapshot()).toEqual({
+      sidebar: 400, details: 0, narrow: true, narrowExpanded: true,
+      rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
+    })
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(false)
     expect(store.getSnapshot().sidebar).toBe(400)
   })
 
-  it('narrow openDetails collapses the squeeze-open sidebar: one narrow surface at a time', () => {
+  it('a rightbar presentation report collapses the squeeze-open sidebar: one narrow surface at a time', () => {
     const { store, actions } = createLayoutStore().create()
     actions.setNarrow(true)
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(true)
-    actions.openDetails()
-    expect(store.getSnapshot()).toMatchObject({ details: DETAILS_DEFAULT, narrowExpanded: false })
+    actions.openRightbar(true, false)
+    expect(store.getSnapshot()).toMatchObject({
+      details: DETAILS_DEFAULT, narrowExpanded: false,
+      rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false,
+    })
   })
 
-  it('narrow toggleSidebar while details is open swaps surfaces instead of sharing the frame', () => {
+  it('narrow sidebar requests leave auxiliary dismissal to the frame owner', () => {
     const { store, actions } = createLayoutStore().create()
     actions.setNarrow(true)
-    actions.openDetails()
+    actions.openRightbar(true, false)
     actions.toggleSidebar()
-    expect(store.getSnapshot()).toMatchObject({ details: 0, narrowExpanded: true })
+    expect(store.getSnapshot()).toMatchObject({
+      details: DETAILS_DEFAULT, narrowExpanded: true,
+      rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false,
+    })
     // The swap is symmetric: opening details again re-collapses the rail.
-    actions.openDetails()
-    expect(store.getSnapshot()).toMatchObject({ details: DETAILS_DEFAULT, narrowExpanded: false })
+    actions.openRightbar(true, false)
+    expect(store.getSnapshot()).toMatchObject({
+      details: DETAILS_DEFAULT, narrowExpanded: false,
+      rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false,
+    })
   })
 
   it('wide toggleSidebar is unaffected by an open details panel', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.openDetails()
+    actions.openRightbar(true, false)
     actions.toggleSidebar()
     expect(store.getSnapshot()).toMatchObject({ sidebar: 0, details: DETAILS_DEFAULT })
   })
@@ -109,26 +124,29 @@ describe('createLayoutStore', () => {
     actions.setNarrow(true)
     expect(store.getSnapshot().narrowExpanded).toBe(true)
     actions.setNarrow(false)
-    expect(store.getSnapshot()).toMatchObject({ narrow: false, narrowExpanded: false })
+    expect(store.getSnapshot()).toMatchObject({
+      narrow: false, narrowExpanded: false,
+      rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
+    })
     actions.setNarrow(true)
     expect(store.getSnapshot().narrowExpanded).toBe(false)
   })
 
-  it('openDetails uses the contract default, preserves an open width, and closeDetails zeroes', () => {
+  it('rightbar reports preserve resized width while releasing the visible track', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.openDetails()
+    actions.openRightbar(true, false)
     expect(store.getSnapshot().details).toBe(DETAILS_DEFAULT)
     actions.setDetails(500)
-    actions.openDetails()
+    actions.openRightbar(true, false)
     expect(store.getSnapshot().details).toBe(500)
-    actions.closeDetails()
-    expect(store.getSnapshot().details).toBe(0)
+    actions.closeRightbar()
+    expect(store.getSnapshot()).toMatchObject({ details: 500, rightbarShown: false, rightbarTrack: false })
   })
 
   it('does not persist panel geometry', () => {
     const first = createLayoutStore().create()
     first.actions.setSidebar(400)
-    first.actions.openDetails()
+    first.actions.openRightbar(true, false)
     first.actions.setDetails(500)
     expect(localStorage.getItem(PERSIST_KEY)).toBeNull()
 
@@ -138,6 +156,7 @@ describe('createLayoutStore', () => {
       details: 0,
       narrow: false,
       narrowExpanded: false,
+      rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })
   })
 })

@@ -8,13 +8,13 @@ The mechanism is two seams. Entry contexts chain to the context a subtree was pl
 
 ## Summary
 
-Use `dsh-agent-presets` to give each session the tools, prompt sections, and skills named by one preset's `agent.cordis.yml`. One process can run sessions with different presets while keeping their state separate. The preset list combines shipped definitions with configured and user roots, reports why a preset cannot start, and can create a local preset by copying an existing one. Deployments and users can choose defaults; only an empty session may switch presets. Treat every authored preset as trusted configuration because it grants the capabilities of the plugins it selects.
+Use `dsh-agent-presets` to give each session the tools, prompt sections, and skills named by one preset's `agent.cordis.yml`. One process can run sessions with different presets while keeping their state separate. The preset list combines shipped definitions with configured and user roots, reports why a preset cannot start, and can create a local preset by copying an existing one. Deployments and users can choose defaults and whether new-session surfaces offer the choice at all; only an empty session may switch presets. Treat every authored preset as trusted configuration because it grants the capabilities of the plugins it selects.
 
 ## Service: `AgentPresets` (ctx key: `agentPresets`)
 
 Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call, so a preset authored while the process runs is visible immediately and a deleted one disappears from the next read. Discovery also owns preset **health**: a directory whose composition is missing or unloadable (unparsable YAML — checked with the loader's own dialect, `!!js` included — or not a list of named plugin rows) is listed with a `broken` reason rather than skipped, because a skipped directory would still occupy its id on disk while every surface shows nothing to delete. A directory whose name is not a usable preset id (`[a-z0-9][a-z0-9-]*`) is skipped outright: no copy could ever claim it.
 
-- `ctx.agentPresets.defaultId: string` The preset id mounted when a caller names none.
+- `ctx.agentPresets.defaultId: string` The preset id mounted when a caller names none — the settings document's `default` while `modeSelectionEnabled` holds, `config.default` while it does not.
 - `ctx.agentPresets.list(): Promise<AgentPreset[]>` Every preset the configured roots currently supply, earlier root winning a duplicate id; broken presets included, each carrying its reason.
 - `ctx.agentPresets.resolve(id?): Promise<AgentPreset>` One preset by id, defaulting to `defaultId`. Throws naming the available ids when no root supplies it. A broken preset resolves — deleting, reading, and reporting one all need the row.
 - `ctx.agentPresets.mount(agentCtx, id?): Promise<AgentPreset>` Compose one agent from a preset — ensure its standing mount (single-flight) and parent the agent's scope key to it — returning the preset for the caller to record. Refuses a broken preset up front with its discovery-reported reason, so every unloadable shape fails the same way before the loader is involved.
@@ -107,16 +107,19 @@ The roots are resolved once, when the service is constructed. A root set that ch
 
 The SHIPPED root stays an assembly fact: it sits beside the installed app's own config, a path only that app can resolve.
 
-### The default preset is a user setting
+### The default preset and picker visibility are settings
 
-When a settings provider is composed, this plugin registers the `agent-presets` namespace with `config.default` as its composition base, so the user document layers over the deployment's engineering default. In a Gateway project scope, the namespace is writable only for the project owner or an organization administrator; ordinary members can inspect the roster but cannot change the shared default:
+When a settings provider is composed, this plugin registers the `agent-presets` namespace with `config.default` as its composition base, so the user document layers over the deployment's engineering default. In a Gateway project scope, the namespace's fields are writable only for a project manager; ordinary members can inspect the roster but cannot change the shared default or the selection policy:
 
 ```yaml
 agent-presets:
   default: minimal
+  modeSelectionEnabled: false
 ```
 
-The value is read per resolution rather than snapshotted, so a hot-reloaded document takes effect on the next session created and every running session stays on the preset it was composed from. Clearing the user field re-inherits the composition default. A default naming a preset no root supplies is stored without complaint and fails at the next `resolve()` — the roster is a live directory, so a name absent now may exist by the time a session asks for it.
+The default is read per resolution rather than snapshotted, so a hot-reloaded document takes effect on the next session created and every running session stays on the preset it was composed from. Clearing the user field re-inherits the composition default. A default naming a preset no root supplies is stored without complaint and fails at the next `resolve()` — the roster is a live directory, so a name absent now may exist by the time a session asks for it.
+
+`modeSelectionEnabled` (base `true`) decides whether an unnamed session consults the saved `default` at all: while `false` the effective default is `config.default` for every unnamed session and the saved value stays parked until the flag returns. The roster reports both halves of that answer — the flag itself and `isDefault` already resolved — so a client with no settings access stays consistent with the surfaces that have one. Running sessions keep their composition either way; the flag only removes the choice from new-session surfaces.
 
 ## What a mount rejects
 

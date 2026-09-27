@@ -1,4 +1,4 @@
-/** The Web bundle keeps its development-only client HMR row out of production. */
+/** The Web bundle delivers live graphs while artifact polling remains development-only. */
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -19,13 +19,15 @@ function rows(): Record<string, unknown>[] {
 }
 
 describe('Web bundle composition', () => {
-  it('disables client HMR unless the explicit development switch is enabled', () => {
+  it('delivers graphs in production and polls only with the explicit development switch', () => {
     const row = rows().find(candidate => candidate.id === 'client-hmr')
     if (row === undefined) throw new Error('Web patch must mount client-hmr')
     expect(row.name).toBe('@deepseek-ai/dsh-client-hmr')
-    const expression = (row.disabled as { __jsExpr?: string } | undefined)?.__jsExpr
-    if (expression === undefined) throw new Error('client-hmr must carry a disabled expression')
-    expect(Boolean(evaluate({ process: { env: {} } }, expression))).toBe(true)
-    expect(Boolean(evaluate({ process: { env: { DSH_CLIENT_HMR: '1' } } }, expression))).toBe(false)
+    expect(row.disabled).toBeUndefined()
+    const expression = (row.config as { watchArtifacts?: { __jsExpr?: string } }).watchArtifacts?.__jsExpr
+    if (expression === undefined) throw new Error('client-hmr must configure artifact polling')
+    expect(Boolean(evaluate({ process: { env: {} } }, expression))).toBe(false)
+    expect(Boolean(evaluate({ process: { env: { DSH_CLIENT_HMR: '1' } } }, expression))).toBe(true)
+    expect(Boolean(evaluate({ process: { env: { DSH_CLIENT_HMR: 'true' } } }, expression))).toBe(false)
   })
 })

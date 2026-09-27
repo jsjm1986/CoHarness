@@ -16,7 +16,7 @@ const root = resolve(import.meta.dirname, '..')
 describe('generated tsconfig package aliases', () => {
   it.each([
     ['subprocess/control', 'subprocess/subprocess', 'control'],
-    ['session-format/legacy', 'session/session-format', 'legacy'],
+    ['session-format/surface', 'session/session-format', 'surface'],
     ['compaction-image-offload/projection', 'compaction/compaction-image-offload', 'projection'],
   ])('resolves %s from source without requiring emitted declarations', (specifier, packagePath, entry) => {
     const path = resolve(root, 'tsconfig.base.json')

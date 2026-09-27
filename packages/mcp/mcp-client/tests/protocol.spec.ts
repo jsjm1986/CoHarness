@@ -129,13 +129,13 @@ describe('modern MCP connections', () => {
   })
 
   it('delivers caller cancellation to an executing modern tool', async () => {
-    const entered: PromiseWithResolvers<void> = Promise.withResolvers()
-    const cancelled: PromiseWithResolvers<void> = Promise.withResolvers()
+    const entered: PromiseWithResolvers<undefined> = Promise.withResolvers()
+    const cancelled: PromiseWithResolvers<undefined> = Promise.withResolvers()
     const server = new McpServer({ name: 'cancel', version: '1' })
     server.registerTool('wait', { inputSchema: z.object({}) }, async (_args, context) => {
       const signal = context.mcpReq.signal
-      signal.addEventListener('abort', () => { cancelled.resolve() }, { once: true })
-      entered.resolve()
+      signal.addEventListener('abort', () => { cancelled.resolve(undefined) }, { once: true })
+      entered.resolve(undefined)
       await cancelled.promise
       return { content: [] }
     })

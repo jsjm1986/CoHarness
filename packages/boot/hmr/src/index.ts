@@ -304,14 +304,14 @@ class Hmr extends Service {
     }, this.config.debounce)
     this.watcher.on('change', (path) => { changed.add(path); dispatch() })
 
-    const ready = Promise.withResolvers<void>()
+    const ready = Promise.withResolvers<undefined>()
     let readyState: 'pending' | 'resolved' | 'rejected' = root.length === 0 ? 'resolved' : 'pending'
     if (root.length === 0) {
-      ready.resolve()
+      ready.resolve(undefined)
     } else {
       this.watcher.once('ready', () => {
         readyState = 'resolved'
-        ready.resolve()
+        ready.resolve(undefined)
       })
     }
     this.watcher.on('error', (error) => {

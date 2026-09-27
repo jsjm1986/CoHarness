@@ -165,12 +165,14 @@ describe('organization Provider credential layer', () => {
       source: 'organization',
     })
     replacePolicy(process.env.DSH_HOME!, policy(SECONDARY_REF, 2))
+    // The watcher's event delivery plus reload publish can outlast waitFor's
+    // 1s default on a loaded host.
     await vi.waitFor(() => {
       expect(bench.ctx.modelProviderConfig.snapshot()).toMatchObject({
         revision: 2,
         providers: [{ credentialRef: SECONDARY_REF }],
       })
-    })
+    }, { timeout: 10_000 })
     expect(await bench.ctx.credentials.resolve(PRIMARY_REF)).toEqual({
       value: 'sk-personal-primary',
       source: 'memory',

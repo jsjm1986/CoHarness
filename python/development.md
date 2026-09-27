@@ -13,7 +13,7 @@ pnpm install
 pnpm exec tsx scripts/build-exe-for-python-sdk.ts
 ```
 
-Use `--skip-build` when the required `lib/` artifacts already exist, or `--targets=node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64` to select platforms. Products land in `dist-exe/` and the script syncs the selected carriers into `python/sdk-runtime/`. macOS builds also sync the matching spawn helper required by `node-pty`.
+Use `--skip-build` when the required `lib/` artifacts already exist, or `--targets=node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64,node24-win-x64` to select platforms. Build each target on its native platform. Products land in `dist-exe/` and the script syncs the selected carriers into `python/sdk-runtime/`. Windows emits `.exe` and `-rg.exe`; macOS builds also sync the matching spawn helper required by `node-pty`.
 
 ## Validate the SDK
 
@@ -31,10 +31,10 @@ That suite drives fake runtime peers. `scripts/smoke-python-runtime.py` drives t
 
 ```sh
 uv run --project python/sdk python scripts/smoke-python-runtime.py \
-  --scenario sdk-minimal --exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64
+  --scenario sdk-minimal --exe dist-exe/deepseek-harness-sdk-runtime-macos-arm64
 ```
 
-Two scenarios compare committed expected output under `scripts/snapshots/python-sdk-single-exe/`. `minimal/model-visible.json` pins the checked-in minimal composition's assembled system prompts, advertised tool schemas, and model-visible messages, so a plugin that contributes an unintended system section or user message fails the job; it drops the dynamic runtime-context snapshot, which the same composition emits on macOS and not on Linux ([#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)). `advanced/` pins the SDK result and the persisted session logs. Rerun the owning scenario with `--update-snapshots` and review that diff before committing it.
+Two scenarios compare committed expected output under `scripts/snapshots/python-sdk-single-exe/`. `minimal/model-visible.json` pins the Linux/macOS minimal composition's assembled system prompts, advertised tool schemas, and model-visible messages; `minimal/win-x64/model-visible.json` pins its PowerShell counterpart. A plugin that contributes an unintended system section or user message therefore fails the job; both files drop the dynamic runtime-context snapshot, which the same composition emits on macOS and not on Linux ([#2488](https://github.com/deepseek-ai/deepseek-harness/issues/2488)). `advanced/` pins the SDK result and the persisted session logs across every target. Rerun the owning scenario with `--update-snapshots` and review that diff before committing it.
 
 An interactive smoke test needs `DEEPSEEK_API_KEY` in the environment or repository-root `.env`:
 
@@ -69,17 +69,17 @@ print(release["pep440_version"](release["repository_version"]()))
 PY
 )"
 python scripts/build-python-release.py --package sdk --output-dir dist-python
-python scripts/build-python-release.py --package runtime --platform macos-arm64 --runtime-exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64 --output-dir dist-python
+python scripts/build-python-release.py --package runtime --platform macos-arm64 --runtime-exe dist-exe/deepseek-harness-sdk-runtime-macos-arm64 --output-dir dist-python
 pip install \
   "dist-python/deepseek_harness_sdk-$version-py3-none-any.whl" \
   "dist-python/deepseek_harness_runtime_bin-$version-py3-none-macosx_14_0_arm64.whl"
 ```
 
-The runtime distribution is wheel-only. The release pipeline publishes four platform wheels with the pure SDK wheel: Linux x64, Linux arm64, and macOS 14 or newer on arm64 and x64. The platform manifest and wheel build path also carry a wired `win-x64` row — the release carrier set simply does not build `node24-win-x64` yet, so no `win_amd64` wheel is published. A `python-v<repository-version>` tag is accepted only when it matches the repository version; prerelease repository versions such as `0.0.1-rc.1` use their normalized PEP 440 spelling, such as `0.0.1rc1`, inside wheel filenames and metadata. The CoHarness version `0.1.2-alpha.3.coharness.1` uses the public spelling `0.1.2a3.post1` in Python wheel filenames and metadata, because a PEP 440 local version is not suitable for a public index.
+The runtime distribution is wheel-only. The release pipeline publishes five platform wheels with the pure SDK wheel: Linux x64, Linux arm64, macOS 14 or newer on arm64 and x64, and Windows x64 (`win_amd64`). A `python-v<repository-version>` tag is accepted only when it matches the repository version; prerelease repository versions such as `0.0.1-rc.1` use their normalized PEP 440 spelling, such as `0.0.1rc1`, inside wheel filenames and metadata. The CoHarness version `0.1.2-alpha.3.coharness.1` uses the public spelling `0.1.2a3.post1` in Python wheel filenames and metadata, because a PEP 440 local version is not suitable for a public index.
 
 ## Validate a release candidate
 
-Label a pull request `python-release-dry-run`, or manually run the GitHub `Release (Python)` workflow with `publish=false`, to build all four wheels, install the Linux release set on Python 3.10 and 3.14, check exact filenames and metadata, enforce PyPI's default per-file size limit, and retain one aggregate artifact with SHA-256 hashes. Both paths have no registry credentials; a pull request run cannot enter either publication job.
+Label a pull request `python-release-dry-run`, or manually run the GitHub `Release (Python)` workflow with `publish=false`, to build all five wheels, install the Linux release set on Python 3.10 and 3.14, check exact filenames and metadata, enforce PyPI's default per-file size limit, and retain one aggregate artifact with SHA-256 hashes. Both paths have no registry credentials; a pull request run cannot enter either publication job.
 
 Public publication runs from the private automation repository; package metadata points to the separate read-only public source mirror, which does not run release Actions. The private repository defines the repository variable `PYPI_PUBLISHER_REPOSITORY` as its own `owner/name` and keeps `PUBLIC_PYPI_RELEASE_ENABLED=false` except during an intentional release.
 

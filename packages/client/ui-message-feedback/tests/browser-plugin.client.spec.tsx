@@ -11,11 +11,11 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup } from '@testing-library/react'
-import { SlotRegistry, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry, createScope, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { MessageFeedbackItem, MessageFeedbackVersion } from '@deepseek-ai/dsh-message-feedback/types'
-import type { MessageFeedbackInjected } from '../src/client/slots.ts'
+import type { FeedbackDialogInjected, MessageFeedbackInjected } from '../src/client/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
@@ -58,18 +58,38 @@ async function bench() {
     }
   }
   new RemoteService(ctx)
+  const scopes = new Map<SessionId, Context>()
+  const detached = new Set<SessionId>()
+  ctx.provide('sessions', { scope: (id: SessionId) => (detached.has(id) ? undefined : (scopes.get(id) ?? ctx)) } as never)
   ctx.provide('remote.messageFeedback', messageFeedback)
+  let recordAnswer: () => Promise<unknown> = () => carried({ ok: true as const, value: { recorded: true as const } })
+  ctx.provide('remote.sessionFeedback', { record: (request: unknown) => {
+    calls.push({ method: 'record', request })
+    return recordAnswer()
+  } })
+  const decorations: import('@deepseek-ai/dsh-client-ui-commands/client').CommandDecoration[] = []
+  ctx.provide('commandUi', { decorate: (value: (typeof decorations)[number]) => {
+    decorations.push(value)
+    return () => { decorations.splice(decorations.indexOf(value), 1) }
+  } } as never)
   await ctx.plugin(SlotRegistry).await()
   ctx.slots.register({
     name: 'root',
-    children: { 'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' } },
+    children: { 'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' }, 'conversation.input.overlay': { kind: 'list', scope: 'session' } },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const fiber = ctx.plugin({ inject: [...inject], apply })
   return {
     ctx,
     fiber,
-    calls,
+    calls, decorations,
+    mint: (id: SessionId) => {
+      const handle = createScope(ctx, id)
+      scopes.set(id, handle.ctx)
+      return handle
+    },
+    detach: (id: SessionId) => { detached.add(id) },
+    setRecordAnswer: (answer: () => Promise<unknown>) => { recordAnswer = answer },
     entry: () => {
       const entry = ctx.slots.entries('conversation.chat.assistant-actions')[0]
       if (entry === undefined) return undefined
@@ -89,6 +109,106 @@ describe('ui-message-feedback browser plugin', () => {
 
     expect(b.entry()).toMatchObject({ id: 'feedback', order: 10, locale: 'feedback' })
     expect(b.entry()?.inject).toBeTypeOf('function')
+  })
+
+  it('records the Session dialog only on submit and isolates drafts by Session', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    try {
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const one = injectDialog(sid('s1'))
+      const two = injectDialog(sid('s2'))
+      const action = b.decorations[0]?.ui
+      if (action?.kind !== 'action') throw new Error('feedback action was not registered')
+      action.run({ sessionId: sid('s1') })
+      one.edit({ category: 'product-interaction', text: '  wrong layout  ' })
+      expect(two.hooks.dialog.getSnapshot().target).toBeNull()
+      expect(b.calls).toEqual([])
+      await one.submit()
+      expect(b.calls).toEqual([{ method: 'record', request: { sessionId: 's1', category: 'product-interaction', text: 'wrong layout' } }])
+      expect(one.hooks.dialog.getSnapshot()).toMatchObject({ target: null, toast: 1 })
+    } finally { await b.fiber.dispose() }
+    expect(b.decorations).toEqual([])
+  })
+
+  it('refuses message feedback and its Session dialog without a retained Session', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    try {
+      b.detach(sid('gone'))
+      expect(() => b.entry()!.inject!(sid('gone'))).toThrow(/requires a retained Session: gone/)
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      expect(() => injectDialog(sid('gone'))).toThrow(/requires a retained Session: gone/)
+    } finally { await b.fiber.dispose() }
+  })
+
+  it('surfaces Session dialog submission failures from the wire and stays open', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    try {
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const dialog = injectDialog(sid('s1'))
+      const decoration = b.decorations[0]
+      const action = decoration?.ui
+      if (action?.kind !== 'action') throw new Error('feedback action was not registered')
+      expect(decoration?.available({ sessionId: sid('s1') })).toBe(true)
+      action.run({ sessionId: sid('s1') })
+      // A carrier-level failure and a business-level refusal both land as the failure toast's code.
+      b.setRecordAnswer(() => Promise.resolve({ ok: false as const, error: { code: 'wire-down', message: 'wire down' } }))
+      await dialog.submit()
+      expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: { kind: 'session' }, submitting: false, failure: 'wire-down' })
+      b.setRecordAnswer(() => Promise.resolve({ ok: true as const, value: { ok: false as const, error: { code: 'invalid', message: 'bad entry' } } }))
+      await dialog.submit()
+      expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: { kind: 'session' }, submitting: false, failure: 'invalid' })
+    } finally { await b.fiber.dispose() }
+  })
+
+  it('drives draft dismissal and both toast retirements through the overlay face', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    try {
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const dialog = injectDialog(sid('s1'))
+      const action = b.decorations[0]?.ui
+      if (action?.kind !== 'action') throw new Error('feedback action was not registered')
+      action.run({ sessionId: sid('s1') })
+      dialog.edit({ text: 'draft' })
+      dialog.dismiss()
+      expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: null, text: '' })
+      action.run({ sessionId: sid('s1') })
+      b.setRecordAnswer(() => Promise.resolve({ ok: false as const, error: { code: 'denied', message: 'denied' } }))
+      await dialog.submit()
+      expect(dialog.hooks.dialog.getSnapshot().failure).toBe('denied')
+      dialog.dismissFailure()
+      expect(dialog.hooks.dialog.getSnapshot().failure).toBeNull()
+      b.setRecordAnswer(() => Promise.resolve({ ok: true as const, value: { ok: true as const, value: { recorded: true as const } } }))
+      await dialog.submit()
+      const toast = dialog.hooks.dialog.getSnapshot().toast
+      expect(toast).toBeGreaterThan(0)
+      dialog.dismissToast(toast)
+      expect(dialog.hooks.dialog.getSnapshot().toast).toBe(0)
+    } finally { await b.fiber.dispose() }
+  })
+
+  it('drops message and dialog state when a Session identity retires', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    try {
+      const firstScope = b.mint(sid('s1'))
+      const first = b.entry()!.inject!(sid('s1'))
+      await first.ensure()
+      const injectDialog = b.ctx.slots.entries('conversation.input.overlay')[0]?.inject as unknown as (id: SessionId) => FeedbackDialogInjected
+      const dialog = injectDialog(sid('s1'))
+      const action = b.decorations[0]?.ui
+      if (action?.kind !== 'action') throw new Error('feedback action was not registered')
+      action.run({ sessionId: sid('s1') })
+      dialog.edit({ text: 'private draft' })
+      await firstScope.fiber.dispose()
+      b.mint(sid('s1'))
+      expect(b.entry()!.inject!(sid('s1')).hooks.feedback.getSnapshot()).toMatchObject({ status: 'cold', items: new Map() })
+      expect(injectDialog(sid('s1')).hooks.dialog.getSnapshot()).toMatchObject({ target: null, text: '', toast: 0 })
+      expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: null, text: '' })
+    } finally { await b.ctx.fiber.dispose() }
   })
 
   it('exposes the feedback hook plus the ensure/rate/clear verbs', async () => {

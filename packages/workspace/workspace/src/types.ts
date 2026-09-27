@@ -25,7 +25,7 @@ export interface Workspace {
   readonly id: WorkspaceId
 
   /**
-   * Canonical directory path: the `fs.realpath` of the path given at create
+   * Canonical directory path returned by the runtime filesystem at create
    * time (trailing slashes, `..`, and symlinks all resolved). Never rewritten
    * afterwards, even when the directory disappears (see {@link status}).
    */

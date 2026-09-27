@@ -450,6 +450,16 @@
   padding-left: var(--dsw-space-5);
 }
 
+/* Workspace pick failures sit on the chip row's indent so the rejected choice
+   reads where it was made. */
+.workspaceError {
+  margin: 0;
+  padding: 0 var(--dsw-space-5);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 :global([data-viewport='compact']) .root {
   --dsh-composer-side-clearance: 12px;
 }

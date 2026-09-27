@@ -117,7 +117,7 @@ jobs:
       # the built artifact under plain Node, resolving plugins through real package
       # exports — the shape a real consumer runs. That requires a prior build.
       - name: Build (lib for the e2e example bins)
-        run: pnpm run build:official
+        run: pnpm run build:coharness
 
       # Real-API end-to-end tests only. The keyless gates (lint/typecheck/
       # coverage/snapshot/etc.) already run in ci.yml on every push/PR.

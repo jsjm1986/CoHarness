@@ -1,0 +1,13 @@
+# Historical source: examples/acp-agent/tests/snapshots/text-turn/session.jsonl
+# Source SHA-256: 4deebc522a29d5abaf7d267cdf41275b5ac4b07b01915ee5ecb0177fd3c5a5a6
+# Initial import only redacts typed identities; source generation and event data are retained.
+version: 1
+scenario: migration-v4
+profile: sdk
+composition: sdk-upload
+recording: authored
+sessionFormat:
+  version: 4
+  coverage: [adjacent-migration]
+header:
+  class: sdk-upload

@@ -105,7 +105,7 @@ export function assertEvidenceEnvironment(
   switch (expected) {
     case 'source': return
     case 'artifact':
-      if (environment.buildProfile !== 'official') throw new Error('release readiness: artifact proof requires the official build profile')
+      if (environment.buildProfile !== 'coharness') throw new Error('release readiness: artifact proof requires the CoHarness build profile')
       return
     case 'windows-native':
       if (!native || runner !== 'windows' || environment.processPlatform !== 'win32'

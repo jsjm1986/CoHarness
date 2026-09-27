@@ -83,9 +83,9 @@ export class ClientTimerService extends Service {
       return dispose
     }
 
-    const { promise, resolve, reject } = Promise.withResolvers<void>()
+    const { promise, resolve, reject } = Promise.withResolvers<undefined>()
     const dispose = this.ctx.effect(() => {
-      const timer = globalThis.setTimeout(resolve, delay)
+      const timer = globalThis.setTimeout(() => { resolve(undefined) }, delay)
       return () => {
         globalThis.clearTimeout(timer)
         reject(new Error('Context has been disposed'))

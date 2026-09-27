@@ -1,8 +1,11 @@
 /** Registers the conversation components, shared store, and service callbacks. */
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
+import { findToolCall } from './tool-node-reader.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
+  permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
@@ -58,7 +61,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Services required by the conversation plugin. */
 export const inject = [
-  'slots', 'layout', 'sessions', 'workspaces', 'locale', 'connection', 'remote', 'remote.permissionPresets', 'settingsScope',
+  'slots', 'layout', 'sessions', 'workspaces', 'locale', 'connection', 'remote', 'settingsScope',
   'conversationEvents', 'conversationViews',
 ]
 
@@ -134,48 +137,20 @@ function selectApproval({ interactions }: ComposerChainProps): ApprovalWait | nu
 export function apply(ctx: Context): void {
   const sessions = ctx.sessions
   const workspaces = ctx.workspaces
+  const lifetime = new AbortController()
+  ctx.effect(() => () => { lifetime.abort() }, 'ui-conversation: navigation lifetime')
   const layout = ctx.layout
   const slots = ctx.slots
   const connection = ctx.get('connection') as ConnectionHandle
 
   const viewportStore = createConversationViewportStore()
 
-  // Process-wide permission catalog: fetched lazily on first subscription and
-  // republished on the host's catalog-changed forward. The snapshot keeps its
-  // identity until the host answers with a different value.
-  const permissionCatalogSource = (() => {
-    let value: PermissionCatalog | undefined
-    let loading: Promise<void> | undefined
-    const listeners = new Set<() => void>()
-    const load = (): void => {
-      // The deferred call keeps a missing/absent catalog namespace (a host
-      // composition without permission presets, or a test double) on the same
-      // `undefined` capability path as a failed remote read instead of
-      // crashing the subscribing render.
-      loading ??= Promise.resolve()
-        .then(() => ctx.remote.permissionPresets.catalog())
-        .then((result) => {
-          if (!result.ok) return
-          if (value !== result.value) {
-            value = result.value
-            for (const listener of listeners) listener()
-          }
-        })
-        .catch(() => undefined)
-        .finally(() => { loading = undefined })
-    }
-    return {
-      getSnapshot: () => value,
-      subscribe: (listener: () => void) => {
-        listeners.add(listener)
-        load()
-        return () => { listeners.delete(listener) }
-      },
-      invalidate: load,
-    }
-  })()
-  ctx.remote.$on('permission-presets/catalog-changed', () => { permissionCatalogSource.invalidate() })
-  ctx.on('connection/reset', () => { permissionCatalogSource.invalidate() })
+  // The runtime-owned directory is the one catalog owner: it resolves each
+  // Session to its own runtime's mirror, drops responses that predate the
+  // latest invalidation, and clears on the owning connection's generation
+  // boundary. A composition without it degrades to the same absent capability
+  // path as a host that serves no permission presets.
+  const permissionCatalogSource = ctx.get('permissionCatalog')
   const viewportAvailable = {
     getSnapshot: () => slots.entries('conversation.workbench.toolbar').length > 0,
     subscribe: (listener: () => void) => slots.subscribe('conversation.workbench.toolbar', listener),
@@ -305,6 +280,17 @@ export function apply(ctx: Context): void {
   }, ConversationRoot)
 
   const viewport = new ConversationViewportController(sessions, slots.bindStore(viewportStore), workspaces)
+  ctx.inject(['projectUiPolicy'], inner => inner.effect(() => {
+    const sync = (): void => {
+      const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired
+      const account = inner.projectUiPolicy.getSnapshot().verifiedAccountId
+      viewport.setPersistenceScope(required === false ? 'local' : required === true && account !== undefined ? `account:${account}` : undefined)
+    }
+    const stopHost = connection.hostDescription.subscribe(sync)
+    const stopIdentity = inner.projectUiPolicy.subscribe(sync)
+    sync()
+    return () => { stopHost(); stopIdentity(); viewport.setPersistenceScope(undefined) }
+  }, 'ui-conversation: verified workbench persistence'))
   ctx.effect(() => {
     const dispose = ctx.reflect.provide('conversationViewport', viewport)
     return () => {
@@ -336,11 +322,17 @@ export function apply(ctx: Context): void {
         displaySettings,
       },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
+        const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])
         const nextId = await workspaces.openWorkspace(workspaceId)
-        sessions.open(nextId)
-        if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
-          inputHub.discardDraft(sessionId)
-        }
+        if (navigation.aborted) return
+        if (workspaces.list.getSnapshot().archivedSessionIds.includes(nextId)) throw new Error(t('placeholder.unavailable'))
+        await commitSessionNavigation(sessions, nextId, navigation, () => {
+          if (workspaces.list.getSnapshot().archivedSessionIds.includes(nextId)) throw new Error(t('placeholder.unavailable'))
+          sessions.open(nextId)
+          if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
+            inputHub.discardDraft(sessionId)
+          }
+        })
       },
       setDisplayWidth: (value) => { displaySettings.setWidth(value) },
     }),
@@ -374,6 +366,7 @@ export function apply(ctx: Context): void {
       'conversation.session.header.lineage': { kind: 'single', scope: 'session' },
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
       'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
+      'conversation.session.header.corner': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
     inject: (): ConversationSessionHeaderInjected => ({
@@ -410,23 +403,26 @@ export function apply(ctx: Context): void {
           removeDocument: undefined,
           retryDocument: undefined,
           draftImages: undefined,
-          resolveSubmitMode: (running, gesture, steeringAvailable) =>
-            submissionPolicy.resolve(running, gesture, steeringAvailable),
           toggleCommandMenu: undefined,
           stop: undefined,
           command: undefined,
           hooks: {
+            busyEnter: submissionPolicy.busyEnter,
             notices: ABSENT_NOTICES,
             lexicon: ABSENT_LEXICON,
             menuLauncher: ABSENT_MENU_LAUNCHER,
             documents: ABSENT_DOCUMENTS,
             permissionCatalog: ABSENT_PERMISSION_CATALOG,
+            permissionAvailability: permissionAvailabilitySource(undefined, undefined),
           },
         }
       }
       const conversation = concreteConversation(ctx)
       const shell = inputHub.shell(sessionId)
       const inputTriggers = inputHub.inputTriggers(sessionId)
+      const permissionAvailability = permissionAvailabilitySource(
+        ctx.get('projectUiPolicy'), sessions.binding(sessionId)?.hostDescription,
+      )
       return {
         keyboard: shell,
         addImages: (files) => {
@@ -465,8 +461,6 @@ export function apply(ctx: Context): void {
           conversation.retryDraftDocument(sessionId, id)
         },
         draftImages: ids => conversation.draftImages(ids),
-        resolveSubmitMode: (running, gesture, steeringAvailable) =>
-          submissionPolicy.resolve(running, gesture, steeringAvailable),
         toggleCommandMenu: inputTriggers === undefined
           ? undefined
           : (selection) => {
@@ -486,17 +480,22 @@ export function apply(ctx: Context): void {
           })
         },
         command: async (line) => {
+          const permission = /^\/permission\s+(\S+)\s*$/.exec(line)?.[1]
+          if (permission !== undefined
+            && permissionUnavailableReason(permission, permissionAvailability.getSnapshot()) !== undefined) return false
           const session = sessions.binding(sessionId)?.session
           if (session === undefined) return false
           const result = await session.command(line)
           return result.ok && result.value.matched
         },
         hooks: {
+          busyEnter: submissionPolicy.busyEnter,
           notices: shell.notices,
           lexicon: shell.lexicon,
           menuLauncher: inputTriggers?.launcher ?? ABSENT_MENU_LAUNCHER,
           documents: conversation.documentStore(sessionId),
-          permissionCatalog: permissionCatalogSource,
+          permissionCatalog: permissionCatalogSource?.forSession(sessionId) ?? ABSENT_PERMISSION_CATALOG,
+          permissionAvailability,
         },
       }
     },
@@ -537,21 +536,31 @@ export function apply(ctx: Context): void {
       return {
         openDetails: (target) => {
           actions.select(target)
-          layout.openDetails(viewportAvailable.getSnapshot() && viewport.snapshot.getSnapshot().mode === 'workbench' ? sessionId : undefined)
+          layout.openDetails(sessionId, target)
+        },
+        openExternalLink: (url) => {
+          if (ctx.bail('web/browser-open', { sessionId, url }) !== true) window.open(url, '_blank', 'noopener,noreferrer')
         },
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
-        openFile: async (path) => {
+        openFile: async (path, options) => {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
           const runtimeTarget = sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }
+          const description = connection.hostDescription.getSnapshot()
           const localDesktop = runtimeTarget.kind === 'base' && connection.isLoopback
-            && connection.hostDescription.getSnapshot()?.canOpenPath === true
-          if (!localDesktop) {
-            const relativePath = workspacePathForResource(cwd, path)
-            const address = workspaceResourceAddress(sessionId, relativePath)
-            const opened = ctx.bail('workspace/resource-open', { runtimeTarget, sessionId, path: relativePath, address })
-            if (opened !== true) throw new Error('Workspace file preview is unavailable in this application')
-            return
+            && description?.executionAuthorityRequired === false && description.canOpenPath
+          let relativePath: string
+          try { relativePath = workspacePathForResource(cwd, path) }
+          catch (error) {
+            if (localDesktop) return workspaces.openPath(resolveWorkspacePath(cwd, path))
+            throw error
           }
+          const address = workspaceResourceAddress(sessionId, relativePath)
+          const opened = ctx.bail('workspace/resource-open', {
+            runtimeTarget, sessionId, path: relativePath, address,
+            ...(options?.line === undefined ? {} : { line: options.line }),
+          })
+          if (opened === true) return
+          if (!localDesktop) throw new Error('Workspace file preview is unavailable in this application')
           return workspaces.openPath(resolveWorkspacePath(cwd, path))
         },
         loadOlder: () => { void scoped.loadOlder() },
@@ -571,8 +580,9 @@ export function apply(ctx: Context): void {
           read: () => chatScrollPositions.get(sessionId) ?? null,
         },
         forkAt: (seq) => {
+          const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])
           sessions.fork({ sessionId, atSeq: seq, increaseTitle: true })
-            .then((childId) => { sessions.open(childId) })
+            .then((childId) => { if (!navigation.aborted) sessions.open(childId) })
             .catch(() => {
               // Fork or child-rename failure keeps the source view untouched.
             })
@@ -598,16 +608,31 @@ export function apply(ctx: Context): void {
   // registration path into the input dock declared above.
   ctx.plugin(queueDockEntry)
 
-  slots.register({
+  slots.inject('details', () => slots.register({
     name: 'details',
     locale: NS,
+    // `conversation.message.images` is already declared under `conversation.view`
+    // (slot names are global), so the panel's gallery rides its own sibling seat.
     children: {
       'conversation.details.tool': { kind: 'single', scope: 'session' },
+      'conversation.details.images': { kind: 'single', scope: 'session' },
     },
-    store: chatStore,
-    inject: (): DetailsInjected => ({
+    inject: (sessionId: SessionId): DetailsInjected => ({
+      readCall: async (callId, signal) => {
+        const scope = sessions.scope(sessionId)
+        const session = scope === undefined ? undefined : sessions.sessionOf(scope)
+        if (session === undefined) throw new Error('Tool detail Session is unavailable')
+        const chat = await session.readCallHistory(callId as ToolCallId, signal)
+        return findToolCall({ chat }, callId)
+      },
+      loadImage: Object.assign(
+        (attachment: import('@deepseek-ai/dsh-attachment').ImageAttachmentRef) =>
+          concreteConversation(ctx).resolveImage(sessionId, attachment),
+        { peek: (attachment: import('@deepseek-ai/dsh-attachment').ImageAttachmentRef) =>
+          concreteConversation(ctx).peekImage(sessionId, attachment) },
+      ),
       closeDetails: () => { layout.closeDetails() },
     }),
-  }, DetailsPanel)
+  }, DetailsPanel))
 
 }

@@ -329,6 +329,8 @@ export interface TypertClientRemote extends TypertRemoteNamespaceMap {
 
 /** Validated Remote request presented to CoHarness Gateway authorization plugins. */
 export interface TypertGatewayAuthorizationRequest {
+  /** Absent before lookup; stream-item checks an already admitted domain stream. */
+  readonly phase?: 'stream-item'
   /** Canonical `<namespace>/<method>` endpoint. */
   readonly endpoint: string
   /** Cordis Service key selected by the invocation descriptor. */

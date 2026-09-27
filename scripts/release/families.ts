@@ -12,7 +12,7 @@
 import { globSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import {
-  officialClientBuildEnvironment,
+  coharnessClientBuildEnvironment,
   readClientBuildRecord,
 } from '../client-build-environment.ts'
 import { validateTarballPayload } from '../publication-payload.ts'
@@ -335,9 +335,9 @@ class DshFamily extends ReleaseFamily {
   readonly patterns = ['packages/*/*/package.json', 'apps/*/package.json'] as const
   readonly tagPrefix = 'dsh-v'
 
-  /** Require current artifacts from a complete official client build. */
+  /** Require current artifacts from a complete CoHarness client build. */
   override verifyBuildArtifacts(root: string): void {
-    readClientBuildRecord(root, officialClientBuildEnvironment(root))
+    readClientBuildRecord(root, coharnessClientBuildEnvironment(root))
   }
 
   /**

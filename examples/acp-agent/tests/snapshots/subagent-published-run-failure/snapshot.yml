@@ -1,0 +1,11 @@
+version: 1
+scenario: subagent-published-run-failure
+profile: acp
+composition: subagent-durability-failure
+recording: authored
+header:
+  class: default
+replay:
+  override: true
+environment:
+  DSH_SUBAGENT_PUBLISHED_FAILURE: "1"

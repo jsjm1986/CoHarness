@@ -13,7 +13,7 @@ import {
   type SessionEvent,
   type SessionSeq,
 } from '@deepseek-ai/dsh-session'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 
 /** Whether a path intentionally preserves physical persistence bytes. */

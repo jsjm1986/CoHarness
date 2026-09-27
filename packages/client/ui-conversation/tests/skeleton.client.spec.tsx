@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
-  createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
+  createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, SessionCreateError,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationSnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
@@ -120,6 +120,7 @@ function mount(
   const sessions = createSnapshotStore<SessionListState>({
     ids: listed ? [root, SID] : [root],
     byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
+    archivedById: {},
     current: SID,
     phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   })
@@ -220,13 +221,14 @@ function mount(
           removeDocument={() => {}}
           retryDocument={() => {}}
           draftImages={() => []}
-          resolveSubmitMode={() => 'queue'}
+          useBusyEnter={bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue'))}
           toggleCommandMenu={vi.fn()}
           useNotices={bindSnapshotSelector(wiring.notices)}
           useLexicon={bindSnapshotSelector(wiring.lexicon)}
           useMenuLauncher={bindSnapshotSelector(createSnapshotStore<string | null>(null))}
           useDocuments={(() => []) as InputBarProps['useDocuments']}
           usePermissionCatalog={(() => undefined) as InputBarProps['usePermissionCatalog']}
+          usePermissionAvailability={(() => 'local') as InputBarProps['usePermissionAvailability']}
           stop={stop}
           command={() => Promise.resolve(true)}
           t={t}
@@ -629,6 +631,26 @@ describe('ConversationRoot resident composer', () => {
     await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
     expect(selectWorkspace).toHaveBeenCalledWith(wid('second'), { discardDraft: false })
     expect(b.view.queryByText('Selected Folder')).toBeNull()
+    expect(b.view.getByText('one')).toBeTruthy()
+    expect(b.view.getByRole('alert').textContent).toBe('connect failed')
+  })
+
+  it('surfaces a session.create rejection as the localized workspace alert with the host reason', async () => {
+    const rpcError = { code: 'workspace/forbidden', message: 'workspace path is not allowed', details: {} } as never
+    const selectWorkspace = vi.fn(async () => { throw new SessionCreateError(rpcError, SID) })
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      [
+        { ...workspace('one'), sessionIds: [SID] },
+        { ...workspace('second'), title: 'Selected Folder' },
+      ],
+      selectWorkspace,
+    )
+    fireEvent.change(b.view.getByRole('textbox'), { target: { value: '' } })
+    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+    const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
+    await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
+    expect(b.view.getByRole('alert').textContent).toBe('无法打开该工作区：workspace path is not allowed（workspace/forbidden）')
     expect(b.view.getByText('one')).toBeTruthy()
   })
 

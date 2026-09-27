@@ -117,6 +117,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
   await ctx.plugin(InputTriggerService).await()
   const inputTriggers = ctx.get('inputTriggers') as InputTriggerService
   register?.(inputTriggers)
+  sessions.open(sessionId)
   const actx = sessions.scope(sessionId)!
   const controller = inputTriggers.sessionOf(actx)
   const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
@@ -140,7 +141,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     SessionProvider: ({ children }) => children(sessionId),
     useSession: bindSnapshotSelector(sessionStore),
     useSessions: bindSnapshotSelector(createSnapshotStore({
-      ids: [], byId: {}, current: undefined, phase: 'ready',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({
@@ -162,7 +163,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
       file: new File([Uint8Array.of(1)], `${id}.png`, { type: 'image/png' }),
       previewUrl: `blob:${id}`,
     })),
-    resolveSubmitMode: () => 'queue',
+    useBusyEnter: bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue')),
     toggleCommandMenu: (selection) => {
       const snapshot = shell.snapshot
       controller.toggleSource('command', {
@@ -178,6 +179,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     useMenuLauncher: bindSnapshotSelector(controller.launcher),
     useDocuments: (() => []) as InputBarProps['useDocuments'],
     usePermissionCatalog: (() => undefined) as InputBarProps['usePermissionCatalog'],
+    usePermissionAvailability: (() => 'local') as InputBarProps['usePermissionAvailability'],
     renderSlot: (() => null) as InputBarProps['renderSlot'],
     stop: vi.fn(),
     command: () => Promise.resolve(true),

@@ -109,6 +109,10 @@ describe('SubagentModelSelectionConfig', () => {
     await ctx.plugin(MemorySettings)
     await ctx.plugin(SubagentModelSelectionConfig)
 
+    expect(ctx.settings.describe()).toEqual(expect.arrayContaining([expect.objectContaining({
+      ns: SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE, owner: 'project', projectWrite: 'manager',
+      projectWritePaths: [['enabled'], ['allowedModels']],
+    })]))
     expect(ctx.subagentModelSelection.current()).toEqual({ enabled: false, allowedModels: [] })
     await ctx.settings.update(SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE, {
       enabled: true,

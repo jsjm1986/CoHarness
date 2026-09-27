@@ -46,8 +46,11 @@ export function verifyConsumerReferences(root: string): void {
   }
   if (new Set(policy.relations.map(row => row.id)).size !== policy.relations.length) throw new Error('ci consumers: duplicate rule IDs')
   for (const [lane, entry] of Object.entries(policy.lanes)) {
-    const manifest = JSON.parse(readFileSync(resolve(root, entry.manifest), 'utf8')) as { scripts?: Record<string, string> }
-    for (const script of entry.scripts) if (!manifest.scripts?.[script]) throw new Error(`ci consumers: ${lane} missing script ${script}`)
+    const owners = [entry, ...'additionalEntries' in entry ? entry.additionalEntries : []]
+    for (const owner of owners) {
+      const manifest = JSON.parse(readFileSync(resolve(root, owner.manifest), 'utf8')) as { scripts?: Record<string, string> }
+      for (const script of owner.scripts) if (!manifest.scripts?.[script]) throw new Error(`ci consumers: ${lane} missing script ${script}`)
+    }
     const workflow = parse(readFileSync(resolve(root, entry.workflow), 'utf8')) as { jobs?: Record<string, unknown> }
     for (const job of entry.jobs) if (!workflow.jobs?.[job]) throw new Error(`ci consumers: ${lane} missing workflow job ${job}`)
     for (const source of entry.sources) if (!existsSync(resolve(root, source))) throw new Error(`ci consumers: ${lane} missing source ${source}`)

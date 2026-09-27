@@ -50,6 +50,8 @@ From the repository root, run this opt-in check against the installed native dep
 env -u NODE_USE_ENV_PROXY DSH_COMPUTER_USE_NATIVE_E2E=1 node node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts packages/experimental/computer-use-cua-driver-native/tests/native.e2e.ts
 ```
 
+Every native tool call passes through the [computer-use execution policy](../../computer-use/computer-use/README.md). Managed deployments without that policy reject operations before calling the SDK. OS permissions alone do not authorize a Gateway user.
+
 -----
 
 <a id="understand-the-implementation"></a>

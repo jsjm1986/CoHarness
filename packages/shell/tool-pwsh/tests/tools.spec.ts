@@ -922,6 +922,7 @@ describe('UI presentation', () => {
     const cases = [
       { result: { ...base, exitCode: 0, signal: null, timedOut: false }, expect: { exitCode: 0 } },
       { result: { ...base, exitCode: 7, signal: null, timedOut: false }, expect: { exitCode: 7 } },
+      { result: { ...base, exitCode: null, signal: null, timedOut: false }, expect: { exitCode: null } },
       { result: { ...base, exitCode: null, signal: 'SIGTERM' as const, timedOut: false }, expect: { signal: 'SIGTERM' } },
       // A trapped-timeout run that exits 0 has no signal/exit marker → reads as exit 0 (it did exit 0).
       { result: { ...base, exitCode: 0, signal: null, timedOut: true }, expect: { exitCode: 0 } },
@@ -930,11 +931,12 @@ describe('UI presentation', () => {
       const rendered = renderPwshResult(c.result)
       const out = present.presentResult!({ command: 'x', description: 'x' }, { content: [{ type: 'text', text: rendered }], isError: false })
       // Drop card + output; the remaining fields are the parsed exit.
-      const { card: _c, output, ...exit } = out as { card: string; output?: string; exitCode?: number; signal?: string }
+      if (out?.card !== 'terminal') throw new Error('foreground shell result did not produce a terminal view')
+      const { card: _c, output, ...exit } = out
       expect(exit).toEqual(c.expect)
       // Whatever the parse consumed is gone from the body, so a card with an
       // exit pill never shows the same status twice.
-      expect(output).not.toMatch(/\[exit code: \d+\]|\[killed by signal: /)
+      expect(output).not.toMatch(/\[exit code: (?:\d+|null)\]|\[killed by signal: /)
     }
   })
 

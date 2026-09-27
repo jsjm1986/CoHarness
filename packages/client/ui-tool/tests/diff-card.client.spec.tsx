@@ -157,6 +157,7 @@ describe('FileMutationRow diff card', () => {
   const list = () => createSnapshotStore<SessionListState>({
     ids: [SID],
     byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd: '/w/app' } },
+    archivedById: {},
     current: SID,
     phase: 'ready',
     subagentsByParent: {}, jobsBySession: {},
@@ -183,6 +184,22 @@ describe('FileMutationRow diff card', () => {
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
     expect(view.getByText('hello fixture')).toBeTruthy()
     expect(view.getByText('复制')).toBeTruthy()
+  })
+
+  it.each([
+    { changed: 1, totals: '+1 -1' },
+    { changed: 129, totals: '+130 -130' },
+  ])('keeps $totals consistent in the collapsed row and expanded card', ({ changed, totals }) => {
+    const fragment = (prefix: string) => ['shared heading', ...Array.from({ length: changed }, (_, i) => `${prefix} setting ${i}`)].join('\n')
+    const view = render(<FileMutationRow {...rowProps(settled({
+      resultView: resultDiff({ diffs: [{ path: 'notes/demo.txt', oldText: fragment('old'), newText: fragment('new') }] }),
+    }))} />)
+    expect(view.getByText(totals, { exact: true })).toBeTruthy()
+    expect(view.container.querySelector('[data-diff]')).toBeNull()
+    toggleRow(view)
+    expect(view.getByText(`└ ${totals} · 1 个文件`, { exact: true })).toBeTruthy()
+    toggleRow(view)
+    expect(view.getByText(totals, { exact: true })).toBeTruthy()
   })
 
   it('the summary is a path link that opens the tool path through the host', () => {
@@ -311,10 +328,11 @@ describe('DetailsPanel diff Output section', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
+        archivedById: {},
         current: SID,
         phase: 'ready',
         subagentsByParent: {}, jobsBySession: {},
@@ -344,9 +362,10 @@ describe('DetailsPanel diff Output section', () => {
           submit: () => {},
         }}
         useProjection={(() => undefined)}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
+        {...(chat.getSnapshot().selection ?? {})}
+        readCall={async () => undefined}
         closeDetails={vi.fn()}
+        loadImage={vi.fn(() => Promise.reject(new Error('not used')))}
         t={t}
       />,
     )

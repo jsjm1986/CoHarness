@@ -12,7 +12,10 @@
   ],
   "references": [
     {
-      "path": "../gateway/tsconfig.client.json"
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../boot/plugin-manager"
     },
     {
       "path": "../../client/connection/tsconfig.client.json"
@@ -69,7 +72,7 @@
       "path": "../../typert/protocol"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../gateway/tsconfig.client.json"
     }
   ]
 }

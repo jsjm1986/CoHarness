@@ -32,6 +32,16 @@
 | `env` | `{}` | 显式指定的子进程环境，叠加在由子进程 seam 清除凭证后的父环境之上。 |
 | `permissionMode` | `never` | 为该提供方实例的每个线程固定原生非交互审批与沙箱模式。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
+| `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`codex.jsonl` 属于默认实例。仅由持续成员使用。 |
+| `memberCwd` | harness 启动目录 | 成员 Codex 线程的工作区。仅由持续成员使用。 |
+
+## 持续成员
+
+默认 `codex` 实例保留既有模型路由及 `codex.jsonl` 存储。其他名称根据完整提供方名称生成独立、确定的路由和文件，在大小写不敏感的文件系统上仍保持隔离；卸载一个实例只释放其路由。重命名实例会改变其持久身份，不会收养其他实例的绑定。
+
+挂载 `llm` 服务时本提供方同时声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用 spawn `codex app-server --stdio`，挂载成员的耐用线程（已绑定时 `thread/resume`，首轮 `thread/start` 带 `ephemeral: false`），发出一次轮次，然后处置进程。
+
+绑定存储记录 harness 子会话 ↔ Codex 线程映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `~/.codex/sessions/` 下的耐用 rollout 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。没有 `llm` 服务时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
 | `permissionMode` 值 | `thread/start` 字段 | 原生行为 |
 |---|---|---|

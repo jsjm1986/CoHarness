@@ -175,7 +175,6 @@ const POSTCONDITIONS: readonly PostCondition[] = [
   // The preset ids in this table are product data, not package names.
   { file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts', text: '[\'cordis\', \'presetCordisName\'', count: 1 },
   // The preset id the shipped composition documents to its own model.
-  { file: 'apps/cli/config/agent-presets/cordis/agent.cordis.yml', text: 'The `cordis` agent preset', count: 1 },
   { file: 'apps/cli/config/agent-presets/cordis/agent.cordis.yml', text: 'corrupting the `cordis` preset', count: 1 },
   { file: 'packages/examples/acp-demo/tests/built-bin.e2e.ts', text: '\'cordis\', \'loader\', \'include\', \'timer\', \'hmr\', \'logger-console\',', count: 1 },
 ]

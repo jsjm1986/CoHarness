@@ -22,6 +22,10 @@
       "types": "./lib/types/internal.d.ts",
       "default": "./lib/types/internal.js"
     },
+    "./external": {
+      "types": "./lib/types/external.d.ts",
+      "default": "./lib/types/external.js"
+    },
     "./invariant": {
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
@@ -79,7 +83,9 @@
     "@deepseek-ai/dsh-collaboration": "workspace:^",
     "@deepseek-ai/dsh-util-time": "workspace:^",
     "@deepseek-ai/dsh-attachment": "workspace:^",
-    "@deepseek-ai/dsh-settings": "workspace:^"
+    "@deepseek-ai/dsh-settings": "workspace:^",
+    "@deepseek-ai/dsh-execution-authority": "workspace:^",
+    "@deepseek-ai/dsh-permission-presets": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-agent-presets": {
@@ -140,6 +146,8 @@
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-typert-protocol": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/dsh-util-time": "workspace:^"
+    "@deepseek-ai/dsh-util-time": "workspace:^",
+    "@deepseek-ai/dsh-execution-authority": "workspace:^",
+    "@deepseek-ai/dsh-permission-presets": "workspace:^"
   }
 }

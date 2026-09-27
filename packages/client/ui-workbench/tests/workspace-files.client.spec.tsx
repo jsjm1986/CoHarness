@@ -70,6 +70,16 @@ describe('WorkspaceFileBrowser edge paths', () => {
     expect(view.queryByRole('button', { name: 'Reload' })).toBeNull()
   })
 
+  it('uses the fallback error copy for a non-Error open failure', async () => {
+    const list = vi.fn(async () => ({ entries: [entry('a.txt', 'file')], truncated: false }))
+    const open = vi.fn<(request: WorkspaceResourceOpenRequest) => void>(() => { throw 'open denied' })
+    const view = render(<WorkspaceFileBrowser sessionId={sessionId} runtimeTarget={{ kind: 'base' }} list={list} open={open} close={() => {}} labels={labels} />)
+    await waitFor(() => { expect(view.getByText('a.txt')).toBeTruthy() })
+    fireEvent.click(view.getByRole('treeitem', { name: 'a.txt' }))
+    await waitFor(() => { expect(view.getByRole('alert').textContent).toBe('Error') })
+    expect(open).toHaveBeenCalledOnce()
+  })
+
   it('uses the fallback error copy for a non-Error directory failure', async () => {
     const list = vi.fn(async () => { throw 'bad directory response' })
     const view = render(

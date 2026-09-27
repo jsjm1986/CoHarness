@@ -34,6 +34,16 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 | `env` | `{}` | 显式指定的 SDK/CLI 环境，叠加在由共享机制清除凭证后的父环境之上。 |
 | `permissionMode` | `dontAsk` | 为该提供方实例的每次运行固定原生非交互权限策略。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
+| `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`claude-code.jsonl` 属于默认实例。仅由持续成员使用。 |
+| `memberCwd` | harness 启动目录 | 成员 Claude 会话的工作区。仅由持续成员使用。 |
+
+## 持续成员
+
+默认 `claude-code` 实例保留既有模型路由及 `claude-code.jsonl` 存储。其他名称根据完整提供方名称生成独立、确定的路由和文件，在大小写不敏感的文件系统上仍保持隔离；卸载一个实例只释放其路由。重命名实例会改变其持久身份，不会收养其他实例的绑定。
+
+挂载 `llm` 服务时本提供方同时声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用在成员的耐用 Claude 会话上运行一次 Agent SDK `query`（已绑定时 `resume`，带 `persistSession`），然后释放 SDK 进程。
+
+绑定存储记录 harness 子会话 ↔ Claude 会话映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `~/.claude/projects/` 下的耐用 transcript 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。没有 `llm` 服务时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
 | `permissionMode` 值 | 原生行为 |
 |---|---|

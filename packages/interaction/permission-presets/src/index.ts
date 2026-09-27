@@ -13,7 +13,9 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -190,6 +192,19 @@ export interface PermissionPresetAuthorization {
    * @returns whether the request may select the preset.
    */
   canSelect(name: string): boolean
+  /**
+   * Recheck deployment authority before an explicit command commits its preset.
+   * @param agent - Agent whose current Session receives the selection.
+   * @param name - validated preset name.
+   * @returns completion when selection is authorized; rejection leaves the Session unchanged.
+   */
+  authorizeSelection?(agent: Agent, name: string): Promise<void>
+  /**
+   * Authorize an explicit future-session default using the live account request.
+   * @param name - schema-valid configured preset name; Auto is never a default.
+   * @returns completion when the default may be persisted.
+   */
+  authorizeDefault?(name: string): Promise<void>
 }
 
 /**
@@ -256,6 +271,17 @@ export class PermissionPresetService extends TypertRemoteService {
     })
     ctx.inject(['settings'], (settingsCtx) => {
       settingsCtx.settings.installSection(ctx, PERMISSION_SETTINGS_NAMESPACE, settingsSchema, baseSettings, {
+        authorizeWrite: async (value) => {
+          const authority = executionAuthorityOf(ctx)
+          const policy = ctx.get('permissionPresetAuthorization')
+          if (authority !== undefined && policy?.authorizeDefault === undefined) {
+            throw new Error('permission: managed defaults require live authorization')
+          }
+          await policy?.authorizeDefault?.(value.defaultPreset)
+          if (executionAuthorityOf(ctx) !== authority || ctx.get('permissionPresetAuthorization') !== policy) {
+            throw new Error('permission: default authorization changed before persistence')
+          }
+        },
         setSource: (current) => {
           this.defaultSettings = current
         },
@@ -295,13 +321,23 @@ export class PermissionPresetService extends TypertRemoteService {
         // No settlement text labels its value with this command's own name: a
         // surface that renders `name · text` (the web command row) would
         // otherwise read `permission · Permission preset: workspace-write.`
-        handler: ({ agent, rawInput }) => {
+        handler: async ({ agent, rawInput, signal }) => {
           const name = rawInput.trim()
           if (name === '') {
             return { kind: 'success', text: `current preset ${this.current(agent.session)} (available: ${this.names.join(', ')})` }
           }
           if (!this.names.includes(name)) {
             return { kind: 'error', text: `unknown preset "${name}" (available: ${this.names.join(', ')})` }
+          }
+          const authority = executionAuthorityOf(this.ctx)
+          const policy = this.ctx.get('permissionPresetAuthorization')
+          if (authority !== undefined && policy?.authorizeSelection === undefined) {
+            throw new Error('permission: managed selection requires live authorization')
+          }
+          await policy?.authorizeSelection?.(agent, name)
+          signal.throwIfAborted()
+          if (executionAuthorityOf(this.ctx) !== authority || this.ctx.get('permissionPresetAuthorization') !== policy) {
+            throw new Error('permission: selection authorization changed before applying')
           }
           this.apply(agent.session, name, (policy) => { this.ctx.approval.setPolicy(agent, policy) }, 'selection')
           return { kind: 'success', text: `preset ${name}` }

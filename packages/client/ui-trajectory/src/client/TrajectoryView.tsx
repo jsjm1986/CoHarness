@@ -68,9 +68,11 @@ function partialStructureSignature(partial: ConversationSnapshot['partial']): st
 export interface TrajectoryViewInjected {
   hooks: {
     duration: SnapshotStore<boolean>
+    wrap: SnapshotStore<boolean>
   }
   loadOlder: () => Promise<boolean>
   setActualDuration: (actualDuration: boolean) => void
+  setWrapLines: (wrapLines: boolean) => void
   ensureHistoryDetail: () => Promise<void>
 }
 
@@ -119,7 +121,7 @@ function addUsage(
 }
 
 export function TrajectoryView({
-  useSession, useDuration, loadOlder, setActualDuration, ensureHistoryDetail,
+  useSession, useDuration, useWrap, loadOlder, setActualDuration, setWrapLines, ensureHistoryDetail,
   inspect, onInspectDone, t, compact = false,
 }: ConvViewProps & InjectFace<TrajectoryViewInjected> & PropsLocale<'trajectory'>) {
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(EMPTY_TURN_IDS)
@@ -127,6 +129,7 @@ export function TrajectoryView({
     useState<ReadonlySet<string>>(EMPTY_RECORD_IDS)
   const [timelineSelection, setTimelineSelection] = useState<TrajectoryTimeRange | null>(null)
   const actualDuration = useDuration(value => value)
+  const wrapLines = useWrap(value => value)
   const [actualTime, setActualTime] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchIndex] = useState(() => new TrajectorySearchIndex())
@@ -508,6 +511,8 @@ export function TrajectoryView({
           onToggleTurn={toggleTurn}
           collapsedAssistants={collapsedAssistants}
           onToggleAssistant={toggleAssistant}
+          wrapLines={wrapLines}
+          onToggleWrapLines={(next) => { setWrapLines(next) }}
           inspectCallId={inspect?.callId ?? null}
           onInspectApplied={onInspectDone}
         />

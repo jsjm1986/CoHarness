@@ -1,0 +1,18 @@
+/** Administrator-owned SSH qualifications for accounts and projects. */
+import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { ResourceAccess, resourcePolicyOwner } from './resource-access.ts'
+export { ResourceAccessError as SshAccessError } from './resource-access.ts'
+export type { ResourcePolicyOwner as SshPolicyOwner, ResourceAccessPolicy as SshAccessPolicy } from './resource-access.ts'
+
+/**
+ * Validate account or project coordinates from the administration API.
+ * @param kind - user or project owner.
+ * @param id - public identifier in the active organization.
+ * @returns validated policy coordinates.
+ */
+export function sshPolicyOwner(kind: unknown, id: unknown) { return resourcePolicyOwner(kind, id, 'ssh') }
+
+/** Versioned SSH decisions; an absent policy denies access. */
+export class SshAccess extends ResourceAccess {
+  constructor(context: PostgresRuntimeContext) { super(context, 'ssh') }
+}

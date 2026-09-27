@@ -148,6 +148,10 @@ interface LoaderSmokeBaseOptions {
   readonly mode?: ExampleMode
   /** Environment overrides layered over the parent and isolated DSH homes. */
   readonly env?: Readonly<NodeJS.ProcessEnv>
+  /** Whether to merge the parent environment; false requires a complete caller-owned environment. */
+  readonly extendEnv?: boolean
+  /** ESM-only source loader for the shipped dsh entry. */
+  readonly sourceImport?: 'tsx/esm'
   /** Process deadline override for harness tests. */
   readonly processTimeoutMs?: number
   /** Optional world-state setup run in the isolated cwd before process start. */
@@ -222,6 +226,7 @@ export async function runLoaderSmoke(options: LoaderSmokeOptions): Promise<Loade
       configArgs: options.binArgs ?? [options.configPath],
       ...options.mode !== undefined ? { mode: options.mode } : {},
       tsconfigPath: options.tsconfigPath,
+      ...options.sourceImport === undefined ? {} : { sourceImport: options.sourceImport },
       env: { DSH_HOME: join(cwd, '.dsh'), DSH_AGENTS_HOME: join(cwd, '.agents'), ...options.env },
     })
     // `input: ''` writes nothing and closes stdin — the fixture-visible
@@ -231,6 +236,7 @@ export async function runLoaderSmoke(options: LoaderSmokeOptions): Promise<Loade
     const result = await execa(launch.command, launch.args, {
       cwd,
       env: launch.env,
+      extendEnv: options.extendEnv ?? true,
       input: '',
       timeout: processTimeoutMs,
       killSignal: 'SIGKILL',

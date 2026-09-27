@@ -62,9 +62,9 @@ export class SubagentInbox {
   close(release: () => Promise<void>): Promise<void> {
     const existing = this.closingPromise
     if (existing !== undefined) return existing
-    const completion = Promise.withResolvers<void>()
+    const completion = Promise.withResolvers<undefined>()
     this.closingPromise = completion.promise
-    void release().then(completion.resolve, completion.reject)
+    void release().then(() => { completion.resolve(undefined) }, completion.reject)
     return completion.promise
   }
 }

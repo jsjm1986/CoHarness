@@ -4,6 +4,8 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { defineStore, type ISessions, type IWorkspaces, type ObservableSnapshot, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
 
+import { readWorkbenchRecord, writeWorkbenchRecord, readLegacyWorkbenchRecord } from './workbench-persistence.ts'
+import type { SavedWorkbench, WorkbenchRecord } from './workbench-persistence.ts'
 import type { StoreInstance } from '@deepseek-ai/dsh-client-ui-slots'
 
 export type { AddPaneResult, ConversationViewport, ConversationViewportMode, ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
@@ -37,36 +39,16 @@ function normalizedRatios(count: number, ratios: readonly number[]): number[] {
   return values.map(value => value / total)
 }
 
-function restoredState(value: unknown): ViewState {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return { mode: 'single', paneIds: [], paneRatios: [] }
-  }
-  const row = value as Record<string, unknown>
-  const paneIds = Array.isArray(row.paneIds)
-    ? [...new Set(row.paneIds.filter((id): id is string => typeof id === 'string' && id !== ''))].slice(0, WORKBENCH_PANE_LIMIT) as SessionId[]
-    : []
-  const activePaneId = typeof row.activePaneId === 'string' && paneIds.includes(row.activePaneId as SessionId)
-    ? row.activePaneId as SessionId
-    : paneIds[0]
-  return {
-    mode: row.mode === 'single' ? 'single' : 'workbench',
-    paneIds,
-    ...activePaneId === undefined ? {} : { activePaneId },
-    paneRatios: normalizedRatios(paneIds.length, Array.isArray(row.paneRatios) ? row.paneRatios as number[] : []),
-  }
-}
-
 type ViewActions = {
   replace: (draft: ViewState, state: ViewState) => void
 }
 
-/** Create the root conversation viewport's persistent viewing store.
+/** Create the root conversation viewport's in-memory viewing store.
  * @returns a handle shared by the root slot and the viewport capability.
  */
 export function createConversationViewportStore(): EngineStoreHandle<ViewState, ViewActions> {
-  const handle = defineStore({
+  return defineStore({
     init: (): ViewState => ({ mode: 'single', paneIds: [], paneRatios: [] }),
-    persist: 'dsh.conversation.workbench.v1',
     actions: {
       replace: (draft, state: ViewState) => {
         draft.mode = state.mode
@@ -77,14 +59,7 @@ export function createConversationViewportStore(): EngineStoreHandle<ViewState, 
       },
     },
   })
-  return {
-    ...handle,
-    create: () => {
-      const instance = handle.create()
-      instance.store.set(restoredState(instance.getSnapshot()))
-      return instance
-    },
-  }
+
 }
 
 /** Owns persistent pane selection and coordinates staged Session windows. */
@@ -98,10 +73,9 @@ export class ConversationViewportController implements ConversationViewport {
   private stagedIds: readonly SessionId[] = []
   private spaceSessionId: SessionId | undefined
   private restoringWorkbenches = false
-  private readonly workbenches = new Map<
-    string,
-    { id: string; name: string; paneIds: SessionId[]; paneRatios: number[]; updatedAt: number }
-  >()
+  private readonly workbenches = new Map<string, SavedWorkbench>()
+  private persistenceScope: string | undefined
+  private legacyPending = false
   private activeWorkbenchId = 'default'
   private readonly stopList: () => void
   private readonly stopView: () => void
@@ -133,11 +107,29 @@ export class ConversationViewportController implements ConversationViewport {
     this.stopWorkspaces = workspaces?.list.subscribe(() => { this.reconcileSessions() }) ?? (() => {})
     this.baselineReady = sessions.list.getSnapshot().phase === 'ready'
     this.restoringWorkbenches = true
-    this.restoreWorkbenches()
+    this.restoreWorkbenches(undefined)
     this.restoringWorkbenches = false
-    this.persistWorkbenches()
     this.reconcileSessions()
     this.syncStaged()
+  }
+
+  /** Change the verified principal, clearing private layouts and holds before restoration.
+   * @param principal - verified account identity, explicit local identity, or undefined after proof loss.
+   */
+  setPersistenceScope(principal: string | undefined): void {
+    if (this.disposed || principal === this.persistenceScope) return
+    if (this.persistenceScope !== undefined) this.sessions.beginNavigation()
+    this.persistenceScope = principal
+    this.spaceSessionId = undefined
+    const saved = principal === undefined ? undefined : readWorkbenchRecord(principal)
+    this.legacyPending = principal === 'local' && saved === undefined
+    this.catalogReady = false
+    this.restoringWorkbenches = true
+    try { this.restoreWorkbenches(saved) }
+    finally { this.restoringWorkbenches = false }
+    this.reconcileSessions()
+    this.syncStaged()
+    if (!this.legacyPending) this.persistWorkbenches()
   }
 
   /** Release subscriptions and additional history windows without cancelling tasks. */
@@ -163,6 +155,7 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   setMode(mode: ConversationViewportMode): void {
+    this.sessions.beginNavigation()
     const previousMode = this.store.getSnapshot().mode
     if (mode === 'workbench' && previousMode !== 'workbench') this.spaceSessionId = this.sessions.list.getSnapshot().current
     this.store.update((draft) => { draft.mode = mode })
@@ -177,6 +170,7 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   add(sessionId: SessionId): AddPaneResult {
+    this.sessions.beginNavigation()
     if (this.disposed || !validSession(this.sessions, sessionId, this.workspaces)) return { ok: false, reason: 'unknown' }
     const state = this.store.getSnapshot()
     if (state.paneIds.includes(sessionId)) {
@@ -195,6 +189,7 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   remove(sessionId: SessionId): void {
+    this.sessions.beginNavigation()
     const state = this.store.getSnapshot()
     const index = state.paneIds.indexOf(sessionId)
     if (index < 0) return
@@ -213,12 +208,14 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   focus(sessionId: SessionId): void {
+    this.sessions.beginNavigation()
     if (!this.store.getSnapshot().paneIds.includes(sessionId)) return
     this.store.update((draft) => { draft.activePaneId = sessionId })
     if (validSession(this.sessions, sessionId, this.workspaces)) this.select(sessionId)
   }
 
   replaceActive(sessionId: SessionId): AddPaneResult {
+    this.sessions.beginNavigation()
     if (this.disposed || !validSession(this.sessions, sessionId, this.workspaces)) return { ok: false, reason: 'unknown' }
     const state = this.store.getSnapshot()
     if (state.paneIds.includes(sessionId)) {
@@ -269,19 +266,22 @@ export class ConversationViewportController implements ConversationViewport {
   listWorkbenches() { return [...this.workbenches.values()].map(item => ({ ...item, paneIds: [...item.paneIds] })) }
   currentWorkbench() { const item = this.workbenches.get(this.activeWorkbenchId); return item === undefined ? { id: 'default', name: '我的工作台', paneIds: [], updatedAt: Date.now() } : { ...item, paneIds: [...item.paneIds] } }
   switchWorkbench(id: string): void {
+    this.sessions.beginNavigation()
     const target = this.workbenches.get(id)
     if (target === undefined || id === this.activeWorkbenchId) return
     this.saveActiveWorkbench()
     this.activeWorkbenchId = id
     this.store.update((draft) => {
       draft.paneIds = [...target.paneIds]
-      if (target.paneIds[0] === undefined) delete draft.activePaneId
-      else draft.activePaneId = target.paneIds[0]
-      draft.paneRatios = normalizedRatios(target.paneIds.length, [])
+      const active = target.activePaneId ?? target.paneIds[0]
+      if (active === undefined) delete draft.activePaneId
+      else draft.activePaneId = active
+      draft.paneRatios = normalizedRatios(target.paneIds.length, target.paneRatios)
     })
     this.reconcileSessions()
   }
   createWorkbench(name: string): string {
+    this.sessions.beginNavigation()
     const id = `workbench-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
     this.saveActiveWorkbench()
     this.workbenches.set(id, { id, name: name.trim() || '我的工作台', paneIds: [], paneRatios: [], updatedAt: Date.now() })
@@ -292,10 +292,11 @@ export class ConversationViewportController implements ConversationViewport {
   }
   renameWorkbench(id: string, name: string): void { const item = this.workbenches.get(id); if (item !== undefined && name.trim() !== '') { item.name = name.trim(); item.updatedAt = Date.now(); this.persistWorkbenches() } }
   duplicateWorkbench(id: string, name: string): string {
+    this.sessions.beginNavigation()
     const source = this.workbenches.get(id)
     const nextId = `workbench-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
     this.saveActiveWorkbench()
-    const target: { id: string; name: string; paneIds: SessionId[]; paneRatios: number[]; updatedAt: number } = {
+    const target: SavedWorkbench = {
       id: nextId,
       name: name.trim() || `${source?.name ?? '我的工作台'} 副本`,
       paneIds: source === undefined ? [] : [...source.paneIds],
@@ -308,13 +309,15 @@ export class ConversationViewportController implements ConversationViewport {
       draft.mode = 'workbench'
       draft.paneIds = [...target.paneIds]
       draft.paneRatios = [...target.paneRatios]
-      if (target.paneIds[0] === undefined) delete draft.activePaneId
-      else draft.activePaneId = target.paneIds[0]
+      const active = target.activePaneId ?? target.paneIds[0]
+      if (active === undefined) delete draft.activePaneId
+      else draft.activePaneId = active
     })
     this.persistWorkbenches()
     return nextId
   }
   deleteWorkbench(id: string): void {
+    this.sessions.beginNavigation()
     if (this.workbenches.size <= 1 || !this.workbenches.has(id)) return
     this.workbenches.delete(id)
     if (id === this.activeWorkbenchId) {
@@ -338,34 +341,47 @@ export class ConversationViewportController implements ConversationViewport {
       const state = this.store.getSnapshot()
       item.paneIds = [...state.paneIds]
       item.paneRatios = [...state.paneRatios]
+      if (state.activePaneId === undefined) delete item.activePaneId
+      else item.activePaneId = state.activePaneId
       item.updatedAt = Date.now()
       this.persistWorkbenches()
     }
   }
-  private persistWorkbenches(): void { try { globalThis.localStorage.setItem('dsh.conversation.workbenches.v1', JSON.stringify({ activeId: this.activeWorkbenchId, workbenches: [...this.workbenches.values()] })) } catch { /* private storage */ } }
-  private restoreWorkbenches(): void {
-    try { const raw = globalThis.localStorage.getItem('dsh.conversation.workbenches.v1'); if (raw === null) throw new Error('empty'); const value = JSON.parse(raw) as { activeId?: string; workbenches?: Array<{ id?: string; name?: string; paneIds?: SessionId[]; paneRatios?: number[]; updatedAt?: number }> }; for (const item of value.workbenches ?? []) if (item.id && item.name && Array.isArray(item.paneIds)) this.workbenches.set(item.id, { id: item.id, name: item.name, paneIds: item.paneIds.slice(0, 4), paneRatios: item.paneRatios ?? [], updatedAt: item.updatedAt ?? Date.now() }); if (this.workbenches.size && value.activeId && this.workbenches.has(value.activeId)) this.activeWorkbenchId = value.activeId } catch { /* defaults below */ }
+  private persistWorkbenches(): void {
+    if (this.persistenceScope === undefined || this.restoringWorkbenches || this.legacyPending) return
+    writeWorkbenchRecord(this.persistenceScope, {
+      version: 2, mode: this.store.getSnapshot().mode,
+      activeId: this.activeWorkbenchId, workbenches: [...this.workbenches.values()],
+    })
+  }
+
+  private restoreWorkbenches(record: WorkbenchRecord | undefined): void {
+    this.workbenches.clear()
+    this.activeWorkbenchId = record?.activeId ?? 'default'
+    for (const item of record?.workbenches ?? []) this.workbenches.set(item.id, item)
     if (this.workbenches.size === 0) this.workbenches.set('default', { id: 'default', name: '我的工作台', paneIds: [], paneRatios: [], updatedAt: Date.now() })
     const active = this.workbenches.get(this.activeWorkbenchId)
-    if (active !== undefined && active.paneIds.length) {
-      this.store.update((draft) => {
-        draft.paneIds = [...active.paneIds]
-        // The workbench row carries no active marker; the ViewState persist
-        // already restored the user's active pane, so keep it while it still
-        // resolves inside the restored pane set.
-        const restored = draft.activePaneId
-        const first = active.paneIds[0]
-        if (restored !== undefined && active.paneIds.includes(restored)) draft.activePaneId = restored
-        else if (first !== undefined) draft.activePaneId = first
-        else delete draft.activePaneId
-        draft.paneRatios = normalizedRatios(active.paneIds.length, [])
-      })
-    }
+    this.store.update((draft) => {
+      draft.mode = record?.mode ?? 'single'
+      draft.paneIds = active === undefined ? [] : [...active.paneIds]
+      draft.paneRatios = normalizedRatios(draft.paneIds.length, active?.paneRatios ?? [])
+      const id = active?.activePaneId ?? draft.paneIds[0]
+      if (id === undefined) delete draft.activePaneId
+      else draft.activePaneId = id
+    })
   }
 
   private reconcileSessions(): void {
     const list = this.sessions.list.getSnapshot()
     if (list.phase !== 'ready' || (this.workspaces !== undefined && this.workspaces.list.getSnapshot().phase !== 'ready')) return
+    if (this.legacyPending) {
+      this.legacyPending = false
+      const legacy = readLegacyWorkbenchRecord(id => validSession(this.sessions, id, this.workspaces))
+      this.restoringWorkbenches = true
+      try { if (legacy !== undefined) this.restoreWorkbenches(legacy) }
+      finally { this.restoringWorkbenches = false }
+      this.persistWorkbenches()
+    }
     const firstBaseline = !this.baselineReady
     this.baselineReady = true
     const state = this.store.getSnapshot()
@@ -395,7 +411,7 @@ export class ConversationViewportController implements ConversationViewport {
     const multi = this.enabled && state.mode === 'workbench'
     if (multi && (this.sessions.list.getSnapshot().phase !== 'ready'
       || (this.workspaces !== undefined && this.workspaces.list.getSnapshot().phase !== 'ready'))) return
-    const ids = multi ? state.paneIds : []
+    const ids = multi ? state.paneIds.filter(id => validSession(this.sessions, id, this.workspaces)) : []
     if (ids.length === this.stagedIds.length && ids.every((id, index) => id === this.stagedIds[index])) return
     this.stagedIds = ids
     this.sessions.setAdditionalStaged(ids)

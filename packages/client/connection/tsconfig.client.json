@@ -17,7 +17,9 @@
     "src/client/rpc.ts",
     "src/client/web-api-client.ts",
     "src/loopback-hostname.ts",
-    "src/rpc.ts"
+    "src/rpc.ts",
+    "src/rpc-stream.ts",
+    "src/rpc-stream-reader.ts"
   ],
   "references": [
     {

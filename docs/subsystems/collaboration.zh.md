@@ -45,7 +45,7 @@ interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
 }
 ```
 
@@ -232,6 +232,41 @@ type CollaborationErrorCode =
 
 删除项目时，Gateway 会在保持该运行时串行操作槽的同时停止共享运行时，再移除项目行。PostgreSQL 会级联删除运行时、成员、挂载、对话树与事件、参与者与交互记录、项目模型用量与额度数据、intake token、告警和内容文件元数据。文件系统中的项目目录会被保留。
 
+## 执行参与人
+
+受管执行在队列编辑、回答、分叉和委派之间保留经过验证的人类输入引用。Gateway 在特权执行前核验所有保留的参与人；显示参与人信息或批准响应都不授予权限。缺少已验证归因的输入会阻止特权执行。消费者归属见[执行身份服务](../../packages/context/execution-authority/README.zh.md)，失效与恢复见 [Gateway 提供者](../../packages/context/gateway-execution/README.zh.md)。
+
+```ts type-equiv
+/** Host RPC identity of the pending human question claimed by the Gateway. */
+type ExecutionQuestionId = Branded<'rpc-id'>
+```
+
+```ts type-equiv
+/** Privilege checked against every current execution participant. */
+type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'desktop'
+```
+
+```ts type-equiv
+/** Gateway-confirmed participant set, with bounded identity witnesses. */
+interface ExecutionState {
+  readonly revision: string
+  readonly inputs: readonly ExecutionInputId[]
+  readonly actors: readonly { readonly userId: number }[]
+  readonly primaryActorUserId?: number
+  readonly unverifiedHistory: boolean
+}
+```
+
+```ts type-equiv
+/** A delegation captures its parent before awaiting child creation. */
+interface ExecutionInheritance {
+  readonly parentSessionId: SessionId
+  readonly inputs: readonly ExecutionInputId[]
+  readonly unverifiedHistory: boolean
+  readonly primaryActorUserId?: number
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -270,6 +305,82 @@ abstract withSessionCreation<T>( creation: CollaborationSessionCreation, operati
 
 Source: [`packages/context/collaboration/src/index.ts`](../../packages/context/collaboration/src/index.ts)
 
+<a id="ctxexecutionauthority--executionauthority-abstract-seam"></a>
+
+### `ctx.executionAuthority` — `ExecutionAuthority` (abstract seam)
+
+Authority operations shared by input transports, delegated work, and privilege consumers.
+
+```ts cordis-catalog
+/**
+ * Attest the live caller and exact human input, retaining all earlier editors.
+ * @param session - Session which owns the input.
+ * @param message - content and display metadata accepted by the input transport.
+ * @returns immutable input with verified origin reference.
+ */
+abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>
+
+/**
+ * Claim a verified human answer and include its responder before delivery.
+ * @param session - Session owning the live question.
+ * @param questionId - exact pending question identity verified by the transport.
+ * @param answer - parser-validated answer.
+ * @returns whether the caller owns this answer, including an identical retry.
+ */
+abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown): Promise<boolean>
+
+/**
+ * Capture the current participants before awaiting delegated work.
+ * @param agent - exact live parent Agent.
+ * @returns immutable inheritance for the new or continued child.
+ */
+abstract capture(agent: Agent): ExecutionInheritance
+
+/**
+ * Capture the complete authority of a cold or live source for an explicit fork.
+ * @param sessionId - source already authorized by the fork transport.
+ * @returns current participant references, independently of the selected history cut.
+ */
+abstract captureSession(sessionId: SessionId): Promise<ExecutionInheritance>
+
+/**
+ * Persist captured restrictions in the child's own log.
+ * @param session - child Session, including the unpublished setup window.
+ * @param scope - participants captured from its actual parent.
+ */
+abstract inherit(session: Session, scope: ExecutionInheritance): void
+
+/**
+ * Include an adjacent sender's restrictions before admitting its durable delivery.
+ * @param session - actual recipient, including a Team's routing host.
+ * @param scope - sender facts captured before asynchronous delivery.
+ * @param messageId - stable delivery identity for retry deduplication.
+ * @param signal - delivery cancellation.
+ * @returns recipient restrictions for an onward delegation of this delivery.
+ */
+abstract relay(session: Session, scope: ExecutionInheritance, messageId: MessageId, signal?: AbortSignal): Promise<ExecutionInheritance>
+
+/**
+ * Recheck every participant against current permissions.
+ * @param capability - required privilege; identity alone grants none.
+ * @param agent - actual executing Agent.
+ * @param signal - operation-owned cancellation.
+ * @returns verified participants for attribution; one call incurs one charge.
+ */
+abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal): Promise<ExecutionState>
+
+/**
+ * Authorize an explicit preset selection before its synchronous commit.
+ * @param agent - target Agent.
+ * @param preset - requested preset name.
+ */
+abstract authorizeSelection(agent: Agent, preset: string): Promise<void>
+```
+
+Types: [Agent](core.zh.md) · [MessageId](llm-streaming.zh.md) · [Session](session.zh.md) · [SessionId](core.zh.md) · [UserMessage](session.zh.md)
+
+Source: [`packages/context/execution-authority/src/index.ts`](../../packages/context/execution-authority/src/index.ts)
+
 <a id="ctxgatewayruntime--gatewayruntime"></a>
 
 ### `ctx.gatewayRuntime` — `GatewayRuntime`
@@ -282,6 +393,12 @@ Authenticated Gateway context for one launched Harness runtime.
  * @returns the verified principal, or undefined outside an authenticated operation.
  */
 current(): GatewayRequestPrincipal | undefined
+
+/**
+ * Read the live HTTP caller; detached work cannot keep interactive authority.
+ * @returns the caller while the HTTP operation remains active, otherwise undefined.
+ */
+interactive(): GatewayRequestPrincipal | undefined
 
 /**
  * Return the current principal or reject an operation outside an authenticated request.
@@ -316,6 +433,43 @@ request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response
 Types: [SessionId](core.zh.md)
 
 Source: [`packages/context/gateway-runtime/src/index.ts`](../../packages/context/gateway-runtime/src/index.ts)
+
+<a id="ctxuserterminaladministration--userterminaladministration"></a>
+
+### `ctx.userTerminalAdministration` — `UserTerminalAdministration`
+
+Administrator access grants metadata and termination, never screen or input access.
+
+```ts cordis-catalog
+/**
+ * Verify inventory and termination authority independently of terminal creation.
+ * @param signal - current request cancellation.
+ * @returns after current administrator role validation.
+ */
+administrator(signal: AbortSignal): Promise<void>
+```
+
+Source: [`packages/api/terminal-controller/src/authorization.ts`](../../packages/api/terminal-controller/src/authorization.ts)
+
+<a id="ctxuserterminalauthorization--userterminalauthorization"></a>
+
+### `ctx.userTerminalAuthorization` — `UserTerminalAuthorization`
+
+Managed deployments verify the interactive user and current writable scope.
+
+```ts cordis-catalog
+/**
+ * Authorize a real user gesture without inheriting model, Auto, or approval authority.
+ * @param sessionId - exact target Session, including inactive history.
+ * @param signal - request cancellation, distinct from the returned authority lifetime.
+ * @returns creator identity and a grant cancelled on revocation.
+ */
+authorize(sessionId: SessionId, signal: AbortSignal): Promise<TerminalAuthority>
+```
+
+Types: [SessionId](core.zh.md)
+
+Source: [`packages/api/terminal-controller/src/authorization.ts`](../../packages/api/terminal-controller/src/authorization.ts)
 
 <a id="typert-gateway-events"></a>
 

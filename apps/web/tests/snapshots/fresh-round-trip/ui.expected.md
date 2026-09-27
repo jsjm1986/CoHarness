@@ -9,10 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
-- text: "Use the bash tool to run exactly: echo WEB_E2E_OK. Then reply with the single word DONE and stop. {{clock}}"
+- text: "Use the bash tool to run exactly: echo WEB_E2E_OK. Then reply with the single word DONE and stop."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The command executed successfully and output \"WEB_E2E_OK\". I just need to reply with \"DONE\".":
@@ -28,10 +31,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -45,10 +49,11 @@
   - img
 - button "6% of context used"
 - button "Send message" [disabled]
-- button "1 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 2 steps{{throughput}} tok/s
-- button "15.8K tok · Cache hit 99%":
-  - img
-  - text: 15.8K tokCache hit 99%
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "15.8K tok · Cache hit 99%":
+    - img
+    - text: 15.8K tokCache hit 99%
 - separator "Adjust transcript content width"

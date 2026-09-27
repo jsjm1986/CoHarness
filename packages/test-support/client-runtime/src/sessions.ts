@@ -1,12 +1,12 @@
 /** Test-owned sessions face: the SlotRegistry host contract over declarative fixtures. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentIdType } from '@deepseek-ai/dsh-attachment'
-import { createScope, scopeOf, SessionProvideChannel } from '@deepseek-ai/dsh-client-runtime/client'
+import { createScope, scopeOf, scopeIdentityOf, SessionProvideChannel, NavigationController } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   AgentContext, ConversationSnapshot, ISessions, ObservableSnapshot, ProjectionsFace, SessionFace, SessionId,
   SessionListState, SessionProvideDescriptor, SessionSearchResultItem, SessionSummary, SnapshotStore,
-  SubagentAddress,
+  SubagentAddress, SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo,
 } from '@deepseek-ai/dsh-client-runtime/client'
 // The double reports the wire schema's own search bound, like the production
 // service — a transport-varying limit would be a fiction no client can see.
@@ -79,6 +79,13 @@ export class FixtureSession implements SessionFace {
    */
   subscribe(fn: () => void): () => void {
     return this.store.subscribe(fn)
+  }
+
+  /** Independent detail reads must be supplied by the test fixture.
+   * @returns never — an undeclared read fails loudly.
+   */
+  readCallHistory(): never {
+    throw new Error(`test session "${this.sessionId}": readCallHistory is not stubbed`)
   }
 
   /**
@@ -185,6 +192,8 @@ export class TestSessions implements ISessions {
    * renderer's SessionProvider.
    */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  private readonly navigation = new NavigationController()
+  private readonly references = new Map<SessionId, SnapshotStore<SessionRetainInfo>>()
   private readonly records = new Map<SessionId, SessionRecord>()
   /** The production provide channel (roster, materialization rules, current projection) — no test-side mirror. */
   private readonly channel: SessionProvideChannel
@@ -207,8 +216,9 @@ export class TestSessions implements ISessions {
    * @param rootCtx - the runtime's Cordis root; scope fibers mount under it.
    */
   constructor(private readonly stabilize: Stabilizer, private readonly rootCtx: Context) {
+    rootCtx.effect(() => () => { this.navigation.dispose() })
     this.list = createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, current: undefined, phase: 'ready',
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })
     this.channel = new SessionProvideChannel({
@@ -224,6 +234,60 @@ export class TestSessions implements ISessions {
     this.currentProvideInfo = this.channel.currentProvideInfo
     // The projection follows every current write, as in production.
     this.list.subscribe(() => { this.channel.publishCurrent() })
+  }
+
+  beginNavigation(): AbortSignal {
+    return this.navigation.begin()
+  }
+
+  retain(target: SessionTarget, options: SessionRetainOptions): SessionReference {
+    options.signal?.throwIfAborted()
+    const id = typeof target === 'string' ? target : target.childSessionId
+    const binding = this.binding(id)
+    if (binding === undefined) throw new Error(`unknown test Session ${id}`)
+    const source = this.retainInfo(id)
+    const update = (delta: number): void => {
+      const previous = source.getSnapshot()
+      const { [options.source]: previousCount = 0, ...remaining } = previous.retainedBy
+      const count = previousCount + delta
+      const counts = count === 0 ? remaining : { ...remaining, [options.source]: count }
+      source.set(Object.freeze({ referenceCount: previous.referenceCount + delta, retainedBy: Object.freeze(counts) }))
+    }
+    update(1)
+    let released = false
+    const release = (): void => {
+      if (released) return
+      released = true
+      update(-1)
+    }
+    return {
+      sessionId: id,
+      get binding() {
+        if (released) throw new Error(`Session reference "${id}" is released`)
+        return binding
+      },
+      ready: Promise.resolve(binding),
+      release,
+      [Symbol.dispose]: release,
+    }
+  }
+
+  async using<T>(
+    target: SessionTarget,
+    options: SessionRetainOptions,
+    operation: (reference: SessionReference) => T | Promise<T>,
+  ): Promise<T> {
+    const reference = this.retain(target, options)
+    try { return await operation(reference) } finally { reference.release() }
+  }
+
+  retainInfo(id: SessionId): SnapshotStore<SessionRetainInfo> {
+    let source = this.references.get(id)
+    if (source === undefined) {
+      source = createSnapshotStore<SessionRetainInfo>(Object.freeze({ referenceCount: 0, retainedBy: Object.freeze({}) }))
+      this.references.set(id, source)
+    }
+    return source
   }
 
   /**
@@ -411,7 +475,8 @@ export class TestSessions implements ISessions {
   sessionOf(ctx: Context): SessionFace | undefined {
     const id = scopeOf(ctx)
     if (id === undefined) return undefined
-    return this.records.get(id)?.session
+    const record = this.records.get(id)
+    return record?.scope !== undefined && scopeIdentityOf(record.scope) === scopeIdentityOf(ctx) ? record.session : undefined
   }
 
   /**
@@ -421,6 +486,7 @@ export class TestSessions implements ISessions {
    * @param id - session id.
    */
   open(id: SessionId): void {
+    this.beginNavigation()
     this.calls.push({ method: 'open', args: [id] })
     this.require(id)
     this.list.update((draft) => {
@@ -431,6 +497,7 @@ export class TestSessions implements ISessions {
 
   /** Open an existing fixture through its catalog address. */
   openSubagent(address: SubagentAddress): void {
+    this.beginNavigation()
     this.calls.push({ method: 'openSubagent', args: [address] })
     this.require(address.childSessionId)
     this.list.update((draft) => {
@@ -471,6 +538,7 @@ export class TestSessions implements ISessions {
 
   /** Clear the current selection (recorded; the production no-session flow). */
   clear(): void {
+    this.beginNavigation()
     this.calls.push({ method: 'clear', args: [] })
     this.list.update((draft) => {
       draft.current = undefined

@@ -13,6 +13,7 @@
 
 import { memo, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
+import clsx from 'clsx'
 import { IncrementalMarkdownParser } from './incremental.ts'
 import { parseGfm, parseGfmWithMath } from './parse.ts'
 import {
@@ -148,16 +149,18 @@ class StreamingRenderer {
  * links inline-code tokens its resolver recognizes as real files; this is
  * the single streaming gate — it applies to settled renders only, because a
  * streaming message's vocabulary is not final and frozen cached elements
- * must not bake in handlers that could go stale.
+ * must not bake in handlers that could go stale. `variant="compact"` uses
+ * secondary typography and tight block spacing without truncating content.
  * @returns A GFM document with TeX math rendered through KaTeX; raw HTML,
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels, fileMentions }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels, fileMentions, variant = 'body' }: {
   text: string
   streaming?: boolean
   labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
+  variant?: 'body' | 'compact'
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownLabels>(labels)
@@ -175,5 +178,5 @@ export const MarkdownText = memo(function MarkdownText({ text, streaming = false
     }
     return streamRef.current.render(text)
   }, [text, streaming, labels, fileMentions])
-  return <div className={css.markdown}>{children}</div>
+  return <div className={clsx(css.markdown, variant === 'compact' && css.compact)}>{children}</div>
 })

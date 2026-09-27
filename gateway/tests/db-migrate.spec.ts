@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -11,14 +11,42 @@ function tables(db: Database.Database): string[] {
 }
 
 describe('SQLite schema migration', () => {
-  it('creates project tables on a fresh database and records schema_version=7', () => {
+  it('upgrades a v7 user with no Auto grant and preserves the grant on later opens', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-v7-auto-'))
+    const file = join(root, 'g.sqlite')
+    const legacy = new Database(file)
+    legacy.exec(`
+      CREATE TABLE schema_meta(version INTEGER NOT NULL);
+      INSERT INTO schema_meta VALUES(7);
+      CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,password_hash TEXT,display_name TEXT,
+        role TEXT,status TEXT,home_path TEXT,must_change_password INTEGER,created_at INTEGER,updated_at INTEGER,deleted_at INTEGER);
+      INSERT INTO users VALUES(1,'legacy','hash','Legacy','admin','active','/legacy',0,1,1,NULL);
+    `)
+    legacy.close()
+    let db: Database.Database | undefined
+    try {
+      db = openDb(file)
+      expect(db.prepare('SELECT username,auto_review_eligible FROM users WHERE id=1').get()).toEqual({ username: 'legacy', auto_review_eligible: 0 })
+      expect(() => db!.prepare('UPDATE users SET auto_review_eligible=2 WHERE id=1').run()).toThrow()
+      db.prepare('UPDATE users SET auto_review_eligible=1 WHERE id=1').run()
+      db.close()
+      db = openDb(file)
+      expect(db.prepare('SELECT auto_review_eligible FROM users WHERE id=1').get()).toEqual({ auto_review_eligible: 1 })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 8 })
+    } finally {
+      if (db?.open) db.close()
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('creates project tables on a fresh database and records schema_version=8', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')
     const db = openDb(file)
     expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'model_registration_events', 'schema_meta']))
     expect(tables(db)).not.toEqual(expect.arrayContaining(['groups', 'dir_grants']))
     expect((db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>)
       .some(column => column.name === 'model_access_default_allowed')).toBe(true)
-    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(7)
+    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(8)
   })
 
   it('folds dir_grants and group members into projects; rw beats ro; then drops old tables', () => {

@@ -1,9 +1,13 @@
 /** Session-authorized, relative-path Workspace file reads over the existing FS provider. */
 import { createHash } from 'node:crypto'
+import { OfficeSourceKey, OfficeToPdfError } from '@deepseek-ai/dsh-office-to-pdf'
 import { posix, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
 import { FsError } from '@deepseek-ai/dsh-fs'
 import type { FileSystem, FsInfo, FsObservation, FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
+import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { CollaborationError, collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { Session, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
@@ -82,6 +86,16 @@ interface ReadOptions {
   authorize(sessionId: SessionId): Promise<{ authority: CollaborationAuthority | undefined } | { error: RpcError }>
   validateRoot(cwd: string, authority: CollaborationAuthority | undefined): Promise<string>
   principalSignal(signal: AbortSignal, authority: CollaborationAuthority | undefined): AbortSignal
+  /**
+   * Resolve a session's live Agent — resuming a cold one — for sessions whose
+   * durable SSH binding puts the workspace behind a realm filesystem only the
+   * mounted composition can reach. Resuming re-runs the caller's SSH
+   * admission inside the agent setup, so a cold read cannot bypass the grant
+   * check. Sessions without a binding never consult it.
+   * @param sessionId - the Session whose workspace is being read.
+   * @returns the Agent carrying the realm mount, or its caller-facing refusal.
+   */
+  agent?(sessionId: SessionId): Promise<{ agent: Agent } | { error: RpcError }>
 }
 interface LocatedFile {
   fs: FileSystem
@@ -136,6 +150,16 @@ function readFailure(error: unknown, sessionId: SessionId, path: string, signal:
     return { code: 'cancelled', message: 'Workspace file operation was cancelled.', details: {} }
   }
   if (error instanceof FileFailure) return error.error
+  if (error instanceof OfficeToPdfError) return { code: 'document-error', message: 'Office preview conversion failed.', details: { reason: error.code } }
+  // A realm-boundary admission failure (a thrown RemoteError escaping the
+  // agent resolver) keeps its wire code so callers can tell denial from
+  // failure. 'ssh/forbidden' lives in dsh-ssh's RemoteErrorDetailsMap
+  // augmentation, which this package does not import — widen to string.
+  const remote = remoteErrorOf(error)
+  const remoteCode: string | undefined = remote?.code
+  if (remoteCode === 'ssh/forbidden' && remote !== undefined) {
+    return { code: 'ssh/forbidden', message: remote.message, details: {} }
+  }
   if (error instanceof CollaborationError) return collaborationRefusal(error, 'read', sessionId)
   if (error instanceof FsError) {
     if (error.code === 'FS_PERMISSION_DENIED' || error.code === 'FS_SANDBOX_DENIED') return { code: 'collaboration-forbidden', message: 'Workspace file access is not permitted.', details: { sessionId, action: 'read', reason: 'forbidden' } }
@@ -187,11 +211,31 @@ export function createWorkspaceFilesApi(ctx: Context, options: ReadOptions): Wor
         signal = options.principalSignal(signal, authorized.authority)
         signal.throwIfAborted()
         path = relativePath(request.payload.path ?? '.', sessionId)
-        const fs = ctx.get('fs')
-        if (fs === undefined) throw new Error('FS unavailable')
         const header = await headerOf(ctx, sessionId, signal)
         if (header?.cwd === undefined) throw new FileFailure({ code: 'workspace-file/unknown-session', message: 'Session workspace is unavailable.', details: { sessionId } })
-        const cwd = await options.validateRoot(header.cwd, authorized.authority)
+        let fs: FileSystem
+        let cwd: string
+        if (header.sshTarget === undefined) {
+          const host = ctx.get('fs')
+          if (host === undefined) throw new Error('FS unavailable')
+          fs = host
+          cwd = await options.validateRoot(header.cwd, authorized.authority)
+        } else {
+          // The workspace lives on the session's remote execution realm. Reads
+          // reach it through the session's mounted agent — a cold session
+          // resumes first, re-running this caller's SSH admission — and the
+          // realm provider's own resolve/contains enforce the remote boundary,
+          // so the host project-root check does not apply to a remote cwd.
+          if (options.agent === undefined) {
+            throw new FileFailure({ code: 'workspace-file/unknown-session', message: 'Session workspace is unavailable.', details: { sessionId } })
+          }
+          const found = await options.agent(sessionId)
+          if ('error' in found) return { rpcId: request.rpcId, result: { ok: false, error: found.error } }
+          const remote = environmentForAgent(ctx, found.agent, 'fs')
+          if (remote === undefined) throw new Error('SSH-bound session has no realm filesystem')
+          fs = remote
+          cwd = header.cwd
+        }
         const file = await locate(ctx, fs, cwd, path, sessionId, signal)
         const value = await operation(file, signal)
         const current = await locate(ctx, fs, cwd, path, sessionId, signal)
@@ -213,6 +257,38 @@ export function createWorkspaceFilesApi(ctx: Context, options: ReadOptions): Wor
   }
 
   return {
+    renderOffice: (request, signal) => unary(request, signal, async (file, abort) => {
+      if (file.info.type !== 'file') refuse('workspace-file/not-regular-file', file.sessionId, file.path)
+      const version = wireVersion(file.info.version)
+      if (request.payload.version !== undefined && request.payload.version !== version) refuse('workspace-file/stale-version', file.sessionId, file.path)
+      const extension = file.path.split('.').at(-1)?.toLowerCase()
+      if (extension !== 'doc' && extension !== 'docx' && extension !== 'xls' && extension !== 'xlsx'
+        && extension !== 'ppt' && extension !== 'pptx') throw new OfficeToPdfError('unsupported-format', 'Unsupported Office document extension.')
+      const converter = ctx.get('officeToPdf')
+      if (converter === undefined) throw new OfficeToPdfError('unavailable', 'Office conversion is not mounted on this runtime.')
+      // Content authorization precedes even a cache hit; metadata visibility alone is insufficient.
+      await file.fs.readByteRange(file.target, { offset: 0, length: 1, expectedVersion: file.info.version }, abort)
+      const result = await converter.convert({ extension, priority: request.payload.priority ?? 'foreground', source: {
+        key: OfficeSourceKey(JSON.stringify([file.sessionId, file.target.targetKey])), version,
+        ...(file.info.size === undefined ? {} : { bytes: file.info.size }),
+        read: async (upstream, maxBytes) => {
+          const bytes = new Uint8Array(maxBytes + 1)
+          let offset = 0
+          while (offset < bytes.length) {
+            upstream.throwIfAborted()
+            const length = Math.min(limits.maxBytes, bytes.length - offset)
+            const part = await file.fs.readByteRange(file.target, { offset, length, expectedVersion: file.info.version }, upstream)
+            bytes.set(part, offset)
+            offset += part.length
+            if (part.length < length) break
+          }
+          upstream.throwIfAborted()
+          return { bytes: bytes.subarray(0, offset), version }
+        },
+      } }, abort)
+      return { path: file.path, version, bytes: Buffer.from(result.pdf).toString('base64'),
+        missingFonts: result.missingFonts, generation: result.generation }
+    }),
     list: (request, signal) => unary(request, signal, async (file, abort) => {
       if (file.info.type !== 'directory') refuse('workspace-file/not-directory', file.sessionId, file.path)
       const limit = bound(request.payload.maxEntries, limits.maxEntries, file.sessionId, file.path)
@@ -296,7 +372,7 @@ interface ChangeOptions {
 export function subscribeWorkspaceFileChanges(ctx: Context, options: ChangeOptions): () => void {
   const lifetime = new AbortController()
   const signal = AbortSignal.any([lifetime.signal, options.signal])
-  const pending = new Map<string, { session: Session; target: FsTarget; observation: FsObservation }>()
+  const pending = new Map<string, { session: Session; agentCtx: Context | undefined; target: FsTarget; observation: FsObservation }>()
   let draining = false
   const drain = async (): Promise<void> => {
     if (draining) return
@@ -307,13 +383,21 @@ export function subscribeWorkspaceFileChanges(ctx: Context, options: ChangeOptio
         const first = pending.entries().next().value
         /* v8 ignore next -- the non-empty Map cannot yield no first entry. */
         if (first === undefined) break
-        const [key, { session, target, observation }] = first
+        const [key, { session, agentCtx, target, observation }] = first
         pending.delete(key)
         if (ctx.sessions.get(session.id) !== session || session.header.cwd === undefined) continue
         if (options.authority !== undefined && !(await options.authority.readableSessionIds([session.id])).has(session.id)) continue
-        const fs = ctx.get('fs')
+        // An SSH-bound session's observations arrive from its realm provider
+        // under the emitting agent's mount; the host filesystem cannot compare
+        // remote targets, so no realm fs means the frame is dropped, never
+        // checked against host paths.
+        const fs = session.header.sshTarget === undefined
+          ? ctx.get('fs')
+          : agentCtx === undefined ? undefined : environmentForAgent(ctx, { ctx: agentCtx }, 'fs')
         if (fs === undefined) continue
-        const cwd = await options.validateRoot(session.header.cwd, options.authority)
+        const cwd = session.header.sshTarget === undefined
+          ? await options.validateRoot(session.header.cwd, options.authority)
+          : session.header.cwd
         const root = await fs.resolve('.', { cwd, signal })
         if (!fs.contains(root, target)) continue
         const base = fs.processPath(root)
@@ -334,7 +418,7 @@ export function subscribeWorkspaceFileChanges(ctx: Context, options: ChangeOptio
   }
   const stop = ctx.on('fs/observed', (target, observation, actor) => {
     if (signal.aborted || actor === undefined) return
-    const subject: { agent?: { session?: Session } } = actor
+    const subject: { agent?: { session?: Session; ctx?: Context } } = actor
     const session = subject.agent?.session
     if (session === undefined) return
     const key = `${String(session.id)}\0${String(target.targetKey)}`
@@ -346,7 +430,7 @@ export function subscribeWorkspaceFileChanges(ctx: Context, options: ChangeOptio
       lifetime.abort()
       return
     }
-    pending.set(key, { session, target, observation })
+    pending.set(key, { session, agentCtx: subject.agent?.ctx, target, observation })
     void drain()
   })
   return () => { lifetime.abort(); pending.clear(); stop() }

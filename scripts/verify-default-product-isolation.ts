@@ -20,6 +20,8 @@ import {
 } from './verify-client-packages.ts'
 
 const EXPERIMENTAL_PREFIX = '@deepseek-ai/dsh-experimental-'
+// The independently published entry package owns platform-engine dependencies.
+const EXTERNAL_KIT_PACKAGES = new Set(['@deepseek-ai/libreoffice-kit'])
 const PROFILE_SOURCE = 'packages/boot/app-boot/src/profile.ts'
 const PRESET_PATTERN = 'apps/cli/config/agent-presets/*/agent.cordis.yml'
 const RUNTIME_SECTIONS = ['dependencies', 'optionalDependencies', 'peerDependencies'] as const
@@ -129,6 +131,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
     }
     const pkg = packages.get(packageName)
     if (pkg !== undefined) add(pkg, origin)
+    else if (EXTERNAL_KIT_PACKAGES.has(packageName)) return
     else if (packageName.startsWith('@deepseek-ai/')) failures.push(`${origin}: unknown workspace package ${name}`)
   }
   const dependency = (name: string, range: string, owner: Package, origin: string): void => {

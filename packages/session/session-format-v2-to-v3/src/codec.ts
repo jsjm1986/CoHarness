@@ -16,20 +16,26 @@ import { assertV3Event, assertV3StructuralRow } from './payload.ts'
 export const releasedV3SessionFormatCodec = Object.freeze({
   version: 3,
   decodeHeader(value: unknown) {
-    const { header, draft } = v2PhysicalHeader(value)
+    const { header, draft, sshTarget } = v2PhysicalHeader(value)
     return {
       ...releasedV2SessionFormatCodec.decodeHeader(header),
       ...(draft === undefined ? {} : { draft }),
+      ...(sshTarget === undefined ? {} : { sshTarget }),
       version: 3,
     }
   },
   createDecoder(value, recovery) {
-    const { header, draft } = v2PhysicalHeader(value)
+    const { header, draft, sshTarget } = v2PhysicalHeader(value)
     const decoder = releasedV2SessionFormatCodec.createDecoder(header, recovery)
     let issue: SessionFormatError | undefined
     let acceptedInheritedCut: number | undefined
     return {
-      header: { ...decoder.header, ...(draft === undefined ? {} : { draft }), version: 3 },
+      header: {
+        ...decoder.header,
+        ...(draft === undefined ? {} : { draft }),
+        ...(sshTarget === undefined ? {} : { sshTarget }),
+        version: 3,
+      },
       decodeRow(row, context) {
         assertV3RowAdmission(row)
         decoder.decodeRow(row, {
@@ -70,10 +76,11 @@ export const releasedV3SessionFormatCodec = Object.freeze({
   },
   encodeHeader(header, inheritedEventCount) {
     assertReleasedV3Header(header)
-    const { draft, ...rest } = header
+    const { draft, sshTarget, ...rest } = header
     return {
       ...releasedV2SessionFormatCodec.encodeHeader({ ...rest, version: 2 }, inheritedEventCount),
       ...(draft === undefined ? {} : { draft }),
+      ...(sshTarget === undefined ? {} : { sshTarget }),
       version: 3,
     }
   },
@@ -94,16 +101,24 @@ export function assertV3RowAdmission(row: unknown): void {
   if (typeof row === 'object' && row !== null && !Array.isArray(row)) assertV3EventAdmission(row as SessionFormatEvent)
 }
 
-function v2PhysicalHeader(value: unknown): { readonly header: SessionFormatHeader; readonly draft: SessionFormatJsonValue | undefined } {
+function v2PhysicalHeader(value: unknown): {
+  readonly header: SessionFormatHeader
+  readonly draft: SessionFormatJsonValue | undefined
+  readonly sshTarget: SessionFormatJsonValue | undefined
+} {
   const header = snapshotSessionFormatJson(value, 'format v3 physical header')
   if (!isSessionFormatJsonObject(header) || header['version'] !== 3) {
     throw new SessionFormatError('expected format v3 physical Session header')
   }
-  // `draft` is a v3-era header field: the v2 layer's released key set predates
-  // it, so it is lifted out here and re-attached by the caller.
-  const { draft, ...rest } = header
+  // `draft` and `sshTarget` postdate the v2 layer's released key set, so they
+  // are lifted out here and re-attached by the caller.
+  const { draft, sshTarget, ...rest } = header
   if (draft !== undefined && typeof draft !== 'boolean') {
     throw new SessionFormatError('format v3 header draft must be boolean')
   }
-  return { header: { ...rest, version: 2 } as SessionFormatHeader, draft }
+  if (sshTarget !== undefined
+    && (typeof sshTarget !== 'number' || !Number.isSafeInteger(sshTarget) || sshTarget <= 0)) {
+    throw new SessionFormatError('format v3 header sshTarget must be a positive safe integer')
+  }
+  return { header: { ...rest, version: 2 } as SessionFormatHeader, draft, sshTarget }
 }

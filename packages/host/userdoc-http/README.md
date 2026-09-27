@@ -28,6 +28,7 @@ The Gateway's `document-admin` principal is accepted only by the trash, restore,
 
 Use `dsh-host-userdoc-http` as the streaming browser HTTP consumer for `ctx.userDocs`: it registers `/api/documents` through Host Connection so the Host/Origin trust check runs before the route while upload bytes bypass the buffered JSON bridge. The route family covers list, upload, move, trash, restore, purge, and folder operations with bounded pages and opaque cursors.
 
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. The route streams each upload into `ctx.userDocs`; document state stays in the attachment backend.

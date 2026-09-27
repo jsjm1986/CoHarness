@@ -1,1 +1,1 @@
-UPDATE sessions SET version = 0 WHERE session_key = ?
+UPDATE sessions SET version = 2 WHERE session_key = ?

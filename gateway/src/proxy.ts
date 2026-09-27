@@ -14,7 +14,7 @@ import { waitingPage } from './html.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
-import type { GatewayAccessInvalidation, GatewayDeps, GatewayRequestContext, ProxyHandler, UpgradeHandler } from './server.ts'
+import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
   return (req.headers.accept ?? '').includes('text/html')
@@ -61,6 +61,9 @@ function scrubRuntimeHeaders(req: IncomingMessage): void {
   ]) delete req.headers[name]
 }
 
+/** Response media types whose streams may legitimately idle past the upstream timeout. */
+const STREAMING_MEDIA_TYPES = new Set(['text/event-stream', 'application/x-ndjson'])
+
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
@@ -68,8 +71,11 @@ export function createProxyHandlers(
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
     xfwd: true,
+    // Bounds upstream connect and time to first byte only: STREAMING_MEDIA_TYPES
+    // disarm it once headers arrive. The http-proxy `timeout` option is not set;
+    // it would put the same idle bound on the client-facing socket, where it
+    // persists on keep-alive connections and kills any stream that pauses.
     proxyTimeout: cfg.upstreamTimeoutMs,
-    timeout: cfg.upstreamTimeoutMs,
   })
   const active = new Set<{ context: GatewayRequestContext; cancel(): void }>()
   const invalidateAccess: GatewayAccessInvalidation = (subject) => {
@@ -80,11 +86,43 @@ export function createProxyHandlers(
       operation.cancel()
     }
   }
+  const unsubscribeAccess = deps.accessMonitor?.subscribe(async (subject) => {
+    invalidateAccess(subject)
+    if (subject.restartRuntime !== true) return
+    if (subject.userId !== undefined) await instances.stop({ kind: 'user', id: subject.userId })
+    if (subject.projectId !== undefined) await instances.stop({ kind: 'project', id: subject.projectId })
+  })
+
+  async function revalidate(token: string | undefined, context: GatewayRequestContext): Promise<boolean> {
+    await deps.accessMonitor?.synchronize()
+    if (token === undefined) return false
+    const user = await deps.auth.validate(token)
+    if (user === null || user.id !== context.user.id || user.mustChangePassword) return false
+    if (context.scope.kind === 'project') {
+      const project = await deps.collaboration?.projectForUser(context.scope.projectId, user.id)
+      if (project === undefined || project === null || 'username' in context.runtime || project.path !== context.runtime.path) return false
+      const detail = await deps.projects.getById(project.projectId)
+      context.scope = {
+        ...context.scope, mode: project.mode,
+        canManage: user.role === 'admin' || project.administrator || detail?.owner?.id === user.id,
+      }
+    } else if (user.homePath !== context.user.homePath || user.role !== context.user.role) {
+      return false
+    }
+    context.user = user
+    // Include changes committed while the account/project reads were in flight.
+    await deps.accessMonitor?.synchronize()
+    return true
+  }
   server.on('proxyRes', (proxyResponse) => {
     const location = proxyResponse.headers.location
     if (typeof location === 'string') {
       const rewritten = publicLocation(location)
       if (rewritten !== location) proxyResponse.headers.location = rewritten
+    }
+    const mediaType = proxyResponse.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase()
+    if (mediaType !== undefined && STREAMING_MEDIA_TYPES.has(mediaType)) {
+      proxyResponse.socket.setTimeout(0)
     }
   })
 
@@ -166,8 +204,11 @@ export function createProxyHandlers(
   }
 
   const proxyRequest: ProxyHandler = async (req, res, context) => {
+    const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
+    await deps.accessMonitor?.synchronize()
+    if (res.destroyed) return
     let ready = await ensureReady(req, res, context)
     if (ready === null) return
     let operationLease = false
@@ -209,6 +250,14 @@ export function createProxyHandlers(
       }
     }
     try {
+      if (!await revalidate(token, context)) {
+        if (!res.destroyed) {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'access-revoked' }))
+        }
+        return
+      }
+      if (res.destroyed) return
       const principal = principalSigner?.issue({
         user: context.user,
         scope: context.scope,
@@ -280,10 +329,13 @@ export function createProxyHandlers(
   }
 
   const upgradeRequest: UpgradeHandler = async (req, socket, head, context) => {
+    const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
     let ready: { port: number; generation: number; target: RuntimeTarget }
     try {
+      await deps.accessMonitor?.synchronize()
+      if (socket.destroyed) return
       const resolved = await ensureReady(req, null, context)
       if (resolved === null) throw new Error('runtime did not start')
       ready = resolved
@@ -321,6 +373,11 @@ export function createProxyHandlers(
       return
     }
     try {
+      if (!await revalidate(token, context) || socket.destroyed) {
+        releaseWebSocketLease()
+        socket.destroy()
+        return
+      }
       const principal = principalSigner?.issue({
         user: context.user,
         scope: context.scope,
@@ -351,6 +408,7 @@ export function createProxyHandlers(
     if (socket.destroyed) release()
   }
   return { proxy, upgrade, invalidateAccess, close: () => {
+    unsubscribeAccess?.()
     invalidateAccess({})
     active.clear()
     server.close()

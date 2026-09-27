@@ -68,6 +68,8 @@ export interface Config {
   dshHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
+  /** Whether Chokidar polls instead of using native filesystem events. */
+  watchUsePolling?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
   debounceMs?: number
 }
@@ -76,6 +78,7 @@ export interface Config {
 interface ResolvedSpec {
   filename: string
   watch: boolean
+  watchUsePolling: boolean
   debounceMs: number
 }
 
@@ -89,6 +92,7 @@ export function resolveSpec(config: Config): ResolvedSpec {
   return {
     filename: resolve(config.path ?? join(resolveDshHome(config.dshHome), CREDENTIALS_FILENAME)),
     watch: config.watch ?? true,
+    watchUsePolling: config.watchUsePolling ?? false,
     debounceMs: config.debounceMs ?? 100,
   }
 }
@@ -518,6 +522,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     path: z.string(),
     dshHome: z.string(),
     watch: z.boolean().default(true),
+    watchUsePolling: z.boolean().default(false),
     debounceMs: z.number().min(0).default(100),
   })
 
@@ -583,6 +588,7 @@ export class LocalCredentialProvider extends CredentialProvider {
        the serialized-refresh and quiesce-on-dispose shape is the reviewed
        lifecycle contract, not accidental repetition. */
     const watcher = chokidarWatch(await canonicalizeWatchPath(this.spec.filename), {
+      usePolling: this.spec.watchUsePolling,
       ignoreInitial: true,
       awaitWriteFinish: {
         stabilityThreshold: this.spec.debounceMs,

@@ -18,6 +18,8 @@ A foreground call passes the execution signal through startup and execution, awa
 
 `toolFilter` changes the child's global tool layer but is not a parent-derived authority ceiling. See the [agent-scope security non-goal](../../../.agents/notes/implemented/architecture/2026-07-08-agent-scope-contexts.md#security-and-authority-are-non-goals).
 
+The `subagent-model-selection` settings section is project-owned. Project managers may change only `enabled` and `allowedModels`; the Host validates them atomically, including rejection of an enabled empty allowlist. This preference does not override runtime model authorization.
+
 ## Config
 
 | Key | Meaning |

@@ -9,13 +9,17 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
-- text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop. {{clock}}
+- text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
-- text: "Interjection: include the word BANANA in your final reply. {{clock}}"
+- text: "Interjection: include the word BANANA in your final reply."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The user selected \"Yes\" and wants me to include the word \"BANANA\" in my final reply. Let me acknowledge their answer.":
@@ -31,10 +35,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -48,10 +53,11 @@
   - img
 - button "6% of context used"
 - button "Send message" [disabled]
-- button "1 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 2 steps{{throughput}} tok/s
-- button "16K tok · Cache hit 98%":
-  - img
-  - text: 16K tokCache hit 98%
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "16K tok · Cache hit 98%":
+    - img
+    - text: 16K tokCache hit 98%
 - separator "Adjust transcript content width"

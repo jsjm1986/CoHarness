@@ -11,12 +11,16 @@ import { assertV3Event, isRepairIdentity, record, SURFACE_TYPES } from './payloa
  */
 export function assertReleasedV3Header(header: SessionFormatHeader): void {
   if (header.version !== 3) throw new SessionFormatError('expected format v3 header')
-  // `draft` entered the header while v3 was current; released-v2 files predate
-  // it, so the field is checked here and stripped before the v2 key assertion.
+  // `draft` and `sshTarget` entered the header after v2's released key set;
+  // both are checked here and stripped before the v2 key assertion.
   if (header.draft !== undefined && typeof header.draft !== 'boolean') {
     throw new SessionFormatError('format v3 header draft must be boolean')
   }
-  const { draft: _draft, ...rest } = header
+  if (header.sshTarget !== undefined
+    && (typeof header.sshTarget !== 'number' || !Number.isSafeInteger(header.sshTarget) || header.sshTarget <= 0)) {
+    throw new SessionFormatError('format v3 header sshTarget must be a positive safe integer')
+  }
+  const { draft: _draft, sshTarget: _sshTarget, ...rest } = header
   assertReleasedV2Header({ ...rest, version: 2 })
 }
 
@@ -76,7 +80,8 @@ export function restoreReleasedV3Artifact(artifact: SessionFormatArtifact, known
     // Only the frozen relationship view uses released endpoint names.
     return { ...projected, surfaceOp: { op: 'replace', start: replacement.startSeq, end: replacement.endSeq } }
   })
-  restoreReleasedV2Artifact({ ...artifact, header: { ...artifact.header, version: 2 }, events }, knownEventTypes, 3)
+  const { draft: _draft, sshTarget: _sshTarget, ...v2Header } = artifact.header
+  restoreReleasedV2Artifact({ ...artifact, header: { ...v2Header, version: 2 }, events }, knownEventTypes, 3)
   return artifact
 }
 

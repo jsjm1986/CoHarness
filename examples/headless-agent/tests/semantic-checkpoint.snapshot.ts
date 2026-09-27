@@ -2,9 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
+import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
-import { createUserMessage, ToolCallId , createMessage  , createSystemMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId , createMessage, createSystemMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
@@ -41,7 +41,7 @@ async function seedInterruptedSession(root: string, cwd: string): Promise<string
       data: {
         turn: 1,
         step: 1,
-        message: createSystemMessage('Seeded interrupted-session system prompt.', '@deepseek-ai/dsh-system-prompt'),
+        message: createSystemMessage('Seeded system prompt.', '@deepseek-ai/dsh-system-prompt'),
       },
       surfaceOp: 'append',
     },

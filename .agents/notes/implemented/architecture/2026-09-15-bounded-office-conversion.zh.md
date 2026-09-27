@@ -10,7 +10,7 @@ Office 预览和显式文档检查可能请求相同转换。仅缓存已完成�
 
 ## 决策
 
-`office-to-pdf` 服务返回完整 PDF 字节。其 Remote 文件入口通过 `workspaceFiles` 授权 Session 文件，进程内转换则接受已授权的延迟读取，不要求该服务。`api/remotes` 装配负责 Client 命名空间挂载。页面栅格化和用户展示由独立消费方负责，因此转换命名不隐含图片渲染或预览 UI。
+`office-to-pdf` 服务通过已授权的延迟读取返回完整 PDF 字节。CoHarness 将会话文件授权放在现有 ApiProxy 的 `workspaceFiles.renderOffice` 入口；转换器不拥有第二套 Remote 文件载体。页面栅格化及用户展示仍由独立消费者负责。[授权工作区预览决定](2026-09-23-authorized-office-preview.zh.md)负责此传输适配。
 
 `packages/document/office-to-pdf`拥有共享转换队列和临时内容缓存。已授权的源文件元数据在加载字节之前进入准入流程。源回调接收预留的字节容量并返回读取版本；源文件变化会导致失败，不发布别名。确切的源字节和 Office 扩展名决定摘要。每个转换器生命周期附加代次，因此引擎、字体或配置替换会使复用失效。
 

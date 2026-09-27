@@ -311,3 +311,6 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
     registerDownlink(HOST_EVENTS_PATH, (req, socket, head) => { downlinks.handleHost(req, socket, head) })
   })
 }
+
+export { createRpcStreamHttpHandler, type ConnectionRpcStreamHandler } from './rpc-stream-host.ts'
+export { RPC_STREAM_PATH } from './rpc-stream.ts'

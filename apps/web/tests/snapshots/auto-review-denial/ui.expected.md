@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "2 tool calls · 2 intermediate messages" [expanded]:
   - text: 2 tool calls · 2 intermediate messages
   - img
@@ -16,7 +18,8 @@
   - img
   - img
   - text: System prompt
-- text: Inspect the protected operation, but do not run it unless authorized. {{date}} {{clock}}
+- text: Inspect the protected operation, but do not run it unless authorized.
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - text: Failed
@@ -43,9 +46,10 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns · 2 steps":
-  - img
-  - text: 1 turns · 2 steps
+- group "Session statistics":
+  - button "1 turns · 2 steps":
+    - img
+    - text: 1 turns · 2 steps
 - separator "Adjust transcript content width"
 
 ## Expanded
@@ -59,6 +63,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "2 tool calls · 2 intermediate messages" [expanded]:
   - text: 2 tool calls · 2 intermediate messages
   - img
@@ -66,7 +72,8 @@
   - img
   - img
   - text: System prompt
-- text: Inspect the protected operation, but do not run it unless authorized. {{date}} {{clock}}
+- text: Inspect the protected operation, but do not run it unless authorized.
+- group "Message timing": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - text: Failed
@@ -74,6 +81,7 @@
   - img
   - text: Tool call Rejected by Auto review
 - text: "OUT Tool was not executed. Reason: raw reason"
+- button "Open details in sidebar"
 - button "Inspect"
 - button "Code Catch an Auto-denied inner call":
   - img
@@ -84,6 +92,7 @@
   - img
   - text: Bash Rejected by Auto review
 - text: "OUT Tool was not executed. Reason: ptc raw reason"
+- button "Open details in sidebar"
 - button "Inspect"
 - textbox "Message the agent"
 - button "Add images or documents":
@@ -97,9 +106,10 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns · 2 steps":
-  - img
-  - text: 1 turns · 2 steps
+- group "Session statistics":
+  - button "1 turns · 2 steps":
+    - img
+    - text: 1 turns · 2 steps
 - separator "Adjust transcript content width"
 
 ## Trajectory
@@ -112,6 +122,8 @@
     - button "Inspect the protected operation, but" [disabled]
   - button "Session log":
     - text: Session log
+    - img
+  - button "Open right sidebar":
     - img
 - toolbar "Trajectory toolbar":
   - button "Use actual duration": Duration
@@ -138,9 +150,11 @@
         - 'button "Request #2"'
         - text: ASSISTANT
       - cell "(tool call only)"
-    - 'row "TOOL, run_code {\"code\":\"try { await tools.bash({command: \"echo hidden-input-ptc\"}) } catch (error) { return \"denial caught\" }\",\"description\":\"Catch an Auto-denied inner call\"}"':
+    - row "TOOL, run_code Catch an Auto-denied inner call":
       - cell "TOOL"
-      - 'cell "run_code{\"code\":\"try { await tools.bash({command: \"echo hidden-input-ptc\"}) } catch (error) { return \"denial caught\" }\",\"description\":\"Catch an Auto-denied inner call\"} → denial caught"'
+      - cell "run_codeCatch an Auto-denied inner call → denial caught":
+        - img
+        - text: run_codeCatch an Auto-denied inner call → denial caught
     - 'row "SUBTOOL, bash {\"command\":\"echo hidden-input-ptc\"}" [selected]':
       - cell "SUBTOOL"
       - 'cell "bash{\"command\":\"echo hidden-input-ptc\"} → AUTO_REVIEW_DENIED"'
@@ -167,7 +181,8 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns · 2 steps":
-  - img
-  - text: 1 turns · 2 steps
+- group "Session statistics":
+  - button "1 turns · 2 steps":
+    - img
+    - text: 1 turns · 2 steps
 - separator "Adjust transcript content width"

@@ -16,7 +16,11 @@
 
 import type { ClientRemote, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { beginRosterRead, messageOf, writeDefaultPreset } from './settings-store.ts'
+import type { SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
+import {
+  beginRosterRead, messageOf, readRoster, writeDefaultPreset, writeModeSelectionEnabled,
+} from './settings-store.ts'
 
 /** Ids a preset directory may be named, mirroring the host's own rule. */
 const PRESET_ID = /^[a-z0-9][a-z0-9-]*$/
@@ -77,6 +81,19 @@ export interface AgentPresetSectionState {
   authorable: boolean
   /** Whether the host can open a preset directory on a native desktop. */
   hasDocument: boolean
+  /** Whether new-session surfaces expose preset selection. */
+  showPicker: boolean
+  /** Whether a mode-selection policy write is in flight. */
+  policySaving: boolean
+  /**
+   * Whether this browser may write the namespace's fields. `settings.describe`
+   * reports a project-managed or read-only provider as `writable: false`; the
+   * policy switch and the default pick then refuse locally rather than offer
+   * a write the gateway will decline.
+   */
+  policyWritable: boolean
+  /** Why the namespace declined writes, when {@link policyWritable} is false. */
+  policyWritableReason: SettingsWritableReason | undefined
   /** Every preset the deployment currently supplies. */
   rows: readonly PresetRow[]
   /** The open copy dialog, or null. */
@@ -99,6 +116,12 @@ const INITIAL: AgentPresetSectionState = {
   error: null,
   authorable: false,
   hasDocument: false,
+  showPicker: false,
+  policySaving: false,
+  // Assumed until `load()` asks; the page renders nothing interactive before
+  // its first ready snapshot anyway.
+  policyWritable: true,
+  policyWritableReason: undefined,
   rows: [],
   copy: null,
   view: null,
@@ -140,6 +163,8 @@ export class AgentPresetSectionController {
      * desktop (host.describe's canOpenPath, read per load).
      */
     private readonly canOpenDocument: () => boolean,
+    /** The shared mirror's describe face: the namespace's writability source. */
+    private readonly describeFace: SettingsDescribeFace,
     /**
      * Called after this page changes the roster DIRECTORY, so the other
      * surfaces reading the same roster re-read it. A settings field moving is
@@ -170,11 +195,29 @@ export class AgentPresetSectionController {
   async load(): Promise<void> {
     const roster = await beginRosterRead(this.remote, this.store)
     if (roster === undefined) return
-    const { presets, authorable } = roster
+    const { presets, authorable, modeSelectionEnabled: showPicker } = roster
     const hasDocument = this.canOpenDocument()
+    // The roster says what may be shown; the shared mirror says whether this
+    // browser may write the namespace's fields (selection policy and saved
+    // default alike — both live under `agent-presets`).
+    await this.describeFace.ensure()
+    const authority = this.describeFace.getSnapshot().view
+    const namespace = authority?.namespaces.find(view => view.ns === 'agent-presets')
+    const policyWritable = namespace?.writable ?? authority?.writable ?? false
+    const writablePatch = { policyWritableReason: namespace?.writableReason }
     if (presets.length === 0) {
       // Nothing to manage leaves nothing to keep a dialog open over.
-      this.set({ status: 'unavailable', rows: [], authorable, hasDocument, copy: null, view: null })
+      this.set({
+        status: 'unavailable',
+        rows: [],
+        authorable,
+        hasDocument,
+        showPicker,
+        policyWritable,
+        ...writablePatch,
+        copy: null,
+        view: null,
+      })
       return
     }
     // A reveal outlives a reload but not its preset: a path for a row the
@@ -187,9 +230,63 @@ export class AgentPresetSectionController {
       error: null,
       authorable,
       hasDocument,
+      showPicker,
+      policyWritable,
+      ...writablePatch,
       rows: presets.map(preset => ({ ...preset })),
       revealedPaths: kept,
     })
+  }
+
+  /**
+   * Read back the Host-effective default after a policy write. The fresh
+   * read — not the published snapshot — is the authority: `load()` joins an
+   * in-flight roster read (the `settings/document-updated` broadcast starts
+   * one), which can answer with state from before this write.
+   * @param showPicker - the picker visibility the write should have reached.
+   * @returns the effective default id, or undefined when the host disagrees.
+   */
+  private async confirmEffectiveDefault(showPicker: boolean): Promise<string | undefined> {
+    await this.load()
+    if (this.store.getSnapshot().status === 'error') await this.load()
+    const roster = await readRoster(this.remote)
+    if (!roster.ok || roster.value.modeSelectionEnabled !== showPicker) return undefined
+    return roster.value.presets.find(preset => preset.isDefault)?.id
+  }
+
+  /**
+   * Show or hide new-session preset selection without changing the saved
+   * default. The Host roster resolves that saved default while selection is
+   * shown and the deployment default while it is hidden.
+   * @param showPicker - whether the new-session picker should be exposed.
+   * @param syncBlankSession - optional current-blank-session sync kept inside the saving state.
+   * @returns once the Host state and optional blank-session sync settle.
+   */
+  async setPickerVisible(
+    showPicker: boolean,
+    syncBlankSession?: (id: string) => Promise<string | undefined>,
+  ): Promise<void> {
+    const state = this.store.getSnapshot()
+    if (state.status !== 'ready' || state.policySaving || !state.policyWritable) return
+    if (state.showPicker === showPicker) return
+    this.set({ policySaving: true, error: null })
+    try {
+      const failure = await writeModeSelectionEnabled(this.api, showPicker)
+      if (failure !== undefined) {
+        await this.load()
+        this.set({ error: failure })
+        return
+      }
+      const effectiveDefault = await this.confirmEffectiveDefault(showPicker)
+      if (effectiveDefault === undefined) return
+      const syncFailure = await syncBlankSession?.(effectiveDefault)
+      if (syncFailure !== undefined) this.set({ error: syncFailure })
+    } catch (error: unknown) {
+      await this.load()
+      this.set({ error: messageOf(error) })
+    } finally {
+      this.set({ policySaving: false })
+    }
   }
 
   /**
@@ -347,15 +444,30 @@ export class AgentPresetSectionController {
    * Make one preset the default for sessions created later. Running sessions
    * keep the composition they began with, so this never disturbs work.
    * @param id - the preset to make default.
-   * @returns once the write settled and the roster was re-read.
+   * @param syncBlankSession - optional current-blank-session sync kept inside the policy lock.
+   * @returns once the write and optional blank-session sync settle.
    */
-  async makeDefault(id: string): Promise<void> {
-    if (!this.store.getSnapshot().authorable) return
-    const failure = await writeDefaultPreset(this.api, id)
-    if (failure !== undefined) {
-      this.set({ error: failure })
-      return
+  async makeDefault(
+    id: string,
+    syncBlankSession?: (id: string) => Promise<string | undefined>,
+  ): Promise<void> {
+    const state = this.store.getSnapshot()
+    if (!state.showPicker || state.policySaving || !state.policyWritable) return
+    this.set({ policySaving: true, error: null })
+    try {
+      const failure = await writeDefaultPreset(this.api, id)
+      if (failure !== undefined) {
+        this.set({ error: failure })
+        return
+      }
+      const effectiveDefault = await this.confirmEffectiveDefault(true)
+      if (effectiveDefault === undefined) return
+      const syncFailure = await syncBlankSession?.(effectiveDefault)
+      if (syncFailure !== undefined) this.set({ error: syncFailure })
+    } catch (error: unknown) {
+      this.set({ error: messageOf(error) })
+    } finally {
+      this.set({ policySaving: false })
     }
-    await this.load()
   }
 }

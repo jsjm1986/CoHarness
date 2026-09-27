@@ -61,6 +61,10 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
     }
   }
   return {
+    desktop: {
+      status: async request => ({ rpcId: request.rpcId, result: { ok: true, value: null } }),
+      confirm: async request => ({ rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'No desktop configured.', details: {} } } }),
+    },
     sessions: {
       async list(request) {
         if (overrides.crashOn === 'session.list') throw new Error('impl crashed')
@@ -228,8 +232,18 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async archiveSession(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { archivedSessionIds: [request.payload.sessionId] } } }
       },
+      async unarchiveSession(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { archivedSessionIds: [] } } }
+      },
+    },
+    workspaceChanges: {
+      async summary(request) { return { rpcId: request.rpcId, result: { ok: true, value: null } } },
+      async diff(request) { return { rpcId: request.rpcId, result: { ok: true, value: null } } },
     },
     workspaceFiles: {
+      async renderOffice(request) { return { rpcId: request.rpcId, result: { ok: false, error: {
+        code: 'document-error', message: 'Office conversion is unavailable in this fixture.', details: { reason: 'unavailable' },
+      } } } },
       async list(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: '', entries: [], truncated: false } } } },
       async stat(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: request.payload.path, type: 'file', bytes: 0, version: 'v' } } } },
       async read(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: request.payload.path, offset: request.payload.offset ?? 1, limit: request.payload.limit ?? 1, text: '', eof: true, version: 'v' } } } },
@@ -369,6 +383,23 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     })
     await expect(readApiResponseText(new Response(body), 5)).rejects.toBeInstanceOf(ApiResponseTooLargeError)
     expect(cancelled).toBe(true)
+  })
+
+  it('keeps a call-addressed turn intact when the ordinary page target would cut its prefix', async () => {
+    const api = fakeApi()
+    const events = [0, 1, 2].map(seq => ({ event: {
+      type: 'user/message' as const, seq: SessionSeq(seq), time: seq,
+      surfaceOp: 'append' as const,
+      data: { id: `message-${seq}`, role: 'user' as const, source: { kind: 'user' as const }, content: [{ type: 'text' as const, text: 'x'.repeat(500) }] },
+    } })) as ResponseValue<'session.history'>['events']
+    api.sessions.history = async request => ({ rpcId: request.rpcId, result: { ok: true, value: { events, hasMore: false } } })
+    const client = new InProcessApiClient(toFetchHandler(api, { historyPageTargetBytes: 400 }))
+    const page = await client.sessions.history({ sessionId: 'old-session' as never })
+    expect(page.result.ok && page.result.value.events.length).toBeLessThan(events.length)
+    const addressed = await client.sessions.history({ sessionId: 'old-session' as never, toolCallId: 'old-call' as never })
+    expect(addressed.result).toEqual({ ok: true, value: { events, hasMore: false } })
+    const invalid = await client.sessions.history({ sessionId: 'old-session' as never, toolCallId: 'old-call' as never, beforeSeq: 2 })
+    expect(invalid.result).toMatchObject({ ok: false, error: { code: 'bad-request' } })
   })
 
   it('packs session history on Fetch and restores the exact logical page for IApiClient', async () => {

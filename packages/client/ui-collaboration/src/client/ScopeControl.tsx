@@ -40,6 +40,14 @@ export interface ScopeControlInjected {
     projectId: number,
     policy: import('./collaboration-client.ts').ProjectThemePolicy,
   ) => Promise<import('./collaboration-client.ts').ProjectConfiguration>
+  /** Organization SSH targets with the project's share flags, for managers. */
+  listProjectSshTargets?: (projectId: number) => Promise<import('./collaboration-client.ts').ProjectSshTarget[]>
+  /** Toggle one target's share toward the project, for managers. */
+  shareProjectSshTarget?: (
+    projectId: number,
+    targetId: number,
+    shared: boolean,
+  ) => Promise<{ publicId: number; name: string; shared: boolean }>
 }
 
 /** Full sidebar collaboration-control props. */
@@ -58,7 +66,7 @@ export type ScopeControlProps =
 export function ScopeControl({
   wide, useCollaboration, switchScope, stageVisibility,
   createProject, listInvitations, inviteMember, acceptInvitation, listUsers, getInvitationCount,
-  loadProjectConfiguration, setProjectThemePolicy, t,
+  loadProjectConfiguration, setProjectThemePolicy, listProjectSshTargets, shareProjectSshTarget, t,
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
@@ -311,6 +319,8 @@ export function ScopeControl({
             t={t}
             load={loadProjectConfiguration}
             setThemePolicy={setProjectThemePolicy}
+            {...listProjectSshTargets === undefined ? {} : { listSshTargets: listProjectSshTargets }}
+            {...shareProjectSshTarget === undefined ? {} : { shareSshTarget: shareProjectSshTarget }}
             onMembers={() => {
               setProjectSettingsOpen(false)
               setManagerMode('members')

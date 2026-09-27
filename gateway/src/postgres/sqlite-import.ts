@@ -89,7 +89,8 @@ async function modelId(client: PoolClient, organizationId: string, provider: unk
 }
 
 /**
- * Import the current Gateway SQLite control plane into one PostgreSQL organization.
+ * Import the current or v7 Gateway SQLite control plane into one PostgreSQL organization.
+ * A v7 source grants no Auto eligibility and remains unchanged on disk.
  * Sessions and login attempts are intentionally not copied: users sign in again,
  * while existing JSONL session logs remain the durable conversation source until
  * the remote persistence phase is enabled.
@@ -98,8 +99,8 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
   const db = new Database(options.sqliteFile, { readonly: true, fileMustExist: true })
   try {
     const sourceVersion = (db.prepare('SELECT version FROM schema_meta LIMIT 1').get() as { version?: number } | undefined)?.version
-    if (sourceVersion !== SCHEMA_VERSION) {
-      throw new Error(`SQLite source schema ${String(sourceVersion)} is unsupported; expected ${String(SCHEMA_VERSION)}`)
+    if (sourceVersion !== 7 && sourceVersion !== SCHEMA_VERSION) {
+      throw new Error(`SQLite source schema ${String(sourceVersion)} is unsupported; expected 7 or ${String(SCHEMA_VERSION)}`)
     }
     return await transaction(pool, async (client) => {
       const slug = options.organizationSlug ?? 'default'
@@ -114,13 +115,17 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
 
       const sourceUsers = rows(db, 'users')
       for (const row of sourceUsers) {
+        if (sourceVersion !== 7 && row.auto_review_eligible !== 0 && row.auto_review_eligible !== 1) {
+          throw new Error(`SQLite user ${String(row.id)} has invalid auto_review_eligible`)
+        }
+        const autoReviewEligible = sourceVersion === 7 ? false : row.auto_review_eligible === 1
         const user = await client.query<{ id: string }>(`INSERT INTO harness.users(
-          organization_id,username,display_name,home_path,status,legacy_id,public_id,created_at,updated_at
-        ) VALUES($1,$2,$3,$4,$5,$6,$6,$7,$8)
+          organization_id,username,display_name,home_path,status,legacy_id,public_id,created_at,updated_at,auto_review_eligible
+        ) VALUES($1,$2,$3,$4,$5,$6,$6,$7,$8,$9)
         ON CONFLICT(organization_id,legacy_id) DO UPDATE SET username=excluded.username,
           display_name=excluded.display_name,home_path=excluded.home_path,status=excluded.status,
-          public_id=excluded.public_id,updated_at=excluded.updated_at RETURNING id`,
-        [organizationId, row.username, row.display_name, row.home_path, row.status, row.id, epoch(row.created_at), epoch(row.updated_at)])
+          public_id=excluded.public_id,updated_at=excluded.updated_at,auto_review_eligible=excluded.auto_review_eligible RETURNING id`,
+        [organizationId, row.username, row.display_name, row.home_path, row.status, row.id, epoch(row.created_at), epoch(row.updated_at), autoReviewEligible])
         const userId = user.rows[0]!.id
         await client.query(`INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password,changed_at)
           VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET password_hash=excluded.password_hash,

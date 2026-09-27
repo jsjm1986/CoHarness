@@ -28,12 +28,14 @@ function scriptedApi(overrides: {
   credentials?: Partial<ApiProxy['credentials']>
   llm?: Partial<ApiProxy['llm']>
   workspaceFiles?: Partial<ApiProxy['workspaceFiles']>
+  workspaceChanges?: Partial<ApiProxy['workspaceChanges']>
   respond?: ApiProxy['respond']
 } = {}): ApiProxy {
   async function *empty<F>(): AsyncGenerator<RpcRequest<F>> { /* no frames */ }
   const err = <T>(r: RpcRequest<unknown>): Promise<RpcResponse<T>> =>
     Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } })
   return {
+    desktop: { status: r => ok(r, null), confirm: r => err(r) },
     sessions: {
       list: r => ok(r, { items: [] }),
       search: r => ok(r, { items: [], hasMore: false }),
@@ -86,8 +88,17 @@ function scriptedApi(overrides: {
       insertBefore: r => ok(r, { workspaceIds: [r.payload.workspaceId] }),
       insertSessionBefore: r => ok(r, { workspace: { workspaceId: 'w1' as never, path: '/t', title: 't', sessionIds: [], createdAt: '0', updatedAt: '0' } }),
       archiveSession: r => ok(r, { archivedSessionIds: [r.payload.sessionId] }),
+      unarchiveSession: r => ok(r, { archivedSessionIds: [] }),
+    },
+    workspaceChanges: {
+      async summary(request) { return { rpcId: request.rpcId, result: { ok: true, value: null } } },
+      async diff(request) { return { rpcId: request.rpcId, result: { ok: true, value: null } } },
+      ...overrides.workspaceChanges,
     },
     workspaceFiles: {
+      renderOffice: r => Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: {
+        code: 'document-error', message: 'Office conversion is unavailable in this fixture.', details: { reason: 'unavailable' },
+      } } }),
       list: r => ok(r, { path: '', entries: [], truncated: false }),
       stat: r => ok(r, { path: r.payload.path, type: 'file', bytes: 0, version: 'v' }),
       read: r => ok(r, { path: r.payload.path, offset: r.payload.offset ?? 1, limit: r.payload.limit ?? 1, text: '', eof: true, version: 'v' }),
@@ -736,5 +747,29 @@ describe('config unary surface', () => {
     expect(response.result.ok).toBe(false)
     if (response.result.ok) throw new Error('unreachable')
     expect(response.result.error.code).toBe('bad-request')
+  })
+})
+
+describe('historical Workspace wire reads', () => {
+  it('carries exact announcement coordinates and validates comparisons', async () => {
+    const summary = vi.fn<ApiProxy['workspaceChanges']['summary']>(r => ok(r, { turn: 1, files: [], total: 0, added: 0, deleted: 0 }))
+    const diff = vi.fn<ApiProxy['workspaceChanges']['diff']>(r => ok(r, { kind: 'binary', path: 'a.bin', display: 'a.bin' }))
+    const api = client(scriptedApi({ workspaceChanges: { summary, diff } }))
+    expect((await api.workspaceChanges.summary({ sessionId: sid('s1'), seq: 8 })).result).toEqual({ ok: true, value: { turn: 1, files: [], total: 0, added: 0, deleted: 0 } })
+    expect((await api.workspaceChanges.diff({ sessionId: sid('s1'), seq: 8, index: 2 })).result).toEqual({ ok: true, value: { kind: 'binary', path: 'a.bin', display: 'a.bin' } })
+    expect(diff.mock.calls[0]?.[0].payload).toEqual({ sessionId: 's1', seq: 8, index: 2 })
+    diff.mockImplementation(r => ok(r, { kind: 'text', path: 'a', display: 'a', before: true, after: true, coarse: false,
+      hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ['unprefixed data'] }] }))
+    await expect(api.workspaceChanges.diff({ sessionId: sid('s1'), seq: 8, index: 2 })).rejects.toThrow()
+  })
+
+  it('rejects invalid event and file indices before invoking the recorder', async () => {
+    const diff = vi.fn<ApiProxy['workspaceChanges']['diff']>(r => ok(r, null))
+    const api = client(scriptedApi({ workspaceChanges: { diff } }))
+    for (const payload of [{ sessionId: sid('s1'), seq: -1, index: 0 }, { sessionId: sid('s1'), seq: 2, index: 0.5 }]) {
+      const response = await api.workspaceChanges.diff(payload)
+      expect(response.result).toMatchObject({ ok: false, error: { code: 'bad-request' } })
+    }
+    expect(diff).not.toHaveBeenCalled()
   })
 })

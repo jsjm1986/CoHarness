@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
       "path": "../../core/session"
     },
     {

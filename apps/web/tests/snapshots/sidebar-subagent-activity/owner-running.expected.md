@@ -5,4 +5,4 @@
     - button "New session in workspace":
       - img
   - treeitem "New Session" [selected]
-  - treeitem "1 subagent running Delegate a background job. now"
+  - "treeitem \"1 subagent running Delegate a background job. {{ago}}\""

@@ -2,7 +2,7 @@ name: Build single-exe
 
 # Native builds for the release targets; see
 # .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md.
-# A full target run retains one SDK wheel and three runtime wheels; subset
+# A full target run retains one SDK wheel and five runtime wheels; subset
 # dispatch retains the SDK wheel and selected runtime wheels. Bare executables
 # and source closures are test inputs. Run manually, label a PR `build-exe`
 # (remove and reapply to rerun), or call it from the Python release workflow.
@@ -11,7 +11,7 @@ on:
   workflow_call:
     inputs:
       targets:
-        description: Comma-separated pkg targets to build; empty builds all three.
+        description: Comma-separated pkg targets to build; empty builds all five.
         type: string
         required: false
         default: ''
@@ -21,7 +21,7 @@ on:
         required: false
         default: false
       ci:
-        description: Run as the required Linux x64 Python runtime pull-request check.
+        description: Run as the required Linux x64 and Windows x64 Python runtime pull-request check.
         type: boolean
         required: false
         default: false
@@ -30,8 +30,8 @@ on:
       targets:
         description: >-
           Comma-separated pkg targets to build. Any subset of:
-          node24-linux-x64, node24-linux-arm64, node24-macos-arm64, node24-macos-x64.
-          Empty builds all four.
+          node24-linux-x64, node24-linux-arm64, node24-macos-arm64,
+          node24-macos-x64, node24-win-x64. Empty builds all five.
         type: string
         required: false
         default: ''
@@ -86,7 +86,7 @@ jobs:
         id: plan
         env:
           # Label runs and blank dispatch inputs build all targets.
-          TARGETS: ${{ inputs.targets || 'node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64' }}
+          TARGETS: ${{ inputs.targets || 'node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64,node24-win-x64' }}
         run: |
           set -euo pipefail
           matrix='[]'
@@ -101,8 +101,9 @@ jobs:
               node24-linux-arm64) runner=ubuntu-24.04-arm ;;
               node24-macos-arm64) runner=macos-latest ;;
               node24-macos-x64)   runner=macos-15-intel ;;
+              node24-win-x64)     runner=windows-2025 ;;
               *)
-                echo "::error::Unknown target '$t'. Supported: node24-linux-x64, node24-linux-arm64, node24-macos-arm64, node24-macos-x64."
+                echo "::error::Unknown target '$t'. Supported: node24-linux-x64, node24-linux-arm64, node24-macos-arm64, node24-macos-x64, node24-win-x64."
                 exit 1
                 ;;
             esac
@@ -156,6 +157,13 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6.0.10
+
+      - name: Enable Windows Developer Mode (symlink support)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
 
       # setup-node's built-in pnpm store cache keys on platform AND arch, so
       # the Linux architectures sharing runner.os stay on separate caches.
@@ -221,11 +229,12 @@ jobs:
 
       - name: Build single-exe
         env:
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
         run: pnpm exec tsx scripts/build-exe-for-python-sdk.ts --targets=${{ matrix.target }}
 
-      - name: Resolve platform outputs
-        id: runtime
+      - name: Resolve platform outputs (POSIX)
+        id: runtime-posix
+        if: runner.os != 'Windows'
         env:
           TARGET: ${{ matrix.target }}
           VERSION: ${{ needs.plan.outputs.version }}
@@ -250,19 +259,46 @@ jobs:
           echo "exe=$exe" >> "$GITHUB_OUTPUT"
           echo "wheel=$wheel" >> "$GITHUB_OUTPUT"
 
-      - name: Full-turn SDK, executable snapshot, and direct-binary smoke
+      - name: Resolve platform outputs (Windows)
+        id: runtime-windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          if ($env:TARGET -ne 'node24-win-x64') { throw "Unsupported runtime target $env:TARGET" }
+          $platform = 'win-x64'
+          $exe = Join-Path $PWD 'dist-exe\deepseek-harness-sdk-runtime-win-x64.exe'
+          $wheel = "deepseek_harness_runtime_bin-$env:VERSION-py3-none-win_amd64.whl"
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Runtime executable is missing at $exe" }
+          "platform=$platform" >> $env:GITHUB_OUTPUT
+          "exe=$exe" >> $env:GITHUB_OUTPUT
+          "wheel=$wheel" >> $env:GITHUB_OUTPUT
+
+      - name: Full-turn SDK, executable snapshot, and direct-binary smoke (POSIX)
+        if: runner.os != 'Windows'
         run: >-
           uv run --python 3.10 --group test --project python/sdk
           python scripts/smoke-python-runtime.py
           --scenario all
-          --exe "${{ steps.runtime.outputs.exe }}"
+          --exe "${{ steps.runtime-posix.outputs.exe }}"
+
+      - name: Full-turn SDK, executable snapshot, and direct-binary smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          uv run --python 3.10 --group test --project python/sdk
+          python scripts/smoke-python-runtime.py
+          --scenario all
+          --exe "${{ steps.runtime-windows.outputs.exe }}"
 
       - name: Build release-shaped runtime wheel
         run: >-
           python scripts/build-python-release.py
           --package runtime
-          --platform "${{ steps.runtime.outputs.platform }}"
-          --runtime-exe "${{ steps.runtime.outputs.exe }}"
+          --platform "${{ steps.runtime-posix.outputs.platform || steps.runtime-windows.outputs.platform }}"
+          --runtime-exe "${{ steps.runtime-posix.outputs.exe || steps.runtime-windows.outputs.exe }}"
           --output-dir dist-python
 
       - uses: actions/download-artifact@v8
@@ -270,9 +306,10 @@ jobs:
           name: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
           path: dist-python
 
-      - name: Install local SDK and runtime wheels into a clean venv
+      - name: Install local SDK and runtime wheels into a clean venv (POSIX)
+        if: runner.os != 'Windows'
         env:
-          RUNTIME_WHEEL: ${{ steps.runtime.outputs.wheel }}
+          RUNTIME_WHEEL: ${{ steps.runtime-posix.outputs.wheel }}
           SDK_WHEEL: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
         run: |
           set -euo pipefail
@@ -285,11 +322,27 @@ jobs:
           "$RUNNER_TEMP/dsh-sdk-smoke/bin/python" scripts/smoke-python-runtime.py \
             --scenario sdk-mcp
 
+      - name: Install local SDK and runtime wheels into a clean venv (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          RUNTIME_WHEEL: ${{ steps.runtime-windows.outputs.wheel }}
+          SDK_WHEEL: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
+        run: |
+          python -m venv "$env:RUNNER_TEMP\dsh-sdk-smoke"
+          $smokePython = Join-Path $env:RUNNER_TEMP 'dsh-sdk-smoke\Scripts\python.exe'
+          & $smokePython -m pip install "dist-python/$env:SDK_WHEEL" "dist-python/$env:RUNTIME_WHEEL"
+          if ($LASTEXITCODE -ne 0) { throw "Wheel installation failed with exit code $LASTEXITCODE" }
+          & $smokePython scripts/smoke-python-runtime.py --scenario sdk-default
+          if ($LASTEXITCODE -ne 0) { throw "sdk-default smoke failed with exit code $LASTEXITCODE" }
+          & $smokePython scripts/smoke-python-runtime.py --scenario sdk-mcp
+          if ($LASTEXITCODE -ne 0) { throw "sdk-mcp smoke failed with exit code $LASTEXITCODE" }
+
       - name: Check Linux GLIBC requirements
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          readelf --version-info "${{ steps.runtime.outputs.exe }}" | tee glibc-versions.txt
+          readelf --version-info "${{ steps.runtime-posix.outputs.exe }}" | tee glibc-versions.txt
           maximum="$(sed -n 's/.*Name: GLIBC_\([0-9.]*\).*/\1/p' glibc-versions.txt | sort -V | tail -1)"
           [ -n "$maximum" ] || { echo "::error::No GLIBC requirements found"; exit 1; }
           dpkg --compare-versions "$maximum" le 2.28 || {
@@ -300,8 +353,8 @@ jobs:
       - name: Check macOS deployment target
         if: runner.os == 'macOS'
         env:
-          EXE: ${{ steps.runtime.outputs.exe }}
-          PLATFORM: ${{ steps.runtime.outputs.platform }}
+          EXE: ${{ steps.runtime-posix.outputs.exe }}
+          PLATFORM: ${{ steps.runtime-posix.outputs.platform }}
         run: >-
           python3 scripts/check-macos-deployment-target.py
           --platform "$PLATFORM"
@@ -311,7 +364,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           RUNNER_ARCH: ${{ runner.arch }}
-          RUNTIME_WHEEL: ${{ steps.runtime.outputs.wheel }}
+          RUNTIME_WHEEL: ${{ steps.runtime-posix.outputs.wheel }}
           SDK_WHEEL: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
         run: |
           set -euo pipefail
@@ -329,8 +382,8 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.runtime.outputs.wheel }}
-          path: dist-python/${{ steps.runtime.outputs.wheel }}
+          name: ${{ steps.runtime-posix.outputs.wheel || steps.runtime-windows.outputs.wheel }}
+          path: dist-python/${{ steps.runtime-posix.outputs.wheel || steps.runtime-windows.outputs.wheel }}
           if-no-files-found: error
           retention-days: 7
 
@@ -341,7 +394,7 @@ jobs:
           DSH_GATE_REPORT_DIR: .artifacts/gates
           DSH_EVIDENCE_ARTIFACT_NAME: gate-evidence-python-runtime-${{ matrix.target }}-${{ github.run_attempt }}
           DSH_EVIDENCE_JOB_NAME: ${{ matrix.target }}
-          DSH_BUILD_CLIENT_PROFILE: official
+          DSH_BUILD_CLIENT_PROFILE: coharness
         with:
           external: python-runtime
           status: ${{ job.status }}

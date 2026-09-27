@@ -30,6 +30,8 @@ The Lead Session first stores the complete queued message. A target receipt is a
 ```ts type-equiv
 /** One peer message retained until its target Session records it. */
 interface TeamMessageSnapshot {
+  /** Captured participants; Team routing never recovers identity from the latest caller. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly id: TeamMessageId
   readonly senderId: SessionId
   readonly senderName: string
@@ -44,6 +46,8 @@ The target Session keeps message identity and sender attribution on both the pen
 ```ts type-equiv
 /** Source retained by the target Session for durable mailbox de-duplication. */
 interface TeamMessageSource {
+  /** Verified adjacent routing-host scope for this exact queued delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
   readonly kind: 'team-message'
   readonly teamId: TeamId
   readonly messageId: TeamMessageId

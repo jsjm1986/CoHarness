@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import Storage from '@deepseek-ai/dsh-storage'
 import type { StorageBackend } from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
@@ -39,6 +40,7 @@ interface HarnessOptions {
 async function harness(options: HarnessOptions = {}) {
   const pool = options.pool ?? new MemoryMediaPool()
   const ctx = new Context()
+  await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
   await ctx.plugin(Storage)
   ctx.storage.backend.register('memory', options.backend ?? new MemoryStorageBackend(pool))
   const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
@@ -81,8 +83,9 @@ async function harness(options: HarnessOptions = {}) {
 }
 
 /** Boot only the storage side, for dependency-pending and startup-failure cases. */
-async function storageContext(pool: MemoryMediaPool, backend: StorageBackend = new MemoryStorageBackend(pool)) {
+async function storageContext(pool: MemoryMediaPool, backend: StorageBackend = new MemoryStorageBackend(pool), filesystem = true) {
   const ctx = new Context()
+  if (filesystem) await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
   await ctx.plugin(Storage)
   ctx.storage.backend.register('memory', backend)
   const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
@@ -198,6 +201,23 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     expect(ctx.workspaceRegistry.list()).toEqual([])
     expect(list).toHaveBeenCalledTimes(1)
     expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], archiveRevision: 0 })
+  })
+
+  it('waits for the execution filesystem before reading history or initializing storage', async () => {
+    const pool = new MemoryMediaPool()
+    const ctx = await storageContext(pool, undefined, false)
+    const list = vi.fn(async () => [] as SessionHeader[])
+    ctx.provide('sessionPersistence', { listHeaders: list } as never)
+    const fiber = await ctx.plugin(WorkspaceRegistry)
+    try {
+      expect(ctx.get('workspaceRegistry')).toBeUndefined()
+      expect(list).not.toHaveBeenCalled()
+      expect(pool.media.has('workspace')).toBe(false)
+      await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
+      await fiber.await()
+      expect(ctx.workspaceRegistry.list()).toEqual([])
+      expect(list).toHaveBeenCalledTimes(1)
+    } finally { await ctx.fiber.dispose() }
   })
 
   it('bootstraps once from list headers only, in workspace/session createdAt order', async () => {
@@ -399,9 +419,9 @@ describe('WorkspaceRegistry create and lookup', () => {
     const file = join(parent, 'plain.txt')
     await writeFile(file, 'file')
     const { registry } = await harness()
-    await expect(registry.create(join(parent, 'missing'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(registry.create(join(parent, 'missing'))).rejects.toMatchObject({ code: 'FS_NOT_FOUND' })
     await expect(registry.create(file)).rejects.toThrow(/not a directory/)
-    await expect(registry.resolveByPath(join(parent, 'missing'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(registry.resolveByPath(join(parent, 'missing'))).rejects.toMatchObject({ code: 'FS_NOT_FOUND' })
     expect(registry.list()).toEqual([])
   })
 
@@ -863,6 +883,20 @@ describe('workspace mutation and status', () => {
     expect(workspace.title).toBe('kept')
   })
 
+  it('does not report a replaced directory symlink as the original workspace', async () => {
+    const dir = await makeDir('owned-status')
+    const other = await makeDir('other-status')
+    const { ctx, registry } = await harness()
+    try {
+      const workspace = await registry.create(dir)
+      await rm(dir, { recursive: true })
+      await symlink(other, dir)
+      expect(await workspace.status()).toBe('missing-dir')
+      expect(workspace.path).toBe(dir)
+      expect(registry.list()).toHaveLength(1)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('reports directory disappearance without mutating the workspace', async () => {
     const dir = await makeDir('vanishing')
     const { registry } = await harness()
@@ -994,6 +1028,43 @@ describe('registry-global session archive', () => {
       revision: Number.MAX_SAFE_INTEGER,
       archivedSessionIds: [session.id],
     })
+  })
+
+  it('returns child-first archived lineage and ungrouped headers without a live Session store', async () => {
+    const dir = await makeDir('child-first-archive')
+    const root = header('root-first-cache', dir)
+    const child = { ...header('child-first-cache', dir), parentSession: root.id }
+    const detached = header('ungrouped-archive')
+    const result = await harness({ sessions: [root, child, detached] })
+    try {
+      for (const h of [child, root, detached]) await result.registry.archiveSession(h.id)
+      expect(result.registry.archiveRevision).toBe(3)
+      const entries = await result.registry.archivedEntries()
+      expect(entries.map(entry => entry.rootSessionId)).toEqual([root.id, root.id, detached.id])
+      expect(entries[2]).not.toHaveProperty('workspace')
+      const revision = result.registry.archiveRevision
+      await result.registry.restoreSession(SessionId('not-archived'))
+      expect(result.registry.archiveRevision).toBe(revision)
+    } finally { await result.ctx.fiber.dispose() }
+  })
+
+  it('omits archived ids whose headers disappeared without fabricating a root', async () => {
+    const pool = storedPool([], { initialized: true, workspaceIds: [], archivedSessionIds: [SessionId('removed-header')] })
+    const result = await harness({ pool })
+    try {
+      expect(await result.registry.archivedEntries()).toEqual([])
+      expect(result.registry.archivedSessionIds).toEqual(['removed-header'])
+    } finally { await result.ctx.fiber.dispose() }
+  })
+
+  it('rejects persisted lineage cycles instead of publishing a guessed root', async () => {
+    const first = { ...header('cycle-a'), parentSession: SessionId('cycle-b') }
+    const second = { ...header('cycle-b'), parentSession: first.id }
+    const result = await harness({ sessions: [first, second] })
+    try {
+      await result.registry.archiveSession(first.id)
+      await expect(result.registry.archivedEntries()).rejects.toThrow("session lineage cycle at 'cycle-a'")
+    } finally { await result.ctx.fiber.dispose() }
   })
 
   it('returns lineage roots and retained positions while preferring persisted headers over live duplicates', async () => {

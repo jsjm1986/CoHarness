@@ -9,6 +9,14 @@ import { resolveUpgradeRecord } from './records.ts'
 import { requiredReleaseChecks } from './requirements.ts'
 
 const upstream = 'a'.repeat(40)
+
+it('refuses official build evidence for the CoHarness release target', () => {
+  const environment = { runnerOS: 'Linux', execution: 'native', buildProfile: 'official' }
+  expect(() => { assertEvidenceEnvironment('artifact', environment, {}, '.github/workflows/release.yml') })
+    .toThrow('CoHarness build profile')
+  expect(() => { assertEvidenceEnvironment('artifact', { ...environment, buildProfile: 'coharness' }, {}, '.github/workflows/release.yml') })
+    .not.toThrow()
+})
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
@@ -41,7 +49,7 @@ function fixture() {
   const check = (id: string) => ({ id, command: id, required: true, reason: 'candidate', status: 'passed', exitCode: 0, signal: null, aborted: false })
   const proof = (mode: string, id: string) => ({ version: 1, stable: {
     policyVersion: 1, commit: head, upstreamCommit: upstream, clean: true, mode,
-    environment: { runnerOS: 'Linux', execution: 'native', buildProfile: 'official', processPlatform: 'linux', architecture: 'x64', node: 'v24.0.0' },
+    environment: { runnerOS: 'Linux', execution: 'native', buildProfile: 'coharness', processPlatform: 'linux', architecture: 'x64', node: 'v24.0.0' },
     checks: [check(id)], artifacts: mode === 'npm-pack' ? [{ path: '.artifacts/dist/package.tgz', sha256: digest }] : [],
   }, observations: { durationMs: 1, recordedAt: '2026-09-21', producer: {
     repository: 'owner/repo', runId: mode === 'npm-pack' ? 2 : 1, attempt: 1, job: mode, artifact: `gate-evidence-${mode}`,

@@ -39,7 +39,7 @@ Connection 拥有 request correlation、`/api` carrier、trust check、精确 Fe
 
 [`host/apiproxy`](../../packages/host/apiproxy/README.zh.md)公开 Session list、search、creation、prompt、queue、cancellation、pagination 及 follow/control stream 等 Host command。其 Client 侧位于 [`client/runtime`](../../packages/client/runtime/README.zh.md)，按 `SessionRuntimePool → SessionManager → Session` 组织：
 
-- `SessionRuntimePool` 提供 `ctx.sessions`，拥有 reference、source count、Session scope 与稳定的 `SessionBinding` object，并投影不含全局 current Session 选择的 catalog state。
+- `SessionRuntimePool` 提供 `ctx.sessions`，把显式引用路由到所属运行时。每个 `SessionRuntime` 拥有来源计数、scope 代次及稳定 binding；当前选择和 Workbench 适配器持有普通视图引用。
 - `SessionManager` 拥有 list baseline、实时 list/control update、惰性 Session instance、queue、projection store、subagent catalog，以及 pull 与后到 update 之间的冲突顺序。
 - 每个 `Session` 拥有一段由 `SessionEventLikeEntry` value 表示的连续逻辑 event window、pagination、follow、prompt/control state 与供 adapter 消费的 observable snapshot。
 

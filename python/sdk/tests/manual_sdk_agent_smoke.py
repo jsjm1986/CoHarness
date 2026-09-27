@@ -1,4 +1,4 @@
-"""Drive the repo-source JSON-RPC bin through the SDK and a keyless mock SSE server.
+"""Drive the repo-source dsh SDK profile through the SDK and a keyless mock SSE server.
 
 Requires ``pnpm install`` but no build. This manual test is not collected by
 pytest; run ``python tests/manual_sdk_agent_smoke.py``.
@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 from deepseek_harness import DeepSeekHarness
-from deepseek_harness_runtime import bundled_default_config_path
 
 
 class MockCompletionHandler(BaseHTTPRequestHandler):
@@ -27,31 +26,41 @@ class MockCompletionHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(length).decode("utf-8")
         self.requests.append({
             "path": self.path,
-            "authorization": self.headers.get("authorization"),
+            "api_key": self.headers.get("x-api-key"),
             "body": json.loads(body),
         })
         self.send_response(200)
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
-        self.wfile.write(b'data: {"choices":[{"delta":{"role":"assistant","content":null,"reasoning_content":""}}]}\n\n')
-        self.wfile.write(b'data: {"choices":[{"delta":{"content":"SDK runtime reached the configured HTTP model endpoint."}}]}\n\n')
-        self.wfile.write(b'data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":7,"completion_tokens":9}}\n\n')
-        self.wfile.write(b"data: [DONE]\n\n")
+        text = "SDK runtime reached the configured HTTP model endpoint."
+        events = [
+            {"type": "message_start", "message": {"id": "smoke", "model": "sdk-smoke-model", "usage": {"input_tokens": 7, "output_tokens": 0}}},
+            {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}},
+            {"type": "content_block_stop", "index": 0},
+            {"type": "message_delta", "delta": {"stop_reason": "end_turn"}, "usage": {"output_tokens": 9}},
+            {"type": "message_stop"},
+        ]
+        for event in events:
+            self.wfile.write(f"event: {event['type']}\ndata: {json.dumps(event)}\n\n".encode())
+        self.wfile.flush()
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
 
 
 def run_smoke(repo_root: Path, keep_sessions: bool) -> None:
-    session_root = Path(tempfile.mkdtemp(prefix="dsh-sdk-smoke-sessions-"))
-    runtime_entry = repo_root / "packages/examples/jsonrpc-demo/src/bin.ts"
+    MockCompletionHandler.requests = []
+    dsh_home = Path(tempfile.mkdtemp(prefix="dsh-sdk-smoke-home-"))
+    session_root = dsh_home / "sessions"
+    runtime_entry = repo_root / "apps/cli/src/bin.ts"
     server = ThreadingHTTPServer(("127.0.0.1", 0), MockCompletionHandler)
     thread = threading.Thread(target=server.serve_forever, name="mock-openai-compatible-server", daemon=True)
     thread.start()
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
     print(f"repo_root={repo_root}")
-    print(f"session_root={session_root}")
+    print(f"dsh_home={dsh_home}")
     print(f"mock_base_url={base_url}")
 
     try:
@@ -59,10 +68,21 @@ def run_smoke(repo_root: Path, keep_sessions: bool) -> None:
             model="sdk-smoke-model",
             cwd=str(repo_root / "python/sdk"),
             runtime_cwd=str(repo_root),
-            session_root=str(session_root),
-            cordis=str(bundled_default_config_path()),
-            launch_args_override=("node", "--import", "tsx", str(runtime_entry)),
+            _launch_args=(
+                "node",
+                "--import",
+                "tsx/esm",
+                str(runtime_entry),
+                "--profile",
+                "sdk",
+                "--patch",
+                str(repo_root / "apps/cli/src/sdk-source.cordis.patch.yml"),
+            ),
             env={
+                "DSH_HOME": str(dsh_home),
+                "TSX_TSCONFIG_PATH": str(repo_root / "apps/cli/tsconfig.json"),
+                "DSH_PERMISSION_MODE": "danger-full-access",
+                "DSH_TELEMETRY_DISABLED": "1",
                 "DEEPSEEK_BASE_URL": base_url,
                 "DEEPSEEK_API_KEY": "sdk-smoke-key",
             },
@@ -77,8 +97,8 @@ def run_smoke(repo_root: Path, keep_sessions: bool) -> None:
         assert "configured HTTP model endpoint" in result.final_response
         assert len(MockCompletionHandler.requests) == 1
         request = MockCompletionHandler.requests[0]
-        print(json.dumps(request, ensure_ascii=False, indent=2)[:4000])
-        assert request["authorization"] == "Bearer sdk-smoke-key"
+        assert request["path"] == "/v1/messages"
+        assert request["api_key"] == "sdk-smoke-key"
         assert request["body"]["model"] == "sdk-smoke-model"
 
         jsonl_files = sorted(session_root.rglob("*.jsonl.zstd"))
@@ -90,12 +110,12 @@ def run_smoke(repo_root: Path, keep_sessions: bool) -> None:
     finally:
         server.shutdown()
         server.server_close()
-
-    if keep_sessions:
-        print(f"kept_session_root={session_root}")
-    else:
-        shutil.rmtree(session_root)
-        print("removed temporary session root")
+        thread.join()
+        if keep_sessions:
+            print(f"kept_dsh_home={dsh_home}")
+        else:
+            shutil.rmtree(dsh_home)
+            print("removed temporary dsh home")
 
 
 def main() -> None:

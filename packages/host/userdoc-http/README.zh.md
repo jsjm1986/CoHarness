@@ -28,6 +28,7 @@ Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路�
 
 使用 `dsh-host-userdoc-http` 作为 `ctx.userDocs` 的流式浏览器 HTTP 消费方：经宿主连接注册 `/api/documents`，使宿主/来源信任检查先于路由执行，上传字节旁路缓冲 JSON 桥。该路由族覆盖列表、上传、移动、回收站、还原、清除与文件夹操作，分页有界且游标不透明。
 
+
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该路由把每次上传流入 `ctx.userDocs`；文档状态留在附件后端。

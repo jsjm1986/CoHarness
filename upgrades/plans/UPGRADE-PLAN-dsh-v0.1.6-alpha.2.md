@@ -2,19 +2,28 @@
 
 ## 状态、目标与证据
 
-状态：升级终点调整为 alpha.2；alpha.1 Phase 1、2 的实现和历史验收保留，alpha.2 增量尚未实施或验收。不先完成一轮 alpha.1 发布再启动第二轮升级，不整体覆盖上游树，不因目标改变默认开放所有新能力。Q1–Q4 与 1B 启动审计方案已于 2026-09-18 全部确认（见下表），暂无待澄清产品决定。
+状态：`implementation-in-progress`。alpha.1 与 alpha.2 已有实现及历史验收保留；本轮从 `aa98a628f4e0e41316af25279c5d922f4bd7b5cd` 继续完成全部已批准范围，尚未完成当前候选验收。不先完成一轮 alpha.1 发布再启动第二轮升级，不整体覆盖上游树，不因目标改变默认开放所有新能力。Q1–Q4 与 1B 启动审计方案已于 2026-09-18 全部确认（见下表）；本轮补全没有撤销这些决定。
 
 | 引用 | 固定值 | 用途 |
 | --- | --- | --- |
-| 已登记同步基线 | `dsh-v0.1.5-rc.2` / `fb2c4b9e698e30edb738bca4cf0618587db7d203` | 累计差异起点，完成前不得前移 |
+| 累计比较基线 | `dsh-v0.1.5-rc.2` / `fb2c4b9e698e30edb738bca4cf0618587db7d203` | 固定的累计差异起点，不代表当前候选已验收 |
 | 前一实施目标 | `dsh-v0.1.6-alpha.1` / `0a15e36e7f82b6ed45af6fa9759f29b40dcd965d` | 保存已经实施的范围和验收历史，不是本地提交 |
 | 本轮唯一目标 | `dsh-v0.1.6-alpha.2` / `ddefc45fbc7f8e46dd73185e68295696d1297887` | 未实施部分直接采用此树的最终实现 |
 | 本地规划检查点 | `6f0ec56328048a1f69f179ebbacb2acd0d40e8b9` | 不是上游共同祖先，也不表示已与 alpha.2 等价 |
+| 本轮实施基线 | `aa98a628f4e0e41316af25279c5d922f4bd7b5cd` / `codex/alpha2-complete-alignment` | 新候选必须取得自己的验证证据 |
 | 发布版本 | 暂拟 `0.1.6-alpha.2.coharness.1` | release families 和原生产版本核验后确定，本批不改包版本 |
 
-[旧计划](UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md)及[旧审计](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)保存 alpha.1 的实施过程；本计划是后续执行入口。[清单](../manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.2.json)记录决定、阶段与未决项，[矩阵](../alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json)同时记录累计差异和 alpha.1→alpha.2 增量，[本轮审计](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md)记录范围来源及证据限制。[同步基线](../../scripts/upstream-sync.json)保持不变。
+[旧计划](UPGRADE-PLAN-dsh-v0.1.6-alpha.1.md)及[旧审计](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.1.md)保存 alpha.1 的实施过程；本计划是后续执行入口。[清单](../manifests/UPGRADE-MANIFEST-dsh-v0.1.6-alpha.2.json)记录决定、阶段与未决项，[矩阵](../alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json)同时记录累计差异和 alpha.1→alpha.2 增量，[本轮审计](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md)记录范围来源及证据限制。[同步记录](../../scripts/upstream-sync.json)已固定 alpha.2 源码比较目标；该字段不声明所有适配及发布验收完成。当前 schema v3 矩阵为 329 个唯一 area：320 行待累计源码审查，9 行保留既有本地测试通过状态。
 
 Phase 1 收口提交为 `6bd418cba3`，原生加载器依赖批次为 `94ea1e1dd8`；Phase 2 收口提交为 `49a968bc26`，较早生命周期迁移见旧审计。`cfb1949958` 合并远端 Web 工作，`6f0ec56328` 后续修改 app-boot 注释、测试及 vendor 记录。旧检查只能证明对应提交和环境；必须记录 alpha.2 实现提交及新验证，不能复制旧退出码作为新目标通过证据。
+
+## Gateway 入口补充决定
+
+2026-09-23 确认：Gateway 使用服务器已有 OpenSSH 配置别名时，由管理员登记并授权用户；共享到项目要求项目管理权，每位使用者仍须具备 SSH 资格。独立本机 CLI 保留本机操作者权限；个人显式密钥／密码连接继续遵循既定资格与共享规则。
+
+Webhook 管理页采用事件、仓库、动作等结构化筛选及提示词模板，不提供任意 JavaScript 编辑器。模板不是可执行代码。签名校验、防重放、限流、执行账号与逐次权限核验均保留。
+
+同一端点的相同签名正文在配置的防重放窗口内只自动执行一次，即使 delivery ID 不同。相同 delivery ID 的重投始终复用原受理结果；执行结果未知时不自动重跑。人工重跑必须由管理员明确触发并保留审计，不能通过更换 ID 或配置版本绕过上述约束。规则确认不代表相关产品入口已经实现或验收。
 
 ## 范围和变更纪律
 
@@ -22,11 +31,11 @@ Phase 1 收口提交为 `6bd418cba3`，原生加载器依赖批次为 `94ea1e1dd
 
 继承 alpha.1 所有已批准的产品决定（含 webhook 默认关闭）、二开保留要求、数据恢复约束和过程约束；新增能力的具体开放策略以本计划的已确认和待确认项为准。后续 tag 不自动跟进：必要修复以固定 SHA 单列范围，其余变更另行批准。每个实施批次记录上游范围、本地适配、消费者、负例、组装快照、验证提交和未验证环境；已删除的上游包在等价替代与部署依赖核验前不得删除。上游 `apps/desktop` 与 `apps/desktop-host` 桌面客户端不携带（2026-09-18 确认，矩阵 reject 行）；`apps/cli` 归 1B，`apps/web` 归 7A。
 
-本升级处于开发阶段、无生产数据，允许破坏性更新：目标是把上游代码尽可能全量对齐到 alpha.2，本地差异只保留二开主权面（矩阵 `localSovereignty` 为 `replaced`／`owned` 的区域和 `upstreamOnly` 行中经替代面承接的行为），不为兼容旧行为保留并行实现；行为变化必须在批次记录中写明。本地不携带的上游包仍须逐行审查增量并把应承接的行为移植到替代面（如 `api/session-controller` 的 Session 多实例经 `host/apiproxy` 与 `client/runtime`），"不携带"不等于"不审查"。`localSovereignty` 为 `unmanifested` 的 32 个上游新包在各自阶段决定携带与否并登记主权，同步基线前移时写入 `upstream-sync.json`。
+本升级处于开发阶段、无生产数据，允许破坏性更新：目标是把上游代码尽可能全量对齐到 alpha.2，本地差异只保留二开主权面（矩阵 `localSovereignty` 为 `replaced`／`owned` 的区域和 `upstreamOnly` 行中经替代面承接的行为），不为兼容旧行为保留并行实现；行为变化必须在批次记录中写明。本地不携带的上游包仍须逐行审查增量并把应承接的行为移植到替代面（如 `api/session-controller` 的 Session 多实例经 `host/apiproxy` 与 `client/runtime`），"不携带"不等于"不审查"。归并 4 组重复 area 后，矩阵仍有 28 行标为 `unmanifested`；这些初始路由仍需在各阶段核对实际携带状态并登记主权，不能凭旧分类推断功能未实现或已验收。
 
 全局管理面：`/admin`（`gateway/admin-ui`）是组织级设置的唯一入口。插件管理（7D）、webhook 端点与开关（7B）、终端用户／项目授权（7B，挂在用户与项目页面）、auto-review 资格（6B）的服务端强制设置落在 `/admin`；模型治理沿用现有 Models 页。上游 Web 插件页等会话内入口只提供个人级补充视图，不作为组织策略面。
 
-过程约束：自 `cfb1949958` 起 `master` 同时包含 Phase 1/2 升级代码与生产修复，当前生产运行 `f92068e800`；Phase 8 验收完成前不得以 `master` 部署生产，生产紧急修复从生产提交另开分支单独发布。Phase 1/2 从未执行 `pnpm run test:coverage`（alpha.1 审计记录 coverage 分片被主动终止），1B、2B 首个实施批次前先对现有 Phase 1/2 源码补跑并收口 per-file 100%，不把缺口带入新代码。`.github`、`scripts`、`lefthook.yml` 的累计门禁变化在 0R 完成后、1B 开工前先比对，新增必需检查登记为前置而不是等到 7E。部署前提——文件描述符上限（原生 watcher `EMFILE`）、CPython ≥3.10、平台能力逐项实测——进入 Phase 8 证据列并写入部署文档。
+过程约束：alpha.1 记录了自 `cfb1949958` 起 `master` 混有升级代码与生产修复，以及当时的生产提交 `f92068e800`；这不是当前部署状态证明。Phase 8 验收完成前不得以未经验收的 `master` 部署生产，生产紧急修复从实际生产提交另开分支单独发布。早期 Phase 1/2 的覆盖率缺口已有后续本地记录，并由 `2ba86fcbb908dd90226dbf5a62148099d24d6607` 的 [CI 全量覆盖率任务](https://github.com/jsjm1986/CoHarness/actions/runs/35688456271/job/106620429647)取得对应提交的成功证据；本轮候选仍须重新满足逐文件 100% 要求。`.github`、`scripts`、`lefthook.yml` 的累计门禁变化在 0R 完成后、1B 开工前先比对，新增必需检查登记为前置而不是等到 7E。部署前提——文件描述符上限（原生 watcher `EMFILE`）、CPython ≥3.10、平台能力逐项实测——进入 Phase 8 证据列并写入部署文档。
 
 ## 已确认的产品策略
 
@@ -92,14 +101,14 @@ UI 区分空闲、自己／他人占用、排队、停止中、不可用、待�
 
 ## 数据、二开保护与证据要求
 
-持续验证登录、身份、项目 ACL、只读成员、目录授权，模型策略/BYOK/提示性配额/用量归属，协作/私有性/父属/inbox 配额，User Documents/Workbench/资源预览，以及 Android、TS/Python SDK、推送、LAN/公网和 PostgreSQL/Linux/macOS 部署。树外治理插件和 Gateway 的独立测试不由根单测替代。
+持续验证登录、身份、项目 ACL、只读成员、目录授权，模型策略/BYOK/提示性配额/用量归属，协作/私有性/父属/inbox 配额，User Documents/Workbench/资源预览，以及 TS/Python SDK、LAN/公网和 PostgreSQL/Linux/macOS 部署。Android 与移动推送按用户确认作为可选手工验证，不阻塞本轮验收。树外治理插件和 Gateway 的独立测试不由根单测替代。
 
 迁移前盘点 Session 代次、未知必读事件、SQLite schema、PostgreSQL ledger、附件及归档引用；仅结构变化增加相邻 Session 格式迁移。JSONL 新代次发布不移动、覆盖或删除已提交代次；SQLite 版本单调，PostgreSQL 编号按实际 ledger 续排。本阶段无生产数据，允许重置环境直接迁移；迁移机制本身仍按发布质量验证——在合成数据上验证迁移重跑、中断、损坏及未来格式拒绝，对比对象数量、引用和摘要，保证机制对将来真实数据正确。代码回退不等于数据可降级；新事件是否 ignorable 由语义决定；开发环境允许整体重建，不要求备份窗口。
 
-验收记录需要本地 commit、上游范围、命令、退出码、环境和覆盖能力；unit、keyless snapshot、真实 provider、built artifact、平台与生产分别记录。SDK 输出变化同时覆盖两种 SDK；GUI/终端/插件管理需真实组装，mock 不替代。外部凭据或权限缺失记 unverified/blocked，skip 不计通过；CI 必需任务未执行时不能只凭汇总绿灯放行。alpha.1 遗留的未验证项、环境阻塞、不稳定用例和观察项集中在[本轮审计的台账](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md#未验证与环境阻塞台账)，共 23 项，每项已绑定承接阶段；新增欠账追加到该台账，不另建清单，销账时记录验证提交与命令。
+验收记录需要本地 commit、上游范围、命令、退出码、环境和覆盖能力；unit、keyless snapshot、真实 provider、built artifact、平台与生产分别记录。SDK 输出变化同时覆盖两种 SDK；GUI/终端/插件管理需真实组装，mock 不替代。外部凭据或权限缺失记 unverified/blocked，skip 不计通过；CI 必需任务未执行时不能只凭汇总绿灯放行。alpha.1 遗留项及后续新增项集中在[本轮审计的台账](../alignment/UPSTREAM-AUDIT-dsh-v0.1.6-alpha.2.md#未验证与环境阻塞台账)，共 25 项，每项已绑定承接阶段；新增欠账追加到该台账，不另建清单，销账时记录验证提交与命令。
 
 ## 排期方法与完成定义
 
-既有人日和完成率只作为低置信度参考，不按 887 个提交、2,643 个变化文件或矩阵行数线性折算。0R 完成后，各阶段按可验收批次估算实现、测试、文档、设备／凭据等待与集成缓冲，明确负责人、前置和最早验收时间；目标变更后的总量不得沿用 alpha.1 分母。
+既有人日和完成率只作为低置信度参考，不按 887 个提交、2,641 个变化文件或矩阵行数线性折算。0R 完成后，各阶段按可验收批次估算实现、测试、文档、设备／凭据等待与集成缓冲，明确负责人、前置和最早验收时间；目标变更后的总量不得沿用 alpha.1 分母。
 
 完成本次升级须所有矩阵行有目标版本审查结果及消费者证据，已批准范围实现或经用户批准延期，未决策略解决，发布产物／数据恢复／必需平台与生产检查通过，再决定发布版本并推进同步基线。仅目标文档更新、本地单测绿或部分包同树都不满足此定义。

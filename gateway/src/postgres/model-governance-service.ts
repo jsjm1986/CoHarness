@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { verifyExecutionAttribution } from '../execution-identity.ts'
 import type { UserRow } from '../auth.ts'
 import type {
   CredentialClass,
@@ -1420,14 +1421,28 @@ export class PostgresModelGovernanceService {
     const provider = nonEmpty(event.provider, 'provider')
     const model = nonEmpty(event.model, 'model')
     return transaction(this.context.pool, async (client) => {
-      const user = subject.kind === 'user'
-        ? await internalUserId(client, this.context.organizationId, subject.id)
-        : null
+      const hasExecutionInputs = Object.hasOwn(event, 'executionInputIds')
+      if (hasExecutionInputs) {
+        if (!Array.isArray(event.executionInputIds) || typeof event.sessionId !== 'string'
+          || event.actorUserId === undefined) throw new Error('execution attribution requires input ids, Session, and primary actor')
+        await verifyExecutionAttribution(client, {
+          organizationId: this.context.organizationId, runtime: subject,
+          sessionId: event.sessionId, inputIds: event.executionInputIds, primaryActorUserId: event.actorUserId,
+        })
+      }
+      const billingUserId = async (id: number): Promise<string | null> => {
+        if (!hasExecutionInputs) return internalUserId(client, this.context.organizationId, id)
+        // Verified past input keeps its historical actor even after account deletion.
+        const row = await client.query<{ id: string }>(
+          'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [this.context.organizationId, id])
+        return row.rows[0]?.id ?? null
+      }
+      const user = subject.kind === 'user' ? await billingUserId(subject.id) : null
       const project = subject.kind === 'project'
         ? await internalProjectId(client, this.context.organizationId, subject.id)
         : null
-      if (subject.kind === 'user' && user === null) throw new Error(`unknown user ${String(subject.id)}`)
-      if (subject.kind === 'project' && project === null) throw new Error(`unknown project ${String(subject.id)}`)
+      const billingOwner = subject.kind === 'user' ? user : project
+      if (billingOwner === null) throw new Error(`unknown ${subject.kind} ${String(subject.id)}`)
       // Actor attribution is an activity projection for shared projects only;
       // personal billing rows must not duplicate their billing user here.
       let actor: string | null = null
@@ -1436,9 +1451,10 @@ export class PostgresModelGovernanceService {
           throw new Error('actorProjectId must match the project usage subject')
         }
         if (event.actorUserId !== undefined) {
-          actor = await internalUserId(client, this.context.organizationId, event.actorUserId)
+          actor = await billingUserId(event.actorUserId)
           if (actor === null) throw new Error(`unknown usage actor ${String(event.actorUserId)}`)
-          const member = await client.query<{ allowed: boolean }>(`SELECT EXISTS(
+          if (!hasExecutionInputs) {
+            const member = await client.query<{ allowed: boolean }>(`SELECT EXISTS(
             SELECT 1 FROM harness.users u
             JOIN harness.memberships membership ON membership.organization_id=u.organization_id
               AND membership.user_id=u.id AND membership.status='active'
@@ -1447,7 +1463,8 @@ export class PostgresModelGovernanceService {
             WHERE u.organization_id=$1 AND u.id=$3 AND u.status='active'
               AND (membership.role='admin' OR member.access_mode='rw')
           ) allowed`, [this.context.organizationId, project, actor])
-          if (member.rows[0]?.allowed !== true) throw new Error(`usage actor ${String(event.actorUserId)} is not an active project writer`)
+            if (member.rows[0]?.allowed !== true) throw new Error(`usage actor ${String(event.actorUserId)} is not an active project writer`)
+          }
         }
       } else {
         if (event.actorUserId !== undefined && event.actorUserId !== subject.id) {
@@ -1514,7 +1531,7 @@ export class PostgresModelGovernanceService {
       if (inserted.rows.length === 0) return { inserted: false, alerts: 0 }
       return {
         inserted: true,
-        alerts: await this.evaluateAlerts(client, subject, monthOf(event.occurredAt, this.timeZone)),
+        alerts: await this.evaluateAlerts(client, subject, monthOf(event.occurredAt, this.timeZone), billingOwner),
       }
     })
   }
@@ -1982,12 +1999,8 @@ export class PostgresModelGovernanceService {
     )
   }
 
-  private async evaluateAlerts(queryable: Queryable, subject: ModelUsageSubject, month: string): Promise<number> {
+  private async evaluateAlerts(queryable: Queryable, subject: ModelUsageSubject, month: string, internalId: string): Promise<number> {
     const summary = await this.summaryWith(queryable, subject, month)
-    const internalId = subject.kind === 'user'
-      ? await internalUserId(queryable, this.context.organizationId, subject.id)
-      : await internalProjectId(queryable, this.context.organizationId, subject.id)
-    if (internalId === null) throw new Error(`unknown ${subject.kind} ${String(subject.id)}`)
     const table = subject.kind === 'user' ? 'model_usage_alerts' : 'project_usage_alerts'
     const column = subject.kind === 'user' ? 'user_id' : 'project_id'
     let inserted = 0

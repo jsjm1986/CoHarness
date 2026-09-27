@@ -2,8 +2,9 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
@@ -115,6 +116,11 @@ export class TeamMailbox {
     request.signal.throwIfAborted()
     const root = membership.root
     const content = structuredClone(request.content)
+    const id = TeamMessageId(`team-message-${randomUUID()}`)
+    const authority = executionAuthorityOf(this.ctx)
+    const captured = authority?.capture(caller)
+    const executionScope = captured === undefined || authority === undefined || caller === root ? captured
+      : await authority.relay(root.session, captured, MessageId(id), request.signal)
     const queued = await this.journal.transact(root.id, async () => {
       request.signal.throwIfAborted()
       const state = this.journal.state(root)
@@ -128,8 +134,10 @@ export class TeamMailbox {
           'TEAM_MAILBOX_FULL',
         )
       }
+      const deliveryScope = target.id === root.id ? captured : executionScope
       const queued: TeamMessageSnapshot = {
-        id: TeamMessageId(`team-message-${randomUUID()}`),
+        id,
+        ...(deliveryScope === undefined ? {} : { gatewayExecutionScope: deliveryScope }),
         senderId: caller.id,
         senderName: membership.name,
         targetId: target.id,
@@ -237,6 +245,7 @@ export class TeamMailbox {
         messageId: message.id,
         senderId: message.senderId,
         senderName: message.senderName,
+        ...(message.gatewayExecutionScope === undefined ? {} : { gatewayExecutionScope: message.gatewayExecutionScope }),
       }
       const content = this.deliveryContent(message)
       if (message.targetId === root.id) {

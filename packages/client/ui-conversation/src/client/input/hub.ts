@@ -8,7 +8,7 @@
  * bail events) and owns the default-sink choreography: every session is a
  * real host entity, so the sink is one unconditional prompt path.
  */
-import type { ClientContext, ISessions, SessionBinding, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, ISessions, SessionBinding, SessionReference, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InputTriggerController, SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { queueReadFaceOf } from '../contract/queue.ts'
@@ -16,6 +16,12 @@ import type { ComposerKeyboard, DraftAttachmentId, DraftDocumentId, SessionInput
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
+
+declare module '@deepseek-ai/dsh-client-runtime/client' {
+  interface SessionReferenceSourceMap {
+    composer: true
+  }
+}
 
 /** Structural command face for per-session popup resolution. */
 interface CommandFace {
@@ -40,7 +46,7 @@ interface ConversationAttachmentFace {
 
 /** Session-addressed input facade registry (SessionInputResolver face + composer-layer extras). */
 export class InputHub implements SessionInputResolver {
-  private readonly shells = new Map<SessionId, SessionInputShell>()
+  private readonly shells = new Map<SessionId, { binding: SessionBinding; shell: SessionInputShell }>()
 
   /**
    * @param ctx - client root context (services resolved lazily per call — boot order stays free).
@@ -59,7 +65,7 @@ export class InputHub implements SessionInputResolver {
   for(actx: ClientContext): SessionInput {
     const sessions = this.sessions()
     const id = sessions.scopeOf(actx)
-    if (id === undefined) throw new Error('conversation.input.for requires a session scope')
+    if (id === undefined || sessions.sessionOf(actx) === undefined) throw new Error('conversation.input.for requires a live session scope')
     return this.shell(id)
   }
 
@@ -73,7 +79,7 @@ export class InputHub implements SessionInputResolver {
    */
   shellFor(binding: SessionBinding): SessionInputShell {
     const existing = this.shells.get(binding.sessionId)
-    if (existing !== undefined) return existing
+    if (existing?.binding === binding) return existing.shell
     const { sessionId: id, session, ctx: actx } = binding
     const shell = new SessionInputShell({
       actx,
@@ -98,11 +104,25 @@ export class InputHub implements SessionInputResolver {
         }),
       },
     })
-    this.shells.set(id, shell)
+    this.shells.set(id, { binding, shell })
     // The one teardown axis: listeners, shell, and map entries all ride the
     // scope fiber (nothing here outlives the scope).
     actx.effect(() => {
+      let reference: SessionReference | undefined
+      const reconcileOwner = (): void => {
+        const state = shell.snapshot
+        const pending = state.draft !== '' || state.imageIds.length > 0 || state.documentIds.length > 0
+          || state.phase === 'adjudicating' || state.phase === 'submitting'
+        if (pending && reference === undefined) {
+          reference = this.sessions().retain(id, { source: 'composer' })
+        } else if (!pending && reference !== undefined) {
+          const previous = reference
+          reference = undefined
+          previous.release()
+        }
+      }
       const offs = [
+        shell.state.subscribe(reconcileOwner),
         actx.on('slash/input-begin-command', req =>
           shell.beginCommand(req.claim, req.span) ? true : undefined),
         actx.on('slash/input-insert-reference', req =>
@@ -117,7 +137,9 @@ export class InputHub implements SessionInputResolver {
         const drafts = shell.snapshot.imageIds
         const documentDrafts = shell.snapshot.documentIds
         shell.dispose()
-        this.shells.delete(id)
+        if (this.shells.get(id)?.shell === shell) this.shells.delete(id)
+        reference?.release()
+        reference = undefined
         const conversation = this.rootCtx.get('conversation') as ConversationAttachmentFace | undefined
         for (const imageId of drafts) conversation?.releaseDraftImage(imageId)
         conversation?.releaseDraftDocuments(id, documentDrafts)
@@ -134,7 +156,7 @@ export class InputHub implements SessionInputResolver {
    */
   shell(id: SessionId): SessionInputShell {
     const existing = this.shells.get(id)
-    if (existing !== undefined) return existing
+    if (existing !== undefined) return existing.shell
     const binding = this.sessions().binding(id)
     if (binding === undefined) throw new Error(`conversation.input: session "${id}" resolved no binding`)
     return this.shellFor(binding)
@@ -148,7 +170,7 @@ export class InputHub implements SessionInputResolver {
    * @param id - session whose draft is being discarded.
    */
   discardDraft(id: SessionId): void {
-    const shell = this.shells.get(id)
+    const shell = this.shells.get(id)?.shell
     if (shell === undefined) return
     const snapshot = shell.snapshot
     const conversation = this.conversation()

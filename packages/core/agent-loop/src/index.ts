@@ -86,7 +86,7 @@ export const turnBoundaryProjectionDefinition = {
 class FactoryOwnership {
   private accepting = true
   private readonly teardown = new AbortController()
-  private readonly inactive = Promise.withResolvers<void>()
+  private readonly inactive = Promise.withResolvers<undefined>()
   private readonly liveAgents = new Set<() => Promise<void>>()
   private startupTasks = new Set<Promise<void>>()
 
@@ -127,7 +127,7 @@ class FactoryOwnership {
   async dispose(): Promise<void> {
     this.accepting = false
     this.teardown.abort(new Error('agent loop is not active'))
-    this.inactive.resolve()
+    this.inactive.resolve(undefined)
     await Promise.all([
       ...[...this.liveAgents].map(dispose => dispose()),
       ...this.startupTasks,
@@ -167,7 +167,7 @@ async function raceAbortCall<T>(
   try {
     return await raceAbort(pending, signal, id)
   } catch (error: unknown) {
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the signal can abort while the operation is awaited.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the awaited operation can abort the signal after the pre-check.
     if (signal.aborted && releaseAbandoned !== undefined) {
       void pending.then(releaseAbandoned, () => undefined)
     }
@@ -519,10 +519,10 @@ export class AgentLoop extends Service implements AgentFactory {
     // occupant is a collision the create/resume below will surface itself.
     if (ownerCtx.agents.get(sessionId) === undefined && ownerCtx.sessions.get(sessionId) === undefined) return
 
-    const released = Promise.withResolvers<void>()
+    const released = Promise.withResolvers<undefined>()
     const checkReleased = (): void => {
       if (ownerCtx.agents.get(sessionId) === undefined && ownerCtx.sessions.get(sessionId) === undefined) {
-        released.resolve()
+        released.resolve(undefined)
       }
     }
     const disposeAgentListener = ownerCtx.on('agent/disposed', () => { checkReleased() })
@@ -584,8 +584,8 @@ export class AgentLoop extends Service implements AgentFactory {
     let detachSession: (() => void) | undefined
     let detachAgent: (() => void) | undefined
     let disposing: Promise<void> | undefined
-    let publication: ReturnType<typeof Promise.withResolvers<void>> | undefined
-    const machineReady = Promise.withResolvers<void>()
+    let publication: ReturnType<typeof Promise.withResolvers<undefined>> | undefined
+    const machineReady = Promise.withResolvers<undefined>()
     // Reverse teardown, memoized so every racing owner awaits one quiescence:
     // stop the machine, drain and close the session's write path, leave the
     // registries, unwind the scope, release bookkeeping.
@@ -641,7 +641,7 @@ export class AgentLoop extends Service implements AgentFactory {
     try {
       unfollowOwner = ownerCtx.effect(function* () {
         machine = new ReactLoopAgent(loopCtx, id, options, session, inbox)
-        machineReady.resolve()
+        machineReady.resolve(undefined)
         yield machine.scope.rawDispose
         yield () => {
           // Owner disposal owns the same quiescence boundary. Its teardown skips
@@ -653,7 +653,7 @@ export class AgentLoop extends Service implements AgentFactory {
       }, `agentLoop.lifecycle(${id})`)
       /* v8 ignore start -- ctx.effect throws only on an inactive fiber, which assertActive() above already rejected */
     } catch (error: unknown) {
-      machineReady.resolve()
+      machineReady.resolve(undefined)
       untrack()
       callerSignal?.removeEventListener('abort', onCallerAbort)
       this.ownership.signal.removeEventListener('abort', onFactoryTeardown)
@@ -679,7 +679,7 @@ export class AgentLoop extends Service implements AgentFactory {
         agent,
         signal: abort.signal,
         publish: async (source) => {
-          publication = Promise.withResolvers<void>()
+          publication = Promise.withResolvers<undefined>()
           try {
             assertLive()
             detachSession = agent.ctx.sessions.enter(session)
@@ -692,14 +692,14 @@ export class AgentLoop extends Service implements AgentFactory {
             assertLive()
             return { agent, dispose }
           } finally {
-            publication.resolve()
+            publication.resolve(undefined)
             publication = undefined
           }
         },
         dispose,
       }
     } catch (error: unknown) {
-      machineReady.resolve()
+      machineReady.resolve(undefined)
       // Rollback swallows a disposal rejection: the setup failure is primary.
       void dispose().catch(() => {})
       throw error

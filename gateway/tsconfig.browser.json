@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "../apps/web/tests/plugin-administration.e2e.ts"
+  ]
+}

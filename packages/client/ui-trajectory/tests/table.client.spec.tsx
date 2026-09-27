@@ -915,4 +915,47 @@ describe('TrajectoryTable', () => {
     expect(screen.getByRole('row', { name: /TOOL/ }).getAttribute('aria-selected')).toBe('false')
     expect(onInspectApplied).not.toHaveBeenCalled()
   })
+
+  it('presents a run_code record as a numbered program with its own result panel', () => {
+    const code = 'export async function run() {\n  return 21 * 2\n}'
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Step 1',
+        cells: [{
+          index: 1,
+          kind: 'tool',
+          toolName: 'run_code',
+          text: 'run_code',
+          inputDetail: JSON.stringify({ code, description: 'Fetch the open PRs' }),
+          schemaDetail: JSON.stringify({
+            parameters: { properties: { code: { description: 'TypeScript source to run' } } },
+          }),
+          outputDetail: '{"count":2}',
+          timeSeconds: 0.4,
+        }],
+      }],
+    }]
+
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+
+    const row = screen.getByRole('row', { name: /TOOL/ })
+    expect(row.textContent).toContain('run_code')
+    expect(row.textContent).toContain('Fetch the open PRs')
+    fireEvent.click(row)
+
+    expect(screen.getByRole('tab', { name: 'Code' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'Payload' })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Result' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Code' }))
+    const panel = screen.getByRole('tabpanel')
+    expect(panel.querySelector('.md-code-block[data-line-numbers]')).not.toBeNull()
+    expect(panel.textContent).toContain('return 21 * 2')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Original JSON' }))
+    expect(panel.textContent).toContain('Fetch the open PRs')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Result' }))
+    expect(screen.getByRole('tabpanel').textContent).toContain('count')
+  })
 })

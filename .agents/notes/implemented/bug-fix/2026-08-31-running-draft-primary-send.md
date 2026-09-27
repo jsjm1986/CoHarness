@@ -10,13 +10,13 @@ The ordinary Web composer remains editable while a Turn is running, and keyboard
 
 ## Decision
 
-`InputBar` chooses the ordinary session's primary action from the running state, draft content, and owner block. An empty running composer shows Stop and routes it through the existing session cancellation callback. Non-whitespace text or at least one image or document changes that same control to Send; the click uses the existing Queue submission path. An owner-blocked running composer keeps Stop even when a retained draft exists, because the block disables both editing and submission. Clearing the draft or completing a successful submission restores Stop while the Turn remains active. Idle sessions continue to show Send, disabled while the draft is empty or submission is unavailable.
+`InputBar` chooses the ordinary session's primary action from the running state, draft content, and owner block. An empty running composer shows Stop and routes it through the existing session cancellation callback. Non-whitespace text or at least one image or document changes that same control to Send; delivery follows the [busy Send decision](2026-09-22-busy-send-follows-enter-setting.md). An owner-blocked running composer keeps Stop even when a retained draft exists, because the block disables both editing and submission. Clearing the draft or completing a successful submission restores Stop while the Turn remains active. Idle sessions continue to show Send, disabled while the draft is empty or submission is unavailable.
 
-Pointer action does not inherit the `ui-conversation.busyEnter` preference. That preference continues to choose Queue or Steer only for the two keyboard gestures. Continuable subagents retain independent Send and Stop controls, and one-shot subagents retain their read-only behavior.
+The [busy Send decision](2026-09-22-busy-send-follows-enter-setting.md) supersedes this note's original Queue-only pointer policy while retaining its primary-seat and owner-block rules. Continuable subagents retain independent Send and Stop controls, and one-shot subagents retain their read-only behavior.
 
 ## Verification
 
-The `InputBar` component tests cover empty, text, cleared, submitted, image-only, document-only, and owner-blocked running drafts, including Queue submission while the keyboard preference selects Steer. The keyless assembled Web scenario parks a real composed Turn in the replay adapter, captures the running draft with Send, clicks it through the Host Queue path, observes Stop return after the draft clears, removes the queued row, and then cancels the Turn.
+The `InputBar` component tests cover empty, text, cleared, submitted, image-only, document-only, and owner-blocked running drafts, including the selected delivery mode while the busy-Enter preference changes. The keyless assembled Web scenario parks a real composed Turn in the replay adapter, captures the running draft with Send, clicks it through the Host Queue path, observes Stop return after the draft clears, removes the queued row, and then cancels the Turn.
 
 ## Related
 
@@ -28,7 +28,7 @@ The empty-draft Cmd/Ctrl+Enter whole-queue gesture remains owned by [Steer the w
 
 **Render Send and Stop simultaneously for every running session.** Continuable subagents need two independent operations because their cancellation route differs from continuation delivery. Ordinary sessions have one established primary seat; adding a permanent second control would spend more space and create a different hierarchy when the draft itself already identifies the immediate action.
 
-**Apply the busy-Enter preference to pointer Send.** A button labeled Send would silently change between Queue and Steer according to a keyboard preference. Keeping pointer submission on Queue preserves the existing explicit distinction and avoids an invisible mode on the button.
+**Apply the busy-Enter preference to pointer Send.** A button labeled Send would silently change between Queue and Steer according to a keyboard preference. The [busy Send decision](2026-09-22-busy-send-follows-enter-setting.md) addresses this concern with an explicit Queue or Steer label and one shared preference for the label and delivery.
 
 ## Consequences
 

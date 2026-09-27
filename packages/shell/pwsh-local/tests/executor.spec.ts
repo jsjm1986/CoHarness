@@ -294,8 +294,10 @@ describe('spawn construction (pure, every platform)', () => {
   })
 })
 
-describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', () => {
-  it('resolves with output and the effective timeout', { timeout: 15_000 }, async () => {
+// Every case spawns real pwsh; cold starts under a loaded host outlast the
+// 5s default, so the suite shares the per-call timeout allowance.
+describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', { timeout: 15_000 }, () => {
+  it('resolves with output and the effective timeout', async () => {
     const { bash } = await setup({ timeoutMs: 10_000 })
     const result = await bash.run(bash.resolve({ command: 'Write-Output hi' }))
     expect(result.exitCode).toBe(0)
@@ -423,7 +425,7 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', () => {
   })
 })
 
-describe.skipIf(!hasPwsh)('PwshLocalExecutor.start (background process handles)', () => {
+describe.skipIf(!hasPwsh)('PwshLocalExecutor.start (background process handles)', { timeout: 15_000 }, () => {
   it('start returns immediately with a running handle that settles as completed', async ({ task }) => {
     const { bash } = await setup()
     const barrier = commandBarrier()
@@ -566,7 +568,7 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.start (background process handles)'
   })
 })
 
-describe.skipIf(!hasPwsh)('process lifecycle ownership (the subprocess service, not the executor)', () => {
+describe.skipIf(!hasPwsh)('process lifecycle ownership (the subprocess service, not the executor)', { timeout: 15_000 }, () => {
   it('a background process survives executor-fiber disposal and dies with the subprocess service', async ({ task }) => {
     const ctx = createContext()
     const managerFiber = await ctx.plugin(LocalSubprocessRuntime)

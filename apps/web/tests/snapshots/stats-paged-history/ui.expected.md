@@ -7,6 +7,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -39,7 +41,8 @@
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m1 7/25 {{clock}}
+- text: m1
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r1
@@ -51,14 +54,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m2 7/25 {{clock}}
+- text: m2
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r2
@@ -70,14 +75,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m3 7/25 {{clock}}
+- text: m3
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r3
@@ -89,14 +96,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m4 7/25 {{clock}}
+- text: m4
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r4
@@ -108,14 +117,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m5 7/25 {{clock}}
+- text: m5
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r5
@@ -127,14 +138,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m6 7/25 {{clock}}
+- text: m6
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r6
@@ -146,14 +159,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m7 7/25 {{clock}}
+- text: m7
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r7
@@ -165,14 +180,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m8 7/25 {{clock}}
+- text: m8
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r8
@@ -184,14 +201,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m9 7/25 {{clock}}
+- text: m9
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r9
@@ -203,14 +222,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m10 7/25 {{clock}}
+- text: m10
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r10
@@ -222,14 +243,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m11 7/25 {{clock}}
+- text: m11
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r11
@@ -241,14 +264,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m12 7/25 {{clock}}
+- text: m12
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r12
@@ -260,14 +285,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m13 7/25 {{clock}}
+- text: m13
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r13
@@ -279,14 +306,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m14 7/25 {{clock}}
+- text: m14
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r14
@@ -298,14 +327,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m15 7/25 {{clock}}
+- text: m15
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r15
@@ -317,14 +348,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m16 7/25 {{clock}}
+- text: m16
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r16
@@ -336,14 +369,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m17 7/25 {{clock}}
+- text: m17
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r17
@@ -355,14 +390,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m18 7/25 {{clock}}
+- text: m18
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r18
@@ -374,14 +411,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m19 7/25 {{clock}}
+- text: m19
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r19
@@ -393,14 +432,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m20 7/25 {{clock}}
+- text: m20
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r20
@@ -412,14 +453,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m21 7/25 {{clock}}
+- text: m21
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r21
@@ -431,14 +474,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m22 7/25 {{clock}}
+- text: m22
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r22
@@ -450,14 +495,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m23 7/25 {{clock}}
+- text: m23
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r23
@@ -469,14 +516,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m24 7/25 {{clock}}
+- text: m24
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r24
@@ -488,14 +537,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m25 7/25 {{clock}}
+- text: m25
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r25
@@ -507,14 +558,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m26 7/25 {{clock}}
+- text: m26
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r26
@@ -526,14 +579,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m27 7/25 {{clock}}
+- text: m27
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r27
@@ -545,14 +600,16 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: m28 7/25 {{clock}}
+- text: m28
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r28
@@ -564,10 +621,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -582,7 +640,8 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "28 turns · 28 steps":
-  - img
-  - text: 28 turns · 28 steps
+- group "Session statistics":
+  - button "28 turns · 28 steps":
+    - img
+    - text: 28 turns · 28 steps
 - separator "Adjust transcript content width"

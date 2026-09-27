@@ -26,6 +26,8 @@ export interface WebTestPolicy {
   readonly groups: readonly string[]
   /** Browser scenario path relative to {@link WEB_TESTS_ROOT} to its single business group. */
   readonly scenarios: Readonly<Record<string, string>>
+  /** Exact repository-relative fixture/config paths to every browser scenario that consumes them. */
+  readonly sharedInputs: Readonly<Record<string, readonly string[]>>
   /**
    * Browser-rendered package key (`<group>/<name>`) to one group, several
    * groups, or `all`. An unmapped browser-rendered package falls back to the
@@ -45,7 +47,7 @@ export interface WebTestPolicy {
  * Load and validate the checked-in policy document.
  * @param root - Repository root holding `scripts/web-test-policy.json`.
  * @returns The validated policy; throws when the document is absent, malformed,
- *   or references a group outside `groups`.
+ *   references an unknown group/scenario, or names a missing shared input or owner.
  */
 export function loadWebTestPolicy(root: string): WebTestPolicy {
   const path = resolve(root, 'scripts/web-test-policy.json')
@@ -55,7 +57,18 @@ export function loadWebTestPolicy(root: string): WebTestPolicy {
   } catch (error) {
     throw new Error(`web-test-policy: cannot parse ${path}: ${error instanceof Error ? error.message : String(error)}`)
   }
-  return validateWebTestPolicy(raw, path)
+  const policy = validateWebTestPolicy(raw, path)
+  for (const [input, owners] of Object.entries(policy.sharedInputs)) {
+    if (!statSync(resolve(root, input), { throwIfNoEntry: false })?.isFile()) {
+      throw new Error(`web-test-policy: shared input ${JSON.stringify(input)} must name an existing regular file.`)
+    }
+    for (const owner of owners) {
+      if (!statSync(resolve(root, WEB_TESTS_ROOT, owner), { throwIfNoEntry: false })?.isFile()) {
+        throw new Error(`web-test-policy: shared input ${JSON.stringify(input)} references missing scenario ${JSON.stringify(owner)}.`)
+      }
+    }
+  }
+  return policy
 }
 
 /**
@@ -88,6 +101,7 @@ export function validateWebTestPolicy(raw: unknown, source: string): WebTestPoli
     throw new Error(`web-test-policy: ${source} scenarios must not be empty.`)
   }
   for (const [scenario, group] of Object.entries(scenarios)) {
+    requireRelativeFile(scenario, 'scenario', source)
     if (!/\.(?:e2e|snapshot)\.ts$/.test(scenario) || scenario.includes('\\')
       || scenario.split('/').some(part => part === '' || part === '.' || part === '..')) {
       throw new Error(`web-test-policy: ${source} scenario ${JSON.stringify(scenario)} must be a relative browser scenario path.`)
@@ -95,6 +109,20 @@ export function validateWebTestPolicy(raw: unknown, source: string): WebTestPoli
     if (!known.has(group)) {
       throw new Error(`web-test-policy: ${source} scenario ${JSON.stringify(scenario)} names unknown group ${JSON.stringify(group)}.`)
     }
+  }
+  const sharedInputs: Record<string, readonly string[]> = {}
+  for (const [input, value] of Object.entries(requireRecord(policy.sharedInputs, 'sharedInputs', source))) {
+    requireRelativeFile(input, 'shared input', source)
+    const owners = requireStringArray(value, `sharedInputs.${input}`, source)
+    if (owners.length === 0 || new Set(owners).size !== owners.length) {
+      throw new Error(`web-test-policy: ${source} shared input ${JSON.stringify(input)} needs a non-empty, duplicate-free scenario list.`)
+    }
+    for (const owner of owners) {
+      if (!Object.hasOwn(scenarios, owner)) {
+        throw new Error(`web-test-policy: ${source} shared input ${JSON.stringify(input)} names unknown scenario ${JSON.stringify(owner)}.`)
+      }
+    }
+    sharedInputs[input] = owners
   }
   const smoke = requireStringArray(policy.smokeScenarios, 'smokeScenarios', source)
   if (smoke.length === 0 || new Set(smoke).size !== smoke.length) {
@@ -124,11 +152,18 @@ export function validateWebTestPolicy(raw: unknown, source: string): WebTestPoli
     version: 1,
     groups,
     scenarios,
+    sharedInputs,
     packages,
     fullPrefixes: requireStringArray(policy.fullPrefixes, 'fullPrefixes', source),
     webInfraPrefixes: requireStringArray(policy.webInfraPrefixes, 'webInfraPrefixes', source),
     smokeScenarios: smoke,
     unknown: 'full',
+  }
+}
+
+function requireRelativeFile(path: string, field: string, source: string): void {
+  if (/^[A-Za-z]:/.test(path) || path.includes('\\') || path.split('/').some(segment => segment === '' || segment === '.' || segment === '..')) {
+    throw new Error(`web-test-policy: ${source} ${field} ${JSON.stringify(path)} must be a normalized repository-relative file path.`)
   }
 }
 

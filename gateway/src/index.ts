@@ -1,5 +1,10 @@
+import { DesktopAccess } from './desktop-access.ts'
+import { SshAccess } from './ssh-access.ts'
+import { TerminalAccess } from './terminal-access.ts'
+import { GatewayPluginManagement } from './plugin-management.ts'
+import { GatewayTerminalManagement } from './terminal-management.ts'
 import { randomBytes } from 'node:crypto'
-import type { Server } from 'node:http'
+import type { Server, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
 import { PostgresAccountPreferencesService } from './postgres/account-preferences-service.ts'
@@ -30,10 +35,19 @@ import {
 } from './organization-model-credentials.ts'
 import { PostgresProjectService } from './postgres/project-service.ts'
 import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
+import { PostgresMaintenanceService, type WriteGateVerdict } from './postgres/maintenance-service.ts'
+import { PostgresBackupService } from './postgres/backup-service.ts'
+import { createDeploymentCommands } from './deployment-commands.ts'
+import { migrationPlan } from './postgres/database.ts'
 import { PostgresUserService } from './postgres/user-service.ts'
+import { PostgresWebhookDeliveryService } from './postgres/webhook-delivery-service.ts'
+import { PostgresWebhookEndpointService, WebhookSecretCipher } from './postgres/webhook-endpoint-service.ts'
+import { GatewayWebhookIntake } from './webhook-intake.ts'
 import { loadPrincipalKeys, PRINCIPAL_HEADER } from './principal.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 import { createProxyHandlers } from './proxy.ts'
+import { PostgresAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
 import { createGatewayWorkbenchCatalogHandler } from './workbench.ts'
@@ -94,7 +108,8 @@ function archiveReadPayload(value: unknown): ConversationArchiveRuntimeRead {
 
 const cfg = loadConfig()
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
-const pool = createPostgresPool(await databaseUrlFromFile())
+const databaseUrl = await databaseUrlFromFile()
+const pool = createPostgresPool(databaseUrl)
 const startupAbort = new AbortController()
 const onStartupSignal = (): void => { startupAbort.abort() }
 process.once('SIGINT', onStartupSignal)
@@ -155,6 +170,7 @@ const launcher = selectLauncher(cfg, () => ({
       cfg.runtimeCredentialDir,
       cfg.principalKeyDir,
       cfg.organizationModelCredentialKeyFile,
+      cfg.webhookSecretKeyFile,
       cfg.bootstrapAdminPasswordFile,
     ],
     memoryMax: cfg.memoryMax,
@@ -201,6 +217,7 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
       status: 'active',
       homePath: '/',
       mustChangePassword: false,
+      autoReviewEligible: false,
     },
     scope,
     runtime: { kind: runtime.kind, id: runtime.id, generation: running.generation },
@@ -237,6 +254,63 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
     if (operationLease) await Promise.resolve(instances.operationRef?.(target, -1)).catch(() => {})
   }
 })
+const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
+const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
+const backups = new PostgresBackupService(context)
+const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand)
+const managedPaths = [
+  cfg.principalKeyDir,
+  cfg.runtimeCredentialDir,
+  cfg.organizationModelCredentialKeyFile,
+  cfg.webhookSecretKeyFile,
+  cfg.bootstrapAdminPasswordFile,
+]
+// The write epoch captured at startup fences this process after a restore: a
+// completed restore bumps it, so pre-restore writers keep rejecting their own
+// mutations until an operator restarts them onto the restored snapshot.
+const baselineWriteEpoch = await maintenance.currentWriteEpoch()
+const MAINTENANCE_GATE_CACHE_MS = 300
+let gateCache: { at: number; verdict: WriteGateVerdict } | undefined
+let observedMaintenanceEpoch = 0n
+const refreshMaintenanceGate = async (): Promise<WriteGateVerdict> => {
+  const gate = await maintenance.writeGate(baselineWriteEpoch)
+  observedMaintenanceEpoch = gate.maintenanceEpoch
+  gateCache = { at: Date.now(), verdict: gate.verdict }
+  return gate.verdict
+}
+const maintenanceGate = async (): Promise<WriteGateVerdict> => {
+  if (gateCache !== undefined && Date.now() - gateCache.at < MAINTENANCE_GATE_CACHE_MS) return gateCache.verdict
+  return refreshMaintenanceGate()
+}
+// Mutating HTTP requests count from gate admission until the response closes;
+// periodic sweeps count for their whole run. The heartbeat publishes the
+// total so the applier's quiesce waits for work already past the gate, not
+// just for new admissions to stop.
+let writersInFlight = 0
+const trackWriter = <T>(operation: () => Promise<T>): Promise<T> => {
+  writersInFlight += 1
+  return Promise.resolve()
+    .then(operation)
+    .finally(() => { writersInFlight -= 1 })
+}
+const writerSpan = (res: ServerResponse): void => {
+  writersInFlight += 1
+  res.once('close', () => { writersInFlight -= 1 })
+}
+// The heartbeat acknowledges only the epoch the write gate has already
+// enforced, so the applier never reads a quiesce this node has not applied.
+const heartbeatTimer = setInterval(() => {
+  void (async () => {
+    await refreshMaintenanceGate()
+    await maintenance.heartbeat(observedMaintenanceEpoch, writersInFlight)
+  })().catch((error: unknown) => {
+    console.error('[gateway] maintenance heartbeat failed:', error)
+  })
+}, cfg.nodeHeartbeatMs)
+heartbeatTimer.unref()
+const webhookDeliveries = new PostgresWebhookDeliveryService(context)
+const webhookEndpoints = new PostgresWebhookEndpointService(context,
+  new WebhookSecretCipher(loadOrganizationModelCredentialKey(cfg.webhookSecretKeyFile)))
 const deps: GatewayDeps = {
   cfg,
   auth,
@@ -251,7 +325,38 @@ const deps: GatewayDeps = {
   push,
   instances,
   desktops,
-  readiness: signal => checkPostgresReadiness(context, signal),
+  desktopAccess: new DesktopAccess(context),
+  terminalAccess: new TerminalAccess(context),
+  sshAccess: new SshAccess(context),
+  sshTargets: new PostgresSshTargetService(context),
+  pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
+  terminalManagement: new GatewayTerminalManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
+  webhookDeliveries,
+  webhookEndpoints,
+  webhookIntake: new GatewayWebhookIntake({ cfg, users, projects, instances },
+    webhookEndpoints, webhookDeliveries, principalKeys.signer),
+  accessMonitor,
+  maintenance,
+  backups,
+  backupWork: {
+    commands: deploymentCommands,
+    databaseUrl,
+    backupDir: cfg.backupDir,
+    managedPaths,
+  },
+  migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
+  maintenanceGate,
+  writerSpan,
+  readiness: async (signal) => {
+    await checkPostgresReadiness(context, signal)
+    await accessMonitor.synchronize()
+    signal?.throwIfAborted()
+    // A completed restore moved the write epoch past this process's baseline;
+    // report unready so the node drains and restarts onto the restored data.
+    if (await maintenance.currentWriteEpoch() !== baselineWriteEpoch) {
+      throw new Error('PostgreSQL write epoch advanced past this process; restart onto the restored snapshot')
+    }
+  },
 }
 
 if (await deps.users.count() === 0) {
@@ -276,6 +381,7 @@ if (await deps.users.count() === 0) {
 await refreshModelGovernance(deps)
 
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
+await accessMonitor.synchronize()
 const documentAdmin = createGatewayDocumentAdminHandler({
   instances: deps.instances,
   users,
@@ -339,6 +445,8 @@ const server = createGatewayServer(deps, {
   }),
   admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
   runtime: createRuntimeApiHandler({
+    accessMonitor,
+    executionWatchHeartbeatMs: cfg.executionWatchHeartbeatMs,
     context,
     instances: instanceRepository,
     conversations,
@@ -428,7 +536,10 @@ const server = createGatewayServer(deps, {
 server.listen(cfg.port, '127.0.0.1', () => {
   console.log(`[gateway] listening on http://127.0.0.1:${cfg.port}`)
 })
-const intake = createUsageIntakeServer(governance, audit)
+const intake = createUsageIntakeServer(governance, audit, {
+  open: async () => (await maintenanceGate()) === 'open',
+  track: trackWriter,
+})
 intake.listen(cfg.intakePort, '127.0.0.1', () => {
   console.log(`[gateway] usage intake listening on http://127.0.0.1:${cfg.intakePort}`)
 })
@@ -457,16 +568,25 @@ function singleFlightTask(label: string, operation: () => Promise<void>): Single
   }
 }
 
-const reaperTask = singleFlightTask('idle reaper', async () => {
+// Periodic writers fence with HTTP writers: the gate keeps a sweep from
+// starting under maintenance, and the in-flight count keeps a running sweep
+// on the quiesce ledger until it drains.
+const fencedTask = (label: string, operation: () => Promise<void>): SingleFlightTask =>
+  singleFlightTask(label, () => trackWriter(async () => {
+    if (await maintenanceGate() !== 'open') return
+    await operation()
+  }))
+
+const reaperTask = fencedTask('idle reaper', async () => {
   await deps.instances.reapIdle()
 })
-const archiveRetentionTask = singleFlightTask('archive retention sweep', async () => {
+const archiveRetentionTask = fencedTask('archive retention sweep', async () => {
   await archives.purgeDue()
 })
-const documentRetentionTask = singleFlightTask('document retention sweep', async () => {
+const documentRetentionTask = fencedTask('document retention sweep', async () => {
   await documentCatalog.purgeDue?.()
 })
-const desktopSweepTask = singleFlightTask('desktop grant sweep', async () => {
+const desktopSweepTask = fencedTask('desktop grant sweep', async () => {
   await desktops.sweep()
 })
 const reaper = setInterval(reaperTask.run, 60_000)
@@ -515,6 +635,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       desktopSweepTask.wait(),
     ])
     proxyHandlers.close()
+    await accessMonitor.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])
     await deps.instances.stopAll()
     await pool.end()

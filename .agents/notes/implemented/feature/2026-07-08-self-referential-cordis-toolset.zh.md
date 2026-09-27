@@ -12,6 +12,8 @@ Status: implemented
 
 ## 决策
 
+本决策中的模型执行接口由[只读 Cordis 发现](../simplification/2026-09-22-retire-dynamic-cordis-model-tools.zh.md)替代。运行器生命周期、生成式 API 发现的依据和历史记录仍保留；文中保留的执行机制不代表当前提供模型执行工具。
+
 该工具集以 [`@deepseek-ai/dsh-tool-cordis`](../../../../packages/extensions/tool-cordis/README.zh.md) 发布，并由 `examples/web-cordis` 演示。它为模型提供三个工具，用于操作当前 DSH 进程中的活跃 Cordis 运行时：检查该运行时、挂载一个仅存于内存的临时插件，再将该插件卸载至完全停稳。
 
 vm 隔离了意外的全局污染，上下文门面隐藏了框架内部细节。但二者都不限制已暴露服务的权限：临时插件可以调用 `ctx.shell` 以宿主执行器的权限运行命令，也能访问真实的文件系统和网络服务。它运行在共享 DSH 运行时中，可能影响同一进程的其他会话。这是一个需要显式启用的开发工具，信任等级与 bash 相当，不是安全边界，也不是产品默认配置。

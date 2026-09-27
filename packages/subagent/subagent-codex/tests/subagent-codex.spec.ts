@@ -7,7 +7,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import * as yaml from 'js-yaml'
 import { describe, expect, it, vi } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { type ContentBlock } from '@deepseek-ai/dsh-llm'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type {
@@ -354,6 +354,33 @@ function expectedFailureDiagnostic(
   }
   return `Product subagent failure (${fields.join('; ')})`
 }
+
+describe('named persistent member routes', () => {
+  it('keeps default and named routes independent through registration and disposal', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      const first = await ctx.plugin(codex, { providerName: 'codex', model: 'first-model' })
+      await ctx.plugin(codex, { providerName: 'codex-secondary', model: 'second-model' })
+      const firstRoute = ctx.subagents.getProvider('codex')!.agentRouteDefaults!
+      const secondRoute = ctx.subagents.getProvider('codex-secondary')!.agentRouteDefaults!
+      expect(firstRoute.provider).not.toBe(secondRoute.provider)
+      expect(firstRoute.model).toBe('first-model')
+      expect(secondRoute.model).toBe('second-model')
+      expect(ctx.llm.listProviders().map(provider => provider.id).sort())
+        .toEqual([firstRoute.provider, secondRoute.provider].sort())
+      await first.dispose()
+      expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual([secondRoute.provider])
+      expect(ctx.subagents.getProvider('codex-secondary')!.agentRouteDefaults).toEqual(secondRoute)
+      await ctx.plugin(codex, { providerName: 'codex' })
+      expect(ctx.subagents.getProvider('codex')!.agentRouteDefaults!.provider).toBe(firstRoute.provider)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+})
 
 describe('task admission and package contracts', () => {
   it('ships one independently installable provider-only Bundle patch', () => {

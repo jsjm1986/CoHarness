@@ -76,9 +76,10 @@ Replay owner for one service-wide estimator and isolated per-session folds.
  * that call's full heuristic anchor; otherwise the complete envelope and
  * surface are heuristically repriced.
  *
- * `requestHeader` affects request pressure only; surface fields always
- * describe the current session surface. Every call clones those positional
- * nodes, so measurement is O(surface).
+ * `requestHeader` affects pressure and route-owned image pricing; the node
+ * set always describes the current session. File handles resolve in the
+ * current execution environment for both the surface and its anchor.
+ * Every call clones those positional nodes, so measurement is O(surface).
  *
  * @param session - session to replay through its current durable tail.
  * @param requestHeader - optional effective request envelope replacing the latest logged header.

@@ -1,0 +1,12 @@
+version: 1
+scenario: cancel-tool-calls
+profile: acp
+composition: acp-agent
+recording: authored
+header:
+  class: default
+replay:
+  override: true
+platform: posix
+workspace:
+  final: true

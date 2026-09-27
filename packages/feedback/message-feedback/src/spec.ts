@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod'
+import { FEEDBACK_CATEGORIES } from '@deepseek-ai/dsh-command-feedback'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
@@ -27,6 +28,7 @@ export const messageFeedbackVersionSchema = z.uuid()
 export const messageFeedbackItemSchema = z.object({
   messageId: z.string().min(1).transform(value => value as MessageId),
   rating: messageFeedbackRatingSchema,
+  category: z.enum(FEEDBACK_CATEGORIES).optional(),
   note: z.string().refine(note => note.trim().length > 0, {
     message: 'message feedback note must contain a non-whitespace character',
   }).optional(),

@@ -13,7 +13,7 @@
 import { fileURLToPath } from 'node:url'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Browser, Page } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { MessageId } from '@deepseek-ai/dsh-llm'
@@ -268,6 +268,60 @@ describe('web e2e: agent-preset selection', () => {
     expect(onStandard.some(option => option.startsWith('compact'))).toBe(true)
     expect(onStandard.some(option => option.startsWith('plan'))).toBe(true)
     await composer.fill('')
+  }, 90_000)
+
+  it('hides the picker: the pending session falls back to the deployment default until selection returns', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-picker-off'))
+    const openSection = async (): Promise<Locator> => {
+      await page.getByRole('button', { name: 'Settings', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: 'Settings' })
+      await dialog.waitFor({ timeout: 10_000 })
+      await dialog.getByRole('button', { name: 'Agent presets' }).click()
+      return dialog
+    }
+    const closeSettings = async (dialog: Locator): Promise<void> => {
+      await dialog.getByRole('button', { name: 'Close' }).last().click()
+      await dialog.waitFor({ state: 'detached', timeout: 10_000 })
+    }
+
+    // A saved default different from the deployment default makes the policy
+    // observable: hidden means the deployment default, not the saved one.
+    let dialog = await openSection()
+    await dialog.getByRole('button', { name: 'Set as default: Minimal mode' }).click()
+    await dialog.getByRole('button', { name: 'In use: Minimal mode' }).waitFor({ timeout: 10_000 })
+    await closeSettings(dialog)
+    await page.getByRole('button', { name: 'Minimal mode', exact: true }).waitFor({ timeout: 10_000 })
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('minimal')
+
+    // Off: the chip leaves the new-session screen and the pending session
+    // returns to the deployment default — the saved `minimal` is ignored, not
+    // lost.
+    dialog = await openSection()
+    await dialog.getByRole('switch', { name: 'Allow switching Agent modes' }).click()
+    await dialog.getByRole('button', { name: 'Default: Standard mode' }).waitFor({ timeout: 10_000 })
+    await closeSettings(dialog)
+    await expect.poll(
+      () => page.getByRole('button', { name: 'Minimal mode', exact: true }).count(),
+      { timeout: 10_000 },
+    ).toBe(0)
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
+
+    // On again: the saved default is still there, so the chip and the pending
+    // session return to `minimal` rather than the deployment default.
+    dialog = await openSection()
+    await dialog.getByRole('switch', { name: 'Allow switching Agent modes' }).click()
+    await dialog.getByRole('button', { name: 'In use: Minimal mode' }).waitFor({ timeout: 10_000 })
+    await closeSettings(dialog)
+    await page.getByRole('button', { name: 'Minimal mode', exact: true }).waitFor({ timeout: 10_000 })
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('minimal')
+
+    // Leave the lane the way the later cases expect it: the saved default
+    // restored to the deployment default and the pending session back on it.
+    dialog = await openSection()
+    await dialog.getByRole('button', { name: 'Set as default: Standard mode' }).click()
+    await dialog.getByRole('button', { name: 'In use: Standard mode' }).waitFor({ timeout: 10_000 })
+    await closeSettings(dialog)
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
   }, 90_000)
 
   it('labels a resumed session with the preset it was created under', async () => {

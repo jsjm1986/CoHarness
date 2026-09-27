@@ -9,10 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
-- text: "Using ONE run_code program: run bash `echo CODE_ROUND_OK`, then read the file missing.txt catching its error in the program. Return an object with both outcomes. Then reply DONE and stop. {{clock}}"
+- text: "Using ONE run_code program: run bash `echo CODE_ROUND_OK`, then read the file missing.txt catching its error in the program. Return an object with both outcomes. Then reply DONE and stop."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think The program ran successfully. Let me now reply DONE as instructed.":
@@ -28,10 +31,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -45,10 +49,11 @@
   - img
 - button "7% of context used"
 - button "Send message" [disabled]
-- button "1 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 2 steps{{throughput}} tok/s
-- button "17.5K tok · Cache hit 52%":
-  - img
-  - text: 17.5K tokCache hit 52%
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "17.5K tok · Cache hit 52%":
+    - img
+    - text: 17.5K tokCache hit 52%
 - separator "Adjust transcript content width"

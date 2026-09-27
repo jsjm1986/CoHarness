@@ -107,7 +107,7 @@ export const localBrowser = {
 
 /** Native wrapper with an independent model and drainable external operations. */
 export class Stagehand {
-  private readonly closed: PromiseWithResolvers<void> = Promise.withResolvers()
+  private readonly closed: PromiseWithResolvers<undefined> = Promise.withResolvers()
   constructor(readonly browser: FixtureBrowser, readonly model: ModelConfig) { browser.connectionClosed = this.closed.promise }
   static async create(options: { browser: FixtureBrowser; model: ModelConfig }): Promise<Stagehand> {
     fixture.models.push(options.model)
@@ -119,7 +119,7 @@ export class Stagehand {
     await fixture.stagehandClose?.()
     await Promise.allSettled(this.browser.pending)
     this.browser.stagehandClosed = true
-    this.closed.resolve()
+    this.closed.resolve(undefined)
   }
   async extract(_instruction: string, schemaOrOptions: unknown, _options?: unknown): Promise<unknown> {
     await this.browser.track(Promise.race([

@@ -7,12 +7,13 @@
  * must stub); runtime-internal entry points (history staging, wire-frame
  * dispatch) stay on the class, invisible out here.
  */
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {
   MessageId, PromptContentPart, QueueAction, RpcId, RpcResult, SessionId,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import type { ConversationSnapshot } from '../sessions/conversation.ts'
+import type { ChatSnapshot, ConversationSnapshot } from '../sessions/conversation.ts'
 import type { PendingSubmissionImage, PendingSubmissionPlacement } from '../sessions/conversation.ts'
 import type { ObservableSnapshot } from './store.ts'
 
@@ -60,6 +61,12 @@ export interface ISession {
   readonly projections: ProjectionsFace
   /** Local submission echoes currently awaiting durable admission. */
   readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle
+  /** Read the complete turn owning a call without changing the visible history window.
+   * @param callId - durable root or nested Tool call identity.
+   * @param signal - cancellation owned by the detail reader.
+   * @returns independently assembled chat nodes; missing calls produce an empty snapshot.
+   */
+  readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>
   /**
    * Send a prompt into the session.
    * @param content - text plus browser-owned temporary image uploads.

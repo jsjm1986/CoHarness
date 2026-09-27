@@ -15,7 +15,8 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, contentHasImage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
@@ -46,11 +47,12 @@ import type {
   ContinuableStart,
   ContinuableStartSpec,
   SubagentInterruptAuthority,
+  SubagentProvider,
   SubagentSendMessageOptions,
 } from './types.ts'
 
 /** Inputs shared by model steering and human prompt delivery. */
-type ChildDeliveryOptions =
+type ChildDeliveryOptions = { readonly message?: ReturnType<typeof createUserMessage> } & (
   | {
     readonly delivery: 'steer'
     /**
@@ -60,12 +62,18 @@ type ChildDeliveryOptions =
     readonly source?: MessageSource
     readonly signal: AbortSignal
   }
-  | { readonly delivery: 'queue'; readonly source: MessageSource; readonly signal: AbortSignal }
+  | { readonly delivery: 'queue'; readonly source: MessageSource; readonly signal: AbortSignal })
 
 /** Package-private hooks supplied by the owning service. */
 interface ContinuationHost {
   /** Resolve one provider's detached continuable-creation contribution. */
   prepareContinuable(name: string, request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>
+  /**
+   * Provider-owned static route defaults merged under the request's
+   * `agentOptions`, or `undefined` when the provider derives its route from
+   * the parent.
+   */
+  agentRouteDefaults(name: string): SubagentProvider['agentRouteDefaults']
   /** Build the lifecycle observer for one Activation residency epoch. */
   observeActivation(provider: string, childId: SessionId, parent: Agent): ActivationObserver
 }
@@ -111,7 +119,11 @@ export class SubagentContinuationManager {
     const childDepth = resolveChildDepth(parent, request.maxDepth)
     // Snapshot before any await: invalid descriptor JSON rejects the call
     // before a child exists, and the detached value is what reaches the log.
-    const agentOptions = resolveChildAgentOptions(parent, request.agentOptions, childDepth)
+    const routeDefaults = this.host.agentRouteDefaults(spec.provider)
+    const requestedOptions: AgentOptions | undefined = routeDefaults === undefined
+      ? request.agentOptions
+      : { ...routeDefaults, ...request.agentOptions }
+    const agentOptions = resolveChildAgentOptions(parent, requestedOptions, childDepth)
     const agentProvider = agentOptions.provider
     const agentModel = agentOptions.model
     const agentReasoningEffort = agentOptions.reasoningEffort
@@ -178,7 +190,8 @@ export class SubagentContinuationManager {
           isAdjacentAgentSendMessageTool(this.ctx.get('tools')?.get('send_message', activation.handle.agent))
             ? withContinuableReturnGuidance(parent.id, request.prompt)
             : request.prompt,
-          { source: { kind: 'user' }, signal: spec.signal, delivery: 'queue' },
+          { source: { kind: 'user', ...(delegatedPolicies.executionScope === undefined ? {}
+            : { gatewayExecutionScope: delegatedPolicies.executionScope }) }, signal: spec.signal, delivery: 'queue' },
           parent,
           () => { establishCatalogChild(parent.session, childHeader, descriptor) },
         )
@@ -278,9 +291,12 @@ export class SubagentContinuationManager {
     options: ChildDeliveryOptions,
   ): Promise<MessageId> {
     this.activations.assertAdmitting(parent)
+    const message = options.source === undefined
+      ? createAgentMessage(parent, content) : createUserMessage({ content, source: options.source })
+    const capturedOptions = { ...options, message }
     const releaseHold = this.activations.holdOwnership(parent, childId)
     try {
-      return await this.deliverFollowup(parent, childId, content, options)
+      return await this.deliverFollowup(parent, childId, content, capturedOptions)
     } catch (error: unknown) {
       releaseHold()
       throw error
@@ -311,7 +327,7 @@ export class SubagentContinuationManager {
             return undefined
           }
         }
-        const messageId = this.submitAdmitted(activation, content, options, parent)
+        const messageId = await this.submitAdmitted(activation, content, options, parent)
         activation.announced = true
         return messageId
       })
@@ -473,7 +489,7 @@ export class SubagentContinuationManager {
           throw new SubagentError(`subagent "${activation.childId}" is closing`, 'ACTIVATION_CLOSING')
         }
       }
-      const messageId = this.submitAdmitted(activation, content, options, parent)
+      const messageId = await this.submitAdmitted(activation, content, options, parent)
       commit?.()
       activation.announced = true
       return messageId
@@ -489,16 +505,20 @@ export class SubagentContinuationManager {
     }
   }
 
-  /** Build and submit one message across the final synchronous admission cutoff. */
-  private submitAdmitted(
+  /** Attest human input before the final synchronous admission cutoff. */
+  private async submitAdmitted(
     activation: Activation,
     content: ContentBlock[],
     options: ChildDeliveryOptions,
     parent: Agent,
-  ): MessageId {
-    const message = options.source === undefined
+  ): Promise<MessageId> {
+    let message = options.message ?? (options.source === undefined
       ? createAgentMessage(parent, content)
-      : createUserMessage({ content, source: options.source })
+      : createUserMessage({ content, source: options.source }))
+    const authority = executionAuthorityOf(this.ctx)
+    if (authority !== undefined && message.source.kind === 'user' && !('gatewayExecutionScope' in message.source)) {
+      message = await authority.stamp(activation.handle.agent.session, message)
+    }
     return this.activations.submitAdmitted(
       activation,
       message,

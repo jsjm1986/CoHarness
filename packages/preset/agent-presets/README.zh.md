@@ -8,13 +8,13 @@
 
 ## 概述
 
-使用 `dsh-agent-presets` 为每个会话提供某个 preset 的 `agent.cordis.yml` 所指定的工具、提示词段落与 skill（技能）。一个进程可以运行使用不同 preset 的会话，同时保持它们的状态相互隔离。preset 名单合并随附定义、已配置根目录与用户根目录，会报告 preset 无法启动的原因，也能通过复制现有 preset 创建本地 preset。部署与用户都可选择默认值；只有空会话可以切换 preset。请将每个自行编写的 preset 视为受信任配置，因为它会授予其所选插件的能力。
+使用 `dsh-agent-presets` 为每个会话提供某个 preset 的 `agent.cordis.yml` 所指定的工具、提示词段落与 skill（技能）。一个进程可以运行使用不同 preset 的会话，同时保持它们的状态相互隔离。preset 名单合并随附定义、已配置根目录与用户根目录，会报告 preset 无法启动的原因，也能通过复制现有 preset 创建本地 preset。部署与用户都可选择默认值、以及新会话表层是否提供选择；只有空会话可以切换 preset。请将每个自行编写的 preset 视为受信任配置，因为它会授予其所选插件的能力。
 
 ## 服务：`AgentPresets`（ctx 键：`agentPresets`）
 
 发现过程不做缓存：`list()` 与 `resolve()` 每次调用都重新读取各个根目录，因此进程运行期间新写的 preset 立即可见，被删除的 preset 也会在下一次读取时消失。发现过程同时负责 preset 的**健康**：组装文件缺失或不可加载（YAML 无法解析——用加载器自己的方言检查，含 `!!js`——或不是由具名插件行组成的列表）的目录会作为携带 `broken` 原因的行列出而不是被跳过，因为被跳过的目录仍在磁盘上占着它的 id，而各个界面却没有任何可删的东西。目录名不是可用 preset id（`[a-z0-9][a-z0-9-]*`）的目录才被直接跳过：复制永远不可能占用那种名字。
 
-- `ctx.agentPresets.defaultId: string` 调用方未指定时挂载的 preset id。
+- `ctx.agentPresets.defaultId: string` 调用方未指定时挂载的 preset id——`modeSelectionEnabled` 为真时取 settings 文档的 `default`，否则取 `config.default`。
 - `ctx.agentPresets.list(): Promise<AgentPreset[]>` 当前各根目录提供的全部 preset；id 重复时靠前的根目录胜出；损坏的 preset 也在其中，各自携带原因。
 - `ctx.agentPresets.resolve(id?): Promise<AgentPreset>` 按 id 取一个 preset，缺省取 `defaultId`。没有任何根目录提供该 id 时抛错，并列出可用 id。损坏的 preset 照样解析——删除、读取与上报都需要这一行。
 - `ctx.agentPresets.mount(agentCtx, id?): Promise<AgentPreset>` 用一个 preset 组装一个 agent——确保其常驻挂载（并发去重）并把 agent 的 scope key 认父到它——返回该 preset 供调用方记录。对损坏的 preset 直接以发现时记下的原因拒绝，所以每种不可加载的形态都在加载器介入之前以同一方式失败。
@@ -107,16 +107,19 @@ description: 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agen
 
 随附根目录仍然是装配事实：它位于已安装 app 自身配置的旁边，那个路径只有该 app 能解析。
 
-### 默认 preset 是一项用户设置
+### 默认 preset 与选择器可见性是 settings
 
-当组装中存在 settings 提供方时，本插件会注册 `agent-presets` 命名空间，并以 `config.default` 作为其组装 base，因此用户文档会层叠覆盖部署方的工程默认值。在 Gateway 项目作用域中，只有项目 owner 或组织管理员可以写入该命名空间；普通成员可以查看名单，但不能更改共享默认值：
+当组装中存在 settings 提供方时，本插件会注册 `agent-presets` 命名空间，并以 `config.default` 作为其组装 base，因此用户文档会层叠覆盖部署方的工程默认值。在 Gateway 项目作用域中，该命名空间的字段只有项目管理者可以写入；普通成员可以查看名单，但不能更改共享默认值或选择策略：
 
 ```yaml
 agent-presets:
   default: minimal
+  modeSelectionEnabled: false
 ```
 
 该值在每次解析时读取而非快照，因此热重载的文档对**此后创建**的会话生效，而每个运行中的会话仍停留在它当初据以组装的 preset 上。清空用户字段即重新继承组装默认值。若默认值指向没有任何根目录提供的 preset，写入时不会报错，而在下一次 `resolve()` 时失败——名单是一个活动目录，此刻不存在的名字，等到某个会话真正索取时可能已经存在。
+
+`modeSelectionEnabled`（base 为 `true`）决定未指名的会话是否查询已保存的 `default`：为 `false` 时，每个未指名会话的有效默认值都是 `config.default`，已保存的值被搁置、待该标志恢复时再生效。名册同时报告这个答案的两半——标志本身，以及已解析好的 `isDefault`——因此没有 settings 访问权的客户端也能与有访问权的表层保持一致。无论开关如何，运行中的会话都保持其组装；该标志只是把选择从新会话表层上移除。
 
 ## 挂载会拒绝什么
 

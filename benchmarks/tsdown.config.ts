@@ -21,4 +21,45 @@ export default defineConfig([
     clean: true,
     tsconfig: 'tsconfig.host.json',
   },
+  {
+    ...shared,
+    entry: { 'reconnect.worker': 'active-stream-reconnect/reconnect.worker.client.ts' },
+    outDir: '.dsh-build/active-stream-reconnect',
+    clean: true,
+    tsconfig: 'tsconfig.client.json',
+  },
+  {
+    ...shared,
+    entry: {
+      'agent-continuation.worker': 'agent-continuation/agent-continuation.worker.ts',
+      'child-catalog.worker': 'agent-continuation/child-catalog.worker.ts',
+      'profile-continuation.worker': 'agent-continuation/profile-continuation.worker.ts',
+      'profile-adapter': 'agent-continuation/profile-adapter.ts',
+    },
+    outDir: '.dsh-build/agent-continuation',
+    clean: true,
+    tsconfig: 'tsconfig.host.json',
+  },
+  {
+    ...shared,
+    entry: { 'session-open.worker': 'session-open/session-open.worker.ts' },
+    outDir: '.dsh-build/session-open',
+    clean: true,
+    tsconfig: 'tsconfig.host.json',
+  },
+  {
+    ...shared,
+    // client-runtime publishes only a module-table factory for /client; alias
+    // it to the shim that re-exports just the fold's leaf modules.
+    deps: { ...shared.deps, neverBundle: [/^@deepseek-ai\/(?!dsh-client-runtime)/] },
+    alias: {
+      '@deepseek-ai/dsh-client-runtime/client': new URL('./conversation-fold/runtime-client-shim.ts', import.meta.url).pathname,
+    },
+    entry: {
+      'conversation-fold.worker': 'conversation-fold/conversation-fold.worker.client.ts',
+    },
+    outDir: '.dsh-build/conversation-fold',
+    clean: true,
+    tsconfig: 'tsconfig.client.json',
+  },
 ])

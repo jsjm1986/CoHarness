@@ -2,6 +2,7 @@
  * Cordis-free React primitives styled only through `--dsw-*` tokens.
  */
 
+export { Switch } from './Switch.tsx'
 export { StateDot } from './StateDot.tsx'
 export type { StateDotState } from './StateDot.tsx'
 export { DisclosureRow } from './DisclosureRow.tsx'
@@ -38,13 +39,15 @@ export { Tooltip } from './Tooltip.tsx'
 export type { TooltipSide } from './Tooltip.tsx'
 export { Toast } from './Toast.tsx'
 export { writeClipboard } from './clipboard.ts'
+export { relativeTime } from './relative-time.ts'
+export type { RelativeTime, RelativeTimeUnit } from './relative-time.ts'
 export { JsonTree } from './JsonTree.tsx'
 export type { JsonTreeProps, JsonTreeLabels } from './JsonTree.tsx'
 export { TerminalBlock, DEFAULT_TERMINAL_MAX_LINES } from './TerminalBlock.tsx'
 export type { TerminalBlockProps, TerminalBlockLabels } from './TerminalBlock.tsx'
 export { ReadBlock, DEFAULT_READ_MAX_LINES } from './ReadBlock.tsx'
 export type { ReadBlockProps, ReadBlockLine, ReadBlockLabels } from './ReadBlock.tsx'
-export { DiffBlock, DEFAULT_DIFF_MAX_LINES } from './DiffBlock.tsx'
+export { DiffBlock, DEFAULT_DIFF_MAX_LINES, diffTotals } from './DiffBlock.tsx'
 export type { DiffBlockProps, DiffHunk, DiffBlockLabels } from './DiffBlock.tsx'
 export { SearchBlock, DEFAULT_SEARCH_MAX_LINES } from './SearchBlock.tsx'
 export type {
@@ -56,6 +59,8 @@ export type { WebBlockProps, WebSearchBlockProps, WebFetchBlockProps, WebSourceV
 export { CodeBlock } from './markdown/CodeBlock.tsx'
 export type { CodeBlockProps } from './markdown/CodeBlock.tsx'
 export { JsonBlock } from './markdown/JsonBlock.tsx'
+export { MarkdownDelegateProvider } from './markdown/MarkdownDelegate.tsx'
+export type { MarkdownDelegate, MarkdownExternalLinkHandler, MarkdownDelegateProviderProps } from './markdown/MarkdownDelegate.tsx'
 export { MarkdownText } from './markdown/MarkdownText.tsx'
 export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels } from './markdown/MarkdownText.tsx'
 export { MessageText } from './markdown/MessageText.tsx'

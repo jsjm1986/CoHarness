@@ -9,6 +9,7 @@ import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, NS } from '../src/client/index.ts'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInventorySettingsTab.tsx'
+import type { ClientModuleLoader } from '@deepseek-ai/dsh-client-modules/client'
 import { apply as nodeApply } from '../src/index.ts'
 
 usePinnedBrowserLanguages('zh-CN')
@@ -33,7 +34,10 @@ async function bench() {
   const list = vi.fn<() => Promise<ListResult>>()
     .mockResolvedValue({ ok: true, value: EMPTY })
   ctx.provide('remote.pluginInventory', { list })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list }
+  const retry = vi.fn(async () => {})
+  const state = { getSnapshot: () => ({ syncing: false, failures: [] }), subscribe: () => () => {} }
+  ctx.provide('modules', { entries: { state, retry } } as unknown as ClientModuleLoader)
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, retry, state }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -45,7 +49,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory', 'modules'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {
@@ -61,6 +65,15 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.list).not.toHaveBeenCalled()
 
     const injected = (entry.inject as unknown as () => PluginInventorySettingsTabInjected)()
+    expect(injected.hooks.clientSync).toBe(b.state)
+    injected.retryClient()
+    expect(b.retry).toHaveBeenCalledOnce()
+    const failure = new Error('page retry failed')
+    const logged = vi.spyOn(b.ctx.logger, 'error').mockImplementation(() => {})
+    b.retry.mockRejectedValueOnce(failure)
+    injected.retryClient()
+    await vi.waitFor(() => { expect(logged).toHaveBeenCalledWith(failure) })
+    logged.mockRestore()
     await expect(injected.list()).resolves.toEqual(EMPTY)
     expect(b.list).toHaveBeenCalledOnce()
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })

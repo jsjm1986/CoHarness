@@ -28,7 +28,7 @@
 
 `ctx.dynamicCordisRunner` 就是全部的面:
 
-- `activeRuns` —— 每个定义唯一的在途活动：`awaiting-approval`（要回答的 requestId，加上这次询问的会话、包名与用途）或 `orchestrating`（这次 run 是为哪个会话在跑）。两条臂都带会话，因为归组属于这次 run 而不属于它的阶段；待确认那条还带着询问自己的文字，因为 `cordis_define` 什么都不播 —— 一个请求可以点名上一次注册表读取没覆盖到的定义，那时这条活动就是那一行唯一的来源。界面从它渲染、自己不留副本 —— 这正是控件能活过 remount 的原因。
+- `activeRuns` —— 每个定义唯一的在途活动：`awaiting-approval`（要回答的 requestId，加上这次询问的会话、包名与用途）或 `orchestrating`（这次 run 是为哪个会话在跑）。两条臂都带会话，因为归组属于这次 run 而不属于它的阶段；待确认那条还带着询问自己的文字，因为 `define()` 什么都不播 —— 一个请求可以点名上一次注册表读取没覆盖到的定义，那时这条活动就是那一行唯一的来源。界面从它渲染、自己不留副本 —— 这正是控件能活过 remount 的原因。
 - `renderFailures` —— **本页**最后一次渲染崩溃，按定义索引（槽位、教学 message、以及这次崩溃是否已把 entry 从格位上摘掉），与 live 集合共用同一条通知通道。它按构造就是「本页当前」：包 stop、被 retract、或重新装载成功时即清空，所以界面可以直接照着渲染。host 那边另存一份「跨页面最后一次」给模型 —— 两份的归属与寿命本来就不同，界面**不要**改成回读 host 那份。
 - `lastRunError` —— 本页自己那次尝试为何失败，按定义索引。它比活动活得更久：host 只拆失败请求自己启动的那半，所以一个页面可能看着 host 报告为「在跑」的定义，而自己什么都没装上。
 - `approve(requestId)` / `decline(requestId)` / `startUserRun({ agentId, id, hasClientHalf })` —— 两条入口。三者都幂等（按 requestId，用户自发的 run 按定义 id），所以连点两次不会起两次 run。`hasClientHalf` 是必填：纯 host 定义没有源码可取，所以由调用方从它正在操作的注册表行里把这个事实说出来，而不是让编排器从一次失败的取码里反推。可回答的请求必然带浏览器半 —— 纯 host 定义是 host 自己起的，它不会去问页面。

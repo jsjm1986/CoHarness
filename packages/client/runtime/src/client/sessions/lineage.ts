@@ -33,6 +33,8 @@ export interface SessionListEntry {
   workspaceId?: WorkspaceId
   /** Agent preset the session's agent was composed from (summary passthrough). */
   agentPreset?: string
+  /** Registered SSH target the session executes on (summary passthrough); absent for host-local. */
+  sshTarget?: number
   /** Current host-computed projection values for list consumers. */
   projectionValues?: Readonly<Partial<SessionProjectionMap>>
   /** User interaction currently blocking this session, derived from live mux frames. */

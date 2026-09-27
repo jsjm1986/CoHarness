@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter as pathDelimiter } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
+import type {} from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import {
   SESSION_FORMAT_VERSION,
   SessionLogOffset,
@@ -26,6 +27,7 @@ import {
 import type {
   ContentBlock,
   GenerateOptions,
+  LlmImageRequestPricing,
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
@@ -33,9 +35,10 @@ import type {
   ResolvedRetryPolicy,
   RetryPolicyConfig,
   StreamChunk,
+  SystemPromptUpdate,
   TokenUsage,
 } from '@deepseek-ai/dsh-llm'
-import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantStream, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
+import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantStream, offloadedImageText, requestImageHandleText, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 
 /**
  * One recorded model call. `throw` may replay prefix chunks before failing;
@@ -45,7 +48,7 @@ import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantSt
  */
 export type ReplayEntry =
   | { kind: 'chunks'; chunks: StreamChunk[] }
-  | { kind: 'throw'; chunks: StreamChunk[]; message: string; code: string }
+  | { kind: 'throw'; chunks: StreamChunk[]; message: string; code: string; accepted?: boolean }
   | {
     kind: 'hang'
     /** Optional marker written after the prefix chunks are consumed and before the stream waits for cancellation. */
@@ -69,6 +72,15 @@ export interface ReplayModelConfig {
    * omit one, so replay reconstructs the request header a live catalog produced.
    */
   defaultMaxTokens?: number
+  /**
+   * Optional flat visual-token price the replay route declares for every
+   * retained request image, so keyless scenarios exercise route-priced
+   * request pressure; each occurrence is priced at this value plus its
+   * request-preview handle text. Requires {@link inputModalities} to include
+   * `image` — a text-only route never sends visual tokens. Absent declares
+   * no image pricing.
+   */
+  imageRequestTokens?: number
   /** Optional reasoning-effort ids the replay route accepts, in display order. */
   reasoningEfforts?: string[]
   /**
@@ -76,6 +88,8 @@ export interface ReplayModelConfig {
    * {@link reasoningEfforts} or call resolution rejects the route.
    */
   defaultReasoningEffort?: string
+  /** Optional in-history system prompt replacement for a keyless replay route. */
+  systemPromptUpdate?: SystemPromptUpdate
 }
 
 /** One provider route exposed by the replay adapter. */
@@ -616,6 +630,56 @@ export function resolveScriptedEntry(entry: ReplayEntry, messages: GenerateOptio
   return substituteValue(entry, leaves.join('\n')) as ReplayEntry
 }
 
+/** Replace typed recorded-session tokens with the live sessions bound at the same corpus indexes. */
+function materializeSessionTokens(entry: ReplayEntry, liveSessionIds: readonly (string | undefined)[]): ReplayEntry {
+  if (!JSON.stringify(entry).includes('{{session:')) return entry
+  const replace = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return value.replace(/\{\{session:([1-9]\d*)\}\}/g, (_token, ordinal: string) => {
+        const live = liveSessionIds[Number(ordinal) - 1]
+        if (live === undefined) {
+          throw new Error(`llm-replay: session token {{session:${ordinal}}} was used before that recorded session bound`)
+        }
+        return live
+      })
+    }
+    if (Array.isArray(value)) return value.map(replace)
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item)]))
+    }
+    return value
+  }
+  return replace(entry) as ReplayEntry
+}
+
+/** Learn child identities only from successful responses to the subagent tool. */
+function inferStartedSubagents(
+  messages: GenerateOptions['messages'],
+  liveSessionIds: (string | undefined)[],
+): void {
+  const subagentCalls = new Set<string>()
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      for (const block of message.content) {
+        if (block.type === 'tool-call' && block.name === 'subagent') subagentCalls.add(block.id)
+      }
+    }
+    if (message.role !== 'user' || message.source.kind !== 'tool'
+      || !subagentCalls.has(message.source.callId)) continue
+    for (const block of message.content) {
+      if (block.type !== 'tool-result' || block.isError) continue
+      for (const content of block.content) {
+        if (content.type !== 'text') continue
+        const id = /^started subagent ([^\s"'<>]+)$/.exec(content.text)?.[1]
+        if (id === undefined || liveSessionIds.includes(id)) continue
+        const index = liveSessionIds.findIndex((value, candidate) => candidate > 0 && value === undefined)
+        if (index < 0) return
+        liveSessionIds[index] = id
+      }
+    }
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -648,7 +712,11 @@ function readReplayEntry(value: unknown, file: string, location: string): Replay
       return { kind: 'chunks', chunks: readChunks(value['chunks'], file, location) }
     }
     case 'throw': {
-      if (!hasExactKeys(value, ['kind', 'chunks', 'message', 'code'])) {
+      const accepted = value['accepted']
+      const keys = accepted === undefined
+        ? ['kind', 'chunks', 'message', 'code']
+        : ['kind', 'chunks', 'message', 'code', 'accepted']
+      if (!hasExactKeys(value, keys)) {
         invalidOverride(file, location, 'has invalid throw-entry fields')
       }
       if (typeof value['message'] !== 'string' || value['message'].length === 0) {
@@ -657,11 +725,15 @@ function readReplayEntry(value: unknown, file: string, location: string): Replay
       if (typeof value['code'] !== 'string' || value['code'].length === 0) {
         invalidOverride(file, location, 'code must be a non-empty string')
       }
+      if (accepted !== undefined && typeof accepted !== 'boolean') {
+        invalidOverride(file, location, 'accepted must be a boolean')
+      }
       return {
         kind: 'throw',
         chunks: readChunks(value['chunks'], file, location),
         message: value['message'],
         code: value['code'],
+        ...(accepted === undefined ? {} : { accepted }),
       }
     }
     case 'hang': {
@@ -707,10 +779,25 @@ function readOverrideDoc(value: unknown, file: string): ReplayOverrideDoc {
  * @returns the resolved primary-session script.
  */
 export function loadReplayScript(config: ReplayConfig): ReplayEntry[] {
+  const fixture = readPrimaryFixture(config)
+  return resolveReplayScript(config, fixture)
+}
+
+/** Read a primary JSONL unless a whole-script sidecar intentionally occupies the same path. */
+function readPrimaryFixture(config: ReplayConfig): ParsedSessionFixture | undefined {
+  if (!existsSync(config.file) || config.file === config.overrideFile) return undefined
+  return parseSessionFixture(readFileSync(config.file, 'utf8'))
+}
+
+/** Resolve an override or derive from one already validated and migrated fixture. */
+function resolveReplayScript(
+  config: ReplayConfig,
+  fixture: ParsedSessionFixture | undefined,
+): ReplayEntry[] {
   if (config.overrideFile !== undefined && existsSync(config.overrideFile)) {
     const doc = readOverrideDoc(JSON.parse(readFileSync(config.overrideFile, 'utf8')) as unknown, config.overrideFile)
     if (Array.isArray(doc)) return doc
-    const script = deriveScriptFromFile(config.file)
+    const script = deriveScriptFromFixture(config.file, fixture)
     const derivedLength = script.length
     const seenIndexes = new Set<number>()
     for (const patch of doc.patches) {
@@ -728,15 +815,15 @@ export function loadReplayScript(config: ReplayConfig): ReplayEntry[] {
     }
     return script
   }
-  return deriveScriptFromFile(config.file)
+  return deriveScriptFromFixture(config.file, fixture)
 }
 
-/** Derive the primary script from the session JSONL, failing loud on a missing fixture. */
-function deriveScriptFromFile(file: string): ReplayEntry[] {
-  if (!existsSync(file)) {
+/** Derive a script from an already migrated fixture, failing loud when it is absent. */
+function deriveScriptFromFixture(file: string, fixture: ParsedSessionFixture | undefined): ReplayEntry[] {
+  if (fixture === undefined) {
     throw new Error(`llm-replay: fixture not found: ${file} — run \`pnpm run test:snapshot:record\` first`)
   }
-  return deriveReplayScript(parseSessionLog(readFileSync(file, 'utf8')))
+  return deriveReplayScript(fixture.events)
 }
 
 /**
@@ -747,13 +834,12 @@ function deriveScriptFromFile(file: string): ReplayEntry[] {
  * @returns the primary script first, then the child scripts in bind order.
  */
 export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
-  const primaryEntries = loadReplayScript(config)
+  const primaryFixture = readPrimaryFixture(config)
+  const primaryEntries = resolveReplayScript(config, primaryFixture)
   // The override path replaces the derived script but carries no header; read
   // the header off the JSONL when it exists, else use a stable default so an
   // override-only fixture (header-less) still orders first as the primary.
-  const primaryHeader = existsSync(config.file)
-    ? readPrimaryHeader(config.file)
-    : { id: '', createdAt: 0 }
+  const primaryHeader = primaryFixture ?? { id: '', createdAt: 0 }
   const primary: SessionScript = {
     recordedId: primaryHeader.id, createdAt: primaryHeader.createdAt, entries: primaryEntries, primary: true,
   }
@@ -763,13 +849,13 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
       throw new Error(`llm-replay: child fixture not found: ${childFile} — re-record the scenario`)
     }
     const text = readFileSync(childFile, 'utf8')
-    const header = parseSessionHeader(text)
+    const fixture = parseSessionFixture(text)
     // Derive the child's script from its own events only — events AT OR after the seed
     // boundary.
-    const ownEvents = parseSessionLog(text).slice(header.inheritedEventCount)
+    const ownEvents = fixture.events.slice(fixture.inheritedEventCount)
     children.push({
-      recordedId: header.id,
-      createdAt: header.createdAt,
+      recordedId: fixture.id,
+      createdAt: fixture.createdAt,
       entries: deriveReplayScript(ownEvents),
       primary: false,
     })
@@ -778,24 +864,6 @@ export function loadSessionScripts(config: ReplayConfig): SessionScript[] {
   // XXX(concurrent-subagents): concurrent children need an explicit first-call ordinal.
   children.sort((a, b) => a.createdAt - b.createdAt || a.recordedId.localeCompare(b.recordedId))
   return [primary, ...children]
-}
-
-/**
- * Read a primary fixture's ordering facts. `file` may itself be an override
- * doc (a JSON array, not a session log) — it carries no header, so the
- * fixture keeps the stable defaults. A corrupt header line still fails loud
- * inside {@link parseSessionHeader}.
- */
-function readPrimaryHeader(file: string): { id: string; createdAt: number } {
-  const text = readFileSync(file, 'utf8')
-  const firstLine = text.split('\n').find(line => line.trim().length > 0)
-  if (firstLine === undefined) return { id: '', createdAt: 0 }
-  const value = JSON.parse(firstLine) as unknown
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return { id: '', createdAt: 0 }
-  }
-  const header = parseSessionHeader(text)
-  return { id: header.id, createdAt: header.createdAt }
 }
 
 /** Replay adapter that makes a configured provider catalog discoverable without provider I/O. */
@@ -824,6 +892,17 @@ class ReplayAdapter extends LlmAdapter {
     return configured.retryPolicy === undefined
       ? undefined
       : resolveRetryPolicy(configured.retryPolicy, `llm-replay: provider "${provider}" retryPolicy`)
+  }
+
+  override imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined {
+    const configured = this.providers.get(provider)
+    const visualTokens = configured?.models?.find(candidate => candidate.id === model)?.imageRequestTokens
+    if (visualTokens === undefined) return undefined
+    return {
+      priceImages: images => images.map(({ attachment: ref, offloaded }) => (offloaded === true
+        ? { visualTokens: 0, text: offloadedImageText(ref) }
+        : { visualTokens, text: requestImageHandleText(ref, { width: ref.width, height: ref.height }) })),
+    }
   }
 
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {
@@ -858,6 +937,9 @@ class ReplayAdapter extends LlmAdapter {
       ...configuredModel?.defaultMaxTokens === undefined
         ? {}
         : { defaultMaxTokens: configuredModel.defaultMaxTokens },
+      ...configuredModel?.systemPromptUpdate === undefined
+        ? {}
+        : { systemPromptUpdate: configuredModel.systemPromptUpdate },
       ...configuredModel?.reasoningEfforts === undefined
         ? {}
         : {
@@ -934,6 +1016,20 @@ async function* replayEntry(entry: ReplayEntry, signal: AbortSignal | undefined,
   }
 }
 
+/** Whether the scripted provider call reached the live adapter's post-2xx commit point. */
+function providerAccepted(entry: ReplayEntry): boolean {
+  switch (entry.kind) {
+    case 'chunks':
+    case 'hang':
+      return true
+    case 'throw':
+      return entry.accepted ?? entry.chunks.length > 0
+    /* v8 ignore next -- override parsing and derived entries close the local union before replay. */
+    default:
+      return assertNever(entry, 'llm-replay acceptance entry')
+  }
+}
+
 /**
  * Install per-session positional replay. A newly seen live session takes the
  * next ordered recorded script, then advances its own cursor synchronously at
@@ -955,12 +1051,14 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
   // next not-yet-bound script (scripts are in bind order); `nextScript` is the
   // index of the next unclaimed one.
   const bound = new Map<string, { entries: ReplayEntry[]; cursor: number }>()
+  const liveSessionIds: (string | undefined)[] = Array.from({ length: scripts.length })
   let nextScript = 0
   const ANON = '\0anon\0' // the key for a call that carries no sessionId
   const replay = (options: GenerateOptions): AsyncIterable<StreamChunk> => {
     const key = options.sessionId ?? ANON
     let state = bound.get(key)
     let unrecorded = false
+    let bindingFailure: Error | undefined
     if (state === undefined) {
       const script = scripts[nextScript]
       if (script === undefined) {
@@ -970,9 +1068,17 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
         unrecorded = true
         state = { entries: [], cursor: 0 }
       } else {
-        nextScript++
-        state = { entries: script.entries, cursor: 0 }
-        bound.set(key, state)
+        const scriptIndex = nextScript
+        const expectedId = liveSessionIds[scriptIndex]
+        if (expectedId !== undefined && expectedId !== key) {
+          bindingFailure = new Error(`llm-replay: session ${key} does not match announced child ${expectedId}`)
+          state = { entries: [], cursor: 0 }
+        } else {
+          nextScript++
+          if (key !== ANON) liveSessionIds[scriptIndex] = key
+          state = { entries: script.entries, cursor: 0 }
+          bound.set(key, state)
+        }
       }
     }
     const boundState = state
@@ -981,6 +1087,7 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
     const index = boundState.cursor++
     const entry: ReplayEntry | undefined = boundState.entries[index]
     return (async function* () {
+      if (bindingFailure !== undefined) throw bindingFailure
       if (unrecorded) {
         throw new Error(
           `llm-replay: a model call arrived from an unrecorded session (#${seenSessions + 1}); `
@@ -993,7 +1100,23 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
           + `but its script has only ${boundState.entries.length}; re-record the scenario`,
         )
       }
-      yield* replayEntry(resolveScriptedEntry(entry, options.messages), options.signal, paceMs)
+      inferStartedSubagents(options.messages, liveSessionIds)
+      const resolved = resolveScriptedEntry(materializeSessionTokens(entry, liveSessionIds), options.messages)
+      if (options.provider === 'deepseek-official' && providerAccepted(resolved)) {
+        const extensions = ctx.get('deepseekLlmApiExtensions')
+        if (extensions !== undefined) {
+          const signal = options.signal ?? new AbortController().signal
+          const prepared = await extensions.prepare({
+            // Replay reproduces post-2xx side effects, not the provider wire body.
+            body: { messages: [] },
+            signal,
+            ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
+            ...options.purpose === undefined ? {} : { purpose: options.purpose },
+          })
+          await prepared.accept()
+        }
+      }
+      yield* replayEntry(resolved, options.signal, paceMs)
     })()
   }
   const providers = config.providers ?? []
@@ -1041,16 +1164,39 @@ export interface Config {
   paceMs?: number
 }
 
-function validateConfiguredModalities(providers: ReplayProviderConfig[] | undefined): void {
+function validateConfiguredModels(providers: ReplayProviderConfig[] | undefined): void {
   for (const provider of providers ?? []) {
     for (const model of provider.models ?? []) {
       const modalities: unknown = model.inputModalities
-      if (modalities === undefined) continue
-      if (!Array.isArray(modalities)
-        || !modalities.every((modality: unknown) => modality === 'text' || modality === 'image')) {
+      if (modalities !== undefined && (!Array.isArray(modalities)
+        || !modalities.every((modality: unknown) => modality === 'text' || modality === 'image'))) {
         throw new Error(
           `llm-replay: provider "${provider.id}" model "${model.id}" inputModalities `
           + 'must be an array containing only "text" and "image"',
+        )
+      }
+      const imageRequestTokens: unknown = model.imageRequestTokens
+      if (imageRequestTokens !== undefined
+        && (!Number.isSafeInteger(imageRequestTokens) || (imageRequestTokens as number) <= 0)) {
+        throw new Error(
+          `llm-replay: provider "${provider.id}" model "${model.id}" imageRequestTokens `
+          + 'must be a positive safe integer',
+        )
+      }
+      // A text-only route never sends visual tokens: LlmRuntime substitutes
+      // its images with deterministic text before dispatch, so declared
+      // visual pricing would contradict the actual request projection.
+      if (imageRequestTokens !== undefined && model.inputModalities?.includes('image') !== true) {
+        throw new Error(
+          `llm-replay: provider "${provider.id}" model "${model.id}" imageRequestTokens `
+          + 'requires inputModalities to include "image"',
+        )
+      }
+      const systemPromptUpdate: unknown = model.systemPromptUpdate
+      if (systemPromptUpdate !== undefined && systemPromptUpdate !== 'in-history') {
+        throw new Error(
+          `llm-replay: provider "${provider.id}" model "${model.id}" systemPromptUpdate `
+          + 'must be "in-history" when present',
         )
       }
     }
@@ -1062,7 +1208,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   if (file === undefined || file.length === 0) {
     throw new Error('llm-replay: a fixture path is required (Config.file or $DSH_SNAPSHOT_FILE)')
   }
-  validateConfiguredModalities(config.providers)
+  validateConfiguredModels(config.providers)
   const overrideFile = config.overrideFile ?? process.env.DSH_SNAPSHOT_OVERRIDE
   const childEnv = process.env.DSH_SNAPSHOT_CHILD_FILES
   const childFiles = config.childFiles

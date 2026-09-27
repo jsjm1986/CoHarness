@@ -47,7 +47,7 @@ The child is a separate process, so it inherits an environment. Credential-shape
 
 ### Why use the ACP SDK 1.4.0 typed API?
 
-The repository uses ACP SDK 1.4.0's `client()` app and typed `connection.agent` facade for both the bridge tests and this backend. This keeps request and notification methods inferred from the protocol map, exposes the connection `closed` lifecycle promise used during teardown, and removes the deprecated `ClientSideConnection`/`AgentSideConnection` classes from the shipped integration. The backend still calls only `initialize`, `session/new`, and `session/prompt` because a subagent run owns one fresh child session; the bridge's list/resume/close/configuration controls remain available to other automation clients without expanding this provider's lifecycle.
+The repository uses ACP SDK 1.4.0's `client()` app and typed `connection.agent` facade for both the bridge tests and this backend. This keeps request and notification methods inferred from the protocol map, exposes the connection `closed` lifecycle promise used during teardown, and removes the deprecated `ClientSideConnection`/`AgentSideConnection` classes from the shipped integration. The `start()` path calls only `initialize`, `session/new`, and `session/prompt` because a one-shot run owns one fresh child session; the [external-runtime member decision](../architecture/2026-09-25-external-runtime-continuable-members.md) adds `session/load` for continuable members behind `resume: true`, and the bridge's list/resume/close/configuration controls remain available to other automation clients without expanding this provider's lifecycle.
 
 ### Why not a persistent child process?
 

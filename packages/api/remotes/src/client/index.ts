@@ -8,14 +8,18 @@ import llmRemote from '@deepseek-ai/dsh-llm/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
+import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
 import permissionPresetsRemote from '@deepseek-ai/dsh-permission-presets/remote'
 import sessionFeedbackRemote from '@deepseek-ai/dsh-command-feedback/remote'
 import sessionReferencesRemote from '@deepseek-ai/dsh-session-reference/remote'
 import subagentsRemote from '@deepseek-ai/dsh-subagent/remote'
-import type { TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
+import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 
-export type { TypertClientRemote as ClientRemote } from '@deepseek-ai/dsh-typert-protocol'
+export type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
+export type { BundleInfo, ChangeResult, InstallBundleOptions, ManagementError, PluginInfo, PluginInstallFailureKind,
+  PluginInstallLogChunk, PluginInstallProgress, PluginInstallRequestId, PluginSpecInspection } from '@deepseek-ai/dsh-plugin-manager/types'
+export type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 export type { PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/remote'
 export type {} from '@deepseek-ai/dsh-commands/remote'
@@ -51,15 +55,18 @@ export type {} from '@deepseek-ai/dsh-settings/types'
  * the carrier's runtime values stay behind their own module edge.
  */
 export type {
-  ClientResponse, ConfigurableProviderView, ConnectionHandle, ConnectionRuntimeTarget, ConnectionSinks, ConnectionStateSource, ContentBlock,
-  CredentialView, DirectoryListing, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan, HostFrame, IApiClient,
+  ClientResponse, ConfigurableProviderView, ConnectionHandle, ConnectionRuntimeTarget, ConnectionSinks, ConnectionStateSource,
+  ContentBlock,
+  CredentialView, DirectoryListing, DesktopConfirmation, DiscoveredModelView, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
+  HostFrame, IApiClient,
   MessageId, ModelCatalogFailure, ModelProviderGroup, ModelReasoningEffort, ModelSelection,
   MuxFrame, PromptContentPart, QuestionResponsePayload, QueueAction, RpcError, RpcId, RpcReceipt,
   RpcRequest, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionDraftId, SessionId, SessionModels, SessionSearchItem,
   SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
   SubagentAddress, SubagentCatalog, SubagentPromptContentPart, JobView, ToolCallView, ToolEventView, ToolResultView,
-  WorkspaceId, WorkspaceView, WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
+  WorkspaceId, WorkspaceView, WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry,
+  WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-client-connection/client'
 export type {} from '@deepseek-ai/dsh-api-gateway/client'
 export type {} from '@deepseek-ai/dsh-cordis-host-runner/remote'
@@ -120,7 +127,7 @@ export type {
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Generated Remote namespaces selected by this Client assembly. */
-    remote: TypertClientRemote
+    remote: ClientRemote
   }
 }
 
@@ -137,7 +144,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
-      fileReferencesRemote, pluginInventoryRemote, messageFeedbackRemote, permissionPresetsRemote, sessionFeedbackRemote,
+      fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, messageFeedbackRemote,
+      permissionPresetsRemote, sessionFeedbackRemote,
       sessionReferencesRemote, subagentsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))

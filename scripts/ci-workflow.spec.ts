@@ -65,6 +65,49 @@ describe('CI workflow', () => {
     }
   })
 
+  it('runs selected keyless Gateway execution with isolated PostgreSQL and one evidence upload', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const consumer = workflowJob(workflow, 'node-24-consumers')
+    expect(consumer.services).toMatchObject({
+      'execution-postgres': {
+        image: "${{ needs.pr-scope.outputs.gateway_mode == 'full' && 'postgres:16' || '' }}",
+        env: { POSTGRES_USER: 'hgw', POSTGRES_PASSWORD: 'hgw', POSTGRES_DB: 'hgw_execution' },
+        ports: ['5432/tcp'],
+      },
+    })
+    const steps = (consumer.steps as unknown[]).filter(isRecord)
+    const install = steps.findIndex(step => step.run === 'npm ci --prefix gateway')
+    const execution = steps.findIndex(step => step.id === 'gateway-execution')
+    const record = steps.findIndex(step => step.name === 'Record Gateway execution evidence')
+    const upload = steps.findIndex(step => step.uses === './.github/actions/gate-evidence')
+    expect(execution).toBeGreaterThan(install)
+    expect(record).toBeGreaterThan(execution)
+    expect(upload).toBeGreaterThan(record)
+    expect(steps[execution]).toMatchObject({
+      if: "needs.pr-scope.outputs.gateway_mode == 'full'",
+      run: 'pnpm run test:gateway:execution',
+      env: { HGW_TEST_DATABASE_URL: "postgres://hgw:hgw@127.0.0.1:${{ job.services.execution-postgres.ports['5432'] }}/hgw_execution" },
+    })
+    expect(steps[execution]?.['continue-on-error']).toBeUndefined()
+    expect(steps[record]).toMatchObject({
+      if: "always() && needs.pr-scope.outputs.gateway_mode == 'full'",
+      run: 'node scripts/gate-evidence.ts',
+      env: {
+        EVIDENCE_CHECK: 'gateway-execution',
+        EVIDENCE_COMMAND: 'pnpm run test:gateway:execution',
+        EVIDENCE_STATUS: "${{ steps.gateway-execution.outcome == 'skipped' && 'cancelled' || steps.gateway-execution.outcome }}",
+      },
+    })
+    expect(steps.filter(step => step.uses === './.github/actions/gate-evidence')).toHaveLength(1)
+    expect(steps.filter(step => step.run === 'npm ci --prefix gateway')).toHaveLength(1)
+    expect(isRecord(consumer.env) && consumer.env.HGW_TEST_DATABASE_URL).toBeUndefined()
+    const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+    expect(manifest.scripts['test:gateway:execution']).toBe(
+      'node -e "if (!process.env.HGW_TEST_DATABASE_URL) throw new Error(\'HGW_TEST_DATABASE_URL must select a disposable test database\')"'
+      + ' && vitest run --config vitest.e2e.config.ts packages/context/gateway-execution/tests/pg-composition.e2e.ts --retry=0',
+    )
+  })
+
   it('keeps portable pools and requires native Windows for selected platform changes', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     if (!isRecord(workflow.jobs)
@@ -74,10 +117,11 @@ describe('CI workflow', () => {
       || !isRecord(workflow.jobs['serial-windows'])
       || !isRecord(workflow.jobs['node-24'])
       || !isRecord(workflow.jobs['node-24-coverage'])
+      || !isRecord(workflow.jobs['node-24-bench'])
       || !isRecord(workflow.jobs['node-24-consumers'])
       || !isRecord(workflow.jobs['pr-scope'])
       || !isRecord(workflow.jobs['all-checks-passed'])) {
-      throw new TypeError('CI workflow must define pr-scope, windows, windows-native, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-consumers, and all-checks-passed jobs')
+      throw new TypeError('CI workflow must define pr-scope, windows, windows-native, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-bench, node-24-consumers, and all-checks-passed jobs')
     }
 
     const windows = workflow.jobs.windows
@@ -86,6 +130,7 @@ describe('CI workflow', () => {
     const serialWindows = workflow.jobs['serial-windows']
     const node24 = workflow.jobs['node-24']
     const node24Coverage = workflow.jobs['node-24-coverage']
+    const node24Bench = workflow.jobs['node-24-bench']
     const node24Consumers = workflow.jobs['node-24-consumers']
     const prScope = workflow.jobs['pr-scope']
     const aggregate = workflow.jobs['all-checks-passed']
@@ -183,17 +228,38 @@ describe('CI workflow', () => {
     expectExternalCapacityExpression(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY, '32', '1')
     expect(String(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY)).toContain("&& '12'")
     const consumerSteps = node24Consumers.steps.filter(isRecord)
-    const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway runtime dependencies')
+    const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway dependencies')
     const consumerGateIndex = consumerSteps.findIndex(step => step.name === 'Run keyless compatibility, snapshot, and artifact gates')
     expect(gatewayInstallIndex).toBeGreaterThanOrEqual(0)
     expect(consumerSteps[gatewayInstallIndex]).toMatchObject({
-      run: 'npm ci --prefix gateway --omit=dev',
+      run: 'npm ci --prefix gateway',
     })
     expect(consumerGateIndex).toBeGreaterThan(gatewayInstallIndex)
     expect(consumerSteps[consumerGateIndex]).toMatchObject({ run: 'pnpm run check:ci:consumers:scoped' })
     // The browser tier moved to the web-verification job; no Playwright work
     // (cache, install) stays in the consumer aggregate.
     expect(consumerSteps.some(step => typeof step.name === 'string' && step.name.includes('Playwright'))).toBe(false)
+
+    // The benchmark lane is a required verdict input and runs alone so its
+    // wall-clock budgets never share a runner with a concurrent aggregate.
+    expect(aggregate.needs).toContain('node-24-bench')
+    expect(node24Bench.name).toBe('node 24 / benchmarks')
+    // Only the uploaded-evidence identity lives in job env: no failover or
+    // capacity variables may steer the measurement lane.
+    expect(node24Bench.env).toEqual({
+      DSH_EVIDENCE_JOB_NAME: 'node 24 / benchmarks',
+      DSH_EVIDENCE_ARTIFACT_NAME: 'gate-evidence-node-24-bench-${{ github.run_attempt }}',
+    })
+    expect(node24Bench.steps).toContainEqual({
+      name: 'Install benchmark browser and hosted dependencies',
+      run: 'pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium',
+    })
+    expect(JSON.stringify(node24Bench.steps)).not.toContain('DSH_CI_FAILOVER_LINUX')
+    expect(node24Bench.steps).toContainEqual({
+      name: 'Run performance benchmarks',
+      env: { DSH_GATE_VERBOSE: '1' },
+      run: 'pnpm run check:ci:bench',
+    })
 
     // The dedicated web verification lane: one stable required check whose
     // steps branch on the selector's snapshot mode.
@@ -394,7 +460,26 @@ describe('CI workflow', () => {
       'npm run typecheck --prefix gateway',
       'npm run build:check --prefix gateway',
       'npm test --prefix gateway',
+      'npm run test:postgres --prefix gateway',
     ]))
+    const gatewaySteps = (gateway.steps as unknown[]).filter(isRecord)
+    const unitIndex = gatewaySteps.findIndex(step => step.run === 'npm test --prefix gateway')
+    const postgresIndex = gatewaySteps.findIndex(step => step.run === 'npm run test:postgres --prefix gateway')
+    const evidenceIndex = gatewaySteps.findIndex(step => step.name === 'Preserve gate evidence')
+    expect(postgresIndex).toBeGreaterThan(unitIndex)
+    expect(evidenceIndex).toBeGreaterThan(postgresIndex)
+    expect(gatewaySteps[postgresIndex]?.if).toBeUndefined()
+    expect(gatewaySteps[postgresIndex]?.['continue-on-error']).toBeUndefined()
+    expect(gatewaySteps[evidenceIndex]?.with).toMatchObject({
+      external: 'gateway',
+      command: 'npm test --prefix gateway && npm run test:postgres --prefix gateway',
+    })
+    const manifest = JSON.parse(readFileSync(resolve(root, 'gateway/package.json'), 'utf8')) as { scripts: Record<string, string> }
+    expect(manifest.scripts['test:postgres']).toContain('--no-file-parallelism')
+    for (const suite of ['postgres', 'access-invalidation', 'execution']) {
+      expect(manifest.scripts['test:postgres']).toContain(`tests/${suite}.spec.ts`)
+      expect(manifest.scripts.test).toContain(`--exclude tests/${suite}.spec.ts`)
+    }
   })
 
   it('limits release and sandbox workflows to relevant changes while retaining manual or scheduled runs', () => {
@@ -420,7 +505,7 @@ describe('CI workflow', () => {
     }
   })
 
-  it('requires one release-shaped Python runtime target on every pull request', () => {
+  it('requires release-shaped Python runtime targets on every pull request', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     const pythonRuntime = workflowJob(workflow, 'python-runtime')
     const aggregate = workflowJob(workflow, 'all-checks-passed')
@@ -429,16 +514,58 @@ describe('CI workflow', () => {
     }
 
     expect(pythonRuntime).toMatchObject({
-      name: 'python runtime / release-shaped Linux x64',
+      name: 'python runtime / release-shaped matrix',
       uses: './.github/workflows/build-exe-for-python-sdk.yml',
       with: {
-        targets: 'node24-linux-x64',
+        targets: 'node24-linux-x64,node24-win-x64',
         ci: true,
       },
     })
     expect(pythonRuntime.if).toContain("github.event_name == 'pull_request'")
     expect(pythonRuntime.if).toContain('needs.pr-scope.outputs.python_mode')
     expect(aggregate.needs).toContain('python-runtime')
+  })
+
+  it('runs required benchmarks on standard hosted Linux independently of failover', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const benchmark = workflowJob(workflow, 'node-24-bench')
+    const aggregate = workflowJob(workflow, 'all-checks-passed')
+
+    expect(benchmark['runs-on']).toBe('ubuntu-24.04')
+    expect(benchmark.if).toBe("github.event_name == 'pull_request'")
+    expect(benchmark.needs).toBeUndefined()
+    expect(benchmark['continue-on-error']).toBeUndefined()
+    expect(benchmark.env).toEqual({
+      DSH_EVIDENCE_JOB_NAME: 'node 24 / benchmarks',
+      DSH_EVIDENCE_ARTIFACT_NAME: 'gate-evidence-node-24-bench-${{ github.run_attempt }}',
+    })
+    expect(aggregate.needs).toContain('node-24-bench')
+  })
+
+  it('bounds the complete benchmark job to fifteen minutes', () => {
+    const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
+
+    expect(benchmark['timeout-minutes']).toBe(15)
+    expect(benchmark.steps).toContainEqual({
+      name: 'Run performance benchmarks',
+      env: { DSH_GATE_VERBOSE: '1' },
+      run: 'pnpm run check:ci:bench',
+    })
+  })
+
+  it('always restores the hosted benchmark pnpm cache', () => {
+    const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
+    if (!Array.isArray(benchmark.steps)) throw new TypeError('benchmark job must define steps')
+    const caches = benchmark.steps.filter(step => isRecord(step) && step.uses === 'actions/cache/restore@v4')
+
+    expect(caches).toHaveLength(1)
+    expect(caches[0]).not.toHaveProperty('if')
+    expect(caches[0]).toMatchObject({
+      with: {
+        path: '${{ steps.pnpm-store.outputs.path }}',
+        key: "${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}",
+      },
+    })
   })
 
   it('keeps every Vitest project process-isolated on native Windows', () => {
@@ -497,7 +624,7 @@ describe('Python release workflows', () => {
       if: "github.event_name == 'workflow_dispatch' || github.event.label.name == 'python-release-dry-run'",
       uses: './.github/workflows/build-exe-for-python-sdk.yml',
       with: {
-        targets: 'node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64',
+        targets: 'node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64,node24-win-x64',
         release: true,
       },
     })
@@ -583,6 +710,10 @@ describe('Python release workflows', () => {
     expect(JSON.stringify(plan.steps)).toContain('pep440_version')
     const workflowJson = JSON.stringify(workflow)
     expect(workflowJson).toContain('macosx_14_0_arm64')
+    expect(workflowJson).toContain('node24-win-x64')
+    expect(workflowJson).toContain('windows-2025')
+    expect(workflowJson).toContain('win_amd64')
+    expect(workflowJson).toContain('deepseek-harness-sdk-runtime-win-x64.exe')
     expect(workflowJson).toContain('dist-python/$SDK_WHEEL')
     expect(workflowJson).toContain('dist-python/$RUNTIME_WHEEL')
     expect(workflowJson).toContain('/work/dist-python/$SDK_WHEEL')

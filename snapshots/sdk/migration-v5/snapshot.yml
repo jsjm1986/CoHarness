@@ -1,0 +1,13 @@
+# Historical source: examples/jsonrpc-agent/tests/snapshots/text-turn/session.jsonl
+# Source SHA-256: 2b881ca347a36f570c1f09f1820554f7aed457ef01624ac4983346416d539001
+# Initial import only redacts typed identities; source generation and event data are retained.
+version: 1
+scenario: migration-v5
+profile: sdk
+composition: sdk-upload
+recording: authored
+sessionFormat:
+  version: 5
+  coverage: [adjacent-migration]
+header:
+  class: sdk-upload

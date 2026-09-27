@@ -66,6 +66,9 @@ export class SubagentModelSelectionConfig extends Service {
       SUBAGENT_MODEL_SELECTION_SETTINGS_SCHEMA,
       entry,
       {
+        owner: 'project',
+        projectWrite: 'manager',
+        projectWritePaths: [['enabled'], ['allowedModels']],
         setSource: (source) => { this.source = source },
         validate: (value) => { this.validate(value) },
         // Consumers sample at Agent publication, so a settings update never

@@ -278,6 +278,9 @@ describe('continuable activation capacity', () => {
     try {
       await ctx.plugin(MemorySettings)
       const fiber = await ctx.plugin(SubagentRuntime, { maxDepth: 4 })
+      expect(ctx.settings.describe().find(section => section.ns === SUBAGENT_SETTINGS_NAMESPACE)).toMatchObject({
+        owner: 'project', projectWrite: 'manager', projectWritePaths: [['maxDepth'], ['maxActiveSubagents']],
+      })
       expect(ctx.subagents.resolveMaxDepth()).toBe(4)
       await ctx.settings.update(SUBAGENT_SETTINGS_NAMESPACE, { maxDepth: 0 })
       expect(ctx.subagents.resolveMaxDepth()).toBe(0)
@@ -1983,6 +1986,17 @@ describe('continuable durability and teardown', () => {
 
     await expect(drained).rejects.toMatchObject({ code: 'ACTIVATION_TEARDOWN_FAILED' })
     expect(ctx.agents.get(started.childId)).toBeUndefined()
+  })
+
+  it('collects an execution-scope capture failure into the teardown failure', async () => {
+    const { ctx, parent } = await setup([])
+    await ctx.subagents.startContinuable(startSpec(parent))
+    // Provided after the child's start so the failure lands inside teardown.
+    ctx.provide('executionAuthority', {
+      capture() { throw new Error('authority offline') },
+    })
+
+    await expect(drainManager(ctx)).rejects.toMatchObject({ code: 'ACTIVATION_TEARDOWN_FAILED' })
   })
 
   it('rejects new materialization and delivery once draining begins', async () => {

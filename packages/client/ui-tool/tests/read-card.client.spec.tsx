@@ -20,7 +20,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { CHAT_READ_MAX_LINES, readCardModel } from '../src/client/tool/models/read-card-model.ts'
+import { CHAT_READ_MAX_LINES, readCallLine, readCardModel } from '../src/client/tool/models/read-card-model.ts'
 import { createChatStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
@@ -136,6 +136,29 @@ describe('readCardModel', () => {
   })
 })
 
+describe('readCallLine', () => {
+  it('reads the 1-based offset a well-formed read call started from, running or settled', () => {
+    expect(readCallLine(running())).toBe(41)
+    expect(readCallLine(settled())).toBe(41)
+  })
+
+  it.each([
+    ['no offset', '{"file_path":"src/a.ts"}'],
+    ['a string offset', '{"file_path":"src/a.ts","offset":"41"}'],
+    ['zero', '{"file_path":"src/a.ts","offset":0}'],
+    ['a negative offset', '{"file_path":"src/a.ts","offset":-3}'],
+    ['a fraction', '{"file_path":"src/a.ts","offset":2.5}'],
+    ['a read without a path', '{"offset":3}'],
+    ['a fractional limit', '{"file_path":"src/a.ts","limit":1.5}'],
+  ])('names no line for %s', (_label, argsRaw) => {
+    expect(readCallLine(running({ argsRaw }))).toBeUndefined()
+  })
+
+  it('names no line for a call that is not read', () => {
+    expect(readCallLine(running({ name: 'echo', argsRaw: '{"offset":3}' }))).toBeUndefined()
+  })
+})
+
 describe('GenericToolCard read body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
     callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), t,
@@ -180,6 +203,7 @@ describe('ReadRow keyed toolview', () => {
   const list = () => createSnapshotStore<SessionListState>({
     ids: [SID],
     byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd: '/w/app' } },
+    archivedById: {},
     current: SID,
     phase: 'ready',
     subagentsByParent: {}, jobsBySession: {},
@@ -222,7 +246,9 @@ describe('ReadRow keyed toolview', () => {
     fireEvent.click(view.getByRole('button', { name: 'src/a.ts' }))
     // The row derives the file path from args; the chat view resolves it against
     // the cwd before this callback opens it, so the arg path is what arrives.
-    expect(openFile).toHaveBeenCalledWith('src/a.ts')
+    // The read call's own offset rides along so the opened surface lands on the
+    // line the model looked at.
+    expect(openFile).toHaveBeenCalledWith('src/a.ts', { line: 41 })
   })
 
   it('a running read renders the summary row alone, and its state', () => {
@@ -271,10 +297,11 @@ describe('DetailsPanel Output section (read)', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
+        archivedById: {},
         current: SID,
         phase: 'ready',
         subagentsByParent: {}, jobsBySession: {},
@@ -305,9 +332,10 @@ describe('DetailsPanel Output section (read)', () => {
           submit: () => {},
         }}
         useProjection={(() => undefined)}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
+        {...(chat.getSnapshot().selection ?? {})}
+        readCall={async () => undefined}
         closeDetails={vi.fn()}
+        loadImage={vi.fn(() => Promise.reject(new Error('not used')))}
       />,
     )
   }

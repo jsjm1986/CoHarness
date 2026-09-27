@@ -77,6 +77,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * `session` scope, and `ctx.layout` owns whether the column is open.
      */
     'details': { kind: 'single'; scope: 'session'; owner: DetailsOwnerProps }
+    /** Single auxiliary-panel root; owns its Session routing. */
+    'rightbar': { kind: 'single'; scope: 'root'; owner: RightbarOwnerProps }
     /**
      * Frame-wide floating layer, above every column and outside their scroll
      * containers. Deliberately generic and unowned by any feature: a badge, a
@@ -113,8 +115,29 @@ export interface ConvOwnerProps {
   compact?: boolean
 }
 
-/** Details owner share: empty — sessionId arrives as a framework-standard prop. */
-export interface DetailsOwnerProps {}
+/** Exact Tool identity and visibility; Session scope arrives through the framework. */
+export interface DetailsOwnerProps {
+  /** Whether the tab is visible; hidden tabs suspend independent reads. */
+  readEnabled?: boolean
+  /** Exact call identity, independent of the active chat selection. */
+  callId?: string
+  /** Display fallback while the durable call is loading. */
+  toolName?: string
+  /** Close this tab through its owning layout. */
+  close?: () => void
+}
+
+/** Frame geometry and explicit Session for the auxiliary-panel root. */
+export interface RightbarOwnerProps {
+  /** Available panel width in pixels. */
+  width: number
+  /** Current viewport width in pixels. */
+  viewportWidth: number
+  /** Whether normal presentation has room. */
+  canShow: boolean
+  /** Explicit pane target; omission follows current Session selection. */
+  targetSessionId?: import('@deepseek-ai/dsh-client-runtime/client').SessionId
+}
 
 /** Mobile topbar action owner share: the slot is rendered only in compact mode. */
 export interface MobileHeaderActionOwnerProps {}
@@ -143,7 +166,7 @@ export function apply(ctx: ClientContext): void {
       children: {
         'sidebar': { kind: 'single', scope: 'root' },
         'conversation': { kind: 'single', scope: 'root' },
-        'details': { kind: 'single', scope: 'session' },
+        'rightbar': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },
@@ -154,7 +177,7 @@ export function apply(ctx: ClientContext): void {
       // conversation business actions belong to their registrants.
       inject: (actions: PanelActions) => {
         layout.attachPanels(actions)
-        return {}
+        return { dismissRightbar: () => { layout.closeDetails() } }
       },
     }, AppFrame)
     return () => {

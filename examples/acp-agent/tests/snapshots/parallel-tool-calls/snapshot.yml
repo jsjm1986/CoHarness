@@ -1,0 +1,7 @@
+version: 1
+scenario: parallel-tool-calls
+profile: acp
+composition: fs
+recording: authored
+header:
+  class: default

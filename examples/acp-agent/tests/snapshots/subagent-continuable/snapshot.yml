@@ -1,0 +1,7 @@
+version: 1
+scenario: subagent-continuable
+profile: acp
+composition: subagent-durability-failure
+recording: authored
+header:
+  class: default

@@ -1,0 +1,10 @@
+version: 1
+scenario: packed-chunks
+profile: acp
+composition: acp-agent
+recording: authored
+sessionFormat:
+  version: 3
+  coverage: [packed-row]
+header:
+  class: default

@@ -7,6 +7,8 @@ export type WorkspaceResourceAddress = string & { readonly __workspaceResourceAd
 export type WorkspaceResourceTarget = ConnectionRuntimeTarget | { readonly kind: 'base' }
 /** Explicit file request retaining the transport that owns its Session. */
 export interface WorkspaceResourceOpenRequest {
+  /** First text line requested by a file link; does not change resource identity. */
+  readonly line?: number
   readonly runtimeTarget: WorkspaceResourceTarget
   readonly sessionId: SessionId
   readonly path: string

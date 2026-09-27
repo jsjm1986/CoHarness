@@ -6,7 +6,9 @@
     "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
   },
   "files": [
-    "src/client/index.ts"
+    "src/client/index.ts",
+    "src/client/remote-stream.ts",
+    "src/client/stream-error.ts"
   ],
   "references": [
     {
@@ -17,6 +19,9 @@
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../core/session"
     }
   ]
 }

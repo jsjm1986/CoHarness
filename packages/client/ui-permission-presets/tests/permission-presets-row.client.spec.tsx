@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { createSnapshotStore, type PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
 import { PermissionRow, type PermissionRowProps } from '../src/client/PermissionRow.tsx'
@@ -54,19 +55,32 @@ const runtime = {
   useWorkspaces: (() => { throw new Error('unused') }) as never,
 }
 
-function mount(controller: PermissionPresetSettingsController) {
+function mount(controller: PermissionPresetSettingsController, availability = createSnapshotStore<PermissionAvailability>('local')) {
   return render(
     <PermissionRow
       {...runtime}
       load={() => controller.load()}
       select={preset => controller.select(preset)}
       usePermission={bindSnapshotSelector(controller.store)}
+      usePermissionAvailability={bindSnapshotSelector(availability)}
       t={t}
     />,
   )
 }
 
 describe('PermissionRow', () => {
+  it('keeps Full visible with an administrator-only explanation for an unqualified account', async () => {
+    const mutate = vi.fn()
+    const controller = derivedController({ settings: {
+      describe: () => Promise.resolve(ok({ writable: true, hasDocument: false, namespaces: [view('read-only')] })), mutate,
+    } })
+    mount(controller, createSnapshotStore<PermissionAvailability>('standard'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Read Only' }))
+    const full = screen.getByRole('menuitem', { name: /Full access.*administrators only/ }) as HTMLButtonElement
+    expect(full.disabled).toBe(true)
+    fireEvent.click(full)
+    expect(mutate).not.toHaveBeenCalled()
+  })
   it('loads the descriptor, opens the menu, and selects a new default', async () => {
     const mutate = vi.fn(() => Promise.resolve(ok(view('workspace-write', 1))))
     const controller = derivedController({

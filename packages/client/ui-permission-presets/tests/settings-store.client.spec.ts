@@ -47,6 +47,26 @@ function permissionController(api: object) {
 }
 
 describe('permission settings store', () => {
+  it('omits Auto from default choices and rejects a direct default Auto write', async () => {
+    const withAuto = { uid: 4, refs: {
+      1: { type: 'const', value: 'read-only' },
+      2: { type: 'const', value: 'auto' },
+      3: { type: 'union', list: [1, 2] },
+      4: { type: 'object', dict: { defaultPreset: 3 } },
+    } }
+    expect(resolveDefault(view('read-only', 0, withAuto)).options.map(option => option.id)).toEqual(['read-only'])
+    expect(() => resolveDefault(view('auto', 0, withAuto))).toThrow('enabled per session')
+    const mutate = vi.fn()
+    const { controller } = permissionController({
+      describe: () => Promise.resolve(ok({ writable: true, hasDocument: false, namespaces: [view('read-only')] })),
+      mutate,
+    })
+    await controller.load()
+    await controller.select('auto')
+    expect(mutate).not.toHaveBeenCalled()
+    expect(controller.store.getSnapshot()).toMatchObject({ status: 'error', currentValue: 'read-only' })
+    expect(controller.store.getSnapshot().error).toContain('enabled per session')
+  })
   it('derives dynamic options and host labels from the descriptor schema', () => {
     expect(resolveDefault(view('read-only'))).toEqual({
       currentValue: 'read-only',

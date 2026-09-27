@@ -7,7 +7,7 @@
 
 import { z } from 'zod'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
-import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import { rpcIdSchema } from './rpc.schema.ts'
 import type { Wire } from './rpc.schema.ts'
@@ -65,6 +65,7 @@ export const sessionSummarySchema = z.object({
   origin: z.literal('subagent').optional(),
   cwd: z.string().optional(),
   agentPreset: z.string().optional(),
+  sshTarget: z.number().int().positive().optional(),
   projections: z.lazy(() => sessionProjectionsBlockSchema).optional(),
 }) as unknown as z.ZodType<Wire<SessionSummary>>
 
@@ -134,6 +135,7 @@ export const sessionCreateRequestSchema = z.object({
   cwd: z.string().optional(),
   sessionId: sessionIdSchema.optional(),
   agentPreset: z.string().optional(),
+  sshTarget: z.number().int().positive().optional(),
   visibility: z.union([z.literal('project'), z.literal('private')]).optional(),
   reuseWorkspaceBlank: z.literal(true).optional(),
   draftId: sessionDraftIdSchema.optional(),
@@ -153,6 +155,7 @@ export const sessionCreateRequestSchema = z.object({
 export const sessionCreateValueSchema = z.object({
   sessionId: sessionIdSchema,
   agentPreset: z.string().optional(),
+  sshTarget: z.number().int().positive().optional(),
   draft: z.literal(true).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.create'>>>
 
@@ -188,13 +191,31 @@ export const historyOmittedSpanSchema = z.object({
   { message: 'omitted span startSeq must be <= endSeq' },
 ) satisfies z.ZodType<Wire<HistoryOmittedSpan>>
 
+/** A durable root or nested Tool call identity validated at the wire parser. */
+export const historyToolCallIdSchema = z.string().min(1) as unknown as z.ZodType<ToolCallId>
+
+/** Reject ambiguous call lookup and pagination combinations.
+ * @param request - parsed history selection.
+ * @returns whether exactly one history selection mode is requested.
+ */
+export function validHistorySelection(request: {
+  toolCallId?: ToolCallId | undefined
+  beforeSeq?: number | undefined
+  maxMessages?: number | undefined
+  detail?: string | undefined
+}): boolean {
+  return request.toolCallId === undefined
+    || (request.beforeSeq === undefined && request.maxMessages === undefined && request.detail !== 'conversation')
+}
+
 /** session.history request payload (beforeSeq/maxMessages page backwards from the window tail). */
 export const sessionHistoryRequestSchema = z.object({
   sessionId: sessionIdSchema,
+  toolCallId: historyToolCallIdSchema.optional(),
   beforeSeq: z.number().int().nonnegative().optional(),
   maxMessages: z.number().int().positive().optional(),
   detail: z.enum(['conversation', 'full']).optional(),
-}) satisfies z.ZodType<Wire<RequestPayload<'session.history'>>>
+}).refine(validHistorySelection, { message: 'toolCallId cannot be combined with pagination or conversation detail' }) satisfies z.ZodType<Wire<RequestPayload<'session.history'>>>
 
 /** Complete provider/model selection. */
 export const modelSelectionSchema = z.object({

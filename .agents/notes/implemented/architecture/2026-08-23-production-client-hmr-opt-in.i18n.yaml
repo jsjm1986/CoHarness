@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-23-production-client-hmr-opt-in.md
-2026-08-23-production-client-hmr-opt-in.md: b108aed1edabae69d183dc78f04fdcffeaade934
-2026-08-23-production-client-hmr-opt-in.zh.md: dd9e59a1a51af8dbc47f763c585de192416399c0
+2026-08-23-production-client-hmr-opt-in.md: 8b816ee73085c7f83d0e1736afce01b792db1087
+2026-08-23-production-client-hmr-opt-in.zh.md: d2ef23aba5593cde8f24c7feccb51e9a6472402f

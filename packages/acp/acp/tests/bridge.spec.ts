@@ -128,7 +128,7 @@ describe('automation-only ACP bridge', () => {
     harness = await makeBridgeHarness()
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const created = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
-    const flushing: PromiseWithResolvers<void> = Promise.withResolvers()
+    const flushing: PromiseWithResolvers<undefined> = Promise.withResolvers()
     const flush = vi.spyOn(harness.ctx.sessions, 'flush').mockImplementationOnce(() => flushing.promise.then(() => true))
 
     const first = harness.client.closeSession({ sessionId: created.sessionId })
@@ -139,7 +139,7 @@ describe('automation-only ACP bridge', () => {
       sessionId: created.sessionId,
       prompt: [{ type: 'text', text: 'too late' }],
     })).rejects.toThrow(/session is closing/)
-    flushing.resolve()
+    flushing.resolve(undefined)
 
     await expect(Promise.all([first, second])).resolves.toEqual([{}, {}])
   })
@@ -226,10 +226,10 @@ describe('automation-only ACP bridge', () => {
     await harness.client.prompt({ sessionId: created.sessionId, prompt: [{ type: 'text', text: 'persist' }] })
     await harness.client.closeSession({ sessionId: created.sessionId })
     const resume = harness.ctx.agents.resume.bind(harness.ctx.agents)
-    const entered: PromiseWithResolvers<void> = Promise.withResolvers()
-    const release: PromiseWithResolvers<void> = Promise.withResolvers()
+    const entered: PromiseWithResolvers<undefined> = Promise.withResolvers()
+    const release: PromiseWithResolvers<undefined> = Promise.withResolvers()
     vi.spyOn(harness.ctx.agents, 'resume').mockImplementationOnce(async (options) => {
-      entered.resolve()
+      entered.resolve(undefined)
       await release.promise
       return resume(options)
     })
@@ -239,7 +239,7 @@ describe('automation-only ACP bridge', () => {
     await expect(harness.client.resumeSession({ sessionId: created.sessionId, cwd: process.cwd() }))
       .rejects.toThrow(/already active/)
     await expect(harness.client.listSessions({})).resolves.toEqual({ sessions: [] })
-    release.resolve()
+    release.resolve(undefined)
 
     await expect(first).resolves.toHaveProperty('configOptions')
   })

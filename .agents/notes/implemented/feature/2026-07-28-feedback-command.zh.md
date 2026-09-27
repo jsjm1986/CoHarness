@@ -12,13 +12,15 @@ Status: implemented
 
 ## 决策
 
-位于 `packages/feedback/command-feedback/` 的 `@deepseek-ai/dsh-command-feedback` 通过 `ctx.commands` 注册一个全局 `feedback` 命令。`/feedback <text>` 在确认文本中包含接收反馈的会话 id 与 harness home 的共享匿名用户 id；空输入或仅含空白的输入返回直接用法错误。处理器是同步的，只注入 `commands`，且没有任何配置。[共享 id 决策](../architecture/2026-08-07-shared-feedback-telemetry-user-id.zh.md)说明了反馈与 OpenTelemetry 为何使用同一个 `$DSH_HOME/.anonymous-user-id` 值。
+位于 `packages/feedback/command-feedback/` 的 `@deepseek-ai/dsh-command-feedback` 通过 `ctx.commands` 注册一个全局 `feedback` 命令。`/feedback <text>` 在确认文本中包含接收反馈的会话 id 与 harness home 的共享匿名用户 id；空输入或仅含空白的输入返回直接用法错误。命令处理器是同步的；Remote 使用 Session 服务，二者均无部署配置。[共享 id 决策](../architecture/2026-08-07-shared-feedback-telemetry-user-id.zh.md)说明了反馈与 OpenTelemetry 为何使用同一个 `$DSH_HOME/.anonymous-user-id` 值。
 
-本包声明仅写入日志的 `feedback/record { text }` 会话事件，并导出 `recordFeedback(session, text)`，作为不依赖命令的生产方。该生产方丢弃前后空白，拒绝空结果，并且恰好追加一个事件。`/feedback` 委托给它，因此其他 UI、钩子或 host 集成无需构造斜杠命令也能记录同一个领域事实。
+本包声明仅写日志的 `feedback/record { text?, category? }` 事件，并导出不依赖命令的生产方 `recordFeedback(session, entry)`。文本去除首尾空白，空文本不写入；空条目仍记录用户请求审阅的意愿。命令要求文本，而 `sessionFeedback.record` Remote 接受可选分类与文本。Gateway 要求对被指定 Session 拥有写权限。
 
 `dsh-commands` 仍会围绕 `/feedback` 写入 `command/run` / `command/done` 生命周期配对，但该命令设置了 `recordInput: false`。因此，它的 `command/run` 携带命令标识与来源，但不携带 `args`；反馈文本只存在于 `feedback/record` 中，而 `command/done` 携带确认结果。三个记录都仅写入日志且非 surface。它们的追加会进入持久化的常规有界写入路径；没有任何环节强制 flush，因此确认文本报告的是反馈已进入日志，而非已经落盘。
 
 采集对正在运行的 agent（智能体）与模型仍不产生后续动作。可选的 OTel 遥测包后续增加了一个基础设施消费方：它在 `FEEDBACK_ONLY` 模式下将 `feedback/record` 作为释放触发器，在 `DISABLED` 模式下将其作为仅限本地的警告触发器，且不改变反馈事件或命令路径。见[反馈门控的会话遥测](2026-08-05-feedback-gated-session-telemetry.zh.md)与[确认文本中的共享披露](2026-08-07-feedback-acknowledgement-sharing-disclosure.zh.md)。
+
+Web 客户端使用上游分类与说明弹窗修饰单独输入的 `/feedback`。它只消费当前触发词，保留附件及其他草稿。`/feedback <text>` 继续由 Host 命令执行。每个被持有的 Session 拥有自己的弹窗，因此四个 Workbench 窗格不会共享草稿。作用域销毁后丢弃草稿并忽略迟到确认。现有单消息控件保持独立 sidecar 行为；用 Session 反馈替代 sidecar 会悄然改变遥测同意含义，不能视作等价 UI 适配。
 
 ### 为何反馈拥有自己的事件
 
@@ -58,6 +60,6 @@ Status: implemented
 
 本包拥有一个独立的仅追加事件，不存在跨事件关系或可变数据关系可供不变式伴生插件检查。该事件遵循会话日志现有的回放、fork、持久化和崩溃尾部行为。
 
-延期事项：没有产品或模型消费方；没有结构化字段；不支持修改或撤回，因为日志仅追加且本包不新增 tombstone；且没有显式持久化屏障，因此紧临崩溃前记录的条目可能与其他未 flush 的尾部一同丢失。可选的遥测消费方只将该事件作为导出策略触发器。
+反馈没有模型消费方、修改、撤回或显式持久化屏障；已记录条目可能与其他未刷新的尾部数据一起丢失。可选遥测消费方将该事件作为导出策略触发器。可编辑的单消息评分仍保存在独立 sidecar 中，不构成日志共享授权。
 
-本次变更按请求者的明确指示不附带无密钥 transcript（文本记录）快照。包测试、基于 `cordis.yml` 的真实 Loader 组合测试，以及随附的 Web 组合测试覆盖注册、采集、模型排除和产品组装。
+包级与真实 Web 组装测试覆盖命令采集、分类提交、失败保留与重试，以及不产生新模型回合。Web 弹窗有独立回放的可访问性快照。

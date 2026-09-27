@@ -27,8 +27,9 @@ import type {
   SessionSeq as SessionSeqType,
 } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { sessionFormatCatalog, SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
-import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format/legacy'
+import { SessionFormatError, SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
+import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
+import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import type {
   SessionEventSuffix,
   SessionInspection,
@@ -74,7 +75,11 @@ function migrateFormatEvents(
   const stream = sessionFormatCatalog.createStream(
     header as unknown as SessionFormatHeader,
     inheritedEventCount,
-    { emitEvent: (event) => { migrated.push(event as unknown as SessionEvent) } },
+    {
+      emitEvent: (event) => { migrated.push(event as unknown as SessionEvent) },
+      /* v8 ignore next -- the logical migration chain refuses compact runs upstream, so this typed-boundary callback never fires. */
+      emitRun: () => { throw new SessionFormatError('stored Session logical migration cannot emit compact runs') },
+    },
   )
   for (const event of events) stream.emitEvent(event as unknown as SessionFormatEvent)
   const targetInheritedEventCount = stream.finish()
@@ -1492,7 +1497,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   private assertVersion(meta: SessionHeader): SessionHeader {
     const version: number = meta.version
     if (version === sessionFormatCatalog.currentVersion) return migrateLegacyPtcMeta(meta)
-    if (version === 0 || version === 1 || version === 2 || version === 3) {
+    if (version >= 0 && version < sessionFormatCatalog.currentVersion) {
       const migrated = sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
       return migrateLegacyPtcMeta(migrated)
     }

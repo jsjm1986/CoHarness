@@ -50,6 +50,8 @@ kind: "package-reference"
 env -u NODE_USE_ENV_PROXY DSH_COMPUTER_USE_NATIVE_E2E=1 node node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts packages/experimental/computer-use-cua-driver-native/tests/native.e2e.ts
 ```
 
+每次原生工具调用都经过[桌面执行政策](../../computer-use/computer-use/README.zh.md)。受管部署缺少该政策时，在调用 SDK 前拒绝操作；操作系统权限本身不代表 Gateway 用户获得授权。
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - group "Command input": /goal
 - 'button "goal No goal is currently set. Usage: /goal [<objective>|clear|edit <objective>|pause|resume]"':
   - img

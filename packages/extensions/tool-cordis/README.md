@@ -2,64 +2,21 @@
 
 English | [中文](README.zh.md)
 
-The self-referential Cordis toolset: five model-facing tools over the live runtime in the current DSH process. The registry, the vm sandbox, and the browser broadcast belong to [`@deepseek-ai/dsh-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them. Design home — sandbox semantics, dynamic-package lifecycle and composition, standing decisions: [the toolset Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
-
 ## Summary
 
-Inspect Host and Client runtime APIs before writing plugin code. Creator mode provides these read-only tools alongside Plugin Manager, which owns persistent profile changes. The inspection registry is supplied by the Cordis host runner; browser queries need a connected page.
+Read-only discovery of Host and Client APIs and existing session-owned Cordis Packages. Creator mode combines these tools with [Plugin Manager](../../boot/plugin-manager/README.md), whose installation workflow owns persistent profile changes.
 
-## What it does
+## Usage
 
-Two paired verbs, plus the read-only report.
+Mount the toolset alongside [the Cordis host runner](../cordis-host-runner/README.md), which provides the inspection registry. Discover providers with `cordis_inspect_list`, then query exact APIs through `cordis_inspect_query`. `cordis_inspect_self` reads existing Plugin summaries, version pointers, or an exact Package's source and diagnostics. An explicit `@pluginId` adds read-only context for that Session's definition.
 
-- `cordis_inspect` — read-only report over the current process: services, all live plugin fibers, registered tools, this session's dynamic packages, the reflection-backed `api` / `events` references, and the compile-time `client` slot surface a browser half can contribute UI into. An exact `name` with `what: "api"`, `what: "events"`, or `what: "client"` narrows the report and adds the full contract.
-- `cordis_define` — records a package (`name`, `purpose`, and a host half `code` and/or a browser half `client`) after syntax-checking both halves. Nothing runs; the user sees a card for it in the conversation with a start control. The minted `dyn-<n>` id rides the result value AND the durable presentation metadata, which is how that card addresses the run verbs on replay.
-- `cordis_run` — evaluates the host half in the sandbox and delivers the browser half to every open web page. Running an already-running package re-delivers the live version instead of failing, which is how a reloaded page gets it back.
-- `cordis_stop` — disposes the host half to quiescence and withdraws the browser half; the definition survives and can run again.
-- `cordis_undefine` — stops the package if needed and forgets the definition; its card stays in the conversation as an unloaded record.
+The toolset cannot define, activate, stop, or remove dynamic Plugins. Those retired tool names fail through the tool executor. Historical definition and lifecycle cards remain readable; reading a log never recreates its runtime effects. Persistent changes use the installed `cordis-plugin-development` skill and Plugin Manager's authorization path. The [retirement decision](../../../.agents/notes/implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.md) records the security and compatibility scope.
 
-Exact model-facing schemas: [the generated tool catalog](../../../docs/tool-catalog.md).
+## Implementation
 
-Dynamic packages live only in the shared DSH process memory. They remain active across later turns and may affect other sessions in that process, but disappear after `cordis_stop`/`cordis_undefine`, toolset unload, or DSH restart. They create no Plugin file, install no package, change no `cordis.yml` or personal/project configuration, do not survive restart, and cannot be promoted automatically. To keep an experiment, ask the Agent to implement a normal local, project, or repository Plugin through the regular development workflow. Every verb is session-scoped: a package is visible and controllable only in the session that defined it.
+Host providers combine the generated [API catalog](src/api-catalog.ts) with the requesting Agent's live tool registry. Client providers synchronize manifests and answer queries from a connected page. Inspection returns data rather than invoking business service methods. Cordis effects own the tool, provider, prompt, and reference-listener registrations; unloading the plugin removes them.
 
-## Trust stance
-
-The sandbox isolates globals but is not a security boundary. Node globals are absent or redirect to Cordis services such as `ctx.fs`, `ctx.web`, and `ctx.bash`, and writes to `globalThis` stay local, but host-realm helpers make escape possible. Mounted plugins receive a façade without framework internals, yet its allowed services affect the live runtime. Dynamic tool schemas and annotations cross the realm through iterative JSON cloning and schema normalization, so valid deep declarations are memory-bounded rather than call-stack-bounded; records with JSON-invisible keys and subclassed or decorated schema arrays reject before normalization. Treat this toolset like bash access; see the [design and trust stance](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
-
-## Config
-
-None. The vm evaluation bound (`vmTimeoutMs`) and the browser acknowledgement window (`ackTimeoutMs`) belong to the runner service that owns the sandbox and the broadcast — see [`@deepseek-ai/dsh-cordis-host-runner`](../cordis-host-runner/README.md#config).
-
-## The generated client slot catalog
-
-`src/client-catalog.ts` describes the browser half's seats, generated by `scripts/gen-client-catalog.ts` (freshness-gated by `pnpm run verify-client-catalog` in `doc-sync`) from a lexical scan of every `SlotMap` declaration merge and every `slots.register` call site. It carries the one surface a browser half can act on — the slot keys, each register call's options, the props a component receives, who already occupies the seat, and which owner's mount makes the seat exist — as plain data: this package stays host-side and imports no client module, so the strings are the only thing that crosses. The generator fails loud rather than shipping an entry a model cannot act on: a slot with no registrant-facing prose, a non-literal `kind`/`scope`, owner props no export provides, a duplicate key, or a registration into an undeclared slot all break the gate. Owner props expand one level — the owner declaration with its own member documentation, and the names of the shapes its fields reference — and one slot's whole report is budget-capped, because narrowing to a single slot exists to spend less context, not more.
-
-A slot's teaching text is its declaration's JSDoc, so improving what the model reads means editing the contract at its declaring package — not this catalog.
-
-## Where the API report comes from
-
-`cordis_inspect what:"api"` / `what:"events"` renders `src/api-catalog.ts`, the generated projection of the workspace's Cordis declarations: rendered method signatures, source JSDoc, harness events with their dispatch modes, and the type shapes those signatures reference, all produced by the same AST walk as `docs/subsystems`, so the data a model reads and the rendered docs cannot diverge. It is a compile-time fact about the REPOSITORY, so `pnpm run gen-cordis-api` regenerates it and `pnpm run verify-cordis-api` gates its freshness.
-
-`src/inspect.ts` intersects that catalog with the LIVE service store: what is RUNNING comes from the store, what each service CAN DO comes from the catalog, and a live service the catalog does not cover is reported as reachable with no signatures rather than omitted. A package that needs the list in its own code copies it out of a report — the catalog is a compile-time fact about the repository, so a copied list and a freshly read one say the same thing for any one deployment.
-
-Two model-facing judgements live in this package rather than in the artifacts, because reflection data is faithful to the code while a report has to be useful:
-
-- **Only callable methods are shown.** Non-method members are state rather than a verb, and their rendered form carries initializers from the implementation body; symbol-keyed members are internal seams between plugins that a package façade deliberately cannot reach, so naming one would advertise a call that cannot be made.
-- **Only keys a host half can reach are named to a model.** The reflection model covers every `ctx.<key>` a package declares, including launcher-supplied boot values (`agent`, `headlessIo`, …) and browser-half services (`connection`). `src/curation.ts` classifies each one's `reach` — `injectable`, `not-a-service`, or `other-face` — and only `injectable` keys reach a report: naming a key a package cannot reach advertises a call that cannot be made. The classification is carried as data on each catalog entry rather than applied while rendering, so the exclusion is testable on its own, and `verify-cordis-catalog` pins the classified set to exactly the keys the documentation projection does not render — a newly declared key stops the gate instead of quietly inviting a model to `inject` something that will never arrive. A classified key that nonetheless has a live provider is still reported as running and injectable: the service store is the authority on what exists.
-
-The generated `INHERITED_CTX_API` closes the `api` report with the framework-inherited `ctx` surface (`ctx.on`, `ctx.effect`, `ctx.loader`, the timer helpers): those members are the Context itself rather than service keys, and the framework tier lives in pinned vendor packages outside every analyzed face, so the generator curates that one tier and renders it into both this catalog and `docs/cordis-api/inherited.md`. A live service the catalog does not describe is reported as running and still injectable rather than as absent. Broad `api` / `events` reports render summaries and signatures only; an exact `name` opts into the retained method/event JSDoc, and unknown or non-running service targets fail loud.
-
-## Rendering
-
-Every tool renders a `generic` card (`read` / `execute` / `delete`); `cordis_define` carries the submitted halves as `rawInput` and titles the card with the label and purpose. Presenters are pure functions of the args, and results keep the default text rendering. A Web client registers its own keyed `cordis_define` row (`@deepseek-ai/dsh-client-ui-cordis`) and reads the label, purpose, and minted id from the call arguments and the result metadata; the generic card is what a surface without that registration falls back to.
-
-## Export shape
-
-Namespace plugin: named exports `name` / `inject` / `apply`, no default export ([docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)). It injects `tools` and `dynamicCordisRunner`.
-
-## Invariants
-
-**Runtime invariant:** No companion is published. The toolset is a set of registrations over `ctx.dynamicCordisRunner`; definition and fiber state belong to the host runner.
+No invariant companion is published because inspection reads its providers directly and maintains no independent runtime projection. The toolset has no configuration; query transport and retained dynamic definitions belong to the host runner.
 
 ## Model Experience
 
@@ -67,18 +24,17 @@ Namespace plugin: named exports `name` / `inject` / `apply`, no default export (
 
 #### What the model sees
 
-The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis) describes two read-only inspection tools. The [prompt](src/prompt.ts) directs persistent changes through Plugin Manager and describes MCP setup. Creator visual requests default to an installed UI plugin displayed in the current Web page; the development skill covers Client packaging and slot registration. Query results contain the requested API declarations or live tool schemas.
+The [three read-only tool schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis), the [inspection guidance](src/prompt.ts), and exact query results. Package source is returned only for an explicit Plugin and Package pair. API declarations describe available interfaces; they do not grant execution authority.
 
 #### Token effect
 
-Both tool schemas and the guidance section enter model requests while this plugin is visible. Query results append to the transcript; exact queries avoid loading unrelated declarations.
+Schemas and guidance enter requests while the plugin is visible. Results append to history; targeted queries avoid unrelated declarations.
 
 #### KV Cache effect
 
-Unchanged schemas and guidance remain prefix-stable. Query results append to history; enabling other plugins can change subsequent tool schemas.
+Unchanged schemas and guidance remain prefix-stable. Results append to history, while other plugin changes can alter later tool schemas.
 
 ## Known Limitations and Deferred Work
 
-- **The sandbox is containment for honest code, not a security boundary** — host-realm helpers on the sandbox global are reachable, so package code can reach Node; load this plugin as deliberately as you would grant a bash tool (see § Trust stance).
-- **The `ctx` façade exposes no `effect()`** — package code cannot register a bespoke disposer; `on`/`provide`/`tools.register` are the supported cleanup paths.
-- **The vm and acknowledgement bounds belong to the runner** — see its [Known Limitations](../cordis-host-runner/README.md#known-limitations-and-deferred-work); an async host-half body escapes `vmTimeoutMs`.
+- Client queries require a responding page or cancellation.
+- Session-owned dynamic references are process-local and may be unavailable after restart. Inspection neither restores definitions nor executes recorded code.

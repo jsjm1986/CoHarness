@@ -12,6 +12,8 @@ Status: implemented
 
 `dsh-workflow-ptc` 通过共享的 Node `PtcRuntime` 实现 `WorkflowEngine`。每次运行在一个 PTC 进程中保留既有 VM 与工作流辅助函数。Host 绑定将 guest 连接到配置的 subagent 提供方及工作流观察器；Host 提供发起调用的 Agent，并解析其 Session 的常设文件策略与 cwd。
 
+提交的 guest 模块由本仓库源文件、共享辅助函数和固定工具链生成；其字节可能与上游生成物不同。因此，上游同步清单将该包登记为适配，并保留本地生成过程作为重放步骤。`pnpm run verify-workflow-guest` 校验生成物新鲜度，guest、schema 和真实运行时测试验证嵌入程序的行为；同步后不能用上游生成字节覆盖本地依赖的产物。
+
 VM 定义辅助 API，以及协作式并发、agent 总数和条目上限。它不是安全边界，这些计数器也不是 Host 强制的安全配额。文件强制、V8 堆限制、输出与控制限制、受管进程清理仍由 PTC 及其沙箱／子进程提供方负责。网络访问与提供方特有的约束限制保持与 PTC 相同。
 
 工作流执行传入 `timeoutMs: null`，显式禁用 Node 运行时的经过时间定时器。省略 timeout 或使用数值的 PTC 请求保留配置的默认值与上限；`run_code` 仍只接受正数覆盖值。最初的 VM 片段保留独立的同步超时。调用方的中止信号（包括外层工具截止）仍会取消工作流。

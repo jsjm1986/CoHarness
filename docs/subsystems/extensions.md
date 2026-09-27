@@ -95,13 +95,13 @@ async undefine(agent: Agent, pluginId: CordisDynamicPluginId): Promise<DynamicCo
 @Remote('undefineFromPanel') async undefineFromPanel(agent: Agent, pluginId: CordisDynamicPluginId): Promise<DynamicCordisUndefineReceipt>
 
 /**
- * Start or update one Package for a model tool call. An unauthorized Client
+ * Start or update one programmatically defined Package. An unauthorized Client
  * Package waits for approval; Plugin-wide authorization covers later versions.
  * @param agent - Agent whose Session must own the Plugin.
  * @param pluginId - Stable Plugin identity to activate.
  * @param packageId - Immutable Package version to activate.
  * @param mode - Whether to run the current version or switch versions.
- * @param signal - Tool-call cancellation signal while the activation request is being created.
+ * @param signal - Caller cancellation signal while the activation request is being created.
  * @returns The successful activation identity or an actionable refusal.
  */
 async run( agent: Agent, pluginId: CordisDynamicPluginId, packageId: CordisDynamicPackageId, mode: CordisDynamicRunMode, signal?: AbortSignal, ): Promise<DynamicCordisRunResponse>
@@ -112,7 +112,7 @@ async run( agent: Agent, pluginId: CordisDynamicPluginId, packageId: CordisDynam
  * @param pluginId - Stable Plugin identity to activate.
  * @param packageId - Immutable Package version to activate.
  * @param mode - Whether to run the current version or switch versions.
- * @param requestId - Model-driven request identity, or null for a direct user gesture.
+ * @param requestId - Programmatic request identity, or null for a direct user gesture.
  * @param approveFutureVersions - Whether this approval covers later Packages of the same Plugin.
  * @returns The exact Host activation or a failure message.
  */
@@ -128,7 +128,7 @@ async run( agent: Agent, pluginId: CordisDynamicPluginId, packageId: CordisDynam
 @Remote('getClientCode') getClientCode( agent: Agent, pluginId: CordisDynamicPluginId, pluginRunId: CordisDynamicPluginRunId, ): DynamicCordisClientSource
 
 /**
- * Resolve one model-driven Client activation request.
+ * Resolve one programmatically requested Client activation.
  * @param requestId - Request identity to settle once.
  * @param resolution - Browser refusal or exact Client activation result.
  * @returns Whether the still-pending request accepted this resolution.

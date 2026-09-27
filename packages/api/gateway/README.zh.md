@@ -4,6 +4,8 @@
 
 为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 `ctx.typertGateway`，`@deepseek-ai/dsh-api-gateway/client` 则提供 `ctx.remote`；两者使用同一份生成的 `InvocationDescriptor` 约定，并将业务选择交给 API Remotes，将传输、请求关联、信任和响应封装交给 Connection。
 
+生成描述符标记为 `acceptsUndefined` 的尾部业务参数可以省略。必需参数保持原有位置，包括作用域身份投影。取消信号仍位于声明的最后位置；在省略选项后提供信号时，调用方显式传入 `undefined` 占位。已提供和省略的值仍经过 Host 编解码校验。
+
 ## 概述
 
 为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 `ctx.typertGateway`，`@deepseek-ai/dsh-api-gateway/client` 则提供 `ctx.remote`；两者使用同一份生成的 `InvocationDescriptor` 约定，并将业务选择交给 API Remotes。Connection 承载一元调用的请求关联、信任和响应 envelope，Gateway 则拥有多路复用的 Remote 流。

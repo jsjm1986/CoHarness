@@ -1,6 +1,7 @@
 /** Wire schemas for the read-only Workspace file RPCs. */
 
 import { z } from 'zod'
+import type { OfficeToPdfGeneration } from '@deepseek-ai/dsh-office-to-pdf/types'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 import type {
@@ -77,3 +78,18 @@ export const workspaceFilesReadBytesValueSchema = z.object({
   eof: z.boolean(),
   version: z.string().min(1),
 }) satisfies z.ZodType<Wire<WorkspaceFileByteWindow>>
+
+/** Office conversion uses the same Session and relative-path rules as other previews. */
+export const workspaceFilesRenderOfficeRequestSchema = z.object({
+  sessionId: sessionIdSchema, path, version: z.string().min(1).optional(),
+  priority: z.enum(['foreground', 'background']).optional(),
+}) satisfies z.ZodType<Wire<RequestPayload<'workspaceFiles.renderOffice'>>>
+
+/** Converter generation admitted after non-empty string validation. */
+const officeGenerationSchema = z.string().min(1) as unknown as z.ZodType<OfficeToPdfGeneration>
+
+/** Complete PDF with no Host path or engine diagnostics. */
+export const workspaceFilesRenderOfficeValueSchema = z.object({
+  path, version: z.string().min(1), bytes: z.string(),
+  missingFonts: z.array(z.string()), generation: officeGenerationSchema,
+}) satisfies z.ZodType<Wire<ResponseValue<'workspaceFiles.renderOffice'>>>

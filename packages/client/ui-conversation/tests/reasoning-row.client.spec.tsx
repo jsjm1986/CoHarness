@@ -40,6 +40,23 @@ const t = makeTranslate(zh, commonZh)
 const renderMessageImages: AssistantMarkdownProps['renderMessageImages'] = () => null
 
 describe('ReasoningRow', () => {
+  it('keeps the start of long streaming reasoning available when expanded', () => {
+    const text = `**First decision**\n\n${'Retained reasoning paragraph.\n\n'.repeat(900)}**Latest decision**`
+    const view = render(<AssistantMarkdown t={t} blocks={[{ kind: 'reasoning', text }]}
+      streaming renderMessageImages={renderMessageImages} />)
+    expect(view.getByText(/Latest decision/)).toBeTruthy()
+    expect(view.queryByText('First decision')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: /思考/ }))
+    expect(view.getByText('First decision').tagName).toBe('STRONG')
+    expect(view.getByText('Latest decision').tagName).toBe('STRONG')
+    expect(view.container.querySelector('[class*="thinkBody"]')?.textContent
+      ?.match(/Retained reasoning paragraph\./g)).toHaveLength(900)
+    view.rerender(<AssistantMarkdown t={t} blocks={[{ kind: 'reasoning', text: `${text}\n\nFinal step` }]}
+      streaming renderMessageImages={renderMessageImages} />)
+    expect(view.getByText('First decision')).toBeTruthy()
+    expect(view.getByText('Final step')).toBeTruthy()
+  })
+
   it('follows the latest streaming line, scrolls to its end, then restores the settled first line', () => {
     const view = render(
       <AssistantMarkdown
@@ -99,7 +116,7 @@ describe('ReasoningRow', () => {
 
     expect(view.getByText('Inspect the session')).toBeTruthy()
     fireEvent.click(view.getByText('思考'))
-    expect(view.container.querySelector('[class*="thinkBody"]')?.textContent).toBe(text)
+    expect(view.container.querySelector('[class*="thinkBody"]')?.textContent).toBe(text.trimStart())
   })
 
   it('expands from either Think or the reasoning summary', () => {
@@ -121,7 +138,7 @@ describe('ReasoningRow', () => {
     expect(row.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('expanded Think drops the inline summary and renders plain prose, no IN card', () => {
+  it('expanded Think drops the inline summary and renders Markdown without an IN card', () => {
     const view = render(
       <AssistantMarkdown
         t={t}

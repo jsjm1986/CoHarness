@@ -155,8 +155,9 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
 
     const input = page.locator('textarea').first()
     await input.fill(RUNNING_DRAFT)
-    const send = page.getByRole('button', { name: 'Send message', exact: true })
+    const send = page.getByRole('button', { name: 'Queue message', exact: true })
     await send.waitFor({ timeout: 10_000 })
+    expect(await page.getByRole('button', { name: 'Send message', exact: true }).count()).toBe(0)
     expect(await page.getByRole('button', { name: 'Stop generating', exact: true }).count()).toBe(0)
     const runningDraftSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
     await compareOrRefreshGolden(RUNNING_DRAFT_EXPECTED, runningDraftSnapshot, MODE)
@@ -185,6 +186,47 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 120_000)
+
+  it.skipIf(MODE === 'record')('the running Send button follows Steer and persists a next-step admission', async () => {
+    let marker = ''
+    await launch((sidecarHome) => {
+      marker = join(sidecarHome, '.busy-send-ready')
+      return { patches: [{ at: 0, entry: { kind: 'hang', readyFile: marker } }] }
+    })
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-busy-send-steer'))
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    await dialog.getByRole('button', { name: 'Queue', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Steer', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Steer', exact: true }).waitFor({ timeout: 10_000 })
+    await page.keyboard.press('Escape')
+
+    const { settled } = await sendPrompt()
+    // A failed browser assertion still leaves the owned turn deadline handled.
+    void settled.catch(() => {})
+    await expect.poll(() => existsSync(marker), { timeout: 15_000 }).toBe(true)
+    const input = page.locator('textarea').first()
+    await input.fill(RUNNING_DRAFT)
+    const send = page.getByRole('button', { name: 'Steer message', exact: true })
+    await send.waitFor({ timeout: 10_000 })
+    expect(await page.getByRole('button', { name: 'Queue message', exact: true }).count()).toBe(0)
+    await send.click()
+    await page.locator('[data-pending-steering]').filter({ hasText: RUNNING_DRAFT }).waitFor({ timeout: 10_000 })
+    expect(await page.locator('[data-queue-dock]').count()).toBe(0)
+    await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('')
+    await page.getByRole('button', { name: 'Stop generating', exact: true }).click()
+    const sessionId = await settled
+
+    const persisted = await scaffold!.ctx.sessionPersistence.inspect(sessionId)
+    const admissions = persisted.events.flatMap(event => event.type === 'agent/inbox/spliced'
+      ? event.data.inserted.filter(message => message.content.some(block => block.type === 'text' && block.text === RUNNING_DRAFT))
+        .map(() => event.data.target)
+      : [])
+    expect(admissions).toEqual(['next-step'])
+    expect(turnEndReasons(sessionEvents).at(-1)).toBe('aborted')
+    expect(tripwire!.pageErrors).toEqual([])
+    expect(tripwire!.warnings).toEqual([])
+  }, 90_000)
 
   it.skipIf(MODE === 'record')('surfaces a non-retryable AUTH failure without retrying', async () => {
     await launch(() => ({

@@ -50,10 +50,13 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-agent-presets": "workspace:^",
     "@deepseek-ai/dsh-api-gateway": "workspace:^",
     "@deepseek-ai/dsh-client-connection": "workspace:^",
+    "@deepseek-ai/dsh-collaboration": "workspace:^",
+    "@deepseek-ai/dsh-command-feedback": "workspace:^",
     "@deepseek-ai/dsh-commands": "workspace:^",
     "@deepseek-ai/dsh-cordis-host-runner": "workspace:^",
     "@deepseek-ai/dsh-credentials": "workspace:^",
@@ -63,22 +66,23 @@
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-message-feedback": "workspace:^",
     "@deepseek-ai/dsh-permission-presets": "workspace:^",
+    "@deepseek-ai/dsh-plugin-manager": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-session-reference": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",
-    "@deepseek-ai/dsh-typert-registry": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
-    "@deepseek-ai/dsh-command-feedback": "workspace:^",
-    "@deepseek-ai/dsh-collaboration": "workspace:^"
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
+    "@deepseek-ai/dsh-typert-registry": "workspace:^"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-agent-presets": "workspace:^",
     "@deepseek-ai/dsh-api-gateway": "workspace:^",
     "@deepseek-ai/dsh-client-connection": "workspace:^",
+    "@deepseek-ai/dsh-collaboration": "workspace:^",
+    "@deepseek-ai/dsh-command-feedback": "workspace:^",
     "@deepseek-ai/dsh-commands": "workspace:^",
     "@deepseek-ai/dsh-cordis-host-runner": "workspace:^",
     "@deepseek-ai/dsh-credentials": "workspace:^",
@@ -88,15 +92,13 @@
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-message-feedback": "workspace:^",
     "@deepseek-ai/dsh-permission-presets": "workspace:^",
+    "@deepseek-ai/dsh-plugin-manager": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
     "@deepseek-ai/dsh-session-reference": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",
-    "@deepseek-ai/dsh-typert-registry": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
-    "@deepseek-ai/dsh-command-feedback": "workspace:^",
-    "@deepseek-ai/dsh-collaboration": "workspace:^"
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
+    "@deepseek-ai/dsh-typert-registry": "workspace:^"
   }
 }

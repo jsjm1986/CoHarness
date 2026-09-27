@@ -3,8 +3,10 @@
 /** Tool call identity as carried on the wire (branded upstream in connection). */
 export type ToolCallId = string
 
-/** Selection target for the details linkage channel (toolcall is the step special case). */
-export interface SelectionTarget { turnSeq: number; stepSeq?: number; callId?: ToolCallId; toolName?: string }
+/** A timeline selection or an exact Tool call independent of a loaded turn. */
+export type SelectionTarget =
+  | { turnSeq: number; stepSeq?: number; callId?: ToolCallId; toolName?: string }
+  | { callId: ToolCallId; toolName?: string; turnSeq?: number; stepSeq?: number }
 
 /**
  * One conversation view tab, projected from a 'conversation.view' slot

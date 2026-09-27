@@ -4,4 +4,4 @@
     - text: workspace
     - button "New session in workspace":
       - img
-  - treeitem "Ask a research subagent to now"
+  - "treeitem \"Ask a research subagent to {{ago}}\""

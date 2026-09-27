@@ -1,0 +1,9 @@
+{
+  "name": "@deepseek-ai/dsh-experimental-isolation-probe",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": { ".": "./index.js", "./client": "./client.js" },
+  "dsh": { "client": { "platform": "web" } }
+}

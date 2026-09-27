@@ -46,6 +46,13 @@ interface SettingsRegisterOptions<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /**
+   * Authorize a resolved in-process write before persistence. Registration and
+   * provider reloads do not call this hook; their validation stays synchronous.
+   * @param value - immutable, schema-valid next section at the front of its write queue.
+   * @returns completion when persistence is authorized; rejection leaves storage unchanged.
+   */
+  authorizeWrite?: (value: T) => Promise<void>
   /** Logical owner shown by remote configuration surfaces. */
   owner?: SettingsOwner
   /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
@@ -61,6 +68,8 @@ interface SettingsRegisterOptions<T> {
 ```
 
 `validate` runs after the schema admits a value, so it sees defaults and the composition base exactly as the owner will. `dsh-llm-pi-ai` uses it to refuse a provider profile it could not serve at the write that produced it, rather than storing one that would disable every route in its namespace.
+
+`authorizeWrite` runs only for in-process writes, after resolution and before persistence. It may await fresh deployment authority; denial, teardown, or an external revision change during that wait refuses the write. It does not participate in registration or provider reload.
 
 `applies` is a UI hint, not a mechanism: a `restart` owner simply never watches, so its value is read once at construction and configuration surfaces can badge the pending change.
 

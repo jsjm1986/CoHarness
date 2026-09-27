@@ -75,7 +75,7 @@ function renderThrown(value: unknown): string {
 
 /** One process-local, disposable projection of an exact agent's durable schedules. */
 export class ScheduleRuntime {
-  private readonly stop = Promise.withResolvers<void>()
+  private readonly stop = Promise.withResolvers<undefined>()
   private timer: ReturnType<typeof setTimeout> | undefined
   private idleWait: Promise<void> | undefined
   private run: Promise<void> | undefined
@@ -133,7 +133,7 @@ export class ScheduleRuntime {
       this.stopping = true
       this.requested = false
       this.clearTimer()
-      this.stop.resolve()
+      this.stop.resolve(undefined)
       const pending = [this.run, this.idleWait].filter((value): value is Promise<void> => value !== undefined)
       await Promise.allSettled(pending)
     })())

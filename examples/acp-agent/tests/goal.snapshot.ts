@@ -8,7 +8,7 @@ import {
   type AgentUnderTest,
   type InputScript,
   type NormalizeContext,
-} from '@deepseek-ai/dsh-acp-snapshot'
+} from '@deepseek-ai/dsh-session-snapshot'
 import { foldGoal } from '@deepseek-ai/dsh-goal'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest'
 // This lifecycle proof has goal-specific timestamp normalization and semantic
 // assertions, so it owns a separate snapshot root from the generic suite.
 const scenarioDir = join(dirname(fileURLToPath(import.meta.url)), 'goal-snapshots/goal-round-driver')
-const fixtureFile = join(scenarioDir, 'session.jsonl')
+const fixtureFile = join(scenarioDir, 'session.v2.jsonl')
 const overrideFile = join(scenarioDir, 'replay.override.json')
 const stdoutExpected = join(scenarioDir, 'stdout.expected.jsonl')
 const sessionExpected = join(scenarioDir, 'session.expected.jsonl')
@@ -116,7 +116,7 @@ describe('same-session goal snapshot through the ACP automation driver', () => {
     const result = await runScenario(input, {
       agent,
       mode: 'replay',
-      fixtureFile: join(wrapupDir, 'session.jsonl'),
+      fixtureFile: join(wrapupDir, 'session.v2.jsonl'),
       overrideFile: join(wrapupDir, 'replay.override.json'),
       configPath: agent.configPath,
     })

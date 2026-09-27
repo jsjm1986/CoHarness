@@ -1,0 +1,31 @@
+- listitem:
+  - 'button "收起设置: Subagent" [expanded]':
+    - text: Subagent 设置 Subagent 的递归层级和并行数量。
+    - img
+  - text: 最大递归深度
+  - button "最大递归深度说明" [expanded]:
+    - img
+  - textbox "最大递归深度":
+    - /placeholder: ""
+    - text: "1"
+  - region "最大递归深度说明":
+    - paragraph: 限制 Agent 创建 Subagent 的递归层级。
+    - table "最大递归深度说明":
+      - rowgroup:
+        - row "0 禁用 Subagent":
+          - rowheader "0"
+          - cell "禁用 Subagent"
+        - row "1 仅允许主 Agent 创建 Subagent":
+          - rowheader "1"
+          - cell "仅允许主 Agent 创建 Subagent"
+    - paragraph: 如果某个工具单独设置了最大递归深度，以该工具的设置为准。
+  - text: Subagent 并行数量上限
+  - button "Subagent 并行数量上限说明" [expanded]:
+    - img
+  - textbox "Subagent 并行数量上限":
+    - /placeholder: ""
+    - text: "8"
+  - region "Subagent 并行数量上限说明":
+    - paragraph: 同一主 Agent 下，所有递归层级同时存活的 Subagent 总数，主 Agent 不计入。达到上限时，新的启动请求会被拒绝。
+  - button "放弃修改" [disabled]
+  - button "保存" [disabled]

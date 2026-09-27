@@ -16,6 +16,8 @@ Web 侧栏终端直接通过 Session 的 subprocess provider 运行，使用执�
 
 本决策仅取代 [Web 侧栏终端决策](../feature/2026-09-09-web-sidebar-terminal.zh.md)中的共享沙箱策略和模式切换限制。原记录继续负责进程所有权、传输、屏幕恢复和 shell 选择。OpenCode 的 `packages/core/src/pty.ts` 和 `packages/core/src/pty/pty.node.ts` 提供相邻实现依据：其交互式终端使用选定的 shell 和工作目录直接创建 PTY。
 
+[受管私有终端](2026-09-23-private-user-terminals.zh.md)通过创建者隔离和 Gateway 资格细化 Session 归属。本说明中对 Agent sandbox 的区分保持不变。
+
 ## 考虑过的替代方案
 
 **继承 Agent 权限。** 一个 Session 模式可以描述两类进程，但用户必须同时授予 Agent 仅用于手动命令的权限。持久用户 shell 随之阻碍 Agent 权限切换。

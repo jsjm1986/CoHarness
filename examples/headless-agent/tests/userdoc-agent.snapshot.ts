@@ -5,9 +5,9 @@ import {
   normalizeSessionLog,
   normalizeSessionSnapshot,
   normalizeStdout,
-  scrubRequestHeaders,
+  scrubModelRequestBulk,
   type NormalizeContext,
-} from '@deepseek-ai/dsh-acp-snapshot'
+} from '@deepseek-ai/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 import { describe, expect, it } from 'vitest'
 
@@ -53,7 +53,7 @@ function normalizedStream(content: string, cwd: string): string {
   if (sessionIds.length !== 1) throw new Error('personal-document agent snapshot must use one session')
   const context: NormalizeContext = { sessionIds, cwd }
   const events = records.slice(0, -1).map(record => record.event as JsonObject)
-  const normalizedEvents = jsonl(scrubRequestHeaders(normalizeSessionLog(
+  const normalizedEvents = jsonl(scrubModelRequestBulk(normalizeSessionLog(
     `${events.map(event => JSON.stringify(event)).join('\n')}\n`, context,
   )))
   const normalized = records.map((record, index) => index < normalizedEvents.length

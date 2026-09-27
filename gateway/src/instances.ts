@@ -39,6 +39,14 @@ const STOP_GRACE_MS = 5000
 const STOP_ALL_CONCURRENCY = 8
 const MANAGED_CREDENTIALS_FILENAME = '.credentials.yaml'
 const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
+/**
+ * Profile every managed runtime instance boots (`dsh web` in `dshCommand`).
+ * Policy packages materialize inside this profile's own `node_modules`: the
+ * runtime profile resolver scans profile-local directories before the shared
+ * `profiles/node_modules` fallback position, which a runtime-mode generation
+ * intentionally never reads.
+ */
+const INSTANCE_PROFILE = 'web'
 const PROJECT_RUNTIME_PATCH = `- id: session-persistence-jsonl
   disabled: true
 - insert:
@@ -61,6 +69,28 @@ const PROJECT_RUNTIME_PATCH = `- id: session-persistence-jsonl
         sandbox: danger-full-access
         approval: never
 `
+
+/**
+ * Managed-desktop patch stanza appended when the node declares an interactive
+ * desktop identifier: the runtime mounts the computer-use service and the
+ * provisioned Cua Driver provider, and `gateway-execution` starts publishing
+ * the managed desktop authorization policy for that identifier.
+ */
+function managedDesktopPatch(cfg: GatewayConfig, desktop: string): string {
+  const driverConfig: string[] = []
+  if (cfg.desktopDriverCommand !== undefined) driverConfig.push(`        command: ${JSON.stringify(cfg.desktopDriverCommand)}`)
+  if (cfg.desktopDriverArgs !== undefined) driverConfig.push(`        args: ${JSON.stringify(cfg.desktopDriverArgs)}`)
+  const config = driverConfig.length === 0 ? '' : `\n      config:\n${driverConfig.join('\n')}`
+  return `- id: gateway-execution
+  config:
+    desktop: ${JSON.stringify(desktop)}
+- insert:
+    - id: computer-use
+      name: '@deepseek-ai/dsh-computer-use'
+    - id: computer-use-cua-driver-mcp
+      name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'${config}
+`
+}
 
 interface InstanceOwner {
   kind: 'user' | 'project'
@@ -537,11 +567,23 @@ export class InstanceManager {
     }
 
     const dshHome = runtime.dshHome
-    const packageParent = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
+    const packageParent = join(dshHome, 'profiles', INSTANCE_PROFILE, 'node_modules', '@deepseek-ai')
+    // Policy copies placed in the shared `profiles/node_modules` fallback by
+    // earlier releases are unreachable under runtime resolution; drop them.
+    const legacyParent = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
+    for (const name of [
+      'dsh-model-governance',
+      'dsh-directory-guard',
+      'dsh-experimental-computer-use-cua-driver-mcp',
+    ]) {
+      this.removeInstalledPolicyPackage(join(legacyParent, name))
+    }
     mkdirSync(packageParent, { recursive: true })
     try {
-      // Materialize the package under the profile so Node resolves peer imports
-      // from the runtime dependency tree rather than the source checkout.
+      // Policy copies live in the instance profile's own node_modules. Peer
+      // imports inside them resolve through the runtime resolver's package
+      // generation (the dsh installation closure), so only the policy packages
+      // themselves — which no manifest declares — need a physical copy here.
       const governancePackage = join(packageParent, 'dsh-model-governance')
       this.materializePolicyPackage(governanceDir, governancePackage, [governancePatch])
 
@@ -570,6 +612,20 @@ export class InstanceManager {
         }
       }
       if (runtime.kind === 'project') patchText += PROJECT_RUNTIME_PATCH
+      patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
+      patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
+      if (this.cfg.desktopId !== undefined) {
+        // The provisioned driver package is materialized beside the policy
+        // plugins so the runtime resolves it from the instance profile's
+        // node_modules; `dsh-computer-use` arrives through the installation
+        // fallback as a peer of the mounted gateway-execution.
+        this.materializePolicyPackage(
+          this.cfg.desktopDriverPackage,
+          join(packageParent, 'dsh-experimental-computer-use-cua-driver-mcp'),
+          [],
+        )
+        patchText += managedDesktopPatch(this.cfg, this.cfg.desktopId)
+      }
       writeFileSync(join(dshHome, 'cordis.patch.yml'), patchText)
     } catch (error) {
       throw new Error(`policy bundle mount failed for ${runtime.runtimeKey ?? runtime.username}: ${String(error)}`)

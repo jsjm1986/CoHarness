@@ -3,7 +3,7 @@ import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, relativeTime,
+  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel,
   UNGROUPED_KEY,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
@@ -17,6 +17,7 @@ const summary = (id: string, updatedAt: number, cwd?: string): SessionSummary =>
 const list = (...items: SessionSummary[]): SessionListState => ({
   ids: items.map(item => item.id),
   byId: Object.fromEntries(items.map(item => [item.id, item])),
+  archivedById: {},
   current: undefined,
   phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
 })
@@ -450,17 +451,5 @@ describe('workspaceLabel', () => {
     expect(workspaceLabel('/projects/demo/')).toBe('demo')
     expect(workspaceLabel('C:\\projects\\demo\\')).toBe('demo')
     expect(workspaceLabel('/')).toBe('/')
-  })
-})
-
-describe('relativeTime', () => {
-  it('buckets current, minute, hour, day, month, and year distances', () => {
-    const now = 400 * 24 * 60 * 60 * 1_000
-    expect(relativeTime(now, now)).toEqual({ unit: 'now', n: 0 })
-    expect(relativeTime(now - 5 * 60_000, now)).toEqual({ unit: 'minutes', n: 5 })
-    expect(relativeTime(now - 3 * 3_600_000, now)).toEqual({ unit: 'hours', n: 3 })
-    expect(relativeTime(now - 2 * 86_400_000, now)).toEqual({ unit: 'days', n: 2 })
-    expect(relativeTime(now - 60 * 86_400_000, now)).toEqual({ unit: 'months', n: 2 })
-    expect(relativeTime(0, now)).toEqual({ unit: 'years', n: 1 })
   })
 })

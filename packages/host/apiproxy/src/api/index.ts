@@ -4,10 +4,12 @@
  * WebSocket, and in-process SSE are merely physical channels (four-quadrant message model).
  */
 
+import type { DesktopApi } from './desktop.ts'
 import type { SessionsApi } from './sessions.ts'
 import type { HostApi } from './host.ts'
 import type { WorkspaceApi } from './workspace.ts'
 import type { WorkspaceFilesApi } from './workspace-files.ts'
+import type { WorkspaceChangesApi } from './workspace-changes.ts'
 import type { AgentPresetsApi } from './agent-presets.ts'
 import type { SkillsApi } from './skills.ts'
 import type { SubagentsApi } from './subagents.ts'
@@ -20,11 +22,13 @@ import type { ClientResponse, RpcReceipt } from './rpc.ts'
 
 /** Root interface of the unified API. New client-request domain = one new file pair + one field here + one map row. */
 export interface ApiProxy {
+  desktop: DesktopApi
   sessions: SessionsApi
   subagents: SubagentsApi
   host: HostApi
   workspace: WorkspaceApi
   workspaceFiles: WorkspaceFilesApi
+  workspaceChanges: WorkspaceChangesApi
   skills: SkillsApi
   agentPresets: AgentPresetsApi
   events: EventsApi
@@ -48,6 +52,7 @@ export type {
   SessionDraftId, SessionHistoryIndex, SessionHistoryIndexItem, SessionListMetadata, SessionProjectionsBlock,
   SessionSearchItem, SessionsApi, SessionSummary,
 } from './sessions.ts'
+export type { DesktopApi, DesktopConfirmation } from './desktop.ts'
 export type { DirectoryEntry, DirectoryListing, HostApi } from './host.ts'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,
@@ -58,11 +63,13 @@ export type { JobView } from './jobs.ts'
 export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'
 export type {
   WorkspaceFileByteWindow,
+  WorkspaceOfficePreview,
   WorkspaceFileEntry,
   WorkspaceFileStat,
   WorkspaceFileTextPage,
   WorkspaceFilesApi,
 } from './workspace-files.ts'
+export type { WorkspaceChangesApi, WorkspaceReviewSummary } from './workspace-changes.ts'
 export type { SkillsApi, SkillEntry } from './skills.ts'
 export type { AgentPresetsApi } from './agent-presets.ts'
 export type { EventsApi, MuxFrame, HostFrame, QueuedInboxItem, SessionAssistantStreamBaseline, SessionAssistantStreamFrame, ToolCallView, ToolEventView, ToolResultView } from './events.ts'

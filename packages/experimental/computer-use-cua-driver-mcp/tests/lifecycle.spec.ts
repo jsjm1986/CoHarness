@@ -48,7 +48,7 @@ async function context(): Promise<Context> {
 describe('installed Cua Driver ownership', () => {
   it('reserves before initial discovery and rejects a second provider before it starts', async () => {
     const ctx = await context()
-    const ready: PromiseWithResolvers<void> = Promise.withResolvers()
+    const ready: PromiseWithResolvers<undefined> = Promise.withResolvers()
     fake.start.mockReturnValueOnce(ready.promise)
     const first = ctx.plugin(Provider, {})
     try {
@@ -58,7 +58,7 @@ describe('installed Cua Driver ownership', () => {
       expect(fake.start).toHaveBeenCalledTimes(1)
       expect(() => ctx.computerUse.register(ComputerUseProviderName('another-driver'))).toThrow('already registered')
     } finally {
-      ready.resolve()
+      ready.resolve(undefined)
       await first
     }
     expect(fake.configurations[0]).toMatchObject({
@@ -70,7 +70,7 @@ describe('installed Cua Driver ownership', () => {
 
   it('retains the reservation until child teardown completes, then permits reload', async () => {
     const ctx = await context()
-    const childClosed: PromiseWithResolvers<void> = Promise.withResolvers()
+    const childClosed: PromiseWithResolvers<undefined> = Promise.withResolvers()
     const first = await ctx.plugin(Provider, {})
     fake.close.mockReturnValueOnce(childClosed.promise)
     const closing = first.dispose()
@@ -79,7 +79,7 @@ describe('installed Cua Driver ownership', () => {
       expect(ctx.computerUse.providerName).toBe('cua-driver-mcp')
       await expect(ctx.plugin(Provider, {})).rejects.toThrow('already registered')
     } finally {
-      childClosed.resolve()
+      childClosed.resolve(undefined)
       await closing
     }
     expect(ctx.computerUse.providerName).toBeUndefined()
@@ -94,7 +94,7 @@ describe('installed Cua Driver ownership', () => {
 
   it('rolls back a failed activation only after its child closes', async () => {
     const ctx = await context()
-    const childClosed: PromiseWithResolvers<void> = Promise.withResolvers()
+    const childClosed: PromiseWithResolvers<undefined> = Promise.withResolvers()
     fake.start.mockRejectedValueOnce(new Error('driver unavailable'))
     fake.close.mockReturnValueOnce(childClosed.promise)
     const failure = Promise.resolve(ctx.plugin(Provider, {})).then(
@@ -105,7 +105,7 @@ describe('installed Cua Driver ownership', () => {
       await vi.waitFor(() => { expect(fake.close).toHaveBeenCalledTimes(1) })
       expect(ctx.computerUse.providerName).toBe('cua-driver-mcp')
     } finally {
-      childClosed.resolve()
+      childClosed.resolve(undefined)
     }
     expect(await failure).toEqual(new Error('driver unavailable'))
     expect(ctx.computerUse.providerName).toBeUndefined()

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSnapshotStore, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, NavigationController, type ISessions, type SessionId, type SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConversationViewportController, createConversationViewportStore } from '../src/client/viewport.ts'
 
 const id = (value: string) => value as SessionId
@@ -11,11 +11,14 @@ function harness() {
     byId: Object.fromEntries(['a', 'b', 'c', 'd', 'e'].map(value => [id(value), {
       id: id(value), displayTitle: value, running: false, blank: false, updatedAt: 0,
     }])),
+    archivedById: {},
     current: id('a'), phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   })
   const opened: SessionId[] = []
   const staged: SessionId[][] = []
+  const navigation = new NavigationController()
   const sessions = {
+    beginNavigation: () => navigation.begin(),
     list,
     open: (sessionId: SessionId) => {
       opened.push(sessionId)
@@ -31,9 +34,29 @@ beforeEach(() => { localStorage.clear() })
 afterEach(() => { vi.restoreAllMocks() })
 
 describe('ConversationViewportController', () => {
+  it('pane focus, presentation, and layout changes supersede pending navigation', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
+    viewport.setEnabled(true)
+    viewport.add(id('a'))
+    try {
+      const focus = h.sessions.beginNavigation()
+      viewport.focus(id('a'))
+      expect(focus.aborted).toBe(true)
+      const mode = h.sessions.beginNavigation()
+      viewport.setMode('single')
+      expect(mode.aborted).toBe(true)
+      const layout = h.sessions.beginNavigation()
+      viewport.createWorkbench('Another layout')
+      expect(layout.aborted).toBe(true)
+    } finally { viewport.dispose() }
+  })
+
   it('bounds panes, focuses duplicates, and stages only workbench panes', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     expect(viewport.snapshot.getSnapshot().mode).toBe('single')
     viewport.setEnabled(true)
     expect(viewport.add(id('a'))).toEqual({ ok: true })
@@ -52,6 +75,7 @@ describe('ConversationViewportController', () => {
   it('removes the active pane, selects its neighbor, and persists ratios', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     viewport.setEnabled(true)
     viewport.add(id('a'))
     viewport.add(id('b'))
@@ -67,6 +91,7 @@ describe('ConversationViewportController', () => {
   it('drops stale persisted ids when the list baseline changes', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     viewport.setEnabled(true)
     viewport.add(id('a'))
     viewport.add(id('b'))
@@ -78,6 +103,7 @@ describe('ConversationViewportController', () => {
   it('starts empty despite the current Session, and replaces only on a subsequent navigation', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     viewport.setEnabled(true)
     h.list.set({ ...h.list.getSnapshot(), byId: { ...h.list.getSnapshot().byId } })
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
@@ -99,13 +125,14 @@ describe('ConversationViewportController', () => {
     const h = harness()
     h.list.set({ ...h.list.getSnapshot(), phase: 'pending', ids: [], byId: {}, current: undefined })
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     viewport.setEnabled(true)
     expect(h.staged).toEqual([])
     const ready = harness().list.getSnapshot()
     h.list.set(ready)
-    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('b'), id('missing'), id('c')])
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('b'), id('c')])
     expect(h.list.getSnapshot().current).toBe(id('c'))
-    expect(h.staged.at(-1)).toEqual([id('b'), id('missing'), id('c')])
+    expect(h.staged.at(-1)).toEqual([id('b'), id('c')])
     viewport.markCatalogReady()
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('b'), id('c')])
     h.list.set({ ...ready, phase: 'pending', current: undefined, byId: {}, ids: [] })
@@ -118,6 +145,7 @@ describe('ConversationViewportController', () => {
     localStorage.setItem('dsh.conversation.workbench.v1', 'null')
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     viewport.setEnabled(true)
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
     expect(viewport.add(id('unknown'))).toEqual({ ok: false, reason: 'unknown' })
@@ -144,6 +172,7 @@ describe('ConversationViewportController', () => {
   it('creates, duplicates, switches, and deletes independent workbench layouts', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     viewport.setEnabled(true)
     viewport.add(id('a'))
     const created = viewport.createWorkbench?.('Review')
@@ -164,6 +193,7 @@ describe('ConversationViewportController', () => {
     localStorage.setItem('dsh.conversation.workbenches.v1', JSON.stringify({ activeId: 'default', workbenches: [{ id: 'default', name: '我的工作台', paneIds: ['a', 'b', 'd'], paneRatios: [], updatedAt: 1 }] }))
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setPersistenceScope('local')
     expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('d'))
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('a'), id('b'), id('d')])
     viewport.dispose()
@@ -172,13 +202,63 @@ describe('ConversationViewportController', () => {
   it('restores an added pane after a new viewport instance is created', () => {
     const first = harness()
     const original = new ConversationViewportController(first.sessions, createConversationViewportStore().create())
+    original.setPersistenceScope('local')
     original.setEnabled(true)
     original.add(id('b'))
     original.dispose()
     const next = harness()
     const restored = new ConversationViewportController(next.sessions, createConversationViewportStore().create())
+    restored.setPersistenceScope('local')
     expect(restored.currentWorkbench?.().paneIds).toEqual([id('b')])
     restored.dispose()
+  })
+
+  it('isolates named layouts by verified account and releases panes when proof is lost', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    viewport.setEnabled(true)
+    viewport.setPersistenceScope('account:1')
+    viewport.add(id('a'))
+    viewport.add(id('b'))
+    viewport.setPaneRatios([1, 3])
+    viewport.renameWorkbench('default', 'Private project')
+    viewport.setPersistenceScope('account:2')
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
+    expect(viewport.listWorkbenches().map(row => row.name)).not.toContain('Private project')
+    expect(h.staged.at(-1)).toEqual([])
+    viewport.add(id('c'))
+    viewport.setPersistenceScope(undefined)
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
+    expect(h.staged.at(-1)).toEqual([])
+    viewport.setPersistenceScope('account:1')
+    expect(viewport.snapshot.getSnapshot()).toMatchObject({ paneIds: ['a', 'b'], activePaneId: 'b', paneRatios: [0.25, 0.75] })
+    expect(viewport.currentWorkbench().name).toBe('Private project')
+    viewport.dispose()
+  })
+
+  it('does not assign an unscoped legacy layout to a Gateway account', () => {
+    localStorage.setItem('dsh.conversation.workbench.v1', JSON.stringify({ mode: 'workbench', paneIds: ['a'] }))
+    localStorage.setItem('dsh.conversation.workbenches.v1', JSON.stringify({ activeId: 'private', workbenches: [{ id: 'private', name: 'Another account secret', paneIds: ['a'] }] }))
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
+    viewport.setPersistenceScope('account:3')
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
+    expect(viewport.listWorkbenches().map(row => row.name)).not.toContain('Another account secret')
+    viewport.dispose()
+  })
+
+  it('does not cancel initial history loading when the first identity proof arrives', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    const navigation = h.sessions.beginNavigation()
+    viewport.setPersistenceScope('local')
+    expect(navigation.aborted).toBe(false)
+    viewport.setPersistenceScope(undefined)
+    expect(navigation.aborted).toBe(true)
+    viewport.dispose()
+    viewport.setPersistenceScope('local')
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
   })
 
 })

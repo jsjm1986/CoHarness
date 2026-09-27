@@ -35,6 +35,10 @@ The service has no configuration. Provider plugins inject `computerUse` and call
 
 Providers stop admitting tool calls, close their resources, and await owned work before releasing the registration. `ctx.computerUse.providerName` reports the registered name until release.
 
+Providers wrap actual desktop effects in `ctx.computerUse.run(execution, operation)`. Independent local callers retain the host operator's authority. Managed runtimes require a live Agent and a `computerUseAuthorization` provider; losing that provider never restores local access. The deployment policy owns qualification, Session confirmation and leases. Its cancellation reaches the driver, and revoked results are rejected after the driver settles.
+
+The optional `computerUseAuthorization.confirmation` controller reads and changes the interactive user's confirmation. It requires a live human request and an exact root, node and desktop; it is not a model tool. Browser consumers import the wire value from `/types`, which does not load Host service declarations.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -43,7 +47,7 @@ Providers stop admitting tool calls, close their resources, and await owned work
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-One private name owns the slot. Cordis effects remove contributions when their plugin unloads; a repeated disposer cannot remove a later registration. The [source](src/index.ts) contains no driver object, operation interface, or provider selector.
+One private name owns the slot. Cordis effects remove contributions when their plugin unloads; a repeated disposer cannot remove a later registration. The [source](src/index.ts) keeps driver schemas outside the service and delegates managed effects to the deployment policy.
 
 No runtime invariant companion is published: the registry has one authoritative field and exposes no independently maintained observation that can diverge. Duplicate rejection and plugin disposal are covered by the owning tests.
 
@@ -63,7 +67,7 @@ No runtime invariant companion is published: the registry has one authoritative 
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as this registry only records provider names.
+None, as this service registers no model-facing tools or prompt sections and providers own result rendering.
 
 #### KV Cache effect
 

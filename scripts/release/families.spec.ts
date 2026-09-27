@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { officialClientBuildEnvironment, writeClientBuildRecord } from '../client-build-environment.ts'
+import { coharnessClientBuildEnvironment, writeClientBuildRecord } from '../client-build-environment.ts'
 import { releaseFamily, type ReleaseMember } from './families.ts'
 import { compareVersions, nextVendorVersion, planShared, reachesPayload } from './bump.ts'
 
@@ -49,12 +49,14 @@ describe('release families', () => {
       .filter(member => member.directory.startsWith('packages/experimental/'))
       .map(member => member.name)).toEqual([
       '@deepseek-ai/dsh-experimental-agent-team-profile',
+      '@deepseek-ai/dsh-experimental-agent-team-web-profile',
       '@deepseek-ai/dsh-experimental-agent-team',
       '@deepseek-ai/dsh-experimental-auto-review',
       '@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp',
       '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp',
       '@deepseek-ai/dsh-experimental-browser-use-runtime',
       '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+      '@deepseek-ai/dsh-experimental-client-ui-agent-team',
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native',
       '@deepseek-ai/dsh-experimental-ptc-runtime-python',
@@ -122,10 +124,10 @@ describe('release families', () => {
     expect(() => { vendor.verifyVersions([{ ...members[0]!, version: 'latest' }]) }).toThrow(/unpublishable version/)
   })
 
-  it('requires a current official client build only for dsh artifacts', () => {
+  it('requires a current CoHarness client build only for dsh artifacts', () => {
     const dsh = releaseFamily('dsh')
     const vendor = releaseFamily('vendor')
-    const officialEnvironment = officialClientBuildEnvironment(resolve(import.meta.dirname, '../..'))
+    const officialEnvironment = coharnessClientBuildEnvironment(resolve(import.meta.dirname, '../..'))
     vi.stubEnv('DSH_CLIENT_COMMIT_HASH', officialEnvironment.DSH_CLIENT_COMMIT_HASH)
     const official = buildFixture(officialEnvironment)
     const defaultBuild = buildFixture({})

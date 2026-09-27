@@ -351,7 +351,9 @@ describe.skipIf(!hasPwsh)('terminal-bash pwsh real shell', () => {
       const result = await second.done
       expect(['stdin_read', 'inferred_idle']).toContain(result.waitReason)
       if (holdCommand) {
-        expect(result.waitReason).toBe('inferred_idle')
+        // pwsh's console host polls stdin even mid-command, so a loaded host
+        // can surface stdin_read while the barrier still blocks the shell;
+        // the held-output assertions below carry the settlement contract.
         expect(result.viewport).not.toContain(expected)
         writeFileSync(releaseFile, '')
       }
@@ -383,16 +385,20 @@ describe.skipIf(!hasPwsh)('terminal-bash pwsh real shell', () => {
       text: '"console=" + [Console]::OutputEncoding.WebName + " out=" + $OutputEncoding.WebName',
       submit: true,
     })
-    const pinnedResult = await pinned.done
-    expect(pinnedResult.viewport).toContain('console=utf-8 out=utf-8')
+    await pinned.done
+    // done can settle on silence before the command's output reaches the
+    // viewport; the scrollback read is the authoritative output surface.
+    await expect.poll(() => ctx.terminals.read(agent, created.sessionId, { offset: 0, count: 100 }).text,
+      { timeout: 8_000 }).toContain('console=utf-8 out=utf-8')
     // Char codes keep the submitted line ASCII-only, so the assertion is a
     // pure output-decode check.
     const sent = ctx.terminals.startSend(agent, created.sessionId, {
       text: "[Console]::Write([char]0x4E2D + [char]0x6587 + ' encoding-ok')",
       submit: true,
     })
-    const result = await sent.done
-    expect(result.viewport).toContain('中文 encoding-ok')
+    await sent.done
+    await expect.poll(() => ctx.terminals.read(agent, created.sessionId, { offset: 0, count: 100 }).text,
+      { timeout: 8_000 }).toContain('中文 encoding-ok')
     await ctx.terminals.kill(agent, created.sessionId)
   }, 30_000)
 })

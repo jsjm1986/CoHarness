@@ -13,12 +13,18 @@
     - button "Agent 预设":
       - img
       - text: Agent 预设
+    - button "已归档会话":
+      - img
+      - text: 已归档会话
   - button "打开配置文件"
   - button "关闭":
     - img
     - text: 关闭
   - heading "Agent 预设" [level=2]
   - paragraph: 预设即一个会话的 Agent 所运行的插件组装 —— 它的工具、提示词与能力。复制一份既有预设改成自己的，或用「创造模式」让 Agent 帮你创建。
+  - text: 允许切换 Agent 模式 Beta
+  - paragraph: 开启后，新会话可选择标准、PTC、创造、极简及自定义模式；关闭后统一使用默认模式（默认为标准模式，可自定义）。仅影响新会话。
+  - switch "允许切换 Agent 模式" [checked]
   - heading "内置" [level=3]
   - list:
     - listitem:

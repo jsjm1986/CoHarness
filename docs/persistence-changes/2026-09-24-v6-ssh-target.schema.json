@@ -1,0 +1,193 @@
+{
+  "formatVersion": 1,
+  "roots": [
+    {
+      "key": "SessionHeader",
+      "kind": "header",
+      "digest": "4e26a4a482d42df86166259d181b53f33e1a52e735968253d79d9a743aa0b9fa",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "agentPreset",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "createdAt",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cwd",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "delegationDepth",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "draft",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "isSeeded",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "origin",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "parentSession",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "sshTarget",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "version",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "literal",
+            "value": "subagent"
+          },
+          {
+            "kind": "literal",
+            "value": 6
+          }
+        ]
+      }
+    },
+    {
+      "key": "JsonlHeaderLine",
+      "kind": "header",
+      "digest": "9136dd6271b5aba11b4748a03cb05bdb0cc9b05f17be5af3d87a86406177033c",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "agentPreset",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "createdAt",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cwd",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "delegationDepth",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "draft",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "isSeeded",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "origin",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "parentSession",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "sshTarget",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "literal",
+            "value": "subagent"
+          },
+          {
+            "kind": "literal",
+            "value": "session"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

@@ -58,6 +58,7 @@ export function permissionDefaultOf(view: SettingsNamespaceView, schema: Setting
 } {
   const value = (view.value as { defaultPreset?: unknown } | null)?.defaultPreset
   if (typeof value !== 'string') throw new Error('permission settings has no defaultPreset value')
+  if (value === 'auto') throw new Error('Auto is enabled per session and cannot be a new-session default')
   const node = schema.nodeAtPath(schema.rehydrate(view.schema), ['defaultPreset'])
   if (node === undefined) throw new Error('permission settings schema has no defaultPreset field')
   const rawChoices = node.type === 'union'
@@ -65,7 +66,7 @@ export function permissionDefaultOf(view: SettingsNamespaceView, schema: Setting
     : [node]
   const options = rawChoices.flatMap((candidate) => {
     const choice = candidate as unknown as ConstChoice
-    if (choice.type !== 'const' || typeof choice.value !== 'string') return []
+    if (choice.type !== 'const' || typeof choice.value !== 'string' || choice.value === 'auto') return []
     const described = choice.meta?.description
     return [{
       id: choice.value,
@@ -100,11 +101,13 @@ export class PermissionPresetSettingsController {
    * @param describeFace - the shared mirror's read/fold face (descriptor and schema source).
    * @param api - settings wire face for the `defaultPreset` write.
    * @param schema - settings-owned schema operations.
+   * @param validateSelection - optional current-account check before a UI-originated write.
    */
   constructor(
     private readonly describeFace: SettingsDescribeFace,
     private readonly api: Pick<IApiClient, 'settings'>,
     private readonly schema: SettingsSchemaService,
+    private readonly validateSelection?: (preset: string) => void,
   ) {}
 
   /**
@@ -135,6 +138,14 @@ export class PermissionPresetSettingsController {
     const view = this.describeFace.getSnapshot().view?.namespaces
       .find(entry => entry.ns === PERMISSION_SETTINGS_NS)
     if (view === undefined || !state.writable || this.saving) return
+    try {
+      if (preset === 'auto') throw new Error('Auto is enabled per session and cannot be a new-session default')
+      if (!state.options.some(option => option.id === preset)) throw new Error('permission default is not an advertised option')
+      this.validateSelection?.(preset)
+    } catch (error) {
+      this.fail(error)
+      return
+    }
     this.saving = true
     this.store.update((draft) => {
       draft.status = 'saving'

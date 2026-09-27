@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   Button, IconDataOutline16, IconFolderOpenOutline16, IconPersonalizationOutline16,
-  IconSettingsOutline16, IconUserOutline16, Modal,
+  IconSettingsOutline16, IconShareOutline16, IconUserOutline16, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { requestSettingsSection } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ProjectConfiguration, ProjectMembership, ProjectThemePolicy } from './collaboration-client.ts'
+import type {
+  ProjectConfiguration, ProjectMembership, ProjectSshTarget, ProjectThemePolicy,
+} from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import css from './ProjectSettingsModal.module.css'
 
@@ -15,6 +17,10 @@ export interface ProjectSettingsModalProps {
   t: (key: CollaborationKey, params?: Record<string, string | number>) => string
   load: (projectId: number) => Promise<ProjectConfiguration>
   setThemePolicy: (projectId: number, policy: ProjectThemePolicy) => Promise<ProjectConfiguration>
+  /** Organization SSH targets with the project's share flags; managers only. */
+  listSshTargets?: (projectId: number) => Promise<ProjectSshTarget[]>
+  /** Toggle one target's share toward the project; managers only. */
+  shareSshTarget?: (projectId: number, targetId: number, shared: boolean) => Promise<{ publicId: number; name: string; shared: boolean }>
   onMembers: () => void
   onClose: () => void
 }
@@ -23,17 +29,22 @@ const THEME_OPTIONS: readonly ProjectThemePolicy[] = ['follow-user', 'light', 'd
 
 /** Render project-owned settings without exposing host paths or raw documents. */
 export function ProjectSettingsModal({
-  open, project, t, load, setThemePolicy, onMembers, onClose,
+  open, project, t, load, setThemePolicy, listSshTargets, shareSshTarget, onMembers, onClose,
 }: ProjectSettingsModalProps) {
   const [configuration, setConfiguration] = useState<ProjectConfiguration>()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
+  const [sshTargets, setSshTargets] = useState<ProjectSshTarget[]>()
+  const [sshBusy, setSshBusy] = useState<number>()
+  const [sshError, setSshError] = useState<string>()
 
   useEffect(() => {
     if (!open) return
     let active = true
     setConfiguration(undefined)
+    setSshTargets(undefined)
+    setSshError(undefined)
     setLoading(true)
     setError(undefined)
     void load(project.projectId)
@@ -49,6 +60,19 @@ export function ProjectSettingsModal({
   const canManageTheme = isManager && capabilities !== undefined && capabilities.themePolicy
   const canManageRuntime = isManager && capabilities !== undefined && capabilities.runtimeSettings
   const canManageModels = isManager && capabilities !== undefined && capabilities.projectModels
+  const canManageSsh = isManager && capabilities !== undefined && capabilities.sshTargets
+    && listSshTargets !== undefined && shareSshTarget !== undefined
+
+  // The target list loads only after the configuration confirms the manager
+  // capability — the account endpoint refuses ordinary members anyway.
+  useEffect(() => {
+    if (!open || !canManageSsh) return
+    let active = true
+    void listSshTargets(project.projectId)
+      .then((value) => { if (active) setSshTargets(value) })
+      .catch((cause: unknown) => { if (active) setSshError(cause instanceof Error ? cause.message : String(cause)) })
+    return () => { active = false }
+  }, [open, canManageSsh, listSshTargets, project.projectId])
   const projectType = project.origin === 'admin' ? t('project.adminProject') : t('project.userProject')
   const owner = configuration === undefined ? project.owner : configuration.project.owner
   const ownerName = owner === undefined || owner === null
@@ -68,6 +92,19 @@ export function ProjectSettingsModal({
   const openSection = (section: string): void => {
     onClose()
     requestSettingsSection(section, { scope: 'project', projectId: project.projectId })
+  }
+
+  const toggleSshTarget = (target: ProjectSshTarget, shared: boolean): void => {
+    if (!canManageSsh || sshBusy !== undefined) return
+    setSshBusy(target.publicId)
+    setSshError(undefined)
+    void shareSshTarget(project.projectId, target.publicId, shared)
+      .then((updated) => {
+        setSshTargets(current => current?.map(row =>
+          row.publicId === updated.publicId ? { ...row, shared: updated.shared } : row))
+      })
+      .catch(() => { setSshError(t('project.sshShareFailed')) })
+      .finally(() => { setSshBusy(undefined) })
   }
 
   return (
@@ -186,6 +223,49 @@ export function ProjectSettingsModal({
             <IconUserOutline16 size={14} />{isManager ? t('manager.membersAction') : t('manager.invitationsAction')}
           </Button>
         </div>
+      </section>
+
+      <section className={css.section} aria-labelledby="project-ssh-title">
+        <div className={css.sectionHeading}>
+          <div className={css.icon}><IconShareOutline16 size={16} /></div>
+          <div>
+            <h3 id="project-ssh-title">{t('project.sshTitle')}</h3>
+            <p>{t('project.sshDescription')}</p>
+          </div>
+        </div>
+        {canManageSsh
+          ? (
+            <div className={css.options} role="group" aria-label={t('project.sshTitle')}>
+              {sshTargets === undefined && sshError === undefined
+                ? <p className={css.notice}>{t('project.sshLoading')}</p>
+                : null}
+              {sshTargets?.map(target => (
+                <label key={target.publicId} className={css.option} data-selected={target.shared}>
+                  <input
+                    type="checkbox"
+                    name={`project-ssh-${String(project.projectId)}-${String(target.publicId)}`}
+                    checked={target.shared}
+                    disabled={!target.enabled || sshBusy !== undefined}
+                    onChange={(event) => { toggleSshTarget(target, event.currentTarget.checked) }}
+                  />
+                  <span>
+                    <strong>{target.name}</strong>
+                    <small>{target.host}{target.enabled ? '' : ` · ${t('project.sshDisabled')}`}</small>
+                  </span>
+                </label>
+              ))}
+              {sshTargets !== undefined && sshTargets.length === 0
+                ? <p className={css.notice}>{t('project.sshEmpty')}</p>
+                : null}
+            </div>
+          )
+          : null}
+        {sshError !== undefined ? <p className={css.error} role="alert">{sshError}</p> : null}
+        {!isManager
+          ? <p className={css.notice}>{t('project.sshManagedByOwner')}</p>
+          : capabilities === undefined || !capabilities.sshTargets
+            ? <p className={css.notice}>{t('project.sshUnavailable')}</p>
+            : null}
       </section>
 
       <p className={css.filesystemNote}>

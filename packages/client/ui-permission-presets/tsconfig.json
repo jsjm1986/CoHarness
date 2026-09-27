@@ -37,6 +37,9 @@
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../ui-conversation"
     }
   ]
 }

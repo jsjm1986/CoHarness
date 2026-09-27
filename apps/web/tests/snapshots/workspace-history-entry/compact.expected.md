@@ -1,7 +1,8 @@
 - button "2 tool calls · 2 intermediate messages":
   - text: 2 tool calls · 2 intermediate messages
   - img
-- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. 7/25 {{clock}}"
+- text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - button "Think Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
@@ -17,9 +18,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- button:
-  - img
-- text: 7/25 {{clock}}
+- group "Turn time and speed":
+  - button:
+    - img
+- group "Message timing": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -30,9 +32,10 @@
 - 'button "Access mode, current: Workspace Write"'
 - button "Select model, current DeepSeek-V4-Flash"
 - button "Send message" [disabled]
-- button "1 turns · 2 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 2 steps{{throughput}} tok/s
-- button "16K tok · Cache hit 98%":
-  - img
-  - text: 16K tokCache hit 98%
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "16K tok · Cache hit 98%":
+    - img
+    - text: 16K tokCache hit 98%

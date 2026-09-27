@@ -43,6 +43,12 @@
     },
     {
       "path": "../../../vendor/timer"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../boot/plugin-manager"
     }
   ]
 }

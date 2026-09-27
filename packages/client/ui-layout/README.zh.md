@@ -2,13 +2,13 @@
 
 [English](README.md) | 中文
 
-外壳插件：三栏 AppFrame（拖动手柄与让步链）加 `ctx.layout` 面板几何服务；它注册到运行时拥有的 `root` slot，并声明 `sidebar`、`conversation`、`details`、`conversation.empty` 和 session-scoped 的 `shell.mobile.header.actions` slot。侧边栏的缩放边界是不可见命中条带，详情栏边界则保留其浮动胶囊；让步期间只有详情栏会收缩并随后自动关闭。关闭的侧边栏仍保留 56px 控制栏，详情栏则关闭到零宽度。框架会把当前视口档位以 `data-viewport` 标记在其根元素上（`compact`／`medium`／`expanded`／`wide`，阈值见 `viewport.ts`），功能包 CSS 以此作为宽度分支依据（[web-styling](../../../docs/web-styling.zh.md)），并据此渲染三种模式之一：expanded 与 wide 保留三栏与拖动手柄；medium 保留控制栏或挤压展开的侧边栏列，但把详情栏提升为可经遮罩关闭的右缘浮层；compact 在 44px 外壳顶栏下渲染单栏（顶栏开关拥有抽屉，session-scoped 移动 action 位于右侧，compact 下的会话导航会收起抽屉），侧边栏成为左侧抽屉、详情栏铺满整宽，两者都可经遮罩关闭、都以 transform 隐藏，因此开合从不重挂已挂载的 slot。compact owner share 会把解析后的模式传给会话 presenter，使嵌入式窄框架不依赖浏览器窗口宽度。该插件还把可视视口高度发布为根级 `--dsw-viewport-height` 变量，compact 框架跟随它，使输入条保持在屏幕键盘上方。该包还提供主题呈现器：它消费解析后的 `ctx.theme` 快照，并将其投影到 document（用 `html { color-scheme }` 驱动原生 UA 控件，依据当前配色方案设置 `body[data-ds-dark-theme]`，并将主题的别名 token 设为 body 上的内联变量，同时拥有一个 `<meta name="theme-color">`，其内容随计算后的 body 背景色更新）。在应用调色板和 token 后进行测量，可确保渲染后的背景成为唯一的颜色依据；呈现器在 dispose（资源释放）时会移除其自有的元数据节点，并一并清除其写入的其他全局状态。
+外壳插件提供唯一的三栏 AppFrame、拖动尺寸与窄屏抽屉。它在 `root` 下声明左侧 `sidebar`、中间 `conversation`、右侧 `rightbar`、浮动层及移动顶栏操作。四会话 Workbench 保持为唯一的中间会话容器；右侧栏的标签、分栏与开合由 [ui-sidebar-right](../ui-sidebar-right/README.zh.md) 管理，框架只消费其呈现报告并分配空间。主题呈现器负责配色、别名 token、正文字号与 document 元数据。
 
-compact 顶栏显示当前非 blank Session 标题，低于短高度阈值的框架还会携带 `data-viewport-short`，供次级外壳使用更紧凑的纵向密度。没有嵌套对话框或菜单占用按键时，Escape 会关闭打开的抽屉或详情浮层；抽屉自动收起后焦点会回到持久存在的顶栏开关。AppFrame 始终挂载会话栏和详情栏；已连接 Session 通过 `SessionProvider` 渲染。布局 store 是瞬时状态，侧边栏以默认宽度启动，详情栏则保持关闭，且该 store 从不读写 `localStorage`。hero 和其他未选中状态也会将详情栏的渲染宽度派生为零，但不会改变存储的宽度偏好。AppFrame 会跨越这些状态保留最后一个非 blank 会话 id：首个会话保持关闭；显式打开详情栏的操作会使用约定默认宽度；返回同一会话时恢复其未改变的宽度；选择不同会话时，详情栏会在绘制前关闭。会话 owner share 只携带解析后的 `compact` 标记，使嵌入式窄框架不依赖浏览器窗口宽度；侧边栏 owner share 包含 `collapsed` 和 `width`。注册方通过标准钩子获取业务数据，并从各自的 inject 接口获取操作。
+框架发布 `data-viewport` 与 `--dsw-viewport-height`，以支持窄窗格和屏幕键盘。medium 模式保留导航控制栏，右侧栏覆盖中间内容；compact 模式使用左侧抽屉和全屏辅助栏。遮罩和 Escape 将关闭请求交给标签状态所有者，不直接改写另一份开合状态。侧边抽屉关闭后恢复顶栏开关焦点。框架尺寸不写入 localStorage，Session 标签的恢复规则由右侧栏负责。
 
 `/client` 导出表层包含插件主体（`apply`／`inject`）、`LayoutController` 和 owner-share 接口（包括 `MobileHeaderActionOwnerProps`）。AppFrame、面板 store 与让步求解器仍属于包内部。
 
-`conversation` slot 属于根作用域，切换当前 Session 不会重挂多面板容器。`layout.openDetails(sessionId?)` 可把唯一的详情栏固定到触发操作的 Session；省略参数时保留跟随当前会话的导航行为。关闭对应的工作台面板会释放固定的详情栏。
+`layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
 
 ## 概述
 
@@ -28,6 +28,6 @@ compact 顶栏显示当前非 blank Session 标题，低于短高度阈值的框
 
 ## 已知限制与暂缓事项
 
-- **面板几何信息是瞬时状态**：重新加载会恢复侧边栏默认值，并使详情栏保持关闭；在不同会话 id 之间切换同样会关闭详情栏，并忘记拖动后的宽度，而未选中表面会以零宽度渲染详情栏，但不会修改几何信息。
-- **让步链自动关闭通过推导零宽度实现，不会改动宽度偏好**：窗口变宽时面板会自行恢复；消费方禁止把 store 中的详情宽度当作实际渲染状态。
+- **面板尺寸是瞬时状态**：刷新后恢复默认宽度；账号与 Session 的标签、开合和分栏记录由右侧栏恢复。
+- **空间不足时收起辅助栏**：框架报告可用空间，由标签所有者决定收起；宽度偏好不代表实际可见状态。
 - **挤压重排期间不提供滚动锚定**：布局变化可能移动读者的 viewport。

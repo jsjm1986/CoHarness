@@ -93,9 +93,9 @@ it('loads from cordis.yml and logs the native screenshot before the next model r
   const model = new VisualModel()
   context.llm.registerAdapter(['native-fixture'], model)
   const agent = await context.agentLoop.create(SessionId('native-loader'), { provider: 'native-fixture', model: 'vision' })
-  const idle: PromiseWithResolvers<void> = Promise.withResolvers()
+  const idle: PromiseWithResolvers<undefined> = Promise.withResolvers()
   const stop = context.on('agent/status', ({ agent: subject, status }) => {
-    if (subject === agent && status === 'idle') idle.resolve()
+    if (subject === agent && status === 'idle') idle.resolve(undefined)
   })
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Observe the fixture window.' }], source: { kind: 'user' } }))
   await idle.promise

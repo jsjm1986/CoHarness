@@ -46,6 +46,7 @@ import * as ToolBashPersistent from '@deepseek-ai/dsh-tool-bash-persistent'
 import * as ToolPwshPersistent from '@deepseek-ai/dsh-tool-pwsh-persistent'
 import CordisHostRunner from '@deepseek-ai/dsh-cordis-host-runner'
 import * as ToolCordis from '@deepseek-ai/dsh-tool-cordis'
+import * as ToolPresent from '@deepseek-ai/dsh-tool-present'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
 import * as ToolUserDoc from '@deepseek-ai/dsh-tool-userdoc'
@@ -119,7 +120,7 @@ class CatalogWorkflowEngine extends WorkflowEngine {
 function registerCatalogSubagentProvider(ctx: Context, name: string): void {
   const provider: SubagentProvider = {
     name,
-    capabilities: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
+    capabilities: { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
     inheritsParentContext: false,
     start: () => Promise.reject(new Error('tool-catalog provider cannot start a child')),
     // Declared so consumers configured for continuable background mode mount.
@@ -296,6 +297,18 @@ const TOOL_PACKAGES: ToolPackage[] = [
       'The bash tool is the model-facing consumer of the bash executor seam. A `run_in_background` run registers with the generic `ctx.jobs` runtime and is collected/stopped through the `job_*` tools from `@deepseek-ai/dsh-tool-jobs`; the `enableRunInBackground` config (default true) removes the parameter entirely when disabled.',
   },
   {
+    pkg: '@deepseek-ai/dsh-tool-present',
+    dir: 'tool-present',
+    source: 'packages/deliverables/tool-present/src/index.ts',
+    requires: ['ctx.tools', 'ctx.fs', 'ctx.sessionProjections'],
+    writes: ['tool/call', 'deliverables/presented after a successful final result', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(ToolPresent)
+    },
+    note: 'Deliveries belong to the calling Session; Web ui-deliverables supplies source-file opening and cards.',
+  },
+  {
     pkg: '@deepseek-ai/dsh-tool-pwsh',
     dir: 'tool-pwsh',
     source: 'packages/shell/tool-pwsh/src/index.ts',
@@ -317,14 +330,17 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-cordis',
     dir: 'tool-cordis',
     source: 'packages/extensions/tool-cordis/src/index.ts',
-    requires: ['ctx.tools', 'ctx.dynamicCordisRunner'],
-    writes: ['tool/call', 'tool/result', 'process-local dynamic package lifecycle'],
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.dynamicCordisRunner', 'ctx.cordisInspect'],
+    writes: ['tool/call', 'tool/result', 'user/message (@pluginId context)'],
     async mount(ctx) {
       await ctx.plugin(CordisHostRunner)
       await ctx.plugin(ToolCordis)
     },
     note:
-      'Not in any shipped tree (a deliberate opt-in — dynamic package code reaches the real runtime, see .agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md). The toolset injects `ctx.dynamicCordisRunner` from `@deepseek-ai/dsh-cordis-host-runner`, which owns the definition registry and the vm sandbox; a composition missing it never activates the tools. A running package may register ADDITIONAL model-visible tools until it is stopped, undefined, or DSH restarts; a full changed request header logs those tool-set changes.',
+      'Read-only Host and Client API discovery and inspection of existing session-owned Cordis Packages. '
+      + 'Creator mode combines these tools with authorized Plugin Manager operations for persistent profile changes. '
+      + 'The toolset cannot define, activate, stop, or remove dynamic Packages; historical cards and explicit @pluginId references remain readable. '
+      + 'See [the retirement decision](../.agents/notes/implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.md).',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-bash-persistent',

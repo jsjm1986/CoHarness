@@ -16,7 +16,7 @@ afterEach(() => {
 
 function emptySessions() {
   return bindSnapshotSelector(createSnapshotStore<SessionListState>({
-    ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   }))
 }
 
@@ -45,8 +45,8 @@ function mount() {
 describe('EnterBehaviorRow', () => {
   it('explains the busy-only scope and shows Queue by default', () => {
     mount()
-    expect(screen.getByText('Enter behavior while busy')).toBeDefined()
-    expect(screen.getByText('Busy only; Cmd/Ctrl+Enter uses the other behavior')).toBeDefined()
+    expect(screen.getByText('Send behavior while busy')).toBeDefined()
+    expect(screen.getByText('What Enter and the Send button do while the agent is running; Cmd/Ctrl+Enter uses the other behavior')).toBeDefined()
     expect(screen.getByRole('button', { name: /Queue/ }).getAttribute('aria-expanded')).toBe('false')
   })
 

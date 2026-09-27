@@ -87,7 +87,7 @@ dsh --profile tui
 
 ## Web Profile
 
-`dsh web` 使用 profile 简写。启动器先解析自身的 flag，其余 flag 属于 web 应用，由组合包中的普通提供方解析。`--host` 和 `--port` 覆盖承载它们的那些行的组合取值，可重复的 `--trusted-host` 通过 `ctx.webRuntime.trustedHosts` 提供本次调用的 authority（部署表达式会拼接自己的 authority），`--no-open` 则只对本次调用关闭默认浏览器交接。客户端插件 HMR（热模块替换）接收器始终挂载，在单独运行的 `pnpm run dev:web` watcher 重建客户端 bundle 之前保持空闲。
+`dsh web` 使用 profile 简写。启动器先解析自身的 flag，其余 flag 属于 web 应用，由组合包中的普通提供方解析。`--host` 和 `--port` 覆盖承载它们的那些行的组合取值，可重复的 `--trusted-host` 通过 `ctx.webRuntime.trustedHosts` 提供本次调用的 authority（部署表达式会拼接自己的 authority），`--no-open` 则只对本次调用关闭默认浏览器交接。每次启动的客户端插件传输都会跟随 Host 实时图变化。只有设置 `DSH_CLIENT_HMR=1` 并单独运行 `pnpm run dev:web` 构建器时，才启用产物轮询。
 
 ```sh
 dsh web

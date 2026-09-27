@@ -10,6 +10,8 @@ Switching the web client to `danger-full-access` was a single click on a permiss
 
 ## Decision
 
+Current-account eligibility is checked before this consent flow; the [account-qualified picker decision](../bug-fix/2026-09-22-account-qualified-permission-pickers.md) owns that additive check. Neither a visible option nor an acknowledged dialog grants server authority.
+
 **Every permission picker gates `danger-full-access` behind the shared in-page `RiskConfirmation` dialog whose enabling action stays disabled until an explicit acknowledgement checkbox is checked; the preset renders under the product label `Full access`; every dismissal path submits nothing.**
 
 - `RiskConfirmation` (ui-primitives) is a controlled Modal composition: title, description, acknowledgement checkbox, cancel, and a confirm button disabled until `acknowledged`. It stays an in-page dialog — the Modal portals to this document's body and never opens a native or separate browser window that could land on another display. `Modal` gains a `contentClassName` seat so the warning body scrolls inside constrained mobile/landscape viewports while the action row stays fixed.

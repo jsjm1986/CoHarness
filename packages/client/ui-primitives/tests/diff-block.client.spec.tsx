@@ -1,11 +1,5 @@
 // @vitest-environment jsdom
-// DiffBlock: the per-file hunk rows (path header, removed block, added block),
-// the same-file second-hunk gap separator, the `+A -R · N file(s)` footer and
-// its singular/plural, the head/tail height cap and its expand control, the
-// empty-diffs null render, and the copy control writing the prefixed diff text
-// on both the accepted and the refused clipboard paths. writeClipboard's own
-// return contract is pinned in terminal-block.spec.tsx (the shared return contract), so
-// only its DOM consequence is asserted here.
+// Bounded inline diffs, neutral context, complete copying, and collapsed presentation.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -118,6 +112,68 @@ describe('DiffBlock footer', () => {
     ]
     render(<DiffBlock diffs={diffs} />)
     expect(screen.getByText('└ +2 -0 · 2 files')).toBeTruthy()
+  })
+})
+
+describe('DiffBlock exact local changes', () => {
+  it('keeps shared lines as neutral context and counts only the changed line', () => {
+    const { container } = render(<DiffBlock diffs={[{
+      path: 'context.txt', oldText: 'before\nold\nafter\n', newText: 'before\nnew\nafter\n',
+    }]} />)
+    expect(changeRows(container)).toEqual(['old', 'new'])
+    expect([...container.querySelectorAll('[class*="_context_"]')].map(row => row.textContent)).toEqual(['before', 'after'])
+    expect(screen.getByText('└ +1 -1 · 1 file')).toBeTruthy()
+  })
+
+  it('reports no additions or deletions for identical content or its terminating newline', () => {
+    const { container } = render(<DiffBlock diffs={[{ path: 'same.txt', oldText: 'same\n', newText: 'same' }]} />)
+    expect(changeRows(container)).toEqual([])
+    expect(bodyRows(container)).toEqual(['same.txt'])
+    expect(screen.getByText('└ +0 -0 · 1 file')).toBeTruthy()
+  })
+
+  it('retains three context lines on each side of distant edits and separates the patches', () => {
+    const original = Array.from({ length: 20 }, (_, index) => `line ${index}`)
+    const changed = [...original]
+    changed[2] = 'changed 2'
+    changed[17] = 'changed 17'
+    const { container } = render(<DiffBlock diffs={[{
+      path: 'distant.txt', oldText: original.join('\n'), newText: changed.join('\n'),
+    }]} maxLines={Infinity} />)
+    expect(bodyRows(container)).toEqual([
+      'distant.txt', 'line 0', 'line 1', 'line 2', 'changed 2', 'line 3', 'line 4', 'line 5',
+      '⋯', 'line 14', 'line 15', 'line 16', 'line 17', 'changed 17', 'line 18', 'line 19',
+    ])
+    expect(screen.getByText('└ +2 -2 · 1 file')).toBeTruthy()
+  })
+
+  it.each([128, 129])('bounds comparison at 256 edits for %i replaced lines', (count) => {
+    const oldLines = ['shared', ...Array.from({ length: count }, (_, index) => `old ${index}`)]
+    const newLines = ['shared', ...Array.from({ length: count }, (_, index) => `new ${index}`)]
+    const { container } = render(<DiffBlock diffs={[{
+      path: 'large.txt', oldText: oldLines.join('\n'), newText: newLines.join('\n'),
+    }]} maxLines={Infinity} />)
+    const expected = count === 128 ? count : count + 1
+    expect(screen.getByText(`└ +${expected} -${expected} · 1 file`)).toBeTruthy()
+    expect(container.querySelectorAll('[class*="_context_"]')).toHaveLength(count === 128 ? 1 : 0)
+    expect(changeRows(container)).toHaveLength(expected * 2)
+  })
+
+  it('copies all context and changes while the visible rows are collapsed', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    const previous = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    try {
+      render(<DiffBlock diffs={[{
+        path: 'copy.txt', oldText: 'before\n+literal\nold\nafter\n', newText: 'before\n+literal\nnew\nafter\n',
+      }]} maxLines={3} />)
+      expect(screen.getByRole('button', { name: /展开其余/ })).toBeTruthy()
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: '复制' })) })
+      expect(writeText).toHaveBeenCalledWith('copy.txt\n  before\n  +literal\n- old\n+ new\n  after')
+    } finally {
+      if (previous === undefined) Reflect.deleteProperty(navigator, 'clipboard')
+      else Object.defineProperty(navigator, 'clipboard', previous)
+    }
   })
 })
 

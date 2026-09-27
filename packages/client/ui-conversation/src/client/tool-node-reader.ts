@@ -22,7 +22,7 @@ export function rootToolCall(snapshot: ConversationSnapshot, rootCallId: string)
  * @param callId - root or nested call identity.
  * @returns current Tool lifecycle when materialized in the loaded window.
  */
-export function findToolCall(snapshot: ConversationSnapshot, callId: string): ToolCallBlock | undefined {
+export function findToolCall(snapshot: Pick<ConversationSnapshot, 'chat'>, callId: string): ToolCallBlock | undefined {
   const visit = (block: ToolCallBlock): ToolCallBlock | undefined => {
     if (block.callId === callId) return block
     for (const child of block.subCalls) {

@@ -40,6 +40,8 @@
 
 该策略只能看到最终格式化的呈现结果，看不到工具的内部资源或规范值。如果提供方已经截断内容（例如 `web-fetch-http.maxBodyChars`），spill 产物保存的是工具返回的完整格式化结果，而非完整原始源。提供方／资源上限仍然是必需的，并且与该策略相互独立。`glob`/`grep` 负责对项级呈现结果执行 spill，因为渲染前仍然存在完整的已获取值；bash 流负责在获取时 spill。通用策略预先注册自己的 waterfall（瀑布式事件）监听器，然后再委托，因此无论插件加载顺序如何，普通工具自身的异步投影都会在通用字节限制之前完成。详见[工具输出 spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)。
 
+浏览器安全入口 `@deepseek-ai/dsh-spill-policy/notice` 同时负责生产方使用的 `formatSpillNotice(omitted, ref)` 和展示消费方使用的 `hasSpillNotice(text)`。格式化与识别共用通知分隔符；省略信息通过现有的 `describeOmitted` 格式化函数校验，而非复制一套文案。识别支持预览之后或单独出现的完整末尾通知，保留持久化通知的原有拼写，只读取已记录的文本而不改写。它识别的是一种文本约定，而非工具输出来源认证——工具也可以打印相同的通知文本。
+
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每个结果由有界预览策略独立变换；不保留跨调用状态。

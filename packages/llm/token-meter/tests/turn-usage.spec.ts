@@ -61,6 +61,19 @@ describe('deriveTurnTokenUsage', () => {
     expect(deriveTurnTokenUsage(complete(message(3, usage({ totalTokens: undefined, cacheWriteTokens: undefined }))))).toBeUndefined()
   })
 
+  it('keeps cache totals when a reported zero-read step sits beside cache-using steps', () => {
+    const events = [
+      event(1, 'turn/start', { turn: 1 }), event(2, 'step/start', { turn: 1, step: 1 }),
+      message(3, usage({ cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 120 })),
+      event(4, 'step/end', { turn: 1, step: 1 }), event(5, 'step/start', { turn: 1, step: 2 }),
+      message(6, usage(), '', '', 2),
+      event(7, 'step/end', { turn: 1, step: 2 }), event(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ]
+    expect(deriveTurnTokenUsage(events)).toEqual({
+      uncachedInputTokens: 200, outputTokens: 40, totalTokens: 290, cacheReadTokens: 50,
+    })
+  })
+
   it('omits optional aggregates when one attempt lacks them', () => {
     const events = [
       event(1, 'turn/start', { turn: 1 }), event(2, 'step/start', { turn: 1, step: 1 }), message(3, usage()),

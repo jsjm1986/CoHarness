@@ -10,21 +10,21 @@ Status: implemented
 
 ## 决策
 
-Document Preview 将资源观察与内容读取分开。[资源模型](2026-09-05-client-resource-model.zh.md)只按地址共享观察：`source(address)`、`pin(address, signal)` 和提供方的 `open(address, { signal })` 均不携带消费 Session。提供方返回 `AsyncIterable<RemoteResult<ResourceProtocolMap[P]>>`；`useResource` 只暴露 `{ status, value, failure }`。持有只控制观察的启停，不控制底层文件或 Session 的生灭。内容通过普通注入的 Preview 回调读取。
+文件预览将资源观察与内容读取分开。[资源模型](2026-09-05-client-resource-model.zh.md)按地址共享观察：`source(request)` 与 `pin(request, signal)` 接收经身份校验的 `WorkspaceResourceOpenRequest`——runtime 目标、Session、路径与地址；提供方只应答 `stat(address, signal)` 元数据，注册表通过 `handleChange` 与 `reload` 驱动刷新。`source.get()` 只暴露 `{ status, value, error }`。持有只控制观察的启停，不控制底层文件或 Session 的生灭。内容通过普通注入的 Preview 回调读取。
 
-[Workspace Files](../../../../packages/host/apiproxy/README.zh.md) 保留 Host 的行读取、字节窗口、有上限的全文读取和相对另一文件目录的有界读取。Client `file` 提供方只观察 `stat` 与 `changes`，`ResourceProtocolMap.file` 直接为 `WorkspaceFileStat`。Host 通过 Session 文件系统解析每条路径；文件读取继承该后端的读取权限，目录列举与变更观察仍限定于工作区。
+[Workspace Files](../../../../packages/host/apiproxy/README.zh.md) 保留 Host 的行读取与字节窗口；全文读取由客户端以 `stat` 加锚定版本的 `readBytes` 窗口组合，相对另一文件目录的读取在客户端解析后走同一授权调用。Host 通过 Session 文件系统解析每条路径；文件读取继承该后端的读取权限，目录列举与变更观察仍限定于工作区。
 
-可读取的文件使用 `dsh-resource://file/session/<sessionId>/<path>`。路径可以相对工作区，也可以是绝对路径；编码后的绝对路径保留前导斜杠。`fileAddressFor` 始终生成这种 Session 地址。提供方与 Preview RPC 只从该地址取 Session，不取当前选择、首个持有者或 tab 所属 Session。不带 Session 的 `absolute` URI 无法读取；提供方报告 `workspace-file/unknown-workspace`。Session 授权是文件协议规则，不是额外的 Resource 身份。
+可读取的文件使用 `dsh-resource://file/session/<sessionId>/<path>`，路径为工作区相对路径；`workspaceResourceAddress` 对绝对、带 scheme 或空路径抛错，`source(request)` 拒绝 Session 或路径与编码地址不符的请求。提供方与 Preview 读取器只从该地址取 Session，不取当前选择、首个持有者或 tab 所属 Session；Session 工作区不可用的请求报告 `workspace-file/unknown-session`。Session 授权是文件协议规则，不是额外的 Resource 身份。
 
-[Document Preview](../../../../packages/client/ui-documents/README.zh.md) 负责格式选择和加载策略。元数据通过 `ctx.documentPreviews` 注册；组件单独注册到 keyed `sidebar.right.tab.document` Slot。扩展注册优先于内置注册，其次比较后缀长度和注册顺序。工具栏列出受支持的候选，按 tab 记住手动选择。未知扩展名及文本兼容的渲染器仍可使用纯文本。文本兼容性由注册的二进制后缀决定，与加载方式无关；HTML 和 SVG 不属于二进制后缀，保留源码查看。只有一个候选时不显示查看器控件。注册声明为二进制的后缀不提供纯文本；已知二进制后缀没有注册渲染器时不发起读取，并显示不支持预览的空态（[侧边栏预览打磨](../feature/2026-09-11-sidebar-document-preview-polish.zh.md)）。子组件收到累积文本或完整原生字节、原始资源地址，以及标准 `useResource` 和 `useTabInfo` 钩子。Preview 经普通注入调用既有 `read`、`readAll` 与 `readRelated`，在自己的 `rpc.ts` 解码字节。刷新仍按 tab 独立进行，不引入资源 reload、共享 `changed` 确认、额外资源包装层或内容 Session。
+[工作台文件标签](../../../../packages/client/ui-workbench/README.zh.md) 负责格式选择和加载策略：`WorkspaceFileTab` 按扩展名把打开请求路由到固定正文——分页文本、累计 Markdown、打包 HTML 或 PDF/Office 文档正文——在同一授权标签内完成，不经过渲染器注册表。正文接收同一个 `WorkspaceResourceOpenRequest`、共享 `useTabInfo` 钩子与注入读取器：`readPreview` 读文本分页、`readFileBytes` 读完整字节、`readBytesPreview` 提供有界二进制回退、`readDocument` 做授权 Office 转换。刷新仍按 tab 独立进行，不引入资源 reload、共享 `changed` 确认、额外资源包装层或内容 Session。打包与累计规则由[工作台 HTML/Markdown 预览 note](../feature/2026-09-25-workbench-html-markdown-previews.zh.md) 记录。
 
-Markdown 和代码通过累积的分页文本复用增量渲染原语。HTML、PDF 和图片读取完整 `Uint8Array<ArrayBuffer>` 数据；Host 传输保持 base64。发布后的缓冲区只读借用，绝不持久化进布局或 Session JSON。PDF.js 在自有 Worker 中运行，字体和解码数据以相同版本随包发布，转移输入前先复制，以保留 Preview 的缓冲区。HTML 在 Blob iframe 中运行，设置 `sandbox="allow-scripts"`，不授予同源、弹窗、表单、下载或顶层导航权限。浏览器保持正常的外部网络规则。有上限的静态本地 JS/CSS 读取由父页面负责；不透明源 iframe 创建自己的资源 Blob，因为它不能加载父源创建的 Blob。PNG、JPEG、GIF、WebP、BMP、ICO 和 SVG 使用图片专用 Blob URL，在 `<img>` 静态图片上下文中渲染。比面板宽的图片按纵横比缩小到面板宽度；较小的图片保留固有 CSS 像素尺寸并由 auto margin 居中，较高的图片扩展共享滚动区的纵向范围（[侧边栏预览打磨](../feature/2026-09-11-sidebar-document-preview-polish.zh.md)）。渲染器不提供缩放或拖拽平移。SVG 标记绝不进入应用 DOM 或 iframe，因此脚本保持不可执行，也无法访问父页面。替换 HTML 或图片时会撤销其根 Blob URL。
+Markdown 通过累积的分页文本复用增量渲染原语。HTML 与 PDF 读取完整 `Uint8Array` 数据；Host 传输保持 base64。发布后的缓冲区只读借用，绝不持久化进布局或 Session JSON。PDF.js 在自有 Worker 中运行，字体和解码数据以相同版本随包发布，转移输入前先复制，以保留 Preview 的缓冲区。HTML 在 Blob iframe 中运行，仅设 `sandbox="allow-scripts"`，不授予同源、弹窗、表单、下载或顶层导航权限；替换或卸载预览即吊销外层 Blob URL。浏览器保持正常的外部网络规则。有上限的静态本地 JS/CSS 读取由父页面负责；不透明源 iframe 创建自己的资源 Blob，因为它不能加载父源创建的 Blob。PNG、JPEG、GIF、WebP、AVIF 和 SVG 经 `data:` URL 在 `<img>` 静态图片上下文中渲染，SVG 标记因此绝不进入应用 DOM，其脚本保持不可执行。
 
 PDF.js 官方 TextLayerBuilder 在适配宽度的 canvas 上负责选择边界和复制规范化，共享页面清理，并使用由组件拥有的 resize observer。响应式尺寸适配使用独立的 CSS `scale` 属性，与 PDF.js 的页面旋转和平移变换组合。其内容结束标记和堆叠规则限制空白区域中的选择；换行高亮被抑制。逐页取消使用 builder 的清理操作，而不 abort 第一页的信号，因为官方选择监听器跨页面共享。
 
 ## 考虑过的替代方案
 
-**通过预览元数据中的回调加载转换内容。** 这种回调会让共享文件 store 同时持有源文件字节和格式专属的转换结果。由渲染器自行加载可将转换缓存、错误和字体元数据留在 Office，同时保留共享文件身份和工具栏控件。定义声明 `loading: 'renderer'`；正文接收与格式无关的加载 revision，只报告已展示的源版本。重新加载或替换实现会增加 revision，过期报告会被忽略，正文在替换或卸载时取消待处理工作。Office 在 tab 生命周期内保留已完成的内容，并组合自己的 PDF 子 slot。
+**通过预览元数据中的回调加载转换内容。** 这种回调会让共享文件 store 同时持有源文件字节和格式专属的转换结果。由渲染器自行加载可将转换缓存、错误和字体元数据留在文档正文，同时保留共享文件身份和工具栏控件。正文持有自己的请求生命周期，重新加载或替换后忽略过期报告，并在卸载时取消待处理工作。Office 在 tab 生命周期内保留已完成的内容。
 
 **把方法挂到 Iterator 或其值上。** 这会混淆观察与命令，并在数据帧中重复能力身份。帧携带数据和失败；显式 Preview RPC 回调负责读取。
 
@@ -42,4 +42,4 @@ PDF.js 官方 TextLayerBuilder 在适配宽度的 canvas 上负责选择边界�
 
 ## 影响
 
-替换渲染器不需要改变 Tab 或文件协议。全文格式承担有上限的整文件内存成本，PDF 增加随包发布的 Worker、字体和解码器字节。格式选择和查看状态仅属于当前页面，不是持久 Session 数据。Preview 独立于元数据观察，拥有 RPC 取消和原生缓冲区。tab 保留读取版本及读取开始时捕获的观察版本；刷新它既不丢弃其他 tab 的内容，也不清除其变更提示。文件读取仍非事务，不透明版本只比较相等性、不排序。[录制的浏览器场景](../../../../apps/web/tests/document-manager.e2e.ts) 覆盖共用工具栏、增量文本、隔离的 HTML 依赖、按宽度适配的位图与 SVG 渲染、不可执行的 SVG 脚本，以及惰性连续 PDF Worker 渲染。
+替换预览正文不需要改变 Tab 或文件协议。全文格式承担有上限的整文件内存成本，PDF 增加随包发布的 Worker、字体和解码器字节。格式选择和查看状态仅属于当前页面，不是持久 Session 数据。Preview 独立于元数据观察，拥有 RPC 取消和原生缓冲区。tab 保留读取版本及读取开始时捕获的观察版本；刷新它既不丢弃其他 tab 的内容，也不清除其变更提示。文件读取仍非事务，不透明版本只比较相等性、不排序。[录制的浏览器场景](../../../../apps/web/tests/workspace-files.e2e.ts) 覆盖增量文本、Markdown 渲染、打包的不透明 HTML frame 与共享的变更/重载路径；[workspace-office.e2e.ts](../../../../apps/web/tests/workspace-office.e2e.ts) 覆盖授权的 Office 正文。

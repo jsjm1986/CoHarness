@@ -24,6 +24,24 @@ import { assertSupportedJsonSchema } from '@deepseek-ai/dsh-tools'
 import type { JsonSchemaNode } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Wrap the actual MCP transport call with server-specific deployment policy.
+     * Listeners for other servers delegate without changing the execution.
+     * @mode waterfall
+     * @param serverName - configured MCP server identity.
+     * @param invocation - immutable caller and invocation-owned transport cancellation.
+     * @param next - dispatch the request once policy admits it.
+     */
+    'mcp/tool-call'(
+      serverName: string,
+      invocation: { readonly execution: ToolExecution; signal: AbortSignal },
+      next: () => Promise<unknown>,
+    ): Promise<unknown>
+  }
+}
+
 /** Resolved options relevant to tool bridging. */
 export interface ToolBridgeOptions {
   /** Whether a registry conflict is contained or rejects this synchronization. */
@@ -135,10 +153,13 @@ export async function syncTools(
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
       taskRequired: tool.execution?.taskSupport === 'required',
-      call: (args, execution) => client.callTool(
-        { name: tool.name, arguments: args },
-        { signal: execution.signal, timeout: opts.toolCallTimeoutMs, toolDefinition: tool },
-      ),
+      call: (args, execution) => {
+        const invocation = { execution, signal: execution.signal }
+        return ctx.waterfall('mcp/tool-call', opts.serverName, invocation, () => client.callTool(
+          { name: tool.name, arguments: args },
+          { signal: invocation.signal, timeout: opts.toolCallTimeoutMs, toolDefinition: tool },
+        ))
+      },
     }))
   }
 

@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 const PACKAGES_DIR = fileURLToPath(new URL('../../../', import.meta.url))
 const RUNTIME_TOKENS = new Set([
   '--dsw-viewport-height',
+  '--dsw-font',
 ])
 
 function cssFiles(root: string): string[] {

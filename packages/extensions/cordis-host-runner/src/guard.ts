@@ -20,8 +20,11 @@ import { assertSupportedJsonSchema, defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
+import { authorizeDynamicHostExecution } from './authorization.ts'
 
 const DYNAMIC_TOOL = Symbol('cordis-host-runner.dynamic-tool')
+/** Resolve a facade to its owner without exposing the real Context to Plugin code. */
+const contextOwners = new WeakMap<Context, Context>()
 const SCHEMA_TYPES = new Set<unknown>(['string', 'number', 'integer', 'boolean', 'null', 'object', 'array', 'json'])
 const VALID_TYPES = '\'string\' | \'number\' | \'integer\' | \'boolean\' | \'null\' | \'object\' | \'array\' | \'json\''
 const ANNOTATION_KEYS = ['description', 'title', 'default', 'examples'] as const
@@ -625,7 +628,15 @@ export function normalizeHandler(method: unknown, fn: unknown): { method: string
  */
 export function sandboxRegisterTool(ctx: Context, tool: unknown): () => void {
   assertDynamicTool(tool)
-  return ctx.tools.register(tool)
+  const owner = contextOwners.get(ctx) ?? ctx
+  return owner.tools.register({
+    ...tool,
+    async execute(args, exec) {
+      await authorizeDynamicHostExecution(owner)
+      owner.fiber.assertActive()
+      return tool.execute(args, exec)
+    },
+  })
 }
 
 /**
@@ -750,7 +761,7 @@ function sandboxContext(ctx: Context, reportFailure: (error: Error) => void): Co
   // in separate programs where `Context` merges different service keys — so the
   // duplication is declared here instead of hidden behind a config exception.
   /* jscpd:ignore-start */
-  return new Proxy({}, {
+  const guarded = new Proxy({}, {
     get(_target, prop) {
       if (prop === 'tools') return tools
       if (prop === 'get') return get
@@ -778,6 +789,8 @@ function sandboxContext(ctx: Context, reportFailure: (error: Error) => void): Co
         && ((CTX_VERBS.has(prop) && (!TIMER_VERBS.has(prop) || declared.has('timer'))) || declared.has(prop))),
   }) as unknown as Context
   /* jscpd:ignore-end */
+  contextOwners.set(guarded, ctx)
+  return guarded
 }
 
 /**
@@ -804,16 +817,22 @@ export function guardedPlugin(plugin: Plugin, reportFailure: (error: Error) => v
     const functionPlugin = plugin as (ctx: Context, config?: unknown) => unknown
     return {
       name: pluginName(plugin),
-      apply(ctx: Context, config?: unknown) {
-        return functionPlugin(sandboxContext(ctx, reportFailure), config)
+      apply(ctx: Context, config?: unknown): unknown {
+        return authorizeDynamicHostExecution(ctx).then(() => {
+          ctx.fiber.assertActive()
+          return functionPlugin(sandboxContext(ctx, reportFailure), config)
+        })
       },
     }
   }
   const objectPlugin = plugin as { apply(ctx: Context, config?: unknown): unknown }
   return {
     ...plugin,
-    apply(ctx: Context, config?: unknown) {
-      return objectPlugin.apply(sandboxContext(ctx, reportFailure), config)
+    apply(ctx: Context, config?: unknown): unknown {
+      return authorizeDynamicHostExecution(ctx).then(() => {
+        ctx.fiber.assertActive()
+        return objectPlugin.apply(sandboxContext(ctx, reportFailure), config)
+      })
     },
   }
 }

@@ -148,12 +148,12 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || process.platform === 'win32')
   const marker = join(root, 'browser.json')
   const wrapper = join(root, 'chrome.mjs')
   const sockets = new Set<import('node:stream').Duplex>()
-  const connected: PromiseWithResolvers<void> = Promise.withResolvers()
+  const connected: PromiseWithResolvers<undefined> = Promise.withResolvers()
   const stalled = createServer()
   stalled.on('upgrade', (_request, socket) => {
     sockets.add(socket)
     socket.on('close', () => { sockets.delete(socket) })
-    connected.resolve()
+    connected.resolve(undefined)
   })
   const ctx = new Context()
   vi.stubEnv('BROWSER_FIXTURE_API_TOKEN', 'do-not-forward')
@@ -208,15 +208,15 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1' || process.platform === 'win32')
 it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')('drains canceled navigation before reconnecting to the same Chromium tabs', { timeout: 120_000, retry: 0 }, async () => {
   const executable = process.env.DSH_BROWSER_EXECUTABLE
   if (executable === undefined) throw new Error('DSH_STAGEHAND_E2E requires DSH_BROWSER_EXECUTABLE')
-  const entered: PromiseWithResolvers<void> = Promise.withResolvers()
-  const release: PromiseWithResolvers<void> = Promise.withResolvers()
+  const entered: PromiseWithResolvers<undefined> = Promise.withResolvers()
+  const release: PromiseWithResolvers<undefined> = Promise.withResolvers()
   const server = createServer((request, response) => {
     const send = () => {
       response.setHeader('content-type', 'text/html')
       response.end('<!doctype html><title>Retained browser</title><h1>Keep this page</h1>')
     }
     if (request.url === '/pending') {
-      entered.resolve()
+      entered.resolve(undefined)
       void release.promise.then(send)
     } else send()
   })
@@ -239,7 +239,7 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')('drains canceled navigation bef
     const navigation = call('navigate', { url })
     await entered.promise
     owner.agent.cancel({ kind: 'user' })
-    release.resolve()
+    release.resolve(undefined)
     expect((await navigation).isError).toBe(true)
     const tabs = await call('tabs', { action: 'list' })
     expect(tabs.isError, JSON.stringify(tabs.content)).toBe(false)
@@ -247,7 +247,7 @@ it.skipIf(process.env.DSH_STAGEHAND_E2E !== '1')('drains canceled navigation bef
     expect(JSON.stringify(tabs.content)).toContain('Retained browser')
     await owner.dispose()
   } finally {
-    release.resolve()
+    release.resolve(undefined)
     await ctx.fiber.dispose()
     server.closeAllConnections()
     await new Promise<void>((resolve, reject) => { server.close((error) => { if (error) reject(error); else resolve() }) })

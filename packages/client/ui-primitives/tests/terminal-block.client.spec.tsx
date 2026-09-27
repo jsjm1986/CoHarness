@@ -100,13 +100,27 @@ describe('TerminalBlock prompt label', () => {
 })
 
 describe('TerminalBlock states', () => {
-  it('running shows the command line only: no output, no placeholder, no copy', () => {
+  it('running shows the output received so far without a placeholder or copy control', () => {
     const view = render(<TerminalBlock command="sleep 5" running output="partial" />)
     expect(view.getByText('sleep 5')).toBeTruthy()
-    expect(view.queryByText('partial')).toBeNull()
+    expect(view.getByText('partial')).toBeTruthy()
     expect(view.queryByText('无输出')).toBeNull()
     expect(view.queryByRole('button')).toBeNull()
     expect(view.container.firstElementChild?.getAttribute('data-running')).toBe('')
+    expect(view.container.firstElementChild?.getAttribute('data-body')).toBe('')
+  })
+
+  it('keeps an empty running command banner-only and displays later output in order', () => {
+    const view = render(<TerminalBlock command="slow command" running />)
+    expect(view.container.firstElementChild?.hasAttribute('data-body')).toBe(false)
+    expect(view.queryByText('无输出')).toBeNull()
+    view.rerender(<TerminalBlock command="slow command" running output={'first\nsecond\n'} />)
+    expect(outputLines(view.container)).toEqual(['first', 'second'])
+    expect(runStateOf(view.container)).toEqual({ state: 'ongoing', label: '运行中' })
+    expect(view.queryByRole('button', { name: '复制' })).toBeNull()
+    view.rerender(<TerminalBlock command="slow command" output={'first\nsecond\n'} exitCode={0} />)
+    expect(outputLines(view.container)).toEqual(['first', 'second'])
+    expect(view.getByRole('button', { name: '复制' })).toBeTruthy()
   })
 
   it('running still shows a settled-looking status pill when one is supplied', () => {
@@ -182,13 +196,28 @@ describe('TerminalBlock states', () => {
 })
 
 describe('TerminalBlock status pill', () => {
+  it('renders the no-exit-code pill for an explicitly unknown settled exit', () => {
+    const view = render(<TerminalBlock command="terminated" output="partial" exitCode={null} />)
+    expect(view.getByText('无退出码')).toBeTruthy()
+    expect(view.queryByText('退出码 null')).toBeNull()
+    expect(runStateOf(view.container).state).not.toBe('done')
+    view.rerender(<TerminalBlock command="terminated" output="partial" exitCode={null} signal="SIGTERM" />)
+    expect(view.getByText('信号 SIGTERM')).toBeTruthy()
+    expect(view.queryByText('无退出码')).toBeNull()
+  })
+
   it('renders no pill for a clean exit', () => {
     const view = render(<TerminalBlock command="true" output="a" exitCode={0} />)
     expect(view.queryByText(/退出码|信号/u)).toBeNull()
   })
 
-  it('renders no pill while the exit status is unknown', () => {
+  it('renders the no-exit-code pill when a settled command reported no status', () => {
     const view = render(<TerminalBlock command="ls" output="a" />)
+    expect(view.getByText('无退出码')).toBeTruthy()
+  })
+
+  it('renders no status pill while the command still runs', () => {
+    const view = render(<TerminalBlock command="sleep 5" running />)
     expect(view.queryByText(/退出码|信号/u)).toBeNull()
   })
 
@@ -215,9 +244,9 @@ describe('TerminalBlock run-state dot', () => {
     expect(runStateOf(view.container)).toEqual({ state: 'done', label: '已完成' })
   })
 
-  it('counts a settled command with no exit status as a clean settle', () => {
+  it('shows the error dot for a settled command whose exit status never arrived', () => {
     const view = render(<TerminalBlock command="ls" output="a" />)
-    expect(runStateOf(view.container)).toEqual({ state: 'done', label: '已完成' })
+    expect(runStateOf(view.container)).toEqual({ state: 'error', label: '失败' })
   })
 
   it('shows the error dot for a non-zero exit', () => {

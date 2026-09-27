@@ -905,7 +905,7 @@ describe('PersistenceCoordinator session preparations', () => {
     await ctx.plugin(SessionStore)
     const medium = new ControlledBackend()
     const id = SessionId('legacy-prefix-read')
-    const stored = { meta: { ...meta(id), version: 0 } as unknown as SessionHeader, events: oneTurnLog() }
+    const stored = { meta: { ...meta(id), version: 2 } as unknown as SessionHeader, events: oneTurnLog() }
     medium.store.set(id, stored)
     const migrateStored = vi.fn(async (
       _source: StoredPrefix<never>, target: SessionStorageMetadata, _events: readonly SessionEvent[],
@@ -927,14 +927,14 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(4)
+      expect(suffix.meta.version).toBe(6)
       expect(suffix.events.map(event => event.type)).toEqual([
         'step/start', 'system/message', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
-      expect(stored.meta.version).toBe(0)
+      expect(stored.meta.version).toBe(2)
       // V2→V3 inserts a durable system node, so a metadata-only backend hook
       // cannot publish the successor without rewriting its body.
-      expect(medium.store.get(id)?.meta.version).toBe(0)
+      expect(medium.store.get(id)?.meta.version).toBe(2)
       expect(migrateStored).toHaveBeenCalledTimes(0)
     } finally {
       await fiber.dispose()
@@ -946,11 +946,10 @@ describe('PersistenceCoordinator session preparations', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const medium = new ControlledBackend()
-    // The v2→v3 catalog inserts a system node only per open step; a legacy log
-    // without step/start migrates with an identical body, so the coordinator
-    // can publish a current-version successor in place.
+    // v4→v6 changes only the header version, so the coordinator can publish a
+    // current-version successor in place with an identical body.
     const storedFor = (id: string): { meta: SessionHeader; events: SessionEvent[] } => ({
-      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
+      meta: { ...meta(id), version: 4 } as unknown as SessionHeader,
       events: [
         { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
         { type: 'user/message', seq: SessionSeq(1), time: 2, data: freezeMessage({
@@ -990,13 +989,13 @@ describe('PersistenceCoordinator session preparations', () => {
     try {
       // The sequential readFrom path publishes the successor through its prefix read.
       const suffix = await coordinator.readFrom(readId, SessionLogOffset(0))
-      expect(suffix.meta.version).toBe(4)
+      expect(suffix.meta.version).toBe(6)
       expect(suffix.events.map(event => event.type)).toEqual(['turn/start', 'user/message', 'turn/end'])
-      expect(medium.store.get(readId)?.meta.version).toBe(4)
+      expect(medium.store.get(readId)?.meta.version).toBe(6)
       // The cold load path publishes through its preparation pass.
       const loaded = await coordinator.load(loadId)
-      expect(loaded.meta.version).toBe(4)
-      expect(medium.store.get(loadId)?.meta.version).toBe(4)
+      expect(loaded.meta.version).toBe(6)
+      expect(medium.store.get(loadId)?.meta.version).toBe(6)
       expect(migrateStored).toHaveBeenCalledTimes(2)
       // Re-running a load over the already-published log is a no-op.
       await coordinator.load(readId)
@@ -1016,7 +1015,7 @@ describe('PersistenceCoordinator session preparations', () => {
     // coordinator migrates only its in-memory view — including the ownerless
     // claim's seed-vs-stored comparison.
     backend.store.set(id, {
-      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
+      meta: { ...meta(id), version: 2 } as unknown as SessionHeader,
       events: oneTurnLog(),
     })
     let coordinator!: PersistenceCoordinator<never>
@@ -1025,12 +1024,12 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const loaded = await coordinator.load(id)
-      expect(loaded.meta.version).toBe(4)
-      expect(backend.store.get(id)?.meta.version).toBe(0)
+      expect(loaded.meta.version).toBe(6)
+      expect(backend.store.get(id)?.meta.version).toBe(2)
 
       const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })
       await expect(ctx.sessions.flush(resumed)).resolves.toBe(true)
-      expect(backend.store.get(id)?.meta.version).toBe(0)
+      expect(backend.store.get(id)?.meta.version).toBe(2)
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()

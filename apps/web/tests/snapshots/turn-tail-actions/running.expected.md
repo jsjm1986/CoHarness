@@ -9,6 +9,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "Open right sidebar":
+    - img
 - button "1 tool call · 1 intermediate message" [expanded]:
   - text: 1 tool call · 1 intermediate message
   - img
@@ -16,7 +18,8 @@
   - img
   - img
   - text: System prompt
-- text: Begin your reply with the plain sentence "Reading the workspace now." as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop. {{clock}}
+- text: Begin your reply with the plain sentence "Reading the workspace now." as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop.
+- group "Message timing": "{{clock}}"
 - button "Copy":
   - img
 - tooltip "Copy"
@@ -48,10 +51,11 @@
   - img
 - button "6% of context used"
 - button "Stop generating"
-- button "1 turns · 1 steps · {{throughput}} tok/s":
-  - img
-  - text: 1 turns · 1 steps{{throughput}} tok/s
-- button "7.9K tok · Cache hit 0%":
-  - img
-  - text: 7.9K tokCache hit 0%
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "7.9K tok · Cache hit 0%":
+    - img
+    - text: 7.9K tokCache hit 0%
 - separator "Adjust transcript content width"

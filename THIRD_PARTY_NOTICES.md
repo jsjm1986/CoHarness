@@ -39,12 +39,14 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/push-notifications`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-harness/libreoffice-kit) | MPL-2.0 |
 | [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi) | MIT |
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |
 | [`@modelcontextprotocol/client`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) | MIT |
+| [`@octokit/webhooks`](https://github.com/octokit/webhooks.js) | MIT |
 | [`@openai/codex`](https://github.com/openai/codex) | Apache-2.0 |
 | [`@opentelemetry/api`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
 | [`@opentelemetry/api-logs`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
@@ -58,6 +60,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@standard-schema/spec`](https://github.com/standard-schema/standard-schema) | MIT |
 | [`@trycua/cua-driver`](https://github.com/trycua/cua) | MIT |
 | [`@vscode/ripgrep`](https://github.com/microsoft/vscode-ripgrep) | MIT |
+| [`@xterm/addon-serialize`](https://github.com/xtermjs/xterm.js/tree/master/addons/addon-serialize) | MIT |
 | [`@xterm/headless`](https://github.com/xtermjs/xterm.js) | MIT |
 | [`anser`](https://github.com/IonicaBizau/anser) | MIT |
 | [`chokidar`](https://github.com/paulmillr/chokidar) | MIT |
@@ -106,6 +109,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 
 pnpm applies local patches to the following packages at install time, so shipped artifacts carry modified copies; each patch file is the complete record of the modification:
 
+- `@yao-pkg/pkg@6.21.0` — [`patches/@yao-pkg__pkg@6.21.0.patch`](patches/@yao-pkg__pkg@6.21.0.patch)
 - `node-pty@1.2.0-beta.15` — [`patches/node-pty@1.2.0-beta.15.patch`](patches/node-pty@1.2.0-beta.15.patch)
 
 ## Official Claude Code platform payloads
@@ -125,6 +129,12 @@ The installed SDK 0.3.263 declares the following optional platform packages. Eac
 | [`@anthropic-ai/claude-agent-sdk-win32-arm64`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk-win32-arm64) | 0.3.263 | SEE LICENSE IN LICENSE.md |
 | [`@anthropic-ai/claude-agent-sdk-win32-x64`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk-win32-x64) | 0.3.263 | SEE LICENSE IN LICENSE.md |
 
+
+## LibreOffice conversion kit
+
+`@deepseek-ai/libreoffice-kit`, `@deepseek-ai/libreoffice-kit-wasm`, `@deepseek-ai/libreoffice-kit-darwin-arm64`, `@deepseek-ai/libreoffice-kit-darwin-x64`, `@deepseek-ai/libreoffice-kit-win32-arm64`, `@deepseek-ai/libreoffice-kit-win32-x64` declare MPL-2.0, which remains outside the permissive-license allowlist; the notices check accepts only these package identities at those terms. The [distribution decision](.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md) records the source obligations.
+
+The [kit repository](https://github.com/deepseek-harness/libreoffice-kit) supplies the corresponding LibreOffice source pin, modifications, build instructions, Node API, and artifact validation. Its engine packages retain their license and third-party notices; the Node API retains its MPL-2.0 declaration and NOTICE. Recipients must have access to those corresponding sources and notices.
 
 ## Development-only npm dependencies
 
@@ -157,6 +167,9 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`@types/ws`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@vitejs/plugin-react`](https://github.com/vitejs/vite-plugin-react) | MIT |
 | [`@vitest/coverage-v8`](https://github.com/vitest-dev/vitest) | MIT |
+| [`@xterm/addon-fit`](https://github.com/xtermjs/xterm.js/tree/master/addons/addon-fit) | MIT |
+| [`@xterm/xterm`](https://github.com/xtermjs/xterm.js) | MIT |
+| [`@yao-pkg/pkg`](https://github.com/yao-pkg/pkg) | MIT |
 | [`@yarnpkg/cli-dist`](https://github.com/yarnpkg/berry) | BSD-2-Clause |
 | [`cytoscape`](https://github.com/cytoscape/cytoscape.js) | MIT |
 | [`cytoscape-cose-bilkent`](https://github.com/cytoscape/cytoscape.js-cose-bilkent) | MIT |
@@ -164,6 +177,7 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`debug`](https://github.com/debug-js/debug) | MIT |
 | [`esbuild`](https://github.com/evanw/esbuild) | MIT |
 | [`eslint-plugin-sonarjs`](https://github.com/SonarSource/SonarJS) | LGPL-3.0-only |
+| [`extract-zip`](https://github.com/maxogden/extract-zip) | BSD-2-Clause |
 | [`fast-check`](https://github.com/dubzzz/fast-check) | MIT |
 | [`istanbul-lib-report`](https://github.com/istanbuljs/istanbuljs) | BSD-3-Clause |
 | [`jscpd`](https://github.com/kucherenko/jscpd) | MIT |
@@ -174,6 +188,7 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`mermaid`](https://github.com/mermaid-js/mermaid) | MIT |
 | [`oxlint`](https://github.com/oxc-project/oxc) | MIT |
 | [`oxlint-tsgolint`](https://github.com/oxc-project/tsgolint) | MIT |
+| [`pdfjs-dist`](https://github.com/mozilla/pdf.js) | Apache-2.0 |
 | [`playwright`](https://github.com/microsoft/playwright) | Apache-2.0 |
 | [`pnpm`](https://github.com/pnpm/pnpm) | MIT |
 | [`publint`](https://github.com/publint/publint) | MIT |
@@ -181,6 +196,7 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`react-dom`](https://github.com/react/react) | MIT |
 | [`smol-toml`](https://github.com/squirrelchat/smol-toml) | BSD-3-Clause |
 | [`spdx-expression-parse`](https://github.com/jslicense/spdx-expression-parse.js) | MIT |
+| [`tar`](https://github.com/isaacs/node-tar) | BlueOak-1.0.0 |
 | [`tsdown`](https://github.com/rolldown/tsdown) | MIT |
 | [`typescript-language-server`](https://github.com/typescript-language-server/typescript-language-server) | Apache-2.0 |
 | [`use-sync-external-store`](https://github.com/facebook/react) | MIT |

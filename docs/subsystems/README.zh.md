@@ -51,6 +51,10 @@
 | [invariants.md](invariants.zh.md) | 运行时不变式注册表：选择配置 `Config`、`InvariantInstaller`/`InvariantFailure`、空配套插件约定 |
 | [web-server.md](web-server.zh.md) | HTTP 载体：`WebRouteKind`/`WebRoute`、匹配顺序、可认领的回退席位、index 渲染挂接点 |
 | [storage.md](storage.zh.md) | 存储子系统：后端约定（`StorageBackend`）、`StorageForms`、`DomainSpec`/`Domain`、`domain/changed` |
+| [deliverables.md](deliverables.zh.md) | 显式文件交付声明与已记录的工作区轮次比较 |
+| [office-to-pdf.md](office-to-pdf.zh.md) | 已授权的延迟 Office 转换、有界 PDF 结果及预览适配 |
+| [ssh.md](ssh.zh.md) | POSIX 远端文件、进程与沙箱共享的 SSH 连接及生命周期 |
+| [webhook.md](webhook.zh.md) | 即发即弃的 Webhook 运行时：`WebhookSessionRequest`、受信任规则注册表与提供方自持的交付接收 |
 | [workspace.md](workspace.zh.md) | 工作区注册表：`Workspace`/`WorkspaceId`、注册与解析、与会话 `cwd` 的关系 |
 | [client-modules.md](client-modules.zh.md) | Web 插件表：`dsh.client` 声明、`WebBootGraph` 线上组合、bundle 路由与 index 转换 |
 | [web-client.md](web-client.zh.md) | 浏览器端 Cordis 应用：四大基础（Client Modules、API Gateway、Slots、Conversation）以及 Client 模型与功能包的归属 |

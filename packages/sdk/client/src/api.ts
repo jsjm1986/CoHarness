@@ -10,8 +10,9 @@
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
-import { HarnessClient, isRecord, SdkProtocolError } from './client.ts'
-import type { ContentBlock, DeepSeekHarnessOptions, HarnessClientOptions, HarnessNotification, RunResult } from './types.ts'
+import { createProcessHarnessClient, HarnessClient, isRecord, SdkProtocolError } from './client.ts'
+import type { RuntimeProcessOptions } from './launch.ts'
+import type { ContentBlock, SdkPromptContentBlock, DeepSeekHarnessOptions, HarnessNotification, RunResult } from './types.ts'
 
 const sessionTailsByHarness = new WeakMap<object, Map<string, Promise<unknown>>>()
 
@@ -37,7 +38,7 @@ function serializeSessionRun<T>(harness: object, sessionId: string, operation: (
  */
 export class DeepSeekHarness implements AsyncDisposable {
   private clientInstance: HarnessClient
-  private readonly launch: HarnessClientOptions
+  private readonly createClient: () => HarnessClient
   private readonly cwd: string
   private readonly provider: string
   private readonly model: string
@@ -47,13 +48,14 @@ export class DeepSeekHarness implements AsyncDisposable {
   private closed = false
 
   /** @param options - runtime launch spec plus the session route (cwd/provider/model). */
-  constructor(options: DeepSeekHarnessOptions) {
-    this.launch = options.launch
-    this.clientInstance = new HarnessClient(options.launch)
+  constructor(options?: DeepSeekHarnessOptions)
+  constructor(options: DeepSeekHarnessOptions = {}, clientFactory?: () => HarnessClient) {
+    this.createClient = clientFactory ?? (() => new HarnessClient(options))
+    this.clientInstance = this.createClient()
     // Absolute before the handshake: the child spawns relative to THIS
     // process's cwd, but the wire cwd is resolved again inside the child — a
     // relative value would double-resolve (e.g. `worker` → `worker/worker`).
-    this.cwd = resolve(options.cwd ?? options.launch.cwd ?? process.cwd())
+    this.cwd = resolve(options.cwd ?? options.processCwd ?? process.cwd())
     this.provider = options.provider ?? 'deepseek-official'
     this.model = options.model ?? 'deepseek-v4-flash'
     this.reasoningEffort = options.reasoningEffort
@@ -98,7 +100,7 @@ export class DeepSeekHarness implements AsyncDisposable {
             'DeepSeek Harness initialization and cleanup failed',
           )
         }
-        if (!this.closed) this.clientInstance = new HarnessClient(this.launch)
+        if (!this.closed) this.clientInstance = this.createClient()
         throw error
       }
     })()
@@ -121,7 +123,7 @@ export class DeepSeekHarness implements AsyncDisposable {
    * @param options - optional session id and per-notification observer.
    * @returns the owned activity interval.
    */
-  run(input: string | ContentBlock[], options?: RunOptions): Promise<RunResult> {
+  run(input: string | SdkPromptContentBlock[], options?: RunOptions): Promise<RunResult> {
     return this.session(options?.sessionId).run(input, options)
   }
 
@@ -154,6 +156,26 @@ export class DeepSeekHarness implements AsyncDisposable {
   }
 }
 
+/**
+ * Construct the high-level API against a generic process for package-local fake-runtime tests.
+ * @param runtime - resolved process and transport limits.
+ * @param options - workspace and model routing options.
+ * @returns a harness retaining production session serialization and retry cleanup.
+ */
+export function createProcessDeepSeekHarness(
+  runtime: RuntimeProcessOptions,
+  options: DeepSeekHarnessOptions = {},
+): DeepSeekHarness {
+  const Constructor = DeepSeekHarness as unknown as new (
+    publicOptions: DeepSeekHarnessOptions,
+    clientFactory: () => HarnessClient,
+  ) => DeepSeekHarness
+  return new Constructor({
+    ...runtime.cwd === undefined ? {} : { processCwd: runtime.cwd },
+    ...options,
+  }, () => createProcessHarnessClient(runtime))
+}
+
 /** Per-run options: target session and streaming observer. */
 export interface RunOptions {
   /** Session id to run on; omitted mints a fresh session per call. */
@@ -179,11 +201,11 @@ export class HarnessSession {
    * @returns the owned activity interval; rejects on transport loss, timeout,
    * or a protocol error.
    */
-  run(input: string | ContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
+  run(input: string | SdkPromptContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
     return serializeSessionRun(this.harness as object, this.id, () => this.runOnce(input, options))
   }
 
-  private async runOnce(input: string | ContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
+  private async runOnce(input: string | SdkPromptContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
     await this.harness.start()
     const client = this.harness.client
     const contentBlocks = normalizeInput(input)
@@ -239,7 +261,7 @@ export class HarnessSession {
  * @param input - prompt text or content blocks.
  * @returns the content blocks to send.
  */
-export function normalizeInput(input: string | ContentBlock[]): ContentBlock[] {
+export function normalizeInput(input: string | SdkPromptContentBlock[]): SdkPromptContentBlock[] {
   return typeof input === 'string' ? [{ type: 'text', text: input }] : input
 }
 

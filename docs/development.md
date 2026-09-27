@@ -134,7 +134,7 @@ Batch related repairs and focused verification before pushing. Rerun failed jobs
 
 `pnpm run test:web:focused -- --scenarios '<JSON array>'` runs registered scenario keys against an already complete build; the array must include every required smoke scenario. Use `--print-plan` to inspect the selection before execution. Groups and exact scenarios are mutually exclusive. `pnpm run verify:web-fixtures -- --focused --scenarios '<JSON array>'` validates recorded Session inputs before building. Local `DSH_SNAPSHOT=refresh` changes only the selected owners; follow it with the same selection under `DSH_SNAPSHOT=replay`. Keep complete assembly scenarios for shared chrome and capture feature goldens at their owning region without weakening text, state, order, or geometry assertions.
 
-`pnpm run verify-plugin-surfaces` reports the runtime-plugin, static-client, Bundle, and browser-prefetch partition without adding runtime metadata. Ordinary Web launches keep client-plugin HMR disabled so the host does not poll client bundles; set `DSH_CLIENT_HMR=1` when `pnpm run dev:web` is rebuilding bundles and no-refresh reloads are required. `pnpm run perf:command -- --label <name> -- <command> [args...]` measures a built command with warm-up and P95 output; keep performance measurements outside correctness tests and compare like-for-like Node, platform, and artifact builds.
+`pnpm run verify-plugin-surfaces` reports the runtime-plugin, static-client, Bundle, and browser-prefetch partition without adding runtime metadata. Ordinary Web launches deliver plugin roster changes to open pages without polling artifacts; set `DSH_CLIENT_HMR=1` when `pnpm run dev:web` is rebuilding bundles and no-refresh code replacement is required. `pnpm run perf:command -- --label <name> -- <command> [args...]` measures a built command with warm-up and P95 output; keep performance measurements outside correctness tests and compare like-for-like Node, platform, and artifact builds.
 
 ### Demos
 
@@ -150,7 +150,7 @@ The one-shot Headless coding agent needs `DEEPSEEK_API_KEY` in the environment o
 pnpm dsh --profile headless "summarize this workspace"
 ```
 
-The self-referential cordis demo can inspect and modify its live plugin runtime and needs the same credentials (`web` by default, or `acp`):
+The Cordis demo provides read-only inspection of its live runtime and needs the same credentials (`web` by default, or `acp`):
 
 ```sh
 pnpm run demo:cordis

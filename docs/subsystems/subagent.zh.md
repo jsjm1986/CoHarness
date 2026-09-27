@@ -27,12 +27,11 @@ Service Definition：[dsh-subagent](../../packages/subagent/subagent)（`ctx.sub
  * to `maxDepth`; the other names match.
  */
 interface SubagentCapabilities {
+  readonly agentOptions: boolean
   readonly outputSchema: boolean
   readonly depthLimit: boolean
   readonly toolFilter: boolean
   readonly persona: boolean
-  /** Whether the provider honors provider/model/reasoning Agent options. */
-  readonly agentOptions?: boolean
 }
 ```
 
@@ -67,6 +66,13 @@ interface SubagentStartRequest {
    * remaining turn work when it fires afterward.
    */
   readonly signal: AbortSignal
+  /**
+   * Optional host-Agent provider, model, reasoning-effort, and output-token
+   * overrides. Requires {@link SubagentCapabilities.agentOptions}; in-process
+   * providers merge them over the parent Agent's options when they create the
+   * child, while the DSH SDK provider merges them over its instance defaults
+   * before initializing the separate child runtime.
+   */
   readonly agentOptions?: AgentOptions
   /**
    * Object-rooted JSON Schema within `assertObjectJsonSchema`'s enforced subset. Start rejects
@@ -170,6 +176,8 @@ interface AgentMessageSource {
   readonly form: 'relay'
   /** Session id of the Agent whose tool call produced the message. */
   readonly senderSessionId: SessionId
+  /** Participants captured when the sender produced this delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
 }
 ```
 
@@ -209,6 +217,8 @@ interface SubagentSettledMessageSource {
   readonly summary: string
   /** Session id of the child that settled. */
   readonly senderSessionId: SessionId
+  /** Participants captured when the sender produced this delivery. */
+  readonly gatewayExecutionScope?: ExecutionInheritance
 }
 ```
 
@@ -410,7 +420,13 @@ interface SubagentProvider {
    * It says nothing about tool registration, injected services, or authority inheritance.
    */
   readonly inheritsParentContext: boolean
-  /** Optional static route defaults used when model selection is enabled. */
+  /**
+   * Optional static provider-owned provider/model route. One-shot consumers
+   * merge caller overrides over these values before preflight, and the
+   * continuation manager merges the continuable request's `agentOptions` over
+   * them the same way; providers whose route derives from the parent omit it.
+   * The value is detached immutable data.
+   */
   readonly agentRouteDefaults?: Readonly<{ provider: string; model: string }>
   /**
    * Establish a ONE-SHOT child and return its handle after publication.

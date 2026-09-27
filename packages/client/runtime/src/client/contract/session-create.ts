@@ -9,6 +9,8 @@ export interface SessionCreateOptions {
   readonly draftId?: SessionDraftId
   /** Project-conversation visibility supplied by an optional collaboration plugin. */
   readonly visibility?: 'project' | 'private'
+  /** Registered SSH target the session executes on; fixed at creation. */
+  readonly sshTarget?: number
 }
 
 /** One existing blank session offered against fully prepared root-create options. */

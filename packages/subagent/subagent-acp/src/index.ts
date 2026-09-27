@@ -8,17 +8,28 @@
  */
 
 import { accessSync, constants, statSync } from 'node:fs'
-import { isAbsolute, resolve } from 'node:path'
+import { homedir } from 'node:os'
+import { isAbsolute, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
+  ContinuableCreateRequest,
+  ContinuableCreateSpec,
   ResolvedSubagentStartRequest,
   SubagentCapabilities,
   SubagentProvider,
   SubagentStartRequest,
 } from '@deepseek-ai/dsh-subagent'
+import { ExternalBindingStore } from '@deepseek-ai/dsh-subagent/external'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { acpConfigurationFailure, type AcpRunSpec, DEFAULT_DISPOSE_EOF_GRACE_MS, DEFAULT_DISPOSE_GRACE_MS, type PermissionPolicy, startAcpRun } from './run.ts'
+import {
+  ACP_MEMBER_MODEL,
+  ACP_MEMBER_ROUTE,
+  AcpMemberAdapter,
+  AcpMemberTransport,
+  type AcpMemberConfig,
+} from './member.ts'
 
 export const name = 'subagent-acp'
 export const inject = ['subagents', 'subprocess']
@@ -61,6 +72,28 @@ export interface Config {
   disposeEofGraceMs?: number
   /** Termination-escalation grace (ms); must not exceed `MAX_TIMER_DELAY_MS`. */
   disposeGraceMs?: number
+  /**
+   * Enable persistent members: the provider gains `prepareContinuable`, so
+   * Team members run as in-process continuation-managed children whose model
+   * calls drive durable ACP sessions through `session/load`. Requires the
+   * configured agent to advertise `loadSession`; the provider probes that
+   * capability at member creation and rejects agents that cannot resume.
+   * Default `false`: the provider stays one-shot only and continuable starts
+   * are rejected.
+   */
+  resume?: boolean
+  /**
+   * Directory holding the member binding store (`<stateDir>/acp.jsonl`),
+   * mapping each durable child session to its ACP session id and pending
+   * prompt. Used only when {@link resume} is enabled; defaults under `~/.dsh`.
+   */
+  stateDir?: string
+  /**
+   * Workspace for member ACP sessions. Member turns have no parent session to
+   * inherit one from; defaults to {@link cwd}, else the harness launch
+   * directory. Used only when {@link resume} is enabled.
+   */
+  memberCwd?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -72,6 +105,9 @@ export const Config: z<Config> = z.object({
   env: z.dict(z.string()).default({}),
   disposeEofGraceMs: z.number().default(DEFAULT_DISPOSE_EOF_GRACE_MS),
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
+  resume: z.boolean().default(false),
+  stateDir: z.string(),
+  memberCwd: z.string(),
 })
 
 /** A dispose grace must fit the single Node timer that owns its teardown tier. */
@@ -81,8 +117,10 @@ function assertPositiveFinite(name: string, value: number): void {
   }
 }
 
-/** The shape after schemastery applied the defaults (cwd has none). */
-type ResolvedConfig = Required<Omit<Config, 'cwd'>> & Pick<Config, 'cwd'>
+/** The shape after schemastery applied the defaults (cwd/stateDir/memberCwd have none). */
+type ResolvedConfig =
+  Required<Omit<Config, 'cwd' | 'stateDir' | 'memberCwd'>>
+  & Pick<Config, 'cwd' | 'stateDir' | 'memberCwd'>
 
 /**
  * Whether `path` names an existing directory the harness can ENTER. The
@@ -153,8 +191,33 @@ class AcpProvider implements SubagentProvider {
   }
   // Context contract: an out-of-process ACP child starts fresh — no parent conversation crosses the process boundary.
   readonly inheritsParentContext = false
+  readonly agentRouteDefaults?: Readonly<{ provider: string; model: string }>
 
-  constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {}
+  constructor(
+    readonly name: string,
+    private readonly ctx: Context,
+    private readonly config: ResolvedConfig,
+    transport?: AcpMemberTransport,
+  ) {
+    if (transport !== undefined) {
+      this.agentRouteDefaults = {
+        provider: ACP_MEMBER_ROUTE,
+        model: ACP_MEMBER_MODEL,
+      }
+      this.prepareContinuable = async (
+        request: ContinuableCreateRequest,
+      ): Promise<ContinuableCreateSpec> => {
+        // Probe once at member creation: a one-shot-only ACP agent is rejected
+        // here, before the durable child exists.
+        await transport.probe(request.signal)
+        return {}
+      }
+    }
+  }
+
+  declare prepareContinuable?: (
+    request: ContinuableCreateRequest,
+  ) => Promise<ContinuableCreateSpec>
 
   start(request: ResolvedSubagentStartRequest) {
     if (request.signal.aborted) {
@@ -202,5 +265,49 @@ export function apply(ctx: Context, config: Config): void {
   const validated: ResolvedConfig = resolved.cwd === undefined
     ? resolved
     : { ...resolved, cwd: assertUsableCwd('config cwd', resolve(resolved.cwd)) }
-  ctx.subagents.registerProvider(new AcpProvider(validated.providerName, ctx, validated))
+
+  // Persistent members need the `llm` service for their model route AND the
+  // `resume` opt-in. Without either the provider stays one-shot only: no
+  // `prepareContinuable`, so continuable starts are rejected.
+  let transport: AcpMemberTransport | undefined
+  const llm = ctx.get('llm')
+  if (validated.resume) {
+    if (llm === undefined) {
+      throw new Error(
+        'subagent-acp: `resume` requires the `llm` service for the member model route',
+      )
+    }
+    const memberCwd = validated.memberCwd === undefined
+      ? validated.cwd ?? process.cwd()
+      : assertUsableCwd('memberCwd', resolve(validated.memberCwd))
+    const memberConfig: AcpMemberConfig = {
+      command: validated.command,
+      args: validated.args,
+      cwd: memberCwd,
+      permission: validated.permission,
+      env: validated.env,
+      disposeEofGraceMs: validated.disposeEofGraceMs,
+      disposeGraceMs: validated.disposeGraceMs,
+    }
+    transport = new AcpMemberTransport(
+      memberConfig,
+      spec => ctx.subprocess.spawn(spec),
+    )
+    const store = new ExternalBindingStore(
+      join(validated.stateDir ?? join(homedir(), '.dsh', 'external-members'), 'acp.jsonl'),
+    )
+    ctx.effect(() => {
+      const registration = llm.registerAdapter(
+        [ACP_MEMBER_ROUTE],
+        new AcpMemberAdapter(transport as AcpMemberTransport, store),
+      )
+      return () => { registration() }
+    })
+  }
+  ctx.subagents.registerProvider(new AcpProvider(
+    validated.providerName,
+    ctx,
+    validated,
+    transport,
+  ))
 }

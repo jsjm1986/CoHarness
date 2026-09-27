@@ -39,7 +39,7 @@ Each API controller package owns a paired Host and Client face. The Host side ow
 
 [`host/apiproxy`](../../packages/host/apiproxy/README.md) exposes Host commands for list, search, creation, prompt, queue, cancellation, pagination, and follow/control streams. Its Client side lives in [`client/runtime`](../../packages/client/runtime/README.md), organized as `SessionRuntimePool → SessionManager → Session`:
 
-- `SessionRuntimePool` provides `ctx.sessions`, owns references, source counts, Session scopes, and stable `SessionBinding` objects, and projects catalog state without selecting a global current Session.
+- `SessionRuntimePool` provides `ctx.sessions` and routes explicit references to their owning runtime. Each `SessionRuntime` owns source counts, scope generations, and stable bindings; the current-selection and Workbench adapters acquire ordinary view references.
 - `SessionManager` owns the list baseline, live list/control updates, lazy Session instances, queues, projection stores, subagent catalogs, and conflict ordering between pulls and later updates.
 - Each `Session` owns one contiguous logical-event window represented by `SessionEventLikeEntry` values, paging, follow, prompt/control state, and the observable snapshot consumed by adapters.
 

@@ -730,7 +730,7 @@ interface GenerateOptions {
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title'
+  purpose?: 'compaction' | 'session-title' | 'auto-review'
 }
 ```
 

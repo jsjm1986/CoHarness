@@ -12,7 +12,9 @@ Host 报告的 `ModelSelection` 是唯一的选择事实，其中包含提供方
 
 目录按会话惰性解析（`ctx.modelDirectories.directoryFor(sessionId)`），随会话作用域一并 dispose（资源释放）。已寻址 subagent 会话不公开任一入口，其目录会拒绝加载、选择与重新连接刷新，因为绑定到 agent（智能体）的普通模型 RPC 会在直接 parent 继续执行路径之外激活持久化 child 历史。
 
-每一份常驻目录都会直接在转发的 owner 事件 `llm/adapters-updated` 与 `settings/document-updated` 上重拉。因此提供方拓扑、提供方目录与默认选择都能收敛，Host 与 client runtime 无需再派生一个单独的模型变更别名。compact 视口会使用共享 `--dsw-mobile-sheet-*` 几何把同一个两级菜单呈现为手机 Sheet，并在进入子面板时提供明确的返回行；低于 360px 的极窄步骤会把 composer 的模型／发送组移到独立一行，使当前模型保留可读的省略标签。模型选择、推理强度选择、加载、重试和失败语义保持不变。
+每一份常驻目录都会直接在转发的 owner 事件 `llm/adapters-updated` 与 `settings/document-updated` 上重拉。因此提供方拓扑、提供方目录与默认选择都能收敛，Host 与 client runtime 无需再派生一个单独的模型变更别名。compact 视口下，composer 在共享 Session Settings Sheet 的模型区打开选择器，推理强度区使用同一目录。不提供该 Sheet 的组装保留独立手机菜单及其返回行。窄 composer 将仅图标的模型触发器与相邻控件保留在同一行，完整选择仍可通过可访问名称和 title 获取。模型选择、推理强度选择、加载、重试和失败语义保持不变。
+
+桌面弹窗渲染在 document body 下方，位于触发器上方；页面滚动、缩放或切换面板时，弹窗保持在视口内。方向键从首行或末行进入并循环导航。子面板聚焦当前选择，没有当前行时退到首个可用行或触发器。Tab 激活当前聚焦行；Shift+Tab 与 Escape 先返回上级面板，再关闭菜单并将焦点交回触发器。Retry 控件和已关闭菜单保留原生 Tab 遍历。能力失效或控件锁定会关闭弹窗，恢复后不会重新打开旧状态。
 
 `/client` 导出面为插件本体（`apply`/`inject`）、`ModelDirectoryResolver`、`ModelDirectory` 及其状态形状、slot 注入面类型。
 

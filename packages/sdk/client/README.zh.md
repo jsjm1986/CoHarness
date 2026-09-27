@@ -4,7 +4,7 @@
 
 以子进程方式驱动 DeepSeek Harness 运行时、走 stdio JSON-RPC 的 TypeScript 客户端 SDK——[Python SDK](../../../python/README.zh.md)（`deepseek-harness`）的设计孪生，共享同一个运行时对端、协议与分层：`DeepSeekHarness` 是高层自有运行 API，`HarnessClient` 是低层协议客户端。包（package）根枚举消费方接口：两层客户端、面向调用方的类型和 `JsonRpcResponseError`；源模块、规范化辅助函数与订阅投递机制不供消费方导入。纯库：不在任何 Cordis 上下文注册；它所 spawn 的运行时进程是一个完整 harness，其组成由自己的 `cordis.yml` 决定。
 
-与 Python SDK 不同，启动规格完全显式（`command`/`args`）：本包面向仓库近旁的 TypeScript 消费方，包括 [`dsh-subagent-dsh-sdk`](../../subagent/subagent-dsh-sdk/README.zh.md) 后端和自动化；它们知道自己要启动哪个运行时。捆绑运行时解析（寻找打包可执行文件）仍归 Python 发行版负责。
+公开启动选项包括 `dshBin`、运行 profile（默认 `sdk`）、有序 `patches` 和 `dshHome`。省略 `dshBin` 时，客户端解析同版本的 `@deepseek-ai/dsh` 包；未构建的工作区使用其声明的源码启动器。[`dsh-subagent-dsh-sdk`](../../subagent/subagent-dsh-sdk/README.zh.md) 后端使用相同选项。Python 另外负责解析其平台可执行发行产物。
 
 ## 概述
 
@@ -16,7 +16,8 @@
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
 
 await using harness = new DeepSeekHarness({
-  launch: { command: 'node', args: ['lib/bin.js', 'cordis.yml'] },
+  profile: 'sdk',
+  dshHome: './.harness',
   provider: 'deepseek-official',
   model: 'deepseek-v4-flash',
   maxTokens: 49_152,
@@ -53,7 +54,7 @@ console.log(result.finalResponse)
 
 ## 已知限制与暂缓事项
 
-- **无捆绑运行时解析**——调用方显式指定运行时可执行文件；打包可执行文件的发现留在 Python 侧，直到出现 TypeScript 发行版消费方。
+- **显式模块版本**——默认解析会检查已安装的 `dsh` 与 SDK 包版本；显式指定 `dshBin` 时，调用方须提供兼容运行时。
 - **无轮次中取消**——协议层没有提示词取消方法；放弃轮次意味着关闭运行时（见协议的 [已知限制](../protocol/README.zh.md)）。
 - **没有逐提示词结果或取消**——低层 `prompt()` 只返回入队回执；高层 `run()` 负责从回执收集到 idle，放弃该过程意味着关闭运行时。
 - **客户端→服务端通知与服务端→客户端请求**在协议两端都未实现；传输层为未来审批流保留了承载能力。

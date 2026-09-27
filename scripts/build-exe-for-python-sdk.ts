@@ -1,5 +1,5 @@
 /**
- * Build the SDK runtime executables and Python node carrier. The fixed
+ * Build the dsh executables and development Node carrier for the Python runtime wheel. The fixed
  * `@yao-pkg/pkg --sea` route, deploy flags, and artifact layout are owned by
  * .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md.
  * The staged closure is symlink-free, and whole-tree assets cover Cordis's
@@ -9,21 +9,21 @@
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
 import { resolveLinuxNodePtyAddon, resolveWindowsNodePtyAddons } from './build-exe-for-python-sdk-native-pty.ts'
+import { copyOfficeSidecar, OFFICE_ASSET_IGNORES } from './build-exe-for-python-sdk-office.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
 /** The closure manifest whose dependencies define the executable. */
 const DEPLOY_ROOT_PACKAGE = 'dsh-python-runtime-closure'
-/** The closed-runtime app entry inside the deployed closure. */
-const ENTRY_BIN = 'node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/packaged-bin.js'
+/** The sole executable entry inside the deployed closure. */
+const ENTRY_BIN = 'runtime-bootstrap.mjs'
+/** Python-visible executable basename. */
 const OUTPUT_BASENAME = 'deepseek-harness-sdk-runtime'
 /** Default Node major; SEA mode requires at least Node 22. */
 const DEFAULT_NODE_RANGE = 'node24'
-/** Pinned for reproducible builds. */
-const PKG_SPEC = '@yao-pkg/pkg@6.21.0'
 const OUT_DIR = 'dist-exe'
 /** Python package destination; created when absent. */
 const PYTHON_RUNTIME_DIR = 'python/sdk-runtime/src/deepseek_harness_runtime/runtime'
@@ -46,8 +46,20 @@ const ASSET_GLOBS = [
   'node_modules/**/*.mjs',
   'node_modules/**/package.json',
   'node_modules/**/*.json',
+  // Package-owned Markdown includes runtime skill instructions and badge content.
+  'node_modules/**/*.md',
+  'node_modules/**/*.dylib',
+  'node_modules/**/*.dll',
   'node_modules/**/*.node',
+  'node_modules/**/*.so',
+  'node_modules/**/*.so.*',
   'node_modules/**/*.wasm',
+  'node_modules/**/*.yaml',
+  'node_modules/**/*.yml',
+  // web-app builds this path dynamically, so pkg cannot discover the static frontend.
+  'node_modules/@deepseek-ai/dsh-web-frontend/dist/**/*',
+  // skill-badge resolves both Markdown and image resources through import.meta.url.
+  'node_modules/@deepseek-ai/dsh-skill-badge/assets/**/*',
 ]
 
 const PLATFORMS = ['linux', 'macos', 'win'] as const
@@ -70,10 +82,7 @@ class Target {
   private constructor(
     /** pkg Node range (`node<major>`). */
     readonly nodeRange: string,
-    /**
-     * pkg platform tag. Windows is a documented non-goal
-     * (.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md).
-     */
+    /** pkg platform tag. */
     readonly platform: Platform,
     /** pkg CPU tag. */
     readonly arch: Arch,
@@ -199,20 +208,39 @@ class BuildCli {
     return [
       'Usage: pnpm exec tsx scripts/build-exe-for-python-sdk.ts [flags]',
       '',
-      '  --targets=<t1,t2,...>  pkg targets, e.g. node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-win-x64.',
+      '  --targets=<t1,t2,...>  pkg targets, e.g. node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64,node24-win-x64.',
       '                         Default: the host platform only (on node24).',
       '  --skip-build           skip `pnpm run build` (lib/ artifacts must already exist).',
       '  --dry-run              print every command and config patch without executing.',
       '  --help                 print this help.',
       '',
-      `Build route: ${PKG_SPEC} --sea; see .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md.`,
+      'Build route: @yao-pkg/pkg --sea (root devDependency, pnpm-patched); see .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md.',
       `Stages the node carrier in ${PYTHON_RUNTIME_DIR}/${PYTHON_NODE_SUBDIR} and writes executables to ${OUT_DIR}/.`,
     ].join('\n')
   }
 }
 
-function pnpmBin(): string {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+function pnpmInvocation(args: string[]): [command: string, args: string[]] {
+  const entrypoint = process.env.npm_execpath?.trim()
+  if (entrypoint !== undefined && entrypoint !== '') {
+    const extension = extname(entrypoint).toLowerCase()
+    if (extension === '.js' || extension === '.cjs' || extension === '.mjs') {
+      return [process.execPath, [entrypoint, ...args]]
+    }
+    if (extension !== '.cmd') return [entrypoint, args]
+  }
+  const home = process.env.PNPM_HOME?.trim()
+  if (home !== undefined && home !== '') {
+    const packageBin = resolve(home, '..', 'pnpm', 'bin')
+    for (const filename of ['pnpm.mjs', 'pnpm.cjs']) {
+      const candidate = resolve(packageBin, filename)
+      if (existsSync(candidate)) return [process.execPath, [candidate, ...args]]
+    }
+  }
+  if (process.platform === 'win32') {
+    throw new Error('build-exe-for-python-sdk: pnpm must expose a JavaScript entrypoint through npm_execpath or PNPM_HOME on Windows.')
+  }
+  return ['pnpm', args]
 }
 
 /**
@@ -231,8 +259,7 @@ function formatCommand(command: string, args: string[]): string {
  */
 class SingleExeBuild {
   /**
-   * The cleared deploy target, pkg input, and Python node-mode carrier. The
-   * checked-in default `cordis.yml` remains in its parent directory.
+   * The cleared deploy target, pkg input, and Python node-mode carrier.
    */
   readonly staging = resolve(root, PYTHON_RUNTIME_DIR, PYTHON_NODE_SUBDIR)
   private readonly outDir = resolve(root, OUT_DIR)
@@ -241,7 +268,7 @@ class SingleExeBuild {
 
   /** Verify the closure before compiling or packaging. */
   async verifyClosure(): Promise<void> {
-    await this.run('runtime dependency closure', pnpmBin(), ['run', 'verify-runtime-closure'])
+    await this.runPnpm('runtime dependency closure', ['run', 'verify-runtime-closure'])
   }
 
   /** Build all package artifacts unless `--skip-build` was passed. */
@@ -250,7 +277,7 @@ class SingleExeBuild {
       console.log('build-exe-for-python-sdk: skipping pnpm run build (--skip-build)')
       return
     }
-    await this.run('build', pnpmBin(), ['run', 'build'])
+    await this.runPnpm('build', ['run', 'build'])
   }
 
   /** Clear and deploy the runtime closure into the node carrier. */
@@ -260,12 +287,14 @@ class SingleExeBuild {
     }
     if (this.cli.dryRun) console.log(`build-exe-for-python-sdk: [dry-run] rm -rf ${this.staging}`)
     else await rm(this.staging, { recursive: true, force: true })
-    await this.run('deploy', pnpmBin(), [
+    await this.runPnpm('deploy', [
       '--filter',
       DEPLOY_ROOT_PACKAGE,
       'deploy',
       '--legacy',
       '--prod',
+      // Production deployment omits workspace tooling such as Electron's patched signer.
+      '--config.allow-unused-patches=true',
       '--config.node-linker=hoisted',
       '--config.auto-install-peers=false',
       '--config.link-workspace-packages=true',
@@ -370,7 +399,7 @@ class SingleExeBuild {
 
   /** Add the executable entry and pkg assets to the staged manifest. */
   async injectPkgConfig(): Promise<void> {
-    const patch = { bin: ENTRY_BIN, pkg: { assets: ASSET_GLOBS } }
+    const patch = { bin: ENTRY_BIN, pkg: { assets: ASSET_GLOBS, ignore: OFFICE_ASSET_IGNORES } }
     const manifestPath = join(this.staging, 'package.json')
     if (this.cli.dryRun) {
       console.log(`build-exe-for-python-sdk: [dry-run] patch ${manifestPath} with ${JSON.stringify(patch)}`)
@@ -380,7 +409,7 @@ class SingleExeBuild {
       throw new Error(`build-exe-for-python-sdk: ${manifestPath} missing — pnpm deploy did not produce a staged package.`)
     }
     if (!existsSync(join(this.staging, ENTRY_BIN))) {
-      throw new Error(`build-exe-for-python-sdk: ${join(this.staging, ENTRY_BIN)} missing — run without --skip-build so lib/ artifacts exist.`)
+      throw new Error(`build-exe-for-python-sdk: staged bootstrap ${join(this.staging, ENTRY_BIN)} is missing.`)
     }
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>
     await writeFile(manifestPath, `${JSON.stringify({ ...manifest, ...patch }, null, 2)}\n`)
@@ -390,16 +419,16 @@ class SingleExeBuild {
   /**
    * Package one target; SEA mode accepts one target per invocation.
    * @param target - the pkg target triple to build.
-   * @returns the executable and ripgrep sidecar paths, plus the macOS spawn helper path when required.
+   * @returns the executable, Office directory, ripgrep, and required macOS spawn helper paths.
    */
   async pack(target: Target): Promise<string[]> {
     const productBase = join(this.outDir, `${OUTPUT_BASENAME}-${target.platform}-${target.arch}`)
     const product = target.platform === 'win' ? `${productBase}.exe` : productBase
     await this.prepareNativePty(target)
     if (!this.cli.dryRun) await mkdir(this.outDir, { recursive: true })
-    await this.run(`pkg ${target.spec}`, pnpmBin(), [
-      'dlx',
-      PKG_SPEC,
+    await this.runPnpm(`pkg ${target.spec}`, [
+      'exec',
+      'pkg',
       this.staging,
       '--sea',
       '--targets',
@@ -410,8 +439,16 @@ class SingleExeBuild {
     if (!this.cli.dryRun && !existsSync(product)) {
       throw new Error(`build-exe-for-python-sdk: product ${product} is missing after the pkg run; inspect ${this.outDir}.`)
     }
+    const office = `${productBase}-office`
+    if (this.cli.dryRun) {
+      console.log(`build-exe-for-python-sdk: [dry-run] copy Office dependency closure from ${this.staging} to ${office}`)
+    } else {
+      const platform = target.platform === 'macos' ? 'darwin' : target.platform === 'win' ? 'win32' : target.platform
+      const packages = await copyOfficeSidecar(this.staging, office, { platform, arch: target.arch })
+      console.log(`build-exe-for-python-sdk: copied ${packages.length} Office packages to ${office}`)
+    }
     const ripgrep = await this.copyRipgrepSidecar(target, product)
-    if (target.platform !== 'macos') return [product, ripgrep]
+    if (target.platform !== 'macos') return [product, ripgrep, office]
     const spawnHelper = `${product}-spawn-helper`
     const source = join(this.staging, 'node_modules', 'node-pty', 'prebuilds', `darwin-${target.arch}`, 'spawn-helper')
     if (this.cli.dryRun) {
@@ -420,7 +457,7 @@ class SingleExeBuild {
       await copyFile(source, spawnHelper)
       await chmod(spawnHelper, 0o755)
     }
-    return [product, ripgrep, spawnHelper]
+    return [product, ripgrep, spawnHelper, office]
   }
 
   /** Copy the target ripgrep binary beside the executable so Node can spawn it outside pkg's virtual filesystem. */
@@ -468,7 +505,9 @@ class SingleExeBuild {
       'node-pty',
     )
     if (target.platform === 'win') {
-      if (target.arch !== 'x64') throw new Error('build-exe-for-python-sdk: Windows supports x64 only.')
+      if (target.arch !== 'x64') {
+        throw new Error('build-exe-for-python-sdk: Windows supports x64 only.')
+      }
       const host = Target.host()
       if (target.platform !== host.platform || target.arch !== host.arch) {
         throw new Error(
@@ -508,6 +547,10 @@ class SingleExeBuild {
         console.log(`  ${path}`)
         continue
       }
+      if (statSync(path).isDirectory()) {
+        console.log(`  ${path}  (Office dependency directory)`)
+        continue
+      }
       const megabytes = statSync(path).size / (1024 * 1024)
       console.log(`  ${path}  (${megabytes.toFixed(1)} MB)`)
     }
@@ -529,7 +572,10 @@ class SingleExeBuild {
     await mkdir(destDir, { recursive: true })
     for (const path of products) {
       const destination = join(destDir, basename(path))
-      await copyFile(path, destination)
+      if (statSync(path).isDirectory()) {
+        await rm(destination, { recursive: true, force: true })
+        await cp(path, destination, { recursive: true })
+      } else await copyFile(path, destination)
       await chmod(destination, statSync(path).mode & 0o777)
       console.log(`build-exe-for-python-sdk: synced ${destination}`)
     }
@@ -568,6 +614,12 @@ class SingleExeBuild {
         reject(new Error(`build-exe-for-python-sdk: ${label} failed (${cause}): ${printable}`))
       })
     })
+  }
+
+  /** Run pnpm through its JavaScript entrypoint when the caller supplies one. */
+  private async runPnpm(label: string, args: string[]): Promise<void> {
+    const [command, invocationArgs] = pnpmInvocation(args)
+    await this.run(label, command, invocationArgs)
   }
 }
 
