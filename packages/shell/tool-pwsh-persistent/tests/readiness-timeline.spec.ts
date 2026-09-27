@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { SubprocessOutcome, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessOutcome, SubprocessTerminalForeground, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
 import type { TerminalSendOperation, TerminalSendResult } from '@deepseek-ai/dsh-terminal'
 import { CONTROLLED_PROMPT, TerminalSanitizer } from '@deepseek-ai/dsh-terminal-bash/src/sanitize.ts'
 import { ReadinessTimeline, TIMELINE_HEADER, replayPromptEvidence } from './readiness-timeline.ts'
@@ -11,36 +11,29 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-interface FakeTerminal {
-  handle: SubprocessTerminalHandle
-  foreground: { processGroupId: number; inputWaiting: boolean } | undefined
+interface FakeTerminalState {
+  foreground: SubprocessTerminalForeground | undefined
   inspectError: Error | undefined
-  writes: string[]
 }
 
-function fakeTerminal(pid: number): FakeTerminal {
-  const fake: FakeTerminal = {
-    foreground: { processGroupId: pid, inputWaiting: false },
-    inspectError: undefined,
-    writes: [],
-    handle: undefined as unknown as SubprocessTerminalHandle,
-  }
-  const output = new Readable({ read() {} })
-  fake.handle = {
+function fakeTerminal(pid: number): { handle: SubprocessTerminalHandle; state: FakeTerminalState; writes: string[] } {
+  const state: FakeTerminalState = { foreground: { processGroupId: pid, inputWaiting: false }, inspectError: undefined }
+  const writes: string[] = []
+  const handle: SubprocessTerminalHandle = {
     pid,
-    output,
+    output: new Readable({ read() {} }),
     done: new Promise<SubprocessOutcome>(() => {}),
-    async write(data: string) { fake.writes.push(data) },
+    async write(data: string) { writes.push(data) },
     async resize() {},
     async inspectForeground() {
-      if (fake.inspectError !== undefined) throw fake.inspectError
-      return fake.foreground
+      if (state.inspectError !== undefined) throw state.inspectError
+      return state.foreground
     },
     async inspectActivity() { return { state: 'unknown' as const, revision: 0 } },
     async signalForeground() { return pid },
     async terminate() {},
   }
-  return fake
+  return { handle, state, writes }
 }
 
 function fakeSend(): { operation: TerminalSendOperation; settle: (waitReason: TerminalSendResult['waitReason']) => void; reject: () => void } {
@@ -107,7 +100,7 @@ describe('ReadinessTimeline', () => {
     timeline.track(b.operation, { text: 'echo b', submit: true })
     await terminal.handle.write('echo b\r')
     sanitizer.push('b-output\r\n')
-    terminal.inspectError = new Error('snapshot unreadable')
+    terminal.state.inspectError = new Error('snapshot unreadable')
     await expect(terminal.handle.inspectForeground()).rejects.toThrow('snapshot unreadable')
     b.reject()
     await settled()
